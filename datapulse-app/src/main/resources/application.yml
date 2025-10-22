@@ -1,0 +1,56 @@
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: datapulse
+
+spring:
+  application:
+    name: datapulse
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/datapulse
+    username: datapulse
+    password: datapulse
+  liquibase:
+    change-log: classpath:/db/changelog/changelog-master.xml
+
+datapulse:
+  files:
+    base-dir: /var/lib/datapulse/raw
+    keep-days: 90
+
+  marketplaces:
+    wb:
+      base-url: https://suppliers-api.wildberries.ru
+      endpoints:
+        sales: /public/api/v1/sales
+        stocks: /public/api/v1/stocks
+        finance: /public/api/v1/finance
+        reviews: /public/api/v1/reviews
+        ads: /adv/v1/reports # пример
+      headers:
+        auth-name: Authorization
+    ozon:
+      base-url: https://api-seller.ozon.ru
+      headers:
+        client-id: Client-Id
+        api-key: Api-Key
+
+resilience4j:
+  retry:
+    instances:
+      wbClient:
+        max-attempts: 3
+        wait-duration: 300ms
+  circuitbreaker:
+    instances:
+      wbClient:
+        sliding-window-size: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
