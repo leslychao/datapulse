@@ -1,0 +1,16 @@
+app:
+  name: datapulse-etl
+  description: "Spring Integration флоу для ETL продаж"
+
+etl:
+  sales:
+    cron: "0 0/30 * * * *"
+    batch:
+      size: 500
+      group-timeout-ms: 2000
+
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 2

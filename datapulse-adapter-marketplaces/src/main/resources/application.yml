@@ -1,0 +1,19 @@
+app:
+  name: datapulse-adapter-marketplaces
+  description: "Адаптеры маркетплейсов (WB/Ozon)"
+marketplace:
+  wb:
+    base-url: "https://seller.wb.ru"
+    token-source: "vault"  # значения: vault|db|env
+    endpoints:
+      sales: "/api/v1/sales"
+  ozon:
+    base-url: "https://api-seller.ozon.ru"
+    token-source: "vault"
+
+adapters:
+  http:
+    retry:
+      attempts: 3
+      backoff-ms: 300
+      jitter: 0.3

@@ -1,0 +1,27 @@
+app:
+  name: datapulse-core
+  description: "Инфраструктурные бины: WebClient, обработчики ошибок, метрики"
+
+# Настройки HTTP-клиента, используются в WebClientConfig
+http:
+  client:
+    connect-timeout-ms: 3000
+    read-timeout-ms: 5000
+
+logging:
+  level:
+    root: INFO
+    io.datapulse: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: datapulse

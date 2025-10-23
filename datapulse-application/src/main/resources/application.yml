@@ -1,0 +1,12 @@
+app:
+  name: datapulse-application
+  description: "REST API и запуск приложения"
+
+server:
+  port: 8080
+
+spring:
+  main:
+    banner-mode: console
+  application:
+    name: datapulse

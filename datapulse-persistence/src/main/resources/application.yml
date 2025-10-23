@@ -1,0 +1,32 @@
+app:
+  name: datapulse-persistence
+  description: "JPA/JDBC, Liquibase, репозитории и адаптеры хранения"
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/datapulse"
+    username: "datapulse"
+    password: "datapulse"
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate.format_sql: true
+      hibernate.jdbc.batch_size: 500
+      hibernate.jdbc.fetch_size: 200
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+      hibernate.generate_statistics: false
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/0001-init.yaml
+
+logging:
+  level:
+    org.hibernate.SQL: INFO
+    org.hibernate.orm.jdbc.bind: WARN

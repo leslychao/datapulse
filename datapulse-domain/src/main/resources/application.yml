@@ -1,0 +1,4 @@
+# Модуль domain не зависит от Spring, но кладём заглушку для единообразия
+app:
+  name: datapulse-domain
+  description: "Чистые доменные модели и порты"
