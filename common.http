@@ -1,0 +1,39 @@
+### @name CreateAccount
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{
+  "id": null,
+  "marketplace": "WILDBERRIES",
+  "name": "Мой WB-аккаунт",
+  "tokenMasked": "***",
+  "active": true
+}
+
+> {%
+  // Мини-проверки ответа
+  client.test("CreateAccount: статус 201 или 200", function() {
+    client.assert(response.status === 201 || response.status === 200, "Ожидался 201/200");
+  });
+  client.test("CreateAccount: тело содержит id", function() {
+    const json = response.body ? JSON.parse(response.body) : {};
+    client.assert(!!json.id, "В ответе нет id");
+  });
+  // Сохраняем id для следующих запросов (если понадобится)
+  if (response.body) {
+    const json = JSON.parse(response.body);
+    client.global.set("accountId", json.id);
+  }
+%}
+
+###
+
+# Запуск ETL продаж
+# Можно дергать сколько угодно раз — он просто триггерит интеграционный флоу.
+POST {{host}}/api/etl/run/sales
+
+> {%
+  client.test("RunSales: статус 200", function() {
+    client.assert(response.status === 200, "Ожидался 200");
+  });
+%}
