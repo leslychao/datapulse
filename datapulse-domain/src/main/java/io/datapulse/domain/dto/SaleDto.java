@@ -10,6 +10,7 @@ import lombok.Setter;
 @Setter
 @EqualsAndHashCode(callSuper = true)
 public class SaleDto extends LongBaseDto {
+
   private Long accountId;
   private Long productId;
   private LocalDate date;

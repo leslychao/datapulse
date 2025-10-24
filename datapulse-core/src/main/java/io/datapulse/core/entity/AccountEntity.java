@@ -20,5 +20,4 @@ public class AccountEntity extends LongBaseEntity {
   private String name;
   private String tokenEncrypted;
   private String login;
-  private Boolean active;
 }

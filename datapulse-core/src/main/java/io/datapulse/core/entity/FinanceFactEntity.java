@@ -1,15 +1,17 @@
-package io.datapulse.domain.dto;
+package io.datapulse.core.entity;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+@Entity
+@Table(name = "finance_fact")
 @Getter
 @Setter
-@EqualsAndHashCode(callSuper = true)
-public class FinanceDto extends LongBaseDto {
+public class FinanceFactEntity extends LongBaseEntity {
 
   private Long accountId;
   private LocalDate date;

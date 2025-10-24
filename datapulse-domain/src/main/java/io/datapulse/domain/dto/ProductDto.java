@@ -8,6 +8,7 @@ import lombok.Setter;
 @Setter
 @EqualsAndHashCode(callSuper = true)
 public class ProductDto extends LongBaseDto {
+
   private Long accountId;
   private String sku;
   private String name;
