@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+    http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0001-init-accounts-sales" author="datapulse" dbms="postgresql">
+    <comment>Создание базовых таблиц: account, account_connection, sales_fact и типов ENUM</comment>
+
+    <sql>
+      -- ===== Типы ENUM =====
+      CREATE TYPE marketplace_type AS ENUM ('WB', 'OZON');
+      CREATE TYPE sync_status_enum AS ENUM ('SUCCESS', 'FAILED', 'PARTIAL');
+
+      -- ===== Таблица account =====
+      CREATE TABLE account
+      (
+        id         BIGSERIAL PRIMARY KEY,
+        name       TEXT        NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ
+      );
+
+      -- ===== Таблица account_connection =====
+      CREATE TABLE account_connection
+      (
+        id               BIGSERIAL PRIMARY KEY,
+        account_id       BIGINT           NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        marketplace      marketplace_type NOT NULL,
+        token_encrypted  TEXT             NOT NULL,
+        active           BOOLEAN          NOT NULL DEFAULT TRUE,
+        last_sync_at     TIMESTAMPTZ,
+        last_sync_status sync_status_enum,
+        created_at       TIMESTAMPTZ      NOT NULL DEFAULT now(),
+        updated_at       TIMESTAMPTZ,
+        CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
+      );
+
+      CREATE INDEX idx_acc_conn_account ON account_connection (account_id);
+      CREATE INDEX idx_acc_conn_marketplace ON account_connection (marketplace);
+
+      -- ===== Таблица sales_fact =====
+      CREATE TABLE sales_fact
+      (
+        id                    BIGSERIAL PRIMARY KEY,
+        account_connection_id BIGINT         NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
+        sku                   VARCHAR(255)   NOT NULL,
+        dt                    DATE           NOT NULL,
+        quantity              INT            NOT NULL,
+        revenue               NUMERIC(18, 2) NOT NULL,
+        cost                  NUMERIC(18, 2) NOT NULL,
+        margin                NUMERIC(18, 2) NOT NULL,
+        CONSTRAINT uq_sales_fact_accconn_sku_dt UNIQUE (account_connection_id, sku, dt)
+      );
+
+      CREATE INDEX idx_sales_fact_dt ON sales_fact (dt);
+      CREATE INDEX idx_sales_fact_sku ON sales_fact (sku);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS sales_fact CASCADE;
+      DROP TABLE IF EXISTS account_connection CASCADE;
+      DROP TABLE IF EXISTS account CASCADE;
+      DROP TYPE IF EXISTS sync_status_enum;
+      DROP TYPE IF EXISTS marketplace_type;
+    </rollback>
+  </changeSet>
+</databaseChangeLog>

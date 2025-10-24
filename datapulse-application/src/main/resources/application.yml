@@ -30,11 +30,37 @@ spring:
 
   liquibase:
     enabled: true
-    change-log: classpath:db/changelog/0001-init.yaml
+    change-log: classpath:db/master.xml
     default-schema: datapulse
     liquibase-schema: datapulse
 
-logging:
-  level:
-    org.hibernate.SQL: INFO
-    org.hibernate.orm.jdbc.bind: WARN
+marketplace:
+  providers:
+    wb:
+      baseUrl: https://suppliers-api.wildberries.ru
+      endpoints:
+        sales: /public/api/sales
+        stock: /public/api/stock
+        finance: /public/api/finance
+        reviews: /public/api/reviews
+      resilience:
+        limitForPeriod: 5
+        maxConcurrentCalls: 4
+        maxAttempts: 6
+        baseBackoff: 500ms
+        maxJitter: 300ms
+        retryAfterFallback: 3s
+    ozon:
+      baseUrl: https://api-seller.ozon.ru
+      endpoints:
+        sales: /v1/analytics/sales
+        stock: /v1/analytics/stock
+        finance: /v1/finance/transactions
+        reviews: /v1/reviews/list
+      resilience:
+        limitForPeriod: 3
+        maxConcurrentCalls: 3
+        maxAttempts: 5
+        baseBackoff: 400ms
+        maxJitter: 250ms
+        retryAfterFallback: 2s

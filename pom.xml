@@ -19,7 +19,6 @@
     <module>datapulse-domain</module>
     <module>datapulse-core</module>
     <module>datapulse-adapter-marketplaces</module>
-    <module>datapulse-persistence</module>
     <module>datapulse-etl</module>
     <module>datapulse-application</module>
   </modules>
