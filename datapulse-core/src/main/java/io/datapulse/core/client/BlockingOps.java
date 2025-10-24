@@ -1,5 +1,6 @@
 package io.datapulse.core.client;
 
+import java.util.concurrent.Callable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -7,7 +8,7 @@ public final class BlockingOps {
 
   private BlockingOps() { }
 
-  public static <T> Mono<T> supplyBlocking(java.util.concurrent.Callable<T> supplier) {
+  public static <T> Mono<T> supplyBlocking(Callable<T> supplier) {
     return Mono.create(sink ->
         Schedulers.boundedElastic().schedule(() -> {
           try {

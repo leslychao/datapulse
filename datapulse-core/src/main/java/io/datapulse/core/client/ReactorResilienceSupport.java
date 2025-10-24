@@ -3,7 +3,8 @@ package io.datapulse.core.client;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.ratelimiter.RateLimiter;
-import java.util.concurrent.atomic.AtomicBoolean;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import java.time.Duration;
 import lombok.experimental.UtilityClass;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -13,15 +14,23 @@ public class ReactorResilienceSupport {
 
   public <T> Flux<T> applyRateLimiter(Flux<T> source, RateLimiter limiter) {
     return Flux.defer(() -> {
-      limiter.acquirePermission();
-      return source;
+      long waitNanos = limiter.reservePermission();
+      if (waitNanos < 0) {
+        return Flux.error(RequestNotPermitted.createRequestNotPermitted(limiter));
+      }
+      Duration wait = Duration.ofNanos(waitNanos);
+      return wait.isZero() ? source : source.delaySubscription(wait);
     });
   }
 
   public <T> Mono<T> applyRateLimiter(Mono<T> source, RateLimiter limiter) {
     return Mono.defer(() -> {
-      limiter.acquirePermission();
-      return source;
+      long waitNanos = limiter.reservePermission();
+      if (waitNanos < 0) {
+        return Mono.error(RequestNotPermitted.createRequestNotPermitted(limiter));
+      }
+      Duration wait = Duration.ofNanos(waitNanos);
+      return wait.isZero() ? source : source.delaySubscription(wait);
     });
   }
 
@@ -30,12 +39,7 @@ public class ReactorResilienceSupport {
       if (!bulkhead.tryAcquirePermission()) {
         return Flux.error(BulkheadFullException.createBulkheadFullException(bulkhead));
       }
-      AtomicBoolean released = new AtomicBoolean(false);
-      return source.doFinally(signal -> {
-        if (released.compareAndSet(false, true)) {
-          bulkhead.onComplete();
-        }
-      });
+      return source.doFinally(sig -> bulkhead.onComplete());
     });
   }
 
@@ -44,12 +48,7 @@ public class ReactorResilienceSupport {
       if (!bulkhead.tryAcquirePermission()) {
         return Mono.error(BulkheadFullException.createBulkheadFullException(bulkhead));
       }
-      AtomicBoolean released = new AtomicBoolean(false);
-      return source.doFinally(signal -> {
-        if (released.compareAndSet(false, true)) {
-          bulkhead.onComplete();
-        }
-      });
+      return source.doFinally(sig -> bulkhead.onComplete());
     });
   }
 

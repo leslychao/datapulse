@@ -43,7 +43,9 @@ public class StreamingDownloadService {
     var errorCounter = meter.counter("datapulse.download.errors");
 
     return ReactorResilienceSupport
-        .applyResilience(httpStreamingClient.getAsDataBufferFlux(uri, headers), rateLimiter,
+        .applyResilience(
+            httpStreamingClient.getAsDataBufferFlux(uri, headers),
+            rateLimiter,
             bulkhead)
         .doOnSubscribe(s -> log.info("Start download {} → {}", uri, targetFile))
         .doOnNext((DataBuffer buf) -> bytesCounter.increment(buf.readableByteCount()))
