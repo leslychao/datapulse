@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 
 public class MarketplaceCredentialsValidator
     implements ConstraintValidator<ConsistentMarketplace, AccountConnectionCreateRequest> {
@@ -17,23 +18,38 @@ public class MarketplaceCredentialsValidator
 
   @Override
   public boolean isValid(AccountConnectionCreateRequest req, ConstraintValidatorContext ctx) {
-    if (req == null || req.getMarketplaceType() == null || req.getCredentials() == null) {
+    if (req == null || req.getMarketplace() == null || req.getCredentials() == null) {
       return true;
     }
 
-    var expected = EXPECTED_TYPES.get(req.getMarketplaceType());
-    var actualRaw = req.getCredentials().type();
-    var actual = actualRaw == null ? null : actualRaw.trim().toUpperCase();
+    var parsedOpt = MarketplaceParser.parse(req.getMarketplace());
+    if (parsedOpt.isEmpty()) {
+      return ValidationUtils.fail(
+          ctx,
+          "validation.marketplace.unknown",
+          "value", req.getMarketplace().trim(),
+          "allowed", MarketplaceParser.allowedList()
+      );
+    }
 
-    boolean ok = Objects.equals(expected, actual);
-    if (!ok) {
+    MarketplaceType marketplace = parsedOpt.get();
+    String expectedType = EXPECTED_TYPES.get(marketplace);
+    String actualType = normalize(req.getCredentials().type());
+
+    if (!Objects.equals(expectedType, actualType)) {
       return ValidationUtils.fail(
           ctx,
           "validation.marketplace.credentials.type.mismatch",
-          "expected", req.getMarketplaceType(),
-          "actual", actual
+          "marketplace", marketplace,
+          "expected", expectedType,
+          "actual", actualType
       );
     }
+
     return true;
+  }
+
+  private static String normalize(String str) {
+    return StringUtils.trimToEmpty(str).toUpperCase();
   }
 }

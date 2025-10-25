@@ -1,9 +1,9 @@
 package io.datapulse.request;
 
-import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.validation.ConsistentMarketplace;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -13,8 +13,8 @@ public class AccountConnectionCreateRequest {
 
   @NotNull
   private Long accountId;
-  @NotNull
-  private MarketplaceType marketplaceType;
+  @NotBlank
+  private String marketplace;
   @Valid
   @NotNull
   private MarketplaceCredentials credentials;
