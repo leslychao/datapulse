@@ -1,0 +1,82 @@
+
+
+### Создать подключение OZON
+# @name createOzon
+POST {{host}}{{base}}
+Accept-Language: {{lang}}
+Content-Type: application/json
+
+{
+  "accountId": 1001,
+  "credentials": {
+    "marketplaceType": "OZON",
+    "clientId": "123456",
+    "apiKey": "test-api-key-ozon"
+  },
+  "active": true
+}
+
+> {% client.global.set("connectionId", response.body.id); %}
+
+### Создать подключение WB
+# @name createWb
+POST {{host}}{{base}}
+Accept-Language: {{lang}}
+Content-Type: application/json
+
+{
+  "accountId": 1001,
+  "marketplaceType": "WILDBERRIES",
+  "credentials": {
+    "token": "wb-token-abc123"
+  },
+  "active": true
+}
+
+> {% client.global.set("wbConnectionId", response.body.id); %}
+
+### Получить по id
+# @name getById
+GET {{host}}{{base}}/{{connectionId}}
+Accept-Language: {{lang}}
+
+### Список (фильтрация по accountId и активности)
+# @name listByAccount
+GET {{host}}{{base}}?accountId=1001&active=true
+Accept-Language: {{lang}}
+
+### Список (фильтрация по marketplaceType)
+# @name listByMarketplace
+GET {{host}}{{base}}?marketplaceType=OZON
+Accept-Language: {{lang}}
+
+### Обновить (полная замена) — переключаем active и меняем креды
+# @name updateConnection
+PUT {{host}}{{base}}/{{connectionId}}
+Accept-Language: {{lang}}
+Content-Type: application/json
+
+{
+  "active": false,
+  "credentials": {
+    "clientId": "123456",
+    "apiKey": "new-api-key-ozon"
+  }
+}
+
+### Удалить (или деактивировать, в зависимости от реализации сервиса)
+# @name deleteConnection
+DELETE {{host}}{{base}}/{{connectionId}}
+Accept-Language: {{lang}}
+
+### ——— Дополнительно: быстрый smoke для WB-связи — получить и удалить ———
+
+### Get WB
+# @name getWb
+GET {{host}}{{base}}/{{wbConnectionId}}
+Accept-Language: {{lang}}
+
+### Delete WB
+# @name deleteWb
+DELETE {{host}}{{base}}/{{wbConnectionId}}
+Accept-Language: {{lang}}
