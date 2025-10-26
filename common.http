@@ -8,15 +8,17 @@ Content-Type: application/json
 
 {
   "accountId": 1001,
+  "marketplaceType": "OZON",
   "credentials": {
-    "marketplaceType": "OZON",
     "clientId": "123456",
     "apiKey": "test-api-key-ozon"
   },
   "active": true
 }
 
-> {% client.global.set("connectionId", response.body.id); %}
+> {%
+  client.global.set("connectionId", response.body.id);
+%}
 
 ### Создать подключение WB
 # @name createWb
@@ -33,7 +35,9 @@ Content-Type: application/json
   "active": true
 }
 
-> {% client.global.set("wbConnectionId", response.body.id); %}
+> {%
+  client.global.set("wbConnectionId", response.body.id);
+%}
 
 ### Получить по id
 # @name getById
