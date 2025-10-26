@@ -3,21 +3,13 @@
   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="
-      http://www.liquibase.org/xml/ns/dbchangelog
-      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <changeSet id="0001-init-datapulse-core" author="datapulse" dbms="postgresql">
-    <comment>Создание базовых таблиц Datapulse: аккаунты, подключения, справочники и фактовые
-      таблицы
-    </comment>
+    <comment>Создание базовых таблиц Datapulse без ENUM-типов (marketplace_type, sync_status_enum заменены на TEXT)</comment>
 
     <sql>
-      -- ===============================
-      -- ENUM-типы
-      -- ===============================
-      CREATE TYPE marketplace_type AS ENUM ('WB', 'OZON');
-      CREATE TYPE sync_status_enum AS ENUM ('SUCCESS', 'FAILED', 'PARTIAL');
-
       -- ===============================
       -- Таблица account
       -- ===============================
@@ -35,13 +27,13 @@
       CREATE TABLE account_connection
       (
         id                    BIGSERIAL PRIMARY KEY,
-        account_id            BIGINT           NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        marketplace           marketplace_type NOT NULL,
-        credentials_encrypted TEXT             NOT NULL,
-        active                BOOLEAN          NOT NULL DEFAULT TRUE,
+        account_id            BIGINT  NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        marketplace           TEXT    NOT NULL,              -- вместо marketplace_type ENUM
+        credentials_encrypted TEXT    NOT NULL,
+        active                BOOLEAN NOT NULL DEFAULT TRUE,
         last_sync_at          TIMESTAMPTZ,
-        last_sync_status      sync_status_enum,
-        created_at            TIMESTAMPTZ      NOT NULL DEFAULT now(),
+        last_sync_status      TEXT,                          -- вместо sync_status_enum ENUM
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at            TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
       );
@@ -220,10 +212,7 @@
       DROP TABLE IF EXISTS product CASCADE;
       DROP TABLE IF EXISTS account_connection CASCADE;
       DROP TABLE IF EXISTS account CASCADE;
-      DROP TYPE IF EXISTS sync_status_enum;
-      DROP TYPE IF EXISTS marketplace_type;
     </rollback>
-
   </changeSet>
 
 </databaseChangeLog>
