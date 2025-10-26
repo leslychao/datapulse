@@ -1,12 +1,24 @@
-# datapulse
+# Datapulse
 
-Модульная SaaS-платформа (каркас) для интеграций с маркетплейсами (WB/Ozon).
-Скелет: WebFlux, Spring Integration, R2DBC Postgres, Liquibase, MapStruct, Lombok, Resilience4j, Micrometer.
-Сырые JSON сохраняются на диск и индексируются в БД.
+Модульная SaaS-платформа для интеграций с маркетплейсами (Wildberries, Ozon).
+Технологии: Java 17, Spring Boot 3 (WebFlux), MapStruct, Liquibase (PostgreSQL), Resilience4j, Micrometer.
 
-## Быстрый старт
-1) Подними Postgres (локально или в Docker) и создай БД/пользователя `datapulse`.
-2) Проверь `spring.r2dbc.*` и блок `datapulse.marketplaces.*` в `datapulse-app/src/main/resources/application.yml`.
-3) Сборка: `mvn -q -DskipTests package`
-4) Запуск: `java -jar datapulse-app/target/datapulse-app-0.1.0-SNAPSHOT.jar`
-5) Метрики Prometheus: http://localhost:8080/actuator/prometheus
+## Модули
+- **datapulse-domain** — DTO, enum’ы, коды сообщений, i18n-конфиг.
+- **datapulse-core** — JPA, Liquibase (`db/master.xml`), WebClient/Resilience, криптография (AES-GCM), мапперы/сервисы.
+- **datapulse-adapter-marketplaces** — адаптеры провайдеров/маскировка кредов.
+- **datapulse-etl** — базис ETL/процессинга.
+- **datapulse-application** — REST API, импортирует YAML из модулей (Variant C).
+
+## Требования
+- JDK 17+
+- Maven 3.9+
+- PostgreSQL 14+ (по умолчанию `localhost:5434`, схема `datapulse`)
+- Переменная окружения `DATAPULSE_CRYPTO_MASTER_KEY_BASE64` (16/24/32 байта ключа AES в Base64)
+
+## Быстрый старт (локально)
+1. **Postgres**
+   ```sql
+   create database datapulse;
+   create user datapulse with password 'datapulse';
+   grant all privileges on database datapulse to datapulse;
