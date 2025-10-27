@@ -27,8 +27,12 @@ public interface AccountMapper extends BeanConverter<AccountDto, AccountEntity> 
   @Mapping(target = "updatedAt", ignore = true)
   AccountDto fromCreateRequest(AccountCreateRequest request);
 
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   void applyUpdateFromDto(AccountDto dto, @MappingTarget AccountEntity entity);
 
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   void applyUpdate(AccountUpdateRequest request, @MappingTarget AccountDto dto);
 
   @AfterMapping

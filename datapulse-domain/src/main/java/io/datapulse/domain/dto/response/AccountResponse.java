@@ -3,6 +3,6 @@ package io.datapulse.domain.dto.response;
 public record AccountResponse(
     Long id,
     String name,
-    String createdA) {
+    String createdAt) {
 
 }

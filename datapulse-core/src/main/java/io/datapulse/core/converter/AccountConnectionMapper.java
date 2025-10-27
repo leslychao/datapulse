@@ -21,6 +21,8 @@ public interface AccountConnectionMapper
   @Override
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "account.id", source = "accountId")
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   AccountConnectionEntity mapToEntity(AccountConnectionDto dto);
 
   @Override
@@ -45,6 +47,9 @@ public interface AccountConnectionMapper
     return dto;
   }
 
+  @Mapping(source = "accountId", target = "account.id")
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   void applyUpdateFromDto(AccountConnectionDto dto, @MappingTarget AccountConnectionEntity entity);
 
   default void applyUpdate(AccountConnectionUpdateRequest request,
