@@ -14,14 +14,13 @@ import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.request.AccountUpdateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
-import io.datapulse.domain.exception.AppException;
+import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,10 +33,6 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
 
   private final AccountRepository repository;
   private final AccountMapper mapper;
-
-  private static String normalizeName(String raw) {
-    return StringUtils.trim(raw);
-  }
 
   @Override
   protected AccountEntity entityPreSaveAction(AccountEntity entity) {
@@ -78,7 +73,7 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
       @Valid @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
     AccountDto dto = mapper.fromCreateRequest(request);
     if (repository.existsByNameIgnoreCase(dto.getName())) {
-      throw new AppException(MessageCodes.ACCOUNT_ALREADY_EXISTS, dto.getName());
+      throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, dto.getName());
     }
     return mapper.toResponse(save(dto));
   }
@@ -92,7 +87,7 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
 
     if (!StringUtils.equalsIgnoreCase(current.getName(), request.name())
         && repository.existsByNameIgnoreCaseAndIdNot(request.name(), id)) {
-      throw new AppException(MessageCodes.ACCOUNT_ALREADY_EXISTS, request.name());
+      throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, request.name());
     }
 
     mapper.applyUpdate(request, current);
@@ -102,11 +97,10 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
   @Override
   @Transactional
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
-    try {
-      repository.deleteById(id);
-    } catch (EmptyResultDataAccessException e) {
+    if (!repository.existsById(id)) {
       throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id);
     }
+    repository.deleteById(id);
   }
 
   @Transactional(readOnly = true)

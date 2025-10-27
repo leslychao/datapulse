@@ -31,7 +31,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,13 +131,13 @@ public class AccountConnectionService
     return mapper.toResponse(updated);
   }
 
+  @Override
   @Transactional
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
-    try {
-      connectionRepository.deleteById(id);
-    } catch (EmptyResultDataAccessException e) {
+    if (!connectionRepository.existsById(id)) {
       throw new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id);
     }
+    connectionRepository.deleteById(id);
   }
 
   @Override

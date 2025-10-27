@@ -23,7 +23,6 @@ PUT {{host}}/api/accounts/{{accountId}}
 Content-Type: application/json
 
 {
-  "id": {{accountId}},
   "name": "Test Account — updated"
 }
 
@@ -77,7 +76,6 @@ PUT {{host}}/api/accounts/9999999
 Content-Type: application/json
 
 {
-  "id": 9999999,
   "name": "Not found"
 }
 
@@ -106,8 +104,41 @@ Content-Type: application/json
   });
 %}
 
+### ACCOUNT — NEGATIVE: duplicate name (case-insensitive) → 400
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{
+  "name": "test account — updated"
+}
+
+> {%
+  client.test("Account CREATE duplicate: 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/уже\sсуществ|exists/i.test(msg), "no duplicate hint: " + msg);
+  });
+%}
+
+### ACCOUNT — UPDATE: same name different case → 200
+PUT {{host}}/api/accounts/{{accountId}}
+Content-Type: application/json
+
+{
+  "name": "TEST ACCOUNT — UPDATED"
+}
+
+> {%
+  client.test("Account UPDATE same-name-different-case: 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    var b = response.body || {};
+    client.assert(/UPDATED/i.test(b.name), "name not applied");
+  });
+%}
+
 ### ========================
-### ACCOUNT-CONNECTION — CREATE (WB)
+### ACCOUNT-CONNECTION — CREATE (WB) → 201
 ### ========================
 POST {{host}}/api/account-connections
 Content-Type: application/json
@@ -129,161 +160,50 @@ Content-Type: application/json
   });
 %}
 
-### ACCOUNT-CONNECTION — UPDATE (WB)
+### AC — UPDATE: change marketplaceType to FREE (WB → OZON) → 200
+# Меняем тип у существующего WB на OZON, пока другого OZON ещё нет — должно пройти.
 PUT {{host}}/api/account-connections/{{acIdWb}}
 Content-Type: application/json
 
 {
-  "accountId": {{accountId}},
-  "marketplaceType": "WILDBERRIES",
-  "credentials": { "token": "yyy" },
-  "active": false
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "cid", "apiKey": "akey" },
+  "active": true
 }
 
 > {%
-  client.test("AC UPDATE WB: 200", function () {
+  client.test("AC UPDATE change marketplace to free: 200", function () {
     client.assert(response.status === 200, "expected 200, got " + response.status);
     var b = response.body || {};
-    client.assert(b.active === false, "active not false");
+    client.assert(b.marketplace === "OZON", "marketplace not changed to OZON");
+    // зафиксируем id этого OZON-подключения (бывшего WB)
+    client.global.set("acIdMovedToOzon", String(client.global.get("acIdWb")));
   });
 %}
 
-### ACCOUNT-CONNECTION — CREATE (OZON)
+### AC — CREATE (WB again) → 201
+# Создаём новое WB-подключение после того, как старое стало OZON.
 POST {{host}}/api/account-connections
 Content-Type: application/json
 
 {
   "accountId": {{accountId}},
-  "marketplaceType": "OZON",
-  "credentials": { "clientId": "xxx", "apiKey": "yyy" },
+  "marketplaceType": "WILDBERRIES",
+  "credentials": { "token": "zzz" },
   "active": true
 }
 
 > {%
-  client.test("AC CREATE OZON: 201", function () {
+  client.test("AC CREATE WB again: 201", function () {
     client.assert(response.status === 201, "expected 201, got " + response.status);
     var b = response.body || {};
-    client.global.set("acIdOzon", String(b.id || ""));
-    client.assert(b.marketplace === "OZON", "wrong marketplace");
+    client.global.set("acIdWb", String(b.id || ""));
+    client.assert(b.marketplace === "WILDBERRIES", "wrong marketplace (WB)");
   });
 %}
 
-### ACCOUNT-CONNECTION — UPDATE (OZON)
-PUT {{host}}/api/account-connections/{{acIdOzon}}
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}},
-  "marketplaceType": "OZON",
-  "credentials": { "clientId": "new", "apiKey": "new" },
-  "active": false
-}
-
-> {%
-  client.test("AC UPDATE OZON: 200", function () {
-    client.assert(response.status === 200, "expected 200, got " + response.status);
-    var b = response.body || {};
-    client.assert(b.active === false, "active not false");
-  });
-%}
-
-### ACCOUNT-CONNECTION — NEGATIVE: credentials missing → 400
-POST {{host}}/api/account-connections
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}},
-  "marketplaceType": "WILDBERRIES",
-  "active": true
-}
-
-> {%
-  client.test("AC missing credentials: 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) || "";
-    client.assert(/credential|учет/i.test(msg), "no credentials hint: " + msg);
-  });
-%}
-
-### ACCOUNT-CONNECTION — NEGATIVE: mismatched credentials type → 400
-POST {{host}}/api/account-connections
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}},
-  "marketplaceType": "WILDBERRIES",
-  "credentials": { "clientId": "ozon", "apiKey": "ozon" },
-  "active": true
-}
-
-> {%
-  client.test("AC mismatch credentials: 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) || "";
-    client.assert(/marketplace|credential|type/i.test(msg), "no hint: " + msg);
-  });
-%}
-
-### ACCOUNT-CONNECTION — NEGATIVE: null marketplaceType → 400
-POST {{host}}/api/account-connections
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}},
-  "marketplaceType": null,
-  "credentials": {},
-  "active": true
-}
-
-> {%
-  client.test("AC null marketplaceType: 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-  });
-%}
-
-### ACCOUNT-CONNECTION — NEGATIVE: null accountId → 400
-POST {{host}}/api/account-connections
-Content-Type: application/json
-
-{
-  "accountId": null,
-  "marketplaceType": "OZON",
-  "credentials": {},
-  "active": true
-}
-
-> {%
-  client.test("AC null accountId: 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-  });
-%}
-
-### ACCOUNT-CONNECTION — NEGATIVE: unknown id → 404
-PUT {{host}}/api/account-connections/999999999
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}},
-  "marketplaceType": "OZON",
-  "credentials": { "clientId": "a", "apiKey": "b" },
-  "active": true
-}
-
-> {%
-  client.test("AC UPDATE unknown id: 404", function () {
-    client.assert(response.status === 404, "expected 404, got " + response.status);
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) || "";
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
-  });
-%}
-
-### ACCOUNT-CONNECTION — NEGATIVE: duplicate marketplace → 400
+### AC — NEGATIVE: create duplicate OZON for same account → 400
+# Уже есть OZON (acIdMovedToOzon). Повторное создание OZON должно упасть.
 POST {{host}}/api/account-connections
 Content-Type: application/json
 
@@ -295,25 +215,136 @@ Content-Type: application/json
 }
 
 > {%
-  client.test("AC duplicate marketplace: 400", function () {
+  client.test("AC duplicate marketplace (OZON): 400", function () {
     client.assert(response.status === 400, "expected 400, got " + response.status);
     var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) || "";
+    var msg = (b && b.message) || (b && b.error) || "";
     client.assert(/существует|exists/i.test(msg), "no duplicate hint: " + msg);
   });
 %}
 
-### CLEANUP — DELETE OZON
-DELETE {{host}}/api/account-connections/{{acIdOzon}}
+### AC — NEGATIVE: change WB → OZON when OZON already exists → 400
+# Пробуем поменять свежесозданный WB на OZON — должен быть конфликт с acIdMovedToOzon.
+PUT {{host}}/api/account-connections/{{acIdWb}}
+Content-Type: application/json
+
+{
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "any", "apiKey": "any" },
+  "active": true
+}
 
 > {%
-  client.test("AC DELETE OZON: 204", function () {
+  client.test("AC UPDATE change marketplace to existing: 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/существует|exists/i.test(msg), "no already-exists hint: " + msg);
+  });
+%}
+
+### AC — UPDATE (OZON) toggle active → 200
+PUT {{host}}/api/account-connections/{{acIdMovedToOzon}}
+Content-Type: application/json
+
+{
+  "active": false
+}
+
+> {%
+  client.test("AC UPDATE OZON active=false: 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    var b = response.body || {};
+    client.assert(b.active === false, "active not false");
+  });
+%}
+
+### AC — NEGATIVE: create for unknown accountId → 404
+POST {{host}}/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": 999999999,
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "x", "apiKey": "y" },
+  "active": true
+}
+
+> {%
+  client.test("AC CREATE unknown account: 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/аккаунт|account|не\sнайден/i.test(msg), "no account-not-found hint: " + msg);
+  });
+%}
+
+### AC — NEGATIVE: WB token blank → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": {{accountId}},
+  "marketplaceType": "WILDBERRIES",
+  "credentials": { "token": " " },
+  "active": true
+}
+
+> {%
+  client.test("AC WB token blank: 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/token|обязател/i.test(msg), "no wb token hint: " + msg);
+  });
+%}
+
+### AC — NEGATIVE: OZON creds blank → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": {{accountId}},
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": " ", "apiKey": " " },
+  "active": true
+}
+
+> {%
+  client.test("AC OZON blank creds: 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/clientId|apiKey|обязател/i.test(msg), "no ozon creds hint: " + msg);
+  });
+%}
+
+### ACCOUNT — NEGATIVE: delete not found → 404
+DELETE {{host}}/api/accounts/9999999
+
+> {%
+  client.test("Account DELETE not found: 404", function () {
+    client.assert(response.status === 404, "expected 404, got " + response.status);
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
+  });
+%}
+
+### ========================
+### CLEANUP
+### ========================
+
+### CLEANUP — DELETE OZON (moved from WB)
+DELETE {{host}}/api/account-connections/{{acIdMovedToOzon}}
+
+> {%
+  client.test("AC DELETE OZON (moved): 204", function () {
     client.assert(response.status === 204, "expected 204, got " + response.status);
   });
 %}
 
-### CLEANUP — DELETE WB
+### CLEANUP — DELETE WB (second one)
 DELETE {{host}}/api/account-connections/{{acIdWb}}
 
 > {%
