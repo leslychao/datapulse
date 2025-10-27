@@ -95,7 +95,7 @@ public class AccountConnectionService
 
     if (connectionRepository.existsByAccount_IdAndMarketplace(request.accountId(),
         request.marketplaceType())) {
-      throw new AppException(
+      throw new BadRequestException(
           ACCOUNT_CONNECTION_ALREADY_EXISTS,
           request.accountId(),
           request.marketplaceType());
@@ -120,7 +120,7 @@ public class AccountConnectionService
           current.getAccountId(),
           request.marketplaceType(),
           id)) {
-        throw new AppException(
+        throw new BadRequestException(
             ACCOUNT_CONNECTION_ALREADY_EXISTS,
             current.getAccountId(),
             request.marketplaceType());
