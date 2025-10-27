@@ -1,9 +1,11 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ID_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.converter.AccountConnectionMapper;
 import io.datapulse.core.converter.BeanConverter;
@@ -13,13 +15,16 @@ import io.datapulse.core.repository.AccountConnectionRepository;
 import io.datapulse.core.service.crypto.CryptoService;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
+import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
 import java.time.OffsetDateTime;
+import java.util.Objects;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -128,6 +133,53 @@ public class AccountConnectionService
     var dto = mapper.fromCreateRequest(request, cryptoService, objectMapper);
     var saved = save(dto);
     return mapper.toResponse(saved);
+  }
+
+  @Transactional
+  public AccountConnectionResponse update(@NonNull Long id,
+      @NonNull AccountConnectionUpdateRequest req) {
+    AccountConnectionDto accountConnectionDto = get(id)
+        .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, id));
+
+    Long currentAccountId = accountConnectionDto.getAccountId();
+    if (!Objects.equals(currentAccountId, req.accountId())) {
+      throw new AppException(ACCOUNT_CONNECTION_ID_IMMUTABLE);
+    }
+
+    if (req.marketplaceType() != null
+        && req.marketplaceType() != accountConnectionDto.getMarketplace()) {
+      if (connectionRepository.existsByAccount_IdAndMarketplaceAndIdNot(
+          req.accountId(),
+          req.marketplaceType(),
+          id)) {
+        throw new AppException(
+            ACCOUNT_CONNECTION_ALREADY_EXISTS,
+            req.accountId(),
+            req.marketplaceType());
+      }
+      accountConnectionDto.setMarketplace(req.marketplaceType());
+    }
+
+    if (req.active() != null) {
+      accountConnectionDto.setActive(req.active());
+    }
+
+    if (req.credentials() != null) {
+      String encrypted = serializeAndEncryptCredentials(req.credentials());
+      accountConnectionDto.setCredentialsEncrypted(encrypted);
+    }
+
+    accountConnectionDto.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
+    return mapper.toResponse(save(accountConnectionDto));
+  }
+
+  private <T> String serializeAndEncryptCredentials(T credentials) {
+    try {
+      String json = objectMapper.writeValueAsString(credentials);
+      return cryptoService.encrypt(json);
+    } catch (JsonProcessingException e) {
+      throw new AppException(MessageCodes.CREDENTIALS_JSON_SERIALIZATION_ERROR, e);
+    }
   }
 
   @Override

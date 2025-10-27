@@ -2,6 +2,7 @@ package io.datapulse.rest;
 
 import io.datapulse.core.service.AccountService;
 import io.datapulse.domain.dto.AccountDto;
+import io.datapulse.domain.dto.request.AccountCreateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,7 @@ public class AccountController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public void create(@Valid @RequestBody AccountDto request) {
-    accountService.save(request);
+  public void create(@Valid @RequestBody AccountCreateRequest request) {
+    accountService.create(request);
   }
 }

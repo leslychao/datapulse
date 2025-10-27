@@ -1,6 +1,8 @@
 package io.datapulse.core.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,7 +15,9 @@ import lombok.Setter;
 @Setter
 public class SaleFactEntity extends LongBaseEntity {
 
-  private Long accountId;
+  @ManyToOne
+  @JoinColumn(name = "account_id")
+  private AccountEntity account;
   private Long productId;
   private LocalDate date;
   private Integer quantity;

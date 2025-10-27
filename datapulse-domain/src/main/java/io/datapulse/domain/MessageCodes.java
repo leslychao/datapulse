@@ -5,7 +5,10 @@ public final class MessageCodes {
   private MessageCodes() {
   }
 
+  public static final String ACCOUNT_NOT_FOUND = "account.not-found";
+  public static final String ACCOUNT_ALREADY_EXISTS = "account.already-exists";
   public static final String ACCOUNT_ID_REQUIRED = "account.id.required";
+
   public static final String ACCOUNT_CONNECTION_ID_IMMUTABLE = "account.connection.id.immutable";
   public static final String ACCOUNT_CONNECTION_NOT_FOUND = "account.connection.not-found";
   public static final String ACCOUNT_CONNECTION_INVALID_JSON = "account.connection.credentials.invalid-json";

@@ -5,7 +5,6 @@ import io.datapulse.domain.SyncStatus;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.NamedAttributeNode;
@@ -25,7 +24,7 @@ import lombok.Setter;
 @Setter
 public class AccountConnectionEntity extends LongBaseEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @ManyToOne
   @JoinColumn(name = "account_id")
   private AccountEntity account;
 

@@ -1,6 +1,8 @@
 package io.datapulse.core.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,7 +13,9 @@ import lombok.Setter;
 @Setter
 public class ProductEntity extends LongBaseEntity {
 
-  private Long accountId;
+  @ManyToOne
+  @JoinColumn(name = "account_id")
+  private AccountEntity account;
   private String sku;
   private String name;
   private String brand;

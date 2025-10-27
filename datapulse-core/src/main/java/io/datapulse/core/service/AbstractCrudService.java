@@ -2,10 +2,10 @@ package io.datapulse.core.service;
 
 import io.datapulse.core.converter.BeanConverter;
 import io.datapulse.core.entity.LongBaseEntity;
-import io.datapulse.domain.exception.AppException;
-import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.dto.LongBaseDto;
+import io.datapulse.domain.exception.AppException;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import lombok.NonNull;
 import org.springframework.data.domain.Page;
@@ -29,7 +29,6 @@ public abstract class AbstractCrudService<T extends LongBaseDto, E extends LongB
     return getRepository().saveAll(entities).stream().map(this::mapToDto).toList();
   }
 
-
   public T update(@NonNull T dto) {
     return updateInternal(dto, getRepository()::save);
   }
@@ -44,10 +43,8 @@ public abstract class AbstractCrudService<T extends LongBaseDto, E extends LongB
         .toList();
   }
 
-  public T get(@NonNull Long id) {
-    E entity = getRepository().findById(id)
-        .orElseThrow(() -> new NotFoundException("not.found", id));
-    return mapToDto(entity);
+  public Optional<T> get(@NonNull Long id) {
+    return getRepository().findById(id).map(this::mapToDto);
   }
 
   public Page<T> getAllPageable(@NonNull Pageable pageable) {

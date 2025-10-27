@@ -21,23 +21,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AccountConnectionController {
 
-  private final AccountConnectionService service;
+  private final AccountConnectionService accountConnectionService;
 
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public AccountConnectionResponse create(@Valid @RequestBody AccountConnectionCreateRequest req) {
-    return service.create(req);
+  public AccountConnectionResponse create(
+      @Valid @RequestBody AccountConnectionCreateRequest request) {
+    return accountConnectionService.create(request);
   }
 
   @PutMapping(value = "/{id}", consumes = "application/json")
-  public AccountConnectionResponse update(@PathVariable Long id,
-      @Valid @RequestBody AccountConnectionUpdateRequest req) {
-    return service.update(id, req);
+  public AccountConnectionResponse update(
+      @PathVariable Long id,
+      @Valid @RequestBody AccountConnectionUpdateRequest request) {
+    return accountConnectionService.update(id, request);
   }
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable Long id) {
-    service.delete(id);
+    accountConnectionService.delete(id);
   }
 }
