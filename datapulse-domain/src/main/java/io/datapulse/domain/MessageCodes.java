@@ -14,6 +14,7 @@ public final class MessageCodes {
   public static final String ACCOUNT_CONNECTION_NOT_FOUND = "account.connection.not-found";
   public static final String ACCOUNT_CONNECTION_INVALID_JSON = "account.connection.credentials.invalid-json";
   public static final String ACCOUNT_CONNECTION_ALREADY_EXISTS = "account.connection.already-exists";
+  public static final String ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED = "account.connection.marketplace.required";
 
 
   public static final String CREDENTIALS_SERIALIZATION_ERROR = "credentials.serialization.error";

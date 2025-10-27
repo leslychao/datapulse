@@ -4,62 +4,63 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.service.crypto.CryptoService;
-import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
+import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
-import java.time.OffsetDateTime;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", config = MapStructCentralConfig.class)
 public interface AccountConnectionMapper
     extends BeanConverter<AccountConnectionDto, AccountConnectionEntity> {
 
   @Override
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "account.id", source = "accountId")
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java( dto.getCreatedAt() != null ? dto.getCreatedAt() : java.time.OffsetDateTime.now(io.datapulse.domain.CommonConstants.ZONE_ID_DEFAULT) )"
-  )
-  public abstract AccountConnectionEntity mapToEntity(AccountConnectionDto dto);
+  AccountConnectionEntity mapToEntity(AccountConnectionDto dto);
 
   @Override
-  @Mapping(
-      target = "accountId",
-      expression = "java(entity.getAccount() != null ? entity.getAccount().getId() : null)"
-  )
+  @Mapping(source = "account.id", target = "accountId")
   AccountConnectionDto mapToDto(AccountConnectionEntity entity);
 
+  AccountConnectionResponse toResponse(AccountConnectionDto dto);
+
   default AccountConnectionDto fromCreateRequest(
-      AccountConnectionCreateRequest req,
+      AccountConnectionCreateRequest request,
       CryptoService cryptoService,
       ObjectMapper objectMapper
   ) {
     AccountConnectionDto dto = new AccountConnectionDto();
-    dto.setAccountId(req.accountId());
-    dto.setMarketplace(req.marketplaceType());
-    dto.setActive(Boolean.TRUE.equals(req.active()));
-    dto.setCredentialsEncrypted(cryptoService.encrypt(writeJson(req.credentials(), objectMapper)));
-    dto.setCreatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
+    dto.setAccountId(request.accountId());
+    dto.setMarketplace(request.marketplaceType());
+    dto.setActive(request.active() == null ? Boolean.TRUE : request.active());
+    if (request.credentials() != null) {
+      dto.setCredentialsEncrypted(
+          cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
+    }
     return dto;
   }
 
-  default AccountConnectionResponse toResponse(AccountConnectionDto dto) {
-    return new AccountConnectionResponse(
-        dto.getId(),
-        dto.getAccountId(),
-        dto.getMarketplace(),
-        dto.getActive(),
-        dto.getLastSyncAt(),
-        dto.getLastSyncStatus(),
-        dto.getCreatedAt(),
-        dto.getUpdatedAt()
-    );
+  void applyUpdateFromDto(AccountConnectionDto dto, @MappingTarget AccountConnectionEntity entity);
+
+  default void applyUpdate(AccountConnectionUpdateRequest request,
+      @MappingTarget AccountConnectionDto dto,
+      CryptoService cryptoService,
+      ObjectMapper objectMapper) {
+    if (request.marketplaceType() != null) {
+      dto.setMarketplace(request.marketplaceType());
+    }
+    if (request.active() != null) {
+      dto.setActive(request.active());
+    }
+    if (request.credentials() != null) {
+      dto.setCredentialsEncrypted(
+          cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
+    }
   }
 
   private <T> String writeJson(T object, ObjectMapper objectMapper) {

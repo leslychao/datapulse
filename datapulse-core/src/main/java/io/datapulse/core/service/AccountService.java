@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -96,10 +97,11 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
 
   @Override
   public void delete(@NonNull Long id) {
-    if (!exists(id)) {
+    try {
+      repository.deleteById(id);
+    } catch (EmptyResultDataAccessException e) {
       throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id);
     }
-    repository.deleteById(id);
   }
 
   public boolean exists(Long id) {

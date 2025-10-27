@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @RequiredArgsConstructor
 public class GenericControllerAdvice {
 
-  private final MessageSource messageSource;
   private static final Locale LOCALE_EN = Locale.ENGLISH;
+  private final MessageSource messageSource;
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleBodyValidation(MethodArgumentNotValidException ex,
