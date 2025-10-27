@@ -1,10 +1,11 @@
 package io.datapulse.core.service;
 
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ID_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
@@ -29,16 +30,16 @@ import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
-import java.util.Objects;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 @Service
 @RequiredArgsConstructor
+@Validated
 public class AccountConnectionService
     extends AbstractCrudService<AccountConnectionDto, AccountConnectionEntity> {
 
@@ -59,10 +60,7 @@ public class AccountConnectionService
   }
 
   @Override
-  protected AccountConnectionEntity entityPreSaveAction(@NonNull AccountConnectionEntity entity) {
-    Long accountId = entity.getAccount() != null ? entity.getAccount().getId() : null;
-    validateNewConnection(accountId, entity.getMarketplace());
-
+  protected AccountConnectionEntity entityPreSaveAction(AccountConnectionEntity entity) {
     var now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
     entity.setCreatedAt(now);
     entity.setUpdatedAt(now);
@@ -70,7 +68,7 @@ public class AccountConnectionService
   }
 
   @Override
-  protected AccountConnectionEntity entityPreUpdateAction(@NonNull AccountConnectionEntity entity) {
+  protected AccountConnectionEntity entityPreUpdateAction(AccountConnectionEntity entity) {
     entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
     return entity;
   }
@@ -78,23 +76,30 @@ public class AccountConnectionService
   @Transactional(readOnly = true)
   public AccountConnectionDto getByAccountIdAndMarketplaceType(
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
-      MarketplaceType marketplaceType) {
-    if (accountId == null) {
-      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
-    }
+      @NotNull(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType) {
+
     return connectionRepository
         .findByAccount_IdAndMarketplaceAndActiveTrue(accountId, marketplaceType)
         .map(mapper::mapToDto)
         .orElseThrow(
-            () -> new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, accountId, marketplaceType));
+            () -> new NotFoundException(ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
+                accountId, marketplaceType));
   }
 
   @Transactional
   public AccountConnectionResponse create(
       @NotNull(message = ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED)
       @Valid AccountConnectionCreateRequest request) {
+
     validateAccountExists(request.accountId());
-    validateNewConnection(request.accountId(), request.marketplaceType());
+
+    if (connectionRepository.existsByAccount_IdAndMarketplace(request.accountId(),
+        request.marketplaceType())) {
+      throw new AppException(
+          ACCOUNT_CONNECTION_ALREADY_EXISTS,
+          request.accountId(),
+          request.marketplaceType());
+    }
 
     var dto = mapper.fromCreateRequest(request, cryptoService, objectMapper);
     var saved = save(dto);
@@ -103,82 +108,65 @@ public class AccountConnectionService
 
   @Transactional
   public AccountConnectionResponse update(
-      @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
-      @NotNull(message = ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED)
-      @Valid AccountConnectionUpdateRequest request) {
-    AccountConnectionDto dto = get(accountId)
-        .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, accountId));
+      @NotNull(message = ID_REQUIRED) Long id,
+      @NotNull(message = ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED) @Valid AccountConnectionUpdateRequest request) {
 
-    validateImmutabilityOnUpdate(dto.getAccountId(), request.accountId());
-    validateMarketplaceUniquenessOnUpdate(
-        dto.getAccountId(),
-        dto.getMarketplace(),
-        request.marketplaceType(),
-        accountId);
+    AccountConnectionDto current = get(id)
+        .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
 
-    mapper.applyUpdate(request, dto, cryptoService, objectMapper);
+    if (request.marketplaceType() != null
+        && request.marketplaceType() != current.getMarketplace()) {
+      if (connectionRepository.existsByAccount_IdAndMarketplaceAndIdNot(
+          current.getAccountId(),
+          request.marketplaceType(),
+          id)) {
+        throw new AppException(
+            ACCOUNT_CONNECTION_ALREADY_EXISTS,
+            current.getAccountId(),
+            request.marketplaceType());
+      }
+    }
 
-    return mapper.toResponse(update(dto));
+    mapper.applyUpdate(request, current, cryptoService, objectMapper);
+    var updated = update(current);
+    return mapper.toResponse(updated);
   }
 
-  public void delete(@NotNull(message = ID_REQUIRED) @NonNull Long id) {
+  @Transactional
+  public void delete(@NotNull(message = ID_REQUIRED) Long id) {
     try {
       connectionRepository.deleteById(id);
     } catch (EmptyResultDataAccessException e) {
-      throw new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, id);
+      throw new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id);
     }
   }
 
   @Override
   protected AccountConnectionEntity updateEntityWithDto(
-      @NonNull AccountConnectionEntity target,
-      @NonNull AccountConnectionDto dto) {
-    if (target.getAccount() == null && dto.getAccountId() != null) {
-      AccountEntity accountEntity = new AccountEntity();
-      accountEntity.setId(dto.getAccountId());
-      target.setAccount(accountEntity);
+      AccountConnectionEntity target,
+      AccountConnectionDto dto) {
+    Long currentAccountId = target.getAccount() != null ? target.getAccount().getId() : null;
+
+    if (currentAccountId != null && dto.getAccountId() != null && !dto.getAccountId()
+        .equals(currentAccountId)) {
+      throw new AppException(ACCOUNT_CONNECTION_ID_IMMUTABLE);
     }
+
+    if (currentAccountId == null && dto.getAccountId() != null) {
+      var account = new AccountEntity();
+      account.setId(dto.getAccountId());
+      target.setAccount(account);
+    }
+
     mapper.applyUpdateFromDto(dto, target);
     return target;
   }
 
-  private void validateNewConnection(Long accountId, MarketplaceType marketplace) {
-    if (accountId == null) {
-      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
-    }
-    if (marketplace == null) {
-      throw new BadRequestException(ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED);
-    }
-    if (connectionRepository.existsByAccount_IdAndMarketplace(accountId, marketplace)) {
-      throw new AppException(ACCOUNT_CONNECTION_ALREADY_EXISTS, accountId, marketplace);
-    }
-  }
-
-  private void validateImmutabilityOnUpdate(Long currentAccountId, Long requestedAccountId) {
-    if (requestedAccountId != null && !Objects.equals(currentAccountId, requestedAccountId)) {
-      throw new AppException(ACCOUNT_CONNECTION_ID_IMMUTABLE);
-    }
-  }
-
-  private void validateMarketplaceUniquenessOnUpdate(
-      Long accountId,
-      MarketplaceType currentMarketplace,
-      MarketplaceType requestedMarketplace,
-      Long selfId) {
-    if (accountId == null) {
-      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
-    }
-    if (requestedMarketplace != null && requestedMarketplace != currentMarketplace) {
-      if (connectionRepository.existsByAccount_IdAndMarketplaceAndIdNot(
-          accountId,
-          requestedMarketplace,
-          selfId)) {
-        throw new AppException(ACCOUNT_CONNECTION_ALREADY_EXISTS, accountId, requestedMarketplace);
-      }
-    }
-  }
 
   private void validateAccountExists(Long accountId) {
+    if (accountId == null) {
+      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
+    }
     if (!accountService.exists(accountId)) {
       throw new NotFoundException(ACCOUNT_NOT_FOUND, accountId);
     }

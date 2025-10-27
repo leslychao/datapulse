@@ -47,7 +47,7 @@ public interface AccountConnectionMapper
     return dto;
   }
 
-  @Mapping(source = "accountId", target = "account.id")
+  @Mapping(target = "account", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   void applyUpdateFromDto(AccountConnectionDto dto, @MappingTarget AccountConnectionEntity entity);
