@@ -4,7 +4,6 @@ import io.datapulse.core.service.AccountService;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.request.AccountUpdateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,13 +24,14 @@ public class AccountController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public AccountResponse create(@Valid @RequestBody AccountCreateRequest request) {
+  public AccountResponse create(@RequestBody AccountCreateRequest request) {
     return accountService.create(request);
   }
 
   @PutMapping(path = "/{id}", consumes = "application/json")
-  public AccountResponse update(@PathVariable Long id,
-      @Valid @RequestBody AccountUpdateRequest request) {
+  public AccountResponse update(
+      @PathVariable Long id,
+      @RequestBody AccountUpdateRequest request) {
     return accountService.update(id, request);
   }
 

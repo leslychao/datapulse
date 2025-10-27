@@ -1,11 +1,15 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ID_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.converter.AccountConnectionMapper;
@@ -23,6 +27,8 @@ import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import lombok.NonNull;
@@ -72,7 +78,7 @@ public class AccountConnectionService
 
   @Transactional(readOnly = true)
   public AccountConnectionDto getByAccountIdAndMarketplaceType(
-      Long accountId,
+      @NotNull(message = ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED) Long accountId,
       MarketplaceType marketplaceType) {
     if (accountId == null) {
       throw new BadRequestException(ACCOUNT_ID_REQUIRED);
@@ -85,7 +91,9 @@ public class AccountConnectionService
   }
 
   @Transactional
-  public AccountConnectionResponse create(@NonNull AccountConnectionCreateRequest request) {
+  public AccountConnectionResponse create(
+      @NotNull(message = ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED)
+      @Valid AccountConnectionCreateRequest request) {
     validateAccountExists(request.accountId());
     validateNewConnection(request.accountId(), request.marketplaceType());
 
@@ -96,8 +104,9 @@ public class AccountConnectionService
 
   @Transactional
   public AccountConnectionResponse update(
-      @NonNull Long id,
-      @NonNull AccountConnectionUpdateRequest request) {
+      @NotNull(message = ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED) Long id,
+      @NotNull(message = ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED)
+      @Valid AccountConnectionUpdateRequest request) {
     AccountConnectionDto dto = get(id)
         .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, id));
 
@@ -113,7 +122,7 @@ public class AccountConnectionService
     return mapper.toResponse(update(dto));
   }
 
-  public void delete(@NonNull Long id) {
+  public void delete(@NotNull(message = ID_REQUIRED) @NonNull Long id) {
     try {
       connectionRepository.deleteById(id);
     } catch (EmptyResultDataAccessException e) {

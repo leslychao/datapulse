@@ -1,16 +1,15 @@
 package io.datapulse.domain.dto.request;
 
+import static io.datapulse.domain.MessageCodes.ACCOUNT_NAME_MAX_LENGTH;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_NAME_REQUIRED;
+
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record AccountUpdateRequest(
 
-    @NotNull(message = "${validation.account.id.not-null}")
-    Long id,
-
-    @NotBlank(message = "${validation.account.name.not-blank}")
-    @Size(max = 255, message = "${validation.account.name.max-length}")
+    @NotBlank(message = ACCOUNT_NAME_REQUIRED)
+    @Size(max = 32, message = ACCOUNT_NAME_MAX_LENGTH)
     String name
 
 ) {

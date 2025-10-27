@@ -1,11 +1,14 @@
 package io.datapulse.domain.dto.request;
 
+import static io.datapulse.domain.MessageCodes.ACCOUNT_NAME_MAX_LENGTH;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_NAME_REQUIRED;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record AccountCreateRequest(
-    @NotBlank(message = "{validation.account.name.notBlank}")
-    @Size(max = 255, message = "{validation.account.name.maxSize}")
+    @NotBlank(message = ACCOUNT_NAME_REQUIRED)
+    @Size(max = 32, message = ACCOUNT_NAME_MAX_LENGTH)
     String name
 ) {
 

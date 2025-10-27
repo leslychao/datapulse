@@ -1,5 +1,9 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CREATE_REQUEST_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_UPDATE_REQUEST_REQUIRED;
+
 import io.datapulse.core.converter.AccountMapper;
 import io.datapulse.core.converter.BeanConverter;
 import io.datapulse.core.entity.AccountEntity;
@@ -13,6 +17,8 @@ import io.datapulse.domain.dto.response.AccountResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import java.time.OffsetDateTime;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -54,14 +60,16 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
   }
 
   @Override
-  protected AccountEntity updateEntityWithDto(@NonNull AccountEntity entity,
+  protected AccountEntity updateEntityWithDto(
+      @NonNull AccountEntity entity,
       @NonNull AccountDto dto) {
     mapper.applyUpdateFromDto(dto, entity);
     return entity;
   }
 
   @Transactional
-  public AccountResponse create(@NonNull AccountCreateRequest request) {
+  public AccountResponse create(
+      @NotBlank(message = ACCOUNT_CREATE_REQUEST_REQUIRED) @Valid AccountCreateRequest request) {
     if (StringUtils.isBlank(request.name())) {
       throw new BadRequestException(MessageCodes.ACCOUNT_NAME_REQUIRED);
     }
@@ -76,11 +84,9 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
   }
 
   @Transactional
-  public AccountResponse update(@NonNull Long id, @NonNull AccountUpdateRequest request) {
-    if (StringUtils.isBlank(request.name())) {
-      throw new BadRequestException(MessageCodes.ACCOUNT_NAME_REQUIRED);
-    }
-
+  public AccountResponse update(
+      @NotBlank(message = ACCOUNT_ID_REQUIRED) Long id,
+      @NotBlank(message = ACCOUNT_UPDATE_REQUEST_REQUIRED) @Valid AccountUpdateRequest request) {
     AccountDto accountDto = get(id)
         .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id));
 
@@ -96,7 +102,7 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
   }
 
   @Override
-  public void delete(@NonNull Long id) {
+  public void delete(@NotBlank(message = ACCOUNT_ID_REQUIRED) @NonNull Long id) {
     try {
       repository.deleteById(id);
     } catch (EmptyResultDataAccessException e) {

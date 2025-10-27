@@ -52,7 +52,8 @@ public interface AccountConnectionMapper
   @Mapping(target = "updatedAt", ignore = true)
   void applyUpdateFromDto(AccountConnectionDto dto, @MappingTarget AccountConnectionEntity entity);
 
-  default void applyUpdate(AccountConnectionUpdateRequest request,
+  default void applyUpdate(
+      AccountConnectionUpdateRequest request,
       @MappingTarget AccountConnectionDto dto,
       CryptoService cryptoService,
       ObjectMapper objectMapper) {
