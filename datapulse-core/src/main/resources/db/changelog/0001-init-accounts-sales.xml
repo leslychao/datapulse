@@ -70,6 +70,7 @@
       CREATE INDEX idx_sales_fact_dt ON sales_fact (dt);
       CREATE INDEX idx_sales_fact_sku ON sales_fact (sku);
       CREATE INDEX idx_sales_fact_accconn ON sales_fact (account_connection_id);
+      CREATE INDEX idx_sales_fact_product ON sales_fact (product_id);
 
       CREATE TABLE stock_snapshot
       (
@@ -87,6 +88,7 @@
       CREATE INDEX idx_stock_dt ON stock_snapshot (dt);
       CREATE INDEX idx_stock_sku ON stock_snapshot (sku);
       CREATE INDEX idx_stock_accconn ON stock_snapshot (account_connection_id);
+      CREATE INDEX idx_stock_product ON stock_snapshot (product_id);
 
       CREATE TABLE price_snapshot
       (
@@ -104,6 +106,7 @@
       CREATE INDEX idx_price_dt ON price_snapshot (dt);
       CREATE INDEX idx_price_sku ON price_snapshot (sku);
       CREATE INDEX idx_price_accconn ON price_snapshot (account_connection_id);
+      CREATE INDEX idx_price_product ON price_snapshot (product_id);
 
       CREATE TABLE ad_spend_fact
       (
@@ -145,13 +148,16 @@
         rating                INT    NOT NULL,
         text                  TEXT,
         author                TEXT,
-        replied               BOOLEAN DEFAULT FALSE,
-        CONSTRAINT uq_review_accconn_sku_dt UNIQUE (account_connection_id, sku, dt, author)
+        replied               BOOLEAN DEFAULT FALSE
       );
 
       CREATE INDEX idx_review_dt ON review (dt);
       CREATE INDEX idx_review_sku ON review (sku);
       CREATE INDEX idx_review_accconn ON review (account_connection_id);
+      CREATE INDEX idx_review_product ON review (product_id);
+
+      CREATE UNIQUE INDEX uq_review_accconn_sku_dt_author
+        ON review (account_connection_id, COALESCE(sku, ''), dt, author);
 
       CREATE TABLE competitor_match
       (
@@ -173,6 +179,8 @@
     </sql>
 
     <rollback>
+      DROP INDEX IF EXISTS uq_review_accconn_sku_dt_author;
+      DROP INDEX IF EXISTS ux_account_name_ci;
       DROP TABLE IF EXISTS competitor_match CASCADE;
       DROP TABLE IF EXISTS review CASCADE;
       DROP TABLE IF EXISTS finance_fact CASCADE;
