@@ -11,16 +11,12 @@ import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import java.time.OffsetDateTime;
-import org.mapstruct.InjectionStrategy;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(
-    componentModel = "spring",
-    injectionStrategy = InjectionStrategy.CONSTRUCTOR
-)
-public abstract class AccountConnectionMapper
-    implements BeanConverter<AccountConnectionDto, AccountConnectionEntity> {
+@Mapper(componentModel = "spring")
+public interface AccountConnectionMapper
+    extends BeanConverter<AccountConnectionDto, AccountConnectionEntity> {
 
   @Override
   @Mapping(target = "id", ignore = true)
@@ -37,9 +33,9 @@ public abstract class AccountConnectionMapper
       target = "accountId",
       expression = "java(entity.getAccount() != null ? entity.getAccount().getId() : null)"
   )
-  public abstract AccountConnectionDto mapToDto(AccountConnectionEntity entity);
+  AccountConnectionDto mapToDto(AccountConnectionEntity entity);
 
-  public AccountConnectionDto fromCreateRequest(
+  default AccountConnectionDto fromCreateRequest(
       AccountConnectionCreateRequest req,
       CryptoService cryptoService,
       ObjectMapper objectMapper
@@ -53,7 +49,7 @@ public abstract class AccountConnectionMapper
     return dto;
   }
 
-  public AccountConnectionResponse toResponse(AccountConnectionDto dto) {
+  default AccountConnectionResponse toResponse(AccountConnectionDto dto) {
     return new AccountConnectionResponse(
         dto.getId(),
         dto.getAccountId(),

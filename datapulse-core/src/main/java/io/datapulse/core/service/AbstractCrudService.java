@@ -22,10 +22,13 @@ public abstract class AbstractCrudService<T extends LongBaseDto, E extends LongB
   }
 
   public List<T> saveAll(@NonNull List<T> dtos) {
-    return dtos.stream()
-        .map(this::save)
+    List<E> entities = dtos.stream()
+        .map(this::mapToEntity)
+        .map(this::entityPreSaveAction)
         .toList();
+    return getRepository().saveAll(entities).stream().map(this::mapToDto).toList();
   }
+
 
   public T update(@NonNull T dto) {
     return updateInternal(dto, getRepository()::save);
@@ -62,6 +65,9 @@ public abstract class AbstractCrudService<T extends LongBaseDto, E extends LongB
   }
 
   private T updateInternal(@NonNull T dto, @NonNull Function<E, E> persistFunction) {
+    if (dto.getId() == null) {
+      throw new AppException("id.required");
+    }
     E entity = getRepository().findById(dto.getId())
         .map(found -> updateEntityWithDto(found, dto))
         .map(this::entityPreUpdateAction)

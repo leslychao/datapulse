@@ -9,6 +9,8 @@ public final class MessageCodes {
   public static final String ACCOUNT_CONNECTION_ID_IMMUTABLE = "account.connection.id.immutable";
   public static final String ACCOUNT_CONNECTION_NOT_FOUND = "account.connection.not-found";
   public static final String ACCOUNT_CONNECTION_INVALID_JSON = "account.connection.credentials.invalid-json";
+  public static final String ACCOUNT_CONNECTION_ALREADY_EXISTS = "account.connection.already-exists";
+
 
   public static final String CREDENTIALS_SERIALIZATION_ERROR = "credentials.serialization.error";
   public static final String CREDENTIALS_DESERIALIZATION_ERROR = "credentials.deserialization.error";

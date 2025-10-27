@@ -38,6 +38,19 @@ public class AccountConnectionService
   private final CryptoService cryptoService;
 
   @Override
+  protected AccountConnectionEntity entityPreSaveAction(@NonNull AccountConnectionEntity entity) {
+    Long accountId = entity.getAccount() != null ? entity.getAccount().getId() : null;
+    if (accountId == null) {
+      throw new AppException("account.id.required");
+    }
+    if (connectionRepository.existsByAccount_IdAndMarketplace(accountId, entity.getMarketplace())) {
+      throw new AppException("account.connection.already-exists", accountId,
+          entity.getMarketplace());
+    }
+    return entity;
+  }
+
+  @Override
   protected BeanConverter<AccountConnectionDto, AccountConnectionEntity> getConverter() {
     return mapper;
   }
@@ -70,6 +83,17 @@ public class AccountConnectionService
           : accountConnectionEntity.getAccount().getId();
       if (existingId != null && !existingId.equals(dto.getAccountId())) {
         throw new AppException(ACCOUNT_CONNECTION_ID_IMMUTABLE);
+      }
+      if (dto.getMarketplace() != null
+          && dto.getMarketplace() != accountConnectionEntity.getMarketplace()) {
+        boolean conflict = connectionRepository.existsByAccount_IdAndMarketplaceAndIdNot(
+            existingId,
+            dto.getMarketplace(),
+            accountConnectionEntity.getId());
+        if (conflict) {
+          throw new AppException("account.connection.already-exists", existingId,
+              dto.getMarketplace());
+        }
       }
       if (existingId == null) {
         AccountEntity accountEntity = new AccountEntity();
@@ -104,5 +128,13 @@ public class AccountConnectionService
     var dto = mapper.fromCreateRequest(request, cryptoService, objectMapper);
     var saved = save(dto);
     return mapper.toResponse(saved);
+  }
+
+  @Override
+  public void delete(@NonNull Long id) {
+    if (!connectionRepository.existsById(id)) {
+      throw new NotFoundException("account.connection.not-found", id);
+    }
+    connectionRepository.deleteById(id);
   }
 }

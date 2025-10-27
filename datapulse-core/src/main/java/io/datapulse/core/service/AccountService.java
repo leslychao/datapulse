@@ -50,7 +50,7 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
   }
 
   public boolean exists(Long id) {
-    Optional.ofNullable(id).orElseThrow(() -> new BadRequestException("account.id.notBlank"));
+    Optional.ofNullable(id).orElseThrow(() -> new BadRequestException("account.id.required"));
     return getRepository().existsById(id);
   }
 }

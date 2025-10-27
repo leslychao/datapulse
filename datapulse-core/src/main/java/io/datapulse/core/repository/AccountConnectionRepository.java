@@ -10,4 +10,11 @@ public interface AccountConnectionRepository extends JpaRepository<AccountConnec
   Optional<AccountConnectionEntity> findByAccount_IdAndMarketplaceAndActiveTrue(
       Long accountId,
       MarketplaceType marketplaceType);
+
+  boolean existsByAccount_IdAndMarketplace(Long accountId, MarketplaceType marketplace);
+
+  boolean existsByAccount_IdAndMarketplaceAndIdNot(
+      Long accountId,
+      MarketplaceType marketplace,
+      Long id);
 }
