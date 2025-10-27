@@ -7,12 +7,7 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <changeSet id="0001-init-datapulse-core" author="datapulse" dbms="postgresql">
-    <comment>Создание базовых таблиц Datapulse без ENUM-типов (marketplace_type, sync_status_enum заменены на TEXT)</comment>
-
     <sql>
-      -- ===============================
-      -- Таблица account
-      -- ===============================
       CREATE TABLE account
       (
         id         BIGSERIAL PRIMARY KEY,
@@ -24,18 +19,15 @@
       CREATE UNIQUE INDEX IF NOT EXISTS ux_account_name_ci
         ON account (LOWER(name));
 
-      -- ===============================
-      -- Таблица account_connection
-      -- ===============================
       CREATE TABLE account_connection
       (
         id                    BIGSERIAL PRIMARY KEY,
         account_id            BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        marketplace           TEXT        NOT NULL, -- вместо marketplace_type ENUM
+        marketplace           TEXT        NOT NULL,
         credentials_encrypted TEXT        NOT NULL,
         active                BOOLEAN     NOT NULL DEFAULT TRUE,
         last_sync_at          TIMESTAMPTZ,
-        last_sync_status      TEXT,                 -- вместо sync_status_enum ENUM
+        last_sync_status      TEXT,
         created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at            TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
@@ -44,9 +36,6 @@
       CREATE INDEX idx_acc_conn_account ON account_connection (account_id);
       CREATE INDEX idx_acc_conn_marketplace ON account_connection (marketplace);
 
-      -- ===============================
-      -- Таблица product
-      -- ===============================
       CREATE TABLE product
       (
         id         BIGSERIAL PRIMARY KEY,
@@ -64,9 +53,6 @@
       CREATE INDEX idx_product_account ON product (account_id);
       CREATE INDEX idx_product_sku ON product (sku);
 
-      -- ===============================
-      -- Таблица sales_fact
-      -- ===============================
       CREATE TABLE sales_fact
       (
         id                    BIGSERIAL PRIMARY KEY,
@@ -85,9 +71,6 @@
       CREATE INDEX idx_sales_fact_sku ON sales_fact (sku);
       CREATE INDEX idx_sales_fact_accconn ON sales_fact (account_connection_id);
 
-      -- ===============================
-      -- Таблица stock_snapshot
-      -- ===============================
       CREATE TABLE stock_snapshot
       (
         id                    BIGSERIAL PRIMARY KEY,
@@ -105,9 +88,6 @@
       CREATE INDEX idx_stock_sku ON stock_snapshot (sku);
       CREATE INDEX idx_stock_accconn ON stock_snapshot (account_connection_id);
 
-      -- ===============================
-      -- Таблица price_snapshot
-      -- ===============================
       CREATE TABLE price_snapshot
       (
         id                    BIGSERIAL PRIMARY KEY,
@@ -125,9 +105,6 @@
       CREATE INDEX idx_price_sku ON price_snapshot (sku);
       CREATE INDEX idx_price_accconn ON price_snapshot (account_connection_id);
 
-      -- ===============================
-      -- Таблица ad_spend_fact
-      -- ===============================
       CREATE TABLE ad_spend_fact
       (
         id                    BIGSERIAL PRIMARY KEY,
@@ -145,9 +122,6 @@
       CREATE INDEX idx_adspend_dt ON ad_spend_fact (dt);
       CREATE INDEX idx_adspend_accconn ON ad_spend_fact (account_connection_id);
 
-      -- ===============================
-      -- Таблица finance_fact
-      -- ===============================
       CREATE TABLE finance_fact
       (
         id                    BIGSERIAL PRIMARY KEY,
@@ -161,9 +135,6 @@
       CREATE INDEX idx_finance_dt ON finance_fact (dt);
       CREATE INDEX idx_finance_accconn ON finance_fact (account_connection_id);
 
-      -- ===============================
-      -- Таблица review
-      -- ===============================
       CREATE TABLE review
       (
         id                    BIGSERIAL PRIMARY KEY,
@@ -182,9 +153,6 @@
       CREATE INDEX idx_review_sku ON review (sku);
       CREATE INDEX idx_review_accconn ON review (account_connection_id);
 
-      -- ===============================
-      -- Таблица competitor_match
-      -- ===============================
       CREATE TABLE competitor_match
       (
         id               BIGSERIAL PRIMARY KEY,
