@@ -14,7 +14,6 @@ public final class MessageCodes {
   public static final String ACCOUNT_ALREADY_EXISTS = "account.already-exists";
   public static final String ACCOUNT_NOT_FOUND = "account.not-found";
 
-  public static final String ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED = "account.connection.account-id.required";
   public static final String ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED = "account.connection.marketplace.required";
   public static final String ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED = "account.connection.credentials.required";
   public static final String ACCOUNT_CONNECTION_ID_IMMUTABLE = "account.connection.id.immutable";

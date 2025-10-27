@@ -1,6 +1,5 @@
 package io.datapulse.core.service;
 
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ID_IMMUTABLE;
@@ -78,7 +77,7 @@ public class AccountConnectionService
 
   @Transactional(readOnly = true)
   public AccountConnectionDto getByAccountIdAndMarketplaceType(
-      @NotNull(message = ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
       MarketplaceType marketplaceType) {
     if (accountId == null) {
       throw new BadRequestException(ACCOUNT_ID_REQUIRED);
@@ -104,18 +103,18 @@ public class AccountConnectionService
 
   @Transactional
   public AccountConnectionResponse update(
-      @NotNull(message = ACCOUNT_CONNECTION_ACCOUNT_ID_REQUIRED) Long id,
+      @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED)
       @Valid AccountConnectionUpdateRequest request) {
-    AccountConnectionDto dto = get(id)
-        .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, id));
+    AccountConnectionDto dto = get(accountId)
+        .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_NOT_FOUND, accountId));
 
     validateImmutabilityOnUpdate(dto.getAccountId(), request.accountId());
     validateMarketplaceUniquenessOnUpdate(
         dto.getAccountId(),
         dto.getMarketplace(),
         request.marketplaceType(),
-        id);
+        accountId);
 
     mapper.applyUpdate(request, dto, cryptoService, objectMapper);
 

@@ -30,11 +30,11 @@ public class AccountConnectionController {
     return accountConnectionService.create(request);
   }
 
-  @PutMapping(value = "/{id}", consumes = "application/json")
+  @PutMapping(value = "/{accountId}", consumes = "application/json")
   public AccountConnectionResponse update(
-      @PathVariable Long id,
+      @PathVariable Long accountId,
       @Valid @RequestBody AccountConnectionUpdateRequest request) {
-    return accountConnectionService.update(id, request);
+    return accountConnectionService.update(accountId, request);
   }
 
   @DeleteMapping("/{id}")
