@@ -16,6 +16,7 @@ import io.datapulse.domain.dto.request.AccountUpdateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.NotFoundException;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,7 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
 
   @Transactional
   public AccountResponse create(
-      @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
+      @Valid @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
     AccountDto dto = mapper.fromCreateRequest(request);
     if (repository.existsByNameIgnoreCase(dto.getName())) {
       throw new AppException(MessageCodes.ACCOUNT_ALREADY_EXISTS, dto.getName());
@@ -85,7 +86,7 @@ public class AccountService extends AbstractCrudService<AccountDto, AccountEntit
   @Transactional
   public AccountResponse update(
       @NotNull(message = ID_REQUIRED) Long id,
-      @NotNull(message = ACCOUNT_UPDATE_REQUEST_REQUIRED) AccountUpdateRequest request) {
+      @Valid @NotNull(message = ACCOUNT_UPDATE_REQUEST_REQUIRED) AccountUpdateRequest request) {
     AccountDto current = get(id).orElseThrow(
         () -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id));
 

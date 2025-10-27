@@ -1,16 +1,20 @@
 package io.datapulse.rest.advice;
 
-import static io.datapulse.domain.MessageCodes.REQUEST_INVALID;
-
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,23 +28,62 @@ public class GenericControllerAdvice {
   private final MessageSource messageSource;
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ErrorResponse> handleBodyValidation(MethodArgumentNotValidException ex,
-      Locale locale) {
-    var fieldError = ex.getBindingResult().getFieldErrors().stream().findFirst().orElse(null);
-    String userMsg;
+  public ResponseEntity<ErrorResponse> handleMethodArgNotValid(MethodArgumentNotValidException ex) {
+    String msg = buildMessage(ex);
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(msg));
+  }
 
-    if (fieldError != null) {
-      userMsg = messageSource.getMessage(fieldError, locale);
-    } else {
-      userMsg = messageSource.getMessage(REQUEST_INVALID, null,
-          "Некорректные данные запроса", locale);
+  @ExceptionHandler(BindException.class)
+  public ResponseEntity<ErrorResponse> handleBindException(BindException ex) {
+    String msg = buildMessage(ex);
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(msg));
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+    String msg = buildMessage(ex);
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(msg));
+  }
+
+  private String buildMessage(Throwable ex) {
+    if (ex instanceof MethodArgumentNotValidException manve) {
+      return messageFromBindingResult(manve.getBindingResult());
     }
+    if (ex instanceof BindException be) {
+      return messageFromBindingResult(be);
+    }
+    if (ex instanceof ConstraintViolationException cve) {
+      return messageFromViolations(cve.getConstraintViolations());
+    }
+    if (ex instanceof IllegalArgumentException iae) {
+      String msg = safe(iae.getMessage());
+      return msg.isBlank() ? "Некорректный аргумент" : msg;
+    }
+    return "Ошибка валидации запроса";
+  }
 
-    String logMsg = messageSource.getMessage(REQUEST_INVALID, null,
-        "Invalid request body", LOCALE_EN);
-    log.warn("{}: {}", logMsg, ex.getBindingResult().getAllErrors());
+  private String messageFromBindingResult(BindingResult br) {
+    String joined = br.getAllErrors().stream()
+        .map(err -> safe(err.getDefaultMessage()))
+        .filter(msg -> !msg.isBlank())
+        .distinct()
+        .collect(Collectors.joining("; "));
 
-    return ResponseEntity.badRequest().body(new ErrorResponse(userMsg));
+    return joined.isBlank() ? "Ошибка валидации запроса" : joined;
+  }
+
+  private String messageFromViolations(Set<ConstraintViolation<?>> violations) {
+    String joined = violations.stream()
+        .map(v -> safe(v.getMessage()))
+        .filter(msg -> !msg.isBlank())
+        .distinct()
+        .collect(Collectors.joining("; "));
+
+    return joined.isBlank() ? "Ошибка валидации запроса" : joined;
+  }
+
+  private String safe(String s) {
+    return s == null ? "" : s.trim();
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)

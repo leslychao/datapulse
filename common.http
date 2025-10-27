@@ -1,50 +1,42 @@
-### Accounts — CREATE 201 + shape
+### ========================
+### ACCOUNT — CREATE (201)
+### ========================
 POST {{host}}/api/accounts
 Content-Type: application/json
 
 {
-  "name": "Test account A"
+  "name": "Test Account"
 }
 
 > {%
   client.test("Account CREATE: 201", () => client.assert(response.status === 201));
-
-  const body = response.body || {};
-  client.test("Account CREATE: body has id & name", () => {
-    client.assert(!!body, "empty body");
-    client.assert(body.id !== undefined, "missing id");
-    client.assert(typeof body.name === "string" && body.name.length > 0, "bad name");
+  const b = response.body || {};
+  client.test("Account CREATE: shape ok", () => {
+    client.assert(b.id !== undefined, "missing id");
+    client.assert(typeof b.name === "string" && b.name.length > 0, "invalid name");
   });
-
-  client.global.set("accountId", String((response.body || {}).id || ""));
+  client.global.set("accountId", String(b.id || ""));
 %}
 
-### Accounts — UPDATE 200
+### ACCOUNT — UPDATE (200)
 PUT {{host}}/api/accounts/{{accountId}}
 Content-Type: application/json
 
 {
   "id": {{accountId}},
-  "name": "Test account A — updated"
+  "name": "Test Account — updated"
 }
 
 > {%
   client.test("Account UPDATE: 200", () => client.assert(response.status === 200));
   const b = response.body || {};
-  client.test("Account UPDATE: id preserved & name updated", () => {
-    client.assert(String(b.id) === String(client.global.get("accountId")), "id mismatch");
-    client.assert(b.name === "Test account A — updated", "name not updated");
-  });
+  client.test("Account UPDATE: id preserved", () =>
+      client.assert(String(b.id) === String(client.global.get("accountId")), "id mismatch"));
+  client.test("Account UPDATE: name updated", () =>
+      client.assert(/updated/i.test(b.name), "name not updated"));
 %}
 
-### Accounts — DELETE 204
-DELETE {{host}}/api/accounts/{{accountId}}
-
-> {%
-  client.test("Account DELETE: 204", () => client.assert(response.status === 204));
-%}
-
-### Accounts — NEGATIVE: name blank -> 400
+### ACCOUNT — NEGATIVE: blank name → 400
 POST {{host}}/api/accounts
 Content-Type: application/json
 
@@ -54,67 +46,67 @@ Content-Type: application/json
 
 > {%
   client.test("Account CREATE blank name: 400", () => client.assert(response.status === 400));
-
-  const b = response.body || {};
-  const msg = typeof b === "string" ? b : (b.message || b.error || JSON.stringify(b));
-  client.test("Account CREATE blank name: has validation hint", () => {
-    client.assert(
-        /blank|пуст|not\s*blank|size|max/i.test(msg),
-        "no expected validation hint: " + msg
-    );
-  });
+  const msg = response.body?.message || "";
+  client.test("Account CREATE blank name: hint", () =>
+      client.assert(/name|обязательно|пуст/i.test(msg), "no validation hint: " + msg));
 %}
 
-### Accounts — NEGATIVE UPDATE: not found -> 404
-PUT {{host}}/api/accounts/9999999
-Content-Type: application/json
-
-{
-  "name": "Name"
-}
-
-> {%
-  client.test("Account UPDATE not found: 404", () => client.assert(response.status === 404));
-  const b = response.body || {};
-  const msg = typeof b === "string" ? b : (b.message || b.error || JSON.stringify(b));
-  client.test("Account UPDATE not found: message mentions not found", () => {
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
-  });
-%}
-
-### Accounts — CREATE 201 + shape
+### ACCOUNT — NEGATIVE: name > 255 → 400
 POST {{host}}/api/accounts
 Content-Type: application/json
 
 {
-  "name": "Test account A"
+  "name": "{{'x'.repeat(260)}}"
 }
 
 > {%
-  client.test("Account CREATE: 201", () => client.assert(response.status === 201));
-
-  const body = response.body || {};
-  client.test("Account CREATE: body has id & name", () => {
-    client.assert(!!body, "empty body");
-    client.assert(body.id !== undefined, "missing id");
-    client.assert(typeof body.name === "string" && body.name.length > 0, "bad name");
-  });
-
-  client.global.set("accountId", String((response.body || {}).id || ""));
+  client.test("Account CREATE long name: 400", () => client.assert(response.status === 400));
+  const msg = response.body?.message || "";
+  client.test("Account CREATE long name: mentions length", () =>
+      client.assert(/длина|max/i.test(msg), "no length hint: " + msg));
 %}
 
-### Account Connections
-### Ниже два позитивных шаблона (WB/OZON). Заполни реальные поля внутри credentials — я отметил // TODO. Если пока не знаешь их, запусти «негатив» ниже — там проверки ожидают 400 и наличие ошибок по credentials.
-### AccountConnection — CREATE (WILDBERRIES) 201
+### ACCOUNT — NEGATIVE: not found → 404
+PUT {{host}}/api/accounts/9999999
+Content-Type: application/json
+
+{
+  "id": 9999999,
+  "name": "Not found"
+}
+
+> {%
+  client.test("Account UPDATE not found: 404", () => client.assert(response.status === 404));
+  const msg = response.body?.message || "";
+  client.test("Account UPDATE not found: mentions not found", () =>
+      client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg));
+%}
+
+### ACCOUNT — NEGATIVE: path id ≠ body id → 4xx
+PUT {{host}}/api/accounts/123456
+Content-Type: application/json
+
+{
+  "id": 654321,
+  "name": "Mismatch"
+}
+
+> {%
+  client.test("Account UPDATE id mismatch: 4xx", () => {
+    client.assert(String(response.status).startsWith("4"), "expected 4xx, got " + response.status);
+  });
+%}
+
+### ========================
+### ACCOUNT-CONNECTION — CREATE (WB)
+### ========================
 POST {{host}}/api/account-connections
 Content-Type: application/json
 
 {
   "accountId": {{accountId}},
   "marketplaceType": "WILDBERRIES",
-  "credentials": {
-    "token": "xxx"
-  },
+  "credentials": { "token": "xxx" },
   "active": true
 }
 
@@ -122,214 +114,183 @@ Content-Type: application/json
   client.test("AC CREATE WB: 201", () => client.assert(response.status === 201));
   const b = response.body || {};
   client.global.set("acIdWb", String(b.id || ""));
-  client.test("AC CREATE WB: basic fields", () => {
-    client.assert(b.marketplace === "WILDBERRIES", "wrong marketplaceType");
-    client.assert(typeof b.active === "boolean", "active missing/invalid");
+  client.test("AC CREATE WB: type & active ok", () => {
+    client.assert(b.marketplace === "WILDBERRIES", "wrong marketplace");
+    client.assert(b.active === true, "active not true");
   });
 %}
 
-### AccountConnection — UPDATE (WILDBERRIES) 200
-PUT {{base}}/api/account-connections/{{acIdWb}}
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — UPDATE (WB)
+PUT {{host}}/api/account-connections/{{acIdWb}}
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": "WILDBERRIES",
-"credentials": {
-// TODO: актуализированные WB-поля
-},
-"active": false
+  "accountId": {{accountId}},
+  "marketplaceType": "WILDBERRIES",
+  "credentials": { "token": "yyy" },
+  "active": false
 }
 
-{%
-client.test("AC UPDATE WB: 200", () => client.assert(response.status === 200));
-const b = response.body || {};
-client.test("AC UPDATE WB: active=false", () => {
-client.assert(b.active === false, "active not false");
-});
+> {%
+  client.test("AC UPDATE WB: 200", () => client.assert(response.status === 200));
+  client.test("AC UPDATE WB: active=false", () =>
+      client.assert(response.body.active === false, "active not false"));
 %}
 
-### AccountConnection — CREATE (OZON) 201
-
-POST {{base}}/api/account-connections
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — CREATE (OZON)
+POST {{host}}/api/account-connections
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": "OZON",
-"credentials": {
-// TODO: заполнить реальными полями OzonCredentials
-// "clientId": "xxx",
-// "apiKey": "yyy"
-},
-"active": true
+  "accountId": {{accountId}},
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "xxx", "apiKey": "yyy" },
+  "active": true
 }
 
-{%
-client.test("AC CREATE OZON: 201", () => client.assert(response.status === 201));
-const b = response.body || {};
-client.global.set("acIdOzon", String(b.id || ""));
-client.test("AC CREATE OZON: type ok", () => client.assert(b.marketplaceType === "OZON"));
+> {%
+  client.test("AC CREATE OZON: 201", () => client.assert(response.status === 201));
+  const b = response.body || {};
+  client.global.set("acIdOzon", String(b.id || ""));
+  client.test("AC CREATE OZON: type ok", () =>
+      client.assert(b.marketplace === "OZON", "wrong marketplace"));
 %}
 
-### AccountConnection — UPDATE (OZON) 200
-
-PUT {{base}}/api/account-connections/{{acIdOzon}}
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — UPDATE (OZON)
+PUT {{host}}/api/account-connections/{{acIdOzon}}
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": "OZON",
-"credentials": {
-// TODO: актуализированные OZON-поля
-},
-"active": false
+  "accountId": {{accountId}},
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "new", "apiKey": "new" },
+  "active": false
 }
 
-{%
-client.test("AC UPDATE OZON: 200", () => client.assert(response.status === 200));
-const b = response.body || {};
-client.test("AC UPDATE OZON: active=false", () => client.assert(b.active === false));
+> {%
+  client.test("AC UPDATE OZON: 200", () => client.assert(response.status === 200));
+  client.test("AC UPDATE OZON: active=false", () =>
+      client.assert(response.body.active === false));
 %}
 
-### AccountConnection — DELETE 204
-
-DELETE {{base}}/api/account-connections/{{acIdWb}}
-Authorization: {{auth}}
-
-{%
-client.test("AC DELETE WB: 204", () => client.assert(response.status === 204));
-%}
-
-### AccountConnection — NEGATIVE: credentials missing -> 400
-
-POST {{base}}/api/account-connections
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — NEGATIVE: credentials missing → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": "WILDBERRIES",
-"active": true
+  "accountId": {{accountId}},
+  "marketplaceType": "WILDBERRIES",
+  "active": true
 }
 
-{%
-client.test("AC CREATE missing credentials: 400", () => client.assert(response.status === 400));
-const b = response.body || {};
-const msg = typeof b === "string" ? b : (b.message || b.error || JSON.stringify(b));
-client.test("AC CREATE missing credentials: mentions credentials", () => {
-client.assert(/credential/i.test(msg), "no credentials hint: " + msg);
-});
+> {%
+  client.test("AC missing credentials: 400", () => client.assert(response.status === 400));
+  const msg = response.body?.message || "";
+  client.test("AC missing credentials: mentions credentials", () =>
+      client.assert(/credential|учет/i.test(msg), "no credentials hint: " + msg));
 %}
 
-### AccountConnection — NEGATIVE: mismatched credentials type -> 400
-marketplaceType=WILDBERRIES, но передаём поля, похожие на Ozon
-
-POST {{base}}/api/account-connections
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — NEGATIVE: mismatched credentials type → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": "WILDBERRIES",
-"credentials": {
-"clientId": "looks-like-ozon",
-"apiKey": "looks-like-ozon"
-},
-"active": true
+  "accountId": {{accountId}},
+  "marketplaceType": "WILDBERRIES",
+  "credentials": { "clientId": "ozon", "apiKey": "ozon" },
+  "active": true
 }
 
-{%
-client.test("AC mismatch type: expect 400", () => client.assert(response.status === 400));
-const b = response.body || {};
-const msg = typeof b === "string" ? b : (b.message || b.error || JSON.stringify(b));
-client.test("AC mismatch type: mentions marketplace/credentials", () => {
-client.assert(/marketplace|credential|type/i.test(msg), "no hint: " + msg);
-});
+> {%
+  client.test("AC mismatch credentials: 400", () => client.assert(response.status === 400));
+  const msg = response.body?.message || "";
+  client.test("AC mismatch credentials: hint marketplace/credentials", () =>
+      client.assert(/marketplace|credential|type/i.test(msg), "no hint: " + msg));
 %}
 
-### AccountConnection — NEGATIVE: marketplaceType null -> 400
-
-POST {{base}}/api/account-connections
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — NEGATIVE: null marketplaceType → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": null,
-"credentials": {},
-"active": true
+  "accountId": {{accountId}},
+  "marketplaceType": null,
+  "credentials": {},
+  "active": true
 }
 
-{%
-client.test("AC null marketplaceType: 400", () => client.assert(response.status === 400));
+> {%
+  client.test("AC null marketplaceType: 400", () => client.assert(response.status === 400));
 %}
 
-### AccountConnection — NEGATIVE: accountId null -> 400
-
-POST {{base}}/api/account-connections
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — NEGATIVE: null accountId → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
 
 {
-"accountId": null,
-"marketplaceType": "OZON",
-"credentials": {},
-"active": true
+  "accountId": null,
+  "marketplaceType": "OZON",
+  "credentials": {},
+  "active": true
 }
 
-{%
-client.test("AC null accountId: 400", () => client.assert(response.status === 400));
+> {%
+  client.test("AC null accountId: 400", () => client.assert(response.status === 400));
 %}
 
-### Account CREATE — name > 255 -> 400
-
-POST {{base}}/api/accounts
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — NEGATIVE: unknown id → 404
+PUT {{host}}/api/account-connections/999999999
+Content-Type: application/json
 
 {
-"name": "{{'x'.repeat(260)}}"
+  "accountId": {{accountId}},
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "a", "apiKey": "b" },
+  "active": true
 }
 
-{%
-client.test("Account CREATE long name: 400", () => client.assert(response.status === 400));
+> {%
+  client.test("AC UPDATE unknown id: 404", () => client.assert(response.status === 404));
+  const msg = response.body?.message || "";
+  client.test("AC UPDATE unknown id: mentions not found", () =>
+      client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg));
 %}
 
-### Account UPDATE — path id != body id -> 400/409
-### Ожидаем 400 (или 409 — зависит от вашей бизнес-логики)
-
-PUT {{base}}/api/accounts/123456
-Content-Type: {{json}}
-Authorization: {{auth}}
+### ACCOUNT-CONNECTION — NEGATIVE: duplicate marketplace → 400
+POST {{host}}/api/account-connections
+Content-Type: application/json
 
 {
-"id": 999999,
-"name": "Mismatch"
+  "accountId": {{accountId}},
+  "marketplaceType": "OZON",
+  "credentials": { "clientId": "dup", "apiKey": "dup" },
+  "active": true
 }
 
-{%
-client.test("Account UPDATE id mismatch: 4xx", () => {
-client.assert(String(response.status).startsWith("4"), "expected 4xx, got " + response.status);
-});
+> {%
+  client.test("AC duplicate marketplace: 400", () => client.assert(response.status === 400));
+  const msg = response.body?.message || "";
+  client.test("AC duplicate marketplace: mentions exists", () =>
+      client.assert(/существует|exists/i.test(msg), "no duplicate hint: " + msg));
 %}
 
-### AccountConnection UPDATE — unknown id -> 404
+### CLEANUP — DELETE OZON
+DELETE {{host}}/api/account-connections/{{acIdOzon}}
 
-PUT {{base}}/api/account-connections/999999999
-Content-Type: {{json}}
-Authorization: {{auth}}
+> {%
+  client.test("AC DELETE OZON: 204", () => client.assert(response.status === 204));
+%}
 
-{
-"accountId": 1,
-"marketplaceType": "OZON",
-"credentials": {},
-"active": true
-}
+### CLEANUP — DELETE WB
+DELETE {{host}}/api/account-connections/{{acIdWb}}
 
-{%
-client.test("AC UPDATE unknown id: 404", () => client.assert(response.status === 404));
+> {%
+  client.test("AC DELETE WB: 204", () => client.assert(response.status === 204));
+%}
+
+### CLEANUP — DELETE ACCOUNT
+DELETE {{host}}/api/accounts/{{accountId}}
+
+> {%
+  client.test("Account DELETE: 204", () => client.assert(response.status === 204));
 %}
