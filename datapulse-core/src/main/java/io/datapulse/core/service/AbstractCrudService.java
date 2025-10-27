@@ -1,9 +1,13 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
+import static io.datapulse.domain.MessageCodes.NOT_FOUND;
+
 import io.datapulse.core.converter.BeanConverter;
 import io.datapulse.core.entity.LongBaseEntity;
 import io.datapulse.domain.dto.LongBaseDto;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.domain.exception.NotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -63,13 +67,13 @@ public abstract class AbstractCrudService<T extends LongBaseDto, E extends LongB
 
   private T updateInternal(@NonNull T dto, @NonNull Function<E, E> persistFunction) {
     if (dto.getId() == null) {
-      throw new AppException("id.required");
+      throw new AppException(ID_REQUIRED);
     }
     E entity = getRepository().findById(dto.getId())
         .map(found -> updateEntityWithDto(found, dto))
         .map(this::entityPreUpdateAction)
         .map(persistFunction)
-        .orElseThrow(() -> new AppException("not.found", dto.getId()));
+        .orElseThrow(() -> new NotFoundException(NOT_FOUND, dto.getId()));
     return mapToDto(entity);
   }
 

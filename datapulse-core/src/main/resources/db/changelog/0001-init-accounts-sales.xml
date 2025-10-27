@@ -21,18 +21,21 @@
         updated_at TIMESTAMPTZ
       );
 
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_account_name_ci
+        ON account (LOWER(name));
+
       -- ===============================
       -- Таблица account_connection
       -- ===============================
       CREATE TABLE account_connection
       (
         id                    BIGSERIAL PRIMARY KEY,
-        account_id            BIGINT  NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        marketplace           TEXT    NOT NULL,              -- вместо marketplace_type ENUM
-        credentials_encrypted TEXT    NOT NULL,
-        active                BOOLEAN NOT NULL DEFAULT TRUE,
+        account_id            BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        marketplace           TEXT        NOT NULL, -- вместо marketplace_type ENUM
+        credentials_encrypted TEXT        NOT NULL,
+        active                BOOLEAN     NOT NULL DEFAULT TRUE,
         last_sync_at          TIMESTAMPTZ,
-        last_sync_status      TEXT,                          -- вместо sync_status_enum ENUM
+        last_sync_status      TEXT,                 -- вместо sync_status_enum ENUM
         created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at            TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)

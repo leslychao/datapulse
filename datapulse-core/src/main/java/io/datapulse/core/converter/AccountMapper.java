@@ -10,14 +10,13 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = TimeMapper.class)
+@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralConfig.class)
 public interface AccountMapper extends BeanConverter<AccountDto, AccountEntity> {
 
   @Override
   @Mapping(target = "id", ignore = true)
-  @Mapping(target = "createdAt", ignore = true) // Variant A: выставит @PrePersist
+  @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-    // Variant A: выставит @PreUpdate
   AccountEntity mapToEntity(AccountDto dto);
 
   @Override

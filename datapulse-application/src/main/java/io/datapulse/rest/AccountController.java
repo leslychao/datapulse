@@ -1,12 +1,16 @@
 package io.datapulse.rest;
 
 import io.datapulse.core.service.AccountService;
-import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
+import io.datapulse.domain.dto.request.AccountUpdateRequest;
+import io.datapulse.domain.dto.response.AccountResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -21,7 +25,19 @@ public class AccountController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public void create(@Valid @RequestBody AccountCreateRequest request) {
-    accountService.create(request);
+  public AccountResponse create(@Valid @RequestBody AccountCreateRequest request) {
+    return accountService.create(request);
+  }
+
+  @PutMapping(path = "/{id}", consumes = "application/json")
+  public AccountResponse update(@PathVariable Long id,
+      @Valid @RequestBody AccountUpdateRequest request) {
+    return accountService.update(id, request);
+  }
+
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(@PathVariable Long id) {
+    accountService.delete(id);
   }
 }

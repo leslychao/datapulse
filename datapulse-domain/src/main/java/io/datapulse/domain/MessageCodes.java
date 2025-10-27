@@ -5,9 +5,10 @@ public final class MessageCodes {
   private MessageCodes() {
   }
 
-  public static final String ACCOUNT_NOT_FOUND = "account.not-found";
-  public static final String ACCOUNT_ALREADY_EXISTS = "account.already-exists";
   public static final String ACCOUNT_ID_REQUIRED = "account.id.required";
+  public static final String ACCOUNT_NAME_REQUIRED = "account.name.required";
+  public static final String ACCOUNT_ALREADY_EXISTS = "account.already-exists";
+  public static final String ACCOUNT_NOT_FOUND = "account.not-found";
 
   public static final String ACCOUNT_CONNECTION_ID_IMMUTABLE = "account.connection.id.immutable";
   public static final String ACCOUNT_CONNECTION_NOT_FOUND = "account.connection.not-found";
@@ -44,4 +45,7 @@ public final class MessageCodes {
   public static final String HTTP_HEADERS_OZON_MISSING_CREDENTIALS = "http.headers.ozon.missing-credentials";
 
   public static final String JSON_BODY_INVALID = "json.parse.body.invalid";
+
+  public static final String ID_REQUIRED = "id.required";
+  public static final String NOT_FOUND = "not.found";
 }
