@@ -6,10 +6,10 @@ public final class MessageCodes {
   }
 
   // ===== Account =====
-  public static final String ACCOUNT_CREATE_REQUEST_REQUIRED = "{account.create-request.required}";
+  public static final String ACCOUNT_CREATE_REQUEST_REQUIRED = "account.create-request.required";
   public static final String ACCOUNT_UPDATE_REQUEST_REQUIRED = "account.update-request.required";
   public static final String ACCOUNT_ID_REQUIRED = "account.id.required";
-  public static final String ACCOUNT_NAME_REQUIRED = "{account.name.required}";
+  public static final String ACCOUNT_NAME_REQUIRED = "account.name.required";
   public static final String ACCOUNT_NAME_MAX_LENGTH = "account.name.max-length";
   public static final String ACCOUNT_ALREADY_EXISTS = "account.already-exists";
   public static final String ACCOUNT_NOT_FOUND = "account.not-found";
