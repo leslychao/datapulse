@@ -1,6 +1,6 @@
 package io.datapulse.rest.advice;
 
-import static io.datapulse.domain.MessageCodes.VALIDATION_REQUEST_INVALID;
+import static io.datapulse.domain.MessageCodes.REQUEST_INVALID;
 
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
@@ -32,11 +32,11 @@ public class GenericControllerAdvice {
     if (fieldError != null) {
       userMsg = messageSource.getMessage(fieldError, locale);
     } else {
-      userMsg = messageSource.getMessage(VALIDATION_REQUEST_INVALID, null,
+      userMsg = messageSource.getMessage(REQUEST_INVALID, null,
           "Некорректные данные запроса", locale);
     }
 
-    String logMsg = messageSource.getMessage(VALIDATION_REQUEST_INVALID, null,
+    String logMsg = messageSource.getMessage(REQUEST_INVALID, null,
         "Invalid request body", LOCALE_EN);
     log.warn("{}: {}", logMsg, ex.getBindingResult().getAllErrors());
 

@@ -71,10 +71,10 @@ public class WbAdapter implements MarketplaceAdapter {
 
   private <T> Flux<T> doFetch(long accountId, URI uri, Class<T> type) {
     if (uri == null) {
-      throw new AppException(MessageCodes.VALIDATION_URI_REQUIRED);
+      throw new AppException(MessageCodes.URI_REQUIRED);
     }
     if (type == null) {
-      throw new AppException(MessageCodes.VALIDATION_TYPE_REQUIRED);
+      throw new AppException(MessageCodes.TYPE_REQUIRED);
     }
 
     Bulkhead bulkhead = resilienceFactory.bulkhead(TYPE);

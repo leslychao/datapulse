@@ -59,7 +59,7 @@ public final class WbEndpoints {
   private static String ensureBaseUrlPresent(MarketplaceProperties.Provider provider) {
     String base = provider.getBaseUrl();
     if (base == null || base.isBlank()) {
-      throw new AppException(MessageCodes.MARKETPLACE_BASEURL_MISSING,
+      throw new AppException(MessageCodes.MARKETPLACE_BASE_URL_MISSING,
           MarketplaceType.WILDBERRIES.name());
     }
     return base;

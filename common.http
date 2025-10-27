@@ -65,57 +65,70 @@ Content-Type: application/json
   });
 %}
 
-### Accounts — NEGATIVE UPDATE: id null -> 400
-PUT {{host}}/api/accounts/1
+### Accounts — NEGATIVE UPDATE: not found -> 404
+PUT {{host}}/api/accounts/9999999
 Content-Type: application/json
 
 {
-  "id": null,
   "name": "Name"
 }
 
 > {%
-  client.test("Account UPDATE id null: 400", () => client.assert(response.status === 400));
+  client.test("Account UPDATE not found: 404", () => client.assert(response.status === 404));
   const b = response.body || {};
   const msg = typeof b === "string" ? b : (b.message || b.error || JSON.stringify(b));
-  client.test("Account UPDATE id null: message mentions id/not null", () => {
-    client.assert(/id.(null|not\snull|пуст)/i.test(msg), "no id not-null hint: " + msg);
+  client.test("Account UPDATE not found: message mentions not found", () => {
+    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
   });
 %}
 
-### Account Connections
-
-### Ниже два позитивных шаблона (WB/OZON). Заполни реальные поля внутри credentials — я отметил // TODO. Если пока не знаешь их, запусти «негатив» ниже — там проверки ожидают 400 и наличие ошибок по credentials.
-
-### AccountConnection — CREATE (WILDBERRIES) 201
-
-POST {{base}}/api/account-connections
-Content-Type: {{json}}
-Authorization: {{auth}}
+### Accounts — CREATE 201 + shape
+POST {{host}}/api/accounts
+Content-Type: application/json
 
 {
-"accountId": 1,
-"marketplaceType": "WILDBERRIES",
-"credentials": {
-// TODO: заполнить реальными полями WbCredentials
-// "token": "xxx",
-// "supplierId": "yyy"
-},
-"active": true
+  "name": "Test account A"
 }
 
-{%
-client.test("AC CREATE WB: 201", () => client.assert(response.status === 201));
-const b = response.body || {};
-client.global.set("acIdWb", String(b.id || ""));
-client.test("AC CREATE WB: basic fields", () => {
-client.assert(b.marketplaceType === "WILDBERRIES", "wrong marketplaceType");
-client.assert(typeof b.active === "boolean", "active missing/invalid");
-});
+> {%
+  client.test("Account CREATE: 201", () => client.assert(response.status === 201));
+
+  const body = response.body || {};
+  client.test("Account CREATE: body has id & name", () => {
+    client.assert(!!body, "empty body");
+    client.assert(body.id !== undefined, "missing id");
+    client.assert(typeof body.name === "string" && body.name.length > 0, "bad name");
+  });
+
+  client.global.set("accountId", String((response.body || {}).id || ""));
+%}
+
+### Account Connections
+### Ниже два позитивных шаблона (WB/OZON). Заполни реальные поля внутри credentials — я отметил // TODO. Если пока не знаешь их, запусти «негатив» ниже — там проверки ожидают 400 и наличие ошибок по credentials.
+### AccountConnection — CREATE (WILDBERRIES) 201
+POST {{host}}/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": {{accountId}},
+  "marketplaceType": "WILDBERRIES",
+  "credentials": {
+    "token": "xxx"
+  },
+  "active": true
+}
+
+> {%
+  client.test("AC CREATE WB: 201", () => client.assert(response.status === 201));
+  const b = response.body || {};
+  client.global.set("acIdWb", String(b.id || ""));
+  client.test("AC CREATE WB: basic fields", () => {
+    client.assert(b.marketplace === "WILDBERRIES", "wrong marketplaceType");
+    client.assert(typeof b.active === "boolean", "active missing/invalid");
+  });
 %}
 
 ### AccountConnection — UPDATE (WILDBERRIES) 200
-
 PUT {{base}}/api/account-connections/{{acIdWb}}
 Content-Type: {{json}}
 Authorization: {{auth}}

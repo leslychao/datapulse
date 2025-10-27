@@ -30,7 +30,7 @@ public class HttpHeaderProvider {
 
     HeaderStrategy strategy = STRATEGIES.get(type);
     if (strategy == null) {
-      throw new AppException(MessageCodes.HTTP_HEADERS_UNKNOWN_MARKETPLACE, type);
+      throw new AppException(MessageCodes.UNKNOWN_MARKETPLACE, type);
     }
 
     strategy.apply(headers, credentials);
@@ -49,7 +49,7 @@ public class HttpHeaderProvider {
       if (credentials instanceof WbCredentials wb && wb.token() != null && !wb.token().isBlank()) {
         headers.set(HttpHeaders.AUTHORIZATION, wb.token());
       } else {
-        throw new AppException(MessageCodes.HTTP_HEADERS_WB_MISSING_TOKEN);
+        throw new AppException(MessageCodes.WB_MISSING_TOKEN);
       }
     }
   }
@@ -67,7 +67,7 @@ public class HttpHeaderProvider {
         headers.set(HEADER_CLIENT_ID, ozon.clientId());
         headers.set(HEADER_API_KEY, ozon.apiKey());
       } else {
-        throw new AppException(MessageCodes.HTTP_HEADERS_OZON_MISSING_CREDENTIALS);
+        throw new AppException(MessageCodes.OZON_MISSING_CREDENTIALS);
       }
     }
   }
