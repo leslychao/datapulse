@@ -36,7 +36,7 @@ public class EtlFlow {
         .split()                         // разбивает Flux на элементы
         .transform(wbSaleMapper::toDto)  // → SaleDto
         .handle(SaleDto.class, (sale, headers) -> {
-          System.out.println(formatLine(sale));
+          System.out.println("=====================" + formatLine(sale));
           return null;
         })
         .log(Level.INFO, "wbSalesFlow", m -> "✓ WB sales printed")

@@ -27,7 +27,7 @@ marketplace:
       # Опциональные локальные оверрайды на эндпоинт (ключи — sales|stock|finance|reviews)
       resilienceOverrides:
         reviews:
-          limitForPeriod: 3
+          limitForPeriod: 3          # не «упираемся»; даем дышать burst-ведру
           limitRefreshPeriod: 1s
           tokenWaitTimeout: 2s
           maxConcurrentCalls: 3
@@ -37,7 +37,39 @@ marketplace:
           maxBackoff: 10s
           maxJitter: 300ms
           retryAfterFallback: 1s
-
+        finance:
+          limitForPeriod: 120        # осторожнее темп
+          limitRefreshPeriod: 60s
+          tokenWaitTimeout: 2s
+          maxConcurrentCalls: 8
+          bulkheadWait: 1s
+          maxAttempts: 5
+          baseBackoff: 300ms
+          maxBackoff: 20s
+          maxJitter: 400ms
+          retryAfterFallback: 1s
+        sales:
+          limitForPeriod: 200
+          limitRefreshPeriod: 60s
+          tokenWaitTimeout: 2s
+          maxConcurrentCalls: 10
+          bulkheadWait: 1s
+          maxAttempts: 5
+          baseBackoff: 250ms
+          maxBackoff: 20s
+          maxJitter: 400ms
+          retryAfterFallback: 1s
+        stock:
+          limitForPeriod: 240
+          limitRefreshPeriod: 60s
+          tokenWaitTimeout: 2s
+          maxConcurrentCalls: 12
+          bulkheadWait: 1s
+          maxAttempts: 5
+          baseBackoff: 200ms
+          maxBackoff: 15s
+          maxJitter: 300ms
+          retryAfterFallback: 1s
     OZON:
       baseUrl: https://api-seller.ozon.ru
       sandbox:
@@ -59,3 +91,37 @@ marketplace:
         maxBackoff: 20s
         maxJitter: 300ms
         retryAfterFallback: 1s
+      resilienceOverrides:
+        sales: # /v1/analytics/data
+          limitForPeriod: 30
+          limitRefreshPeriod: 1s
+          tokenWaitTimeout: 3s
+          maxConcurrentCalls: 10
+          bulkheadWait: 1s
+          maxAttempts: 4
+          baseBackoff: 400ms
+          maxBackoff: 15s
+          maxJitter: 400ms
+          retryAfterFallback: 1s
+        finance: # /v3/finance/transaction/list
+          limitForPeriod: 30
+          limitRefreshPeriod: 1s
+          tokenWaitTimeout: 3s
+          maxConcurrentCalls: 10
+          bulkheadWait: 1s
+          maxAttempts: 4
+          baseBackoff: 400ms
+          maxBackoff: 15s
+          maxJitter: 400ms
+          retryAfterFallback: 1s
+        reviews: # /v1/review/list — умеренно консервативный
+          limitForPeriod: 40
+          limitRefreshPeriod: 1s
+          tokenWaitTimeout: 3s
+          maxConcurrentCalls: 12
+          bulkheadWait: 1s
+          maxAttempts: 4
+          baseBackoff: 300ms
+          maxBackoff: 12s
+          maxJitter: 300ms
+          retryAfterFallback: 1s
