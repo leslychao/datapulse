@@ -53,6 +53,10 @@ public class EtlFlow {
     return wbAdapter.fetchSales(accountId, from, to)
         .timeout(Duration.ofMinutes(3))
         .doOnSubscribe(s -> log.info("WB fetchSales acc={} {}..{}", accountId, from, to))
+        .switchIfEmpty(Flux.defer(() -> {
+          log.info("WB fetchSales acc={} {}..{}: EMPTY", accountId, from, to);
+          return Flux.empty();
+        }))
         .doOnComplete(() -> log.info("WB fetchSales done acc={} {}..{}", accountId, from, to));
   }
 

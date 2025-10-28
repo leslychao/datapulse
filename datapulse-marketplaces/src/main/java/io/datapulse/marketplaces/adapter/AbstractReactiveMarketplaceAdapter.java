@@ -9,60 +9,65 @@ import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.MarketplaceExceptions;
 import io.datapulse.marketplaces.endpoints.EndpointKey;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
-import io.datapulse.marketplaces.resilience.ResilienceFactory;
-import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.datapulse.marketplaces.resilience.ResilienceManager;
+import io.datapulse.marketplaces.resilience.ResilienceManager.ResilienceKit;
 import java.net.URI;
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import reactor.core.publisher.Flux;
-import reactor.util.retry.Retry;
 
+/**
+ * Базовый реактивный адаптер: - формирует заголовки - создаёт ResilienceKit
+ * (RateLimiter+Bulkhead+Retry) - применяет resilience (rate-limit, bulkhead) и retry к сырому
+ * стриму - конвертирует JSON-массив в Flux<T> с внятной обёрткой ошибок
+ */
 abstract class AbstractReactiveMarketplaceAdapter {
 
   protected final StreamingDownloadService streamingDownloadService;
-  protected final ResilienceFactory resilienceFactory;
+  protected final ResilienceManager resilienceManager;
   protected final JsonFluxReader fluxReader;
   protected final HttpHeaderProvider headerProvider;
   protected final CredentialsProvider credentialsProvider;
 
   protected AbstractReactiveMarketplaceAdapter(
       StreamingDownloadService streamingDownloadService,
-      ResilienceFactory resilienceFactory,
+      ResilienceManager resilienceManager,
       JsonFluxReader fluxReader,
       HttpHeaderProvider headerProvider,
       CredentialsProvider credentialsProvider
   ) {
     this.streamingDownloadService = Objects.requireNonNull(streamingDownloadService);
-    this.resilienceFactory = Objects.requireNonNull(resilienceFactory);
+    this.resilienceManager = Objects.requireNonNull(resilienceManager);
     this.fluxReader = Objects.requireNonNull(fluxReader);
     this.headerProvider = Objects.requireNonNull(headerProvider);
     this.credentialsProvider = Objects.requireNonNull(credentialsProvider);
   }
 
-  protected final <T> Flux<T> get(MarketplaceType type, EndpointKey key, long accountId, URI uri,
-      Class<T> targetType) {
+  protected final <T> Flux<T> get(
+      MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType
+  ) {
     return execute(type, key, accountId, uri, targetType, () ->
-        streamingDownloadService.stream(
-            uri, buildHeaders(type, accountId),
-            retry(type, key), rateLimiter(type, key, accountId), bulkhead(type, key, accountId)
-        ));
+        streamingDownloadService.stream(uri, buildHeaders(type, accountId)));
   }
 
-  protected final <T> Flux<T> post(MarketplaceType type, EndpointKey key, long accountId, URI uri,
-      Object body, Class<T> targetType) {
+  protected final <T> Flux<T> post(
+      MarketplaceType type, EndpointKey key, long accountId, URI uri, Object body,
+      Class<T> targetType
+  ) {
     return execute(type, key, accountId, uri, targetType, () ->
-        streamingDownloadService.post(
-            uri, buildHeaders(type, accountId), body,
-            retry(type, key), rateLimiter(type, key, accountId), bulkhead(type, key, accountId)
-        ));
+        streamingDownloadService.post(uri, buildHeaders(type, accountId), body));
   }
 
-  private <T> Flux<T> execute(MarketplaceType type, EndpointKey key, long accountId, URI uri,
+  private <T> Flux<T> execute(
+      MarketplaceType type,
+      EndpointKey key,
+      long accountId,
+      URI uri,
       Class<T> targetType,
-      Supplier<Flux<DataBuffer>> call) {
+      Supplier<Flux<DataBuffer>> rawCall
+  ) {
     if (uri == null) {
       throw new AppException(MessageCodes.URI_REQUIRED);
     }
@@ -70,29 +75,24 @@ abstract class AbstractReactiveMarketplaceAdapter {
       throw new AppException(MessageCodes.TYPE_REQUIRED);
     }
 
-    Flux<DataBuffer> bytes = call.get()
-        .onErrorMap(ex -> new MarketplaceExceptions.FetchFailed(ex,
-            MessageCodes.MARKETPLACE_FETCH_FAILED, type, key.tag(), accountId, uri));
+    // Сформировать комплект устойчивости (для данного marketplace/endpoint/account)
+    ResilienceKit kit = resilienceManager.kit(type, key.tag(), accountId);
 
-    return fluxReader.readArray(bytes, targetType)
-        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(ex,
-            MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), accountId, uri));
+    // Применить ratelimiter + bulkhead и затем кастомный retry
+    Flux<DataBuffer> guarded = resilienceManager
+        .apply(rawCall.get(), kit)
+        .retryWhen(kit.retry())
+        .onErrorMap(ex -> new MarketplaceExceptions.FetchFailed(
+            ex, MessageCodes.MARKETPLACE_FETCH_FAILED, type, key.tag(), accountId, uri));
+
+    // Прочитать массив JSON → Flux<T> с правильной ошибкой парсинга
+    return fluxReader.readArray(guarded, targetType)
+        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
+            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), accountId, uri));
   }
 
   private HttpHeaders buildHeaders(MarketplaceType type, long accountId) {
     var creds = credentialsProvider.resolve(accountId, type);
     return headerProvider.build(type, creds);
-  }
-
-  private Bulkhead bulkhead(MarketplaceType type, EndpointKey key, long accountId) {
-    return resilienceFactory.bulkhead(type, key.tag(), accountId);
-  }
-
-  private Retry retry(MarketplaceType type, EndpointKey key) {
-    return resilienceFactory.retry(type, key.tag());
-  }
-
-  private RateLimiter rateLimiter(MarketplaceType type, EndpointKey key, long accountId) {
-    return resilienceFactory.rateLimiter(type, key.tag(), accountId);
   }
 }

@@ -11,7 +11,6 @@ import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
 import io.datapulse.marketplaces.endpoints.EndpointKey;
 import io.datapulse.marketplaces.endpoints.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
-import io.datapulse.marketplaces.resilience.ResilienceFactory;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.ZoneId;
