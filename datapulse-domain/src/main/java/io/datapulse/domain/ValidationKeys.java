@@ -14,4 +14,11 @@ public final class ValidationKeys {
       "{" + MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED + "}";
   public static final String ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED =
       "{" + MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED + "}";
+
+  public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK =
+      "{" + MessageCodes.CREDENTIALS_WB_TOKEN_NOT_BLANK + "}";
+  public static final String CREDENTIALS_OZON_CLIENT_ID_NOT_BLANK =
+      "{" + MessageCodes.CREDENTIALS_OZON_CLIENT_ID_NOT_BLANK + "}";
+  public static final String CREDENTIALS_OZON_API_KEY_NOT_BLANK =
+      "{" + MessageCodes.CREDENTIALS_OZON_API_KEY_NOT_BLANK + "}";
 }
