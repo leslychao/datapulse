@@ -18,7 +18,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", config = MapStructCentralConfig.class)
+@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralConfig.class)
 public interface AccountConnectionMapper
     extends BeanConverter<AccountConnectionDto, AccountConnectionEntity> {
 
