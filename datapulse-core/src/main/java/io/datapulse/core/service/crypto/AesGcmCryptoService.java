@@ -1,5 +1,6 @@
 package io.datapulse.core.service.crypto;
 
+import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -32,7 +33,7 @@ public class AesGcmCryptoService implements CryptoService {
       byte[] ct = cipher.doFinal(plain.getBytes(StandardCharsets.UTF_8));
       return VERSION + ":" + b64(iv) + ":" + b64(ct);
     } catch (Exception e) {
-      throw new AppException(e, "crypto.encrypt.failed");
+      throw new AppException(e, MessageCodes.CRYPTO_ENCRYPTION_ERROR);
     }
   }
 
@@ -41,14 +42,14 @@ public class AesGcmCryptoService implements CryptoService {
     try {
       String[] parts = cipherText.split(":", 3);
       if (parts.length != 3) {
-        throw new AppException("crypto.decrypt.invalid-format");
+        throw new AppException(MessageCodes.CRYPTO_DECRYPTION_INVALID_FORMAT);
       }
       if (!VERSION.equals(parts[0])) {
-        throw new AppException("crypto.decrypt.unsupported-version", parts[0]);
+        throw new AppException(MessageCodes.CRYPTO_DECRYPTION_UNSUPPORTED_VERSION, parts[0]);
       }
       byte[] iv = b64d(parts[1]);
       if (iv.length != IV_BYTES) {
-        throw new AppException("crypto.decrypt.invalid-iv-length", iv.length);
+        throw new AppException(MessageCodes.CRYPTO_DECRYPTION_INVALID_IV_LENGTH, iv.length);
       }
       byte[] ct = b64d(parts[2]);
 
@@ -57,7 +58,7 @@ public class AesGcmCryptoService implements CryptoService {
       byte[] pt = cipher.doFinal(ct);
       return new String(pt, StandardCharsets.UTF_8);
     } catch (Exception e) {
-      throw new AppException(e, "crypto.decrypt.failed");
+      throw new AppException(e, MessageCodes.CRYPTO_DECRYPTION_ERROR);
     }
   }
 

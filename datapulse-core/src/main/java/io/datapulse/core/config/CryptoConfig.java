@@ -1,37 +1,42 @@
 package io.datapulse.core.config;
 
+import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@RequiredArgsConstructor
 public class CryptoConfig {
 
+  private final CryptoProperties props;
+
   @Bean
-  public SecretKey masterKey(CryptoProperties props) {
-    String encodedKey = props.getMasterKeyBase64();
+  public SecretKey masterKey() {
+    String encoded = props.getMasterKeyBase64();
 
-    if (encodedKey == null || encodedKey.isBlank()) {
-      throw new AppException("crypto.master-key.missing");
+    if (encoded == null || encoded.isBlank()) {
+      throw new AppException(MessageCodes.CRYPTO_MASTER_KEY_MISSING);
     }
 
-    byte[] raw;
+    byte[] decoded;
     try {
-      raw = Base64.getDecoder().decode(encodedKey);
+      decoded = Base64.getDecoder().decode(encoded);
     } catch (IllegalArgumentException e) {
-      throw new AppException(e, "crypto.master-key.invalid-base64");
+      throw new AppException(e, MessageCodes.CRYPTO_MASTER_KEY_INVALID_BASE64);
     }
 
-    int len = raw.length;
-    if (len != 16 && len != 24 && len != 32) {
-      throw new AppException("crypto.master-key.invalid-length", len);
+    int length = decoded.length;
+    if (length != 16 && length != 24 && length != 32) {
+      throw new AppException(MessageCodes.CRYPTO_MASTER_KEY_INVALID_LENGTH, length);
     }
 
-    return new SecretKeySpec(raw, "AES");
+    return new SecretKeySpec(decoded, "AES");
   }
 
   @Bean

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-/** /public/api/sales — продажи */
 public record WbSalesResponse(
     List<Item> data,
     String nextCursor // если используется постраничность курсором
