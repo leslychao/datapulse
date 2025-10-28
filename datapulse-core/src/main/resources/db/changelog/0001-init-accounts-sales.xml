@@ -4,10 +4,11 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="
         http://www.liquibase.org/xml/ns/dbchangelog
-        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <changeSet id="0001-init-datapulse-core" author="datapulse" dbms="postgresql">
     <sql>
+      -- ===== Accounts =====
       CREATE TABLE account
       (
         id         BIGSERIAL PRIMARY KEY,
@@ -15,7 +16,6 @@
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ
       );
-
       CREATE UNIQUE INDEX IF NOT EXISTS ux_account_name_ci
         ON account (LOWER(name));
 
@@ -32,166 +32,13 @@
         updated_at            TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
       );
-
       CREATE INDEX idx_acc_conn_account ON account_connection (account_id);
       CREATE INDEX idx_acc_conn_marketplace ON account_connection (marketplace);
-
-      CREATE TABLE product
-      (
-        id         BIGSERIAL PRIMARY KEY,
-        account_id BIGINT       NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        sku        VARCHAR(255) NOT NULL,
-        name       TEXT,
-        brand      TEXT,
-        category   TEXT,
-        barcode    TEXT,
-        created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ,
-        CONSTRAINT uq_product_acc_sku UNIQUE (account_id, sku)
-      );
-
-      CREATE INDEX idx_product_account ON product (account_id);
-      CREATE INDEX idx_product_sku ON product (sku);
-
-      CREATE TABLE sales_fact
-      (
-        id                    BIGSERIAL PRIMARY KEY,
-        account_connection_id BIGINT         NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
-        product_id            BIGINT REFERENCES product (id),
-        sku                   VARCHAR(255)   NOT NULL,
-        dt                    DATE           NOT NULL,
-        quantity              INT            NOT NULL,
-        revenue               NUMERIC(18, 2) NOT NULL,
-        cost                  NUMERIC(18, 2) NOT NULL,
-        margin                NUMERIC(18, 2) NOT NULL,
-        CONSTRAINT uq_sales_accconn_sku_dt UNIQUE (account_connection_id, sku, dt)
-      );
-
-      CREATE INDEX idx_sales_fact_dt ON sales_fact (dt);
-      CREATE INDEX idx_sales_fact_sku ON sales_fact (sku);
-      CREATE INDEX idx_sales_fact_accconn ON sales_fact (account_connection_id);
-      CREATE INDEX idx_sales_fact_product ON sales_fact (product_id);
-
-      CREATE TABLE stock_snapshot
-      (
-        id                    BIGSERIAL PRIMARY KEY,
-        account_connection_id BIGINT       NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
-        product_id            BIGINT REFERENCES product (id),
-        sku                   VARCHAR(255) NOT NULL,
-        dt                    DATE         NOT NULL,
-        stock                 INT          NOT NULL,
-        out_of_stock_flag     BOOLEAN      NOT NULL DEFAULT FALSE,
-        days_of_cover         INT,
-        CONSTRAINT uq_stock_accconn_sku_dt UNIQUE (account_connection_id, sku, dt)
-      );
-
-      CREATE INDEX idx_stock_dt ON stock_snapshot (dt);
-      CREATE INDEX idx_stock_sku ON stock_snapshot (sku);
-      CREATE INDEX idx_stock_accconn ON stock_snapshot (account_connection_id);
-      CREATE INDEX idx_stock_product ON stock_snapshot (product_id);
-
-      CREATE TABLE price_snapshot
-      (
-        id                    BIGSERIAL PRIMARY KEY,
-        account_connection_id BIGINT       NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
-        product_id            BIGINT REFERENCES product (id),
-        sku                   VARCHAR(255) NOT NULL,
-        dt                    DATE         NOT NULL,
-        price                 NUMERIC(18, 2),
-        promo_price           NUMERIC(18, 2),
-        promo_active          BOOLEAN DEFAULT FALSE,
-        CONSTRAINT uq_price_accconn_sku_dt UNIQUE (account_connection_id, sku, dt)
-      );
-
-      CREATE INDEX idx_price_dt ON price_snapshot (dt);
-      CREATE INDEX idx_price_sku ON price_snapshot (sku);
-      CREATE INDEX idx_price_accconn ON price_snapshot (account_connection_id);
-      CREATE INDEX idx_price_product ON price_snapshot (product_id);
-
-      CREATE TABLE ad_spend_fact
-      (
-        id                    BIGSERIAL PRIMARY KEY,
-        account_connection_id BIGINT NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
-        dt                    DATE   NOT NULL,
-        shows                 NUMERIC(18, 2),
-        clicks                NUMERIC(18, 2),
-        ctr                   NUMERIC(10, 4),
-        cpc                   NUMERIC(18, 4),
-        cpo                   NUMERIC(18, 4),
-        roas                  NUMERIC(18, 4),
-        CONSTRAINT uq_adspend_accconn_dt UNIQUE (account_connection_id, dt)
-      );
-
-      CREATE INDEX idx_adspend_dt ON ad_spend_fact (dt);
-      CREATE INDEX idx_adspend_accconn ON ad_spend_fact (account_connection_id);
-
-      CREATE TABLE finance_fact
-      (
-        id                    BIGSERIAL PRIMARY KEY,
-        account_connection_id BIGINT         NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
-        dt                    DATE           NOT NULL,
-        fee_type              TEXT           NOT NULL,
-        amount                NUMERIC(18, 2) NOT NULL,
-        CONSTRAINT uq_finance_accconn_dt_feetype UNIQUE (account_connection_id, dt, fee_type)
-      );
-
-      CREATE INDEX idx_finance_dt ON finance_fact (dt);
-      CREATE INDEX idx_finance_accconn ON finance_fact (account_connection_id);
-
-      CREATE TABLE review
-      (
-        id                    BIGSERIAL PRIMARY KEY,
-        account_connection_id BIGINT NOT NULL REFERENCES account_connection (id) ON DELETE CASCADE,
-        product_id            BIGINT REFERENCES product (id),
-        sku                   VARCHAR(255),
-        dt                    DATE   NOT NULL,
-        rating                INT    NOT NULL,
-        text                  TEXT,
-        author                TEXT,
-        replied               BOOLEAN DEFAULT FALSE
-      );
-
-      CREATE INDEX idx_review_dt ON review (dt);
-      CREATE INDEX idx_review_sku ON review (sku);
-      CREATE INDEX idx_review_accconn ON review (account_connection_id);
-      CREATE INDEX idx_review_product ON review (product_id);
-
-      CREATE UNIQUE INDEX uq_review_accconn_sku_dt_author
-        ON review (account_connection_id, COALESCE(sku, ''), dt, author);
-
-      CREATE TABLE competitor_match
-      (
-        id               BIGSERIAL PRIMARY KEY,
-        account_id       BIGINT       NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        product_id       BIGINT REFERENCES product (id),
-        competitor_sku   VARCHAR(255) NOT NULL,
-        competitor_name  TEXT,
-        competitor_brand TEXT,
-        competitor_price NUMERIC(18, 2),
-        verified         BOOLEAN               DEFAULT FALSE,
-        created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
-        updated_at       TIMESTAMPTZ
-      );
-
-      CREATE INDEX idx_comp_match_acc ON competitor_match (account_id);
-      CREATE INDEX idx_comp_match_sku ON competitor_match (competitor_sku);
-      CREATE INDEX idx_comp_match_verified ON competitor_match (verified);
     </sql>
 
     <rollback>
-      DROP INDEX IF EXISTS uq_review_accconn_sku_dt_author;
-      DROP INDEX IF EXISTS ux_account_name_ci;
-      DROP TABLE IF EXISTS competitor_match CASCADE;
-      DROP TABLE IF EXISTS review CASCADE;
-      DROP TABLE IF EXISTS finance_fact CASCADE;
-      DROP TABLE IF EXISTS ad_spend_fact CASCADE;
-      DROP TABLE IF EXISTS price_snapshot CASCADE;
-      DROP TABLE IF EXISTS stock_snapshot CASCADE;
-      DROP TABLE IF EXISTS sales_fact CASCADE;
-      DROP TABLE IF EXISTS product CASCADE;
       DROP TABLE IF EXISTS account_connection CASCADE;
       DROP TABLE IF EXISTS account CASCADE;
     </rollback>
   </changeSet>
-
 </databaseChangeLog>

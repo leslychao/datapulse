@@ -1,6 +1,5 @@
 package io.datapulse.marketplaces.adapter;
 
-import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.core.parser.JsonFluxReader;
 import io.datapulse.core.resilience.ResilienceFactory;
 import io.datapulse.core.service.CredentialsProvider;
@@ -9,6 +8,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.MarketplaceExceptions;
+import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import java.net.URI;

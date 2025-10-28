@@ -1,19 +1,18 @@
 package io.datapulse.marketplaces.adapter;
 
-import io.datapulse.domain.dto.FinanceDto;
-import io.datapulse.domain.dto.ReviewDto;
-import io.datapulse.domain.dto.SaleDto;
-import io.datapulse.domain.dto.StockDto;
+import io.datapulse.domain.MarketplaceType;
 import java.time.LocalDate;
 import reactor.core.publisher.Flux;
 
-public interface MarketplaceAdapter {
+public interface MarketplaceAdapter<S, ST, F, R> {
 
-  Flux<SaleDto> fetchSales(long accountId, LocalDate from, LocalDate to);
+  MarketplaceType type();
 
-  Flux<StockDto> fetchStock(long accountId, LocalDate onDate);
+  Flux<S>  fetchSales(long accountId, LocalDate from, LocalDate to);
 
-  Flux<FinanceDto> fetchFinance(long accountId, LocalDate from, LocalDate to);
+  Flux<ST> fetchStock(long accountId, LocalDate onDate);
 
-  Flux<ReviewDto> fetchReviews(long accountId, LocalDate from, LocalDate to);
+  Flux<F>  fetchFinance(long accountId, LocalDate from, LocalDate to);
+
+  Flux<R>  fetchReviews(long accountId, LocalDate from, LocalDate to);
 }
