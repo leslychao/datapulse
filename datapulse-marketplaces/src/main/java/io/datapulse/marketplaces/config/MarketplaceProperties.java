@@ -5,7 +5,6 @@ import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
@@ -25,8 +24,8 @@ import org.springframework.validation.annotation.Validated;
 public class MarketplaceProperties {
 
   @NotNull
-  private final Map<MarketplaceType, @Valid Provider> providers =
-      new EnumMap<>(MarketplaceType.class);
+  private final Map<MarketplaceType, @Valid Provider> providers = new EnumMap<>(
+      MarketplaceType.class);
 
   public Provider get(MarketplaceType type) {
     Provider provider = providers.get(type);
@@ -42,19 +41,15 @@ public class MarketplaceProperties {
   public static class Provider {
 
     /**
-     * Продакшн-хост для «основных» эндпоинтов (обязателен).
+     * Переключатель режима песочницы на уровне провайдера.
      */
+    private boolean useSandbox = false;
+
     @NotBlank
     private String baseUrl;
 
-    /**
-     * Продакшн-хост для «feedbacks» (WB), опционален.
-     */
     private String feedbacksBaseUrl;
 
-    /**
-     * Опциональный блок песочницы (если нужен).
-     */
     @Valid
     private Sandbox sandbox;
 
@@ -65,6 +60,13 @@ public class MarketplaceProperties {
     @Valid
     @NotNull
     private Resilience resilience;
+
+    /**
+     * Опциональные локальные оверрайды параметров резилентности по ключу эндпоинта: sales | stock |
+     * finance | reviews.
+     */
+    @Valid
+    private Map<String, Resilience> resilienceOverrides;
   }
 
   @Getter
@@ -72,15 +74,8 @@ public class MarketplaceProperties {
   @Validated
   public static class Sandbox {
 
-    /**
-     * Песочница: базовый хост для основных эндпоинтов.
-     */
     @NotBlank
     private String baseUrl;
-
-    /**
-     * Песочница: хост для feedbacks (WB), опционален.
-     */
     private String feedbacksBaseUrl;
   }
 
@@ -105,15 +100,11 @@ public class MarketplaceProperties {
   public static class Resilience {
 
     @NotNull
-    @Min(1)
     private Integer limitForPeriod;
     @NotNull
-    @Min(1)
     private Integer maxConcurrentCalls;
     @NotNull
-    @Min(1)
     private Integer maxAttempts;
-
     @NotNull
     private Duration baseBackoff;
     @NotNull
@@ -122,7 +113,6 @@ public class MarketplaceProperties {
     private Duration maxJitter;           // 0 — без джиттера
     @NotNull
     private Duration retryAfterFallback;  // 0 — без ожидания по умолчанию
-
     @NotNull
     private Duration limitRefreshPeriod;  // rate limiter refresh
     @NotNull

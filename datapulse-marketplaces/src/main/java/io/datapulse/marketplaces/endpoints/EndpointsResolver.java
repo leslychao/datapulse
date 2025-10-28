@@ -1,9 +1,9 @@
 package io.datapulse.marketplaces.endpoints;
 
-import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.marketplaces.config.MarketplaceProperties;
 import java.net.URI;
 import java.util.Map;
 import lombok.NonNull;
@@ -21,26 +21,22 @@ public class EndpointsResolver {
 
   public URI sales(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(p.getSandbox().getBaseUrl(), required(p.getEndpoints().getSales(), "sales"));
+    return buildUri(host(p, type, "sales"), required(p.getEndpoints().getSales(), "sales"));
   }
 
   public URI stock(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(p.getBaseUrl(), required(p.getEndpoints().getStock(), "stock"));
+    return buildUri(host(p, type, "stock"), required(p.getEndpoints().getStock(), "stock"));
   }
 
   public URI finance(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(p.getBaseUrl(), required(p.getEndpoints().getFinance(), "finance"));
+    return buildUri(host(p, type, "finance"), required(p.getEndpoints().getFinance(), "finance"));
   }
 
   public URI reviews(@NonNull MarketplaceType type) {
     var p = provider(type);
-    String host = p.getBaseUrl();
-    if (type == MarketplaceType.WILDBERRIES && notBlank(p.getFeedbacksBaseUrl())) {
-      host = p.getFeedbacksBaseUrl();
-    }
-    return buildUri(host, required(p.getEndpoints().getReviews(), "reviews"));
+    return buildUri(host(p, type, "reviews"), required(p.getEndpoints().getReviews(), "reviews"));
   }
 
   private MarketplaceProperties.Provider provider(MarketplaceType type) {
@@ -62,14 +58,24 @@ public class EndpointsResolver {
     return s == null || s.isBlank();
   }
 
-  private static boolean notBlank(String s) {
-    return !isBlank(s);
-  }
-
   private static String required(String path, String key) {
     if (isBlank(path)) {
       throw new AppException(MessageCodes.MARKETPLACE_CONFIG_MISSING, key);
     }
     return path;
+  }
+
+  private static String host(MarketplaceProperties.Provider p, MarketplaceType type,
+      String endpointKey) {
+    final boolean sandbox = p.isUseSandbox() && p.getSandbox() != null;
+    final String base = sandbox ? p.getSandbox().getBaseUrl() : p.getBaseUrl();
+
+    // Особый хост для WB feedbacks (reviews)
+    if (type == MarketplaceType.WILDBERRIES && "reviews".equals(endpointKey)) {
+      final String fb = sandbox ? p.getSandbox().getFeedbacksBaseUrl()
+          : p.getFeedbacksBaseUrl();
+      return isBlank(fb) ? base : fb;
+    }
+    return base;
   }
 }

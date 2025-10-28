@@ -1,48 +1,61 @@
 marketplace:
   providers:
     WILDBERRIES:
-      # прод-окружение
+      useSandbox: false
       baseUrl: https://statistics-api.wildberries.ru
       feedbacksBaseUrl: https://feedbacks-api.wildberries.ru
-      # песочница
       sandbox:
         baseUrl: https://statistics-api-sandbox.wildberries.ru
         feedbacksBaseUrl: https://feedbacks-api-sandbox.wildberries.ru
       endpoints:
-        sales: /api/v1/supplier/sales          # продажи/возвраты :contentReference[oaicite:0]{index=0}
-        stock: /api/v1/supplier/stocks         # остатки :contentReference[oaicite:1]{index=1}
-        finance: /api/v5/supplier/reportDetailByPeriod  # детализация реализаций (v5) :contentReference[oaicite:2]{index=2}
-        reviews: /api/v1/questions             # список вопросов (Q&A) :contentReference[oaicite:3]{index=3}
+        sales: /api/v1/supplier/sales
+        stock: /api/v1/supplier/stocks
+        finance: /api/v5/supplier/reportDetailByPeriod
+        reviews: /api/v1/questions
       resilience:
-        limitForPeriod: 50
-        limitRefreshPeriod: 1s
+        # WB дефолт: «ровная подача» + запас под burst (можно точечно переопределять ниже)
+        limitForPeriod: 300        # 300 запросов/мин (пример для категории Marketplace)
+        limitRefreshPeriod: 60s
         tokenWaitTimeout: 2s
-        maxConcurrentCalls: 10
+        maxConcurrentCalls: 16     # держим ниже burst, оставляя запас
         bulkheadWait: 1s
         maxAttempts: 5
         baseBackoff: 200ms
         maxBackoff: 30s
         maxJitter: 500ms
         retryAfterFallback: 1s
+      # Опциональные локальные оверрайды на эндпоинт (ключи — sales|stock|finance|reviews)
+      resilienceOverrides:
+        reviews:
+          limitForPeriod: 3
+          limitRefreshPeriod: 1s
+          tokenWaitTimeout: 2s
+          maxConcurrentCalls: 3
+          bulkheadWait: 1s
+          maxAttempts: 4
+          baseBackoff: 200ms
+          maxBackoff: 10s
+          maxJitter: 300ms
+          retryAfterFallback: 1s
+
     OZON:
-      # основной боевой API
       baseUrl: https://api-seller.ozon.ru
-      # опциональная песочница (удобно для локальных тестов)
       sandbox:
         baseUrl: https://sandbox-api-seller.ozon.ru
       endpoints:
-        sales: /v1/analytics/data                # Аналитика продаж
-        stock: /v4/product/info/stocks           # Остатки по товарам
-        finance: /v3/finance/transaction/list      # Финансовые транзакции
-        reviews: /v1/review/list                   # Отзывы покупателей
+        sales: /v1/analytics/data
+        stock: /v4/product/info/stocks
+        finance: /v3/finance/transaction/list
+        reviews: /v1/review/list
       resilience:
-        limitForPeriod: 20          # разрешено N запросов за период
-        limitRefreshPeriod: 1s      # период обновления лимита (1 сек)
-        tokenWaitTimeout: 3s        # ожидание токена при rate-limit
-        maxConcurrentCalls: 8        # одновременно обрабатываемых вызовов
-        bulkheadWait: 1s            # ожидание свободного слота bulkhead
-        maxAttempts: 4              # количество попыток при ошибке
-        baseBackoff: 300ms          # начальная задержка при retry
-        maxBackoff: 20s             # верхний предел задержки
-        maxJitter: 300ms            # разброс для случайного джиттера
-        retryAfterFallback: 1s      # дефолт для Retry-After, если заголовок не пришёл
+        # Глобальный лимит 50 rps на Client ID — ставим секционный limiter
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        tokenWaitTimeout: 3s
+        maxConcurrentCalls: 20
+        bulkheadWait: 1s
+        maxAttempts: 4
+        baseBackoff: 300ms
+        maxBackoff: 20s
+        maxJitter: 300ms
+        retryAfterFallback: 1s

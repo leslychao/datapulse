@@ -31,7 +31,8 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
       ResilienceFactory resilienceFactory,
       JsonFluxReader fluxReader,
       HttpHeaderProvider headerProvider,
-      CredentialsProvider credentialsProvider) {
+      CredentialsProvider credentialsProvider
+  ) {
     super(streamingDownloadService, resilienceFactory, fluxReader, headerProvider,
         credentialsProvider);
     this.endpoints = endpoints;
@@ -39,63 +40,48 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
-    // /v1/analytics/data — нужны dimensions/metrics
     URI uri = endpoints.sales(TYPE);
     var body = Map.of(
         "date_from", from.toString(),
         "date_to", to.toString(),
-        "dimension", List.of("sku"),         // базовый разрез
+        "dimension", List.of("sku"),
         "metrics", List.of("revenue", "orders"),
-        "filters", List.of()                 // без фильтров
+        "filters", List.of()
     );
-    return post(TYPE, accountId, uri, body, OzonSaleRaw.class);
+    return post(TYPE, "sales", accountId, uri, body, OzonSaleRaw.class);
   }
 
   @Override
   public Flux<OzonStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    // /v4/product/info/stocks — filter + last_id/limit
     URI uri = endpoints.stock(TYPE);
     var body = Map.of(
-        "filter", Map.of(
-            "offer_id", List.of(),
-            "product_id", List.of(),
-            "sku", List.of()
-        ),
+        "filter", Map.of("offer_id", List.of(), "product_id", List.of(), "sku", List.of()),
         "last_id", "",
         "limit", 1000
     );
-    return post(TYPE, accountId, uri, body, OzonStockRaw.class);
+    return post(TYPE, "stock", accountId, uri, body, OzonStockRaw.class);
   }
 
   @Override
   public Flux<OzonFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
-    // /v3/finance/transaction/list — filter.date + page
     URI uri = endpoints.finance(TYPE);
     var body = Map.of(
-        "filter", Map.of(
-            "date", Map.of("from", from.toString(), "to", to.toString())
-            // при необходимости сюда же "operation_type": List.of("OperationMarketplaceService", ...)
-        ),
+        "filter", Map.of("date", Map.of("from", from.toString(), "to", to.toString())),
         "page", Map.of("page", 1, "page_size", 1000)
     );
-    return post(TYPE, accountId, uri, body, OzonFinanceRaw.class);
+    return post(TYPE, "finance", accountId, uri, body, OzonFinanceRaw.class);
   }
 
   @Override
   public Flux<OzonReviewRaw> fetchReviews(long accountId, LocalDate from, LocalDate to) {
-    // /v1/review/list — page/page_size + filter.date_created
     URI uri = endpoints.reviews(TYPE);
     var body = Map.of(
         "page", 1,
         "page_size", 100,
-        "filter", Map.of(
-            "date_created", Map.of(
-                "time_from", from.toString() + "T00:00:00Z",
-                "time_to", to.toString() + "T23:59:59Z"
-            )
-            // опц.: "status": "published", "rating": [4,5], ...
-        )
+        "filter", Map.of("date_created", Map.of(
+            "time_from", from + "T00:00:00Z",
+            "time_to", to + "T23:59:59Z"))
     );
-    return post(TYPE, accountId, uri, body, OzonReviewRaw.class);
+    return post(TYPE, "reviews", accountId, uri, body, OzonReviewRaw.class);
   }
 }

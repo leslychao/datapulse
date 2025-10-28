@@ -13,6 +13,7 @@ import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
@@ -28,10 +29,10 @@ public class ResilienceFactory {
 
   private final MarketplaceProperties props;
 
-  public RateLimiter rateLimiter(MarketplaceType type, long accountId) {
-    var r = props.get(type).getResilience();
+  public RateLimiter rateLimiter(MarketplaceType type, String endpointKey, long accountId) {
+    var r = effectiveResilience(type, endpointKey);
     return RateLimiter.of(
-        type + ".rl." + accountId,
+        name(type, endpointKey, "rl", accountId),
         RateLimiterConfig.custom()
             .limitRefreshPeriod(Objects.requireNonNull(r.getLimitRefreshPeriod()))
             .limitForPeriod(reqPos(r.getLimitForPeriod()))
@@ -40,10 +41,10 @@ public class ResilienceFactory {
     );
   }
 
-  public Bulkhead bulkhead(MarketplaceType type, long accountId) {
-    var r = props.get(type).getResilience();
+  public Bulkhead bulkhead(MarketplaceType type, String endpointKey, long accountId) {
+    var r = effectiveResilience(type, endpointKey);
     return Bulkhead.of(
-        type + ".bh." + accountId,
+        name(type, endpointKey, "bh", accountId),
         BulkheadConfig.custom()
             .maxConcurrentCalls(reqPos(r.getMaxConcurrentCalls()))
             .maxWaitDuration(Objects.requireNonNull(r.getBulkheadWait()))
@@ -51,8 +52,8 @@ public class ResilienceFactory {
     );
   }
 
-  public Retry retry(MarketplaceType type) {
-    var r = props.get(type).getResilience();
+  public Retry retry(MarketplaceType type, String endpointKey) {
+    var r = effectiveResilience(type, endpointKey);
     final int maxAttempts = reqPos(r.getMaxAttempts());
     final Duration base = Objects.requireNonNull(r.getBaseBackoff());
     final Duration cap = Objects.requireNonNull(r.getMaxBackoff());
@@ -65,11 +66,8 @@ public class ResilienceFactory {
         return Mono.error(t);
       }
 
-      // HTTP
       if (t instanceof WebClientResponseException w) {
         final int code = w.getStatusCode().value();
-
-        // 429/503 — уважаем Retry-After
         if (code == 429 || code == 503) {
           Duration d = RetryAfterSupport.parse(w.getHeaders(), raFallback);
           if (d == null || d.isNegative()) {
@@ -77,15 +75,12 @@ public class ResilienceFactory {
           }
           return Mono.delay(d).then();
         }
-
-        // 408/425/5xx — экспоненциальный бэкофф
         if (code == 408 || code == 425 || (code >= 500 && code <= 599)) {
           return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
         }
         return Mono.error(t);
       }
 
-      // Транзитные сетевые
       if (t instanceof WebClientRequestException req) {
         Throwable c = req.getCause();
         if (c instanceof SocketTimeoutException || c instanceof ConnectException
@@ -95,13 +90,30 @@ public class ResilienceFactory {
         }
       }
 
-      // Отказы лимитера/булкхеда — ретраим
       if (t instanceof RequestNotPermitted || t instanceof BulkheadFullException) {
         return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
       }
 
       return Mono.error(t);
     }));
+  }
+
+  private MarketplaceProperties.Resilience effectiveResilience(MarketplaceType type,
+      String endpointKey) {
+    var p = props.get(type);
+    Map<String, MarketplaceProperties.Resilience> overrides = p.getResilienceOverrides();
+    if (overrides != null) {
+      var local = overrides.get(endpointKey);
+      if (local != null) {
+        return local;
+      }
+    }
+    return p.getResilience();
+  }
+
+  private static String name(MarketplaceType type, String endpointKey, String kind,
+      long accountId) {
+    return type + "." + endpointKey + "." + kind + "." + accountId;
   }
 
   private static int reqPos(Integer v) {
