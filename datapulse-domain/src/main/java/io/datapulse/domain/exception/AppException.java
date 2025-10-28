@@ -1,7 +1,9 @@
 package io.datapulse.domain.exception;
 
 import java.io.Serial;
+import java.util.Arrays;
 import lombok.Getter;
+import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.http.HttpStatus;
 
 @Getter
@@ -19,18 +21,26 @@ public class AppException extends RuntimeException {
   }
 
   public AppException(HttpStatus status, String messageKey, Object... args) {
-    this.status = status;
-    this.messageKey = messageKey;
-    this.args = args;
-  }
-
-  public AppException(Throwable cause, HttpStatus status, String messageKey, Object... args) {
-    this.status = status;
-    this.messageKey = messageKey;
-    this.args = args;
+    this(null, status, messageKey, args);
   }
 
   public AppException(Throwable cause, String messageKey, Object... args) {
     this(cause, HttpStatus.INTERNAL_SERVER_ERROR, messageKey, args);
+  }
+
+  public AppException(Throwable cause, HttpStatus status, String messageKey, Object... args) {
+    super(cause);
+    this.status = status;
+    this.messageKey = messageKey;
+    this.args = sanitizeArgs(args);
+  }
+
+  private static Object[] sanitizeArgs(Object[] args) {
+    if (ArrayUtils.isEmpty(args)) {
+      return args;
+    }
+    return Arrays.stream(args)
+        .map(arg -> arg instanceof Number ? String.valueOf(arg) : arg)
+        .toArray();
   }
 }
