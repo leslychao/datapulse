@@ -4,15 +4,14 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record OzonSaleRaw(
-    Result result
+public record OzonAnalyticsRowRaw(
+    List<Dimension> dimensions,
+    List<Double> metrics
 ) {
-
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public record Result(
-      List<OzonAnalyticsRowRaw> data,
-      List<Double> totals // если запрошены
-  ) {
-
-  }
+  public record Dimension(
+      String id,
+      String name
+  ) {}
 }
+

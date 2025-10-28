@@ -23,6 +23,7 @@ import reactor.core.publisher.Flux;
 public class EtlFlow {
 
   private final WbAdapter wbAdapter;
+  private final WbSaleMapper wbSaleMapper;
 
   @Bean
   public IntegrationFlow wbSalesFlow() {
@@ -30,9 +31,8 @@ public class EtlFlow {
         // payload — это Long accountId
         .handle(this::fetchWbSales)         // → Flux<WbSaleRaw>
         .split()                            // по одному raw на сообщение
-        .transform(WbSaleMapper::toDto)     // → SaleDto (нормализация)
+        .transform(wbSaleMapper::toDto)     // → SaleDto (нормализация)
         .handle(SaleDto.class, (sale, headers) -> {
-          // Печать «как есть» — без сохранения
           System.out.println(formatLine(sale));
           return null; // завершаем обработку
         })

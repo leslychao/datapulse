@@ -1,7 +1,6 @@
 package io.datapulse.marketplaces.adapter;
 
 import io.datapulse.core.parser.JsonFluxReader;
-import io.datapulse.core.resilience.ResilienceFactory;
 import io.datapulse.core.service.CredentialsProvider;
 import io.datapulse.core.service.StreamingDownloadService;
 import io.datapulse.domain.MarketplaceType;
@@ -9,10 +8,13 @@ import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.MarketplaceExceptions;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
+import io.datapulse.marketplaces.resilience.ResilienceFactory;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.util.Objects;
+import java.util.function.Supplier;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import reactor.core.publisher.Flux;
@@ -33,60 +35,61 @@ abstract class AbstractReactiveMarketplaceAdapter {
       HttpHeaderProvider headerProvider,
       CredentialsProvider credentialsProvider
   ) {
-    this.streamingDownloadService = streamingDownloadService;
-    this.resilienceFactory = resilienceFactory;
-    this.fluxReader = fluxReader;
-    this.headerProvider = headerProvider;
-    this.credentialsProvider = credentialsProvider;
+    this.streamingDownloadService = Objects.requireNonNull(streamingDownloadService,
+        "streamingDownloadService");
+    this.resilienceFactory = Objects.requireNonNull(resilienceFactory, "resilienceFactory");
+    this.fluxReader = Objects.requireNonNull(fluxReader, "fluxReader");
+    this.headerProvider = Objects.requireNonNull(headerProvider, "headerProvider");
+    this.credentialsProvider = Objects.requireNonNull(credentialsProvider, "credentialsProvider");
   }
 
-  protected <T> Flux<T> get(MarketplaceType type, long accountId, URI uri, Class<T> targetType) {
-    require(uri, targetType);
-    String endpoint = extractEndpoint(uri);
-
-    Bulkhead bulkhead = resilienceFactory.bulkhead(type);
-    Retry retry = resilienceFactory.retry(type);
-    RateLimiter rateLimiter = resilienceFactory.rateLimiter(type);
-    HttpHeaders headers = buildHeaders(type, accountId);
-
-    Flux<DataBuffer> body = streamingDownloadService
-        .stream(uri, headers, retry, rateLimiter, bulkhead)
-        .onErrorMap(ex -> new MarketplaceExceptions.FetchFailed(
-            ex, MessageCodes.MARKETPLACE_FETCH_FAILED, type, endpoint, accountId, uri));
-
-    return fluxReader.readArray(body, targetType)
-        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
-            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, endpoint, accountId, uri));
-  }
-
-  protected <T> Flux<T> post(MarketplaceType type, long accountId, URI uri, Object requestBody,
+  protected final <T> Flux<T> get(MarketplaceType type, long accountId, URI uri,
       Class<T> targetType) {
-    require(uri, targetType);
-    String endpoint = extractEndpoint(uri);
-
-    Bulkhead bulkhead = resilienceFactory.bulkhead(type);
-    Retry retry = resilienceFactory.retry(type);
-    RateLimiter rateLimiter = resilienceFactory.rateLimiter(type);
-    HttpHeaders headers = buildHeaders(type, accountId);
-
-    Flux<DataBuffer> body = streamingDownloadService
-        .post(uri, headers, requestBody, retry, rateLimiter, bulkhead)
-        .onErrorMap(ex -> new MarketplaceExceptions.FetchFailed(
-            ex, MessageCodes.MARKETPLACE_FETCH_FAILED, type, endpoint, accountId, uri));
-
-    return fluxReader.readArray(body, targetType)
-        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
-            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, endpoint, accountId, uri));
+    return execute(type, accountId, uri, targetType,
+        () -> streamingDownloadService.stream(
+            uri,
+            buildHeaders(type, accountId),
+            retry(type, accountId),
+            rateLimiter(type, accountId),
+            bulkhead(type, accountId)
+        ));
   }
 
-  // ===== helpers =====
-  private static void require(URI uri, Class<?> type) {
+  protected final <T> Flux<T> post(MarketplaceType type, long accountId, URI uri, Object body,
+      Class<T> targetType) {
+    return execute(type, accountId, uri, targetType,
+        () -> streamingDownloadService.post(
+            uri,
+            buildHeaders(type, accountId),
+            body,
+            retry(type, accountId),
+            rateLimiter(type, accountId),
+            bulkhead(type, accountId)
+        ));
+  }
+
+  private <T> Flux<T> execute(
+      MarketplaceType type, long accountId, URI uri, Class<T> targetType,
+      Supplier<Flux<DataBuffer>> call
+  ) {
     if (uri == null) {
       throw new AppException(MessageCodes.URI_REQUIRED);
     }
-    if (type == null) {
+    if (targetType == null) {
       throw new AppException(MessageCodes.TYPE_REQUIRED);
     }
+
+    final String endpoint = endpointOf(uri);
+
+    Flux<DataBuffer> bytes = call.get()
+        .onErrorMap(
+            ex -> new MarketplaceExceptions.FetchFailed(ex, MessageCodes.MARKETPLACE_FETCH_FAILED,
+                type, endpoint, accountId, uri));
+
+    return fluxReader.readArray(bytes, targetType)
+        .onErrorMap(
+            ex -> new MarketplaceExceptions.ParseFailed(ex, MessageCodes.MARKETPLACE_PARSE_FAILED,
+                type, endpoint, accountId, uri));
   }
 
   private HttpHeaders buildHeaders(MarketplaceType type, long accountId) {
@@ -94,15 +97,29 @@ abstract class AbstractReactiveMarketplaceAdapter {
     return headerProvider.build(type, creds);
   }
 
-  protected static String extractEndpoint(URI uri) {
-    String path = uri.getPath();
-    if (path == null || path.isBlank()) {
+  private static String endpointOf(URI uri) {
+    String p = (uri.getRawPath() != null) ? uri.getRawPath() : uri.getPath();
+    if (p == null || p.isBlank()) {
       return "unknown";
     }
-    path = path.startsWith("/") ? path.substring(1) : path;
-    if (path.endsWith("/")) {
-      path = path.substring(0, path.length() - 1);
+    if (p.startsWith("/")) {
+      p = p.substring(1);
     }
-    return Paths.get(path).normalize().toString();
+    if (p.endsWith("/")) {
+      p = p.substring(0, p.length() - 1);
+    }
+    return Paths.get(p).normalize().toString();
+  }
+
+  private Bulkhead bulkhead(MarketplaceType type, long accountId) {
+    return resilienceFactory.bulkhead(type, accountId);
+  }
+
+  private Retry retry(MarketplaceType type, long accountId) {
+    return resilienceFactory.retry(type, accountId);
+  }
+
+  private RateLimiter rateLimiter(MarketplaceType type, long accountId) {
+    return resilienceFactory.rateLimiter(type, accountId);
   }
 }

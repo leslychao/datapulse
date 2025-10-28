@@ -189,7 +189,7 @@ Content-Type: application/json
 {
   "accountId": {{accountId}},
   "marketplace": "WILDBERRIES",
-  "credentials": { "token": "zzz" },
+  "credentials": { "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzc3MDU5Mzg0LCJpZCI6IjAxOWExNTI1LWI1ZmEtNzNiZi04ZWIwLTE3YjMwYjk1MGY2MCIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.eURulaP5UTqegdGH86XJqRX2qnBao0jnX5DFCa_wUKzku84MCJF-IWyO6cdSokf6oVn5LPqtQkn-zLONagFvcg" },
   "active": true
 }
 
@@ -258,6 +258,47 @@ Content-Type: application/json
     client.assert(b.active === false, "active not false");
   });
 %}
+
+### ========================
+### WB SALES ETL — TRIGGER (202) c явными датами
+### ========================
+POST {{host}}/etl/wb/sales
+Content-Type: application/json
+
+{
+  "accountId": {{accountId}},
+  "from": "2025-10-27",
+  "to":   "2025-10-27"
+}
+
+> {%
+  client.test("WB SALES ETL (dates): 202 Accepted", function () {
+    client.assert(response.status === 202, "expected 202, got " + response.status);
+    var b = response.body || {};
+    client.assert(String(b.accountId) === String(client.global.get("acIdWb")), "accountId echo mismatch");
+    client.assert(/^\d{4}-\d{2}-\d{2}$/.test(b.from) && /^\d{4}-\d{2}-\d{2}$/.test(b.to), "dates are not ISO");
+  });
+%}
+
+### ========================
+### WB SALES ETL — TRIGGER (202) без дат (использует D-1)
+### ========================
+POST {{host}}/etl/wb/sales
+Content-Type: application/json
+
+{
+  "accountId": {{accountId}}
+}
+
+> {%
+  client.test("WB SALES ETL (default dates): 202 Accepted", function () {
+    client.assert(response.status === 202, "expected 202, got " + response.status);
+    var b = response.body || {};
+    client.assert(String(b.accountId) === String(client.global.get("acIdWb")), "accountId echo mismatch");
+    client.assert(b.from && b.to, "missing from/to in echo body");
+  });
+%}
+
 
 ### AC — NEGATIVE: create for unknown accountId → 404
 POST {{host}}/api/account-connections

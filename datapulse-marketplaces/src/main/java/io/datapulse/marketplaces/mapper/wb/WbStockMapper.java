@@ -1,32 +1,46 @@
 package io.datapulse.marketplaces.mapper.wb;
 
-import io.datapulse.domain.FulfillmentType;
 import io.datapulse.domain.dto.StockDto;
 import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
-import java.time.LocalDate;
+import org.mapstruct.*;
 
-public final class WbStockMapper {
+import java.math.BigDecimal;
 
-  private WbStockMapper() {
-  }
+@Mapper(componentModel = "spring", imports = BigDecimal.class)
+public interface WbStockMapper {
 
-  public static StockDto toDto(LocalDate onDate, WbStockRaw r) {
-    String sku = r.supplierArticle() != null ? r.supplierArticle() : String.valueOf(r.nmId());
-    int available = r.quantity() == null ? 0 : r.quantity();
-    int inWay =
-        (r.inWayToClient() == null ? 0 : r.inWayToClient()) + (r.inWayFromClient() == null ? 0
-            : r.inWayFromClient());
-    return new StockDto(
-        sku,
-        onDate,
-        r.lastChangeDate(),
-        null,
-        r.warehouseName(),
-        FulfillmentType.FBS,
-        available,
-        0,
-        inWay,
-        null
-    );
-  }
+  @Mappings({
+      // Идентификаторы
+      @Mapping(target = "sku", expression = "java(toStringSafe(src.nmId()))"),
+      @Mapping(target = "offerId", source = "supplierArticle"),
+      @Mapping(target = "productId", expression = "java(toStringSafe(src.nmId()))"),
+
+      // Склад
+      @Mapping(target = "warehouseId", source = "scCode"), // SCCode — ближайший аналог id
+      @Mapping(target = "warehouseName", source = "warehouseName"),
+
+      // Остатки
+      @Mapping(target = "quantityAvailable", source = "quantity"),
+      @Mapping(target = "quantityReserved", ignore = true), // у WB stocks нет прямого reserved
+      @Mapping(target = "quantityInTransitToClient", source = "inWayToClient"),
+      @Mapping(target = "quantityInTransitFromClient", source = "inWayFromClient"),
+      @Mapping(target = "quantityTotal", source = "quantityFull"),
+
+      // Атрибуты
+      @Mapping(target = "barcode", source = "barcode"),
+      @Mapping(target = "category", source = "category"),
+      @Mapping(target = "subject", source = "subject"),
+      @Mapping(target = "brand", source = "brand"),
+      @Mapping(target = "techSize", source = "techSize"),
+
+      // Цена/скидка
+      @Mapping(target = "priceOriginal", source = "price"),
+      @Mapping(target = "discountPercent", source = "discount"),
+
+      // Время
+      @Mapping(target = "lastChangeDate", source = "lastChangeDate")
+  })
+  StockDto toDto(WbStockRaw src);
+
+  default String toStringSafe(Long v) { return v == null ? null : v.toString(); }
 }

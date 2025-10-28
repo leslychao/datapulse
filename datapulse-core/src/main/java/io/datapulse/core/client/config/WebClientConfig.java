@@ -58,7 +58,7 @@ public class WebClientConfig {
       ExchangeFilterFunction loggingExchangeFilter
   ) {
     ExchangeStrategies streamingStrategies = ExchangeStrategies.builder()
-        .codecs(c -> c.defaultCodecs().maxInMemorySize(0))
+        .codecs(c -> c.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
         .build();
 
     return WebClient.builder()
@@ -69,13 +69,14 @@ public class WebClientConfig {
   }
 
   @Bean
-  public ExchangeFilterFunction loggingExchangeFilter() {
+  public ExchangeFilterFunction statusLoggingFilter() {
     return (request, next) -> {
       long start = System.nanoTime();
       String method = request.method().name();
       String url = request.url().toString();
+
       return next.exchange(request)
-          .doOnSuccess(resp -> {
+          .doOnNext(resp -> {
             long tookMs = (System.nanoTime() - start) / 1_000_000;
             log.info("HTTP {} {} -> {} ({} ms)", method, url, resp.statusCode().value(), tookMs);
           })
