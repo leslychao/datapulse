@@ -49,7 +49,7 @@ abstract class AbstractReactiveMarketplaceAdapter {
         () -> streamingDownloadService.stream(
             uri,
             buildHeaders(type, accountId),
-            retry(type, accountId),
+            retry(type),
             rateLimiter(type, accountId),
             bulkhead(type, accountId)
         ));
@@ -62,7 +62,7 @@ abstract class AbstractReactiveMarketplaceAdapter {
             uri,
             buildHeaders(type, accountId),
             body,
-            retry(type, accountId),
+            retry(type),
             rateLimiter(type, accountId),
             bulkhead(type, accountId)
         ));
@@ -115,8 +115,8 @@ abstract class AbstractReactiveMarketplaceAdapter {
     return resilienceFactory.bulkhead(type, accountId);
   }
 
-  private Retry retry(MarketplaceType type, long accountId) {
-    return resilienceFactory.retry(type, accountId);
+  private Retry retry(MarketplaceType type) {
+    return resilienceFactory.retry(type);
   }
 
   private RateLimiter rateLimiter(MarketplaceType type, long accountId) {

@@ -8,24 +8,38 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.integration.channel.DirectChannel;
+import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.core.MessagingTemplate;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 @RequiredArgsConstructor
 public class WbSalesHttpInbound {
 
-  // Если канала ещё нет как бина — объявим (имя совпадает с твоей константой)
+  @Bean
+  public TaskExecutor etlExecutor() {
+    var ex = new ThreadPoolTaskExecutor();
+    ex.setThreadNamePrefix("etl-");
+    ex.setCorePoolSize(4);
+    ex.setMaxPoolSize(16);
+    ex.setQueueCapacity(1000);
+    ex.initialize();
+    return ex;
+  }
+
   @Bean(name = CHANNEL_FETCH_SALES)
-  public MessageChannel fetchSalesChannel() {
-    return new DirectChannel();
+  public MessageChannel fetchSalesChannel(TaskExecutor etlExecutor) {
+    // ВАЖНО: асинхронный канал вместо DirectChannel
+    return new ExecutorChannel(etlExecutor);
   }
 
   @Bean

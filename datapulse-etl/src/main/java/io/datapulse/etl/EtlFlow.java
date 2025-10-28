@@ -13,7 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.integration.dsl.MessageChannels;
 import org.springframework.integration.handler.LoggingHandler.Level;
 import reactor.core.publisher.Flux;
 
@@ -26,15 +28,16 @@ public class EtlFlow {
   private final WbSaleMapper wbSaleMapper;
 
   @Bean
-  public IntegrationFlow wbSalesFlow() {
+  public IntegrationFlow wbSalesFlow(TaskExecutor etlExecutor) {
     return IntegrationFlow.from(CHANNEL_FETCH_SALES)
-        // payload — это Long accountId
-        .handle(this::fetchWbSales)         // → Flux<WbSaleRaw>
-        .split()                            // по одному raw на сообщение
-        .transform(wbSaleMapper::toDto)     // → SaleDto (нормализация)
+        // ещё раз явно отцепимся на executor, чтобы весь downstream точно шёл не в HTTP-потоке
+        .channel(MessageChannels.executor(etlExecutor))
+        .handle(this::fetchWbSales)      // → Flux<WbSaleRaw>
+        .split()                         // разбивает Flux на элементы
+        .transform(wbSaleMapper::toDto)  // → SaleDto
         .handle(SaleDto.class, (sale, headers) -> {
           System.out.println(formatLine(sale));
-          return null; // завершаем обработку
+          return null;
         })
         .log(Level.INFO, "wbSalesFlow", m -> "✓ WB sales printed")
         .get();

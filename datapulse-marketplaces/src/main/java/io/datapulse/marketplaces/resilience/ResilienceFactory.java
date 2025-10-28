@@ -51,7 +51,7 @@ public class ResilienceFactory {
     );
   }
 
-  public Retry retry(MarketplaceType type, long accountId) {
+  public Retry retry(MarketplaceType type) {
     var r = props.get(type).getResilience();
     final int maxAttempts = reqPos(r.getMaxAttempts());
     final Duration base = Objects.requireNonNull(r.getBaseBackoff());
