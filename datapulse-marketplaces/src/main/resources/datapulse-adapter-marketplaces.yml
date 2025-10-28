@@ -1,0 +1,41 @@
+marketplace:
+  providers:
+
+    WILDBERRIES:
+      baseUrl: https://suppliers-api.wildberries.ru
+      feedbacksBaseUrl: https://feedbacks-api.wildberries.ru
+      endpoints:
+        sales: /api/v1/supplier/sales
+        stock: /api/v1/supplier/stocks
+        finance: /api/v1/supplier/reportDetailByPeriod
+        reviews: /api/v1/questions
+      resilience:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        tokenWaitTimeout: 2s
+        maxConcurrentCalls: 10
+        bulkheadWait: 1s
+        maxAttempts: 5
+        baseBackoff: 200ms
+        maxBackoff: 30s
+        maxJitter: 500ms
+        retryAfterFallback: 1s
+
+    OZON:
+      baseUrl: https://api-seller.ozon.ru
+      endpoints:
+        sales: /v1/analytics/data
+        stock: /v4/product/info/stocks
+        finance: /v3/finance/transaction/list
+        reviews: /v1/review/list
+      resilience:
+        limitForPeriod: 20
+        limitRefreshPeriod: 1s
+        tokenWaitTimeout: 3s
+        maxConcurrentCalls: 8
+        bulkheadWait: 1s
+        maxAttempts: 4
+        baseBackoff: 300ms
+        maxBackoff: 20s
+        maxJitter: 300ms
+        retryAfterFallback: 1s

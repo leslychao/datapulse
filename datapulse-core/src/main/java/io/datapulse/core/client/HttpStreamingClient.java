@@ -17,6 +17,9 @@ public class HttpStreamingClient {
 
   private final WebClient streamingWebClient;
 
+  /**
+   * Выполняет GET и возвращает тело как поток DataBuffer.
+   */
   public Flux<DataBuffer> getAsDataBufferFlux(URI uri, HttpHeaders extraHeaders) {
     return streamingWebClient.get()
         .uri(uri)
@@ -26,6 +29,26 @@ public class HttpStreamingClient {
           }
           h.setAccept(List.of(MediaType.APPLICATION_JSON));
         })
+        .exchangeToFlux(resp -> resp.statusCode().is2xxSuccessful()
+            ? resp.bodyToFlux(DataBuffer.class)
+            : resp.createException().flatMapMany(Mono::error)
+        );
+  }
+
+  /**
+   * Выполняет POST и возвращает тело как поток DataBuffer (для JSON-ответов).
+   */
+  public Flux<DataBuffer> postAsDataBufferFlux(URI uri, HttpHeaders extraHeaders, Object body) {
+    return streamingWebClient.post()
+        .uri(uri)
+        .headers(h -> {
+          if (extraHeaders != null) {
+            h.addAll(extraHeaders);
+          }
+          h.setContentType(MediaType.APPLICATION_JSON);
+          h.setAccept(List.of(MediaType.APPLICATION_JSON));
+        })
+        .bodyValue(body)
         .exchangeToFlux(resp -> resp.statusCode().is2xxSuccessful()
             ? resp.bodyToFlux(DataBuffer.class)
             : resp.createException().flatMapMany(Mono::error)

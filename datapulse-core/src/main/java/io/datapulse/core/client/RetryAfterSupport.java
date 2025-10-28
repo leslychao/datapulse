@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
@@ -14,51 +14,52 @@ import org.springframework.http.HttpHeaders;
 
 public final class RetryAfterSupport {
 
-  private static final Pattern DELTA_SECONDS_PATTERN = Pattern.compile("^[+]?\\d+(?:\\.\\d+)?$");
-  private static final DateTimeFormatter HTTP_DATE_FORMATTER =
+  private static final Pattern DELTA_SECONDS = Pattern.compile("^[+]?\\d+(?:\\.\\d+)?$");
+  private static final DateTimeFormatter RFC1123_US =
       DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.US);
 
   private RetryAfterSupport() {
   }
 
   public static Duration parse(HttpHeaders headers, Clock clock, Duration fallback) {
-    return Optional.ofNullable(headers.getFirst(HttpHeaders.RETRY_AFTER))
-        .map(String::trim)
-        .filter(v -> !v.isEmpty())
-        .flatMap(v -> parseDeltaSeconds(v)
-            .or(() -> parseHttpDate(v, clock))
-            .map(RetryAfterSupport::nonNegative))
+    String headerValue = headers.getFirst(HttpHeaders.RETRY_AFTER);
+    if (headerValue == null) {
+      return fallback;
+    }
+
+    String value = headerValue.trim();
+    if (value.isEmpty()) {
+      return fallback;
+    }
+
+    return parseDeltaSeconds(value)
+        .or(() -> parseHttpDateToInstant(value).map(t -> Duration.between(clock.instant(), t)))
+        .map(RetryAfterSupport::nonNegative)
         .orElse(fallback);
   }
 
-  private static Optional<Duration> parseDeltaSeconds(String headerValue) {
-    if (!DELTA_SECONDS_PATTERN.matcher(headerValue).matches()) {
+  private static Optional<Duration> parseDeltaSeconds(String v) {
+    if (!DELTA_SECONDS.matcher(v).matches()) {
       return Optional.empty();
     }
-
     try {
-      if (headerValue.indexOf('.') < 0) {
-        String numericPart = headerValue.charAt(0) == '+' ? headerValue.substring(1) : headerValue;
-        long seconds = Long.parseUnsignedLong(numericPart);
+      int dot = v.indexOf('.');
+      if (dot < 0) {
+        String s = (v.charAt(0) == '+') ? v.substring(1) : v;
+        long seconds = Long.parseUnsignedLong(s);
         return Optional.of(Duration.ofSeconds(seconds));
       }
-
-      BigDecimal numericValue = new BigDecimal(headerValue);
-      long roundedSeconds = numericValue.setScale(0, RoundingMode.CEILING).longValueExact();
-      return Optional.of(Duration.ofSeconds(roundedSeconds));
-
-    } catch (NumberFormatException | ArithmeticException parseError) {
+      long seconds = new BigDecimal(v).setScale(0, RoundingMode.CEILING).longValueExact();
+      return Optional.of(Duration.ofSeconds(seconds));
+    } catch (NumberFormatException | ArithmeticException e) {
       return Optional.empty();
     }
   }
 
-  private static Optional<Duration> parseHttpDate(String headerValue, Clock systemClock) {
+  private static Optional<Instant> parseHttpDateToInstant(String v) {
     try {
-      ZonedDateTime httpDateTime = ZonedDateTime.parse(headerValue, HTTP_DATE_FORMATTER);
-      Duration durationUntilTarget = Duration.between(systemClock.instant(),
-          httpDateTime.toInstant());
-      return Optional.of(durationUntilTarget);
-    } catch (DateTimeParseException parseError) {
+      return Optional.of(RFC1123_US.parse(v, Instant::from));
+    } catch (DateTimeParseException e) {
       return Optional.empty();
     }
   }

@@ -29,25 +29,51 @@ public class StreamingDownloadService {
       RateLimiter rateLimiter,
       Bulkhead bulkhead
   ) {
-    var bytesCounter = meter.counter("datapulse.download.bytes");
-    var successCounter = meter.counter("datapulse.download.success");
-    var errorCounter = meter.counter("datapulse.download.errors");
-
-    return ReactorResilienceSupport
-        .applyResilience(
+    return pipeline(
+        ReactorResilienceSupport.applyResilience(
             httpStreamingClient.getAsDataBufferFlux(uri, headers),
             rateLimiter,
             bulkhead
-        )
+        ),
+        uri,
+        retry
+    );
+  }
+
+  public Flux<DataBuffer> post(
+      URI uri,
+      HttpHeaders headers,
+      Object body,
+      Retry retry,
+      RateLimiter rateLimiter,
+      Bulkhead bulkhead
+  ) {
+    return pipeline(
+        ReactorResilienceSupport.applyResilience(
+            httpStreamingClient.postAsDataBufferFlux(uri, headers, body),
+            rateLimiter,
+            bulkhead
+        ),
+        uri,
+        retry
+    );
+  }
+
+  private Flux<DataBuffer> pipeline(Flux<DataBuffer> source, URI uri, Retry retry) {
+    var bytes = meter.counter("datapulse.download.bytes");
+    var ok = meter.counter("datapulse.download.success");
+    var err = meter.counter("datapulse.download.errors");
+
+    return source
         .doOnSubscribe(s -> log.info("Start streaming from {}", uri))
-        .doOnNext(buf -> bytesCounter.increment(buf.readableByteCount()))
+        .doOnNext(buf -> bytes.increment(buf.readableByteCount()))
         .retryWhen(retry)
         .doOnComplete(() -> {
-          successCounter.increment();
+          ok.increment();
           log.info("Streaming completed: {}", uri);
         })
         .doOnError(ex -> {
-          errorCounter.increment();
+          err.increment();
           log.error("Streaming error from {}: {}", uri, ex.toString());
         });
   }

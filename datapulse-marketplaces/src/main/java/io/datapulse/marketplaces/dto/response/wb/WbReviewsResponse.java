@@ -1,0 +1,11 @@
+package io.datapulse.marketplaces.dto.response.wb;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public record WbReviewsResponse(List<Item> data, String nextCursor) {
+
+  public record Item(String sku, LocalDate date, Integer rating, String text, String author) {
+
+  }
+}
