@@ -38,7 +38,7 @@ public interface AccountConnectionMapper
   ) {
     AccountConnectionDto dto = new AccountConnectionDto();
     dto.setAccountId(request.accountId());
-    dto.setMarketplace(request.marketplaceType());
+    dto.setMarketplace(request.marketplace());
     dto.setActive(request.active() == null ? Boolean.TRUE : request.active());
     if (request.credentials() != null) {
       dto.setCredentialsEncrypted(
@@ -57,8 +57,8 @@ public interface AccountConnectionMapper
       @MappingTarget AccountConnectionDto dto,
       CryptoService cryptoService,
       ObjectMapper objectMapper) {
-    if (request.marketplaceType() != null) {
-      dto.setMarketplace(request.marketplaceType());
+    if (request.marketplace() != null) {
+      dto.setMarketplace(request.marketplace());
     }
     if (request.active() != null) {
       dto.setActive(request.active());

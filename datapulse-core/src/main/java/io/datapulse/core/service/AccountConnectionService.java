@@ -93,11 +93,11 @@ public class AccountConnectionService
     validateAccountExists(request.accountId());
 
     if (connectionRepository.existsByAccount_IdAndMarketplace(request.accountId(),
-        request.marketplaceType())) {
+        request.marketplace())) {
       throw new BadRequestException(
           ACCOUNT_CONNECTION_ALREADY_EXISTS,
           request.accountId(),
-          request.marketplaceType());
+          request.marketplace());
     }
 
     var dto = mapper.fromCreateRequest(request, cryptoService, objectMapper);
@@ -113,16 +113,16 @@ public class AccountConnectionService
     AccountConnectionDto current = get(id)
         .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
 
-    if (request.marketplaceType() != null
-        && request.marketplaceType() != current.getMarketplace()) {
+    if (request.marketplace() != null
+        && request.marketplace() != current.getMarketplace()) {
       if (connectionRepository.existsByAccount_IdAndMarketplaceAndIdNot(
           current.getAccountId(),
-          request.marketplaceType(),
+          request.marketplace(),
           id)) {
         throw new BadRequestException(
             ACCOUNT_CONNECTION_ALREADY_EXISTS,
             current.getAccountId(),
-            request.marketplaceType());
+            request.marketplace());
       }
     }
 

@@ -1,8 +1,8 @@
 package io.datapulse.domain.dto.request;
 
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.ACCOUNT_ID_REQUIRED;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -17,12 +17,12 @@ public record AccountConnectionCreateRequest(
     @NotNull(message = ACCOUNT_ID_REQUIRED)
     Long accountId,
     @NotNull(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)
-    MarketplaceType marketplaceType,
+    MarketplaceType marketplace,
 
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-        property = "marketplaceType",
+        property = "marketplace",
         visible = true
     )
     @JsonSubTypes({

@@ -9,11 +9,11 @@ import io.datapulse.domain.dto.credentials.WbCredentials;
 import jakarta.validation.Valid;
 
 public record AccountConnectionUpdateRequest(
-    MarketplaceType marketplaceType,
+    MarketplaceType marketplace,
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-        property = "marketplaceType",
+        property = "marketplace",
         visible = true
     )
     @JsonSubTypes({

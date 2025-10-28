@@ -145,7 +145,7 @@ Content-Type: application/json
 
 {
   "accountId": {{accountId}},
-  "marketplaceType": "WILDBERRIES",
+  "marketplace": "WILDBERRIES",
   "credentials": { "token": "xxx" },
   "active": true
 }
@@ -160,13 +160,13 @@ Content-Type: application/json
   });
 %}
 
-### AC — UPDATE: change marketplaceType to FREE (WB → OZON) → 200
+### AC — UPDATE: change marketplace to FREE (WB → OZON) → 200
 # Меняем тип у существующего WB на OZON, пока другого OZON ещё нет — должно пройти.
 PUT {{host}}/api/account-connections/{{acIdWb}}
 Content-Type: application/json
 
 {
-  "marketplaceType": "OZON",
+  "marketplace": "OZON",
   "credentials": { "clientId": "cid", "apiKey": "akey" },
   "active": true
 }
@@ -188,7 +188,7 @@ Content-Type: application/json
 
 {
   "accountId": {{accountId}},
-  "marketplaceType": "WILDBERRIES",
+  "marketplace": "WILDBERRIES",
   "credentials": { "token": "zzz" },
   "active": true
 }
@@ -209,7 +209,7 @@ Content-Type: application/json
 
 {
   "accountId": {{accountId}},
-  "marketplaceType": "OZON",
+  "marketplace": "OZON",
   "credentials": { "clientId": "dup", "apiKey": "dup" },
   "active": true
 }
@@ -229,7 +229,7 @@ PUT {{host}}/api/account-connections/{{acIdWb}}
 Content-Type: application/json
 
 {
-  "marketplaceType": "OZON",
+  "marketplace": "OZON",
   "credentials": { "clientId": "any", "apiKey": "any" },
   "active": true
 }
@@ -265,7 +265,7 @@ Content-Type: application/json
 
 {
   "accountId": 999999999,
-  "marketplaceType": "OZON",
+  "marketplace": "OZON",
   "credentials": { "clientId": "x", "apiKey": "y" },
   "active": true
 }
@@ -285,7 +285,7 @@ Content-Type: application/json
 
 {
   "accountId": {{accountId}},
-  "marketplaceType": "WILDBERRIES",
+  "marketplace": "WILDBERRIES",
   "credentials": { "token": " " },
   "active": true
 }
@@ -305,7 +305,7 @@ Content-Type: application/json
 
 {
   "accountId": {{accountId}},
-  "marketplaceType": "OZON",
+  "marketplace": "OZON",
   "credentials": { "clientId": " ", "apiKey": " " },
   "active": true
 }
