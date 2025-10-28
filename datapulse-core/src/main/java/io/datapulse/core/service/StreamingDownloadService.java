@@ -10,8 +10,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 /**
- * Сервис тупо стримит байты (GET/POST) и логирует. Без ретраев/лимитеров/булкхедов — эта
- * оркестрация перенесена выше (в адаптер).
+ * Сервис тупо стримит байты (GET/POST) и логирует.
+ * Без ретраев/лимитеров/булкхедов — оркестрация выше (в адаптере).
  */
 @Service
 @RequiredArgsConstructor
@@ -25,7 +25,7 @@ public class StreamingDownloadService {
         .getAsDataBufferFlux(uri, headers)
         .doOnSubscribe(s -> log.info("Start streaming from {}", uri))
         .doOnComplete(() -> log.info("Streaming completed: {}", uri))
-        .doOnError(ex -> log.error("Streaming error from {}: {}", uri, ex.toString()));
+        .doOnError(ex -> log.error("Streaming error from {}", uri, ex));
   }
 
   public Flux<DataBuffer> post(URI uri, HttpHeaders headers, Object body) {
@@ -33,6 +33,6 @@ public class StreamingDownloadService {
         .postAsDataBufferFlux(uri, headers, body)
         .doOnSubscribe(s -> log.info("Start POST streaming to {}", uri))
         .doOnComplete(() -> log.info("POST streaming completed: {}", uri))
-        .doOnError(ex -> log.error("POST streaming error to {}: {}", uri, ex.toString()));
+        .doOnError(ex -> log.error("POST streaming error to {}", uri, ex));
   }
 }
