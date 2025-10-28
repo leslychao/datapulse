@@ -51,7 +51,12 @@ public final class MessageCodes {
   public static final String PAGEABLE_REQUIRED = "pageable.required";
   public static final String ID_REQUIRED = "id.required";
   public static final String NOT_FOUND = "not-found";
-  public static final String REQUEST_INVALID = "request.invalid";
+  public static final String JSON_BODY_INVALID = "json.parse.body.invalid";
+  public static final String PARAMS_MUST_BE_KEY_VALUE_PAIRS = "params.must-be-key-value-pairs";
+  public static final String URI_REQUIRED = "uri.required";
+  public static final String TYPE_REQUIRED = "type.required";
+  public static final String INVALID_DATE_RANGE = "invalid.date-range";
+  public static final String REQUIRED_PARAMETER_MISSING = "required.parameter.missing";
 
   // ===== Marketplace / HTTP =====
   public static final String UNKNOWN_MARKETPLACE = "unknown-marketplace";
@@ -61,10 +66,7 @@ public final class MessageCodes {
   public static final String MARKETPLACE_BASE_URL_MISSING = "marketplace.base-url.missing";
   public static final String MARKETPLACE_FETCH_FAILED = "marketplace.fetch.failed";
   public static final String MARKETPLACE_PARSE_FAILED = "marketplace.parse.failed";
+  public static final String MARKETPLACE_ENDPOINTS_MISSING = "marketplace.endpoints.missing";
 
-  // ===== JSON / generic =====
-  public static final String PARAMS_MUST_BE_KEY_VALUE_PAIRS = "params.must-be-key-value-pairs";
-  public static final String URI_REQUIRED = "uri.required";
-  public static final String TYPE_REQUIRED = "type.required";
-  public static final String JSON_BODY_INVALID = "json.parse.body.invalid";
+
 }
