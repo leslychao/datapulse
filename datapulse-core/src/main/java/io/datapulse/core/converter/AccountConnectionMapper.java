@@ -2,10 +2,14 @@ package io.datapulse.core.converter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.datapulse.core.codec.CredentialsCodec;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.service.crypto.CryptoService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountConnectionDto;
+import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
+import io.datapulse.domain.dto.credentials.OzonCredentials;
+import io.datapulse.domain.dto.credentials.WbCredentials;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
@@ -29,7 +33,15 @@ public interface AccountConnectionMapper
   @Mapping(source = "account.id", target = "accountId")
   AccountConnectionDto mapToDto(AccountConnectionEntity entity);
 
-  AccountConnectionResponse toResponse(AccountConnectionDto dto);
+  @Mapping(
+      target = "maskedCredentials",
+      expression = "java(maskCredentials(dto, cryptoService, objectMapper, credentialsCodec))"
+  )
+  AccountConnectionResponse toResponse(
+      AccountConnectionDto dto,
+      CryptoService cryptoService,
+      ObjectMapper objectMapper,
+      CredentialsCodec credentialsCodec);
 
   default AccountConnectionDto fromCreateRequest(
       AccountConnectionCreateRequest request,
@@ -66,6 +78,35 @@ public interface AccountConnectionMapper
     if (request.credentials() != null) {
       dto.setCredentialsEncrypted(
           cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
+    }
+  }
+
+  default String maskCredentials(
+      AccountConnectionDto dto,
+      CryptoService cryptoService,
+      ObjectMapper objectMapper,
+      CredentialsCodec credentialsCodec) {
+    String encrypted = dto.getCredentialsEncrypted();
+    if (encrypted == null) {
+      return null;
+    }
+    try {
+      String json = cryptoService.decrypt(encrypted);
+
+      Class<? extends MarketplaceCredentials> target;
+      switch (dto.getMarketplace()) {
+        case WILDBERRIES -> target = WbCredentials.class;
+        case OZON -> target = OzonCredentials.class;
+        default -> {
+          return null;
+        }
+      }
+
+      MarketplaceCredentials marketplaceCredentials = objectMapper.readValue(json, target);
+      return credentialsCodec.mask(dto.getMarketplace(), marketplaceCredentials);
+
+    } catch (JsonProcessingException e) {
+      throw new AppException(e, MessageCodes.CREDENTIALS_DESERIALIZATION_ERROR);
     }
   }
 

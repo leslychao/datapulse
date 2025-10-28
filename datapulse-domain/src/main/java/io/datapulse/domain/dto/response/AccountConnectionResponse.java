@@ -12,7 +12,8 @@ public record AccountConnectionResponse(
     OffsetDateTime lastSyncAt,
     SyncStatus lastSyncStatus,
     OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    OffsetDateTime updatedAt,
+    String maskedCredentials
 ) {
 
 }

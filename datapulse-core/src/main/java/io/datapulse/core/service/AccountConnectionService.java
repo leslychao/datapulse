@@ -12,6 +12,7 @@ import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.datapulse.core.codec.CredentialsCodec;
 import io.datapulse.core.converter.AccountConnectionMapper;
 import io.datapulse.core.converter.BeanConverter;
 import io.datapulse.core.entity.AccountConnectionEntity;
@@ -47,6 +48,8 @@ public class AccountConnectionService
   private final AccountConnectionMapper mapper;
   private final ObjectMapper objectMapper;
   private final CryptoService cryptoService;
+  private final CredentialsCodec credentialsCodec;
+
 
   @Override
   protected BeanConverter<AccountConnectionDto, AccountConnectionEntity> getConverter() {
@@ -102,7 +105,7 @@ public class AccountConnectionService
 
     var dto = mapper.fromCreateRequest(request, cryptoService, objectMapper);
     var saved = save(dto);
-    return mapper.toResponse(saved);
+    return mapper.toResponse(saved, cryptoService, objectMapper, credentialsCodec);
   }
 
   @Transactional
@@ -128,7 +131,7 @@ public class AccountConnectionService
 
     mapper.applyUpdate(request, current, cryptoService, objectMapper);
     var updated = update(current);
-    return mapper.toResponse(updated);
+    return mapper.toResponse(updated, cryptoService, objectMapper, credentialsCodec);
   }
 
   @Override
