@@ -36,35 +36,19 @@ public class WebClientConfig {
   }
 
   @Bean
-  public WebClient webClient(
+  public WebClient streamingWebClient(
       @Value("${webclient.max-in-memory-size:10485760}") int maxInMemorySize,
       HttpClient httpClient,
-      ExchangeFilterFunction loggingExchangeFilter
+      ExchangeFilterFunction statusLoggingFilter
   ) {
-    ExchangeStrategies strategies = ExchangeStrategies.builder()
+    ExchangeStrategies streamingStrategies = ExchangeStrategies.builder()
         .codecs(c -> c.defaultCodecs().maxInMemorySize(maxInMemorySize))
         .build();
 
     return WebClient.builder()
         .clientConnector(new ReactorClientHttpConnector(httpClient))
-        .exchangeStrategies(strategies)
-        .filters(fns -> fns.add(0, loggingExchangeFilter))
-        .build();
-  }
-
-  @Bean
-  public WebClient streamingWebClient(
-      HttpClient httpClient,
-      ExchangeFilterFunction loggingExchangeFilter
-  ) {
-    ExchangeStrategies streamingStrategies = ExchangeStrategies.builder()
-        .codecs(c -> c.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-        .build();
-
-    return WebClient.builder()
-        .clientConnector(new ReactorClientHttpConnector(httpClient))
         .exchangeStrategies(streamingStrategies)
-        .filters(fns -> fns.add(0, loggingExchangeFilter))
+        .filters(fns -> fns.add(0, statusLoggingFilter))
         .build();
   }
 

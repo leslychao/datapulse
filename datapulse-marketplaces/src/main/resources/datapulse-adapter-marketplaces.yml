@@ -1,7 +1,7 @@
 marketplace:
   providers:
     WILDBERRIES:
-      useSandbox: false
+      useSandbox: true
       baseUrl: https://statistics-api.wildberries.ru
       feedbacksBaseUrl: https://feedbacks-api.wildberries.ru
       sandbox:

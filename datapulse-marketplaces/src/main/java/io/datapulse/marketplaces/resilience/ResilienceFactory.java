@@ -11,14 +11,18 @@ import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import io.netty.handler.timeout.ReadTimeoutException;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.net.ssl.SSLException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -80,7 +84,7 @@ public class ResilienceFactory {
         Retry.from(signals -> signals.flatMap(rs -> {
           final Throwable t = rs.failure();
 
-          // досрочно выходим, если достигли предела
+          // Досрочно выходим, если достигли предела (в Reactor maxAttempts включает первую попытку)
           if (rs.totalRetries() >= maxAttempts - 1) {
             return Mono.error(t);
           }
@@ -95,11 +99,14 @@ public class ResilienceFactory {
               if (d == null || d.isNegative()) {
                 d = Duration.ZERO;
               }
-              return Mono.delay(d).then();
+              // Не уменьшаем Retry-After; добавим "распушающий" джиттер и ограничим cap-ом
+              Duration delay = addJitterAndCap(d, jitter, cap);
+              return Mono.delay(delay);
             }
 
+            // Прочие ретраябельные статусы
             if (code == 409 || code == 408 || code == 425 || (code >= 500 && code <= 599)) {
-              return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
+              return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter));
             }
 
             // Остальное — не ретраим
@@ -107,19 +114,13 @@ public class ResilienceFactory {
           }
 
           // Сетевые транзиенты
-          if (t instanceof WebClientRequestException req) {
-            Throwable c = req.getCause();
-            if (c instanceof SocketTimeoutException
-                || c instanceof ConnectException
-                || c instanceof NoRouteToHostException
-                || (c != null && c.getClass().getName().contains("UnknownHostException"))) {
-              return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
-            }
+          if (t instanceof WebClientRequestException req && isTransientNetwork(req)) {
+            return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter));
           }
 
           // Отказы лимитера / булкхеда — можно/нужно ретраить
           if (t instanceof RequestNotPermitted || t instanceof BulkheadFullException) {
-            return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
+            return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter));
           }
 
           // Всё остальное — не ретраим
@@ -152,13 +153,40 @@ public class ResilienceFactory {
   private static int reqPos(Integer v) {
     Objects.requireNonNull(v, "value");
     if (v <= 0) {
-      throw new IllegalArgumentException("value must be > 0");
+      throw new IllegalArgumentException("значение должно быть > 0");
     }
     return v;
   }
 
   private static Duration orZero(Duration d) {
     return d == null ? Duration.ZERO : d;
+  }
+
+  private static boolean isTransientNetwork(Throwable t) {
+    for (Throwable c = t; c != null; c = c.getCause()) {
+      if (c instanceof SocketTimeoutException || c instanceof ConnectException
+          || c instanceof NoRouteToHostException || c instanceof UnknownHostException
+          || c instanceof ReadTimeoutException || c instanceof SSLException
+          || c instanceof ClosedChannelException) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static Duration addJitterAndCap(Duration baseDelay, Duration jitter, Duration cap) {
+    if (jitter.isZero() || jitter.isNegative()) {
+      return baseDelay.compareTo(cap) > 0 ? cap : baseDelay;
+    }
+    long bound = Math.max(0, jitter.toMillis());
+    long rand = (bound == 0) ? 0 : ThreadLocalRandom.current().nextLong(bound + 1);
+    Duration withJitter;
+    try {
+      withJitter = baseDelay.plusMillis(rand);
+    } catch (ArithmeticException e) {
+      withJitter = cap;
+    }
+    return withJitter.compareTo(cap) > 0 ? cap : withJitter;
   }
 
   /**

@@ -4,7 +4,6 @@ import io.datapulse.core.client.HttpStreamingClient;
 import io.datapulse.core.client.ReactorResilienceSupport;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.ratelimiter.RateLimiter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,6 @@ import reactor.util.retry.Retry;
 public class StreamingDownloadService {
 
   private final HttpStreamingClient httpStreamingClient;
-  private final MeterRegistry meter;
 
   public Flux<DataBuffer> stream(
       URI uri,
@@ -60,21 +58,10 @@ public class StreamingDownloadService {
   }
 
   private Flux<DataBuffer> pipeline(Flux<DataBuffer> source, URI uri, Retry retry) {
-    var bytes = meter.counter("datapulse.download.bytes");
-    var ok = meter.counter("datapulse.download.success");
-    var err = meter.counter("datapulse.download.errors");
-
     return source
         .doOnSubscribe(s -> log.info("Start streaming from {}", uri))
-        .doOnNext(buf -> bytes.increment(buf.readableByteCount()))
         .retryWhen(retry)
-        .doOnComplete(() -> {
-          ok.increment();
-          log.info("Streaming completed: {}", uri);
-        })
-        .doOnError(ex -> {
-          err.increment();
-          log.error("Streaming error from {}: {}", uri, ex.toString());
-        });
+        .doOnComplete(() -> log.info("Streaming completed: {}", uri))
+        .doOnError(ex -> log.error("Streaming error from {}: {}", uri, ex.toString()));
   }
 }
