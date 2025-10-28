@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record AccountCreateRequest(
-    @NotBlank(message = "{"  + ACCOUNT_NAME_REQUIRED + "}")
+    @NotBlank(message = ACCOUNT_NAME_REQUIRED)
     @Size(max = 32, message = ACCOUNT_NAME_MAX_LENGTH)
     String name
 ) {
