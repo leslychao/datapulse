@@ -6,8 +6,10 @@ import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
@@ -15,6 +17,7 @@ import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -29,74 +32,104 @@ public class ResilienceFactory {
 
   private final MarketplaceProperties props;
 
+  // Реестры для шаринга состояния лимитеров/булкхедов
+  private final RateLimiterRegistry rlRegistry = RateLimiterRegistry.ofDefaults();
+  private final BulkheadRegistry bhRegistry = BulkheadRegistry.ofDefaults();
+
+  // Кэш для кастомных реактивных Retry (reactor.util.retry.Retry)
+  private final ConcurrentHashMap<String, Retry> retryCache = new ConcurrentHashMap<>();
+
+  /* ===================== Public API ===================== */
+
   public RateLimiter rateLimiter(MarketplaceType type, String endpointKey, long accountId) {
     var r = effectiveResilience(type, endpointKey);
-    return RateLimiter.of(
-        name(type, endpointKey, "rl", accountId),
-        RateLimiterConfig.custom()
-            .limitRefreshPeriod(Objects.requireNonNull(r.getLimitRefreshPeriod()))
-            .limitForPeriod(reqPos(r.getLimitForPeriod()))
-            .timeoutDuration(Objects.requireNonNull(r.getTokenWaitTimeout()))
-            .build()
-    );
+    var cfg = RateLimiterConfig.custom()
+        .limitRefreshPeriod(Objects.requireNonNull(r.getLimitRefreshPeriod()))
+        .limitForPeriod(reqPos(r.getLimitForPeriod()))
+        .timeoutDuration(Objects.requireNonNull(r.getTokenWaitTimeout()))
+        .build();
+
+    String name = name(type, endpointKey, "rl", accountId);
+    return rlRegistry.rateLimiter(name, cfg);
   }
 
   public Bulkhead bulkhead(MarketplaceType type, String endpointKey, long accountId) {
     var r = effectiveResilience(type, endpointKey);
-    return Bulkhead.of(
-        name(type, endpointKey, "bh", accountId),
-        BulkheadConfig.custom()
-            .maxConcurrentCalls(reqPos(r.getMaxConcurrentCalls()))
-            .maxWaitDuration(Objects.requireNonNull(r.getBulkheadWait()))
-            .build()
-    );
+    var cfg = BulkheadConfig.custom()
+        .maxConcurrentCalls(reqPos(r.getMaxConcurrentCalls()))
+        .maxWaitDuration(Objects.requireNonNull(r.getBulkheadWait()))
+        .build();
+
+    String name = name(type, endpointKey, "bh", accountId);
+    return bhRegistry.bulkhead(name, cfg);
   }
 
   public Retry retry(MarketplaceType type, String endpointKey) {
     var r = effectiveResilience(type, endpointKey);
+
     final int maxAttempts = reqPos(r.getMaxAttempts());
     final Duration base = Objects.requireNonNull(r.getBaseBackoff());
     final Duration cap = Objects.requireNonNull(r.getMaxBackoff());
     final Duration jitter = orZero(r.getMaxJitter());
     final Duration raFallback = orZero(r.getRetryAfterFallback());
 
-    return Retry.from(signals -> signals.flatMap(rs -> {
-      final Throwable t = rs.failure();
-      if (rs.totalRetries() >= maxAttempts - 1) {
-        return Mono.error(t);
-      }
+    String name = name(type, endpointKey, "rt", 0);
 
-      if (t instanceof WebClientResponseException w) {
-        final int code = w.getStatusCode().value();
-        if (code == 429 || code == 503) {
-          Duration d = RetryAfterSupport.parse(w.getHeaders(), raFallback);
-          if (d == null || d.isNegative()) {
-            d = Duration.ZERO;
+    // Кэшируем кастомный reactor Retry с нашей стратегией
+    return retryCache.computeIfAbsent(name, n ->
+        Retry.from(signals -> signals.flatMap(rs -> {
+          final Throwable t = rs.failure();
+
+          // досрочно выходим, если достигли предела
+          if (rs.totalRetries() >= maxAttempts - 1) {
+            return Mono.error(t);
           }
-          return Mono.delay(d).then();
-        }
-        if (code == 408 || code == 425 || (code >= 500 && code <= 599)) {
-          return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
-        }
-        return Mono.error(t);
-      }
 
-      if (t instanceof WebClientRequestException req) {
-        Throwable c = req.getCause();
-        if (c instanceof SocketTimeoutException || c instanceof ConnectException
-            || c instanceof NoRouteToHostException
-            || (c != null && c.getClass().getName().contains("UnknownHostException"))) {
-          return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
-        }
-      }
+          // HTTP ответы
+          if (t instanceof WebClientResponseException w) {
+            final int code = w.getStatusCode().value();
 
-      if (t instanceof RequestNotPermitted || t instanceof BulkheadFullException) {
-        return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
-      }
+            // 429 / 503 — уважаем Retry-After (и WB X-Ratelimit-*), либо fallback
+            if (code == 429 || code == 503) {
+              Duration d = RetryAfterSupport.parse(w.getHeaders(), raFallback);
+              if (d == null || d.isNegative()) {
+                d = Duration.ZERO;
+              }
+              return Mono.delay(d).then();
+            }
 
-      return Mono.error(t);
-    }));
+            // 408 / 425 / 5xx — экспоненциальный бэкофф с джиттером
+            if (code == 408 || code == 425 || (code >= 500 && code <= 599)) {
+              return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
+            }
+
+            // Остальное — не ретраим
+            return Mono.error(t);
+          }
+
+          // Сетевые транзиенты
+          if (t instanceof WebClientRequestException req) {
+            Throwable c = req.getCause();
+            if (c instanceof SocketTimeoutException
+                || c instanceof ConnectException
+                || c instanceof NoRouteToHostException
+                || (c != null && c.getClass().getName().contains("UnknownHostException"))) {
+              return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
+            }
+          }
+
+          // Отказы лимитера / булкхеда — можно/нужно ретраить
+          if (t instanceof RequestNotPermitted || t instanceof BulkheadFullException) {
+            return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
+          }
+
+          // Всё остальное — не ретраим
+          return Mono.error(t);
+        }))
+    );
   }
+
+  /* ===================== Helpers ===================== */
 
   private MarketplaceProperties.Resilience effectiveResilience(MarketplaceType type,
       String endpointKey) {
@@ -113,11 +146,12 @@ public class ResilienceFactory {
 
   private static String name(MarketplaceType type, String endpointKey, String kind,
       long accountId) {
+    // пример: WILDBERRIES.reviews.rl.12345
     return type + "." + endpointKey + "." + kind + "." + accountId;
   }
 
   private static int reqPos(Integer v) {
-    Objects.requireNonNull(v);
+    Objects.requireNonNull(v, "value");
     if (v <= 0) {
       throw new IllegalArgumentException("value must be > 0");
     }
@@ -128,6 +162,10 @@ public class ResilienceFactory {
     return d == null ? Duration.ZERO : d;
   }
 
+  /**
+   * Экспоненциальный backoff с «ceil»-капом и add-джиттером. exp = min(cap, base * 2^(attempt-1)) +
+   * rand(0..jitter)
+   */
   private static Duration backoff(long retries, Duration base, Duration cap, Duration jitter) {
     long attempt = Math.max(1, retries + 1);
     long factor = attempt >= 63 ? Long.MAX_VALUE : (1L << (attempt - 1));

@@ -54,7 +54,7 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
     URI uri = UriComponentsBuilder.fromUri(endpoints.financeRef(TYPE).uri())
         .queryParam("dateFrom", from)
         .queryParam("dateTo", to)
-        .queryParam("limit", 100000) // лучше вынести в конфиг
+        .queryParam("limit", 100000)
         .build(true).toUri();
     return get(TYPE, EndpointKey.FINANCE, accountId, uri, WbFinanceRaw.class);
   }
