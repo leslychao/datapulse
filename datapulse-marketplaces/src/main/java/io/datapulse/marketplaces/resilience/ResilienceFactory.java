@@ -98,8 +98,7 @@ public class ResilienceFactory {
               return Mono.delay(d).then();
             }
 
-            // 408 / 425 / 5xx — экспоненциальный бэкофф с джиттером
-            if (code == 408 || code == 425 || (code >= 500 && code <= 599)) {
+            if (code == 409 || code == 408 || code == 425 || (code >= 500 && code <= 599)) {
               return Mono.delay(backoff(rs.totalRetries(), base, cap, jitter)).then();
             }
 
