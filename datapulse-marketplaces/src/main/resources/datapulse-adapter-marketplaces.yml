@@ -71,6 +71,7 @@ marketplace:
           maxJitter: 300ms
           retryAfterFallback: 1s
     OZON:
+      useSandbox: true
       baseUrl: https://api-seller.ozon.ru
       sandbox:
         baseUrl: https://sandbox-api-seller.ozon.ru
