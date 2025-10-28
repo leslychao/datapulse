@@ -8,6 +8,7 @@ import io.datapulse.marketplaces.dto.raw.wb.WbFinanceRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbReviewRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
+import io.datapulse.marketplaces.endpoints.EndpointKey;
 import io.datapulse.marketplaces.endpoints.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceFactory;
@@ -26,54 +27,46 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
   private static final ZoneId MSK = ZoneId.of("Europe/Moscow");
   private final EndpointsResolver endpoints;
 
-  public WbAdapter(
-      EndpointsResolver endpoints,
-      StreamingDownloadService streamingDownloadService,
-      ResilienceFactory resilienceFactory,
-      JsonFluxReader fluxReader,
-      HttpHeaderProvider headerProvider,
-      CredentialsProvider credentialsProvider
-  ) {
-    super(streamingDownloadService, resilienceFactory, fluxReader, headerProvider,
-        credentialsProvider);
+  public WbAdapter(EndpointsResolver endpoints,
+      StreamingDownloadService s, ResilienceFactory r, JsonFluxReader f,
+      HttpHeaderProvider h, CredentialsProvider c) {
+    super(s, r, f, h, c);
     this.endpoints = endpoints;
   }
 
   @Override
   public Flux<WbSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
-    URI uri = UriComponentsBuilder.fromUri(endpoints.sales(TYPE))
+    URI uri = UriComponentsBuilder.fromUri(endpoints.salesRef(TYPE).uri())
         .queryParam("dateFrom", from)
         .queryParam("dateTo", to)
         .build(true).toUri();
-    return get(TYPE, "sales", accountId, uri, WbSaleRaw.class);
+    return get(TYPE, EndpointKey.SALES, accountId, uri, WbSaleRaw.class);
   }
 
   @Override
   public Flux<WbStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    return get(TYPE, "stock", accountId, endpoints.stock(TYPE), WbStockRaw.class);
+    return get(TYPE, EndpointKey.STOCK, accountId, endpoints.stockRef(TYPE).uri(),
+        WbStockRaw.class);
   }
 
   @Override
   public Flux<WbFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
-    URI uri = UriComponentsBuilder.fromUri(endpoints.finance(TYPE))
+    URI uri = UriComponentsBuilder.fromUri(endpoints.financeRef(TYPE).uri())
         .queryParam("dateFrom", from)
         .queryParam("dateTo", to)
-        .queryParam("limit", 100000)
+        .queryParam("limit", 100000) // лучше вынести в конфиг
         .build(true).toUri();
-    return get(TYPE, "finance", accountId, uri, WbFinanceRaw.class);
+    return get(TYPE, EndpointKey.FINANCE, accountId, uri, WbFinanceRaw.class);
   }
 
   @Override
   public Flux<WbReviewRaw> fetchReviews(long accountId, LocalDate from, LocalDate to) {
     long fromSec = from.atStartOfDay(MSK).toEpochSecond();
     long toSec = to.atTime(23, 59, 59).atZone(MSK).toEpochSecond();
-    URI uri = UriComponentsBuilder.fromUri(endpoints.reviews(TYPE))
-        .queryParam("isAnswered", false)
-        .queryParam("take", 1000)
-        .queryParam("skip", 0)
-        .queryParam("dateFrom", fromSec)
-        .queryParam("dateTo", toSec)
+    URI uri = UriComponentsBuilder.fromUri(endpoints.reviewsRef(TYPE).uri())
+        .queryParam("isAnswered", false).queryParam("take", 1000).queryParam("skip", 0)
+        .queryParam("dateFrom", fromSec).queryParam("dateTo", toSec)
         .build(true).toUri();
-    return get(TYPE, "reviews", accountId, uri, WbReviewRaw.class);
+    return get(TYPE, EndpointKey.REVIEWS, accountId, uri, WbReviewRaw.class);
   }
 }

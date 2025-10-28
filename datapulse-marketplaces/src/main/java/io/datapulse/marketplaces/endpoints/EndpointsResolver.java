@@ -19,26 +19,48 @@ public class EndpointsResolver {
     this.providers = properties.getProviders();
   }
 
+  public EndpointRef salesRef(@NonNull MarketplaceType type) {
+    return new EndpointRef(EndpointKey.SALES, sales(type));
+  }
+
+  public EndpointRef stockRef(@NonNull MarketplaceType type) {
+    return new EndpointRef(EndpointKey.STOCK, stock(type));
+  }
+
+  public EndpointRef financeRef(@NonNull MarketplaceType type) {
+    return new EndpointRef(EndpointKey.FINANCE, finance(type));
+  }
+
+  public EndpointRef reviewsRef(@NonNull MarketplaceType type) {
+    return new EndpointRef(EndpointKey.REVIEWS, reviews(type));
+  }
+
+  // Backward-compat (если где-то используются)
   public URI sales(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(host(p, type, "sales"), required(p.getEndpoints().getSales(), "sales"));
+    return buildUri(host(p, type, EndpointKey.SALES),
+        required(p.getEndpoints().getSales(), "sales"));
   }
 
   public URI stock(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(host(p, type, "stock"), required(p.getEndpoints().getStock(), "stock"));
+    return buildUri(host(p, type, EndpointKey.STOCK),
+        required(p.getEndpoints().getStock(), "stock"));
   }
 
   public URI finance(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(host(p, type, "finance"), required(p.getEndpoints().getFinance(), "finance"));
+    return buildUri(host(p, type, EndpointKey.FINANCE),
+        required(p.getEndpoints().getFinance(), "finance"));
   }
 
   public URI reviews(@NonNull MarketplaceType type) {
     var p = provider(type);
-    return buildUri(host(p, type, "reviews"), required(p.getEndpoints().getReviews(), "reviews"));
+    return buildUri(host(p, type, EndpointKey.REVIEWS),
+        required(p.getEndpoints().getReviews(), "reviews"));
   }
 
+  // ——— private ———
   private MarketplaceProperties.Provider provider(MarketplaceType type) {
     var p = providers.get(type);
     if (p == null || p.getEndpoints() == null) {
@@ -54,10 +76,6 @@ public class EndpointsResolver {
     return UriComponentsBuilder.fromHttpUrl(host).path(path).build(true).toUri();
   }
 
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
-  }
-
   private static String required(String path, String key) {
     if (isBlank(path)) {
       throw new AppException(MessageCodes.MARKETPLACE_CONFIG_MISSING, key);
@@ -65,16 +83,18 @@ public class EndpointsResolver {
     return path;
   }
 
+  private static boolean isBlank(String s) {
+    return s == null || s.isBlank();
+  }
+
   private static String host(MarketplaceProperties.Provider p, MarketplaceType type,
-      String endpointKey) {
+      EndpointKey endpointKey) {
     final boolean sandbox = p.isUseSandbox() && p.getSandbox() != null;
     final String base = sandbox ? p.getSandbox().getBaseUrl() : p.getBaseUrl();
-
-    // Особый хост для WB feedbacks (reviews)
-    if (type == MarketplaceType.WILDBERRIES && "reviews".equals(endpointKey)) {
+    if (type == MarketplaceType.WILDBERRIES && endpointKey == EndpointKey.REVIEWS) {
       final String fb = sandbox ? p.getSandbox().getFeedbacksBaseUrl()
           : p.getFeedbacksBaseUrl();
-      return isBlank(fb) ? base : fb;
+      return (fb == null || fb.isBlank()) ? base : fb;
     }
     return base;
   }

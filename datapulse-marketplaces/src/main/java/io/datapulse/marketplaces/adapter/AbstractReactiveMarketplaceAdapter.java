@@ -7,6 +7,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.MarketplaceExceptions;
+import io.datapulse.marketplaces.endpoints.EndpointKey;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceFactory;
 import io.github.resilience4j.bulkhead.Bulkhead;
@@ -19,11 +20,6 @@ import org.springframework.http.HttpHeaders;
 import reactor.core.publisher.Flux;
 import reactor.util.retry.Retry;
 
-/**
- * Базовый адаптер для всех маркетплейсов. Минималистичный и универсальный: - Адаптер сам указывает
- * endpointKey ("sales", "stock", "finance", "reviews"). - База управляет Resilience (rateLimiter /
- * bulkhead / retry). - Единая обработка ошибок и парсинга.
- */
 abstract class AbstractReactiveMarketplaceAdapter {
 
   protected final StreamingDownloadService streamingDownloadService;
@@ -46,41 +42,27 @@ abstract class AbstractReactiveMarketplaceAdapter {
     this.credentialsProvider = Objects.requireNonNull(credentialsProvider);
   }
 
-  /**
-   * GET с явным указанием endpointKey
-   */
-  protected final <T> Flux<T> get(MarketplaceType type, String endpointKey, long accountId, URI uri,
+  protected final <T> Flux<T> get(MarketplaceType type, EndpointKey key, long accountId, URI uri,
       Class<T> targetType) {
-    return execute(type, endpointKey, accountId, uri, targetType, () ->
+    return execute(type, key, accountId, uri, targetType, () ->
         streamingDownloadService.stream(
-            uri,
-            buildHeaders(type, accountId),
-            retry(type, endpointKey),
-            rateLimiter(type, endpointKey, accountId),
-            bulkhead(type, endpointKey, accountId)
+            uri, buildHeaders(type, accountId),
+            retry(type, key), rateLimiter(type, key, accountId), bulkhead(type, key, accountId)
         ));
   }
 
-  /**
-   * POST с явным указанием endpointKey
-   */
-  protected final <T> Flux<T> post(MarketplaceType type, String endpointKey, long accountId,
-      URI uri, Object body, Class<T> targetType) {
-    return execute(type, endpointKey, accountId, uri, targetType, () ->
+  protected final <T> Flux<T> post(MarketplaceType type, EndpointKey key, long accountId, URI uri,
+      Object body, Class<T> targetType) {
+    return execute(type, key, accountId, uri, targetType, () ->
         streamingDownloadService.post(
-            uri,
-            buildHeaders(type, accountId),
-            body,
-            retry(type, endpointKey),
-            rateLimiter(type, endpointKey, accountId),
-            bulkhead(type, endpointKey, accountId)
+            uri, buildHeaders(type, accountId), body,
+            retry(type, key), rateLimiter(type, key, accountId), bulkhead(type, key, accountId)
         ));
   }
 
-  private <T> Flux<T> execute(
-      MarketplaceType type, String endpointKey, long accountId, URI uri, Class<T> targetType,
-      Supplier<Flux<DataBuffer>> call
-  ) {
+  private <T> Flux<T> execute(MarketplaceType type, EndpointKey key, long accountId, URI uri,
+      Class<T> targetType,
+      Supplier<Flux<DataBuffer>> call) {
     if (uri == null) {
       throw new AppException(MessageCodes.URI_REQUIRED);
     }
@@ -89,12 +71,12 @@ abstract class AbstractReactiveMarketplaceAdapter {
     }
 
     Flux<DataBuffer> bytes = call.get()
-        .onErrorMap(ex -> new MarketplaceExceptions.FetchFailed(
-            ex, MessageCodes.MARKETPLACE_FETCH_FAILED, type, endpointKey, accountId, uri));
+        .onErrorMap(ex -> new MarketplaceExceptions.FetchFailed(ex,
+            MessageCodes.MARKETPLACE_FETCH_FAILED, type, key.tag(), accountId, uri));
 
     return fluxReader.readArray(bytes, targetType)
-        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
-            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, endpointKey, accountId, uri));
+        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(ex,
+            MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), accountId, uri));
   }
 
   private HttpHeaders buildHeaders(MarketplaceType type, long accountId) {
@@ -102,15 +84,15 @@ abstract class AbstractReactiveMarketplaceAdapter {
     return headerProvider.build(type, creds);
   }
 
-  private Bulkhead bulkhead(MarketplaceType type, String key, long accountId) {
-    return resilienceFactory.bulkhead(type, key, accountId);
+  private Bulkhead bulkhead(MarketplaceType type, EndpointKey key, long accountId) {
+    return resilienceFactory.bulkhead(type, key.tag(), accountId);
   }
 
-  private Retry retry(MarketplaceType type, String key) {
-    return resilienceFactory.retry(type, key);
+  private Retry retry(MarketplaceType type, EndpointKey key) {
+    return resilienceFactory.retry(type, key.tag());
   }
 
-  private RateLimiter rateLimiter(MarketplaceType type, String key, long accountId) {
-    return resilienceFactory.rateLimiter(type, key, accountId);
+  private RateLimiter rateLimiter(MarketplaceType type, EndpointKey key, long accountId) {
+    return resilienceFactory.rateLimiter(type, key.tag(), accountId);
   }
 }
