@@ -11,6 +11,7 @@ import io.datapulse.marketplaces.dto.raw.ozon.OzonStockRaw;
 import io.datapulse.marketplaces.endpoints.EndpointKey;
 import io.datapulse.marketplaces.endpoints.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
+import io.datapulse.marketplaces.resilience.ResilienceManager;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,7 +27,7 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
   private final EndpointsResolver endpoints;
 
   public OzonAdapter(EndpointsResolver endpoints,
-      StreamingDownloadService s, ResilienceFactory r, JsonFluxReader f,
+      StreamingDownloadService s, ResilienceManager r, JsonFluxReader f,
       HttpHeaderProvider h, CredentialsProvider c) {
     super(s, r, f, h, c);
     this.endpoints = endpoints;
