@@ -101,14 +101,6 @@ public class GenericControllerAdvice {
         locale
     );
 
-    String logMessage = messageSource.getMessage(
-        MessageCodes.JSON_BODY_INVALID,
-        new Object[]{raw},
-        "Invalid request body",
-        LOCALE_EN
-    );
-
-    log.warn(logMessage, ex);
     return ResponseEntity.status(status).body(new ErrorResponse(userMessage));
   }
 

@@ -1,6 +1,5 @@
 package io.datapulse.marketplaces.resilience;
 
-
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.datapulse.domain.MarketplaceType;
@@ -21,6 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import javax.net.ssl.SSLException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -31,6 +31,7 @@ import reactor.util.retry.Retry;
 /**
  * Минимальный фасад: сборка RL/BH/Retry, применение к Mono/Flux.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ResilienceManager {
@@ -44,14 +45,18 @@ public class ResilienceManager {
   private final Cache<String, Bulkhead> bhCache = Caffeine.newBuilder()
       .maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
   private final Cache<String, Retry> retryCache = Caffeine.newBuilder()
-      .maximumSize(1000)
-      .expireAfterAccess(Duration.ofHours(1))
-      .build();
+      .maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
 
+  /**
+   * Комплект ограничителей и Retry.
+   */
   public record ResilienceKit(RateLimiter rl, Bulkhead bh, Retry retry) {
 
   }
 
+  /**
+   * Конфигурирование под (marketplace, endpoint, account).
+   */
   public ResilienceKit kit(MarketplaceType type, String endpointKey, long accountId) {
     var r = effectiveResilience(type, endpointKey);
 
@@ -88,59 +93,99 @@ public class ResilienceManager {
     String rlName = name(type, endpointKey, "rl", accountId);
     String bhName = name(type, endpointKey, "bh", accountId);
     String rtName = name(type, endpointKey, "rt", accountId); // Retry per-account
+    String ctx = type + ":" + endpointKey + ":acc=" + accountId;
 
     RateLimiter rl = rlCache.get(rlName, n -> RateLimiter.of(n, rlCfg));
     Bulkhead bh = bhCache.get(bhName, n -> Bulkhead.of(n, bhCfg));
     Retry rt = retryCache.get(rtName,
-        n -> buildRetry(maxAttempts, base, cap, jitter, raFallback));
+        n -> buildRetry(maxAttempts, base, cap, jitter, raFallback, ctx));
 
     return new ResilienceKit(rl, bh, rt);
   }
 
+  /**
+   * Применение RL+BH к Flux (без ретраев — они накладываются снаружи через retryWhen).
+   */
   public <T> Flux<T> apply(Flux<T> src, ResilienceKit k) {
     return applyBulkhead(applyRateLimiter(src, k.rl()), k.bh());
   }
 
+  /**
+   * Применение RL+BH к Mono (без ретраев — они накладываются снаружи через retryWhen).
+   */
   public <T> Mono<T> apply(Mono<T> src, ResilienceKit k) {
     return applyBulkhead(applyRateLimiter(src, k.rl()), k.bh());
   }
 
   /**
-   * Важно: {@code maxAttempts} включает первую попытку. Т.е. при {@code maxAttempts=3} допускаются
-   * 2 повтора (totalRetries() ∈ {0,1,2}; стоп на >=2).
+   * Важно: maxAttempts включает первую попытку. Пример: maxAttempts=3 ⇒ допускаются два повтора
+   * (totalRetries ∈ {0,1,2}).
    */
-  private Retry buildRetry(int maxAttempts, Duration base, Duration cap, Duration jitter,
-      Duration raFallback) {
+  private Retry buildRetry(
+      int maxAttempts, Duration base, Duration cap, Duration jitter, Duration raFallback,
+      String ctx) {
+
     return Retry.from(signals -> signals.flatMap(rs -> {
       final Throwable t = rs.failure();
+      final long attempt = rs.totalRetries() + 1; // первая "повторная" попытка — #1
 
+      // Стоп-условие
       if (rs.totalRetries() >= maxAttempts - 1) {
+        log.warn("[{}] retry exhausted after {} attempts, last-cause={}", ctx, maxAttempts,
+            simpleName(t));
         return Mono.error(t);
       }
 
+      // HTTP-ответы
       if (t instanceof WebClientResponseException w) {
         final int code = w.getStatusCode().value();
+
+        // 429/503 — уважаем Retry-After/RateLimit-заголовки
         if (code == 429 || code == 503) {
-          Duration d = RetryAfterSupport.parse(w.getHeaders(), raFallback);
-          return Mono.delay(BackoffSupport.addJitterAndCap(d, jitter, cap));
+          Duration ra = RetryAfterSupport.parse(w.getHeaders(), raFallback);
+          Duration delay = BackoffSupport.addJitterAndCap(ra, jitter, cap);
+          log.info("[{}] {} -> retry (attempt #{}) in {} (headers={}, jitter={}, cap={})",
+              ctx, code, attempt, delay, shortRetryAfterHeaders(w), jitter, cap);
+          return Mono.delay(delay);
         }
+
+        // Прочие ретраябельные
         if (code == 409 || code == 408 || code == 425 || (code >= 500 && code <= 599)) {
-          return Mono.delay(BackoffSupport.expBackoff(rs.totalRetries(), base, cap, jitter));
+          Duration delay = BackoffSupport.expBackoff(rs.totalRetries(), base, cap, jitter);
+          log.info("[{}] {} -> retry (attempt #{}) in {} (base={}, jitter={}, cap={})",
+              ctx, code, attempt, delay, base, jitter, cap);
+          return Mono.delay(delay);
         }
+
+        // Не ретраим
+        log.warn("[{}] non-retryable status={}, giving up (attempt #{})", ctx, code, attempt);
         return Mono.error(t);
       }
 
+      // Сетевые «транзиенты»
       if (t instanceof WebClientRequestException req && isTransientNetwork(req)) {
-        return Mono.delay(BackoffSupport.expBackoff(rs.totalRetries(), base, cap, jitter));
+        Duration delay = BackoffSupport.expBackoff(rs.totalRetries(), base, cap, jitter);
+        log.info("[{}] transient network -> retry (attempt #{}) in {} (base={}, jitter={}, cap={})",
+            ctx, attempt, delay, base, jitter, cap);
+        return Mono.delay(delay);
       }
 
+      // RL/BH блокировки
       if (t instanceof RequestNotPermitted || t instanceof BulkheadFullException) {
-        return Mono.delay(BackoffSupport.expBackoff(rs.totalRetries(), base, cap, jitter));
+        Duration delay = BackoffSupport.expBackoff(rs.totalRetries(), base, cap, jitter);
+        log.info("[{}] RL/BH blocked -> retry (attempt #{}) in {} (base={}, jitter={}, cap={})",
+            ctx, attempt, delay, base, jitter, cap);
+        return Mono.delay(delay);
       }
 
+      // Всё прочее — не ретраим
+      log.warn("[{}] non-retryable exception={}, giving up (attempt #{})", ctx, simpleName(t),
+          attempt);
       return Mono.error(t);
     }));
   }
+
+  /* ---- конфиг-выбор и валидации ---- */
 
   private MarketplaceProperties.Resilience effectiveResilience(MarketplaceType type,
       String endpointKey) {
@@ -209,7 +254,7 @@ public class ResilienceManager {
     return false;
   }
 
-  /* ---- локальные операторы RL/BH ---- */
+  /* ---- локальные операторы RL/BH (без внешних зависимостей) ---- */
 
   private static <T> Flux<T> applyRateLimiter(Flux<T> src, RateLimiter limiter) {
     return Flux.defer(() -> {
@@ -249,5 +294,21 @@ public class ResilienceManager {
       }
       return src.doFinally(sig -> bh.onComplete());
     });
+  }
+
+  /* ---- лаконичные хелперы для понятных логов ---- */
+
+  private static String simpleName(Throwable t) {
+    return (t == null) ? "null" : t.getClass().getSimpleName();
+  }
+
+  private static String shortRetryAfterHeaders(WebClientResponseException w) {
+    var h = w.getHeaders();
+    String ra = h.getFirst("Retry-After");
+    String xr = h.getFirst("X-Ratelimit-Retry");
+    String xrst = h.getFirst("X-Ratelimit-Reset");
+    return "retry-after=" + (ra == null ? "-" : ra)
+        + ", x-ratelimit-retry=" + (xr == null ? "-" : xr)
+        + ", x-ratelimit-reset=" + (xrst == null ? "-" : xrst);
   }
 }
