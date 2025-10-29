@@ -26,25 +26,25 @@ public class EventEtlFlow {
     return IntegrationFlow.from(CHANNEL_RUN_EVENT)
         .channel(MessageChannels.executor(etlExecutor))
         .handle((payload, headers) -> {
-          FetchRequest job = (FetchRequest) payload;
+          FetchRequest fetchRequest = (FetchRequest) payload;
 
           var matched = sources.stream()
-              .filter(src -> src.event() == job.event())
+              .filter(src -> src.event() == fetchRequest.event())
               .toList();
 
           if (matched.isEmpty()) {
-            log.warn("No sources found for event={}", job.event());
+            log.warn("No sources found for event={}", fetchRequest.event());
             return null;
           }
 
           Flux<?> flux = Flux.merge(matched.stream()
-              .map(source -> source.fetch(job))
+              .map(source -> source.fetch(fetchRequest))
               .toList());
 
           flux
-              .doOnSubscribe(s -> log.info("ETL start event={}", job.event()))
+              .doOnSubscribe(s -> log.info("ETL start event={}", fetchRequest.event()))
               .doOnNext(System.out::println)
-              .doOnComplete(() -> log.info("ETL done  event={}", job.event()))
+              .doOnComplete(() -> log.info("ETL done  event={}", fetchRequest.event()))
               .subscribe();
 
           return null;

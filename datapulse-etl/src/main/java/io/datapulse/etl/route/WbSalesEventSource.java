@@ -1,7 +1,6 @@
-package io.datapulse.marketplaces.event.source;
+package io.datapulse.etl.route;
 
 import io.datapulse.domain.dto.SaleDto;
-import io.datapulse.etl.route.EventSource;
 import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.event.BusinessEvent;
 import io.datapulse.marketplaces.event.FetchRequest;

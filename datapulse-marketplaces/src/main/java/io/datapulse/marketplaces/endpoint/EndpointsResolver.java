@@ -6,68 +6,136 @@ import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.event.BusinessEvent;
 import java.net.URI;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import lombok.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * Minimal resolver: BusinessEvent → EndpointKey → URI for a given marketplace. No extra
- * registries/config classes; single method to resolve everything.
- */
 @Component
 public final class EndpointsResolver {
 
   private final Map<MarketplaceType, MarketplaceProperties.Provider> providers;
 
-  public EndpointsResolver(@NonNull MarketplaceProperties properties) {
-    this.providers = properties.getProviders();
+  /**
+   * 1→N сопоставление событий и ключей (по умолчанию).
+   */
+  private static final Map<BusinessEvent, List<EndpointKey>> DEFAULT_KEYS = defaultKeys();
+
+  public EndpointsResolver(@NonNull MarketplaceProperties props) {
+    this.providers = props.getProviders();
   }
 
   /**
-   * Single entrypoint: resolve endpoint for marketplace + business event.
+   * Все эндпоинты для события (без query).
    */
-  public EndpointRef resolve(
-      @NonNull MarketplaceType type,
-      @NonNull BusinessEvent event) {
-    var key = mapEventToKey(event);
+  public List<EndpointRef> resolveAll(@NonNull MarketplaceType type, @NonNull BusinessEvent event) {
+    var keys = keys(event);
     var p = provider(type);
-
-    String path = switch (key) {
-      case SALES -> required(p.getEndpoints().getSales(), "sales");
-      case STOCK -> required(p.getEndpoints().getStock(), "stock");
-      case FINANCE -> required(p.getEndpoints().getFinance(), "finance");
-      case REVIEWS -> required(p.getEndpoints().getReviews(), "reviews");
-    };
-
-    String base = host(p, type, key);
-    return new EndpointRef(key, buildUri(base, path));
+    return keys.stream()
+        .map(k -> new EndpointRef(
+            k,
+            buildUri(host(p, type, k), required(pathByKey(p, k), k.name().toLowerCase()))
+        ))
+        .toList();
   }
 
-  // ——— mapping ———
-  private static EndpointKey mapEventToKey(BusinessEvent event) {
-    return switch (event) {
-      case SALES_FACT -> EndpointKey.SALES;
-      case STOCK_LEVEL -> EndpointKey.STOCK;
-      case REVIEW -> EndpointKey.REVIEWS;
-      case RETURN -> EndpointKey.FINANCE; // until a dedicated returns API appears
-      case AD_PERFORMANCE -> EndpointKey.FINANCE; // temporary
-      case ORDER_POSTING -> EndpointKey.FINANCE; // adjust when posting endpoint is added
-      case PRICE_SNAPSHOT -> EndpointKey.FINANCE; // adjust when price endpoint is added
-      case CATALOG_ITEM -> EndpointKey.FINANCE; // adjust when catalog endpoint is added
-    };
+  /**
+   * То же, c едиными query из Map<String, ?>.
+   */
+  public List<EndpointRef> resolveAll(
+      @NonNull MarketplaceType type,
+      @NonNull BusinessEvent event,
+      @NonNull Map<String, ?> query
+  ) {
+    return resolveAll(type, event, toQueryParams(query));
   }
 
-  // ——— infra ———
+  /**
+   * То же, c MultiValueMap.
+   */
+  public List<EndpointRef> resolveAll(
+      @NonNull MarketplaceType type,
+      @NonNull BusinessEvent event,
+      @NonNull MultiValueMap<String, String> query
+  ) {
+    return resolveAll(type, event).stream()
+        .map(ref -> new EndpointRef(ref.key(), applyQuery(ref.uri(), query)))
+        .toList();
+  }
+
+  // ——— helpers ———
+
+  private static Map<BusinessEvent, List<EndpointKey>> defaultKeys() {
+    var m = new EnumMap<BusinessEvent, List<EndpointKey>>(BusinessEvent.class);
+    m.put(BusinessEvent.SALES_FACT, List.of(EndpointKey.SALES));
+    m.put(BusinessEvent.STOCK_LEVEL, List.of(EndpointKey.STOCK));
+    m.put(BusinessEvent.REVIEW, List.of(EndpointKey.REVIEWS));
+    m.put(BusinessEvent.RETURN, List.of(EndpointKey.FINANCE));
+    m.put(BusinessEvent.AD_PERFORMANCE, List.of(EndpointKey.FINANCE));
+    m.put(BusinessEvent.ORDER_POSTING, List.of(EndpointKey.FINANCE));
+    m.put(BusinessEvent.PRICE_SNAPSHOT, List.of(EndpointKey.FINANCE));
+    m.put(BusinessEvent.CATALOG_ITEM, List.of(EndpointKey.FINANCE));
+    return Map.copyOf(m);
+  }
+
+  private static List<EndpointKey> keys(BusinessEvent event) {
+    var list = DEFAULT_KEYS.get(event);
+    if (CollectionUtils.isEmpty(list)) {
+      throw new AppException(MessageCodes.MARKETPLACE_CONFIG_MISSING, "endpoint-keys:" + event);
+    }
+    return list;
+  }
+
   private MarketplaceProperties.Provider provider(MarketplaceType type) {
     var p = providers.get(type);
     if (p == null || p.getEndpoints() == null) {
       throw new AppException(MessageCodes.MARKETPLACE_CONFIG_MISSING, type.name());
     }
-    if (isBlank(p.getBaseUrl())) {
+    if (!StringUtils.hasText(p.getBaseUrl())) {
       throw new AppException(MessageCodes.MARKETPLACE_BASE_URL_MISSING, type.name());
     }
     return p;
+  }
+
+  private static String pathByKey(MarketplaceProperties.Provider p, EndpointKey key) {
+    return switch (key) {
+      case SALES -> p.getEndpoints().getSales();
+      case STOCK -> p.getEndpoints().getStock();
+      case FINANCE -> p.getEndpoints().getFinance();
+      case REVIEWS -> p.getEndpoints().getReviews();
+    };
+  }
+
+  private static URI applyQuery(URI base, MultiValueMap<String, String> query) {
+    return UriComponentsBuilder.fromUri(base)
+        .queryParams(query)
+        .build(true)
+        .toUri();
+  }
+
+  private static MultiValueMap<String, String> toQueryParams(Map<String, ?> raw) {
+    var mv = new LinkedMultiValueMap<String, String>(raw.size());
+    raw.forEach((k, v) -> {
+      if (v == null) {
+        return;
+      }
+      if (v instanceof Iterable<?> it) {
+        for (Object val : it) {
+          if (val != null) {
+            mv.add(k, String.valueOf(val));
+          }
+        }
+      } else {
+        mv.add(k, String.valueOf(v));
+      }
+    });
+    return mv;
   }
 
   private static URI buildUri(String host, String path) {
@@ -75,18 +143,14 @@ public final class EndpointsResolver {
   }
 
   private static String required(String path, String key) {
-    if (isBlank(path)) {
+    if (!StringUtils.hasText(path)) {
       throw new AppException(MessageCodes.MARKETPLACE_CONFIG_MISSING, key);
     }
     return path;
   }
 
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
-  }
-
   /**
-   * WB reviews may use a dedicated host; otherwise use base URL (sandbox-aware).
+   * Для WB отзывы могут идти через отдельный host; иначе — базовый (учитываем sandbox).
    */
   private static String host(MarketplaceProperties.Provider p, MarketplaceType type,
       EndpointKey key) {
@@ -94,7 +158,7 @@ public final class EndpointsResolver {
     final String base = sandbox ? p.getSandbox().getBaseUrl() : p.getBaseUrl();
     if (type == MarketplaceType.WILDBERRIES && key == EndpointKey.REVIEWS) {
       final String fb = sandbox ? p.getSandbox().getFeedbacksBaseUrl() : p.getFeedbacksBaseUrl();
-      return (fb == null || fb.isBlank()) ? base : fb;
+      return StringUtils.hasText(fb) ? fb : base;
     }
     return base;
   }

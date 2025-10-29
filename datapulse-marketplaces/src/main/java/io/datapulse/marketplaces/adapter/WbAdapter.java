@@ -8,17 +8,14 @@ import io.datapulse.marketplaces.dto.raw.wb.WbFinanceRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbReviewRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
-import io.datapulse.marketplaces.endpoint.EndpointKey;
-import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.event.BusinessEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceManager;
-import java.net.URI;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Map;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 
 @Component
@@ -42,46 +39,31 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<WbSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
-    EndpointRef ref = endpoints.resolve(TYPE, BusinessEvent.SALES_FACT);
-    URI uri = UriComponentsBuilder.fromUri(ref.uri())
-        .queryParam("dateFrom", from)
-        .queryParam("dateTo",   to)
-        .build(true).toUri();
-    return get(TYPE, ref.key(), accountId, uri, WbSaleRaw.class);
+    var refs = endpoints.resolveAll(TYPE, BusinessEvent.SALES_FACT,
+        Map.of("dateFrom", from, "dateTo", to));
+    return mergeGet(TYPE, accountId, refs, WbSaleRaw.class);
   }
 
   @Override
   public Flux<WbStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    EndpointRef ref = endpoints.resolve(TYPE, BusinessEvent.STOCK_LEVEL);
-    return get(TYPE, ref.key(), accountId, ref.uri(), WbStockRaw.class);
+    var refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
+    return mergeGet(TYPE, accountId, refs, WbStockRaw.class);
   }
 
   @Override
   public Flux<WbFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
-    EndpointRef ref = endpoints.resolve(TYPE, BusinessEvent.RETURN); // temp → FINANCE per mapping
-    URI uri = UriComponentsBuilder.fromUri(ref.uri())
-        .queryParam("dateFrom", from)
-        .queryParam("dateTo",   to)
-        .queryParam("limit",    100_000)
-        .build(true).toUri();
-    return get(TYPE, ref.key(), accountId, uri, WbFinanceRaw.class);
+    var refs = endpoints.resolveAll(TYPE, BusinessEvent.RETURN,
+        Map.of("dateFrom", from, "dateTo", to, "limit", 100_000));
+    return mergeGet(TYPE, accountId, refs, WbFinanceRaw.class);
   }
 
   @Override
   public Flux<WbReviewRaw> fetchReviews(long accountId, LocalDate from, LocalDate to) {
-    EndpointRef ref = endpoints.resolve(TYPE, BusinessEvent.REVIEW);
-
     long fromSec = from.atStartOfDay(MSK).toEpochSecond();
-    long toSec   = to.atTime(23, 59, 59).atZone(MSK).toEpochSecond();
-
-    URI uri = UriComponentsBuilder.fromUri(ref.uri())
-        .queryParam("isAnswered", false)
-        .queryParam("take", 1000)
-        .queryParam("skip", 0)
-        .queryParam("dateFrom", fromSec)
-        .queryParam("dateTo",   toSec)
-        .build(true).toUri();
-
-    return get(TYPE, ref.key(), accountId, uri, WbReviewRaw.class);
+    long toSec = to.atTime(23, 59, 59).atZone(MSK).toEpochSecond();
+    var refs = endpoints.resolveAll(TYPE, BusinessEvent.REVIEW,
+        Map.of("isAnswered", false, "take", 1000, "skip", 0, "dateFrom", fromSec, "dateTo", toSec));
+    return mergeGet(TYPE, accountId, refs, WbReviewRaw.class);
   }
+
 }
