@@ -55,7 +55,7 @@ POST http://localhost:8080/api/etl/run
 Content-Type: application/json
 
 {
-  "accountId": "{{accountId}}",
+  "accountId": "44",
   "from": "{{moment().subtract(1, 'day').toISOString()}}",
   "to": "{{moment().toISOString()}}"
 }

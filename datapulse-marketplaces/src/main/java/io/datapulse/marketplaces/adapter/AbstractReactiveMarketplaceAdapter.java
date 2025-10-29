@@ -92,7 +92,7 @@ abstract class AbstractReactiveMarketplaceAdapter {
 
     final String ctx = type + ":" + key.tag() + ":acc=" + accountId;
 
-    Flux<DataBuffer> guarded = resilienceManager.apply(raw, type, key.tag(), accountId)
+    Flux<DataBuffer> guarded = resilienceManager.apply(raw, type, key, accountId)
         .doOnSubscribe(s -> log.debug("[{}] start streaming {}", ctx, uri))
         .doFinally(st -> {
           if (st == SignalType.CANCEL) {

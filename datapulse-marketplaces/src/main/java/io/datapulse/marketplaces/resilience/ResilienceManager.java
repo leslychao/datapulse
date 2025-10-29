@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
+import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
@@ -24,7 +25,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Stream;
+import java.util.concurrent.ThreadLocalRandom;
 import javax.net.ssl.SSLException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,325 +43,328 @@ import reactor.util.retry.Retry;
 @RequiredArgsConstructor
 public class ResilienceManager {
 
-  private static final Duration MAX_CAP = Duration.ofMinutes(5);
+  private static final Duration MAX_BACKOFF_CAP = Duration.ofMinutes(5);
 
   private final MarketplaceProperties marketplaceProperties;
 
-  private final Cache<String, RateLimiter> rlCache = Caffeine.newBuilder()
-      .maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
-  private final Cache<String, Bulkhead> bhCache = Caffeine.newBuilder()
-      .maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
-  private final Cache<String, Retry> retryCache = Caffeine.newBuilder()
-      .maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
+  private final Cache<String, RateLimiter> rateLimiterCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
+  private final Cache<String, Bulkhead> bulkheadCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
+  private final Cache<String, Retry> retryCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterAccess(Duration.ofHours(1)).build();
 
-  /* ====== Public API ====== */
-
-  public <T> Flux<T> apply(Flux<T> raw, MarketplaceType type, String endpointKey, long accountId) {
-    return doApply(raw, type, endpointKey, "acc:" + accountId);
+  public <T> Flux<T> apply(Flux<T> source, MarketplaceType marketplaceType, EndpointKey endpointKey,
+      long accountId) {
+    return doApply(source, marketplaceType, endpointKey, "acc:" + accountId);
   }
 
-  /* ====== Core impl ====== */
-
-  private <T> Flux<T> doApply(Flux<T> raw, MarketplaceType type, String endpointKey, String limiterKey) {
-    var epKit = doBuildKit(type, endpointKey, limiterKey);
-    var globalOpt = tryBuildGlobalKit(type, limiterKey);
-
-    Flux<T> withGuards = globalOpt
-        .map(gk -> apply(apply(raw, gk), epKit)) // GLOBAL → PER-ENDPOINT
-        .orElseGet(() -> apply(raw, epKit));
-
-    // Ретраи — пер-эндпоинт (контекст логов и политики привязаны к конкретному API)
-    return withGuards.retryWhen(epKit.retry());
+  private <T> Flux<T> doApply(Flux<T> source, MarketplaceType marketplaceType,
+      EndpointKey endpointKey, String scopeId) {
+    ResilienceKit endpointKit = buildKit(marketplaceType, endpointKey, scopeId);
+    Optional<ResilienceKit> globalKitOpt = tryBuildGlobalKit(marketplaceType, scopeId);
+    Flux<T> guardedStream = globalKitOpt
+        .map(globalKit -> applyGuards(applyGuards(source, globalKit), endpointKit))
+        .orElseGet(() -> applyGuards(source, endpointKit));
+    return guardedStream.retryWhen(endpointKit.retry());
   }
 
-  /** Пытается построить GLOBAL-kit на основе базовой resilience-конфигурации провайдера. */
-  private Optional<ResilienceKit> tryBuildGlobalKit(MarketplaceType type, String limiterKey) {
-    MarketplaceProperties.Provider provider = marketplaceProperties.get(type);
-    MarketplaceProperties.Resilience base = provider.getResilience();
-    if (base == null) {
+  private Optional<ResilienceKit> tryBuildGlobalKit(MarketplaceType marketplaceType,
+      String scopeId) {
+    var provider = marketplaceProperties.get(marketplaceType);
+    var baseResilience = provider.getResilience();
+    if (baseResilience == null) {
       return Optional.empty();
     }
-    return Optional.of(doBuildKit(type, null, limiterKey));
+    return Optional.of(buildKit(marketplaceType, null, scopeId));
   }
 
-  /** Строим комплект для (type, endpointKey, limiterKey). */
-  private ResilienceKit doBuildKit(MarketplaceType type, String endpointKey, String limiterKey) {
-    var r = effectiveResilience(type, endpointKey);
+  private ResilienceKit buildKit(MarketplaceType marketplaceType, EndpointKey endpointKey,
+      String scopeId) {
+    var cfg = resolveResilience(marketplaceType, endpointKey);
 
-    // Валидации / нормализация
-    final int maxAttempts = reqPos(r.getMaxAttempts(), "maxAttempts");
-    final Duration base = reqPositive(r.getBaseBackoff(), "baseBackoff");
-    final Duration cap = reqCap(r.getMaxBackoff(), "maxBackoff");
-    final Duration jitter = nonNegative(orZero(r.getMaxJitter()), "maxJitter");
-    final Duration raFallback = reqCap(orZero(r.getRetryAfterFallback()), "retryAfterFallback");
-    if (base.compareTo(cap) > 0) {
+    int maxAttempts = requirePositive(cfg.getMaxAttempts(), "maxAttempts");
+    Duration baseBackoff = requirePositive(cfg.getBaseBackoff(), "baseBackoff");
+    Duration maxBackoff = requireCap(cfg.getMaxBackoff(), "maxBackoff");
+    Duration maxJitter = requireNonNegative(orZero(cfg.getMaxJitter()), "maxJitter");
+    Duration retryAfterFallback = requireCap(orZero(cfg.getRetryAfterFallback()),
+        "retryAfterFallback");
+    if (baseBackoff.compareTo(maxBackoff) > 0) {
       throw new IllegalArgumentException("baseBackoff must be <= maxBackoff");
     }
-    final Duration tokenWait = reqCap(Objects.requireNonNull(r.getTokenWaitTimeout(), "tokenWaitTimeout"), "tokenWaitTimeout");
-    final Duration bhWait = reqCap(Objects.requireNonNull(r.getBulkheadWait(), "bulkheadWait"), "bulkheadWait");
+    Duration tokenWaitTimeout =
+        requireCap(Objects.requireNonNull(cfg.getTokenWaitTimeout(), "tokenWaitTimeout"),
+            "tokenWaitTimeout");
+    Duration bulkheadWait =
+        requireCap(Objects.requireNonNull(cfg.getBulkheadWait(), "bulkheadWait"), "bulkheadWait");
 
-    var rlCfg = RateLimiterConfig.custom()
-        .limitRefreshPeriod(Objects.requireNonNull(r.getLimitRefreshPeriod(), "limitRefreshPeriod"))
-        .limitForPeriod(reqPos(r.getLimitForPeriod(), "limitForPeriod"))
-        .timeoutDuration(tokenWait)
+    RateLimiterConfig rateLimiterConfig = RateLimiterConfig.custom()
+        .limitRefreshPeriod(
+            Objects.requireNonNull(cfg.getLimitRefreshPeriod(), "limitRefreshPeriod"))
+        .limitForPeriod(requirePositive(cfg.getLimitForPeriod(), "limitForPeriod"))
+        .timeoutDuration(tokenWaitTimeout)
         .build();
 
-    var bhCfg = BulkheadConfig.custom()
-        .maxConcurrentCalls(reqPos(r.getMaxConcurrentCalls(), "maxConcurrentCalls"))
-        .maxWaitDuration(bhWait)
+    BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
+        .maxConcurrentCalls(requirePositive(cfg.getMaxConcurrentCalls(), "maxConcurrentCalls"))
+        .maxWaitDuration(bulkheadWait)
         .build();
 
-    String ep = epLabel(endpointKey);
-    String rlName = type + "." + ep + ".rl." + limiterKey;
-    String bhName = type + "." + ep + ".bh." + limiterKey;
-    String rtName = type + "." + ep + ".rt." + limiterKey;
-    String ctx = type + ":" + ep + ":" + limiterKey;
+    String endpointLabel = labelOf(endpointKey);
+    String rlName = marketplaceType + "." + endpointLabel + ".rl." + scopeId;
+    String bhName = marketplaceType + "." + endpointLabel + ".bh." + scopeId;
+    String rtName = marketplaceType + "." + endpointLabel + ".rt." + scopeId;
+    String contextLabel = marketplaceType + ":" + endpointLabel + ":" + scopeId;
 
-    RateLimiter rl = rlCache.get(rlName, n -> RateLimiter.of(n, rlCfg));
-    Bulkhead bh = bhCache.get(bhName, n -> Bulkhead.of(n, bhCfg));
-    Retry rt = retryCache.get(rtName, n -> buildRetry(maxAttempts, base, cap, jitter, raFallback, ctx));
+    RateLimiter rateLimiter = rateLimiterCache.get(rlName,
+        name -> RateLimiter.of(name, rateLimiterConfig));
+    Bulkhead bulkhead = bulkheadCache.get(bhName, name -> Bulkhead.of(name, bulkheadConfig));
+    Retry retry = retryCache.get(rtName,
+        name -> buildRetry(maxAttempts, baseBackoff, maxBackoff, maxJitter, retryAfterFallback,
+            contextLabel));
 
-    return new ResilienceKit(rl, bh, rt);
+    return new ResilienceKit(rateLimiter, bulkhead, retry);
   }
 
-  /** Комплект ограничителей и Retry. */
-  public record ResilienceKit(RateLimiter rl, Bulkhead bh, Retry retry) {}
+  public record ResilienceKit(RateLimiter rateLimiter, Bulkhead bulkhead, Retry retry) {
 
-  /* ====== Локальные операторы RL/BH ====== */
-
-  public <T> Flux<T> apply(Flux<T> src, ResilienceKit k) {
-    return applyBulkhead(applyRateLimiter(src, k.rl()), k.bh());
   }
 
-  private static <T> Flux<T> applyRateLimiter(Flux<T> src, RateLimiter limiter) {
+  private static <T> Flux<T> applyGuards(Flux<T> source, ResilienceKit kit) {
+    return applyRateLimiter(applyBulkhead(source, kit.bulkhead()), kit.rateLimiter());
+  }
+
+  private static <T> Mono<T> applyGuards(Mono<T> source, ResilienceKit kit) {
+    return applyRateLimiter(applyBulkhead(source, kit.bulkhead()), kit.rateLimiter());
+  }
+
+  private static <T> Flux<T> applyBulkhead(Flux<T> source, Bulkhead bulkhead) {
     return Flux.defer(() -> {
-      long waitNanos = limiter.reservePermission();
+      if (!bulkhead.tryAcquirePermission()) {
+        return Flux.error(BulkheadFullException.createBulkheadFullException(bulkhead));
+      }
+      return source.doFinally(signal -> bulkhead.onComplete());
+    });
+  }
+
+  private static <T> Mono<T> applyBulkhead(Mono<T> source, Bulkhead bulkhead) {
+    return Mono.defer(() -> {
+      if (!bulkhead.tryAcquirePermission()) {
+        return Mono.error(BulkheadFullException.createBulkheadFullException(bulkhead));
+      }
+      return source.doFinally(signal -> bulkhead.onComplete());
+    });
+  }
+
+  private static <T> Flux<T> applyRateLimiter(Flux<T> source, RateLimiter rateLimiter) {
+    return Flux.defer(() -> {
+      long waitNanos = rateLimiter.reservePermission();
       if (waitNanos < 0) {
-        return Flux.error(RequestNotPermitted.createRequestNotPermitted(limiter));
+        return Flux.error(RequestNotPermitted.createRequestNotPermitted(rateLimiter));
       }
       Duration wait = Duration.ofNanos(waitNanos);
-      return wait.isZero() ? src : src.delaySubscription(wait);
+      return wait.isZero() ? source : source.delaySubscription(wait);
     });
   }
 
-  private static <T> Mono<T> applyRateLimiter(Mono<T> src, RateLimiter limiter) {
+  private static <T> Mono<T> applyRateLimiter(Mono<T> source, RateLimiter rateLimiter) {
     return Mono.defer(() -> {
-      long waitNanos = limiter.reservePermission();
+      long waitNanos = rateLimiter.reservePermission();
       if (waitNanos < 0) {
-        return Mono.error(RequestNotPermitted.createRequestNotPermitted(limiter));
+        return Mono.error(RequestNotPermitted.createRequestNotPermitted(rateLimiter));
       }
       Duration wait = Duration.ofNanos(waitNanos);
-      return wait.isZero() ? src : src.delaySubscription(wait);
+      return wait.isZero() ? source : source.delaySubscription(wait);
     });
   }
 
-  private static <T> Flux<T> applyBulkhead(Flux<T> src, Bulkhead bh) {
-    return Flux.defer(() -> {
-      if (!bh.tryAcquirePermission()) {
-        return Flux.error(BulkheadFullException.createBulkheadFullException(bh));
-      }
-      return src.doFinally(sig -> bh.onComplete());
-    });
-  }
+  private Retry buildRetry(int maxAttempts, Duration baseBackoff, Duration maxBackoff,
+      Duration jitter,
+      Duration retryAfterFallback, String contextLabel) {
+    return Retry.from(signals -> signals.flatMap(retrySignal -> {
+      Throwable failure = retrySignal.failure();
+      long attempt = retrySignal.totalRetries() + 1;
 
-  private static <T> Mono<T> applyBulkhead(Mono<T> src, Bulkhead bh) {
-    return Mono.defer(() -> {
-      if (!bh.tryAcquirePermission()) {
-        return Mono.error(BulkheadFullException.createBulkheadFullException(bh));
-      }
-      return src.doFinally(sig -> bh.onComplete());
-    });
-  }
-
-  /* ====== Retry ====== */
-
-  private Retry buildRetry(int maxAttempts, Duration base, Duration cap, Duration jitter,
-      Duration raFallback, String ctx) {
-    return Retry.from(signals -> signals.flatMap(rs -> {
-      final Throwable t = rs.failure();
-      final long attempt = rs.totalRetries() + 1;
-
-      if (rs.totalRetries() >= maxAttempts - 1) {
-        log.warn("[{}] retry exhausted after {} attempts, last-cause={}", ctx, maxAttempts, simpleName(t));
-        return Mono.error(t);
+      if (retrySignal.totalRetries() >= maxAttempts - 1) {
+        log.warn("[{}] retry exhausted after {} attempts, last-cause={}", contextLabel, maxAttempts,
+            simpleClassName(failure));
+        return Mono.error(failure);
       }
 
-      if (t instanceof WebClientResponseException w) {
-        final int code = w.getStatusCode().value();
+      if (failure instanceof WebClientResponseException responseEx) {
+        int code = responseEx.getStatusCode().value();
         if (code == 429 || code == 503) {
-          Duration ra = RetryAfterSupport.parse(w.getHeaders(), raFallback);
-          Duration delay = BackoffMath.addJitterAndCap(ra, jitter, cap);
-          log.info("[{}] {} -> retry (attempt #{}) in {} (headers={}, jitter={}, cap={})",
-              ctx, code, attempt, delay, shortRetryAfterHeaders(w), jitter, cap);
+          Duration retryAfter = RetryAfterSupport.parse(responseEx.getHeaders(),
+              retryAfterFallback);
+          Duration delay = BackoffMath.addJitterAndCap(retryAfter, jitter, maxBackoff);
+          log.info("[{}] {} -> retry (#{} ) in {} (headers={}, jitter={}, cap={})",
+              contextLabel, code, attempt, delay, shortRetryHeaders(responseEx), jitter,
+              maxBackoff);
           return Mono.delay(delay);
         }
         if (code == 409 || code == 408 || code == 425 || (code >= 500 && code <= 599)) {
-          Duration delay = BackoffMath.expBackoff(rs.totalRetries(), base, cap, jitter);
-          log.info("[{}] {} -> retry (attempt #{}) in {} (base={}, jitter={}, cap={})",
-              ctx, code, attempt, delay, base, jitter, cap);
+          Duration delay = BackoffMath.expBackoff(retrySignal.totalRetries(), baseBackoff,
+              maxBackoff, jitter);
+          log.info("[{}] {} -> retry (#{} ) in {} (base={}, jitter={}, cap={})",
+              contextLabel, code, attempt, delay, baseBackoff, jitter, maxBackoff);
           return Mono.delay(delay);
         }
-        log.warn("[{}] non-retryable status={}, giving up (attempt #{})", ctx, code, attempt);
-        return Mono.error(t);
+        log.warn("[{}] non-retryable status={}, giving up (#{} )", contextLabel, code, attempt);
+        return Mono.error(failure);
       }
 
-      if (t instanceof WebClientRequestException req && isTransientNetwork(req)) {
-        Duration delay = BackoffMath.expBackoff(rs.totalRetries(), base, cap, jitter);
-        log.info("[{}] transient network -> retry (attempt #{}) in {} (base={}, jitter={}, cap={})",
-            ctx, attempt, delay, base, jitter, cap);
+      if (failure instanceof WebClientRequestException requestEx && isTransientNetwork(requestEx)) {
+        Duration delay = BackoffMath.expBackoff(retrySignal.totalRetries(), baseBackoff, maxBackoff,
+            jitter);
+        log.info("[{}] transient network -> retry (#{} ) in {} (base={}, jitter={}, cap={})",
+            contextLabel, attempt, delay, baseBackoff, jitter, maxBackoff);
         return Mono.delay(delay);
       }
 
-      if (t instanceof RequestNotPermitted || t instanceof BulkheadFullException) {
-        Duration delay = BackoffMath.expBackoff(rs.totalRetries(), base, cap, jitter);
-        log.info("[{}] RL/BH blocked -> retry (attempt #{}) in {} (base={}, jitter={}, cap={})",
-            ctx, attempt, delay, base, jitter, cap);
+      if (failure instanceof RequestNotPermitted || failure instanceof BulkheadFullException) {
+        Duration delay = BackoffMath.expBackoff(retrySignal.totalRetries(), baseBackoff, maxBackoff,
+            jitter);
+        log.info("[{}] RL/BH blocked -> retry (#{} ) in {} (base={}, jitter={}, cap={})",
+            contextLabel, attempt, delay, baseBackoff, jitter, maxBackoff);
         return Mono.delay(delay);
       }
 
-      log.warn("[{}] non-retryable exception={}, giving up (attempt #{})", ctx, simpleName(t), attempt);
-      return Mono.error(t);
+      log.warn("[{}] non-retryable exception={}, giving up (#{} )", contextLabel,
+          simpleClassName(failure), attempt);
+      return Mono.error(failure);
     }));
   }
 
-  /* ====== Конфиг и хелперы ====== */
+  private MarketplaceProperties.Resilience resolveResilience(MarketplaceType marketplaceType,
+      EndpointKey endpointKey) {
+    var provider = marketplaceProperties.get(marketplaceType);
+    var endpointOverrides = provider.getResilienceOverrides();
 
-  private MarketplaceProperties.Resilience effectiveResilience(MarketplaceType type, String endpointKey) {
-    var provider = marketplaceProperties.get(type); // бросит AppException, если провайдера нет
-    var overrides = provider.getResilienceOverrides();
-
-    // 1) endpoint override
-    if (overrides != null) {
-      var local = overrides.get(endpointKey);
-      if (local != null) {
-        return local;
+    if (endpointOverrides != null && endpointKey != null) {
+      var override = endpointOverrides.get(endpointKey.tag());
+      if (override != null) {
+        return override;
       }
     }
 
-    // 2) базовая конфигурация (если нет — это ошибка конфигурации)
     var base = provider.getResilience();
     if (base == null) {
-      throw new IllegalStateException(
-          "Missing resilience configuration for provider " + type
-              + " (neither base nor override defined for endpoint=" + endpointKey + ")"
-      );
+      throw new IllegalStateException("Missing resilience configuration for provider "
+          + marketplaceType + " (neither base nor override defined for endpoint=" + endpointKey
+          + ")");
     }
     return base;
   }
 
-  private static Duration orZero(Duration d) {
-    return d == null ? Duration.ZERO : d;
+  private static Duration orZero(Duration value) {
+    return value == null ? Duration.ZERO : value;
   }
 
-  private static int reqPos(Integer v, String name) {
-    Objects.requireNonNull(v, name);
-    if (v <= 0) {
+  private static int requirePositive(Integer value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value <= 0) {
       throw new IllegalArgumentException(name + " must be > 0");
     }
-    return v;
+    return value;
   }
 
-  private static Duration reqCap(Duration d, String name) {
-    Objects.requireNonNull(d, name);
-    if (d.isNegative() || d.compareTo(MAX_CAP) > 0) {
-      throw new IllegalArgumentException(name + " must be in [0.." + MAX_CAP.toMinutes() + "m]");
+  private static Duration requireCap(Duration value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isNegative() || value.compareTo(MAX_BACKOFF_CAP) > 0) {
+      throw new IllegalArgumentException(
+          name + " must be in [0.." + MAX_BACKOFF_CAP.toMinutes() + "m]");
     }
-    return d;
+    return value;
   }
 
-  private static Duration reqPositive(Duration d, String name) {
-    Objects.requireNonNull(d, name);
-    if (d.isZero() || d.isNegative()) {
+  private static Duration requirePositive(Duration value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isZero() || value.isNegative()) {
       throw new IllegalArgumentException(name + " must be > 0");
     }
-    return d;
+    return value;
   }
 
-  private static Duration nonNegative(Duration d, String name) {
-    Objects.requireNonNull(d, name);
-    if (d.isNegative()) {
+  private static Duration requireNonNegative(Duration value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isNegative()) {
       throw new IllegalArgumentException(name + " must be >= 0");
     }
-    return d;
+    return value;
   }
 
-  private static boolean isTransientNetwork(Throwable t) {
-    for (Throwable c = t; c != null; c = c.getCause()) {
-      if (c instanceof SocketTimeoutException
-          || c instanceof ConnectException
-          || c instanceof NoRouteToHostException
-          || c instanceof UnknownHostException
-          || c instanceof SSLException
-          || c instanceof ClosedChannelException
-          || c instanceof PrematureCloseException) {
+  private static boolean isTransientNetwork(Throwable throwable) {
+    for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SocketTimeoutException
+          || cause instanceof ConnectException
+          || cause instanceof NoRouteToHostException
+          || cause instanceof UnknownHostException
+          || cause instanceof SSLException
+          || cause instanceof ClosedChannelException
+          || cause instanceof PrematureCloseException) {
         return true;
       }
     }
     return false;
   }
 
-  private static String simpleName(Throwable t) {
-    return (t == null) ? "null" : t.getClass().getSimpleName();
+  private static String simpleClassName(Throwable throwable) {
+    return (throwable == null) ? "null" : throwable.getClass().getSimpleName();
   }
 
-  private static String shortRetryAfterHeaders(WebClientResponseException w) {
-    var h = w.getHeaders();
-    String ra = h.getFirst("Retry-After");
-    String xr = h.getFirst("X-Ratelimit-Retry");
-    String xrst = h.getFirst("X-Ratelimit-Reset");
-    return "retry-after=" + (ra == null ? "-" : ra)
-        + ", x-ratelimit-retry=" + (xr == null ? "-" : xr)
-        + ", x-ratelimit-reset=" + (xrst == null ? "-" : xrst);
+  private static String shortRetryHeaders(WebClientResponseException ex) {
+    var headers = ex.getHeaders();
+    String retryAfter = headers.getFirst("Retry-After");
+    String xRetry = headers.getFirst("X-Ratelimit-Retry");
+    String xReset = headers.getFirst("X-Ratelimit-Reset");
+    return "retry-after=" + (retryAfter == null ? "-" : retryAfter)
+        + ", x-ratelimit-retry=" + (xRetry == null ? "-" : xRetry)
+        + ", x-ratelimit-reset=" + (xReset == null ? "-" : xReset);
   }
 
-  private static String epLabel(String endpointKey) {
-    return (endpointKey == null || endpointKey.isBlank()) ? "GLOBAL" : endpointKey;
+  private static String labelOf(EndpointKey endpointKey) {
+    return (endpointKey == null) ? "GLOBAL" : endpointKey.name();
   }
 
-  /* ====== Вложенная математика backoff/jitter/cap ====== */
   private static final class BackoffMath {
-    private BackoffMath() {}
 
-    /** Экспоненциальный backoff с «ceil»-капом и add-джиттером. */
+    private BackoffMath() {
+    }
+
     static Duration expBackoff(long retries, Duration base, Duration cap, Duration jitter) {
       long attempt = Math.max(1, retries + 1);
       long factor = attempt >= 63 ? Long.MAX_VALUE : (1L << (attempt - 1));
-
-      Duration exp;
+      Duration expDelay;
       try {
-        exp = base.multipliedBy(factor);
+        expDelay = base.multipliedBy(factor);
       } catch (ArithmeticException e) {
-        exp = Duration.ofMillis(Long.MAX_VALUE);
+        expDelay = Duration.ofMillis(Long.MAX_VALUE);
       }
-
-      if (exp.compareTo(cap) > 0) {
-        exp = cap;
+      if (expDelay.compareTo(cap) > 0) {
+        expDelay = cap;
       }
       if (jitter == null || jitter.isZero() || jitter.isNegative()) {
-        return exp;
+        return expDelay;
       }
-
       long bound = Math.max(0, jitter.toMillis());
-      long rand = (bound == 0) ? 0 : java.util.concurrent.ThreadLocalRandom.current().nextLong(bound + 1);
-
+      long rnd = (bound == 0) ? 0 : ThreadLocalRandom.current().nextLong(bound + 1);
       try {
-        Duration withJitter = exp.plusMillis(rand);
+        Duration withJitter = expDelay.plusMillis(rnd);
         return withJitter.compareTo(cap) > 0 ? cap : withJitter;
       } catch (ArithmeticException e) {
         return cap;
       }
     }
 
-    /** Добавляет джиттер к базовой задержке и применяет верхний кап. */
     static Duration addJitterAndCap(Duration baseDelay, Duration jitter, Duration cap) {
       if (jitter == null || jitter.isZero() || jitter.isNegative()) {
         return baseDelay.compareTo(cap) > 0 ? cap : baseDelay;
       }
       long bound = Math.max(0, jitter.toMillis());
-      long rand = (bound == 0) ? 0 : java.util.concurrent.ThreadLocalRandom.current().nextLong(bound + 1);
+      long rnd = (bound == 0) ? 0 : ThreadLocalRandom.current().nextLong(bound + 1);
       Duration withJitter;
       try {
-        withJitter = baseDelay.plusMillis(rand);
+        withJitter = baseDelay.plusMillis(rnd);
       } catch (ArithmeticException e) {
         withJitter = cap;
       }
@@ -368,33 +372,29 @@ public class ResilienceManager {
     }
   }
 
-  /* ====== Вложенный парсер Retry-After / RateLimit-* ====== */
   public static final class RetryAfterSupport {
+
     private static final String XR_RETRY = "X-Ratelimit-Retry";
     private static final String XR_RESET = "X-Ratelimit-Reset";
     private static final String RL_RESET = "RateLimit-Reset";
     private static final String RL_RESET_AFTER = "RateLimit-Reset-After";
 
-    private RetryAfterSupport() {}
+    private RetryAfterSupport() {
+    }
 
-    /** Приоритет: X-RateLimit-Retry → X-RateLimit-Reset / RateLimit-Reset / RateLimit-Reset-After → Retry-After. */
     public static Duration parse(HttpHeaders headers, Duration fallback) {
       return parse(headers, Clock.systemUTC(), fallback);
     }
 
-    static Duration parse(HttpHeaders h, Clock clock, Duration fallback) {
-      Optional<Duration> candidate = Stream.<Optional<Duration>>of(
-              header(h, XR_RETRY).flatMap(RetryAfterSupport::parseDeltaSeconds),
-
-              // reset: сначала как дельта, иначе epoch s/ms
-              header(h, XR_RESET)
-                  .or(() -> header(h, RL_RESET))
-                  .or(() -> header(h, RL_RESET_AFTER))
-                  .flatMap(v -> parseReset(v, clock)),
-
-              // Retry-After: либо дельта, либо RFC1123
-              header(h, HttpHeaders.RETRY_AFTER).flatMap(v ->
-                  parseDeltaSeconds(v).or(() -> parseHttpDate(v, clock)))
+    static Duration parse(HttpHeaders headers, Clock clock, Duration fallback) {
+      Optional<Duration> candidate = java.util.stream.Stream.<Optional<Duration>>of(
+              header(headers, XR_RETRY).flatMap(RetryAfterSupport::parseDeltaSeconds),
+              header(headers, XR_RESET)
+                  .or(() -> header(headers, RL_RESET))
+                  .or(() -> header(headers, RL_RESET_AFTER))
+                  .flatMap(value -> parseReset(value, clock)),
+              header(headers, HttpHeaders.RETRY_AFTER).flatMap(value ->
+                  parseDeltaSeconds(value).or(() -> parseHttpDate(value, clock)))
           )
           .flatMap(Optional::stream)
           .findFirst();
@@ -402,39 +402,35 @@ public class ResilienceManager {
       return candidate.map(RetryAfterSupport::nonNegative).orElse(fallback);
     }
 
-    /* -------- helpers -------- */
-
-    private static Optional<String> header(HttpHeaders h, String name) {
-      String v = h.getFirst(name);
-      if (v == null && name.startsWith("X-Ratelimit-")) {
-        v = h.getFirst(name.replace("Ratelimit", "RateLimit")); // доп. регистр/вариант
+    private static Optional<String> header(HttpHeaders headers, String name) {
+      String value = headers.getFirst(name);
+      if (value == null && name.startsWith("X-Ratelimit-")) {
+        value = headers.getFirst(name.replace("Ratelimit", "RateLimit"));
       }
-      return (v == null || v.isBlank()) ? Optional.empty() : Optional.of(v.trim());
+      return (value == null || value.isBlank()) ? Optional.empty() : Optional.of(value.trim());
     }
 
-    /** "+10", "0.4" → ceil секунд; отрицательные → empty. */
-    private static Optional<Duration> parseDeltaSeconds(String v) {
+    private static Optional<Duration> parseDeltaSeconds(String value) {
       try {
-        String s = v.charAt(0) == '+' ? v.substring(1) : v;
-        BigDecimal bd = new BigDecimal(s);
-        if (bd.signum() < 0) {
+        String s = value.charAt(0) == '+' ? value.substring(1) : value;
+        BigDecimal number = new BigDecimal(s);
+        if (number.signum() < 0) {
           return Optional.empty();
         }
-        long ceilSec = bd.setScale(0, RoundingMode.CEILING).longValueExact();
+        long ceilSec = number.setScale(0, RoundingMode.CEILING).longValueExact();
         return Optional.of(Duration.ofSeconds(ceilSec));
       } catch (RuntimeException ignore) {
         return Optional.empty();
       }
     }
 
-    /** Reset: пробуем как дельту, иначе epoch (len>=12 → millis, иначе seconds). */
-    private static Optional<Duration> parseReset(String v, Clock clock) {
-      var delta = parseDeltaSeconds(v);
+    private static Optional<Duration> parseReset(String value, Clock clock) {
+      var delta = parseDeltaSeconds(value);
       if (delta.isPresent()) {
         return delta;
       }
       try {
-        String s = v.trim();
+        String s = value.trim();
         long n = Long.parseLong(s);
         Instant when = (s.length() >= 12) ? Instant.ofEpochMilli(n) : Instant.ofEpochSecond(n);
         return Optional.of(Duration.between(Instant.now(clock), when));
@@ -443,17 +439,17 @@ public class ResilienceManager {
       }
     }
 
-    private static Optional<Duration> parseHttpDate(String v, Clock clock) {
+    private static Optional<Duration> parseHttpDate(String value, Clock clock) {
       try {
-        ZonedDateTime when = ZonedDateTime.parse(v, DateTimeFormatter.RFC_1123_DATE_TIME);
+        ZonedDateTime when = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME);
         return Optional.of(Duration.between(Instant.now(clock), when.toInstant()));
       } catch (RuntimeException e) {
         return Optional.empty();
       }
     }
 
-    private static Duration nonNegative(Duration d) {
-      return d.isNegative() ? Duration.ZERO : d;
+    private static Duration nonNegative(Duration value) {
+      return value.isNegative() ? Duration.ZERO : value;
     }
   }
 }
