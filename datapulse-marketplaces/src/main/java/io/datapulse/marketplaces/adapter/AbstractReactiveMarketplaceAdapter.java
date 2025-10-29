@@ -21,8 +21,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.SignalType;
 
 /**
- * Базовый реактивный адаптер маркетплейса. Правило: ВСЕ ретраи и ограничения применяются к сырому
- * HTTP-потоку ДО декодирования.
+ * Base reactive adapter: apply RL/BH/Retry to raw HTTP stream BEFORE decoding.
  */
 @Slf4j
 abstract class AbstractReactiveMarketplaceAdapter {
@@ -33,13 +32,11 @@ abstract class AbstractReactiveMarketplaceAdapter {
   protected final HttpHeaderProvider headerProvider;
   protected final CredentialsProvider credentialsProvider;
 
-  protected AbstractReactiveMarketplaceAdapter(
-      StreamingDownloadService streamingDownloadService,
+  protected AbstractReactiveMarketplaceAdapter(StreamingDownloadService streamingDownloadService,
       ResilienceManager resilienceManager,
       JsonFluxReader fluxReader,
       HttpHeaderProvider headerProvider,
-      CredentialsProvider credentialsProvider
-  ) {
+      CredentialsProvider credentialsProvider) {
     this.streamingDownloadService = Objects.requireNonNull(streamingDownloadService,
         "streamingDownloadService");
     this.resilienceManager = Objects.requireNonNull(resilienceManager, "resilienceManager");
@@ -48,41 +45,24 @@ abstract class AbstractReactiveMarketplaceAdapter {
     this.credentialsProvider = Objects.requireNonNull(credentialsProvider, "credentialsProvider");
   }
 
-  /**
-   * HTTP GET → Flux&lt;T&gt;.
-   */
   protected final <T> Flux<T> get(
-      MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType
-  ) {
+      MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType) {
     HttpHeaders headers = buildHeaders(type, accountId);
     Flux<DataBuffer> raw = streamingDownloadService.stream(uri, headers);
     return execute(type, key, accountId, uri, targetType, raw);
   }
 
-  /**
-   * HTTP POST → Flux&lt;T&gt;.
-   */
   protected final <T> Flux<T> post(
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Object body,
-      Class<T> targetType
-  ) {
+      Class<T> targetType) {
     HttpHeaders headers = buildHeaders(type, accountId);
     Flux<DataBuffer> raw = streamingDownloadService.post(uri, headers, body);
     return execute(type, key, accountId, uri, targetType, raw);
   }
 
-  /**
-   * Общая реализация: применяем RL/BH + Retry к сырому потоку (через ResilienceManager), затем
-   * декодируем. Декод-ошибки НЕ ретраятся.
-   */
   private <T> Flux<T> execute(
-      MarketplaceType type,
-      EndpointKey key,
-      long accountId,
-      URI uri,
-      Class<T> targetType,
-      Flux<DataBuffer> raw
-  ) {
+      MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType,
+      Flux<DataBuffer> raw) {
     if (uri == null) {
       throw new AppException(MessageCodes.URI_REQUIRED);
     }
@@ -101,18 +81,15 @@ abstract class AbstractReactiveMarketplaceAdapter {
             log.debug("[{}] stream finalized={} {}", ctx, st, uri);
           }
         })
-        // После исчерпания попыток оборачиваем сетевую/HTTP-ошибку в доменную
         .onErrorMap(ex -> {
           if (ex instanceof CancellationException || Exceptions.isCancel(ex)) {
-            return ex; // не трогаем отмену
+            return ex;
           }
           return new MarketplaceExceptions.FetchFailed(
               ex, MessageCodes.MARKETPLACE_FETCH_FAILED, type, key.tag(), accountId, uri);
         });
 
-    // Декод уже после стабилизации потока
-    return fluxReader
-        .readArray(guarded, targetType)
+    return fluxReader.readArray(guarded, targetType)
         .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
             ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), accountId, uri));
   }

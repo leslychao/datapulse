@@ -4,14 +4,19 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
+import io.datapulse.marketplaces.event.BusinessEvent;
 import java.net.URI;
 import java.util.Map;
 import lombok.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * Minimal resolver: BusinessEvent → EndpointKey → URI for a given marketplace. No extra
+ * registries/config classes; single method to resolve everything.
+ */
 @Component
-public class EndpointsResolver {
+public final class EndpointsResolver {
 
   private final Map<MarketplaceType, MarketplaceProperties.Provider> providers;
 
@@ -19,48 +24,41 @@ public class EndpointsResolver {
     this.providers = properties.getProviders();
   }
 
-  public EndpointRef salesRef(@NonNull MarketplaceType type) {
-    return new EndpointRef(EndpointKey.SALES, sales(type));
-  }
-
-  public EndpointRef stockRef(@NonNull MarketplaceType type) {
-    return new EndpointRef(EndpointKey.STOCK, stock(type));
-  }
-
-  public EndpointRef financeRef(@NonNull MarketplaceType type) {
-    return new EndpointRef(EndpointKey.FINANCE, finance(type));
-  }
-
-  public EndpointRef reviewsRef(@NonNull MarketplaceType type) {
-    return new EndpointRef(EndpointKey.REVIEWS, reviews(type));
-  }
-
-  // Backward-compat (если где-то используются)
-  public URI sales(@NonNull MarketplaceType type) {
+  /**
+   * Single entrypoint: resolve endpoint for marketplace + business event.
+   */
+  public EndpointRef resolve(
+      @NonNull MarketplaceType type,
+      @NonNull BusinessEvent event) {
+    var key = mapEventToKey(event);
     var p = provider(type);
-    return buildUri(host(p, type, EndpointKey.SALES),
-        required(p.getEndpoints().getSales(), "sales"));
+
+    String path = switch (key) {
+      case SALES -> required(p.getEndpoints().getSales(), "sales");
+      case STOCK -> required(p.getEndpoints().getStock(), "stock");
+      case FINANCE -> required(p.getEndpoints().getFinance(), "finance");
+      case REVIEWS -> required(p.getEndpoints().getReviews(), "reviews");
+    };
+
+    String base = host(p, type, key);
+    return new EndpointRef(key, buildUri(base, path));
   }
 
-  public URI stock(@NonNull MarketplaceType type) {
-    var p = provider(type);
-    return buildUri(host(p, type, EndpointKey.STOCK),
-        required(p.getEndpoints().getStock(), "stock"));
+  // ——— mapping ———
+  private static EndpointKey mapEventToKey(BusinessEvent event) {
+    return switch (event) {
+      case SALES_FACT -> EndpointKey.SALES;
+      case STOCK_LEVEL -> EndpointKey.STOCK;
+      case REVIEW -> EndpointKey.REVIEWS;
+      case RETURN -> EndpointKey.FINANCE; // until a dedicated returns API appears
+      case AD_PERFORMANCE -> EndpointKey.FINANCE; // temporary
+      case ORDER_POSTING -> EndpointKey.FINANCE; // adjust when posting endpoint is added
+      case PRICE_SNAPSHOT -> EndpointKey.FINANCE; // adjust when price endpoint is added
+      case CATALOG_ITEM -> EndpointKey.FINANCE; // adjust when catalog endpoint is added
+    };
   }
 
-  public URI finance(@NonNull MarketplaceType type) {
-    var p = provider(type);
-    return buildUri(host(p, type, EndpointKey.FINANCE),
-        required(p.getEndpoints().getFinance(), "finance"));
-  }
-
-  public URI reviews(@NonNull MarketplaceType type) {
-    var p = provider(type);
-    return buildUri(host(p, type, EndpointKey.REVIEWS),
-        required(p.getEndpoints().getReviews(), "reviews"));
-  }
-
-  // ——— private ———
+  // ——— infra ———
   private MarketplaceProperties.Provider provider(MarketplaceType type) {
     var p = providers.get(type);
     if (p == null || p.getEndpoints() == null) {
@@ -87,13 +85,15 @@ public class EndpointsResolver {
     return s == null || s.isBlank();
   }
 
+  /**
+   * WB reviews may use a dedicated host; otherwise use base URL (sandbox-aware).
+   */
   private static String host(MarketplaceProperties.Provider p, MarketplaceType type,
-      EndpointKey endpointKey) {
+      EndpointKey key) {
     final boolean sandbox = p.isUseSandbox() && p.getSandbox() != null;
     final String base = sandbox ? p.getSandbox().getBaseUrl() : p.getBaseUrl();
-    if (type == MarketplaceType.WILDBERRIES && endpointKey == EndpointKey.REVIEWS) {
-      final String fb = sandbox ? p.getSandbox().getFeedbacksBaseUrl()
-          : p.getFeedbacksBaseUrl();
+    if (type == MarketplaceType.WILDBERRIES && key == EndpointKey.REVIEWS) {
+      final String fb = sandbox ? p.getSandbox().getFeedbacksBaseUrl() : p.getFeedbacksBaseUrl();
       return (fb == null || fb.isBlank()) ? base : fb;
     }
     return base;

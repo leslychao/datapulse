@@ -50,13 +50,16 @@ Content-Type: application/json
 }
 > {% client.log("Создан Ozon-Conn: " + response.body.id); %}
 
-### 4. Запустить ETL за последние сутки
+### 4. Run ETL for the last 24 hours
 POST http://localhost:8080/api/etl/run
 Content-Type: application/json
 
 {
-  "accountId": "44",
-  "from": "{{moment().subtract(1, 'day').toISOString()}}",
-  "to": "{{moment().toISOString()}}"
+  "accountId": 44,
+  "event": "SALES_FACT",
+  "from": "{{moment().subtract(1, 'day').format('YYYY-MM-DD')}}",
+  "to": "{{moment().format('YYYY-MM-DD')}}",
+  "burst": 1
 }
-> {% client.log("ETL запущен для accountId=" + client.global.get("accountId")) %}
+
+> {% client.log("ETL started for accountId=44, event=SALES_FACT (last 24h)") %}

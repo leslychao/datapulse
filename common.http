@@ -167,7 +167,10 @@ Content-Type: application/json
 
 {
   "marketplace": "OZON",
-  "credentials": { "clientId": "cid", "apiKey": "akey" },
+  "credentials": {
+    "clientId": "cid",
+    "apiKey": "akey"
+  },
   "active": true
 }
 
@@ -230,7 +233,10 @@ Content-Type: application/json
 
 {
   "marketplace": "OZON",
-  "credentials": { "clientId": "any", "apiKey": "any" },
+  "credentials": {
+    "clientId": "any",
+    "apiKey": "any"
+  },
   "active": true
 }
 
@@ -259,47 +265,6 @@ Content-Type: application/json
   });
 %}
 
-### ========================
-### WB SALES ETL — TRIGGER (202) c явными датами
-### ========================
-POST {{host}}/etl/wb/sales
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}},
-  "from": "2025-10-27",
-  "to":   "2025-10-27"
-}
-
-> {%
-  client.test("WB SALES ETL (dates): 202 Accepted", function () {
-    client.assert(response.status === 202, "expected 202, got " + response.status);
-    var b = response.body || {};
-    client.assert(String(b.accountId) === String(client.global.get("acIdWb")), "accountId echo mismatch");
-    client.assert(/^\d{4}-\d{2}-\d{2}$/.test(b.from) && /^\d{4}-\d{2}-\d{2}$/.test(b.to), "dates are not ISO");
-  });
-%}
-
-### ========================
-### WB SALES ETL — TRIGGER (202) без дат (использует D-1)
-### ========================
-POST {{host}}/etl/wb/sales
-Content-Type: application/json
-
-{
-  "accountId": {{accountId}}
-}
-
-> {%
-  client.test("WB SALES ETL (default dates): 202 Accepted", function () {
-    client.assert(response.status === 202, "expected 202, got " + response.status);
-    var b = response.body || {};
-    client.assert(String(b.accountId) === String(client.global.get("acIdWb")), "accountId echo mismatch");
-    client.assert(b.from && b.to, "missing from/to in echo body");
-  });
-%}
-
-
 ### AC — NEGATIVE: create for unknown accountId → 404
 POST {{host}}/api/account-connections
 Content-Type: application/json
@@ -307,7 +272,10 @@ Content-Type: application/json
 {
   "accountId": 999999999,
   "marketplace": "OZON",
-  "credentials": { "clientId": "x", "apiKey": "y" },
+  "credentials": {
+    "clientId": "x",
+    "apiKey": "y"
+  },
   "active": true
 }
 

@@ -1,13 +1,10 @@
 package io.datapulse.etl;
 
-
 import static io.datapulse.etl.IntegrationChannels.CHANNEL_RUN_EVENT;
 
-import io.datapulse.etl.EtlInbound.EventJob;
-import io.datapulse.etl.route.EventRoute;
-import io.datapulse.etl.route.EventRoutesRegistry;
+import io.datapulse.etl.route.EventSource;
 import io.datapulse.marketplaces.event.FetchRequest;
-import java.util.Optional;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -22,38 +19,32 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class EventEtlFlow {
 
-  private final EventRoutesRegistry routes;
+  private final List<EventSource<?>> sources;
 
   @Bean
   public IntegrationFlow runEtlFlow(TaskExecutor etlExecutor) {
     return IntegrationFlow.from(CHANNEL_RUN_EVENT)
         .channel(MessageChannels.executor(etlExecutor))
         .handle((payload, headers) -> {
-          EventJob job = (EventJob) payload;
+          FetchRequest job = (FetchRequest) payload;
 
-          Optional<EventRoute<?>> routeOpt = routes.route(job.event);
-          if (routeOpt.isEmpty()) {
-            log.warn("Нет маршрута для события {}", job.event);
+          var matched = sources.stream()
+              .filter(src -> src.event() == job.event())
+              .toList();
+
+          if (matched.isEmpty()) {
+            log.warn("No sources found for event={}", job.event());
             return null;
           }
 
-          EventRoute<?> route = routeOpt.get();
+          Flux<?> flux = Flux.merge(matched.stream()
+              .map(source -> source.fetch(job))
+              .toList());
 
-          // теперь создаём единый FetchRequest и передаём его по цепочке
-          FetchRequest request = new FetchRequest(
-              job.accountId, job.event, job.from, job.to, null
-          );
-
-          Flux<?> dtoFlux = route.fetchAll(request);
-
-          dtoFlux
-              .doOnSubscribe(
-                  s -> log.info("ETL start event={} batch={} seq={}", job.event, job.batchId,
-                      job.seq))
+          flux
+              .doOnSubscribe(s -> log.info("ETL start event={}", job.event()))
               .doOnNext(System.out::println)
-              .doOnComplete(
-                  () -> log.info("ETL done  event={} batch={} seq={}", job.event, job.batchId,
-                      job.seq))
+              .doOnComplete(() -> log.info("ETL done  event={}", job.event()))
               .subscribe();
 
           return null;
