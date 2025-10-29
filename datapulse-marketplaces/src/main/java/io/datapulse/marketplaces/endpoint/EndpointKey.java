@@ -1,4 +1,4 @@
-package io.datapulse.marketplaces.endpoints;
+package io.datapulse.marketplaces.endpoint;
 
 public enum EndpointKey {
   SALES, STOCK, FINANCE, REVIEWS;

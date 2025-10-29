@@ -7,7 +7,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.MarketplaceExceptions;
-import io.datapulse.marketplaces.endpoints.EndpointKey;
+import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceManager;
 import java.net.URI;
