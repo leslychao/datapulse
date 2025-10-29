@@ -117,51 +117,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
             ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), accountId, uri));
   }
 
-  /**
-   * Вариант execute с произвольным limiterKey (делегирует в
-   * ResilienceManager.applyWithLimiterKey).
-   */
-  private <T> Flux<T> executeWithLimiterKey(
-      MarketplaceType type,
-      EndpointKey key,
-      String limiterKey,
-      URI uri,
-      Class<T> targetType,
-      Flux<DataBuffer> raw
-  ) {
-    if (uri == null) {
-      throw new AppException(MessageCodes.URI_REQUIRED);
-    }
-    if (targetType == null) {
-      throw new AppException(MessageCodes.TYPE_REQUIRED);
-    }
-
-    final String ctx = type + ":" + key.tag() + ":limiter=" + limiterKey;
-
-    Flux<DataBuffer> guarded = resilienceManager.applyWithLimiterKey(raw, type, key.tag(),
-            limiterKey)
-        .doOnSubscribe(s -> log.debug("[{}] start streaming {}", ctx, uri))
-        .doFinally(st -> {
-          if (st == SignalType.CANCEL) {
-            log.debug("[{}] stream cancelled {}", ctx, uri);
-          } else {
-            log.debug("[{}] stream finalized={} {}", ctx, st, uri);
-          }
-        })
-        .onErrorMap(ex -> {
-          if (ex instanceof CancellationException || Exceptions.isCancel(ex)) {
-            return ex;
-          }
-          return new MarketplaceExceptions.FetchFailed(
-              ex, MessageCodes.MARKETPLACE_FETCH_FAILED, type, key.tag(), /*accountId*/ -1L, uri);
-        });
-
-    return fluxReader
-        .readArray(guarded, targetType)
-        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
-            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), /*accountId*/ -1L, uri));
-  }
-
   private HttpHeaders buildHeaders(MarketplaceType type, long accountId) {
     var creds = credentialsProvider.resolve(accountId, type);
     return headerProvider.build(type, creds);

@@ -51,14 +51,6 @@ public class ResilienceManager {
     return doApply(raw, type, endpointKey, "acc:" + accountId);
   }
 
-  /**
-   * Перегрузка, если нужно шарить не per-account, а per-credential (по произвольному ключу).
-   */
-  public <T> Flux<T> applyWithLimiterKey(Flux<T> raw, MarketplaceType type, String endpointKey,
-      String limiterKey) {
-    return doApply(raw, type, endpointKey, limiterKey);
-  }
-
   /* ====== Core impl ====== */
 
   private <T> Flux<T> doApply(Flux<T> raw, MarketplaceType type, String endpointKey,
