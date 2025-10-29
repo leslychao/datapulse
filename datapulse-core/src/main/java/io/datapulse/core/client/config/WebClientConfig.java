@@ -37,7 +37,7 @@ public class WebClientConfig {
 
   @Bean
   public WebClient streamingWebClient(
-      @Value("${webclient.max-in-memory-size:10485760}") int maxInMemorySize,
+      @Value("${webclient.max-in-memory-size:262144}") int maxInMemorySize,
       HttpClient httpClient,
       ExchangeFilterFunction statusLoggingFilter
   ) {

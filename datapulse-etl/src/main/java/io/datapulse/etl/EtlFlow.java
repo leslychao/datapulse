@@ -8,15 +8,17 @@ import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
 import io.datapulse.marketplaces.mapper.wb.WbSaleMapper;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.integration.core.GenericHandler;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.MessageChannels;
-import org.springframework.integration.handler.LoggingHandler.Level;
+import org.springframework.messaging.Message;
 import reactor.core.publisher.Flux;
 
 @Slf4j
@@ -30,16 +32,29 @@ public class EtlFlow {
   @Bean
   public IntegrationFlow wbSalesFlow(TaskExecutor etlExecutor) {
     return IntegrationFlow.from(CHANNEL_FETCH_SALES)
-        // ещё раз явно отцепимся на executor, чтобы весь downstream точно шёл не в HTTP-потоке
+        .enrichHeaders(h -> h.headerFunction("accountId", Message::getPayload))
         .channel(MessageChannels.executor(etlExecutor))
         .handle(this::fetchWbSales)      // → Flux<WbSaleRaw>
         .split()                         // разбивает Flux на элементы
         .transform(wbSaleMapper::toDto)  // → SaleDto
-        .handle(SaleDto.class, (sale, headers) -> {
-          System.out.println("=====================" + formatLine(sale));
-          return null;
+        .aggregate(a -> a
+            .correlationStrategy(m -> m.getHeaders().get("accountId"))
+            .releaseStrategy(g -> g.size() >= 500)
+            .groupTimeout(1000)
+            .sendPartialResultOnExpiry(true)
+            .expireGroupsUponCompletion(true)
+        )
+        .channel(MessageChannels.executor(etlExecutor))
+        .handle((GenericHandler<List<SaleDto>>) (batch, headers) ->
+            {
+              batch.forEach(saleDto -> log.info(saleDto.toString()));
+              return null;
+            }
+        )
+        .<List<SaleDto>>handle((batch, headers) -> {
+          batch.forEach(sale -> log.info(sale.toString()));
+          return null; // терминальный шаг: дальше ничего не отправляем
         })
-        .log(Level.INFO, "wbSalesFlow", m -> "✓ WB sales printed")
         .get();
   }
 

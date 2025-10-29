@@ -41,12 +41,10 @@ public class HttpStreamingClient {
   public Flux<DataBuffer> postAsDataBufferFlux(URI uri, HttpHeaders extraHeaders, Object body) {
     return streamingWebClient.post()
         .uri(uri)
-        .headers(h -> {
+        .headers(headers -> {
           if (extraHeaders != null) {
-            h.addAll(extraHeaders);
+            headers.addAll(extraHeaders);
           }
-          h.setContentType(MediaType.APPLICATION_JSON);
-          h.setAccept(List.of(MediaType.APPLICATION_JSON));
         })
         .bodyValue(body)
         .exchangeToFlux(resp -> resp.statusCode().is2xxSuccessful()
