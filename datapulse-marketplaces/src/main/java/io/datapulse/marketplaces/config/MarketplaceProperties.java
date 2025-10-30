@@ -41,7 +41,7 @@ public class MarketplaceProperties {
   @Validated
   public static class Provider {
 
-    private boolean useSandbox = false;
+    private boolean useSandbox;
 
     @NotBlank
     private String baseUrl;
@@ -50,22 +50,13 @@ public class MarketplaceProperties {
     @Valid
     private Sandbox sandbox;
 
-    /**
-     * относительные пути по ключам эндпоинтов
-     */
     @NotNull
     private final Map<EndpointKey, @NotBlank String> endpoints = new EnumMap<>(EndpointKey.class);
 
-    /**
-     * базовые лимиты/ретраи (обязательны)
-     */
     @Valid
     @NotNull
     private Resilience resilience;
 
-    /**
-     * опциональные частичные override’ы по ключу эндпоинта
-     */
     @Valid
     private Map<EndpointKey, Resilience> resilienceOverrides = new EnumMap<>(EndpointKey.class);
 
@@ -73,18 +64,12 @@ public class MarketplaceProperties {
       return endpoints.get(key);
     }
 
-    /**
-     * полное слитое (base + override(key))
-     */
     public Resilience effectiveResilience(EndpointKey key) {
       var base = resilience.requireAll();
       var override = resilienceOverrides.get(key);
       return (override == null) ? base : base.mergeWith(override);
     }
 
-    /**
-     * override maxConcurrentCalls либо базовый
-     */
     public int effectiveMaxConcurrentCalls(EndpointKey key) {
       var o = resilienceOverrides.get(key);
       return (o != null && o.getMaxConcurrentCalls() != null)
@@ -103,10 +88,6 @@ public class MarketplaceProperties {
     private String feedbacksBaseUrl;
   }
 
-  /**
-   * Универсальная модель для base/override. Все поля опциональны для совместимости с override. Для
-   * «базы» вызови requireAll() при старте.
-   */
   @Getter
   @Setter
   @Validated
@@ -123,22 +104,19 @@ public class MarketplaceProperties {
     private Duration tokenWaitTimeout;
     private Duration bulkheadWait;
 
-    /**
-     * merge: this as base, override on top
-     */
     public Resilience mergeWith(Resilience o) {
-      var r = new Resilience();
-      r.limitForPeriod = nvl(o.limitForPeriod, this.limitForPeriod);
-      r.maxConcurrentCalls = nvl(o.maxConcurrentCalls, this.maxConcurrentCalls);
-      r.maxAttempts = nvl(o.maxAttempts, this.maxAttempts);
-      r.baseBackoff = nvl(o.baseBackoff, this.baseBackoff);
-      r.maxBackoff = nvl(o.maxBackoff, this.maxBackoff);
-      r.maxJitter = nvl(o.maxJitter, this.maxJitter);
-      r.retryAfterFallback = nvl(o.retryAfterFallback, this.retryAfterFallback);
-      r.limitRefreshPeriod = nvl(o.limitRefreshPeriod, this.limitRefreshPeriod);
-      r.tokenWaitTimeout = nvl(o.tokenWaitTimeout, this.tokenWaitTimeout);
-      r.bulkheadWait = nvl(o.bulkheadWait, this.bulkheadWait);
-      return r;
+      var resilience = new Resilience();
+      resilience.limitForPeriod = nvl(o.limitForPeriod, this.limitForPeriod);
+      resilience.maxConcurrentCalls = nvl(o.maxConcurrentCalls, this.maxConcurrentCalls);
+      resilience.maxAttempts = nvl(o.maxAttempts, this.maxAttempts);
+      resilience.baseBackoff = nvl(o.baseBackoff, this.baseBackoff);
+      resilience.maxBackoff = nvl(o.maxBackoff, this.maxBackoff);
+      resilience.maxJitter = nvl(o.maxJitter, this.maxJitter);
+      resilience.retryAfterFallback = nvl(o.retryAfterFallback, this.retryAfterFallback);
+      resilience.limitRefreshPeriod = nvl(o.limitRefreshPeriod, this.limitRefreshPeriod);
+      resilience.tokenWaitTimeout = nvl(o.tokenWaitTimeout, this.tokenWaitTimeout);
+      resilience.bulkheadWait = nvl(o.bulkheadWait, this.bulkheadWait);
+      return resilience;
     }
 
     /**

@@ -12,18 +12,11 @@ import lombok.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * Минималистичный resolver: 1→N сопоставление события → ключи эндпоинтов, построение URI c учётом
- * sandbox и особого host для WB REVIEWS.
- */
 @Component
 public final class EndpointsResolver {
 
   private final MarketplaceProperties properties;
 
-  /**
-   * дефолтная карта 1→N (расширяй по мере необходимости)
-   */
   private static final Map<BusinessEvent, List<EndpointKey>> DEFAULT_KEYS = Map.of(
       BusinessEvent.SALES_FACT, List.of(EndpointKey.SALES),
       BusinessEvent.STOCK_LEVEL, List.of(EndpointKey.STOCK),
@@ -39,9 +32,6 @@ public final class EndpointsResolver {
     this.properties = props;
   }
 
-  /**
-   * Все потенциальные endpoints для события (без query)
-   */
   public List<EndpointRef> resolveAll(@NonNull MarketplaceType type, @NonNull BusinessEvent event) {
     var keys = DEFAULT_KEYS.get(event);
     if (keys == null || keys.isEmpty()) {
@@ -54,9 +44,6 @@ public final class EndpointsResolver {
         .toList();
   }
 
-  /**
-   * То же, но применяем общий query ко всем
-   */
   public List<EndpointRef> resolveAll(@NonNull MarketplaceType type,
       @NonNull BusinessEvent event,
       @NonNull Map<String, ?> query) {
@@ -64,8 +51,6 @@ public final class EndpointsResolver {
         .map(ref -> new EndpointRef(ref.key(), applyQuery(ref.uri(), query)))
         .toList();
   }
-
-  // --- helpers ---
 
   private static URI applyQuery(URI base, Map<String, ?> query) {
     var b = UriComponentsBuilder.fromUri(base);
@@ -93,17 +78,17 @@ public final class EndpointsResolver {
     return path;
   }
 
-  /**
-   * WB REVIEWS могут иметь отдельный host; иначе базовый (sandbox-aware).
-   */
-  private static String host(MarketplaceProperties.Provider p, MarketplaceType type,
-      EndpointKey key) {
-    final boolean sandbox = p.isUseSandbox() && p.getSandbox() != null;
-    final String base = sandbox ? p.getSandbox().getBaseUrl() : p.getBaseUrl();
-    if (type == MarketplaceType.WILDBERRIES && key == EndpointKey.REVIEWS) {
-      final String fb = sandbox ? p.getSandbox().getFeedbacksBaseUrl() : p.getFeedbacksBaseUrl();
-      return (fb == null || fb.isBlank()) ? base : fb;
+  private static String host(
+      MarketplaceProperties.Provider provider,
+      MarketplaceType marketplaceType,
+      EndpointKey endpointKey) {
+    final boolean sandbox = provider.isUseSandbox() && provider.getSandbox() != null;
+    final String baseUrl = sandbox ? provider.getSandbox().getBaseUrl() : provider.getBaseUrl();
+    if (marketplaceType == MarketplaceType.WILDBERRIES && endpointKey == EndpointKey.REVIEWS) {
+      final String feedbacksBaseUrl =
+          sandbox ? provider.getSandbox().getFeedbacksBaseUrl() : provider.getFeedbacksBaseUrl();
+      return (feedbacksBaseUrl == null || feedbacksBaseUrl.isBlank()) ? baseUrl : feedbacksBaseUrl;
     }
-    return base;
+    return baseUrl;
   }
 }

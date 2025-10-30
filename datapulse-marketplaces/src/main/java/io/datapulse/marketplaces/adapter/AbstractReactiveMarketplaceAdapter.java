@@ -26,10 +26,6 @@ import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-/**
- * Базовый реактивный адаптер: - RL/BH/Retry до декодирования - 1→N merge с конкурентностью из YAML
- * - без Object в API (POST принимает Map<String, ?>) - наблюдаемость (name/tag/checkpoint)
- */
 @Slf4j
 abstract class AbstractReactiveMarketplaceAdapter {
 
@@ -58,8 +54,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
     this.credentialsProvider = Objects.requireNonNull(credentialsProvider);
   }
 
-  // ---------- HTTP primitives (без Object) ----------
-
   protected final <T> Flux<T> get(
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType
   ) {
@@ -78,8 +72,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
     return execute(type, key, accountId, uri, targetType, raw)
         .name("mp.post").tag("mp", type.name()).tag("key", key.tag());
   }
-
-  // ---------- Fan-out helpers (1→N) ----------
 
   protected final <T> Flux<T> mergeGet(
       MarketplaceType type, long accountId, List<EndpointRef> refs, Class<T> elementType
@@ -120,9 +112,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
         );
   }
 
-  /**
-   * min(refs.size(), min(effectiveMaxConcurrentCalls(key)), global).
-   */
   protected final int concurrencyFor(MarketplaceType type, List<EndpointRef> refs) {
     var provider = properties.get(type);
     int globalCap = provider.getResilience().requireAll().getMaxConcurrentCalls();
@@ -133,8 +122,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
     int sources = refs.size();
     return Math.max(1, Math.min(sources, Math.min(minEndpointCap, globalCap)));
   }
-
-  // ---------- Универсальная пагинация (optional) ----------
 
   public record Page<T>(List<T> items, String nextCursor) {
 
@@ -151,8 +138,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
         })
         .flatMapIterable(Page::items);
   }
-
-  // ---------- internal ----------
 
   private <T> Flux<T> execute(
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType,
