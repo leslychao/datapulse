@@ -82,7 +82,7 @@ public class ResilienceManager {
       String scopeId) {
     var provider = marketplaceProperties.get(marketplaceType);
     var cfg = (endpointKey == null)
-        ? provider.getResilience().requireAll()
+        ? provider.getResilience()
         : provider.effectiveResilience(endpointKey);
 
     int maxAttempts = requirePositive(cfg.getMaxAttempts(), "maxAttempts");
@@ -241,7 +241,7 @@ public class ResilienceManager {
       EndpointKey endpointKey) {
     var provider = marketplaceProperties.get(marketplaceType);
     return (endpointKey == null)
-        ? provider.getResilience().requireAll()
+        ? provider.getResilience()
         : provider.effectiveResilience(endpointKey);
   }
 

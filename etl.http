@@ -50,18 +50,23 @@ Content-Type: application/json
 }
 > {% client.log("Создан Ozon-Conn: " + response.body.id); %}
 
-### 4. Run ETL for the last 24 hours
+### Run ETL (last 30 days)
 POST http://localhost:8080/api/etl/run
 Content-Type: application/json
 
 {
   "accountId": 44,
   "event": "SALES_FACT",
-  "from": "{{moment().subtract(5, 'day').toISOString()}}",
-  "to": "{{moment().toISOString()}}",
-  "burst": 1
+  "from": "{{from}}",
+  "to": "{{to}}",
+  "burst": 10
 }
 
 > {%
-  client.log(`ETL started for accountId=44, event=SALES_FACT (last 24h)`);
+  const now  = new Date();
+  const to   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = new Date(to.getTime() - 30*24*60*60*1000);
+  function ymd(d){ return d.toISOString().slice(0,10); }
+  client.global.set("from", ymd(from));
+  client.global.set("to",   ymd(to));
 %}
