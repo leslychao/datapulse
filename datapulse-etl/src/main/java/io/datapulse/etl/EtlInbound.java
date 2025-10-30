@@ -2,9 +2,13 @@ package io.datapulse.etl;
 
 import static io.datapulse.etl.IntegrationChannels.CHANNEL_RUN_EVENT;
 
-import io.datapulse.marketplaces.event.MarketplaceEvent;
+import io.datapulse.domain.MessageCodes;
+import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.event.FetchParams;
+import io.datapulse.marketplaces.event.FetchRequest;
+import io.datapulse.marketplaces.event.MarketplaceEvent;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,7 +33,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @RequiredArgsConstructor
 public class EtlInbound {
 
-  public record EtlRunRequest(Long accountId, String event, String from, String to, Integer burst) {
+  public record EtlRequest(Long accountId, String event, String from, String to, Integer burst) {
 
   }
 
@@ -67,22 +71,28 @@ public class EtlInbound {
   public IntegrationFlow etlInboundFlow() {
     return IntegrationFlow.from(Http.inboundGateway("/api/etl/run")
             .requestMapping(m -> m.methods(HttpMethod.POST).consumes(MediaType.APPLICATION_JSON_VALUE))
-            .requestPayloadType(EtlRunRequest.class).statusCodeFunction(m -> HttpStatus.ACCEPTED))
-        .transform(EtlRunRequest.class, req -> EventJob.builder().accountId(req.accountId())
+            .requestPayloadType(EtlRequest.class).statusCodeFunction(m -> HttpStatus.ACCEPTED))
+        .transform(EtlRequest.class, req -> EventJob.builder().accountId(req.accountId())
             .event(MarketplaceEvent.valueOf(req.event()))
-            .from(parseOrDefault(req.from(), LocalDate.now().minusDays(120)))
-            .to(parseOrDefault(req.to(), LocalDate.now().minusDays(1)))
+            .from(parseOrThrow(req.from(), "from"))
+            .to(parseOrThrow(req.to(), "to"))
             .batchId(UUID.randomUUID().toString()).burst(normalizeBurst(req.burst())).seq(-1)
             .build())
         .wireTap(flow -> flow.split(EventJob.class, job -> replicate(job, job.burst))
             .transform(EventJob.class,
-                job -> new io.datapulse.marketplaces.event.FetchRequest(job.getAccountId(),
-                    job.getEvent(), job.getFrom(), job.getTo(), FetchParams.empty()))
+                job -> new FetchRequest(
+                    job.getAccountId(),
+                    job.getEvent(),
+                    job.getFrom(),
+                    job.getTo(),
+                    FetchParams.empty()))
             .channel(CHANNEL_RUN_EVENT))
-        // Немедленный ответ клиенту (202)
         .transform(EventJob.class,
-            job -> Map.of("status", "accepted", "event", job.getEvent().name(), "batchId",
-                job.getBatchId(), "burst", job.getBurst())).get();
+            job -> Map.of(
+                "status", "accepted",
+                "event", job.getEvent().name(),
+                "batchId", job.getBatchId(),
+                "burst", job.getBurst())).get();
   }
 
   private static List<EventJob> replicate(EventJob job, int times) {
@@ -94,11 +104,14 @@ public class EtlInbound {
     return Math.max(1, Math.min(v, 10_000));
   }
 
-  private static LocalDate parseOrDefault(String s, LocalDate dflt) {
+  private static LocalDate parseOrThrow(String value, String field) {
+    if (value == null || value.isBlank()) {
+      throw new AppException(MessageCodes.REQUEST_DATE_REQUIRED, field);
+    }
     try {
-      return (s == null || s.isBlank()) ? dflt : LocalDate.parse(s);
-    } catch (Exception e) {
-      return dflt;
+      return LocalDate.parse(value);
+    } catch (DateTimeParseException e) {
+      throw new AppException(MessageCodes.REQUEST_DATE_INVALID, field, value);
     }
   }
 }
