@@ -1,9 +1,6 @@
 package io.datapulse.marketplaces.event;
 
-/**
- * Бизнес-уровень: единые события для WB/Ozon.
- */
-public enum BusinessEvent {
+public enum MarketplaceEvent {
   ORDER_POSTING,      // заказы/отправки/статусы
   RETURN,             // возвраты/невыкупы/штрафы
   SALES_FACT,         // аналитика продаж / факт продаж

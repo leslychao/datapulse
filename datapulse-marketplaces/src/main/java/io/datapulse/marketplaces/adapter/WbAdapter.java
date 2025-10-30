@@ -11,7 +11,7 @@ import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
-import io.datapulse.marketplaces.event.BusinessEvent;
+import io.datapulse.marketplaces.event.MarketplaceEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceManager;
 import java.time.LocalDate;
@@ -44,7 +44,7 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
   @Override
   public Flux<WbSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
     List<EndpointRef> refs = endpoints.resolveAll(
-        TYPE, BusinessEvent.SALES_FACT,
+        TYPE, MarketplaceEvent.SALES_FACT,
         Map.of("dateFrom", from, "dateTo", to)
     );
     return mergeGet(TYPE, accountId, refs, WbSaleRaw.class);
@@ -52,7 +52,7 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<WbStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.STOCK_LEVEL);
     return mergeGet(TYPE, accountId, refs, WbStockRaw.class);
   }
 
@@ -60,7 +60,7 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
   public Flux<WbFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
     // временно через RETURN→FINANCE
     List<EndpointRef> refs = endpoints.resolveAll(
-        TYPE, BusinessEvent.RETURN,
+        TYPE, MarketplaceEvent.RETURN,
         Map.of("dateFrom", from, "dateTo", to, "limit", 100_000)
     );
     return mergeGet(TYPE, accountId, refs, WbFinanceRaw.class);
@@ -72,7 +72,7 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
     long toSec = to.atTime(23, 59, 59).atZone(MSK).toEpochSecond();
 
     List<EndpointRef> refs = endpoints.resolveAll(
-        TYPE, BusinessEvent.REVIEW,
+        TYPE, MarketplaceEvent.REVIEW,
         Map.of("isAnswered", false, "take", 1000, "skip", 0,
             "dateFrom", fromSec, "dateTo", toSec)
     );

@@ -4,7 +4,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
-import io.datapulse.marketplaces.event.BusinessEvent;
+import io.datapulse.marketplaces.event.MarketplaceEvent;
 import java.lang.reflect.Array;
 import java.net.URI;
 import java.util.List;
@@ -19,25 +19,24 @@ public final class EndpointsResolver {
 
   private final MarketplaceProperties properties;
 
-  private static final Map<BusinessEvent, List<EndpointKey>> DEFAULT_KEYS = Map.of(
-      BusinessEvent.SALES_FACT, List.of(EndpointKey.SALES),
-      BusinessEvent.STOCK_LEVEL, List.of(EndpointKey.STOCK),
-      BusinessEvent.REVIEW, List.of(EndpointKey.REVIEWS),
-      BusinessEvent.RETURN, List.of(EndpointKey.FINANCE),
-      BusinessEvent.AD_PERFORMANCE, List.of(EndpointKey.FINANCE),
-      BusinessEvent.ORDER_POSTING, List.of(EndpointKey.FINANCE),
-      BusinessEvent.PRICE_SNAPSHOT, List.of(EndpointKey.FINANCE),
-      BusinessEvent.CATALOG_ITEM, List.of(EndpointKey.FINANCE)
+  private static final Map<MarketplaceEvent, List<EndpointKey>> DEFAULT_KEYS = Map.of(
+      MarketplaceEvent.SALES_FACT, List.of(EndpointKey.SALES),
+      MarketplaceEvent.STOCK_LEVEL, List.of(EndpointKey.STOCK),
+      MarketplaceEvent.REVIEW, List.of(EndpointKey.REVIEWS),
+      MarketplaceEvent.RETURN, List.of(EndpointKey.FINANCE),
+      MarketplaceEvent.AD_PERFORMANCE, List.of(EndpointKey.FINANCE),
+      MarketplaceEvent.ORDER_POSTING, List.of(EndpointKey.FINANCE),
+      MarketplaceEvent.PRICE_SNAPSHOT, List.of(EndpointKey.FINANCE),
+      MarketplaceEvent.CATALOG_ITEM, List.of(EndpointKey.FINANCE)
   );
 
   public EndpointsResolver(@NonNull MarketplaceProperties props) {
     this.properties = props;
   }
 
-  public List<EndpointRef> resolveAll(@NonNull MarketplaceType type, @NonNull BusinessEvent event) {
+  public List<EndpointRef> resolveAll(@NonNull MarketplaceType type, @NonNull MarketplaceEvent event) {
     var keys = DEFAULT_KEYS.get(event);
     if (keys == null || keys.isEmpty()) {
-      // ⬇️ больше не хардкодим строку — берём константу из MessageCodes
       throw new AppException(MessageCodes.MARKETPLACE_EVENT_ENDPOINTS_MISSING, event.name());
     }
     var provider = properties.get(type);
@@ -53,15 +52,13 @@ public final class EndpointsResolver {
 
   public List<EndpointRef> resolveAll(
       @NonNull MarketplaceType type,
-      @NonNull BusinessEvent event,
+      @NonNull MarketplaceEvent event,
       @NonNull Map<String, ?> query
   ) {
     return resolveAll(type, event).stream()
         .map(ref -> new EndpointRef(ref.key(), applyQuery(ref.uri(), query)))
         .toList();
   }
-
-  // ── helpers ───────────────────────────────────────────────────────────────────
 
   private static URI applyQuery(URI base, Map<String, ?> query) {
     var b = UriComponentsBuilder.fromUri(base);
@@ -86,17 +83,13 @@ public final class EndpointsResolver {
     return UriComponentsBuilder.fromHttpUrl(host).path(path).build(true).toUri();
   }
 
-  /**
-   * отдельный метод, чтобы использовать корректный код ошибки для отсутствующего path
-   */
   private static String requiredEndpointPath(
       MarketplaceProperties.Provider provider,
       EndpointKey key,
       MarketplaceType type
   ) {
-    String path = provider.endpoint(key); // см. примечание ниже
+    String path = provider.endpoint(key);
     if (path == null || path.isBlank()) {
-      // ⬇️ раньше здесь был MARKETPLACE_CONFIG_MISSING, теперь — точный код
       throw new AppException(MessageCodes.MARKETPLACE_ENDPOINT_PATH_MISSING,
           key.name(),
           type.name());

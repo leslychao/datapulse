@@ -11,7 +11,7 @@ import io.datapulse.marketplaces.dto.raw.ozon.OzonSaleRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonStockRaw;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
-import io.datapulse.marketplaces.event.BusinessEvent;
+import io.datapulse.marketplaces.event.MarketplaceEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceManager;
 import java.time.LocalDate;
@@ -40,7 +40,7 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
-    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.SALES_FACT);
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.SALES_FACT);
     Map<String, ?> body = Map.of(
         "date_from", from.toString(),
         "date_to", to.toString(),
@@ -53,7 +53,7 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.STOCK_LEVEL);
     Map<String, ?> body = Map.of(
         "filter", Map.of("offer_id", List.of(), "product_id", List.of(), "sku", List.of()),
         "last_id", "",
@@ -65,7 +65,7 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
   @Override
   public Flux<OzonFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
     // временно через RETURN→FINANCE
-    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.RETURN);
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.RETURN);
     Map<String, ?> body = Map.of(
         "filter", Map.of("date", Map.of("from", from.toString(), "to", to.toString())),
         "page", Map.of("page", 1, "page_size", 1000)
@@ -75,7 +75,7 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonReviewRaw> fetchReviews(long accountId, LocalDate from, LocalDate to) {
-    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.REVIEW);
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.REVIEW);
     Map<String, ?> body = Map.of(
         "page", 1, "page_size", 100,
         "filter", Map.of("date_created", Map.of(

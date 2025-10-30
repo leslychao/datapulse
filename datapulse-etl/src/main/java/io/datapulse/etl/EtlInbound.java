@@ -2,7 +2,7 @@ package io.datapulse.etl;
 
 import static io.datapulse.etl.IntegrationChannels.CHANNEL_RUN_EVENT;
 
-import io.datapulse.marketplaces.event.BusinessEvent;
+import io.datapulse.marketplaces.event.MarketplaceEvent;
 import io.datapulse.marketplaces.event.FetchParams;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,7 +38,7 @@ public class EtlInbound {
   public static final class EventJob {
 
     public final long accountId;
-    public final BusinessEvent event;
+    public final MarketplaceEvent event;
     public final LocalDate from;
     public final LocalDate to;
     public final String batchId;
@@ -69,7 +69,7 @@ public class EtlInbound {
             .requestMapping(m -> m.methods(HttpMethod.POST).consumes(MediaType.APPLICATION_JSON_VALUE))
             .requestPayloadType(EtlRunRequest.class).statusCodeFunction(m -> HttpStatus.ACCEPTED))
         .transform(EtlRunRequest.class, req -> EventJob.builder().accountId(req.accountId())
-            .event(BusinessEvent.valueOf(req.event()))
+            .event(MarketplaceEvent.valueOf(req.event()))
             .from(parseOrDefault(req.from(), LocalDate.now().minusDays(120)))
             .to(parseOrDefault(req.to(), LocalDate.now().minusDays(1)))
             .batchId(UUID.randomUUID().toString()).burst(normalizeBurst(req.burst())).seq(-1)
