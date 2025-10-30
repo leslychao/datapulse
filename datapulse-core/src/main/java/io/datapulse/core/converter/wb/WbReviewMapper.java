@@ -1,7 +1,7 @@
-package io.datapulse.marketplaces.mapper.wb;
+package io.datapulse.core.converter.wb;
 
 import io.datapulse.domain.dto.ReviewDto;
-import io.datapulse.marketplaces.dto.raw.wb.WbReviewRaw; // = бывший WbQuestionRaw
+import io.datapulse.domain.dto.raw.wb.WbReviewRaw; // = бывший WbQuestionRaw
 import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")

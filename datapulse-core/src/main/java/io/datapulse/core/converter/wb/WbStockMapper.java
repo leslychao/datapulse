@@ -1,7 +1,7 @@
-package io.datapulse.marketplaces.mapper.wb;
+package io.datapulse.core.converter.wb;
 
 import io.datapulse.domain.dto.StockDto;
-import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
+import io.datapulse.domain.dto.raw.wb.WbStockRaw;
 import org.mapstruct.*;
 
 import java.math.BigDecimal;

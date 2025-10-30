@@ -1,8 +1,8 @@
-package io.datapulse.marketplaces.mapper.wb;
+package io.datapulse.core.converter.wb;
 
 import io.datapulse.core.converter.TimeMapper;
 import io.datapulse.domain.dto.SaleDto;
-import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
+import io.datapulse.domain.dto.raw.wb.WbSaleRaw;
 import java.math.BigDecimal;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

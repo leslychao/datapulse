@@ -1,4 +1,4 @@
-package io.datapulse.marketplaces.dto.raw.ozon;
+package io.datapulse.domain.dto.raw.ozon;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.OffsetDateTime;

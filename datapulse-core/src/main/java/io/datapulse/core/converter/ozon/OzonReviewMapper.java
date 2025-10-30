@@ -1,7 +1,7 @@
-package io.datapulse.marketplaces.mapper.ozon;
+package io.datapulse.core.converter.ozon;
 
 import io.datapulse.domain.dto.ReviewDto;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonReviewRaw;
+import io.datapulse.domain.dto.raw.ozon.OzonReviewRaw;
 import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")

@@ -5,10 +5,10 @@ import io.datapulse.core.service.CredentialsProvider;
 import io.datapulse.core.service.StreamingDownloadService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
-import io.datapulse.marketplaces.dto.raw.wb.WbFinanceRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbReviewRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
+import io.datapulse.domain.dto.raw.wb.WbFinanceRaw;
+import io.datapulse.domain.dto.raw.wb.WbReviewRaw;
+import io.datapulse.domain.dto.raw.wb.WbSaleRaw;
+import io.datapulse.domain.dto.raw.wb.WbStockRaw;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.event.MarketplaceEvent;
@@ -52,7 +52,10 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<WbStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.STOCK_LEVEL);
+    List<EndpointRef> refs = endpoints.resolveAll(
+        TYPE,
+        MarketplaceEvent.STOCK_LEVEL,
+        Map.of("dateFrom", onDate));
     return mergeGet(TYPE, accountId, refs, WbStockRaw.class);
   }
 

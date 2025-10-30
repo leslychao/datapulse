@@ -1,7 +1,7 @@
-package io.datapulse.marketplaces.mapper.ozon;
+package io.datapulse.core.converter.ozon;
 
 import io.datapulse.domain.dto.StockDto;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonStockRaw;
+import io.datapulse.domain.dto.raw.ozon.OzonStockRaw;
 import org.mapstruct.*;
 
 import java.math.BigDecimal;

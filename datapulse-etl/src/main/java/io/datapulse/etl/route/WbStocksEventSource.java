@@ -1,30 +1,30 @@
 package io.datapulse.etl.route;
 
-import io.datapulse.domain.dto.SaleDto;
+import io.datapulse.domain.dto.StockDto;
 import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.event.FetchRequest;
 import io.datapulse.marketplaces.event.MarketplaceEvent;
-import io.datapulse.core.converter.wb.WbSaleMapper;
+import io.datapulse.core.converter.wb.WbStockMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 @Component
 @RequiredArgsConstructor
-public final class WbSalesEventSource implements EventSource<SaleDto> {
+public final class WbStocksEventSource implements EventSource<StockDto> {
 
   private final WbAdapter wbAdapter;
-  private final WbSaleMapper transformer;
+  private final WbStockMapper transformer;
 
   @Override
   public MarketplaceEvent event() {
-    return MarketplaceEvent.SALES_FACT;
+    return MarketplaceEvent.STOCK_LEVEL;
   }
 
   @Override
-  public Flux<SaleDto> fetch(FetchRequest req) {
+  public Flux<StockDto> fetch(FetchRequest req) {
     return wbAdapter
-        .fetchSales(req.accountId(), req.from(), req.to())
+        .fetchStock(req.accountId(), req.from())
         .map(transformer::toDto);
   }
 }
