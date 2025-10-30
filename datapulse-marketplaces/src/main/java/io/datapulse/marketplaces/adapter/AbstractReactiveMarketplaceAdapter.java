@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -57,6 +58,9 @@ abstract class AbstractReactiveMarketplaceAdapter {
   protected final <T> Flux<T> get(
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType
   ) {
+    if (uri == null) {
+      throw new AppException(MessageCodes.URI_REQUIRED);
+    }
     HttpHeaders headers = buildHeaders(type, accountId);
     Flux<DataBuffer> raw = streamingDownloadService.stream(uri, headers);
     return execute(type, key, accountId, uri, targetType, raw)
@@ -67,6 +71,9 @@ abstract class AbstractReactiveMarketplaceAdapter {
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Map<String, ?> body,
       Class<T> targetType
   ) {
+    if (uri == null) {
+      throw new AppException(MessageCodes.URI_REQUIRED);
+    }
     HttpHeaders headers = buildHeaders(type, accountId);
     Flux<DataBuffer> raw = streamingDownloadService.post(uri, headers, body);
     return execute(type, key, accountId, uri, targetType, raw)
@@ -114,13 +121,18 @@ abstract class AbstractReactiveMarketplaceAdapter {
 
   protected final int concurrencyFor(MarketplaceType type, List<EndpointRef> refs) {
     var provider = properties.get(type);
-    int globalCap = provider.getResilience().requireAll().getMaxConcurrentCalls();
-    int minEndpointCap = refs.stream()
-        .map(EndpointRef::key)
-        .mapToInt(provider::effectiveMaxConcurrentCalls)
-        .min().orElse(globalCap);
-    int sources = refs.size();
-    return Math.max(1, Math.min(sources, Math.min(minEndpointCap, globalCap)));
+    int globalCap = provider.getResilience().getMaxConcurrentCalls();
+
+    Map<String, List<EndpointRef>> byRoute = refs.stream().collect(
+        Collectors.groupingBy(ref -> ref.key().name() + "|" + ref.uri().getPath())
+    );
+
+    int sumCapped = byRoute.values().stream()
+        .mapToInt(
+            list -> Math.min(list.size(), provider.effectiveMaxConcurrentCalls(list.get(0).key())))
+        .sum();
+
+    return Math.max(1, Math.min(sumCapped, globalCap));
   }
 
   public record Page<T>(List<T> items, String nextCursor) {

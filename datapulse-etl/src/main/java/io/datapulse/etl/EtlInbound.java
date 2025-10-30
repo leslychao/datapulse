@@ -70,11 +70,10 @@ public class EtlInbound {
             .requestPayloadType(EtlRunRequest.class).statusCodeFunction(m -> HttpStatus.ACCEPTED))
         .transform(EtlRunRequest.class, req -> EventJob.builder().accountId(req.accountId())
             .event(BusinessEvent.valueOf(req.event()))
-            .from(parseOrDefault(req.from(), LocalDate.now().minusDays(6)))
+            .from(parseOrDefault(req.from(), LocalDate.now().minusDays(120)))
             .to(parseOrDefault(req.to(), LocalDate.now().minusDays(1)))
             .batchId(UUID.randomUUID().toString()).burst(normalizeBurst(req.burst())).seq(-1)
             .build())
-        // Асинхронный запуск: репликация + преобразование в FetchRequest → канал
         .wireTap(flow -> flow.split(EventJob.class, job -> replicate(job, job.burst))
             .transform(EventJob.class,
                 job -> new io.datapulse.marketplaces.event.FetchRequest(job.getAccountId(),

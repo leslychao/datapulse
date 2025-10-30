@@ -66,7 +66,22 @@ public final class MessageCodes {
   public static final String MARKETPLACE_BASE_URL_MISSING = "marketplace.base-url.missing";
   public static final String MARKETPLACE_FETCH_FAILED = "marketplace.fetch.failed";
   public static final String MARKETPLACE_PARSE_FAILED = "marketplace.parse.failed";
-  public static final String MARKETPLACE_ENDPOINTS_MISSING = "marketplace.endpoints.missing";
+  public static final String MARKETPLACE_EVENT_ENDPOINTS_MISSING = "marketplace.event-endpoints.missing";
+  public static final String MARKETPLACE_ENDPOINT_PATH_MISSING = "marketplace.endpoint-path.missing";
 
+  // ===== Marketplace / Config binding (Bean Validation) =====
+  public static final String MARKETPLACE_ENDPOINTS_REQUIRED = "marketplace.endpoints.required";
+  public static final String MARKETPLACE_ENDPOINT_PATH_REQUIRED = "marketplace.endpoint.path.required";
+  public static final String MARKETPLACE_RESILIENCE_REQUIRED = "marketplace.resilience.required";
+  public static final String MARKETPLACE_RESILIENCE_LIMIT_FOR_PERIOD_REQUIRED = "marketplace.resilience.limitForPeriod.required";
+  public static final String MARKETPLACE_RESILIENCE_MAX_CONCURRENT_CALLS_REQUIRED = "marketplace.resilience.maxConcurrentCalls.required";
+  public static final String MARKETPLACE_RESILIENCE_MAX_ATTEMPTS_REQUIRED = "marketplace.resilience.maxAttempts.required";
+  public static final String MARKETPLACE_RESILIENCE_BASE_BACKOFF_REQUIRED = "marketplace.resilience.baseBackoff.required";
+  public static final String MARKETPLACE_RESILIENCE_MAX_BACKOFF_REQUIRED = "marketplace.resilience.maxBackoff.required";
+  public static final String MARKETPLACE_RESILIENCE_MAX_JITTER_REQUIRED = "marketplace.resilience.maxJitter.required";
+  public static final String MARKETPLACE_RESILIENCE_RETRY_AFTER_FALLBACK_REQUIRED = "marketplace.resilience.retryAfterFallback.required";
+  public static final String MARKETPLACE_RESILIENCE_LIMIT_REFRESH_PERIOD_REQUIRED = "marketplace.resilience.limitRefreshPeriod.required";
+  public static final String MARKETPLACE_RESILIENCE_TOKEN_WAIT_TIMEOUT_REQUIRED = "marketplace.resilience.tokenWaitTimeout.required";
+  public static final String MARKETPLACE_RESILIENCE_BULKHEAD_WAIT_REQUIRED = "marketplace.resilience.bulkheadWait.required";
 
 }
