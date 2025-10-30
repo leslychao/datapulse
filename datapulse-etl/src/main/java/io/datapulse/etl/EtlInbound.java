@@ -3,12 +3,14 @@ package io.datapulse.etl;
 import static io.datapulse.etl.IntegrationChannels.CHANNEL_RUN_EVENT;
 
 import io.datapulse.marketplaces.event.BusinessEvent;
+import io.datapulse.marketplaces.event.FetchParams;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.With;
 import org.springframework.context.annotation.Bean;
@@ -32,6 +34,7 @@ public class EtlInbound {
   }
 
   @Builder
+  @Getter
   public static final class EventJob {
 
     public final long accountId;
@@ -62,27 +65,25 @@ public class EtlInbound {
 
   @Bean
   public IntegrationFlow etlInboundFlow() {
-    return IntegrationFlow
-        .from(Http.inboundGateway("/api/etl/run")
-            .requestMapping(
-                m -> m.methods(HttpMethod.POST).consumes(MediaType.APPLICATION_JSON_VALUE))
-            .requestPayloadType(EtlRunRequest.class)
-            .statusCodeFunction(m -> HttpStatus.ACCEPTED)
-            .replyTimeout(0))
-        .transform(EtlRunRequest.class, req -> EventJob.builder()
-            .accountId(req.accountId())
+    return IntegrationFlow.from(Http.inboundGateway("/api/etl/run")
+            .requestMapping(m -> m.methods(HttpMethod.POST).consumes(MediaType.APPLICATION_JSON_VALUE))
+            .requestPayloadType(EtlRunRequest.class).statusCodeFunction(m -> HttpStatus.ACCEPTED))
+        .transform(EtlRunRequest.class, req -> EventJob.builder().accountId(req.accountId())
             .event(BusinessEvent.valueOf(req.event()))
-            .from(parseOrDefault(req.from(), LocalDate.now().minusDays(1)))
+            .from(parseOrDefault(req.from(), LocalDate.now().minusDays(6)))
             .to(parseOrDefault(req.to(), LocalDate.now().minusDays(1)))
-            .batchId(UUID.randomUUID().toString())
-            .burst(normalizeBurst(req.burst()))
-            .seq(-1)
+            .batchId(UUID.randomUUID().toString()).burst(normalizeBurst(req.burst())).seq(-1)
             .build())
-        .split(EventJob.class, job -> replicate(job, job.burst))
-        .channel(CHANNEL_RUN_EVENT)
-        .aggregate(a -> a.releaseStrategy(g -> true))
-        .transform(payload -> Map.of("status", "accepted"))
-        .get();
+        // Асинхронный запуск: репликация + преобразование в FetchRequest → канал
+        .wireTap(flow -> flow.split(EventJob.class, job -> replicate(job, job.burst))
+            .transform(EventJob.class,
+                job -> new io.datapulse.marketplaces.event.FetchRequest(job.getAccountId(),
+                    job.getEvent(), job.getFrom(), job.getTo(), FetchParams.empty()))
+            .channel(CHANNEL_RUN_EVENT))
+        // Немедленный ответ клиенту (202)
+        .transform(EventJob.class,
+            job -> Map.of("status", "accepted", "event", job.getEvent().name(), "batchId",
+                job.getBatchId(), "burst", job.getBurst())).get();
   }
 
   private static List<EventJob> replicate(EventJob job, int times) {

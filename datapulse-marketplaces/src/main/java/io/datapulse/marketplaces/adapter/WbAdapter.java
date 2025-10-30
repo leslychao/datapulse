@@ -4,16 +4,19 @@ import io.datapulse.core.parser.JsonFluxReader;
 import io.datapulse.core.service.CredentialsProvider;
 import io.datapulse.core.service.StreamingDownloadService;
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.raw.wb.WbFinanceRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbReviewRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbSaleRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbStockRaw;
+import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.event.BusinessEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceManager;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -30,30 +33,36 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
   public WbAdapter(EndpointsResolver endpoints,
       StreamingDownloadService s,
       ResilienceManager r,
+      MarketplaceProperties props,
       JsonFluxReader f,
       HttpHeaderProvider h,
       CredentialsProvider c) {
-    super(s, r, f, h, c);
+    super(s, r, props, f, h, c);
     this.endpoints = endpoints;
   }
 
   @Override
   public Flux<WbSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.SALES_FACT,
-        Map.of("dateFrom", from, "dateTo", to));
+    List<EndpointRef> refs = endpoints.resolveAll(
+        TYPE, BusinessEvent.SALES_FACT,
+        Map.of("dateFrom", from, "dateTo", to)
+    );
     return mergeGet(TYPE, accountId, refs, WbSaleRaw.class);
   }
 
   @Override
   public Flux<WbStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
     return mergeGet(TYPE, accountId, refs, WbStockRaw.class);
   }
 
   @Override
   public Flux<WbFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.RETURN,
-        Map.of("dateFrom", from, "dateTo", to, "limit", 100_000));
+    // временно через RETURN→FINANCE
+    List<EndpointRef> refs = endpoints.resolveAll(
+        TYPE, BusinessEvent.RETURN,
+        Map.of("dateFrom", from, "dateTo", to, "limit", 100_000)
+    );
     return mergeGet(TYPE, accountId, refs, WbFinanceRaw.class);
   }
 
@@ -61,9 +70,12 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
   public Flux<WbReviewRaw> fetchReviews(long accountId, LocalDate from, LocalDate to) {
     long fromSec = from.atStartOfDay(MSK).toEpochSecond();
     long toSec = to.atTime(23, 59, 59).atZone(MSK).toEpochSecond();
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.REVIEW,
-        Map.of("isAnswered", false, "take", 1000, "skip", 0, "dateFrom", fromSec, "dateTo", toSec));
+
+    List<EndpointRef> refs = endpoints.resolveAll(
+        TYPE, BusinessEvent.REVIEW,
+        Map.of("isAnswered", false, "take", 1000, "skip", 0,
+            "dateFrom", fromSec, "dateTo", toSec)
+    );
     return mergeGet(TYPE, accountId, refs, WbReviewRaw.class);
   }
-
 }

@@ -35,7 +35,6 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.netty.http.client.PrematureCloseException;
 import reactor.util.retry.Retry;
 
 @Slf4j
@@ -81,7 +80,10 @@ public class ResilienceManager {
 
   private ResilienceKit buildKit(MarketplaceType marketplaceType, EndpointKey endpointKey,
       String scopeId) {
-    var cfg = resolveResilience(marketplaceType, endpointKey);
+    var provider = marketplaceProperties.get(marketplaceType);
+    var cfg = (endpointKey == null)
+        ? provider.getResilience().requireAll()
+        : provider.effectiveResilience(endpointKey);
 
     int maxAttempts = requirePositive(cfg.getMaxAttempts(), "maxAttempts");
     Duration baseBackoff = requirePositive(cfg.getBaseBackoff(), "baseBackoff");
@@ -92,11 +94,12 @@ public class ResilienceManager {
     if (baseBackoff.compareTo(maxBackoff) > 0) {
       throw new IllegalArgumentException("baseBackoff must be <= maxBackoff");
     }
-    Duration tokenWaitTimeout =
-        requireCap(Objects.requireNonNull(cfg.getTokenWaitTimeout(), "tokenWaitTimeout"),
-            "tokenWaitTimeout");
-    Duration bulkheadWait =
-        requireCap(Objects.requireNonNull(cfg.getBulkheadWait(), "bulkheadWait"), "bulkheadWait");
+    Duration tokenWaitTimeout = requireCap(
+        Objects.requireNonNull(cfg.getTokenWaitTimeout(), "tokenWaitTimeout"),
+        "tokenWaitTimeout");
+    Duration bulkheadWait = requireCap(
+        Objects.requireNonNull(cfg.getBulkheadWait(), "bulkheadWait"),
+        "bulkheadWait");
 
     RateLimiterConfig rateLimiterConfig = RateLimiterConfig.custom()
         .limitRefreshPeriod(
@@ -110,7 +113,7 @@ public class ResilienceManager {
         .maxWaitDuration(bulkheadWait)
         .build();
 
-    String endpointLabel = labelOf(endpointKey);
+    String endpointLabel = (endpointKey == null) ? "GLOBAL" : endpointKey.name();
     String rlName = marketplaceType + "." + endpointLabel + ".rl." + scopeId;
     String bhName = marketplaceType + "." + endpointLabel + ".bh." + scopeId;
     String rtName = marketplaceType + "." + endpointLabel + ".rt." + scopeId;
@@ -179,8 +182,7 @@ public class ResilienceManager {
   }
 
   private Retry buildRetry(int maxAttempts, Duration baseBackoff, Duration maxBackoff,
-      Duration jitter,
-      Duration retryAfterFallback, String contextLabel) {
+      Duration jitter, Duration retryAfterFallback, String contextLabel) {
     return Retry.from(signals -> signals.flatMap(retrySignal -> {
       Throwable failure = retrySignal.failure();
       long attempt = retrySignal.totalRetries() + 1;
@@ -238,22 +240,9 @@ public class ResilienceManager {
   private MarketplaceProperties.Resilience resolveResilience(MarketplaceType marketplaceType,
       EndpointKey endpointKey) {
     var provider = marketplaceProperties.get(marketplaceType);
-    var endpointOverrides = provider.getResilienceOverrides();
-
-    if (endpointOverrides != null && endpointKey != null) {
-      var override = endpointOverrides.get(endpointKey.tag());
-      if (override != null) {
-        return override;
-      }
-    }
-
-    var base = provider.getResilience();
-    if (base == null) {
-      throw new IllegalStateException("Missing resilience configuration for provider "
-          + marketplaceType + " (neither base nor override defined for endpoint=" + endpointKey
-          + ")");
-    }
-    return base;
+    return (endpointKey == null)
+        ? provider.getResilience().requireAll()
+        : provider.effectiveResilience(endpointKey);
   }
 
   private static Duration orZero(Duration value) {
@@ -301,7 +290,7 @@ public class ResilienceManager {
           || cause instanceof UnknownHostException
           || cause instanceof SSLException
           || cause instanceof ClosedChannelException
-          || cause instanceof PrematureCloseException) {
+          || cause instanceof reactor.netty.http.client.PrematureCloseException) {
         return true;
       }
     }
@@ -320,10 +309,6 @@ public class ResilienceManager {
     return "retry-after=" + (retryAfter == null ? "-" : retryAfter)
         + ", x-ratelimit-retry=" + (xRetry == null ? "-" : xRetry)
         + ", x-ratelimit-reset=" + (xReset == null ? "-" : xReset);
-  }
-
-  private static String labelOf(EndpointKey endpointKey) {
-    return (endpointKey == null) ? "GLOBAL" : endpointKey.name();
   }
 
   private static final class BackoffMath {
@@ -398,7 +383,6 @@ public class ResilienceManager {
           )
           .flatMap(Optional::stream)
           .findFirst();
-
       return candidate.map(RetryAfterSupport::nonNegative).orElse(fallback);
     }
 

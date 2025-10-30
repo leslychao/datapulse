@@ -57,9 +57,11 @@ Content-Type: application/json
 {
   "accountId": 44,
   "event": "SALES_FACT",
-  "from": "{{moment().subtract(1, 'day').format('YYYY-MM-DD')}}",
-  "to": "{{moment().format('YYYY-MM-DD')}}",
+  "from": "{{moment().subtract(5, 'day').toISOString()}}",
+  "to": "{{moment().toISOString()}}",
   "burst": 1
 }
 
-> {% client.log("ETL started for accountId=44, event=SALES_FACT (last 24h)") %}
+> {%
+  client.log(`ETL started for accountId=44, event=SALES_FACT (last 24h)`);
+%}

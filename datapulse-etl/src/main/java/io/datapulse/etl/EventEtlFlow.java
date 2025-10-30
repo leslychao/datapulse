@@ -23,13 +23,11 @@ public class EventEtlFlow {
 
   @Bean
   public IntegrationFlow runEtlFlow(TaskExecutor etlExecutor) {
-    return IntegrationFlow.from(CHANNEL_RUN_EVENT)
-        .channel(MessageChannels.executor(etlExecutor))
+    return IntegrationFlow.from(CHANNEL_RUN_EVENT).channel(MessageChannels.executor(etlExecutor))
         .handle((payload, headers) -> {
-          FetchRequest fetchRequest = (FetchRequest) payload;
+          var fetchRequest = (FetchRequest) payload;
 
-          var matched = sources.stream()
-              .filter(src -> src.event() == fetchRequest.event())
+          var matched = sources.stream().filter(src -> src.event() == fetchRequest.event())
               .toList();
 
           if (matched.isEmpty()) {
@@ -37,18 +35,15 @@ public class EventEtlFlow {
             return null;
           }
 
-          Flux<?> flux = Flux.merge(matched.stream()
-              .map(source -> source.fetch(fetchRequest))
-              .toList());
+          Flux<?> flux = Flux.merge(
+              matched.stream().map(source -> source.fetch(fetchRequest)).toList());
 
-          flux
-              .doOnSubscribe(s -> log.info("ETL start event={}", fetchRequest.event()))
-              .doOnNext(System.out::println)
-              .doOnComplete(() -> log.info("ETL done  event={}", fetchRequest.event()))
-              .subscribe();
+          flux.doOnSubscribe(s -> log.info("ETL start event={}", fetchRequest.event()))
+              .doOnNext(item -> log.info("ETL item: {}", item))
+              .doOnError(e -> log.error("ETL error event={}", fetchRequest.event(), e))
+              .doOnComplete(() -> log.info("ETL done  event={}", fetchRequest.event())).subscribe();
 
           return null;
-        })
-        .get();
+        }).get();
   }
 }

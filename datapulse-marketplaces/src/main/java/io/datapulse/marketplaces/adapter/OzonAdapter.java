@@ -4,10 +4,12 @@ import io.datapulse.core.parser.JsonFluxReader;
 import io.datapulse.core.service.CredentialsProvider;
 import io.datapulse.core.service.StreamingDownloadService;
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonFinanceRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonReviewRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonSaleRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonStockRaw;
+import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.event.BusinessEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
@@ -28,17 +30,18 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
   public OzonAdapter(EndpointsResolver endpoints,
       StreamingDownloadService s,
       ResilienceManager r,
+      MarketplaceProperties props,
       JsonFluxReader f,
       HttpHeaderProvider h,
       CredentialsProvider c) {
-    super(s, r, f, h, c);
+    super(s, r, props, f, h, c);
     this.endpoints = endpoints;
   }
 
   @Override
   public Flux<OzonSaleRaw> fetchSales(long accountId, LocalDate from, LocalDate to) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.SALES_FACT);
-    var body = Map.of(
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.SALES_FACT);
+    Map<String, ?> body = Map.of(
         "date_from", from.toString(),
         "date_to", to.toString(),
         "dimension", List.of("sku"),
@@ -50,8 +53,8 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonStockRaw> fetchStock(long accountId, LocalDate onDate) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
-    var body = Map.of(
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.STOCK_LEVEL);
+    Map<String, ?> body = Map.of(
         "filter", Map.of("offer_id", List.of(), "product_id", List.of(), "sku", List.of()),
         "last_id", "",
         "limit", 1000
@@ -61,8 +64,9 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.RETURN);
-    var body = Map.of(
+    // временно через RETURN→FINANCE
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.RETURN);
+    Map<String, ?> body = Map.of(
         "filter", Map.of("date", Map.of("from", from.toString(), "to", to.toString())),
         "page", Map.of("page", 1, "page_size", 1000)
     );
@@ -71,8 +75,8 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonReviewRaw> fetchReviews(long accountId, LocalDate from, LocalDate to) {
-    var refs = endpoints.resolveAll(TYPE, BusinessEvent.REVIEW);
-    var body = Map.of(
+    List<EndpointRef> refs = endpoints.resolveAll(TYPE, BusinessEvent.REVIEW);
+    Map<String, ?> body = Map.of(
         "page", 1, "page_size", 100,
         "filter", Map.of("date_created", Map.of(
             "time_from", from + "T00:00:00Z",
