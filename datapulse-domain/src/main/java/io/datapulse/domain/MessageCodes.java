@@ -47,6 +47,7 @@ public final class MessageCodes {
 
   // ===== Common validation =====
   public static final String DTO_REQUIRED = "dto.required";
+  public static final String ENTITY_REQUIRED = "entity.required";
   public static final String LIST_REQUIRED = "list.required";
   public static final String PAGEABLE_REQUIRED = "pageable.required";
   public static final String ID_REQUIRED = "id.required";

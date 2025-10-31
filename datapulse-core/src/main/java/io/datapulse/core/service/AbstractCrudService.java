@@ -1,6 +1,7 @@
 package io.datapulse.core.service;
 
 import static io.datapulse.domain.MessageCodes.DTO_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ENTITY_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.LIST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.NOT_FOUND;
@@ -17,6 +18,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
@@ -27,16 +29,20 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongBaseEntity> {
 
   private final MapperFacade mapper;
+  private final JpaRepository<E, Long> repository;
 
   protected MapperFacade mapper() {
     return mapper;
+  }
+
+  protected JpaRepository<E, Long> repository() {
+    return repository;
   }
 
   protected abstract Class<D> dtoType();
 
   protected abstract Class<E> entityType();
 
-  protected abstract JpaRepository<E, Long> repository();
 
   public D save(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
     E entity = mapper.to(dto, entityType());
@@ -47,15 +53,17 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
   public List<D> saveAll(
       @NotEmpty(message = LIST_REQUIRED)
       List<@Valid @NotNull(message = DTO_REQUIRED) D> dtos) {
-    return repository()
-        .saveAll(
-            dtos.stream()
-                .map(d -> mapper.to(d, entityType()))
-                .map(this::beforeSave)
-                .toList())
-        .stream()
-        .map(e -> mapper.to(e, dtoType()))
-        .toList();
+    return dtos.stream()
+        .map(dto -> mapper.to(dto, entityType()))
+        .map(this::beforeSave)
+        .collect(Collectors.collectingAndThen(
+            Collectors.toList(),
+            entities -> repository()
+                .saveAll(entities)
+                .stream()
+                .map(e -> mapper.to(e, dtoType()))
+                .toList()
+        ));
   }
 
   public D update(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
@@ -66,16 +74,21 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
     return doUpdate(dto, repository()::saveAndFlush);
   }
 
+  public List<D> updateAll(@NotEmpty(message = LIST_REQUIRED)
+  List<@Valid @NotNull(message = DTO_REQUIRED) D> dtos) {
+    return dtos.stream().map(this::updateAndFlush).toList();
+  }
+
   public Optional<D> get(@NotNull(message = ID_REQUIRED) Long id) {
-    return repository().findById(id).map(e -> mapper.to(e, dtoType()));
+    return repository().findById(id).map(entity -> mapper.to(entity, dtoType()));
   }
 
   public Page<D> getAllPageable(@NotNull(message = PAGEABLE_REQUIRED) Pageable pageable) {
-    return repository().findAll(pageable).map(e -> mapper.to(e, dtoType()));
+    return repository().findAll(pageable).map(entity -> mapper.to(entity, dtoType()));
   }
 
   public List<D> getAll() {
-    return repository().findAll().stream().map(e -> mapper.to(e, dtoType())).toList();
+    return repository().findAll().stream().map(entity -> mapper.to(entity, dtoType())).toList();
   }
 
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
@@ -86,8 +99,9 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
     }
   }
 
-  private D doUpdate(@Valid @NotNull(message = DTO_REQUIRED) D dto,
-      @NotNull Function<E, E> persistFn) {
+  private D doUpdate(
+      @Valid @NotNull(message = DTO_REQUIRED) D dto,
+      @NotNull Function<E, E> persistFunction) {
     if (dto.getId() == null) {
       throw new AppException(ID_REQUIRED);
     }
@@ -95,18 +109,20 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
         .findById(dto.getId())
         .map(found -> merge(found, dto))
         .map(this::beforeUpdate)
-        .map(persistFn)
+        .map(persistFunction)
         .orElseThrow(() -> new NotFoundException(NOT_FOUND, dto.getId()));
     return mapper.to(entity, dtoType());
   }
 
-  protected E beforeSave(E entity) {
+  protected E beforeSave(@NotNull(message = ENTITY_REQUIRED) E entity) {
     return entity;
   }
 
-  protected E beforeUpdate(E entity) {
+  protected E beforeUpdate(@NotNull(message = ENTITY_REQUIRED) E entity) {
     return entity;
   }
 
-  protected abstract E merge(@NotNull E target, @Valid @NotNull D source);
+  protected abstract E merge(
+      @NotNull(message = ENTITY_REQUIRED) E target,
+      @Valid @NotNull(message = DTO_REQUIRED) D source);
 }
