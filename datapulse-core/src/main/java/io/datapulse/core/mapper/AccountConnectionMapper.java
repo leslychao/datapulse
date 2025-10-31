@@ -1,4 +1,4 @@
-package io.datapulse.core.converter;
+package io.datapulse.core.mapper;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,18 +18,15 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralConfig.class)
-public interface AccountConnectionMapper
-    extends BeanConverter<AccountConnectionDto, AccountConnectionEntity> {
+@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralMapperConfig.class)
+public interface AccountConnectionMapper {
 
-  @Override
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "account.id", source = "accountId")
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   AccountConnectionEntity mapToEntity(AccountConnectionDto dto);
 
-  @Override
   @Mapping(source = "account.id", target = "accountId")
   AccountConnectionDto mapToDto(AccountConnectionEntity entity);
 

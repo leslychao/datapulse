@@ -1,4 +1,4 @@
-package io.datapulse.core.converter;
+package io.datapulse.core.mapper;
 
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.domain.dto.AccountDto;
@@ -10,16 +10,14 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralConfig.class)
-public interface AccountMapper extends BeanConverter<AccountDto, AccountEntity> {
+@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralMapperConfig.class)
+public interface AccountMapper {
 
-  @Override
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   AccountEntity mapToEntity(AccountDto dto);
 
-  @Override
   AccountDto mapToDto(AccountEntity entity);
 
   @Mapping(target = "id", ignore = true)

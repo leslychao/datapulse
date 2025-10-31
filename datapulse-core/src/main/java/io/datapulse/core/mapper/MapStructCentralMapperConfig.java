@@ -1,4 +1,4 @@
-package io.datapulse.core.converter;
+package io.datapulse.core.mapper;
 
 import org.mapstruct.MapperConfig;
 import org.mapstruct.NullValuePropertyMappingStrategy;
@@ -8,6 +8,6 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.ERROR,
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
 )
-public interface MapStructCentralConfig {
+public interface MapStructCentralMapperConfig {
 
 }

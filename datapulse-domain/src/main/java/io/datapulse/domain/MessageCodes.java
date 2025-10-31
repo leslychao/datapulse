@@ -51,7 +51,7 @@ public final class MessageCodes {
   public static final String PAGEABLE_REQUIRED = "pageable.required";
   public static final String ID_REQUIRED = "id.required";
   public static final String NOT_FOUND = "not-found";
-  public static final String JSON_BODY_INVALID = "json.parse.body.invalid";
+  public static final String JSON_BODY_INVALID = "json.parse. body.invalid";
   public static final String URI_REQUIRED = "uri.required";
   public static final String TYPE_REQUIRED = "type.required";
   public static final String REQUEST_DATE_REQUIRED = "request.date.required";
@@ -82,5 +82,7 @@ public final class MessageCodes {
   public static final String MARKETPLACE_RESILIENCE_LIMIT_REFRESH_PERIOD_REQUIRED = "marketplace.resilience.limitRefreshPeriod.required";
   public static final String MARKETPLACE_RESILIENCE_TOKEN_WAIT_TIMEOUT_REQUIRED = "marketplace.resilience.tokenWaitTimeout.required";
   public static final String MARKETPLACE_RESILIENCE_BULKHEAD_WAIT_REQUIRED = "marketplace.resilience.bulkheadWait.required";
+
+  public static final String CONVERSION_MAPPING_NOT_FOUND = "conversion.mapping.not.found";
 
 }

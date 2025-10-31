@@ -1,15 +1,11 @@
 package io.datapulse.core.service;
 
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CREATE_REQUEST_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_UPDATE_REQUEST_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
+import static io.datapulse.domain.MessageCodes.*;
 
-import io.datapulse.core.converter.AccountMapper;
-import io.datapulse.core.converter.BeanConverter;
 import io.datapulse.core.entity.AccountEntity;
+import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountRepository;
 import io.datapulse.domain.CommonConstants;
-import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.request.AccountUpdateRequest;
@@ -19,7 +15,6 @@ import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
@@ -27,78 +22,82 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 @Service
-@RequiredArgsConstructor
 @Validated
-public class AccountService extends AbstractCrudService<AccountDto, AccountEntity> {
+public class AccountService extends AbstractIngestApiService<
+    AccountCreateRequest,
+    AccountUpdateRequest,
+    AccountResponse,
+    AccountDto,
+    AccountEntity> {
 
   private final AccountRepository repository;
-  private final AccountMapper mapper;
+
+  public AccountService(MapperFacade mapperFacade, AccountRepository repository) {
+    super(mapperFacade);
+    this.repository = repository;
+  }
+
+  @Override protected Class<AccountDto> dtoType() { return AccountDto.class; }
+  @Override protected Class<AccountEntity> entityType() { return AccountEntity.class; }
+  @Override protected Class<AccountResponse> responseType() { return AccountResponse.class; }
+  @Override protected JpaRepository<AccountEntity, Long> repository() { return repository; }
 
   @Override
-  protected AccountEntity entityPreSaveAction(AccountEntity entity) {
+  protected AccountEntity beforeSave(AccountEntity entity) {
     var now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
     if (entity.getCreatedAt() == null) {
       entity.setCreatedAt(now);
     }
     entity.setUpdatedAt(now);
-    return super.entityPreSaveAction(entity);
-  }
-
-  @Override
-  protected AccountEntity entityPreUpdateAction(AccountEntity entity) {
-    entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
-    return super.entityPreUpdateAction(entity);
-  }
-
-  @Override
-  protected BeanConverter<AccountDto, AccountEntity> getConverter() {
-    return mapper;
-  }
-
-  @Override
-  protected JpaRepository<AccountEntity, Long> getRepository() {
-    return repository;
-  }
-
-  @Override
-  protected AccountEntity updateEntityWithDto(
-      AccountEntity entity,
-      AccountDto dto) {
-    mapper.applyUpdateFromDto(dto, entity);
     return entity;
+  }
+
+  @Override
+  protected AccountEntity beforeUpdate(AccountEntity entity) {
+    entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
+    return entity;
+  }
+
+  @Override
+  protected AccountEntity merge(AccountEntity target, AccountDto source) {
+    mapper().merge(source, target);
+    return target;
   }
 
   @Transactional
   public AccountResponse create(
       @Valid @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
-    AccountDto dto = mapper.fromCreateRequest(request);
-    if (repository.existsByNameIgnoreCase(dto.getName())) {
-      throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, dto.getName());
+    var draft = mapper().to(request, AccountDto.class);
+    if (repository.existsByNameIgnoreCase(draft.getName())) {
+      throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, draft.getName());
     }
-    return mapper.toResponse(save(dto));
+    var saved = save(draft);
+    return mapper().to(saved, AccountResponse.class);
   }
 
   @Transactional
   public AccountResponse update(
       @NotNull(message = ID_REQUIRED) Long id,
       @Valid @NotNull(message = ACCOUNT_UPDATE_REQUEST_REQUIRED) AccountUpdateRequest request) {
-    AccountDto current = get(id).orElseThrow(
-        () -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id));
+
+    var current = get(id).orElseThrow(() -> new NotFoundException(ACCOUNT_NOT_FOUND, id));
 
     if (!StringUtils.equalsIgnoreCase(current.getName(), request.name())
         && repository.existsByNameIgnoreCaseAndIdNot(request.name(), id)) {
-      throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, request.name());
+      throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, request.name());
     }
 
-    mapper.applyUpdate(request, current);
-    return mapper.toResponse(update(current));
+    // UpdateReq -> DTO (patch) -> merge(patch, current) -> update -> Response
+    var patch = mapper().to(request, AccountDto.class);
+    mapper().merge(patch, current);
+    return mapper().to(update(current), AccountResponse.class);
   }
 
   @Override
   @Transactional
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
     if (!repository.existsById(id)) {
-      throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id);
+      throw new NotFoundException(ACCOUNT_NOT_FOUND, id);
     }
     repository.deleteById(id);
   }

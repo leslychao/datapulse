@@ -1,6 +1,6 @@
-package io.datapulse.core.converter.wb;
+package io.datapulse.core.mapper.mapper.wb;
 
-import io.datapulse.core.converter.TimeMapper;
+import io.datapulse.core.mapper.TimeMapper;
 import io.datapulse.domain.dto.SaleDto;
 import io.datapulse.domain.dto.raw.wb.WbSaleRaw;
 import java.math.BigDecimal;

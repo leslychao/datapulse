@@ -1,12 +1,13 @@
-package io.datapulse.core.converter.ozon;
+package io.datapulse.core.mapper.mapper.ozon;
 
 import io.datapulse.domain.dto.StockDto;
 import io.datapulse.domain.dto.raw.ozon.OzonStockRaw;
-import org.mapstruct.*;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring", imports = BigDecimal.class)
 public abstract class OzonStockMapper {

@@ -1,13 +1,13 @@
-package io.datapulse.core.converter.wb;
+package io.datapulse.core.mapper.mapper.wb;
 
 import io.datapulse.domain.OperationType;
 import io.datapulse.domain.dto.FinanceDto;
-import io.datapulse.domain.dto.raw.wb.WbFinanceRaw; // = бывший WbRealizationRowRaw
-import org.mapstruct.*;
-
+import io.datapulse.domain.dto.raw.wb.WbFinanceRaw;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring", imports = {BigDecimal.class, OffsetDateTime.class, ZoneId.class})
 public abstract class WbFinanceMapper {

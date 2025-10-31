@@ -1,11 +1,12 @@
-package io.datapulse.core.converter.ozon;
+package io.datapulse.core.mapper.mapper.ozon;
 
 import io.datapulse.domain.OperationType;
 import io.datapulse.domain.dto.FinanceDto;
 import io.datapulse.domain.dto.raw.ozon.OzonFinanceRaw;
-import org.mapstruct.*;
-
 import java.math.BigDecimal;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring", imports = BigDecimal.class)
 public abstract class OzonFinanceMapper {

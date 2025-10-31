@@ -1,4 +1,4 @@
-package io.datapulse.core.converter;
+package io.datapulse.core.mapper;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;

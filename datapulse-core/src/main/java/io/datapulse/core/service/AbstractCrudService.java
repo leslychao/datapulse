@@ -1,9 +1,13 @@
 package io.datapulse.core.service;
 
-import static io.datapulse.domain.MessageCodes.*;
+import static io.datapulse.domain.MessageCodes.DTO_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
+import static io.datapulse.domain.MessageCodes.LIST_REQUIRED;
+import static io.datapulse.domain.MessageCodes.NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.PAGEABLE_REQUIRED;
 
-import io.datapulse.core.converter.BeanConverter;
 import io.datapulse.core.entity.LongBaseEntity;
+import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.domain.dto.LongBaseDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.NotFoundException;
@@ -13,95 +17,96 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public abstract class AbstractCrudService<T extends LongBaseDto, E extends LongBaseEntity> {
+@RequiredArgsConstructor
+public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongBaseEntity> {
 
-  public T save(@Valid @NotNull(message = DTO_REQUIRED) T dto) {
-    E entity = mapToEntity(dto);
-    E prepared = entityPreSaveAction(entity);
-    E persisted = getRepository().save(prepared);
-    return mapToDto(persisted);
+  private final MapperFacade mapper;
+
+  protected MapperFacade mapper() {
+    return mapper;
   }
 
-  public List<T> saveAll(@NotEmpty(message = LIST_REQUIRED)
-  List<@Valid @NotNull(message = DTO_REQUIRED) T> dtos) {
-    List<E> entities = dtos.stream()
-        .map(this::mapToEntity)
-        .map(this::entityPreSaveAction)
+  protected abstract Class<D> dtoType();
+
+  protected abstract Class<E> entityType();
+
+  protected abstract JpaRepository<E, Long> repository();
+
+  public D save(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
+    E entity = mapper.to(dto, entityType());
+    E persisted = repository().save(beforeSave(entity));
+    return mapper.to(persisted, dtoType());
+  }
+
+  public List<D> saveAll(
+      @NotEmpty(message = LIST_REQUIRED)
+      List<@Valid @NotNull(message = DTO_REQUIRED) D> dtos) {
+    return repository()
+        .saveAll(
+            dtos.stream()
+                .map(d -> mapper.to(d, entityType()))
+                .map(this::beforeSave)
+                .toList())
+        .stream()
+        .map(e -> mapper.to(e, dtoType()))
         .toList();
-    return getRepository().saveAll(entities).stream().map(this::mapToDto).toList();
   }
 
-  public T update(@Valid @NotNull(message = DTO_REQUIRED) T dto) {
-    return updateInternal(dto, getRepository()::save);
+  public D update(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
+    return doUpdate(dto, repository()::save);
   }
 
-  public T updateAndFlush(@Valid @NotNull(message = DTO_REQUIRED) T dto) {
-    return updateInternal(dto, getRepository()::saveAndFlush);
+  public D updateAndFlush(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
+    return doUpdate(dto, repository()::saveAndFlush);
   }
 
-  public List<T> updateAll(@NotEmpty(message = LIST_REQUIRED)
-  List<@Valid @NotNull(message = DTO_REQUIRED) T> dtos) {
-    return dtos.stream().map(this::updateAndFlush).toList();
+  public Optional<D> get(@NotNull(message = ID_REQUIRED) Long id) {
+    return repository().findById(id).map(e -> mapper.to(e, dtoType()));
   }
 
-  public Optional<T> get(@NotNull(message = ID_REQUIRED) Long id) {
-    return getRepository().findById(id).map(this::mapToDto);
+  public Page<D> getAllPageable(@NotNull(message = PAGEABLE_REQUIRED) Pageable pageable) {
+    return repository().findAll(pageable).map(e -> mapper.to(e, dtoType()));
   }
 
-  public Page<T> getAllPageable(@NotNull(message = PAGEABLE_REQUIRED) Pageable pageable) {
-    return getRepository().findAll(pageable).map(this::mapToDto);
-  }
-
-  public List<T> getAll() {
-    return getRepository().findAll().stream().map(this::mapToDto).toList();
+  public List<D> getAll() {
+    return repository().findAll().stream().map(e -> mapper.to(e, dtoType())).toList();
   }
 
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
     try {
-      getRepository().deleteById(id);
+      repository().deleteById(id);
     } catch (EmptyResultDataAccessException ex) {
       throw new NotFoundException(NOT_FOUND, id);
     }
   }
 
-  private T updateInternal(@Valid @NotNull(message = DTO_REQUIRED) T dto,
-      @NotNull(message = DTO_REQUIRED) Function<E, E> persistFunction) {
+  private D doUpdate(@Valid @NotNull(message = DTO_REQUIRED) D dto,
+      @NotNull Function<E, E> persistFn) {
     if (dto.getId() == null) {
       throw new AppException(ID_REQUIRED);
     }
-    E entity = getRepository().findById(dto.getId())
-        .map(found -> updateEntityWithDto(found, dto))
-        .map(this::entityPreUpdateAction)
-        .map(persistFunction)
+    E entity = repository()
+        .findById(dto.getId())
+        .map(found -> merge(found, dto))
+        .map(this::beforeUpdate)
+        .map(persistFn)
         .orElseThrow(() -> new NotFoundException(NOT_FOUND, dto.getId()));
-    return mapToDto(entity);
+    return mapper.to(entity, dtoType());
   }
 
-  protected E entityPreSaveAction(@NotNull(message = DTO_REQUIRED) E entity) {
+  protected E beforeSave(E entity) {
     return entity;
   }
 
-  protected E entityPreUpdateAction(@NotNull(message = DTO_REQUIRED) E entity) {
+  protected E beforeUpdate(E entity) {
     return entity;
   }
 
-  protected E mapToEntity(@Valid @NotNull(message = DTO_REQUIRED) T dto) {
-    return getConverter().mapToEntity(dto);
-  }
-
-  protected T mapToDto(@NotNull(message = DTO_REQUIRED) E entity) {
-    return getConverter().mapToDto(entity);
-  }
-
-  protected abstract BeanConverter<T, E> getConverter();
-
-  protected abstract JpaRepository<E, Long> getRepository();
-
-  protected abstract E updateEntityWithDto(@NotNull(message = DTO_REQUIRED) E entity,
-      @Valid @NotNull(message = DTO_REQUIRED) T dto);
+  protected abstract E merge(@NotNull E target, @Valid @NotNull D source);
 }

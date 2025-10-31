@@ -1,8 +1,10 @@
-package io.datapulse.core.converter.wb;
+package io.datapulse.core.mapper.mapper.wb;
 
 import io.datapulse.domain.dto.ReviewDto;
-import io.datapulse.domain.dto.raw.wb.WbReviewRaw; // = бывший WbQuestionRaw
-import org.mapstruct.*;
+import io.datapulse.domain.dto.raw.wb.WbReviewRaw;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring")
 public interface WbReviewMapper {

@@ -1,10 +1,11 @@
-package io.datapulse.core.converter.wb;
+package io.datapulse.core.mapper.mapper.wb;
 
 import io.datapulse.domain.dto.StockDto;
 import io.datapulse.domain.dto.raw.wb.WbStockRaw;
-import org.mapstruct.*;
-
 import java.math.BigDecimal;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring", imports = BigDecimal.class)
 public interface WbStockMapper {

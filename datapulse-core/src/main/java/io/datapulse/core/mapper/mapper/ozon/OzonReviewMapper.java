@@ -1,8 +1,10 @@
-package io.datapulse.core.converter.ozon;
+package io.datapulse.core.mapper.mapper.ozon;
 
 import io.datapulse.domain.dto.ReviewDto;
 import io.datapulse.domain.dto.raw.ozon.OzonReviewRaw;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring")
 public interface OzonReviewMapper {
