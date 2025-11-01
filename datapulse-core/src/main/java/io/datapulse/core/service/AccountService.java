@@ -71,17 +71,6 @@ public class AccountService extends AbstractIngestApiService<
     return AccountEntity.class;
   }
 
-  // Типы для AbstractIngestApiService
-  @Override
-  protected Class<AccountDto> dtoClass() {
-    return AccountDto.class;
-  }
-
-  @Override
-  protected Class<AccountEntity> entityClass() {
-    return AccountEntity.class;
-  }
-
   @Override
   protected Class<AccountResponse> responseClass() {
     return AccountResponse.class;
@@ -112,7 +101,7 @@ public class AccountService extends AbstractIngestApiService<
   @Transactional
   public AccountResponse create(
       @Valid @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
-    var draft = mapper().to(request, dtoClass());
+    var draft = mapper().to(request, dtoType());
     if (repository.existsByNameIgnoreCase(draft.getName())) {
       throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, draft.getName());
     }

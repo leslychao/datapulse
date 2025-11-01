@@ -91,16 +91,6 @@ public class AccountConnectionService extends AbstractIngestApiService<
   }
 
   @Override
-  protected Class<AccountConnectionDto> dtoClass() {
-    return AccountConnectionDto.class;
-  }
-
-  @Override
-  protected Class<AccountConnectionEntity> entityClass() {
-    return AccountConnectionEntity.class;
-  }
-
-  @Override
   protected Class<AccountConnectionResponse> responseClass() {
     return AccountConnectionResponse.class;
   }
