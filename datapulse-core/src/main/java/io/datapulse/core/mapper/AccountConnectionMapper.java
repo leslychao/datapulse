@@ -11,12 +11,10 @@ import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.domain.dto.credentials.OzonCredentials;
 import io.datapulse.domain.dto.credentials.WbCredentials;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
-import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralMapperConfig.class)
 public interface AccountConnectionMapper {
@@ -54,28 +52,6 @@ public interface AccountConnectionMapper {
           cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
     }
     return dto;
-  }
-
-  @Mapping(target = "account", ignore = true)
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "updatedAt", ignore = true)
-  void applyUpdateFromDto(AccountConnectionDto dto, @MappingTarget AccountConnectionEntity entity);
-
-  default void applyUpdate(
-      AccountConnectionUpdateRequest request,
-      @MappingTarget AccountConnectionDto dto,
-      CryptoService cryptoService,
-      ObjectMapper objectMapper) {
-    if (request.marketplace() != null) {
-      dto.setMarketplace(request.marketplace());
-    }
-    if (request.active() != null) {
-      dto.setActive(request.active());
-    }
-    if (request.credentials() != null) {
-      dto.setCredentialsEncrypted(
-          cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
-    }
   }
 
   default String maskCredentials(

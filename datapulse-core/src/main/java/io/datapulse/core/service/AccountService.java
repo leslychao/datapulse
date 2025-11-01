@@ -1,8 +1,13 @@
 package io.datapulse.core.service;
 
-import static io.datapulse.domain.MessageCodes.*;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_ALREADY_EXISTS;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CREATE_REQUEST_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_UPDATE_REQUEST_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
 import io.datapulse.core.entity.AccountEntity;
+import io.datapulse.core.mapper.MapStructCentralMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountRepository;
 import io.datapulse.domain.CommonConstants;
@@ -16,6 +21,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import org.apache.commons.lang3.StringUtils;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,16 +39,53 @@ public class AccountService extends AbstractIngestApiService<
     AccountEntity> {
 
   private final AccountRepository repository;
+  private final MapperFacade mapperFacade;
+  private final AccountApplier accountApplier;
 
-  public AccountService(MapperFacade mapperFacade, AccountRepository repository) {
-    super(mapperFacade);
+  public AccountService(
+      MapperFacade mapperFacade,
+      AccountRepository repository,
+      AccountApplier accountApplier) {
     this.repository = repository;
+    this.mapperFacade = mapperFacade;
+    this.accountApplier = accountApplier;
   }
 
-  @Override protected Class<AccountDto> dtoType() { return AccountDto.class; }
-  @Override protected Class<AccountEntity> entityType() { return AccountEntity.class; }
-  @Override protected Class<AccountResponse> responseType() { return AccountResponse.class; }
-  @Override protected JpaRepository<AccountEntity, Long> repository() { return repository; }
+  @Override
+  protected MapperFacade mapper() {
+    return mapperFacade;
+  }
+
+  @Override
+  protected JpaRepository<AccountEntity, Long> repository() {
+    return repository;
+  }
+
+  @Override
+  protected Class<AccountDto> dtoType() {
+    return AccountDto.class;
+  }
+
+  @Override
+  protected Class<AccountEntity> entityType() {
+    return AccountEntity.class;
+  }
+
+  // Типы для AbstractIngestApiService
+  @Override
+  protected Class<AccountDto> dtoClass() {
+    return AccountDto.class;
+  }
+
+  @Override
+  protected Class<AccountEntity> entityClass() {
+    return AccountEntity.class;
+  }
+
+  @Override
+  protected Class<AccountResponse> responseClass() {
+    return AccountResponse.class;
+  }
 
   @Override
   protected AccountEntity beforeSave(AccountEntity entity) {
@@ -60,19 +105,18 @@ public class AccountService extends AbstractIngestApiService<
 
   @Override
   protected AccountEntity merge(AccountEntity target, AccountDto source) {
-    mapper().merge(source, target);
+    accountApplier.applyUpdateFromDto(source, target);
     return target;
   }
 
   @Transactional
   public AccountResponse create(
       @Valid @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
-    var draft = mapper().to(request, AccountDto.class);
+    var draft = mapper().to(request, dtoClass());
     if (repository.existsByNameIgnoreCase(draft.getName())) {
       throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, draft.getName());
     }
-    var saved = save(draft);
-    return mapper().to(saved, AccountResponse.class);
+    return mapper().to(save(draft), responseClass());
   }
 
   @Transactional
@@ -87,10 +131,8 @@ public class AccountService extends AbstractIngestApiService<
       throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, request.name());
     }
 
-    // UpdateReq -> DTO (patch) -> merge(patch, current) -> update -> Response
-    var patch = mapper().to(request, AccountDto.class);
-    mapper().merge(patch, current);
-    return mapper().to(update(current), AccountResponse.class);
+    accountApplier.applyUpdate(request, current);
+    return mapper().to(update(current), responseClass());
   }
 
   @Override
@@ -105,5 +147,18 @@ public class AccountService extends AbstractIngestApiService<
   @Transactional(readOnly = true)
   public boolean exists(@NotNull(message = ID_REQUIRED) Long id) {
     return repository.existsById(id);
+  }
+
+  @Mapper(componentModel = "spring", config = MapStructCentralMapperConfig.class)
+  public interface AccountApplier {
+
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    void applyUpdateFromDto(AccountDto dto, @MappingTarget AccountEntity entity);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    void applyUpdate(AccountUpdateRequest request, @MappingTarget AccountDto dto);
   }
 }

@@ -1,4 +1,4 @@
-package io.datapulse.core.mapper.mapper.wb;
+package io.datapulse.core.mapper.wb;
 
 import io.datapulse.core.mapper.TimeMapper;
 import io.datapulse.domain.dto.SaleDto;

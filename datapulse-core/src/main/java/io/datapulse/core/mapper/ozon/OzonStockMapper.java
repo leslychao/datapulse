@@ -1,4 +1,4 @@
-package io.datapulse.core.mapper.mapper.ozon;
+package io.datapulse.core.mapper.ozon;
 
 import io.datapulse.domain.dto.StockDto;
 import io.datapulse.domain.dto.raw.ozon.OzonStockRaw;

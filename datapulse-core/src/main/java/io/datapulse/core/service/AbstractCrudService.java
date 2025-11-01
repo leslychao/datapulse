@@ -28,16 +28,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 @RequiredArgsConstructor
 public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongBaseEntity> {
 
-  private final MapperFacade mapper;
-  private final JpaRepository<E, Long> repository;
+  protected abstract MapperFacade mapper();
 
-  protected MapperFacade mapper() {
-    return mapper;
-  }
-
-  protected JpaRepository<E, Long> repository() {
-    return repository;
-  }
+  protected abstract JpaRepository<E, Long> repository();
 
   protected abstract Class<D> dtoType();
 
@@ -45,23 +38,23 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
 
 
   public D save(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
-    E entity = mapper.to(dto, entityType());
+    E entity = mapper().to(dto, entityType());
     E persisted = repository().save(beforeSave(entity));
-    return mapper.to(persisted, dtoType());
+    return mapper().to(persisted, dtoType());
   }
 
   public List<D> saveAll(
       @NotEmpty(message = LIST_REQUIRED)
       List<@Valid @NotNull(message = DTO_REQUIRED) D> dtos) {
     return dtos.stream()
-        .map(dto -> mapper.to(dto, entityType()))
+        .map(dto -> mapper().to(dto, entityType()))
         .map(this::beforeSave)
         .collect(Collectors.collectingAndThen(
             Collectors.toList(),
             entities -> repository()
                 .saveAll(entities)
                 .stream()
-                .map(e -> mapper.to(e, dtoType()))
+                .map(e -> mapper().to(e, dtoType()))
                 .toList()
         ));
   }
@@ -80,15 +73,15 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
   }
 
   public Optional<D> get(@NotNull(message = ID_REQUIRED) Long id) {
-    return repository().findById(id).map(entity -> mapper.to(entity, dtoType()));
+    return repository().findById(id).map(entity -> mapper().to(entity, dtoType()));
   }
 
   public Page<D> getAllPageable(@NotNull(message = PAGEABLE_REQUIRED) Pageable pageable) {
-    return repository().findAll(pageable).map(entity -> mapper.to(entity, dtoType()));
+    return repository().findAll(pageable).map(entity -> mapper().to(entity, dtoType()));
   }
 
   public List<D> getAll() {
-    return repository().findAll().stream().map(entity -> mapper.to(entity, dtoType())).toList();
+    return repository().findAll().stream().map(entity -> mapper().to(entity, dtoType())).toList();
   }
 
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
@@ -111,7 +104,7 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
         .map(this::beforeUpdate)
         .map(persistFunction)
         .orElseThrow(() -> new NotFoundException(NOT_FOUND, dto.getId()));
-    return mapper.to(entity, dtoType());
+    return mapper().to(entity, dtoType());
   }
 
   protected E beforeSave(@NotNull(message = ENTITY_REQUIRED) E entity) {
