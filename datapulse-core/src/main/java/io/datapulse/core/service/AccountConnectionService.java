@@ -11,7 +11,6 @@ import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
@@ -19,9 +18,9 @@ import io.datapulse.core.mapper.MapStructCentralMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
 import io.datapulse.core.service.crypto.CryptoService;
+import io.datapulse.core.util.JsonUtils;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
@@ -170,24 +169,9 @@ public class AccountConnectionService extends AbstractIngestApiService<
             request.marketplace());
       }
     }
-    applyUpdate(request, current);
+    accountConnectionApplier.applyUpdate(request, current, cryptoService, objectMapper);
     var updated = update(current);
     return mapper().to(updated, responseClass());
-  }
-
-  void applyUpdate(
-      AccountConnectionUpdateRequest request,
-      @MappingTarget AccountConnectionDto dto) {
-    if (request.marketplace() != null) {
-      dto.setMarketplace(request.marketplace());
-    }
-    if (request.active() != null) {
-      dto.setActive(request.active());
-    }
-    if (request.credentials() != null) {
-      dto.setCredentialsEncrypted(
-          cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
-    }
   }
 
   @Override
@@ -210,14 +194,6 @@ public class AccountConnectionService extends AbstractIngestApiService<
 
     accountConnectionApplier.applyUpdateFromDto(source, target);
     return target;
-  }
-
-  private <T> String writeJson(T object, ObjectMapper objectMapper) {
-    try {
-      return objectMapper.writeValueAsString(object);
-    } catch (JsonProcessingException ex) {
-      throw new AppException(ex, MessageCodes.CREDENTIALS_JSON_SERIALIZATION_ERROR);
-    }
   }
 
   @Override
@@ -243,6 +219,23 @@ public class AccountConnectionService extends AbstractIngestApiService<
       config = MapStructCentralMapperConfig.class
   )
   public interface AccountConnectionApplier {
+
+    default void applyUpdate(
+        AccountConnectionUpdateRequest request,
+        @MappingTarget AccountConnectionDto dto,
+        CryptoService cryptoService,
+        ObjectMapper objectMapper) {
+      if (request.marketplace() != null) {
+        dto.setMarketplace(request.marketplace());
+      }
+      if (request.active() != null) {
+        dto.setActive(request.active());
+      }
+      if (request.credentials() != null) {
+        dto.setCredentialsEncrypted(
+            cryptoService.encrypt(JsonUtils.writeJson(request.credentials(), objectMapper)));
+      }
+    }
 
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "createdAt", ignore = true)

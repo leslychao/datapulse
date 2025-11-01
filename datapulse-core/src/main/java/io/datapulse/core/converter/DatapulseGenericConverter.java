@@ -11,6 +11,7 @@ import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.exception.AppException;
+import jakarta.annotation.PostConstruct;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -29,21 +30,22 @@ public final class DatapulseGenericConverter implements GenericConverter {
   private final CryptoService cryptoService;
   private final ObjectMapper objectMapper;
 
+  private final Map<ConvertiblePair, Function<Object, Object>> registry = new java.util.LinkedHashMap<>();
 
-  private final Map<ConvertiblePair, Function<Object, Object>> registry = Map.of(
-      // REQUEST → DTO
-      new ConvertiblePair(AccountCreateRequest.class, AccountDto.class),
-      src -> accountMapper.fromCreateRequest((AccountCreateRequest) src),
+  @PostConstruct
+  void init() {
+    // REQUEST → DTO
+    registry.put(new ConvertiblePair(AccountCreateRequest.class, AccountDto.class),
+        src -> accountMapper.fromCreateRequest((AccountCreateRequest) src));
 
-      new ConvertiblePair(AccountConnectionCreateRequest.class, AccountConnectionDto.class),
-      src -> accountConnectionMapper.fromCreateRequest(
-          (AccountConnectionCreateRequest) src, cryptoService, objectMapper)
+    registry.put(
+        new ConvertiblePair(AccountConnectionCreateRequest.class, AccountConnectionDto.class),
+        src -> accountConnectionMapper.fromCreateRequest(
+            (AccountConnectionCreateRequest) src, cryptoService, objectMapper));
 
-      // DTO → Entity
-
-      // Entity → DTO
-
-  );
+    // DTO → Entity
+    // Entity → DTO
+  }
 
   @Override
   public Set<ConvertiblePair> getConvertibleTypes() {
@@ -51,11 +53,9 @@ public final class DatapulseGenericConverter implements GenericConverter {
   }
 
   @Override
-  public Object convert(
-      Object source,
+  public Object convert(Object source,
       @NonNull TypeDescriptor sourceType,
-      @NonNull TypeDescriptor targetType
-  ) {
+      @NonNull TypeDescriptor targetType) {
     if (source == null) {
       return null;
     }
@@ -68,3 +68,4 @@ public final class DatapulseGenericConverter implements GenericConverter {
     return fn.apply(source);
   }
 }
+

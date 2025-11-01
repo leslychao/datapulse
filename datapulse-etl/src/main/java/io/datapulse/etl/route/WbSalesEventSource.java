@@ -1,10 +1,10 @@
 package io.datapulse.etl.route;
 
+import io.datapulse.core.mapper.wb.WbSaleMapper;
 import io.datapulse.domain.dto.SaleDto;
 import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.event.FetchRequest;
 import io.datapulse.marketplaces.event.MarketplaceEvent;
-import io.datapulse.core.converter.wb.WbSaleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;

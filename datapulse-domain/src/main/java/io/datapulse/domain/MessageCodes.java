@@ -26,6 +26,8 @@ public final class MessageCodes {
   public static final String ACCOUNT_CONNECTION_ALREADY_EXISTS = "account.connection.already-exists";
   public static final String ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED = "account.connection.create-request.required";
   public static final String ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED = "account.connection.update-request.required";
+  public static final String ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH = "account_connection.credentials.type.mismatch";
+
 
   // ===== Credentials =====
   public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK = "credentials.wb.token.not-blank";
