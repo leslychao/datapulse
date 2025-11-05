@@ -1,93 +1,112 @@
 package io.datapulse.core.mapper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.codec.CredentialsCodec;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.service.crypto.CryptoService;
-import io.datapulse.domain.MessageCodes;
+import io.datapulse.core.util.JsonUtils;
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.domain.dto.credentials.OzonCredentials;
 import io.datapulse.domain.dto.credentials.WbCredentials;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
+import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
-import io.datapulse.domain.exception.AppException;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+import org.springframework.beans.factory.annotation.Autowired;
 
-@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralMapperConfig.class)
-public interface AccountConnectionMapper {
+@Mapper(
+    componentModel = "spring",
+    uses = TimeMapper.class,
+    config = BaseMapperConfig.class
+)
+public abstract class AccountConnectionMapper {
+
+  @Autowired
+  protected CryptoService cryptoService;
+
+  @Autowired
+  protected ObjectMapper objectMapper;
+
+  @Autowired
+  protected CredentialsCodec credentialsCodec;
 
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "account.id", source = "accountId")
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  AccountConnectionEntity mapToEntity(AccountConnectionDto dto);
+  public abstract AccountConnectionEntity mapToEntity(AccountConnectionDto dto);
 
   @Mapping(source = "account.id", target = "accountId")
-  AccountConnectionDto mapToDto(AccountConnectionEntity entity);
+  public abstract AccountConnectionDto mapToDto(AccountConnectionEntity entity);
 
-  @Mapping(
-      target = "maskedCredentials",
-      expression = "java(maskCredentials(dto, cryptoService, objectMapper, credentialsCodec))"
-  )
-  AccountConnectionResponse toResponse(
-      AccountConnectionDto dto,
-      CryptoService cryptoService,
-      ObjectMapper objectMapper,
-      CredentialsCodec credentialsCodec);
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "accountId", source = "accountId")
+  @Mapping(target = "marketplace", source = "marketplace")
+  @Mapping(target = "active", source = "active")
+  @Mapping(target = "credentialsEncrypted", source = "credentials", qualifiedByName = "encryptCredentials")
+  @Mapping(target = "lastSyncAt", ignore = true)
+  @Mapping(target = "lastSyncStatus", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  public abstract AccountConnectionDto mapCreateRequestToDto(
+      AccountConnectionCreateRequest request);
 
-  default AccountConnectionDto fromCreateRequest(
-      AccountConnectionCreateRequest request,
-      CryptoService cryptoService,
-      ObjectMapper objectMapper
-  ) {
-    AccountConnectionDto dto = new AccountConnectionDto();
-    dto.setAccountId(request.accountId());
-    dto.setMarketplace(request.marketplace());
-    dto.setActive(request.active() == null ? Boolean.TRUE : request.active());
-    if (request.credentials() != null) {
-      dto.setCredentialsEncrypted(
-          cryptoService.encrypt(writeJson(request.credentials(), objectMapper)));
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "accountId", ignore = true)
+  @Mapping(target = "marketplace", source = "marketplace")
+  @Mapping(target = "active", source = "active")
+  @Mapping(target = "credentialsEncrypted", source = "credentials", qualifiedByName = "encryptCredentials")
+  @Mapping(target = "lastSyncAt", ignore = true)
+  @Mapping(target = "lastSyncStatus", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  public abstract AccountConnectionDto mapUpdateRequestToDto(
+      AccountConnectionUpdateRequest request);
+
+  @Mapping(target = "maskedCredentials", expression = "java(maskCredentials(dto))")
+  public abstract AccountConnectionResponse mapToResponse(AccountConnectionDto dto);
+
+  @Named("encryptCredentials")
+  protected String encryptCredentials(MarketplaceCredentials credentials) {
+    if (credentials == null) {
+      return null;
     }
-    return dto;
+    return cryptoService.encrypt(JsonUtils.writeJson(credentials, objectMapper));
   }
 
-  default String maskCredentials(
-      AccountConnectionDto dto,
-      CryptoService cryptoService,
-      ObjectMapper objectMapper,
-      CredentialsCodec credentialsCodec) {
+  protected MarketplaceCredentials readDecryptedCredentials(AccountConnectionDto dto) {
     String encrypted = dto.getCredentialsEncrypted();
     if (encrypted == null) {
       return null;
     }
-    try {
-      String json = cryptoService.decrypt(encrypted);
-
-      Class<? extends MarketplaceCredentials> target;
-      switch (dto.getMarketplace()) {
-        case WILDBERRIES -> target = WbCredentials.class;
-        case OZON -> target = OzonCredentials.class;
-        default -> {
-          return null;
-        }
-      }
-
-      MarketplaceCredentials marketplaceCredentials = objectMapper.readValue(json, target);
-      return credentialsCodec.mask(dto.getMarketplace(), marketplaceCredentials);
-
-    } catch (JsonProcessingException e) {
-      throw new AppException(e, MessageCodes.CREDENTIALS_DESERIALIZATION_ERROR);
+    Class<? extends MarketplaceCredentials> type = resolveCredentialsClass(dto.getMarketplace());
+    if (type == null) {
+      return null;
     }
+    String json = cryptoService.decrypt(encrypted);
+    return JsonUtils.readJson(json, type, objectMapper);
   }
 
-  private <T> String writeJson(T object, ObjectMapper objectMapper) {
-    try {
-      return objectMapper.writeValueAsString(object);
-    } catch (JsonProcessingException ex) {
-      throw new AppException(ex, MessageCodes.CREDENTIALS_JSON_SERIALIZATION_ERROR);
+  protected String maskCredentials(AccountConnectionDto dto) {
+    MarketplaceCredentials credentials = readDecryptedCredentials(dto);
+    if (credentials == null) {
+      return null;
     }
+    return credentialsCodec.mask(dto.getMarketplace(), credentials);
+  }
+
+  protected static Class<? extends MarketplaceCredentials> resolveCredentialsClass(
+      MarketplaceType marketplace) {
+    if (marketplace == null) {
+      return null;
+    }
+    return switch (marketplace) {
+      case WILDBERRIES -> WbCredentials.class;
+      case OZON -> OzonCredentials.class;
+    };
   }
 }

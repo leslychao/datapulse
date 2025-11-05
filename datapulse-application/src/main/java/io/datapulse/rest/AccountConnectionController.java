@@ -27,14 +27,14 @@ public class AccountConnectionController {
   @ResponseStatus(HttpStatus.CREATED)
   public AccountConnectionResponse create(
       @Valid @RequestBody AccountConnectionCreateRequest request) {
-    return accountConnectionService.create(request);
+    return accountConnectionService.createFromRequest(request);
   }
 
   @PutMapping(value = "/{id}", consumes = "application/json")
   public AccountConnectionResponse update(
       @PathVariable Long id,
       @Valid @RequestBody AccountConnectionUpdateRequest request) {
-    return accountConnectionService.update(id, request);
+    return accountConnectionService.updateFromRequest(id, request);
   }
 
   @DeleteMapping("/{id}")

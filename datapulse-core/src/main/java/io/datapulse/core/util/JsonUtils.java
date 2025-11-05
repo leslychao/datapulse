@@ -14,4 +14,12 @@ public class JsonUtils {
       throw new AppException(ex, MessageCodes.CREDENTIALS_JSON_SERIALIZATION_ERROR);
     }
   }
+
+  public static <T> T readJson(String json, Class<T> targetType, ObjectMapper objectMapper) {
+    try {
+      return objectMapper.readValue(json, targetType);
+    } catch (JsonProcessingException ex) {
+      throw new AppException(ex, MessageCodes.CREDENTIALS_DESERIALIZATION_ERROR);
+    }
+  }
 }

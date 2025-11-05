@@ -1,13 +1,12 @@
 package io.datapulse.core.service;
 
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ALREADY_EXISTS;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CREATE_REQUEST_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ACCOUNT_NAME_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_UPDATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
 import io.datapulse.core.entity.AccountEntity;
-import io.datapulse.core.mapper.MapStructCentralMapperConfig;
+import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountRepository;
 import io.datapulse.domain.CommonConstants;
@@ -17,7 +16,6 @@ import io.datapulse.domain.dto.request.AccountUpdateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import org.apache.commons.lang3.StringUtils;
@@ -72,8 +70,27 @@ public class AccountService extends AbstractIngestApiService<
   }
 
   @Override
-  protected Class<AccountResponse> responseClass() {
+  protected Class<AccountResponse> responseType() {
     return AccountResponse.class;
+  }
+
+  @Override
+  protected void validateOnCreate(AccountDto draft) {
+
+  }
+
+  @Override
+  protected void validateOnUpdate(Long id, AccountDto dto, AccountEntity existing) {
+    String newName = StringUtils.trimToNull(dto.getName());
+    String oldName = StringUtils.trimToNull(existing.getName());
+    if (!StringUtils.equalsIgnoreCase(newName, oldName)) {
+      if (newName == null) {
+        throw new BadRequestException(ACCOUNT_NAME_REQUIRED);
+      }
+      if (repository.existsByNameIgnoreCaseAndIdNot(newName, id)) {
+        throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, newName);
+      }
+    }
   }
 
   @Override
@@ -98,32 +115,6 @@ public class AccountService extends AbstractIngestApiService<
     return target;
   }
 
-  @Transactional
-  public AccountResponse create(
-      @Valid @NotNull(message = ACCOUNT_CREATE_REQUEST_REQUIRED) AccountCreateRequest request) {
-    var draft = mapper().to(request, dtoType());
-    if (repository.existsByNameIgnoreCase(draft.getName())) {
-      throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, draft.getName());
-    }
-    return mapper().to(save(draft), responseClass());
-  }
-
-  @Transactional
-  public AccountResponse update(
-      @NotNull(message = ID_REQUIRED) Long id,
-      @Valid @NotNull(message = ACCOUNT_UPDATE_REQUEST_REQUIRED) AccountUpdateRequest request) {
-
-    var current = get(id).orElseThrow(() -> new NotFoundException(ACCOUNT_NOT_FOUND, id));
-
-    if (!StringUtils.equalsIgnoreCase(current.getName(), request.name())
-        && repository.existsByNameIgnoreCaseAndIdNot(request.name(), id)) {
-      throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, request.name());
-    }
-
-    accountApplier.applyUpdate(request, current);
-    return mapper().to(update(current), responseClass());
-  }
-
   @Override
   @Transactional
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
@@ -138,16 +129,12 @@ public class AccountService extends AbstractIngestApiService<
     return repository.existsById(id);
   }
 
-  @Mapper(componentModel = "spring", config = MapStructCentralMapperConfig.class)
+  @Mapper(componentModel = "spring", config = BaseMapperConfig.class)
   public interface AccountApplier {
 
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void applyUpdateFromDto(AccountDto dto, @MappingTarget AccountEntity entity);
 
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    void applyUpdate(AccountUpdateRequest request, @MappingTarget AccountDto dto);
   }
 }

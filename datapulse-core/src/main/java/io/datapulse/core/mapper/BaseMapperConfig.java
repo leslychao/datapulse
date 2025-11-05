@@ -8,6 +8,6 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.ERROR,
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
 )
-public interface MapStructCentralMapperConfig {
+public interface BaseMapperConfig {
 
 }

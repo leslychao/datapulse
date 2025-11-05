@@ -38,6 +38,7 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
 
 
   public D save(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
+    validateOnCreate(dto);
     E entity = mapper().to(dto, entityType());
     E persisted = repository().save(beforeSave(entity));
     return mapper().to(persisted, dtoType());
@@ -47,6 +48,7 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
       @NotEmpty(message = LIST_REQUIRED)
       List<@Valid @NotNull(message = DTO_REQUIRED) D> dtos) {
     return dtos.stream()
+        .peek(this::validateOnCreate)
         .map(dto -> mapper().to(dto, entityType()))
         .map(this::beforeSave)
         .collect(Collectors.collectingAndThen(
@@ -92,6 +94,13 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
     }
   }
 
+  protected abstract void validateOnCreate(@Valid @NotNull(message = DTO_REQUIRED) D dto);
+
+  protected abstract void validateOnUpdate(
+      @NotNull(message = ID_REQUIRED) Long id,
+      @Valid @NotNull(message = DTO_REQUIRED) D dto,
+      @NotNull E existing);
+
   private D doUpdate(
       @Valid @NotNull(message = DTO_REQUIRED) D dto,
       @NotNull Function<E, E> persistFunction) {
@@ -100,7 +109,10 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
     }
     E entity = repository()
         .findById(dto.getId())
-        .map(found -> merge(found, dto))
+        .map(existing -> {
+          validateOnUpdate(dto.getId(), dto, existing);
+          return merge(existing, dto);
+        })
         .map(this::beforeUpdate)
         .map(persistFunction)
         .orElseThrow(() -> new NotFoundException(NOT_FOUND, dto.getId()));

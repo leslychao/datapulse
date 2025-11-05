@@ -25,14 +25,14 @@ public class AccountController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public AccountResponse create(@RequestBody AccountCreateRequest request) {
-    return accountService.create(request);
+    return accountService.createFromRequest(request);
   }
 
   @PutMapping(path = "/{id}", consumes = "application/json")
   public AccountResponse update(
       @PathVariable Long id,
       @RequestBody AccountUpdateRequest request) {
-    return accountService.update(id, request);
+    return accountService.updateFromRequest(id, request);
   }
 
   @DeleteMapping("/{id}")

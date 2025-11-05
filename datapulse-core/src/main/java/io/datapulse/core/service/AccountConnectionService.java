@@ -3,10 +3,8 @@ package io.datapulse.core.service;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ID_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
@@ -14,11 +12,10 @@ import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
-import io.datapulse.core.mapper.MapStructCentralMapperConfig;
+import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
 import io.datapulse.core.service.crypto.CryptoService;
-import io.datapulse.core.util.JsonUtils;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.AccountConnectionDto;
@@ -91,8 +88,46 @@ public class AccountConnectionService extends AbstractIngestApiService<
   }
 
   @Override
-  protected Class<AccountConnectionResponse> responseClass() {
+  protected Class<AccountConnectionResponse> responseType() {
     return AccountConnectionResponse.class;
+  }
+
+  @Override
+  protected void validateOnCreate(AccountConnectionDto dto) {
+    validateAccountExists(dto.getAccountId());
+    if (repository.existsByAccount_IdAndMarketplace(dto.getAccountId(), dto.getMarketplace())) {
+      throw new BadRequestException(
+          ACCOUNT_CONNECTION_ALREADY_EXISTS,
+          dto.getAccountId(),
+          dto.getMarketplace());
+    }
+  }
+
+  @Override
+  protected void validateOnUpdate(
+      Long id,
+      AccountConnectionDto dto,
+      AccountConnectionEntity existing) {
+    var currentMarketplace = existing.getMarketplace();
+    var newMarketplace = dto.getMarketplace();
+
+    if (newMarketplace != null && newMarketplace != currentMarketplace) {
+      if (repository.existsByAccount_IdAndMarketplaceAndIdNot(
+          existing.getAccount().getId(), newMarketplace, id)) {
+        throw new BadRequestException(
+            ACCOUNT_CONNECTION_ALREADY_EXISTS,
+            existing.getAccount().getId(),
+            newMarketplace
+        );
+      }
+    }
+
+    if (dto.getCredentialsEncrypted() != null && !dto.getCredentialsEncrypted()
+        .equals(existing.getCredentialsEncrypted())) {
+      if (dto.getMarketplace() == null) {
+        throw new BadRequestException(ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED);
+      }
+    }
   }
 
   @Override
@@ -116,52 +151,12 @@ public class AccountConnectionService extends AbstractIngestApiService<
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
   ) {
-    return ((AccountConnectionRepository) repository()).findByAccount_IdAndMarketplaceAndActiveTrue(
+    return repository.findByAccount_IdAndMarketplaceAndActiveTrue(
             accountId, marketplaceType)
         .map(e -> mapper().to(e, AccountConnectionDto.class))
         .orElseThrow(() ->
             new NotFoundException(ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND, accountId,
                 marketplaceType));
-  }
-
-  @Transactional
-  public AccountConnectionResponse create(
-      @NotNull(message = ACCOUNT_CONNECTION_CREATE_REQUEST_REQUIRED) @Valid AccountConnectionCreateRequest request
-  ) {
-    validateAccountExists(request.accountId());
-    if (repository.existsByAccount_IdAndMarketplace(request.accountId(), request.marketplace())) {
-      throw new BadRequestException(
-          ACCOUNT_CONNECTION_ALREADY_EXISTS,
-          request.accountId(),
-          request.marketplace());
-    }
-    var dto = mapperFacade.to(request, dtoType());
-    var saved = save(dto);
-    return mapper().to(saved, responseClass());
-  }
-
-  @Transactional
-  public AccountConnectionResponse update(
-      @NotNull(message = ID_REQUIRED) Long id,
-      @NotNull(message = ACCOUNT_CONNECTION_UPDATE_REQUEST_REQUIRED) @Valid AccountConnectionUpdateRequest request
-  ) {
-    var current = get(id).orElseThrow(
-        () -> new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
-
-    if (request.marketplace() != null && request.marketplace() != current.getMarketplace()) {
-      if (repository.existsByAccount_IdAndMarketplaceAndIdNot(
-          current.getAccountId(),
-          request.marketplace(),
-          id)) {
-        throw new BadRequestException(
-            ACCOUNT_CONNECTION_ALREADY_EXISTS,
-            current.getAccountId(),
-            request.marketplace());
-      }
-    }
-    accountConnectionApplier.applyUpdate(request, current, cryptoService, objectMapper);
-    var updated = update(current);
-    return mapper().to(updated, responseClass());
   }
 
   @Override
@@ -206,26 +201,9 @@ public class AccountConnectionService extends AbstractIngestApiService<
 
   @Mapper(
       componentModel = "spring",
-      config = MapStructCentralMapperConfig.class
+      config = BaseMapperConfig.class
   )
   public interface AccountConnectionApplier {
-
-    default void applyUpdate(
-        AccountConnectionUpdateRequest request,
-        @MappingTarget AccountConnectionDto dto,
-        CryptoService cryptoService,
-        ObjectMapper objectMapper) {
-      if (request.marketplace() != null) {
-        dto.setMarketplace(request.marketplace());
-      }
-      if (request.active() != null) {
-        dto.setActive(request.active());
-      }
-      if (request.credentials() != null) {
-        dto.setCredentialsEncrypted(
-            cryptoService.encrypt(JsonUtils.writeJson(request.credentials(), objectMapper)));
-      }
-    }
 
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "createdAt", ignore = true)

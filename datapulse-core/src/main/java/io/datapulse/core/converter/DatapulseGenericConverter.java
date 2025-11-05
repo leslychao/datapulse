@@ -2,10 +2,8 @@ package io.datapulse.core.converter;
 
 import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.mapper.AccountConnectionMapper;
 import io.datapulse.core.mapper.AccountMapper;
-import io.datapulse.core.service.crypto.CryptoService;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
@@ -27,9 +25,6 @@ public final class DatapulseGenericConverter implements GenericConverter {
 
   private final AccountMapper accountMapper;
   private final AccountConnectionMapper accountConnectionMapper;
-  private final CryptoService cryptoService;
-  private final ObjectMapper objectMapper;
-
   private final Map<ConvertiblePair, Function<Object, Object>> registry = new java.util.LinkedHashMap<>();
 
   @PostConstruct
@@ -40,8 +35,7 @@ public final class DatapulseGenericConverter implements GenericConverter {
 
     registry.put(
         new ConvertiblePair(AccountConnectionCreateRequest.class, AccountConnectionDto.class),
-        src -> accountConnectionMapper.fromCreateRequest(
-            (AccountConnectionCreateRequest) src, cryptoService, objectMapper));
+        src -> accountConnectionMapper.mapCreateRequestToDto((AccountConnectionCreateRequest) src));
 
     // DTO → Entity
     // Entity → DTO

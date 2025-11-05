@@ -9,7 +9,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = TimeMapper.class, config = MapStructCentralMapperConfig.class)
+@Mapper(componentModel = "spring", uses = TimeMapper.class, config = BaseMapperConfig.class)
 public interface AccountMapper {
 
   @Mapping(target = "id", ignore = true)
