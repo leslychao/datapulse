@@ -114,13 +114,6 @@ public class AccountConnectionService extends AbstractIngestApiService<
         );
       }
     }
-
-    if (dto.getCredentialsEncrypted() != null && !dto.getCredentialsEncrypted()
-        .equals(existing.getCredentialsEncrypted())) {
-      if (dto.getMarketplace() == null) {
-        throw new BadRequestException(ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED);
-      }
-    }
   }
 
   @Override

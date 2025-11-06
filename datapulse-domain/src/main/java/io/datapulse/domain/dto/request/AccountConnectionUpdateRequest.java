@@ -1,6 +1,7 @@
 package io.datapulse.domain.dto.request;
 
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH;
+import static io.datapulse.domain.ValidationKeys.ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH;
+import static io.datapulse.domain.ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -37,5 +38,10 @@ public record AccountConnectionUpdateRequest(
       case WILDBERRIES -> credentials instanceof WbCredentials;
       case OZON -> credentials instanceof OzonCredentials;
     };
+  }
+
+  @AssertTrue(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)
+  public boolean isMarketplacePresentWhenCredentialsProvided() {
+    return credentials == null || marketplace != null;
   }
 }
