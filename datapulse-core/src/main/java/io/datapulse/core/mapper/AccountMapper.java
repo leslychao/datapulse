@@ -4,6 +4,7 @@ import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
+import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -27,14 +28,7 @@ public interface AccountMapper {
   @AfterMapping
   default void normalizeDto(@MappingTarget AccountDto dto) {
     if (dto.getName() != null) {
-      dto.setName(dto.getName().trim());
-    }
-  }
-
-  @AfterMapping
-  default void normalizeEntity(@MappingTarget AccountEntity entity) {
-    if (entity.getName() != null) {
-      entity.setName(entity.getName().trim());
+      dto.setName(StringUtils.trimToNull(dto.getName()));
     }
   }
 

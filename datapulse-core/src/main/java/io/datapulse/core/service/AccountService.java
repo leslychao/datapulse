@@ -76,7 +76,13 @@ public class AccountService extends AbstractIngestApiService<
 
   @Override
   protected void validateOnCreate(AccountDto draft) {
-
+    String name = draft.getName();
+    if (name == null) {
+      throw new BadRequestException(ACCOUNT_NAME_REQUIRED);
+    }
+    if (repository.existsByNameIgnoreCase(name)) {
+      throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, name);
+    }
   }
 
   @Override
@@ -96,9 +102,7 @@ public class AccountService extends AbstractIngestApiService<
   @Override
   protected AccountEntity beforeSave(AccountEntity entity) {
     var now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
-    if (entity.getCreatedAt() == null) {
-      entity.setCreatedAt(now);
-    }
+    entity.setCreatedAt(now);
     entity.setUpdatedAt(now);
     return entity;
   }
@@ -131,10 +135,8 @@ public class AccountService extends AbstractIngestApiService<
 
   @Mapper(componentModel = "spring", config = BaseMapperConfig.class)
   public interface AccountApplier {
-
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void applyUpdateFromDto(AccountDto dto, @MappingTarget AccountEntity entity);
-
   }
 }
