@@ -17,8 +17,6 @@ import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
-import java.util.Objects;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -87,15 +85,16 @@ public abstract class AccountConnectionMapper {
     }
   }
 
-  protected Optional<MarketplaceCredentials> readDecryptedCredentials(AccountConnectionDto dto) {
+  protected MarketplaceCredentials decryptCredentials(AccountConnectionDto dto) {
     String encrypted = dto.getCredentialsEncrypted();
     if (StringUtils.isBlank(encrypted)) {
-      return Optional.empty();
+      throw new AppException(MessageCodes.DATA_CORRUPTED_CREDENTIALS_MISSING, dto.getId());
     }
 
-    var marketplace = Objects.requireNonNull(
-        dto.getMarketplace(),
-        MessageCodes.MARKETPLACE_REQUIRED);
+    var marketplace = dto.getMarketplace();
+    if (marketplace == null) {
+      throw new BadRequestException(MessageCodes.MARKETPLACE_REQUIRED);
+    }
 
     Class<? extends MarketplaceCredentials> type = resolveCredentialsClass(marketplace);
     if (type == null) {
@@ -103,17 +102,15 @@ public abstract class AccountConnectionMapper {
     }
     String json = cryptoService.decrypt(encrypted);
     try {
-      return Optional.of(JsonUtils.readJson(json, type, objectMapper));
+      return JsonUtils.readJson(json, type, objectMapper);
     } catch (JsonProcessingException e) {
       throw new AppException(e, MessageCodes.CREDENTIALS_DESERIALIZATION_ERROR);
     }
   }
 
   protected String maskCredentials(AccountConnectionDto dto) {
-    return readDecryptedCredentials(dto)
-        .map(marketplaceCredentials -> credentialsCodec
-            .mask(dto.getMarketplace(), marketplaceCredentials))
-        .orElse(StringUtils.EMPTY);
+    MarketplaceCredentials credentials = decryptCredentials(dto);
+    return credentialsCodec.mask(dto.getMarketplace(), credentials);
   }
 
   protected static Class<? extends MarketplaceCredentials> resolveCredentialsClass(

@@ -60,6 +60,7 @@ public final class MessageCodes {
   public static final String REQUEST_DATE_REQUIRED = "request.date.required";
   public static final String REQUEST_DATE_INVALID = "request.date.invalid";
   public static final String DATA_CORRUPTED_ACCOUNT_MISSING = "data.corrupted.account.missing";
+  public static final String DATA_CORRUPTED_CREDENTIALS_MISSING = "data.corrupted.credentials.missing";
 
   // ===== Marketplace / HTTP =====
   public static final String MARKETPLACE_REQUIRED = "marketplace.required";
