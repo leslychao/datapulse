@@ -95,7 +95,7 @@ public class GenericControllerAdvice {
     String raw = ex.getMostSpecificCause().getMessage();
 
     String userMessage = messageSource.getMessage(
-        MessageCodes.JSON_BODY_INVALID,
+        MessageCodes.JSON_PARSE_BODY_INVALID,
         new Object[]{raw},
         "Некорректное тело запроса",
         locale

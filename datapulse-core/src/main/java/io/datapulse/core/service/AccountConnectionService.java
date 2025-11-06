@@ -24,7 +24,6 @@ import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -127,9 +126,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
   @Override
   protected AccountConnectionEntity beforeSave(@NotNull AccountConnectionEntity entity) {
     var now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
-    if (entity.getCreatedAt() == null) {
-      entity.setCreatedAt(now);
-    }
+    entity.setCreatedAt(now);
     entity.setUpdatedAt(now);
     return entity;
   }
@@ -156,8 +153,8 @@ public class AccountConnectionService extends AbstractIngestApiService<
 
   @Override
   protected AccountConnectionEntity merge(
-      @NotNull AccountConnectionEntity target,
-      @Valid @NotNull AccountConnectionDto source
+      AccountConnectionEntity target,
+      AccountConnectionDto source
   ) {
     Long existingAccountId = Optional.ofNullable(target.getAccount())
         .map(AccountEntity::getId)
