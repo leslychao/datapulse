@@ -9,13 +9,11 @@ import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
-import io.datapulse.core.service.crypto.CryptoService;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.AccountConnectionDto;
@@ -49,22 +47,16 @@ public class AccountConnectionService extends AbstractIngestApiService<
   private final AccountConnectionRepository repository;
   private final AccountService accountService;
   private final AccountConnectionApplier accountConnectionApplier;
-  private final CryptoService cryptoService;
-  private final ObjectMapper objectMapper;
 
   public AccountConnectionService(
       MapperFacade mapperFacade,
       AccountConnectionRepository repository,
       AccountService accountService,
-      AccountConnectionApplier accountConnectionApplier,
-      CryptoService cryptoService,
-      ObjectMapper objectMapper) {
+      AccountConnectionApplier accountConnectionApplier) {
     this.mapperFacade = mapperFacade;
     this.repository = repository;
     this.accountService = accountService;
     this.accountConnectionApplier = accountConnectionApplier;
-    this.cryptoService = cryptoService;
-    this.objectMapper = objectMapper;
   }
 
   @Override

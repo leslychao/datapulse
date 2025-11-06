@@ -82,11 +82,11 @@ public class AccountService extends AbstractIngestApiService<
   @Override
   protected void validateOnUpdate(Long id, AccountDto dto, AccountEntity existing) {
     String newName = StringUtils.trimToNull(dto.getName());
+    if (newName == null) {
+      throw new BadRequestException(ACCOUNT_NAME_REQUIRED);
+    }
     String oldName = StringUtils.trimToNull(existing.getName());
     if (!StringUtils.equalsIgnoreCase(newName, oldName)) {
-      if (newName == null) {
-        throw new BadRequestException(ACCOUNT_NAME_REQUIRED);
-      }
       if (repository.existsByNameIgnoreCaseAndIdNot(newName, id)) {
         throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, newName);
       }

@@ -36,6 +36,7 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
 
   protected abstract Class<E> entityType();
 
+  protected abstract void validateOnCreate(@Valid @NotNull(message = DTO_REQUIRED) D dto);
 
   public D save(@Valid @NotNull(message = DTO_REQUIRED) D dto) {
     validateOnCreate(dto);
@@ -93,8 +94,6 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
       throw new NotFoundException(NOT_FOUND, id);
     }
   }
-
-  protected abstract void validateOnCreate(@Valid @NotNull(message = DTO_REQUIRED) D dto);
 
   protected abstract void validateOnUpdate(
       @NotNull(message = ID_REQUIRED) Long id,
