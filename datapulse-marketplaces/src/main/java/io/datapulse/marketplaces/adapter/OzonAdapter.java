@@ -64,7 +64,6 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   @Override
   public Flux<OzonFinanceRaw> fetchFinance(long accountId, LocalDate from, LocalDate to) {
-    // временно через RETURN→FINANCE
     List<EndpointRef> refs = endpoints.resolveAll(TYPE, MarketplaceEvent.RETURN);
     Map<String, ?> body = Map.of(
         "filter", Map.of("date", Map.of("from", from.toString(), "to", to.toString())),

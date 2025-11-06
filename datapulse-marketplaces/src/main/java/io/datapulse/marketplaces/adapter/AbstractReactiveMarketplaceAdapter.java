@@ -152,7 +152,11 @@ abstract class AbstractReactiveMarketplaceAdapter {
   }
 
   private <T> Flux<T> execute(
-      MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType,
+      MarketplaceType marketplace,
+      EndpointKey key,
+      long accountId,
+      URI uri,
+      Class<T> targetType,
       Flux<DataBuffer> raw
   ) {
     if (uri == null) {
@@ -162,10 +166,10 @@ abstract class AbstractReactiveMarketplaceAdapter {
       throw new AppException(MessageCodes.TYPE_REQUIRED);
     }
 
-    final String ctx = type + ":" + key.tag() + ":acc=" + accountId;
+    final String ctx = marketplace + ":" + key.tag() + ":acc=" + accountId;
 
-    Flux<DataBuffer> guarded = resilienceManager.apply(raw, type, key, accountId)
-        .name("mp.http").tag("mp", type.name()).tag("key", key.tag())
+    Flux<DataBuffer> guarded = resilienceManager.apply(raw, marketplace, key, accountId)
+        .name("mp.http").tag("mp", marketplace.name()).tag("key", key.tag())
         .doOnSubscribe(s -> log.debug("[{}] start {}", ctx, uri))
         .doFinally(st -> log.debug("[{}] done st={} {}", ctx, st, uri))
         .onErrorMap(ex -> {
@@ -173,13 +177,13 @@ abstract class AbstractReactiveMarketplaceAdapter {
             return ex;
           }
           return new MarketplaceExceptions.FetchFailed(ex, MessageCodes.MARKETPLACE_FETCH_FAILED,
-              type, key.tag(), accountId, uri);
+              marketplace, key.tag(), accountId, uri);
         })
-        .checkpoint("mp:" + type + "." + key.tag(), true);
+        .checkpoint("mp:" + marketplace + "." + key.tag(), true);
 
     return fluxReader.readArray(guarded, targetType)
         .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
-            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, type, key.tag(), accountId, uri));
+            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, marketplace, key.tag(), accountId, uri));
   }
 
   private HttpHeaders buildHeaders(MarketplaceType type, long accountId) {

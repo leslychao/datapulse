@@ -34,18 +34,19 @@ public final class EndpointsResolver {
     this.properties = props;
   }
 
-  public List<EndpointRef> resolveAll(@NonNull MarketplaceType type, @NonNull MarketplaceEvent event) {
+  public List<EndpointRef> resolveAll(@NonNull MarketplaceType type,
+      @NonNull MarketplaceEvent event) {
     var keys = DEFAULT_KEYS.get(event);
     if (keys == null || keys.isEmpty()) {
       throw new AppException(MessageCodes.MARKETPLACE_EVENT_ENDPOINTS_MISSING, event.name());
     }
     var provider = properties.get(type);
     return keys.stream()
-        .map(k -> new EndpointRef(
-            k,
+        .map(key -> new EndpointRef(
+            key,
             buildUri(
-                host(provider, type, k),
-                requiredEndpointPath(provider, k, type)
+                host(provider, type, key),
+                requiredEndpointPath(provider, key, type)
             )))
         .toList();
   }

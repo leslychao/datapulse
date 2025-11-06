@@ -50,8 +50,6 @@ public class MarketplaceProperties {
     return provider;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-
   @Getter
   @Setter
   @Validated
@@ -62,29 +60,19 @@ public class MarketplaceProperties {
     @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
     private String baseUrl;
 
-    /** WB: опциональный отдельный host для отзывов. */
     private String feedbacksBaseUrl;
 
     @Valid
     private Sandbox sandbox;
 
-    /**
-     * Карта путей по ключам эндпоинтов (строго через enum-ключи).
-     */
     @NotNull(message = MARKETPLACE_ENDPOINTS_REQUIRED)
     private final Map<EndpointKey, @NotBlank(message = MARKETPLACE_ENDPOINT_PATH_REQUIRED) String>
         endpoints = new EnumMap<>(EndpointKey.class);
 
-    /**
-     * Базовая (обязательная и полная) резилентность.
-     */
     @Valid
     @NotNull(message = MARKETPLACE_RESILIENCE_REQUIRED)
     private Resilience resilience;
 
-    /**
-     * Частичные оверрайды (опционально) по ключам эндпоинтов.
-     */
     @Valid
     private Map<EndpointKey, ResilienceOverride> resilienceOverrides =
         new EnumMap<>(EndpointKey.class);
@@ -93,14 +81,12 @@ public class MarketplaceProperties {
       return endpoints.get(key);
     }
 
-    /** Итоговая резилентность = base ⊕ override(key). */
     public Resilience effectiveResilience(EndpointKey key) {
       var base = resilience;
       var ov = (resilienceOverrides != null) ? resilienceOverrides.get(key) : null;
       return base.mergeWithOverride(ov);
     }
 
-    /** Быстрый доступ к maxConcurrentCalls с учётом override. */
     public int effectiveMaxConcurrentCalls(EndpointKey key) {
       var ov = (resilienceOverrides != null) ? resilienceOverrides.get(key) : null;
       return (ov != null && ov.getMaxConcurrentCalls() != null)
@@ -108,8 +94,6 @@ public class MarketplaceProperties {
           : resilience.getMaxConcurrentCalls();
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
 
   @Getter
   @Setter
@@ -119,12 +103,8 @@ public class MarketplaceProperties {
     @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
     private String baseUrl;
 
-    /** WB: опциональный отдельный host для отзывов в sandbox. */
     private String feedbacksBaseUrl;
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // БАЗА: всё обязательно (@NotNull/Blank) — fail-fast на старте приложения
 
   @Getter
   @Setter
@@ -161,32 +141,28 @@ public class MarketplaceProperties {
     @NotNull(message = MARKETPLACE_RESILIENCE_BULKHEAD_WAIT_REQUIRED)
     private Duration bulkheadWait;
 
-    /** Слияние: берём base, поверх «накрываем» непустыми полями из override. */
     public Resilience mergeWithOverride(ResilienceOverride ov) {
       if (ov == null) {
         return this;
       }
-      var r = new Resilience();
-      r.limitForPeriod = nvl(ov.getLimitForPeriod(), this.limitForPeriod);
-      r.maxConcurrentCalls = nvl(ov.getMaxConcurrentCalls(), this.maxConcurrentCalls);
-      r.maxAttempts = nvl(ov.getMaxAttempts(), this.maxAttempts);
-      r.baseBackoff = nvl(ov.getBaseBackoff(), this.baseBackoff);
-      r.maxBackoff = nvl(ov.getMaxBackoff(), this.maxBackoff);
-      r.maxJitter = nvl(ov.getMaxJitter(), this.maxJitter);
-      r.retryAfterFallback = nvl(ov.getRetryAfterFallback(), this.retryAfterFallback);
-      r.limitRefreshPeriod = nvl(ov.getLimitRefreshPeriod(), this.limitRefreshPeriod);
-      r.tokenWaitTimeout = nvl(ov.getTokenWaitTimeout(), this.tokenWaitTimeout);
-      r.bulkheadWait = nvl(ov.getBulkheadWait(), this.bulkheadWait);
-      return r;
+      var resilience = new Resilience();
+      resilience.limitForPeriod = nvl(ov.getLimitForPeriod(), this.limitForPeriod);
+      resilience.maxConcurrentCalls = nvl(ov.getMaxConcurrentCalls(), this.maxConcurrentCalls);
+      resilience.maxAttempts = nvl(ov.getMaxAttempts(), this.maxAttempts);
+      resilience.baseBackoff = nvl(ov.getBaseBackoff(), this.baseBackoff);
+      resilience.maxBackoff = nvl(ov.getMaxBackoff(), this.maxBackoff);
+      resilience.maxJitter = nvl(ov.getMaxJitter(), this.maxJitter);
+      resilience.retryAfterFallback = nvl(ov.getRetryAfterFallback(), this.retryAfterFallback);
+      resilience.limitRefreshPeriod = nvl(ov.getLimitRefreshPeriod(), this.limitRefreshPeriod);
+      resilience.tokenWaitTimeout = nvl(ov.getTokenWaitTimeout(), this.tokenWaitTimeout);
+      resilience.bulkheadWait = nvl(ov.getBulkheadWait(), this.bulkheadWait);
+      return resilience;
     }
 
     private static <T> T nvl(T v, T def) {
       return (v != null) ? v : def;
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // OVERRIDE: всё опционально (частичное перекрытие)
 
   @Getter
   @Setter

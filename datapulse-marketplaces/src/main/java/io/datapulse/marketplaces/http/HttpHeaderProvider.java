@@ -1,5 +1,7 @@
 package io.datapulse.marketplaces.http;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
@@ -87,9 +89,5 @@ public class HttpHeaderProvider {
       headers.set(HEADER_CLIENT_ID, ozon.clientId());
       headers.set(HEADER_API_KEY, ozon.apiKey());
     }
-  }
-
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
   }
 }
