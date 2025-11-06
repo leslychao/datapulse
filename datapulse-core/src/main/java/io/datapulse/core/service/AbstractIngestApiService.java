@@ -22,14 +22,14 @@ public abstract class AbstractIngestApiService<
   }
 
   @Transactional
-  public final R createFromRequest(@Valid @NotNull(message = REQUEST_REQUIRED) CR request) {
+  public R createFromRequest(@Valid @NotNull(message = REQUEST_REQUIRED) CR request) {
     D draft = mapper().to(request, dtoType());
     D saved = save(draft);
     return toResponse(saved);
   }
 
   @Transactional
-  public final R updateFromRequest(
+  public R updateFromRequest(
       @NotNull(message = ID_REQUIRED) Long id,
       @Valid @NotNull(message = REQUEST_REQUIRED) UR request) {
     D patch = mapper().to(request, dtoType());
