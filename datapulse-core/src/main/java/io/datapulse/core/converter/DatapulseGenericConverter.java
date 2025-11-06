@@ -8,8 +8,11 @@ import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
+import io.datapulse.domain.dto.response.AccountConnectionResponse;
+import io.datapulse.domain.dto.response.AccountResponse;
 import io.datapulse.domain.exception.AppException;
 import jakarta.annotation.PostConstruct;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -25,7 +28,7 @@ public final class DatapulseGenericConverter implements GenericConverter {
 
   private final AccountMapper accountMapper;
   private final AccountConnectionMapper accountConnectionMapper;
-  private final Map<ConvertiblePair, Function<Object, Object>> registry = new java.util.LinkedHashMap<>();
+  private final Map<ConvertiblePair, Function<Object, Object>> registry = new LinkedHashMap<>();
 
   @PostConstruct
   void init() {
@@ -39,6 +42,13 @@ public final class DatapulseGenericConverter implements GenericConverter {
 
     // DTO → Entity
     // Entity → DTO
+    // DTO → RESPONSE
+    registry.put(new ConvertiblePair(AccountDto.class, AccountResponse.class),
+        src -> accountMapper.toResponse((AccountDto) src));
+
+    registry.put(
+        new ConvertiblePair(AccountConnectionDto.class, AccountConnectionResponse.class),
+        src -> accountConnectionMapper.toResponse((AccountConnectionDto) src));
   }
 
   @Override

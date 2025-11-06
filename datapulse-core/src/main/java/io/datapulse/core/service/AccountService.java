@@ -135,6 +135,7 @@ public class AccountService extends AbstractIngestApiService<
 
   @Mapper(componentModel = "spring", config = BaseMapperConfig.class)
   public interface AccountApplier {
+
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void applyUpdateFromDto(AccountDto dto, @MappingTarget AccountEntity entity);
