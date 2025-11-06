@@ -117,7 +117,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
   }
 
   @Override
-  protected AccountConnectionEntity beforeSave(@NotNull AccountConnectionEntity entity) {
+  protected AccountConnectionEntity beforeSave(AccountConnectionEntity entity) {
     var now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
     entity.setCreatedAt(now);
     entity.setUpdatedAt(now);
@@ -125,7 +125,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
   }
 
   @Override
-  protected AccountConnectionEntity beforeUpdate(@NotNull AccountConnectionEntity entity) {
+  protected AccountConnectionEntity beforeUpdate(AccountConnectionEntity entity) {
     entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
     return entity;
   }

@@ -3,6 +3,7 @@ package io.datapulse.core.mapper;
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
+import io.datapulse.domain.dto.request.AccountUpdateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.mapstruct.AfterMapping;
@@ -24,6 +25,11 @@ public interface AccountMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   AccountDto toDto(AccountCreateRequest request);
+
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  AccountDto toDto(AccountUpdateRequest request);
 
   @AfterMapping
   default void normalizeDto(@MappingTarget AccountDto dto) {
