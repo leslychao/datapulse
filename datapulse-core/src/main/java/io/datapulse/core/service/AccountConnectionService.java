@@ -1,12 +1,13 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ID_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
 import io.datapulse.core.entity.AccountConnectionEntity;
@@ -26,6 +27,7 @@ import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -143,11 +145,12 @@ public class AccountConnectionService extends AbstractIngestApiService<
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
   ) {
-    return repository.findByAccount_IdAndMarketplaceAndActiveTrue(
-            accountId, marketplaceType)
-        .map(e -> mapper().to(e, AccountConnectionDto.class))
+    return repository.findByAccount_IdAndMarketplaceAndActiveTrue(accountId, marketplaceType)
+        .map(accountConnection -> mapper().to(accountConnection, AccountConnectionDto.class))
         .orElseThrow(() ->
-            new NotFoundException(ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND, accountId,
+            new NotFoundException(
+                ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
+                accountId,
                 marketplaceType));
   }
 
@@ -156,17 +159,12 @@ public class AccountConnectionService extends AbstractIngestApiService<
       @NotNull AccountConnectionEntity target,
       @Valid @NotNull AccountConnectionDto source
   ) {
-    Long currentAccountId = target.getAccount() != null ? target.getAccount().getId() : null;
+    Long existingAccountId = Optional.ofNullable(target.getAccount())
+        .map(AccountEntity::getId)
+        .orElseThrow(() -> new AppException(DATA_CORRUPTED_ACCOUNT_MISSING));
 
-    if (currentAccountId != null
-        && source.getAccountId() != null
-        && !source.getAccountId().equals(currentAccountId)) {
-      throw new AppException(ACCOUNT_CONNECTION_ID_IMMUTABLE);
-    }
-    if (currentAccountId == null && source.getAccountId() != null) {
-      var account = new AccountEntity();
-      account.setId(source.getAccountId());
-      target.setAccount(account);
+    if (source.getAccountId() != null && !source.getAccountId().equals(existingAccountId)) {
+      throw new AppException(ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE);
     }
 
     accountConnectionApplier.applyUpdateFromDto(source, target);

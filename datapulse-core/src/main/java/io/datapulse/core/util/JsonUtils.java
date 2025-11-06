@@ -2,24 +2,16 @@ package io.datapulse.core.util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.datapulse.domain.MessageCodes;
-import io.datapulse.domain.exception.AppException;
 
 public class JsonUtils {
 
-  public static <T> String writeJson(T object, ObjectMapper objectMapper) {
-    try {
-      return objectMapper.writeValueAsString(object);
-    } catch (JsonProcessingException ex) {
-      throw new AppException(ex, MessageCodes.CREDENTIALS_JSON_SERIALIZATION_ERROR);
-    }
+  public static <T> String writeJson(T object, ObjectMapper objectMapper)
+      throws JsonProcessingException {
+    return objectMapper.writeValueAsString(object);
   }
 
-  public static <T> T readJson(String json, Class<T> targetType, ObjectMapper objectMapper) {
-    try {
-      return objectMapper.readValue(json, targetType);
-    } catch (JsonProcessingException ex) {
-      throw new AppException(ex, MessageCodes.CREDENTIALS_DESERIALIZATION_ERROR);
-    }
+  public static <T> T readJson(String json, Class<T> targetType, ObjectMapper objectMapper)
+      throws JsonProcessingException {
+    return objectMapper.readValue(json, targetType);
   }
 }

@@ -31,11 +31,11 @@ public final class DatapulseGenericConverter implements GenericConverter {
   void init() {
     // REQUEST → DTO
     registry.put(new ConvertiblePair(AccountCreateRequest.class, AccountDto.class),
-        src -> accountMapper.fromCreateRequest((AccountCreateRequest) src));
+        src -> accountMapper.toDto((AccountCreateRequest) src));
 
     registry.put(
         new ConvertiblePair(AccountConnectionCreateRequest.class, AccountConnectionDto.class),
-        src -> accountConnectionMapper.mapCreateRequestToDto((AccountConnectionCreateRequest) src));
+        src -> accountConnectionMapper.toDto((AccountConnectionCreateRequest) src));
 
     // DTO → Entity
     // Entity → DTO

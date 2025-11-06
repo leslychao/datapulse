@@ -15,14 +15,14 @@ public interface AccountMapper {
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  AccountEntity mapToEntity(AccountDto dto);
+  AccountEntity toEntity(AccountDto dto);
 
-  AccountDto mapToDto(AccountEntity entity);
+  AccountDto toDto(AccountEntity entity);
 
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  AccountDto fromCreateRequest(AccountCreateRequest request);
+  AccountDto toDto(AccountCreateRequest request);
 
   @AfterMapping
   default void normalizeDto(@MappingTarget AccountDto dto) {

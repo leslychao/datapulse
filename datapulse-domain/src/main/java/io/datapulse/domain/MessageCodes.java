@@ -17,7 +17,7 @@ public final class MessageCodes {
   // ===== Account-Connection =====
   public static final String ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED = "account.connection.marketplace.required";
   public static final String ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED = "account.connection.credentials.required";
-  public static final String ACCOUNT_CONNECTION_ID_IMMUTABLE = "account.connection.id.immutable";
+  public static final String ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE = "account.connection.account.immutable";
   public static final String ACCOUNT_CONNECTION_BY_ID_NOT_FOUND =
       "account.connection.by-id.not-found";
   public static final String ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND =
@@ -35,7 +35,6 @@ public final class MessageCodes {
   public static final String CREDENTIALS_OZON_API_KEY_NOT_BLANK = "credentials.ozon.api-key.not-blank";
   public static final String CREDENTIALS_SERIALIZATION_ERROR = "credentials.serialization.error";
   public static final String CREDENTIALS_DESERIALIZATION_ERROR = "credentials.deserialization.error";
-  public static final String CREDENTIALS_JSON_SERIALIZATION_ERROR = "credentials.json-serialization.error";
 
   // ===== Crypto =====
   public static final String CRYPTO_MASTER_KEY_MISSING = "crypto.master-key.missing";
@@ -60,8 +59,10 @@ public final class MessageCodes {
   public static final String TYPE_REQUIRED = "type.required";
   public static final String REQUEST_DATE_REQUIRED = "request.date.required";
   public static final String REQUEST_DATE_INVALID = "request.date.invalid";
+  public static final String DATA_CORRUPTED_ACCOUNT_MISSING = "data.corrupted.account.missing";
 
   // ===== Marketplace / HTTP =====
+  public static final String MARKETPLACE_REQUIRED = "marketplace.required";
   public static final String UNKNOWN_MARKETPLACE = "unknown-marketplace";
   public static final String WB_MISSING_TOKEN = "wb.missing-token";
   public static final String OZON_MISSING_CREDENTIALS = "ozon.missing-credentials";
