@@ -3,6 +3,7 @@ package io.datapulse.marketplaces.resilience;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.github.resilience4j.bulkhead.Bulkhead;
@@ -71,6 +72,9 @@ public class ResilienceManager {
   private Optional<ResilienceKit> tryBuildGlobalKit(MarketplaceType marketplaceType,
       String scopeId) {
     var provider = marketplaceProperties.get(marketplaceType);
+    if (provider == null) {
+      return Optional.empty();
+    }
     var baseResilience = provider.getResilience();
     if (baseResilience == null) {
       return Optional.empty();
@@ -81,8 +85,11 @@ public class ResilienceManager {
   private ResilienceKit buildKit(MarketplaceType marketplaceType, EndpointKey endpointKey,
       String scopeId) {
     var provider = marketplaceProperties.get(marketplaceType);
-    var cfg = (endpointKey == null)
-        ? provider.getResilience()
+    if (provider == null) {
+      throw new AppException(io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING,
+          marketplaceType);
+    }
+    var cfg = (endpointKey == null) ? provider.getResilience()
         : provider.effectiveResilience(endpointKey);
 
     int maxAttempts = requirePositive(cfg.getMaxAttempts(), "maxAttempts");
@@ -134,11 +141,11 @@ public class ResilienceManager {
   }
 
   private static <T> Flux<T> applyGuards(Flux<T> source, ResilienceKit kit) {
-    return applyRateLimiter(applyBulkhead(source, kit.bulkhead()), kit.rateLimiter());
+    return applyBulkhead(applyRateLimiter(source, kit.rateLimiter()), kit.bulkhead());
   }
 
   private static <T> Mono<T> applyGuards(Mono<T> source, ResilienceKit kit) {
-    return applyRateLimiter(applyBulkhead(source, kit.bulkhead()), kit.rateLimiter());
+    return applyBulkhead(applyRateLimiter(source, kit.rateLimiter()), kit.bulkhead());
   }
 
   private static <T> Flux<T> applyBulkhead(Flux<T> source, Bulkhead bulkhead) {
@@ -235,14 +242,6 @@ public class ResilienceManager {
           simpleClassName(failure), attempt);
       return Mono.error(failure);
     }));
-  }
-
-  private MarketplaceProperties.Resilience resolveResilience(MarketplaceType marketplaceType,
-      EndpointKey endpointKey) {
-    var provider = marketplaceProperties.get(marketplaceType);
-    return (endpointKey == null)
-        ? provider.getResilience()
-        : provider.effectiveResilience(endpointKey);
   }
 
   private static Duration orZero(Duration value) {

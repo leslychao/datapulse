@@ -4,7 +4,6 @@ import io.datapulse.core.parser.JsonFluxReader;
 import io.datapulse.core.service.CredentialsProvider;
 import io.datapulse.core.service.StreamingDownloadService;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.domain.dto.raw.wb.WbFinanceRaw;
 import io.datapulse.domain.dto.raw.wb.WbReviewRaw;
 import io.datapulse.domain.dto.raw.wb.WbSaleRaw;
@@ -33,11 +32,10 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
   public WbAdapter(EndpointsResolver endpoints,
       StreamingDownloadService s,
       ResilienceManager r,
-      MarketplaceProperties props,
       JsonFluxReader f,
       HttpHeaderProvider h,
       CredentialsProvider c) {
-    super(s, r, props, f, h, c);
+    super(s, r, f, h, c);
     this.endpoints = endpoints;
   }
 

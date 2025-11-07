@@ -7,19 +7,20 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.MarketplaceExceptions;
-import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.resilience.ResilienceManager;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -30,11 +31,10 @@ import reactor.core.publisher.Mono;
 @Slf4j
 abstract class AbstractReactiveMarketplaceAdapter {
 
-  protected static final int DEFAULT_PREFETCH = 32;
+  protected static final int DEFAULT_MAX_PAGES = 10_000;
 
   protected final StreamingDownloadService streamingDownloadService;
   protected final ResilienceManager resilienceManager;
-  protected final MarketplaceProperties properties;
   protected final JsonFluxReader fluxReader;
   protected final HttpHeaderProvider headerProvider;
   protected final CredentialsProvider credentialsProvider;
@@ -42,14 +42,12 @@ abstract class AbstractReactiveMarketplaceAdapter {
   protected AbstractReactiveMarketplaceAdapter(
       StreamingDownloadService streamingDownloadService,
       ResilienceManager resilienceManager,
-      MarketplaceProperties properties,
       JsonFluxReader fluxReader,
       HttpHeaderProvider headerProvider,
       CredentialsProvider credentialsProvider
   ) {
     this.streamingDownloadService = Objects.requireNonNull(streamingDownloadService);
     this.resilienceManager = Objects.requireNonNull(resilienceManager);
-    this.properties = Objects.requireNonNull(properties);
     this.fluxReader = Objects.requireNonNull(fluxReader);
     this.headerProvider = Objects.requireNonNull(headerProvider);
     this.credentialsProvider = Objects.requireNonNull(credentialsProvider);
@@ -58,12 +56,9 @@ abstract class AbstractReactiveMarketplaceAdapter {
   protected final <T> Flux<T> get(
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Class<T> targetType
   ) {
-    if (uri == null) {
-      throw new AppException(MessageCodes.URI_REQUIRED);
-    }
     HttpHeaders headers = buildHeaders(type, accountId);
-    Flux<DataBuffer> raw = streamingDownloadService.stream(uri, headers);
-    return execute(type, key, accountId, uri, targetType, raw)
+    return exchange(type, key, accountId, uri, targetType,
+        () -> streamingDownloadService.stream(uri, headers))
         .name("mp.get").tag("mp", type.name()).tag("key", key.tag());
   }
 
@@ -71,68 +66,46 @@ abstract class AbstractReactiveMarketplaceAdapter {
       MarketplaceType type, EndpointKey key, long accountId, URI uri, Map<String, ?> body,
       Class<T> targetType
   ) {
+    HttpHeaders headers = buildHeaders(type, accountId);
+    return exchange(type, key, accountId, uri, targetType,
+        () -> streamingDownloadService.post(uri, headers, body))
+        .name("mp.post").tag("mp", type.name()).tag("key", key.tag());
+  }
+
+  private <T> Flux<T> exchange(
+      MarketplaceType type, EndpointKey key, long accountId, URI uri,
+      Class<T> targetType, Supplier<Flux<DataBuffer>> requestSupplier
+  ) {
     if (uri == null) {
       throw new AppException(MessageCodes.URI_REQUIRED);
     }
-    HttpHeaders headers = buildHeaders(type, accountId);
-    Flux<DataBuffer> raw = streamingDownloadService.post(uri, headers, body);
-    return execute(type, key, accountId, uri, targetType, raw)
-        .name("mp.post").tag("mp", type.name()).tag("key", key.tag());
+    return execute(type, key, accountId, uri, targetType, requestSupplier.get());
   }
 
   protected final <T> Flux<T> mergeGet(
       MarketplaceType type, long accountId, List<EndpointRef> refs, Class<T> elementType
   ) {
-    if (refs == null || refs.isEmpty()) {
-      return Flux.empty();
-    }
-    if (refs.size() == 1) {
-      var r = refs.get(0);
-      return this.get(type, r.key(), accountId, r.uri(), elementType);
-    }
-    int concurrency = concurrencyFor(type, refs);
-    return Flux.fromIterable(refs)
-        .flatMapDelayError(
-            ref -> this.get(type, ref.key(), accountId, ref.uri(), elementType),
-            concurrency,
-            DEFAULT_PREFETCH
-        );
+    return merge(refs, r -> get(type, r.key(), accountId, r.uri(), elementType));
   }
 
   protected final <T> Flux<T> mergePost(
       MarketplaceType type, long accountId, List<EndpointRef> refs, Map<String, ?> body,
       Class<T> elementType
   ) {
+    return merge(refs, r -> post(type, r.key(), accountId, r.uri(), body, elementType));
+  }
+
+  private <T> Flux<T> merge(
+      List<EndpointRef> refs, Function<EndpointRef, Flux<T>> invoker
+  ) {
     if (refs == null || refs.isEmpty()) {
       return Flux.empty();
     }
     if (refs.size() == 1) {
-      var r = refs.get(0);
-      return this.post(type, r.key(), accountId, r.uri(), body, elementType);
+      return invoker.apply(refs.get(0));
     }
-    int concurrency = concurrencyFor(type, refs);
     return Flux.fromIterable(refs)
-        .flatMapDelayError(
-            ref -> this.post(type, ref.key(), accountId, ref.uri(), body, elementType),
-            concurrency,
-            DEFAULT_PREFETCH
-        );
-  }
-
-  protected final int concurrencyFor(MarketplaceType type, List<EndpointRef> refs) {
-    var provider = properties.get(type);
-    int globalCap = provider.getResilience().getMaxConcurrentCalls();
-
-    Map<String, List<EndpointRef>> byRoute = refs.stream().collect(
-        Collectors.groupingBy(ref -> ref.key().name() + "|" + ref.uri().getPath())
-    );
-
-    int sumCapped = byRoute.values().stream()
-        .mapToInt(
-            list -> Math.min(list.size(), provider.effectiveMaxConcurrentCalls(list.get(0).key())))
-        .sum();
-
-    return Math.max(1, Math.min(sumCapped, globalCap));
+        .flatMapDelayError(invoker, Integer.MAX_VALUE, 32);
   }
 
   public record Page<T>(List<T> items, String nextCursor) {
@@ -143,10 +116,28 @@ abstract class AbstractReactiveMarketplaceAdapter {
       Supplier<Mono<Page<T>>> firstPage,
       Function<String, Mono<Page<T>>> nextPageByCursor
   ) {
+    return paginate(firstPage, nextPageByCursor, DEFAULT_MAX_PAGES);
+  }
+
+  protected final <T> Flux<T> paginate(
+      Supplier<Mono<Page<T>>> firstPage,
+      Function<String, Mono<Page<T>>> nextPageByCursor,
+      int maxPages
+  ) {
+    final Set<String> seen = Collections.newSetFromMap(new ConcurrentHashMap<>());
     return Mono.defer(firstPage)
         .expand(p -> {
-          var next = p.nextCursor();
-          return (next == null || next.isBlank()) ? Mono.empty() : nextPageByCursor.apply(next);
+          String next = p.nextCursor();
+          if (next == null || next.isBlank()) {
+            return Mono.empty();
+          }
+          if (!seen.add(next)) {
+            return Mono.empty();
+          }
+          if (seen.size() >= maxPages) {
+            return Mono.empty();
+          }
+          return nextPageByCursor.apply(next);
         })
         .flatMapIterable(Page::items);
   }
@@ -159,9 +150,6 @@ abstract class AbstractReactiveMarketplaceAdapter {
       Class<T> targetType,
       Flux<DataBuffer> raw
   ) {
-    if (uri == null) {
-      throw new AppException(MessageCodes.URI_REQUIRED);
-    }
     if (targetType == null) {
       throw new AppException(MessageCodes.TYPE_REQUIRED);
     }
@@ -169,21 +157,35 @@ abstract class AbstractReactiveMarketplaceAdapter {
     final String ctx = marketplace + ":" + key.tag() + ":acc=" + accountId;
 
     Flux<DataBuffer> guarded = resilienceManager.apply(raw, marketplace, key, accountId)
-        .name("mp.http").tag("mp", marketplace.name()).tag("key", key.tag())
-        .doOnSubscribe(s -> log.debug("[{}] start {}", ctx, uri))
-        .doFinally(st -> log.debug("[{}] done st={} {}", ctx, st, uri))
+        .name("mp.http")
+        .tag("mp", marketplace.name())
+        .tag("key", key.tag())
+        .doOnSubscribe(s -> log.debug("[{}] start {}", ctx, safeUri(uri)))
+        .doFinally(st -> log.debug("[{}] done st={} {}", ctx, st, safeUri(uri)))
         .onErrorMap(ex -> {
           if (ex instanceof CancellationException || Exceptions.isCancel(ex)) {
             return ex;
           }
-          return new MarketplaceExceptions.FetchFailed(ex, MessageCodes.MARKETPLACE_FETCH_FAILED,
-              marketplace, key.tag(), accountId, uri);
+          return new MarketplaceExceptions.FetchFailed(
+              ex, MessageCodes.MARKETPLACE_FETCH_FAILED, marketplace, key.tag(), accountId, uri);
         })
         .checkpoint("mp:" + marketplace + "." + key.tag(), true);
 
     return fluxReader.readArray(guarded, targetType)
-        .onErrorMap(ex -> new MarketplaceExceptions.ParseFailed(
-            ex, MessageCodes.MARKETPLACE_PARSE_FAILED, marketplace, key.tag(), accountId, uri));
+        .onErrorMap(ex -> {
+          if (ex instanceof CancellationException || Exceptions.isCancel(ex)) {
+            return ex;
+          }
+          return new MarketplaceExceptions.ParseFailed(
+              ex, MessageCodes.MARKETPLACE_PARSE_FAILED, marketplace, key.tag(), accountId, uri);
+        });
+  }
+
+  private static String safeUri(URI uri) {
+    if (uri == null) {
+      return "null";
+    }
+    return uri.getPath();
   }
 
   private HttpHeaders buildHeaders(MarketplaceType type, long accountId) {

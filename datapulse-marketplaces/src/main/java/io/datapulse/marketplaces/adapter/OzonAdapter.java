@@ -30,11 +30,10 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
   public OzonAdapter(EndpointsResolver endpoints,
       StreamingDownloadService s,
       ResilienceManager r,
-      MarketplaceProperties props,
       JsonFluxReader f,
       HttpHeaderProvider h,
       CredentialsProvider c) {
-    super(s, r, props, f, h, c);
+    super(s, r, f, h, c);
     this.endpoints = endpoints;
   }
 
