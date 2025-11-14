@@ -10,10 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.reactivestreams.Publisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
@@ -23,7 +21,6 @@ import org.springframework.integration.channel.FluxMessageChannel;
 import org.springframework.integration.channel.PublishSubscribeChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.http.dsl.Http;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.MessagingException;
@@ -42,7 +39,9 @@ public class EventEtlFlowConfig {
 
   private final List<EventSource<?>> sources;
 
-  /** DTO, которое принимает HTTP. */
+  /**
+   * DTO, которое принимает HTTP.
+   */
   public record EventJob(
       Long accountId,
       String event,
@@ -51,7 +50,9 @@ public class EventEtlFlowConfig {
       String batchId,
       Integer burst,
       FetchParams params
-  ) {}
+  ) {
+
+  }
 
   @Bean
   public TaskExecutor etlExecutor() {
@@ -64,19 +65,25 @@ public class EventEtlFlowConfig {
     return ex;
   }
 
-  /** Реактивный канал для Publisher-пейлоадов. */
+  /**
+   * Реактивный канал для Publisher-пейлоадов.
+   */
   @Bean(name = CH_ETL_ASYNC)
   public MessageChannel etlAsyncChannel() {
     return new FluxMessageChannel();
   }
 
-  /** Канал/топик для ошибок (единый бин, на него и ссылаемся). */
+  /**
+   * Канал/топик для ошибок (единый бин, на него и ссылаемся).
+   */
   @Bean(name = CH_ETL_ERRORS)
   public MessageChannel etlErrorsChannel() {
     return new PublishSubscribeChannel();
   }
 
-  /** HTTP → (ACK сразу) + асинхронный запуск ETL; ошибки HTTP-ветки → CH_ETL_ERRORS. */
+  /**
+   * HTTP → (ACK сразу) + асинхронный запуск ETL; ошибки HTTP-ветки → CH_ETL_ERRORS.
+   */
   @Bean
   public IntegrationFlow httpToEtl(TaskExecutor etlExecutor) {
     return IntegrationFlow
@@ -99,17 +106,22 @@ public class EventEtlFlowConfig {
           // sync-ветка: немедленный ACK (HTTP 202)
           ps.subscribe(sf -> sf.transform(EventJob.class, job -> {
             Map<String, Object> ack = new LinkedHashMap<>();
-            ack.put("status",  "accepted");
-            ack.put("event",   job.event());
-            ack.put("batchId", job.batchId() != null ? job.batchId() : UUID.randomUUID().toString());
-            if (job.burst() != null) ack.put("burst", job.burst());
+            ack.put("status", "accepted");
+            ack.put("event", job.event());
+            ack.put("batchId",
+                job.batchId() != null ? job.batchId() : UUID.randomUUID().toString());
+            if (job.burst() != null) {
+              ack.put("burst", job.burst());
+            }
             return ack;
           }));
         })
         .get();
   }
 
-  /** Consumer: распаковываем Publisher → элементы и обрабатываем. */
+  /**
+   * Consumer: распаковываем Publisher → элементы и обрабатываем.
+   */
   @Bean
   public IntegrationFlow etlAsyncFlow(TaskExecutor etlExecutor) {
     return IntegrationFlow.from(CH_ETL_ASYNC)
@@ -123,7 +135,9 @@ public class EventEtlFlowConfig {
         .get();
   }
 
-  /** Error-flow: лог + формирование ACK (202), чтобы фронт не видел 500. */
+  /**
+   * Error-flow: лог + формирование ACK (202), чтобы фронт не видел 500.
+   */
   @Bean
   public IntegrationFlow etlErrorFlow() {
     return IntegrationFlow.from(CH_ETL_ERRORS)
@@ -133,8 +147,8 @@ public class EventEtlFlowConfig {
         // формируем ответ, который отдаст inbound-gateway вместо 500
         .transform(MessagingException.class, ex -> {
           Map<String, Object> ack = new LinkedHashMap<>();
-          ack.put("status",  "accepted"); // мы уже ушли в async
-          ack.put("event",   "unknown");
+          ack.put("status", "accepted"); // мы уже ушли в async
+          ack.put("event", "unknown");
           ack.put("batchId", UUID.randomUUID().toString());
           return ack;
         })
@@ -143,7 +157,9 @@ public class EventEtlFlowConfig {
         .get();
   }
 
-  /** Собирает единый Flux из всех подходящих EventSource; никаких побочек до subscribe(). */
+  /**
+   * Собирает единый Flux из всех подходящих EventSource; никаких побочек до subscribe().
+   */
   private Flux<?> buildMergedFlux(EventJob job, Map<String, Object> headers) {
     String reqId = String.valueOf(headers.getOrDefault(HDR_REQ_ID, "n/a"));
 
@@ -152,19 +168,21 @@ public class EventEtlFlowConfig {
         Objects.requireNonNull(job.accountId(), "accountId is required"),
         MarketplaceEvent.valueOf(job.event()),
         Objects.requireNonNull(job.from(), "from is required"),
-        Objects.requireNonNull(job.to(),   "to is required"),
+        Objects.requireNonNull(job.to(), "to is required"),
         job.params()
     );
 
     var matched = sources.stream()
         .filter(src -> src.event() == req.event())
-        .collect(Collectors.toList());
+        .toList();
 
     if (matched.isEmpty()) {
       log.warn("No EventSource for event={} (reqId={})", req.event(), reqId);
       return Flux.empty()
-          .doOnSubscribe(s -> log.info("ETL pipeline started event={} reqId={}", req.event(), reqId))
-          .doOnComplete(() -> log.info("ETL pipeline finished event={} reqId={}", req.event(), reqId));
+          .doOnSubscribe(
+              s -> log.info("ETL pipeline started event={} reqId={}", req.event(), reqId))
+          .doOnComplete(
+              () -> log.info("ETL pipeline finished event={} reqId={}", req.event(), reqId));
     }
 
     log.info("ETL start event={} sources={} (reqId={})", req.event(), matched.size(), reqId);
@@ -175,10 +193,13 @@ public class EventEtlFlowConfig {
         )
         .doOnSubscribe(s -> log.info("ETL pipeline started event={} reqId={}", req.event(), reqId))
         .doOnError(e -> log.error("ETL pipeline error event={} reqId={}", req.event(), reqId, e))
-        .doOnComplete(() -> log.info("ETL pipeline finished event={} reqId={}", req.event(), reqId));
+        .doOnComplete(
+            () -> log.info("ETL pipeline finished event={} reqId={}", req.event(), reqId));
   }
 
-  /** Пример батч-писателя (на будущее). */
+  /**
+   * Пример батч-писателя (на будущее).
+   */
   private Mono<Void> bulkWrite(List<?> batch) {
     return Mono.fromRunnable(() -> log.debug("Batch processed: size={}", batch.size()));
   }
