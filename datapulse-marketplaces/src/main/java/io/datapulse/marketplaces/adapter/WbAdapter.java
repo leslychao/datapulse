@@ -12,7 +12,7 @@ import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.event.MarketplaceEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
-import io.datapulse.marketplaces.resilience.ResilienceManager;
+import io.datapulse.marketplaces.resilience.MarketplaceRetryService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -31,7 +31,7 @@ public class WbAdapter extends AbstractReactiveMarketplaceAdapter
 
   public WbAdapter(EndpointsResolver endpoints,
       StreamingDownloadService s,
-      ResilienceManager r,
+      MarketplaceRetryService r,
       JsonFluxReader f,
       HttpHeaderProvider h,
       CredentialsProvider c) {

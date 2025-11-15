@@ -4,17 +4,6 @@ import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_BASE_URL_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_BASE_BACKOFF_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_BULKHEAD_WAIT_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_LIMIT_FOR_PERIOD_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_LIMIT_REFRESH_PERIOD_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_MAX_ATTEMPTS_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_MAX_BACKOFF_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_MAX_CONCURRENT_CALLS_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_MAX_JITTER_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_RETRY_AFTER_FALLBACK_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RESILIENCE_TOKEN_WAIT_TIMEOUT_REQUIRED;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
@@ -31,6 +20,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Минимальная конфигурация:
+ * - URL’ы + endpoints.
+ * - Resilience: только то, что нужно для простых ретраев (maxAttempts/baseBackoff/maxBackoff/retryAfterFallback).
+ * Пер-endpoint override оставлен, но включает только эти поля.
+ */
 @Getter
 @Setter
 @Validated
@@ -70,7 +65,7 @@ public class MarketplaceProperties {
         endpoints = new EnumMap<>(EndpointKey.class);
 
     @Valid
-    @NotNull(message = MARKETPLACE_RESILIENCE_REQUIRED)
+    @NotNull
     private Resilience resilience;
 
     @Valid
@@ -81,82 +76,17 @@ public class MarketplaceProperties {
       return endpoints.get(key);
     }
 
+    /** Базовый + точечный override только по нужным полям. */
     public Resilience effectiveResilience(EndpointKey key) {
       var base = resilience;
       var ov = (resilienceOverrides != null) ? resilienceOverrides.get(key) : null;
-      return base.mergeWithOverride(ov);
-    }
-
-    public int effectiveMaxConcurrentCalls(EndpointKey key) {
-      var ov = (resilienceOverrides != null) ? resilienceOverrides.get(key) : null;
-      return (ov != null && ov.getMaxConcurrentCalls() != null)
-          ? ov.getMaxConcurrentCalls()
-          : resilience.getMaxConcurrentCalls();
-    }
-  }
-
-  @Getter
-  @Setter
-  @Validated
-  public static class Sandbox {
-
-    @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
-    private String baseUrl;
-
-    private String feedbacksBaseUrl;
-  }
-
-  @Getter
-  @Setter
-  @Validated
-  public static class Resilience {
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_LIMIT_FOR_PERIOD_REQUIRED)
-    private Integer limitForPeriod;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_MAX_CONCURRENT_CALLS_REQUIRED)
-    private Integer maxConcurrentCalls;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_MAX_ATTEMPTS_REQUIRED)
-    private Integer maxAttempts;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_BASE_BACKOFF_REQUIRED)
-    private Duration baseBackoff;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_MAX_BACKOFF_REQUIRED)
-    private Duration maxBackoff;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_MAX_JITTER_REQUIRED)
-    private Duration maxJitter;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_RETRY_AFTER_FALLBACK_REQUIRED)
-    private Duration retryAfterFallback;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_LIMIT_REFRESH_PERIOD_REQUIRED)
-    private Duration limitRefreshPeriod;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_TOKEN_WAIT_TIMEOUT_REQUIRED)
-    private Duration tokenWaitTimeout;
-
-    @NotNull(message = MARKETPLACE_RESILIENCE_BULKHEAD_WAIT_REQUIRED)
-    private Duration bulkheadWait;
-
-    public Resilience mergeWithOverride(ResilienceOverride ov) {
-      if (ov == null) {
-        return this;
-      }
-      var resilience = new Resilience();
-      resilience.limitForPeriod = nvl(ov.getLimitForPeriod(), this.limitForPeriod);
-      resilience.maxConcurrentCalls = nvl(ov.getMaxConcurrentCalls(), this.maxConcurrentCalls);
-      resilience.maxAttempts = nvl(ov.getMaxAttempts(), this.maxAttempts);
-      resilience.baseBackoff = nvl(ov.getBaseBackoff(), this.baseBackoff);
-      resilience.maxBackoff = nvl(ov.getMaxBackoff(), this.maxBackoff);
-      resilience.maxJitter = nvl(ov.getMaxJitter(), this.maxJitter);
-      resilience.retryAfterFallback = nvl(ov.getRetryAfterFallback(), this.retryAfterFallback);
-      resilience.limitRefreshPeriod = nvl(ov.getLimitRefreshPeriod(), this.limitRefreshPeriod);
-      resilience.tokenWaitTimeout = nvl(ov.getTokenWaitTimeout(), this.tokenWaitTimeout);
-      resilience.bulkheadWait = nvl(ov.getBulkheadWait(), this.bulkheadWait);
-      return resilience;
+      if (ov == null) return base;
+      var r = new Resilience();
+      r.maxAttempts = nvl(ov.getMaxAttempts(), base.getMaxAttempts());
+      r.baseBackoff = nvl(ov.getBaseBackoff(), base.getBaseBackoff());
+      r.maxBackoff = nvl(ov.getMaxBackoff(), base.getMaxBackoff());
+      r.retryAfterFallback = nvl(ov.getRetryAfterFallback(), base.getRetryAfterFallback());
+      return r;
     }
 
     private static <T> T nvl(T v, T def) {
@@ -166,17 +96,31 @@ public class MarketplaceProperties {
 
   @Getter
   @Setter
-  public static class ResilienceOverride {
+  @Validated
+  public static class Sandbox {
+    @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
+    private String baseUrl;
+    private String feedbacksBaseUrl;
+  }
 
-    private Integer limitForPeriod;
-    private Integer maxConcurrentCalls;
+  @Getter
+  @Setter
+  @Validated
+  public static class Resilience {
+    /** Всего попыток, включая первую. */
+    @NotNull private Integer maxAttempts;
+    @NotNull private Duration baseBackoff;
+    @NotNull private Duration maxBackoff;
+    /** Если нет заголовков (WB/Ozon), сколько подождать «по умолчанию». Можно 0s. */
+    @NotNull private Duration retryAfterFallback;
+  }
+
+  @Getter
+  @Setter
+  public static class ResilienceOverride {
     private Integer maxAttempts;
     private Duration baseBackoff;
     private Duration maxBackoff;
-    private Duration maxJitter;
     private Duration retryAfterFallback;
-    private Duration limitRefreshPeriod;
-    private Duration tokenWaitTimeout;
-    private Duration bulkheadWait;
   }
 }

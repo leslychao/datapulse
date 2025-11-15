@@ -13,62 +13,15 @@ marketplace:
         finance: /api/v5/supplier/reportDetailByPeriod
         reviews: /api/v1/questions
       resilience:
-        # WB дефолт: «ровная подача» + запас под burst (можно точечно переопределять ниже)
-        limitForPeriod: 300        # 300 запросов/мин (пример для категории Marketplace)
-        limitRefreshPeriod: 60s
-        tokenWaitTimeout: 2s
-        maxConcurrentCalls: 16     # держим ниже burst, оставляя запас
-        bulkheadWait: 1s
         maxAttempts: 5
         baseBackoff: 200ms
         maxBackoff: 30s
-        maxJitter: 500ms
         retryAfterFallback: 1s
-      # Опциональные локальные оверрайды на эндпоинт (ключи — sales|stock|finance|reviews)
       resilienceOverrides:
         reviews:
-          limitForPeriod: 3          # не «упираемся»; даем дышать burst-ведру
-          limitRefreshPeriod: 1s
-          tokenWaitTimeout: 2s
-          maxConcurrentCalls: 3
-          bulkheadWait: 1s
           maxAttempts: 4
           baseBackoff: 200ms
           maxBackoff: 10s
-          maxJitter: 300ms
-          retryAfterFallback: 1s
-        finance:
-          limitForPeriod: 120        # осторожнее темп
-          limitRefreshPeriod: 60s
-          tokenWaitTimeout: 2s
-          maxConcurrentCalls: 8
-          bulkheadWait: 1s
-          maxAttempts: 5
-          baseBackoff: 300ms
-          maxBackoff: 20s
-          maxJitter: 400ms
-          retryAfterFallback: 1s
-        sales:
-          limitForPeriod: 200
-          limitRefreshPeriod: 60s
-          tokenWaitTimeout: 2s
-          maxConcurrentCalls: 10
-          bulkheadWait: 1s
-          maxAttempts: 5
-          baseBackoff: 250ms
-          maxBackoff: 20s
-          maxJitter: 400ms
-          retryAfterFallback: 1s
-        stock:
-          limitForPeriod: 240
-          limitRefreshPeriod: 60s
-          tokenWaitTimeout: 2s
-          maxConcurrentCalls: 12
-          bulkheadWait: 1s
-          maxAttempts: 5
-          baseBackoff: 200ms
-          maxBackoff: 15s
-          maxJitter: 300ms
           retryAfterFallback: 1s
     OZON:
       useSandbox: true
@@ -81,48 +34,7 @@ marketplace:
         finance: /v3/finance/transaction/list
         reviews: /v1/review/list
       resilience:
-        # Глобальный лимит 50 rps на Client ID — ставим секционный limiter
-        limitForPeriod: 50
-        limitRefreshPeriod: 1s
-        tokenWaitTimeout: 3s
-        maxConcurrentCalls: 20
-        bulkheadWait: 1s
         maxAttempts: 4
         baseBackoff: 300ms
         maxBackoff: 20s
-        maxJitter: 300ms
         retryAfterFallback: 1s
-      resilienceOverrides:
-        sales: # /v1/analytics/data
-          limitForPeriod: 30
-          limitRefreshPeriod: 1s
-          tokenWaitTimeout: 3s
-          maxConcurrentCalls: 10
-          bulkheadWait: 1s
-          maxAttempts: 4
-          baseBackoff: 400ms
-          maxBackoff: 15s
-          maxJitter: 400ms
-          retryAfterFallback: 1s
-        finance: # /v3/finance/transaction/list
-          limitForPeriod: 30
-          limitRefreshPeriod: 1s
-          tokenWaitTimeout: 3s
-          maxConcurrentCalls: 10
-          bulkheadWait: 1s
-          maxAttempts: 4
-          baseBackoff: 400ms
-          maxBackoff: 15s
-          maxJitter: 400ms
-          retryAfterFallback: 1s
-        reviews: # /v1/review/list — умеренно консервативный
-          limitForPeriod: 40
-          limitRefreshPeriod: 1s
-          tokenWaitTimeout: 3s
-          maxConcurrentCalls: 12
-          bulkheadWait: 1s
-          maxAttempts: 4
-          baseBackoff: 300ms
-          maxBackoff: 12s
-          maxJitter: 300ms
-          retryAfterFallback: 1s

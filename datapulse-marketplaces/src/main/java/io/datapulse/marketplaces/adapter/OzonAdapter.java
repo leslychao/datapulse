@@ -4,7 +4,6 @@ import io.datapulse.core.parser.JsonFluxReader;
 import io.datapulse.core.service.CredentialsProvider;
 import io.datapulse.core.service.StreamingDownloadService;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.domain.dto.raw.ozon.OzonFinanceRaw;
 import io.datapulse.domain.dto.raw.ozon.OzonReviewRaw;
 import io.datapulse.domain.dto.raw.ozon.OzonSaleRaw;
@@ -13,7 +12,7 @@ import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.event.MarketplaceEvent;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
-import io.datapulse.marketplaces.resilience.ResilienceManager;
+import io.datapulse.marketplaces.resilience.MarketplaceRetryService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +28,7 @@ public class OzonAdapter extends AbstractReactiveMarketplaceAdapter
 
   public OzonAdapter(EndpointsResolver endpoints,
       StreamingDownloadService s,
-      ResilienceManager r,
+      MarketplaceRetryService r,
       JsonFluxReader f,
       HttpHeaderProvider h,
       CredentialsProvider c) {
