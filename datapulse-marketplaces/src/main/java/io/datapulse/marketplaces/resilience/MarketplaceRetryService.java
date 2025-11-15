@@ -29,11 +29,13 @@ public class MarketplaceRetryService {
     return m;
   }
 
-  public <T> Flux<T> withRetries(Flux<T> source, MarketplaceType marketplace, EndpointKey endpoint) {
+  public <T> Flux<T> withRetries(Flux<T> source, MarketplaceType marketplace,
+      EndpointKey endpoint) {
     return source.retryWhen(retryFor(marketplace, endpoint));
   }
 
-  public <T> Mono<T> withRetries(Mono<T> source, MarketplaceType marketplace, EndpointKey endpoint) {
+  public <T> Mono<T> withRetries(Mono<T> source, MarketplaceType marketplace,
+      EndpointKey endpoint) {
     return source.retryWhen(retryFor(marketplace, endpoint));
   }
 

@@ -8,7 +8,6 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import javax.net.ssl.SSLException;
 import org.springframework.http.HttpHeaders;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.netty.http.client.PrematureCloseException;
 
 abstract class BaseRetryPolicy {
@@ -22,11 +21,9 @@ abstract class BaseRetryPolicy {
   protected static final int STATUS_TOO_EARLY = 425;
 
   protected static final String HDR_X_RETRY = "X-Ratelimit-Retry";
-  protected static final String HDR_X_RESET = "X-Ratelimit-Reset";
 
   protected static boolean isRetryableStatus(int s) {
     return s == STATUS_TOO_MANY_REQUESTS
-        || s == STATUS_SERVICE_UNAVAILABLE
         || s == STATUS_REQUEST_TIMEOUT
         || s == STATUS_CONFLICT
         || s == STATUS_TOO_EARLY
@@ -38,7 +35,9 @@ abstract class BaseRetryPolicy {
   }
 
   protected static Duration parseSeconds(String value) {
-    if (value == null || value.isBlank()) return null;
+    if (value == null || value.isBlank()) {
+      return null;
+    }
     try {
       long seconds = Long.parseLong(value.trim());
       return seconds < 0 ? null : Duration.ofSeconds(seconds);
