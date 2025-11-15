@@ -34,7 +34,6 @@ public class WbRetryPolicy extends BaseRetryPolicy implements MarketplaceRetryPo
         int status = ex.getStatusCode().value();
         HttpHeaders headers = ex.getHeaders();
 
-        // WB-спец ветка раньше общей: 429/503 → X-Ratelimit-Retry → Retry-After → fallback
         if (status == STATUS_TOO_MANY_REQUESTS || status == STATUS_SERVICE_UNAVAILABLE) {
           var xr = parseSeconds(headers.getFirst(HDR_X_RETRY));
           if (xr != null) {

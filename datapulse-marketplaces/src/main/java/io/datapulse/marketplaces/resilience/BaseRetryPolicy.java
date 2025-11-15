@@ -12,17 +12,15 @@ abstract class BaseRetryPolicy {
   protected static final int STATUS_TOO_MANY_REQUESTS = 429;
   protected static final int STATUS_SERVICE_UNAVAILABLE = 503;
   protected static final int STATUS_REQUEST_TIMEOUT = 408;
-  protected static final int STATUS_CONFLICT = 409;
   protected static final int STATUS_TOO_EARLY = 425;
 
   protected static final String HDR_X_RETRY = "X-Ratelimit-Retry";
 
   protected static boolean isRetryableStatus(int s) {
-    return s == STATUS_TOO_MANY_REQUESTS
-        || s == STATUS_REQUEST_TIMEOUT
-        || s == STATUS_CONFLICT
-        || s == STATUS_TOO_EARLY
-        || (s >= 500 && s <= 599);
+    return s == STATUS_REQUEST_TIMEOUT       // 408
+        || s == STATUS_TOO_EARLY            // 425
+        || s == STATUS_TOO_MANY_REQUESTS    // 429
+        || (s >= 500 && s <= 599);          // 5xx
   }
 
   protected static Duration parseRetryAfter(HttpHeaders headers) {
@@ -43,7 +41,7 @@ abstract class BaseRetryPolicy {
 
   protected static Duration expBackoff(long retries, Duration base, Duration cap) {
     long attempt = Math.max(1, retries + 1);
-    long raw = base.toMillis() * (1L << Math.min(attempt - 1, 4)); // рост до x16
+    long raw = base.toMillis() * (1L << Math.min(attempt - 1, 4)); // до x16
     long capped = Math.min(raw, cap.toMillis());
     long jitter = Math.round(capped * JITTER_FACTOR * Math.random());
     long total = Math.min(cap.toMillis(), capped + jitter);
@@ -52,11 +50,7 @@ abstract class BaseRetryPolicy {
 
   protected boolean isTransient(Throwable t) {
     if (t instanceof WebClientResponseException ex) {
-      int s = ex.getStatusCode().value();
-      return s == 429
-          || s == 408
-          || s == 425
-          || (s >= 500 && s <= 599);
+      return isRetryableStatus(ex.getStatusCode().value());
     }
     return t instanceof TimeoutException;
   }
