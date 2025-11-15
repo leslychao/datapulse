@@ -1,14 +1,9 @@
 package io.datapulse.marketplaces.resilience;
 
-import java.net.ConnectException;
-import java.net.NoRouteToHostException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
-import javax.net.ssl.SSLException;
+import java.util.concurrent.TimeoutException;
 import org.springframework.http.HttpHeaders;
-import reactor.netty.http.client.PrematureCloseException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 abstract class BaseRetryPolicy {
 
@@ -55,18 +50,14 @@ abstract class BaseRetryPolicy {
     return Duration.ofMillis(total);
   }
 
-  protected static boolean isTransientNetwork(Throwable t) {
-    for (Throwable c = t; c != null; c = c.getCause()) {
-      if (c instanceof SocketTimeoutException
-          || c instanceof ConnectException
-          || c instanceof UnknownHostException
-          || c instanceof NoRouteToHostException
-          || c instanceof SSLException
-          || c instanceof ClosedChannelException
-          || c instanceof PrematureCloseException) {
-        return true;
-      }
+  protected boolean isTransient(Throwable t) {
+    if (t instanceof WebClientResponseException ex) {
+      int s = ex.getStatusCode().value();
+      return s == 429
+          || s == 408
+          || s == 425
+          || (s >= 500 && s <= 599);
     }
-    return false;
+    return t instanceof TimeoutException;
   }
 }

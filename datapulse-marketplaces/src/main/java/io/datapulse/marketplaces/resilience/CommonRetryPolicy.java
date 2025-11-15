@@ -46,7 +46,7 @@ public class CommonRetryPolicy extends BaseRetryPolicy implements MarketplaceRet
         return Mono.error(error);
       }
 
-      if (error instanceof WebClientRequestException reqEx && isTransientNetwork(reqEx)) {
+      if (error instanceof WebClientRequestException reqEx && isTransient(reqEx)) {
         var delay = expBackoff(rs.totalRetries(), base, cap);
         log.info("[{}:{}] net-transient → retry #{} in {}", marketplace, endpoint, attempt, delay);
         return Mono.delay(delay);
