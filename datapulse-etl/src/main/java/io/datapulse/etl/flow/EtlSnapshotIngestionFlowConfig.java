@@ -35,6 +35,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.channel.DirectChannel;
+import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.channel.PublishSubscribeChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.util.CloseableIterator;
@@ -72,8 +73,8 @@ public class EtlSnapshotIngestionFlowConfig {
 
   }
 
-  @Bean("etlExecutor")
-  public TaskExecutor etlExecutor() {
+  @Bean("etlIngestExecutor")
+  public TaskExecutor etlIngestExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     int cores = Runtime.getRuntime().availableProcessors();
     int corePool = Math.max(1, cores - 1);
@@ -100,8 +101,8 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   @Bean(name = CH_ETL_INGEST)
-  public MessageChannel etlIngestChannel() {
-    return new DirectChannel();
+  public MessageChannel etlIngestChannel(TaskExecutor etlIngestExecutor) {
+    return new ExecutorChannel(etlIngestExecutor);
   }
 
   @Bean(name = CH_ETL_SNAPSHOT_READY)
@@ -180,14 +181,14 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow snapshotStreamingFlow(TaskExecutor etlExecutor) {
+  public IntegrationFlow snapshotStreamingFlow(TaskExecutor etlIngestExecutor) {
     return IntegrationFlow
         .from(CH_ETL_SNAPSHOT_READY)
         .enrichHeaders(enricher -> enricher
             .headerFunction(HDR_ETL_SNAPSHOT_ID, this::registerSnapshotInBarrier)
         )
         .split(Message.class, this::toSnapshotIterator)
-        .channel(c -> c.executor(etlExecutor))
+        .channel(c -> c.executor(etlIngestExecutor))
         .aggregate(aggregator -> aggregator
             .correlationStrategy(message -> {
               String snapshotId =
