@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0001-init-datapulse-core" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      CREATE TABLE account
+      (
+        id         BIGSERIAL PRIMARY KEY,
+        name       TEXT        NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_account_name_ci
+        ON account (LOWER(name));
+
+      CREATE TABLE account_connection
+      (
+        id                    BIGSERIAL PRIMARY KEY,
+        account_id            BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        marketplace           TEXT        NOT NULL,
+        credentials_encrypted TEXT        NOT NULL,
+        active                BOOLEAN     NOT NULL DEFAULT TRUE,
+        last_sync_at          TIMESTAMPTZ,
+        last_sync_status      TEXT,
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at            TIMESTAMPTZ,
+        CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
+      );
+      CREATE INDEX idx_acc_conn_account ON account_connection (account_id);
+      CREATE INDEX idx_acc_conn_marketplace ON account_connection (marketplace);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS account_connection CASCADE;
+      DROP TABLE IF EXISTS account CASCADE;
+    </rollback>
+  </changeSet>
+</databaseChangeLog>

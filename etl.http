@@ -1,0 +1,93 @@
+### 1. Создать аккаунт
+POST http://localhost:8080/api/accounts
+Content-Type: application/json
+
+{
+  "name": "Demo Vitalii WB+Ozon"
+}
+
+> {%
+  // Проверим код ответа и JSON
+  const ok = response.status === 201 || response.status === 200;
+  if (!ok) {
+    client.fail("Unexpected status: " + response.status + " " + response.statusText);
+  }
+  if (!response.body || !response.body.id) {
+    client.fail("Response has no 'id'. Body: " + JSON.stringify(response.body));
+  }
+  client.global.set("accountId", response.body.id);
+  client.log("✅ Account created, id=" + response.body.id);
+%}
+
+
+### 2. Создать WB подключениe
+POST http://localhost:8080/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": "{{accountId}}",
+  "marketplace": "WILDBERRIES",
+  "name": "WB-Conn",
+  "active": true,
+  "credentials": {
+    "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzc3MDU5Mzg0LCJpZCI6IjAxOWExNTI1LWI1ZmEtNzNiZi04ZWIwLTE3YjMwYjk1MGY2MCIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.eURulaP5UTqegdGH86XJqRX2qnBao0jnX5DFCa_wUKzku84MCJF-IWyO6cdSokf6oVn5LPqtQkn-zLONagFvcg"
+  }
+}
+> {% client.log("Создан WB-Conn: " + response.body.id); %}
+
+### 3. Создать Ozon подключениe
+POST http://localhost:8080/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": "{{accountId}}",
+  "marketplace": "OZON",
+  "active": true,
+  "credentials": {
+    "clientId": "3528862",
+    "apiKey": "e9e97944-6e3a-414a-aed1-9b547babac05"
+  }
+}
+> {% client.log("Создан Ozon-Conn: " + response.body.id); %}
+
+### Run ETL (last 30 days) SALES_FACT
+POST http://localhost:8080/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 4,
+  "event": "SALES_FACT",
+  "from": "2025-10-07",
+  "to": "2025-11-07",
+  "burst": 4
+}
+
+> {%
+  const now  = new Date();
+  const to   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = new Date(to.getTime() - 30*24*60*60*1000);
+  function ymd(d){ return d.toISOString().slice(0,10); }
+  client.global.set("from", ymd(from));
+  client.global.set("to",   ymd(to));
+%}
+
+### Run ETL (last 30 days) STOCK_LEVEL
+POST http://localhost:8080/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 44,
+  "event": "STOCK_LEVEL",
+  "from": "{{from}}",
+  "to": "{{to}}",
+  "burst": 4
+}
+
+> {%
+  const now  = new Date();
+  const to   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = new Date(to.getTime() - 30*24*60*60*1000);
+  function ymd(d){ return d.toISOString().slice(0,10); }
+  client.global.set("from", ymd(from));
+  client.global.set("to",   ymd(to));
+%}

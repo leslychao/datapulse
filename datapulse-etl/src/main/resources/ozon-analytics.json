@@ -1,0 +1,846 @@
+{
+  "result": {
+    "data": [
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00001"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00001"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-002"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-01"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 3
+          },
+          {
+            "id": "returns",
+            "value": 2
+          },
+          {
+            "id": "revenue",
+            "value": 17.39
+          },
+          {
+            "id": "commission",
+            "value": 1.73
+          },
+          {
+            "id": "delivery_amount",
+            "value": 4.25
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00002"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00002"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-003"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-02"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 6
+          },
+          {
+            "id": "returns",
+            "value": 4
+          },
+          {
+            "id": "revenue",
+            "value": 34.78
+          },
+          {
+            "id": "commission",
+            "value": 3.46
+          },
+          {
+            "id": "delivery_amount",
+            "value": 8.5
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00003"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00003"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-004"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-03"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 9
+          },
+          {
+            "id": "returns",
+            "value": 6
+          },
+          {
+            "id": "revenue",
+            "value": 52.17
+          },
+          {
+            "id": "commission",
+            "value": 5.19
+          },
+          {
+            "id": "delivery_amount",
+            "value": 12.75
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00004"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00004"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-005"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-04"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 12
+          },
+          {
+            "id": "returns",
+            "value": 8
+          },
+          {
+            "id": "revenue",
+            "value": 69.56
+          },
+          {
+            "id": "commission",
+            "value": 6.92
+          },
+          {
+            "id": "delivery_amount",
+            "value": 17.0
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00005"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00005"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-006"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-05"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 15
+          },
+          {
+            "id": "returns",
+            "value": 10
+          },
+          {
+            "id": "revenue",
+            "value": 86.95
+          },
+          {
+            "id": "commission",
+            "value": 8.65
+          },
+          {
+            "id": "delivery_amount",
+            "value": 21.25
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00006"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00006"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-007"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-06"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 18
+          },
+          {
+            "id": "returns",
+            "value": 12
+          },
+          {
+            "id": "revenue",
+            "value": 104.34
+          },
+          {
+            "id": "commission",
+            "value": 10.38
+          },
+          {
+            "id": "delivery_amount",
+            "value": 25.5
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00007"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00007"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-008"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-07"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 21
+          },
+          {
+            "id": "returns",
+            "value": 14
+          },
+          {
+            "id": "revenue",
+            "value": 121.73
+          },
+          {
+            "id": "commission",
+            "value": 12.11
+          },
+          {
+            "id": "delivery_amount",
+            "value": 29.75
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00008"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00008"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-009"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-08"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 24
+          },
+          {
+            "id": "returns",
+            "value": 16
+          },
+          {
+            "id": "revenue",
+            "value": 139.12
+          },
+          {
+            "id": "commission",
+            "value": 13.84
+          },
+          {
+            "id": "delivery_amount",
+            "value": 34.0
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00009"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00009"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-010"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-09"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 27
+          },
+          {
+            "id": "returns",
+            "value": 18
+          },
+          {
+            "id": "revenue",
+            "value": 156.51
+          },
+          {
+            "id": "commission",
+            "value": 15.57
+          },
+          {
+            "id": "delivery_amount",
+            "value": 38.25
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00010"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00010"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-001"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-10"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 30
+          },
+          {
+            "id": "returns",
+            "value": 0
+          },
+          {
+            "id": "revenue",
+            "value": 173.9
+          },
+          {
+            "id": "commission",
+            "value": 17.3
+          },
+          {
+            "id": "delivery_amount",
+            "value": 42.5
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00011"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00011"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-002"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-11"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 33
+          },
+          {
+            "id": "returns",
+            "value": 2
+          },
+          {
+            "id": "revenue",
+            "value": 191.29
+          },
+          {
+            "id": "commission",
+            "value": 19.03
+          },
+          {
+            "id": "delivery_amount",
+            "value": 46.75
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00012"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00012"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-003"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-12"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 36
+          },
+          {
+            "id": "returns",
+            "value": 4
+          },
+          {
+            "id": "revenue",
+            "value": 208.68
+          },
+          {
+            "id": "commission",
+            "value": 20.76
+          },
+          {
+            "id": "delivery_amount",
+            "value": 51.0
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00013"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00013"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-004"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-13"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 39
+          },
+          {
+            "id": "returns",
+            "value": 6
+          },
+          {
+            "id": "revenue",
+            "value": 226.07
+          },
+          {
+            "id": "commission",
+            "value": 22.49
+          },
+          {
+            "id": "delivery_amount",
+            "value": 55.25
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00014"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00014"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-005"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-14"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 42
+          },
+          {
+            "id": "returns",
+            "value": 8
+          },
+          {
+            "id": "revenue",
+            "value": 243.46
+          },
+          {
+            "id": "commission",
+            "value": 24.22
+          },
+          {
+            "id": "delivery_amount",
+            "value": 59.5
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00015"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00015"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-006"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-15"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 45
+          },
+          {
+            "id": "returns",
+            "value": 10
+          },
+          {
+            "id": "revenue",
+            "value": 260.85
+          },
+          {
+            "id": "commission",
+            "value": 25.95
+          },
+          {
+            "id": "delivery_amount",
+            "value": 63.75
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00016"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00016"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-007"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-16"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 48
+          },
+          {
+            "id": "returns",
+            "value": 12
+          },
+          {
+            "id": "revenue",
+            "value": 278.24
+          },
+          {
+            "id": "commission",
+            "value": 27.68
+          },
+          {
+            "id": "delivery_amount",
+            "value": 68.0
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00017"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00017"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-008"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-17"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 1
+          },
+          {
+            "id": "returns",
+            "value": 14
+          },
+          {
+            "id": "revenue",
+            "value": 295.63
+          },
+          {
+            "id": "commission",
+            "value": 29.41
+          },
+          {
+            "id": "delivery_amount",
+            "value": 72.25
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00018"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00018"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-009"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-18"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 4
+          },
+          {
+            "id": "returns",
+            "value": 16
+          },
+          {
+            "id": "revenue",
+            "value": 313.02
+          },
+          {
+            "id": "commission",
+            "value": 31.14
+          },
+          {
+            "id": "delivery_amount",
+            "value": 76.5
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00019"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00019"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-010"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-19"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 7
+          },
+          {
+            "id": "returns",
+            "value": 18
+          },
+          {
+            "id": "revenue",
+            "value": 330.41
+          },
+          {
+            "id": "commission",
+            "value": 32.87
+          },
+          {
+            "id": "delivery_amount",
+            "value": 80.75
+          }
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "id": "sku",
+            "value": "SKU-00020"
+          },
+          {
+            "id": "offer_id",
+            "value": "OFFER-00020"
+          },
+          {
+            "id": "warehouse_id",
+            "value": "WH-001"
+          },
+          {
+            "id": "day",
+            "value": "2025-01-20"
+          }
+        ],
+        "metrics": [
+          {
+            "id": "ordered_units",
+            "value": 10
+          },
+          {
+            "id": "returns",
+            "value": 0
+          },
+          {
+            "id": "revenue",
+            "value": 347.8
+          },
+          {
+            "id": "commission",
+            "value": 34.6
+          },
+          {
+            "id": "delivery_amount",
+            "value": 85.0
+          }
+        ]
+      }
+    ]
+  }
+}

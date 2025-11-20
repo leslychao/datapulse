@@ -1,0 +1,39 @@
+package io.datapulse.etl.route.impl;
+
+import static io.datapulse.etl.RawTableNames.OZON_SALES_FACT;
+
+import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.domain.MarketplaceType;
+import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
+import io.datapulse.domain.marketplace.Snapshot;
+import io.datapulse.etl.route.EtlSourceMeta;
+import io.datapulse.etl.route.EventSource;
+import io.datapulse.marketplaces.adapter.OzonAdapter;
+import java.time.LocalDate;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+@EtlSourceMeta(
+    event = MarketplaceEvent.SALES_FACT,
+    marketplace = MarketplaceType.OZON,
+    rawTable = OZON_SALES_FACT
+)
+@Profile("!test")
+public final class OzonSalesFactEventSource implements EventSource {
+
+  private final OzonAdapter ozonAdapter;
+
+  @Override
+  public @NonNull Snapshot<OzonAnalyticsApiRaw> fetchSnapshot(
+      long accountId,
+      @NonNull MarketplaceEvent event,
+      @NonNull LocalDate from,
+      @NonNull LocalDate to
+  ) {
+    return ozonAdapter.downloadSalesSnapshot(accountId, from, to);
+  }
+}

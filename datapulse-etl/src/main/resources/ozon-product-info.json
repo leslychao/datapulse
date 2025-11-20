@@ -1,0 +1,480 @@
+{
+  "items": [
+    {
+      "availabilities": [
+        {
+          "availability": "available",
+          "reasons": [
+            {
+              "human_text": {
+                "text": "OK"
+              },
+              "id": 1
+            }
+          ],
+          "sku": 100001,
+          "source": "fbo"
+        }
+      ],
+      "barcodes": [
+        "4600000000001"
+      ],
+      "color_image": [],
+      "commissions": [
+        {
+          "delivery_amount": 10,
+          "percent": 5,
+          "return_amount": 2,
+          "sale_schema": "FBO",
+          "value": 100
+        }
+      ],
+      "created_at": "2025-01-01T10:00:00Z",
+      "currency_code": "RUB",
+      "description_category_id": 101,
+      "discounted_fbo_stocks": 0,
+      "errors": [],
+      "has_discounted_fbo_item": false,
+      "id": 100001,
+      "images": [],
+      "images360": [],
+      "is_archived": false,
+      "is_autoarchived": false,
+      "is_discounted": false,
+      "is_kgt": false,
+      "is_prepayment_allowed": true,
+      "is_super": false,
+      "min_price": "499.00",
+      "model_info": {
+        "count": 1,
+        "model_id": 900001
+      },
+      "name": "Product 01",
+      "offer_id": "OFFER-00001",
+      "old_price": "599.00",
+      "price": "499.00",
+      "price_indexes": {
+        "color_index": "NORMAL",
+        "external_index_data": {
+          "minimal_price": "480.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "ozon_index_data": {
+          "minimal_price": "490.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "self_marketplaces_index_data": {
+          "minimal_price": "500.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        }
+      },
+      "primary_image": [],
+      "promotions": [
+        {
+          "is_enabled": true,
+          "type": "UNSPECIFIED"
+        }
+      ],
+      "sku": 100001,
+      "sources": [
+        {
+          "created_at": "2025-01-01T09:00:00Z",
+          "quant_code": "MSK",
+          "shipment_type": "FBO",
+          "sku": 100001,
+          "source": "fbo"
+        }
+      ],
+      "statuses": {
+        "is_created": true,
+        "moderate_status": "approved",
+        "status": "active",
+        "status_description": "OK",
+        "status_failed": "",
+        "status_name": "Active",
+        "status_tooltip": "",
+        "status_updated_at": "2025-01-01T11:00:00Z",
+        "validation_status": "ok"
+      },
+      "stocks": {
+        "has_stock": true,
+        "stocks": [
+          {
+            "present": 10,
+            "reserved": 1,
+            "sku": 100001,
+            "source": "fbo"
+          }
+        ]
+      },
+      "type_id": 1,
+      "updated_at": "2025-01-01T12:00:00Z",
+      "vat": "0.2",
+      "visibility_details": {
+        "has_price": true,
+        "has_stock": true
+      },
+      "volume_weight": 0.5
+    },
+    {
+      "availabilities": [
+        {
+          "availability": "available",
+          "reasons": [
+            {
+              "human_text": {
+                "text": "OK"
+              },
+              "id": 1
+            }
+          ],
+          "sku": 100002,
+          "source": "fbo"
+        }
+      ],
+      "barcodes": [
+        "4600000000002"
+      ],
+      "color_image": [],
+      "commissions": [
+        {
+          "delivery_amount": 10,
+          "percent": 5,
+          "return_amount": 2,
+          "sale_schema": "FBO",
+          "value": 100
+        }
+      ],
+      "created_at": "2025-01-02T10:00:00Z",
+      "currency_code": "RUB",
+      "description_category_id": 101,
+      "discounted_fbo_stocks": 0,
+      "errors": [],
+      "has_discounted_fbo_item": false,
+      "id": 100002,
+      "images": [],
+      "images360": [],
+      "is_archived": false,
+      "is_autoarchived": false,
+      "is_discounted": false,
+      "is_kgt": false,
+      "is_prepayment_allowed": true,
+      "is_super": false,
+      "min_price": "499.00",
+      "model_info": {
+        "count": 1,
+        "model_id": 900002
+      },
+      "name": "Product 02",
+      "offer_id": "OFFER-00002",
+      "old_price": "599.00",
+      "price": "499.00",
+      "price_indexes": {
+        "color_index": "NORMAL",
+        "external_index_data": {
+          "minimal_price": "480.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "ozon_index_data": {
+          "minimal_price": "490.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "self_marketplaces_index_data": {
+          "minimal_price": "500.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        }
+      },
+      "primary_image": [],
+      "promotions": [
+        {
+          "is_enabled": true,
+          "type": "UNSPECIFIED"
+        }
+      ],
+      "sku": 100002,
+      "sources": [
+        {
+          "created_at": "2025-01-02T09:00:00Z",
+          "quant_code": "MSK",
+          "shipment_type": "FBO",
+          "sku": 100002,
+          "source": "fbo"
+        }
+      ],
+      "statuses": {
+        "is_created": true,
+        "moderate_status": "approved",
+        "status": "active",
+        "status_description": "OK",
+        "status_failed": "",
+        "status_name": "Active",
+        "status_tooltip": "",
+        "status_updated_at": "2025-01-02T11:00:00Z",
+        "validation_status": "ok"
+      },
+      "stocks": {
+        "has_stock": true,
+        "stocks": [
+          {
+            "present": 10,
+            "reserved": 1,
+            "sku": 100002,
+            "source": "fbo"
+          }
+        ]
+      },
+      "type_id": 1,
+      "updated_at": "2025-01-02T12:00:00Z",
+      "vat": "0.2",
+      "visibility_details": {
+        "has_price": true,
+        "has_stock": true
+      },
+      "volume_weight": 0.5
+    },
+    {
+      "availabilities": [
+        {
+          "availability": "available",
+          "reasons": [
+            {
+              "human_text": {
+                "text": "OK"
+              },
+              "id": 1
+            }
+          ],
+          "sku": 100003,
+          "source": "fbo"
+        }
+      ],
+      "barcodes": [
+        "4600000000003"
+      ],
+      "color_image": [],
+      "commissions": [
+        {
+          "delivery_amount": 10,
+          "percent": 5,
+          "return_amount": 2,
+          "sale_schema": "FBO",
+          "value": 100
+        }
+      ],
+      "created_at": "2025-01-03T10:00:00Z",
+      "currency_code": "RUB",
+      "description_category_id": 101,
+      "discounted_fbo_stocks": 0,
+      "errors": [],
+      "has_discounted_fbo_item": false,
+      "id": 100003,
+      "images": [],
+      "images360": [],
+      "is_archived": false,
+      "is_autoarchived": false,
+      "is_discounted": false,
+      "is_kgt": false,
+      "is_prepayment_allowed": true,
+      "is_super": false,
+      "min_price": "499.00",
+      "model_info": {
+        "count": 1,
+        "model_id": 900003
+      },
+      "name": "Product 03",
+      "offer_id": "OFFER-00003",
+      "old_price": "599.00",
+      "price": "499.00",
+      "price_indexes": {
+        "color_index": "NORMAL",
+        "external_index_data": {
+          "minimal_price": "480.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "ozon_index_data": {
+          "minimal_price": "490.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "self_marketplaces_index_data": {
+          "minimal_price": "500.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        }
+      },
+      "primary_image": [],
+      "promotions": [
+        {
+          "is_enabled": true,
+          "type": "UNSPECIFIED"
+        }
+      ],
+      "sku": 100003,
+      "sources": [
+        {
+          "created_at": "2025-01-03T09:00:00Z",
+          "quant_code": "MSK",
+          "shipment_type": "FBO",
+          "sku": 100003,
+          "source": "fbo"
+        }
+      ],
+      "statuses": {
+        "is_created": true,
+        "moderate_status": "approved",
+        "status": "active",
+        "status_description": "OK",
+        "status_failed": "",
+        "status_name": "Active",
+        "status_tooltip": "",
+        "status_updated_at": "2025-01-03T11:00:00Z",
+        "validation_status": "ok"
+      },
+      "stocks": {
+        "has_stock": true,
+        "stocks": [
+          {
+            "present": 10,
+            "reserved": 1,
+            "sku": 100003,
+            "source": "fbo"
+          }
+        ]
+      },
+      "type_id": 1,
+      "updated_at": "2025-01-03T12:00:00Z",
+      "vat": "0.2",
+      "visibility_details": {
+        "has_price": true,
+        "has_stock": true
+      },
+      "volume_weight": 0.5
+    },
+    {
+      "availabilities": [
+        {
+          "availability": "available",
+          "reasons": [
+            {
+              "human_text": {
+                "text": "OK"
+              },
+              "id": 1
+            }
+          ],
+          "sku": 100020,
+          "source": "fbo"
+        }
+      ],
+      "barcodes": [
+        "4600000000020"
+      ],
+      "color_image": [],
+      "commissions": [
+        {
+          "delivery_amount": 10,
+          "percent": 5,
+          "return_amount": 2,
+          "sale_schema": "FBO",
+          "value": 100
+        }
+      ],
+      "created_at": "2025-01-20T10:00:00Z",
+      "currency_code": "RUB",
+      "description_category_id": 101,
+      "discounted_fbo_stocks": 0,
+      "errors": [],
+      "has_discounted_fbo_item": false,
+      "id": 100020,
+      "images": [],
+      "images360": [],
+      "is_archived": false,
+      "is_autoarchived": false,
+      "is_discounted": false,
+      "is_kgt": false,
+      "is_prepayment_allowed": true,
+      "is_super": false,
+      "min_price": "499.00",
+      "model_info": {
+        "count": 1,
+        "model_id": 900020
+      },
+      "name": "Product 20",
+      "offer_id": "OFFER-00020",
+      "old_price": "599.00",
+      "price": "499.00",
+      "price_indexes": {
+        "color_index": "NORMAL",
+        "external_index_data": {
+          "minimal_price": "480.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "ozon_index_data": {
+          "minimal_price": "490.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        },
+        "self_marketplaces_index_data": {
+          "minimal_price": "500.00",
+          "minimal_price_currency": "RUB",
+          "price_index_value": 1
+        }
+      },
+      "primary_image": [],
+      "promotions": [
+        {
+          "is_enabled": true,
+          "type": "UNSPECIFIED"
+        }
+      ],
+      "sku": 100020,
+      "sources": [
+        {
+          "created_at": "2025-01-20T09:00:00Z",
+          "quant_code": "MSK",
+          "shipment_type": "FBO",
+          "sku": 100020,
+          "source": "fbo"
+        }
+      ],
+      "statuses": {
+        "is_created": true,
+        "moderate_status": "approved",
+        "status": "active",
+        "status_description": "OK",
+        "status_failed": "",
+        "status_name": "Active",
+        "status_tooltip": "",
+        "status_updated_at": "2025-01-20T11:00:00Z",
+        "validation_status": "ok"
+      },
+      "stocks": {
+        "has_stock": true,
+        "stocks": [
+          {
+            "present": 10,
+            "reserved": 1,
+            "sku": 100020,
+            "source": "fbo"
+          }
+        ]
+      },
+      "type_id": 1,
+      "updated_at": "2025-01-20T12:00:00Z",
+      "vat": "0.2",
+      "visibility_details": {
+        "has_price": true,
+        "has_stock": true
+      },
+      "volume_weight": 0.5
+    }
+  ]
+}
