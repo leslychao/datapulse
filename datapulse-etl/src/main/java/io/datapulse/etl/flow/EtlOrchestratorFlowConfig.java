@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -43,6 +44,7 @@ import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -236,11 +238,12 @@ public class EtlOrchestratorFlowConfig {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATE)
         .enrichHeaders(headers ->
-            headers.header(org.springframework.messaging.MessageHeaders.ERROR_CHANNEL,
+            headers.header(
+                MessageHeaders.ERROR_CHANNEL,
                 CH_ETL_ERRORS,
                 true
             ))
-        .headerFilter(org.springframework.messaging.MessageHeaders.REPLY_CHANNEL)
+        .headerFilter(MessageHeaders.REPLY_CHANNEL)
         .handle(EtlRunRequest.class, (request, headers) -> {
           validateRunRequest(request);
 
@@ -387,7 +390,7 @@ public class EtlOrchestratorFlowConfig {
       List<EtlSourceExecution> sourceExecutions
   ) {
     return sourceExecutions.stream()
-        .collect(java.util.stream.Collectors.groupingBy(EtlSourceExecution::marketplace))
+        .collect(Collectors.groupingBy(EtlSourceExecution::marketplace))
         .values()
         .stream()
         .toList();
