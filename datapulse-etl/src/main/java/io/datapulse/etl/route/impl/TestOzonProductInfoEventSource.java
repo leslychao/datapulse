@@ -1,7 +1,5 @@
 package io.datapulse.etl.route.impl;
 
-import static io.datapulse.etl.RawTableNames.OZON_PRODUCT_INFO;
-
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.ozon.OzonProductInfoRaw;
@@ -27,7 +25,6 @@ import org.springframework.stereotype.Component;
 @EtlSourceMeta(
     event = MarketplaceEvent.SALES_FACT,
     marketplace = MarketplaceType.OZON,
-    rawTable = OZON_PRODUCT_INFO,
     order = 1
 )
 public final class TestOzonProductInfoEventSource implements EventSource {

@@ -9,7 +9,6 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EXPECTED_SNAPSHOTS;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_RAW_TABLE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
@@ -306,10 +305,6 @@ public class EtlOrchestratorFlowConfig {
               EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
               return exec.to();
             })
-            .headerFunction(HDR_ETL_RAW_TABLE, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.rawTable();
-            })
         )
         .channel(CH_ETL_INGEST)
         .get();
@@ -416,7 +411,6 @@ public class EtlOrchestratorFlowConfig {
                   source.sourceId(),
                   source.event(),
                   marketplace,
-                  source.rawTable(),
                   request.accountId(),
                   request.from(),
                   request.to(),

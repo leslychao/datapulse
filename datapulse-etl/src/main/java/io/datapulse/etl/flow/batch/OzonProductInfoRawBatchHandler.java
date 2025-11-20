@@ -14,11 +14,6 @@ public class OzonProductInfoRawBatchHandler implements EtlBatchHandler<OzonProdu
   private final OzonProductInfoRawJdbcRepository rawRepository;
 
   @Override
-  public String rawTableName() {
-    return "raw_product_info_ozon";
-  }
-
-  @Override
   public Class<OzonProductInfoRaw> elementType() {
     return OzonProductInfoRaw.class;
   }

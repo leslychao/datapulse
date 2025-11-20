@@ -15,7 +15,5 @@ public @interface EtlSourceMeta {
 
   MarketplaceType marketplace();
 
-  String rawTable();
-
   int order() default 0;
 }

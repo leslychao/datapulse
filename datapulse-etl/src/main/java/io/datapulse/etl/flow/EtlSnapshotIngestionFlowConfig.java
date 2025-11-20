@@ -7,7 +7,6 @@ import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_SAVE_BATCH;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_RAW_TABLE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_ID;
@@ -63,7 +62,6 @@ public class EtlSnapshotIngestionFlowConfig {
       String sourceId,
       MarketplaceEvent event,
       MarketplaceType marketplace,
-      String rawTable,
       long accountId,
       LocalDate from,
       LocalDate to,
@@ -179,18 +177,16 @@ public class EtlSnapshotIngestionFlowConfig {
           String snapshotId = headers.get(HDR_ETL_SNAPSHOT_ID, String.class);
           Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
           MarketplaceType marketplace = headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
-          String rawTable = headers.get(HDR_ETL_RAW_TABLE, String.class);
           Path snapshotFile = headers.get(HDR_ETL_SNAPSHOT_FILE, Path.class);
 
           snapshotCommitBarrier.registerBatch(snapshotId);
 
           try {
-            etlBatchDispatcher.dispatch(rawTable, rawBatch, accountId, marketplace);
+            etlBatchDispatcher.dispatch(rawBatch, accountId, marketplace);
             snapshotCommitBarrier.batchCompleted(snapshotId);
             log.debug(
-                "ETL snapshot batch persisted: snapshotId={}, rawTable={}, batchSize={}",
+                "ETL snapshot batch persisted: snapshotId={}, batchSize={}",
                 snapshotId,
-                rawTable,
                 rawBatch.size()
             );
           } catch (Throwable throwable) {
@@ -349,9 +345,6 @@ public class EtlSnapshotIngestionFlowConfig {
     }
     if (headers.get(HDR_ETL_EVENT, String.class) == null) {
       missing.add("event");
-    }
-    if (headers.get(HDR_ETL_RAW_TABLE, String.class) == null) {
-      missing.add("rawTable");
     }
 
     if (!missing.isEmpty()) {

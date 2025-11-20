@@ -32,7 +32,6 @@ public final class EtlSourceRegistry {
               meta.marketplace(),
               meta.order(),
               type.getSimpleName(),
-              meta.rawTable(),
               source
           ));
     }
@@ -57,7 +56,6 @@ public final class EtlSourceRegistry {
       MarketplaceType marketplace,
       int order,
       String sourceId,
-      String rawTable,
       EventSource source
   ) {
 

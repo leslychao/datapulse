@@ -1,7 +1,5 @@
 package io.datapulse.etl.route.impl;
 
-import static io.datapulse.etl.RawTableNames.WB_REALIZATION;
-
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
@@ -18,8 +16,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @EtlSourceMeta(
     event = MarketplaceEvent.SALES_FACT,
-    marketplace = MarketplaceType.WILDBERRIES,
-    rawTable = WB_REALIZATION
+    marketplace = MarketplaceType.WILDBERRIES
 )
 public final class WbSalesFactEventSource implements EventSource {
 

@@ -19,44 +19,48 @@ public class EtlBatchDispatcher {
 
   private final List<EtlBatchHandler<?>> handlerList;
 
-  private Map<String, EtlBatchHandler<?>> handlersByRawTable;
+  private Map<Class<?>, EtlBatchHandler<?>> handlersByType;
 
   @PostConstruct
   void init() {
-    Map<String, EtlBatchHandler<?>> map = new HashMap<>();
+    Map<Class<?>, EtlBatchHandler<?>> map = new HashMap<>();
     for (EtlBatchHandler<?> handler : handlerList) {
-      String rawTableName = handler.rawTableName();
-      EtlBatchHandler<?> previous = map.put(rawTableName, handler);
+      Class<?> elementType = handler.elementType();
+      EtlBatchHandler<?> previous = map.put(elementType, handler);
       if (previous != null) {
-        throw new AppException(ETL_BATCH_HANDLER_DUPLICATE, rawTableName);
+        throw new AppException(ETL_BATCH_HANDLER_DUPLICATE, elementType.getName());
       }
     }
-    this.handlersByRawTable = Map.copyOf(map);
+    this.handlersByType = Map.copyOf(map);
   }
 
   public void dispatch(
-      String rawTable,
       List<?> rawBatch,
       Long accountId,
       MarketplaceType marketplace
   ) {
-    EtlBatchHandler<?> handler = handlersByRawTable.get(rawTable);
-    if (handler == null) {
-      throw new AppException(ETL_BATCH_HANDLER_NOT_FOUND, rawTable);
-    }
-
     if (rawBatch.isEmpty()) {
       return;
     }
 
-    Class<?> elementType = handler.elementType();
     Object first = rawBatch.get(0);
-    if (!elementType.isInstance(first)) {
+    Class<?> actualType = first.getClass();
+
+    EtlBatchHandler<?> handler = handlersByType.get(actualType);
+    if (handler == null) {
+      throw new AppException(
+          ETL_BATCH_HANDLER_NOT_FOUND,
+          actualType.getName()
+      );
+    }
+
+    Class<?> expectedType = handler.elementType();
+    if (!expectedType.isInstance(first)) {
       throw new AppException(
           ETL_BATCH_HANDLER_TYPE_MISMATCH,
-          rawTable,
-          elementType.getName(),
-          first.getClass().getName()
+          expectedType.getName(),
+          expectedType.getName(),
+          actualType.getName()
       );
     }
 

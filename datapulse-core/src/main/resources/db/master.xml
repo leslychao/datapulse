@@ -5,4 +5,5 @@
 
   <include file="changelog/0001-init-accounts-sales.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0002-account-active.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0003-init-raw-ozon-tables.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

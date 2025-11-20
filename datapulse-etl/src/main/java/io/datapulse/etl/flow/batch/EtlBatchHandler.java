@@ -5,8 +5,6 @@ import java.util.List;
 
 public interface EtlBatchHandler<T> {
 
-  String rawTableName();
-
   Class<T> elementType();
 
   void handleBatch(

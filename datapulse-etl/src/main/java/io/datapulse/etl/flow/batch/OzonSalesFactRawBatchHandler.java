@@ -9,15 +9,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class OzonSalesFactRawBatchHandler
-    implements EtlBatchHandler<OzonAnalyticsApiRaw> {
+public class OzonSalesFactRawBatchHandler implements EtlBatchHandler<OzonAnalyticsApiRaw> {
 
   private final OzonSalesFactRawJdbcRepository rawRepository;
-
-  @Override
-  public String rawTableName() {
-    return "raw_sales_fact_ozon";
-  }
 
   @Override
   public Class<OzonAnalyticsApiRaw> elementType() {
