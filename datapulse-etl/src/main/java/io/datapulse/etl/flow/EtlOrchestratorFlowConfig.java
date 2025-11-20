@@ -4,7 +4,6 @@ import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ERRORS;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_EVENT_INGEST_COMPLETED;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
-import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_PLAN_FAILED;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
@@ -20,7 +19,6 @@ import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.file.SnapshotCommitBarrier;
 import io.datapulse.etl.file.SnapshotCommitBarrier.SnapshotCompletionEvent;
-import io.datapulse.etl.flow.dto.EarlySourceFailureContext;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.route.EtlSourceRegistry;
 import io.datapulse.etl.route.EtlSourceRegistry.RegisteredSource;
@@ -45,7 +43,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.integration.channel.ExecutorChannel;
-import org.springframework.integration.channel.PublishSubscribeChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.messaging.MessageChannel;
@@ -351,11 +348,6 @@ public class EtlOrchestratorFlowConfig {
     return new ExecutorChannel(etlOrchestrateExecutor);
   }
 
-  @Bean(name = CH_ETL_PLAN_FAILED)
-  public MessageChannel etlPlanFailedChannel() {
-    return new PublishSubscribeChannel();
-  }
-
   @Bean
   public IntegrationFlow etlOrchestratorInboundFlow() {
     return IntegrationFlow
@@ -455,33 +447,6 @@ public class EtlOrchestratorFlowConfig {
 
           return null;
         }, endpoint -> endpoint.requiresReply(false))
-        .get();
-  }
-
-  @Bean
-  public IntegrationFlow orchestratorSourceFailListener() {
-    return IntegrationFlow
-        .from(CH_ETL_PLAN_FAILED)
-        .handle(String.class, (payload, headers) -> {
-          EarlySourceFailureContext ctx = EarlySourceFailureContext.fromHeaders(headers);
-
-          if (ctx.isComplete()) {
-            markSourceFailedBeforeSnapshot(
-                ctx.requestId(),
-                ctx.accountId(),
-                ctx.event(),
-                ctx.marketplace(),
-                ctx.sourceId()
-            );
-          } else {
-            log.warn(
-                "Plan-failure event received with incomplete context; headers={}",
-                headers
-            );
-          }
-
-          return null;
-        }, e -> e.requiresReply(false))
         .get();
   }
 

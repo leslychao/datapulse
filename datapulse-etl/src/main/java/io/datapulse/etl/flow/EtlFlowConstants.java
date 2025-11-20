@@ -12,7 +12,6 @@ public final class EtlFlowConstants {
   public static final String CH_ETL_EVENT_INGEST_COMPLETED = "ETL_EVENT_INGEST_COMPLETED";
   public static final String CH_ETL_EVENT_MATERIALIZED = "ETL_EVENT_MATERIALIZED";
   public static final String CH_ETL_EVENT_VIEWS_BUILT = "ETL_EVENT_VIEWS_BUILT";
-  public static final String CH_ETL_PLAN_FAILED = "ETL_PLAN_FAILED";
 
   public static final String HDR_ETL_REQUEST_ID = "ETL_REQUEST_ID";
   public static final String HDR_ETL_ACCOUNT_ID = "ETL_ACCOUNT_ID";
