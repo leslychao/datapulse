@@ -22,10 +22,9 @@ import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.etl.flow.batch.EtlBatchDispatcher;
+import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.i18n.ExceptionMessageService;
-import io.datapulse.etl.route.EventSource;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -59,19 +58,6 @@ public class EtlSnapshotIngestionFlowConfig {
   private final SnapshotIteratorFactory snapshotIteratorFactory;
   private final ExceptionMessageService exceptionMessageService;
   private final EtlOrchestratorFlowConfig orchestratorFlowConfig;
-
-  public record EtlSourceExecution(
-      String sourceId,
-      MarketplaceEvent event,
-      MarketplaceType marketplace,
-      Long accountId,
-      LocalDate from,
-      LocalDate to,
-      int order,
-      EventSource source
-  ) {
-
-  }
 
   @Bean("etlIngestExecutor")
   public TaskExecutor etlIngestExecutor() {
@@ -134,39 +120,16 @@ public class EtlSnapshotIngestionFlowConfig {
             );
             return requireSnapshotPayload(rawSnapshot);
           } catch (Throwable throwable) {
-            String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-            Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-            MarketplaceType marketplace =
-                headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
-            String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
-            String eventValue = headers.get(HDR_ETL_EVENT, String.class);
-            MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
-
             log.warn(
                 "ETL source failed before snapshot registration: requestId={}, accountId={}, "
                     + "event={}, marketplace={}, sourceId={}",
-                requestId,
-                accountId,
-                event,
-                marketplace,
-                sourceId,
+                headers.get(HDR_ETL_REQUEST_ID, String.class),
+                headers.get(HDR_ETL_ACCOUNT_ID, Long.class),
+                headers.get(HDR_ETL_EVENT, String.class),
+                headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class),
+                headers.get(HDR_ETL_SOURCE_ID, String.class),
                 throwable
             );
-
-            if (requestId != null
-                && accountId != null
-                && event != null
-                && marketplace != null
-                && sourceId != null) {
-              orchestratorFlowConfig.markSourceFailedBeforeSnapshot(
-                  requestId,
-                  accountId,
-                  event,
-                  marketplace,
-                  sourceId
-              );
-            }
-
             throw throwable;
           }
         })
@@ -247,8 +210,7 @@ public class EtlSnapshotIngestionFlowConfig {
 
             log.warn(
                 "ETL source execution failed; subsequent stages for this marketplace/event will NOT be started. "
-                    +
-                    "requestId={}, event={}, marketplace={}, sourceId={}, snapshotId={}, accountId={}",
+                    + "requestId={}, event={}, marketplace={}, sourceId={}, snapshotId={}, accountId={}",
                 requestId,
                 event,
                 marketplace,
@@ -383,24 +345,66 @@ public class EtlSnapshotIngestionFlowConfig {
     if (snapshotId != null || snapshotFile != null) {
       snapshotCommitBarrier.discard(snapshotId, snapshotFile);
     } else {
-      log.warn(
-          "ETL snapshot ingestion failed before snapshot registration: payload={}",
-          failedMessage.getPayload(),
-          rootCause
-      );
+      notifyOrchestratorAboutEarlySourceFailure(failedHeaders, rootCause);
     }
 
-    String context = "snapshotId=%s, file=%s"
-        .formatted(snapshotId, snapshotFile);
+    String context = "snapshotId=%s, file=%s".formatted(snapshotId, snapshotFile);
 
     log.error(
         "ETL snapshot ingestion failed: {}, payload={}",
         context,
-        failedMessage.getPayload()
+        failedMessage.getPayload(),
+        rootCause
     );
 
     if (rootCause != null) {
       exceptionMessageService.logEtlError(rootCause);
+    }
+  }
+
+  private void notifyOrchestratorAboutEarlySourceFailure(
+      MessageHeaders headers,
+      Throwable cause
+  ) {
+    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
+    Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
+    String eventValue = headers.get(HDR_ETL_EVENT, String.class);
+    MarketplaceEvent event =
+        eventValue != null ? MarketplaceEvent.fromString(eventValue) : null;
+    MarketplaceType marketplace =
+        headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
+    String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+
+    if (requestId != null
+        && accountId != null
+        && event != null
+        && marketplace != null
+        && sourceId != null) {
+      orchestratorFlowConfig.markSourceFailedBeforeSnapshot(
+          requestId,
+          accountId,
+          event,
+          marketplace,
+          sourceId
+      );
+
+      log.warn(
+          "ETL source failed before snapshot registration; "
+              + "plan will be marked as failed: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
+          requestId,
+          accountId,
+          event,
+          marketplace,
+          sourceId,
+          cause
+      );
+    } else {
+      log.warn(
+          "ETL source failed before snapshot registration but context is incomplete; "
+              + "cannot notify orchestrator reliably. headers={}",
+          headers,
+          cause
+      );
     }
   }
 

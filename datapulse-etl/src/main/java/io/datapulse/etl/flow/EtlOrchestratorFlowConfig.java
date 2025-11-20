@@ -19,7 +19,7 @@ import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.file.SnapshotCommitBarrier;
 import io.datapulse.etl.file.SnapshotCommitBarrier.SnapshotCompletionEvent;
-import io.datapulse.etl.flow.EtlSnapshotIngestionFlowConfig.EtlSourceExecution;
+import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.route.EtlSourceRegistry;
 import io.datapulse.etl.route.EtlSourceRegistry.RegisteredSource;
 import jakarta.annotation.PostConstruct;
