@@ -9,6 +9,8 @@ public interface EtlBatchHandler<T> {
 
   void handleBatch(
       List<T> rawBatch,
+      String requestId,
+      String snapshotId,
       Long accountId,
       MarketplaceType marketplace
   );

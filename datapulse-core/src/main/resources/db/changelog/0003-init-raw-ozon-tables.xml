@@ -15,11 +15,19 @@
       CREATE TABLE raw_sales_fact_ozon
       (
         id          BIGSERIAL PRIMARY KEY,
+        request_id  VARCHAR(64) NOT NULL,
+        snapshot_id VARCHAR(64) NOT NULL,
         account_id  BIGINT      NOT NULL,
         marketplace VARCHAR(32) NOT NULL,
         payload     JSONB       NOT NULL,
         created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+
+      CREATE INDEX IF NOT EXISTS idx_raw_sales_fact_ozon_req
+        ON raw_sales_fact_ozon (request_id);
+
+      CREATE INDEX IF NOT EXISTS idx_raw_sales_fact_ozon_snap
+        ON raw_sales_fact_ozon (snapshot_id);
 
       CREATE INDEX IF NOT EXISTS idx_raw_sales_fact_ozon_acc
         ON raw_sales_fact_ozon (account_id);
@@ -33,11 +41,19 @@
       CREATE TABLE raw_product_info_ozon
       (
         id          BIGSERIAL PRIMARY KEY,
+        request_id  VARCHAR(64) NOT NULL,
+        snapshot_id VARCHAR(64) NOT NULL,
         account_id  BIGINT      NOT NULL,
         marketplace VARCHAR(32) NOT NULL,
         payload     JSONB       NOT NULL,
         created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+
+      CREATE INDEX IF NOT EXISTS idx_raw_product_info_ozon_req
+        ON raw_product_info_ozon (request_id);
+
+      CREATE INDEX IF NOT EXISTS idx_raw_product_info_ozon_snap
+        ON raw_product_info_ozon (snapshot_id);
 
       CREATE INDEX IF NOT EXISTS idx_raw_product_info_ozon_acc
         ON raw_product_info_ozon (account_id);

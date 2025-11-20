@@ -24,14 +24,15 @@ import io.datapulse.etl.route.EtlSourceRegistry;
 import io.datapulse.etl.route.EtlSourceRegistry.RegisteredSource;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -54,16 +55,18 @@ public class EtlOrchestratorFlowConfig {
 
   private final EtlSourceRegistry etlSourceRegistry;
   private final SnapshotCommitBarrier snapshotCommitBarrier;
+  private final MessageChannel ingestChannel;
   private final MessageChannel eventIngestCompletedChannel;
 
   public EtlOrchestratorFlowConfig(
       EtlSourceRegistry etlSourceRegistry,
       SnapshotCommitBarrier snapshotCommitBarrier,
-      @Qualifier(CH_ETL_EVENT_INGEST_COMPLETED)
-      MessageChannel eventIngestCompletedChannel
+      @Qualifier(CH_ETL_INGEST) MessageChannel ingestChannel,
+      @Qualifier(CH_ETL_EVENT_INGEST_COMPLETED) MessageChannel eventIngestCompletedChannel
   ) {
     this.etlSourceRegistry = etlSourceRegistry;
     this.snapshotCommitBarrier = snapshotCommitBarrier;
+    this.ingestChannel = ingestChannel;
     this.eventIngestCompletedChannel = eventIngestCompletedChannel;
   }
 
@@ -118,6 +121,68 @@ public class EtlOrchestratorFlowConfig {
   private final Map<MaterializationJobKey, MaterializationJob> materializationJobs =
       new ConcurrentHashMap<>();
 
+  private record MarketplaceKey(
+      String requestId,
+      Long accountId,
+      MarketplaceEvent event,
+      MarketplaceType marketplace
+  ) {
+
+  }
+
+  private static final class MarketplaceExecutionPlan {
+
+    final String requestId;
+    final Long accountId;
+    final MarketplaceEvent event;
+    final MarketplaceType marketplace;
+    final Map<Integer, List<EtlSourceExecution>> stages;
+    final Set<String> completedSourceIds = ConcurrentHashMap.newKeySet();
+    int currentOrder;
+
+    MarketplaceExecutionPlan(
+        String requestId,
+        Long accountId,
+        MarketplaceEvent event,
+        MarketplaceType marketplace,
+        List<EtlSourceExecution> executions
+    ) {
+      this.requestId = requestId;
+      this.accountId = accountId;
+      this.event = event;
+      this.marketplace = marketplace;
+      this.stages = executions.stream()
+          .collect(
+              LinkedHashMap::new,
+              (map, exec) -> map
+                  .computeIfAbsent(exec.order(), o -> new ArrayList<>())
+                  .add(exec),
+              Map::putAll
+          );
+      this.currentOrder = stages.keySet().stream().min(Integer::compareTo).orElse(0);
+    }
+
+    boolean isCurrentStageCompleted() {
+      List<EtlSourceExecution> list = stages.getOrDefault(currentOrder, List.of());
+      for (EtlSourceExecution exec : list) {
+        if (!completedSourceIds.contains(exec.sourceId())) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    Integer nextOrder() {
+      return stages.keySet().stream()
+          .filter(o -> o > currentOrder)
+          .min(Integer::compareTo)
+          .orElse(null);
+    }
+  }
+
+  private final Map<MarketplaceKey, MarketplaceExecutionPlan> plans =
+      new ConcurrentHashMap<>();
+
   @PostConstruct
   public void registerSnapshotCompletionListener() {
     snapshotCommitBarrier.registerListener(this::onSnapshotCompleted);
@@ -134,50 +199,77 @@ public class EtlOrchestratorFlowConfig {
           event.snapshotId(),
           key
       );
-      return;
-    }
-
-    int done = job.completedSnapshots.incrementAndGet();
-    if (done > job.expectedSnapshots) {
-      log.warn(
-          "Snapshot completed over plan: key={}, done={}, expected={}",
-          key,
-          done,
-          job.expectedSnapshots
-      );
-    }
-
-    Map<String, Object> headers = new LinkedHashMap<>();
-    headers.put(HDR_ETL_REQUEST_ID, job.requestId);
-    headers.put(HDR_ETL_ACCOUNT_ID, job.accountId);
-    headers.put(HDR_ETL_EVENT, job.event.name());
-    headers.put(HDR_ETL_DATE_FROM, job.from);
-    headers.put(HDR_ETL_DATE_TO, job.to);
-    headers.put(HDR_ETL_EXPECTED_SNAPSHOTS, job.expectedSnapshots);
-
-    GenericMessage<String> message = new GenericMessage<>(event.snapshotId(), headers);
-
-    boolean sent = eventIngestCompletedChannel.send(message);
-    if (!sent) {
-      log.warn(
-          "Failed to send ingest-completed tick: snapshotId={}, key={}",
-          event.snapshotId(),
-          key
-      );
-    }
-
-    if (done == job.expectedSnapshots) {
-      boolean removed = materializationJobs.remove(key, job);
-      if (!removed) {
-        log.debug("MaterializationJob already removed by another thread: key={}", key);
-      } else {
-        log.debug(
-            "MaterializationJob completed and removed: key={}, expectedSnapshots={}",
+    } else {
+      int done = job.completedSnapshots.incrementAndGet();
+      if (done > job.expectedSnapshots) {
+        log.warn(
+            "Snapshot completed over plan: key={}, done={}, expected={}",
             key,
+            done,
             job.expectedSnapshots
         );
       }
+
+      Map<String, Object> headers = new LinkedHashMap<>();
+      headers.put(HDR_ETL_REQUEST_ID, job.requestId);
+      headers.put(HDR_ETL_ACCOUNT_ID, job.accountId);
+      headers.put(HDR_ETL_EVENT, job.event.name());
+      headers.put(HDR_ETL_DATE_FROM, job.from);
+      headers.put(HDR_ETL_DATE_TO, job.to);
+      headers.put(HDR_ETL_EXPECTED_SNAPSHOTS, job.expectedSnapshots);
+
+      GenericMessage<String> message = new GenericMessage<>(event.snapshotId(), headers);
+
+      boolean sent = eventIngestCompletedChannel.send(message);
+      if (!sent) {
+        log.warn(
+            "Failed to send ingest-completed tick: snapshotId={}, key={}",
+            event.snapshotId(),
+            key
+        );
+      }
+
+      if (done == job.expectedSnapshots) {
+        boolean removed = materializationJobs.remove(key, job);
+        if (!removed) {
+          log.debug("MaterializationJob already removed by another thread: key={}", key);
+        } else {
+          log.debug(
+              "MaterializationJob completed and removed: key={}, expectedSnapshots={}",
+              key,
+              job.expectedSnapshots
+          );
+        }
+      }
     }
+
+    MarketplaceKey marketplaceKey =
+        new MarketplaceKey(
+            event.requestId(),
+            event.accountId(),
+            event.event(),
+            event.marketplace()
+        );
+
+    MarketplaceExecutionPlan plan = plans.get(marketplaceKey);
+    if (plan == null) {
+      return;
+    }
+
+    plan.completedSourceIds.add(event.sourceId());
+
+    if (!plan.isCurrentStageCompleted()) {
+      return;
+    }
+
+    Integer nextOrder = plan.nextOrder();
+    if (nextOrder == null) {
+      plans.remove(marketplaceKey);
+      return;
+    }
+
+    plan.currentOrder = nextOrder;
+    startStage(plan, nextOrder);
   }
 
   @Bean("etlOrchestrateExecutor")
@@ -201,22 +293,6 @@ public class EtlOrchestratorFlowConfig {
     return new ExecutorChannel(etlOrchestrateExecutor);
   }
 
-  @Bean("etlMarketplaceExecutor")
-  public TaskExecutor etlMarketplaceExecutor(
-      @Value("${etl.marketplace.core-pool-size:4}") int corePoolSize,
-      @Value("${etl.marketplace.max-pool-size:16}") int maxPoolSize,
-      @Value("${etl.marketplace.queue-capacity:200}") int queueCapacity
-  ) {
-    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(corePoolSize);
-    executor.setMaxPoolSize(maxPoolSize);
-    executor.setQueueCapacity(queueCapacity);
-    executor.setThreadNamePrefix("etl-marketplace-");
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-    executor.initialize();
-    return executor;
-  }
-
   @Bean
   public IntegrationFlow etlOrchestratorInboundFlow() {
     return IntegrationFlow
@@ -234,7 +310,7 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlOrchestrateFlow(TaskExecutor etlMarketplaceExecutor) {
+  public IntegrationFlow etlOrchestrateFlow() {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATE)
         .enrichHeaders(headers ->
@@ -278,39 +354,75 @@ public class EtlOrchestratorFlowConfig {
               expectedSnapshots
           );
 
-          return groupExecutionsByMarketplace(sourceExecutions);
-        })
-        .split()
-        .channel(channelSpec -> channelSpec.executor(etlMarketplaceExecutor))
-        .split()
-        .enrichHeaders(headers -> headers
-            .headerFunction(HDR_ETL_SOURCE_ID, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.sourceId();
-            })
-            .headerFunction(HDR_ETL_SOURCE_MP, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.marketplace();
-            })
-            .headerFunction(HDR_ETL_ACCOUNT_ID, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.accountId();
-            })
-            .headerFunction(HDR_ETL_EVENT, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.event().name();
-            })
-            .headerFunction(HDR_ETL_DATE_FROM, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.from();
-            })
-            .headerFunction(HDR_ETL_DATE_TO, message -> {
-              EtlSourceExecution exec = (EtlSourceExecution) message.getPayload();
-              return exec.to();
-            })
-        )
-        .channel(CH_ETL_INGEST)
+          Map<MarketplaceType, List<EtlSourceExecution>> byMarketplace =
+              sourceExecutions.stream().collect(
+                  LinkedHashMap::new,
+                  (map, exec) -> map
+                      .computeIfAbsent(exec.marketplace(), m -> new ArrayList<>())
+                      .add(exec),
+                  Map::putAll
+              );
+
+          for (Map.Entry<MarketplaceType, List<EtlSourceExecution>> entry : byMarketplace.entrySet()) {
+            MarketplaceType marketplace = entry.getKey();
+            List<EtlSourceExecution> executions = entry.getValue();
+
+            MarketplaceExecutionPlan plan = new MarketplaceExecutionPlan(
+                requestId,
+                request.accountId(),
+                event,
+                marketplace,
+                executions
+            );
+
+            MarketplaceKey key = new MarketplaceKey(
+                requestId,
+                request.accountId(),
+                event,
+                marketplace
+            );
+
+            MarketplaceExecutionPlan previous = plans.put(key, plan);
+            if (previous != null) {
+              log.warn("Execution plan overwritten: key={}", key);
+            }
+
+            startStage(plan, plan.currentOrder);
+          }
+
+          return null;
+        }, endpoint -> endpoint.requiresReply(false))
         .get();
+  }
+
+  private void startStage(MarketplaceExecutionPlan plan, int order) {
+    List<EtlSourceExecution> list = plan.stages.get(order);
+    if (list == null || list.isEmpty()) {
+      return;
+    }
+
+    for (EtlSourceExecution exec : list) {
+      Map<String, Object> headers = new LinkedHashMap<>();
+      headers.put(HDR_ETL_REQUEST_ID, plan.requestId);
+      headers.put(HDR_ETL_ACCOUNT_ID, plan.accountId);
+      headers.put(HDR_ETL_EVENT, plan.event.name());
+      headers.put(HDR_ETL_DATE_FROM, exec.from());
+      headers.put(HDR_ETL_DATE_TO, exec.to());
+      headers.put(HDR_ETL_SOURCE_ID, exec.sourceId());
+      headers.put(HDR_ETL_SOURCE_MP, exec.marketplace());
+
+      GenericMessage<EtlSourceExecution> message = new GenericMessage<>(exec, headers);
+      boolean sent = ingestChannel.send(message);
+      if (!sent) {
+        log.warn(
+            "Failed to send EtlSourceExecution: requestId={}, marketplace={}, order={}, sourceId={}",
+            plan.requestId,
+            plan.marketplace,
+            order,
+            exec.sourceId()
+        );
+      }
+    }
   }
 
   private void registerMaterializationJob(
@@ -386,16 +498,6 @@ public class EtlOrchestratorFlowConfig {
     }
   }
 
-  private List<List<EtlSourceExecution>> groupExecutionsByMarketplace(
-      List<EtlSourceExecution> sourceExecutions
-  ) {
-    return sourceExecutions.stream()
-        .collect(Collectors.groupingBy(EtlSourceExecution::marketplace))
-        .values()
-        .stream()
-        .toList();
-  }
-
   private List<EtlSourceExecution> buildSourceExecutions(
       EtlRunRequest request,
       MarketplaceEvent event
@@ -417,6 +519,7 @@ public class EtlOrchestratorFlowConfig {
                   request.accountId(),
                   request.from(),
                   request.to(),
+                  source.order(),
                   source.source()
               ));
         })

@@ -21,9 +21,11 @@ public class OzonSalesFactRawBatchHandler implements EtlBatchHandler<OzonAnalyti
   @Override
   public void handleBatch(
       List<OzonAnalyticsApiRaw> rawBatch,
+      String requestId,
+      String snapshotId,
       Long accountId,
       MarketplaceType marketplace
   ) {
-    rawRepository.saveBatch(rawBatch, accountId, marketplace);
+    rawRepository.saveBatch(rawBatch, requestId, snapshotId, accountId, marketplace);
   }
 }

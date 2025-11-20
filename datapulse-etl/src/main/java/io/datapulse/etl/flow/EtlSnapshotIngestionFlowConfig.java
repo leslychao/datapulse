@@ -10,6 +10,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_ID;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
 
 import io.datapulse.domain.MarketplaceEvent;
@@ -49,7 +50,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 public class EtlSnapshotIngestionFlowConfig {
 
   private static final String CH_ETL_SNAPSHOT_READY = "ETL_SNAPSHOT_READY";
-
   private static final int SNAPSHOT_BATCH_SIZE = 500;
 
   private final SnapshotCommitBarrier snapshotCommitBarrier;
@@ -62,9 +62,10 @@ public class EtlSnapshotIngestionFlowConfig {
       String sourceId,
       MarketplaceEvent event,
       MarketplaceType marketplace,
-      long accountId,
+      Long accountId,
       LocalDate from,
       LocalDate to,
+      int order,
       EventSource source
   ) {
 
@@ -174,24 +175,48 @@ public class EtlSnapshotIngestionFlowConfig {
         .<List<?>>handle((rawBatch, headers) -> {
           validateRequiredEtlHeaders(headers);
 
+          String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
           String snapshotId = headers.get(HDR_ETL_SNAPSHOT_ID, String.class);
           Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-          MarketplaceType marketplace = headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
+          MarketplaceType marketplace =
+              headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
           Path snapshotFile = headers.get(HDR_ETL_SNAPSHOT_FILE, Path.class);
+          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+          String event = headers.get(HDR_ETL_EVENT, String.class);
 
           snapshotCommitBarrier.registerBatch(snapshotId);
 
           try {
-            etlBatchDispatcher.dispatch(rawBatch, accountId, marketplace);
+            etlBatchDispatcher.dispatch(
+                rawBatch,
+                requestId,
+                snapshotId,
+                accountId,
+                marketplace
+            );
             snapshotCommitBarrier.batchCompleted(snapshotId);
             log.debug(
-                "ETL snapshot batch persisted: snapshotId={}, batchSize={}",
+                "ETL snapshot batch persisted: requestId={}, snapshotId={}, sourceId={}, batchSize={}",
+                requestId,
                 snapshotId,
+                sourceId,
                 rawBatch.size()
             );
           } catch (Throwable throwable) {
             snapshotCommitBarrier.discard(snapshotId, snapshotFile);
             exceptionMessageService.logEtlError(throwable);
+
+            log.warn(
+                "ETL source execution failed; subsequent stages for this marketplace/event will NOT be started. "
+                    +
+                    "requestId={}, event={}, marketplace={}, sourceId={}, snapshotId={}, accountId={}",
+                requestId,
+                event,
+                marketplace,
+                sourceId,
+                snapshotId,
+                accountId
+            );
           }
           return null;
         }, endpoint -> endpoint.requiresReply(false))
@@ -231,13 +256,25 @@ public class EtlSnapshotIngestionFlowConfig {
       throw new AppException(ETL_CONTEXT_MISSING, "event=" + eventValue);
     }
 
+    MarketplaceType marketplace = headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
+    if (marketplace == null) {
+      throw new AppException(ETL_CONTEXT_MISSING, "marketplace");
+    }
+
+    String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+    if (sourceId == null) {
+      throw new AppException(ETL_CONTEXT_MISSING, "sourceId");
+    }
+
     Path snapshotFile = snapshot.file();
 
     return snapshotCommitBarrier.registerSnapshot(
         snapshotFile,
         requestId,
         accountId,
-        event
+        event,
+        marketplace,
+        sourceId
     );
   }
 

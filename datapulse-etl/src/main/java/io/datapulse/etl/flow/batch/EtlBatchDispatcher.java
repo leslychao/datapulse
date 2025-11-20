@@ -36,6 +36,8 @@ public class EtlBatchDispatcher {
 
   public void dispatch(
       List<?> rawBatch,
+      String requestId,
+      String snapshotId,
       Long accountId,
       MarketplaceType marketplace
   ) {
@@ -48,10 +50,7 @@ public class EtlBatchDispatcher {
 
     EtlBatchHandler<?> handler = handlersByType.get(actualType);
     if (handler == null) {
-      throw new AppException(
-          ETL_BATCH_HANDLER_NOT_FOUND,
-          actualType.getName()
-      );
+      throw new AppException(ETL_BATCH_HANDLER_NOT_FOUND, actualType.getName());
     }
 
     Class<?> expectedType = handler.elementType();
@@ -64,21 +63,22 @@ public class EtlBatchDispatcher {
       );
     }
 
-    dispatchTyped(handler, rawBatch, accountId, marketplace);
+    dispatchTyped(handler, rawBatch, requestId, snapshotId, accountId, marketplace);
   }
 
   private <T> void dispatchTyped(
       EtlBatchHandler<T> handler,
       List<?> rawBatch,
+      String requestId,
+      String snapshotId,
       Long accountId,
       MarketplaceType marketplace
   ) {
     Class<T> elementType = handler.elementType();
-
     List<T> typedBatch = rawBatch.stream()
         .map(elementType::cast)
         .toList();
 
-    handler.handleBatch(typedBatch, accountId, marketplace);
+    handler.handleBatch(typedBatch, requestId, snapshotId, accountId, marketplace);
   }
 }

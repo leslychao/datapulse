@@ -1,6 +1,7 @@
 package io.datapulse.etl.file;
 
 import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.domain.MarketplaceType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,16 +27,27 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
     final String requestId;
     final Long accountId;
     final MarketplaceEvent event;
+    final MarketplaceType marketplace;
+    final String sourceId;
 
     final AtomicInteger batches = new AtomicInteger(0);
     volatile boolean snapshotCompleted = false;
     volatile boolean hasElements = false;
 
-    SnapshotState(Path file, String requestId, Long accountId, MarketplaceEvent event) {
+    SnapshotState(
+        Path file,
+        String requestId,
+        Long accountId,
+        MarketplaceEvent event,
+        MarketplaceType marketplace,
+        String sourceId
+    ) {
       this.file = file;
       this.requestId = requestId;
       this.accountId = accountId;
       this.event = event;
+      this.marketplace = marketplace;
+      this.sourceId = sourceId;
     }
 
     boolean isReadyToComplete() {
@@ -44,7 +56,6 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
   }
 
   private final Map<String, SnapshotState> snapshots = new ConcurrentHashMap<>();
-
   private final List<SnapshotCompletionListener> listeners = new CopyOnWriteArrayList<>();
 
   @Override
@@ -52,15 +63,26 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
       Path file,
       String requestId,
       Long accountId,
-      MarketplaceEvent event
+      MarketplaceEvent event,
+      MarketplaceType marketplace,
+      String sourceId
   ) {
     Objects.requireNonNull(file, "file must not be null");
     Objects.requireNonNull(requestId, "requestId must not be null");
     Objects.requireNonNull(accountId, "accountId must not be null");
     Objects.requireNonNull(event, "event must not be null");
+    Objects.requireNonNull(marketplace, "marketplace must not be null");
+    Objects.requireNonNull(sourceId, "sourceId must not be null");
 
     String snapshotId = UUID.randomUUID().toString();
-    snapshots.put(snapshotId, new SnapshotState(file, requestId, accountId, event));
+    snapshots.put(snapshotId, new SnapshotState(
+        file,
+        requestId,
+        accountId,
+        event,
+        marketplace,
+        sourceId
+    ));
 
     log.debug("Snapshot registered: id={}, file={}", snapshotId, file);
     return snapshotId;
@@ -131,12 +153,14 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
     deleteFile(removed.file, "complete");
 
     log.info(
-        "Snapshot fully completed: id={}, file={}, requestId={}, accountId={}, event={}",
+        "Snapshot fully completed: id={}, file={}, requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
         snapshotId,
         removed.file,
         removed.requestId,
         removed.accountId,
-        removed.event
+        removed.event,
+        removed.marketplace,
+        removed.sourceId
     );
 
     SnapshotCompletionEvent event = new SnapshotCompletionEvent(
@@ -144,7 +168,9 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
         removed.file,
         removed.requestId,
         removed.accountId,
-        removed.event
+        removed.event,
+        removed.marketplace,
+        removed.sourceId
     );
 
     for (SnapshotCompletionListener listener : listeners) {

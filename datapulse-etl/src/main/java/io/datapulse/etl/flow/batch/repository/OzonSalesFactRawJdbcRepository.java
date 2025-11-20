@@ -18,8 +18,9 @@ import org.springframework.stereotype.Repository;
 public class OzonSalesFactRawJdbcRepository {
 
   private static final String INSERT_SQL = """
-      insert into raw_sales_fact_ozon (account_id, marketplace, payload)
-      values (?, ?, cast(? as jsonb))
+      insert into raw_sales_fact_ozon
+        (request_id, snapshot_id, account_id, marketplace, payload)
+      values (?, ?, ?, ?, cast(? as jsonb))
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -27,6 +28,8 @@ public class OzonSalesFactRawJdbcRepository {
 
   public void saveBatch(
       List<OzonAnalyticsApiRaw> batch,
+      String requestId,
+      String snapshotId,
       Long accountId,
       MarketplaceType marketplace
   ) {
@@ -39,9 +42,11 @@ public class OzonSalesFactRawJdbcRepository {
         batch,
         batch.size(),
         (ps, raw) -> {
-          ps.setLong(1, accountId);
-          ps.setString(2, marketplace.name());
-          ps.setString(3, toJson(raw));
+          ps.setObject(1, requestId);
+          ps.setObject(2, snapshotId);
+          ps.setLong(3, accountId);
+          ps.setString(4, marketplace.name());
+          ps.setString(5, toJson(raw));
         }
     );
   }
