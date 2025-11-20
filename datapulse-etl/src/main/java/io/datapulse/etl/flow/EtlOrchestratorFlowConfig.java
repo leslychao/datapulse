@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -132,6 +133,8 @@ public class EtlOrchestratorFlowConfig {
 
   private static final class MarketplaceExecutionPlan {
 
+    final ReentrantLock lock = new ReentrantLock();
+
     final String requestId;
     final Long accountId;
     final MarketplaceEvent event;
@@ -139,6 +142,7 @@ public class EtlOrchestratorFlowConfig {
     final Map<Integer, List<EtlSourceExecution>> stages;
     final Set<String> completedSourceIds = ConcurrentHashMap.newKeySet();
     int currentOrder;
+    boolean failed;
 
     MarketplaceExecutionPlan(
         String requestId,
@@ -186,6 +190,43 @@ public class EtlOrchestratorFlowConfig {
   @PostConstruct
   public void registerSnapshotCompletionListener() {
     snapshotCommitBarrier.registerListener(this::onSnapshotCompleted);
+  }
+
+  public void markSourceFailedBeforeSnapshot(
+      String requestId,
+      Long accountId,
+      MarketplaceEvent event,
+      MarketplaceType marketplace,
+      String sourceId
+  ) {
+    MaterializationJobKey jobKey = new MaterializationJobKey(requestId, accountId, event);
+    MarketplaceKey planKey = new MarketplaceKey(requestId, accountId, event, marketplace);
+
+    MaterializationJob removedJob = materializationJobs.remove(jobKey);
+    MarketplaceExecutionPlan plan = plans.get(planKey);
+    boolean planRemoved = false;
+
+    if (plan != null) {
+      plan.lock.lock();
+      try {
+        plan.failed = true;
+        planRemoved = plans.remove(planKey, plan);
+      } finally {
+        plan.lock.unlock();
+      }
+    }
+
+    log.warn(
+        "ETL orchestration failed before snapshot registration: requestId={}, accountId={}, "
+            + "event={}, marketplace={}, sourceId={}, jobRemoved={}, planRemoved={}",
+        requestId,
+        accountId,
+        event,
+        marketplace,
+        sourceId,
+        removedJob != null,
+        planRemoved
+    );
   }
 
   private void onSnapshotCompleted(SnapshotCompletionEvent event) {
@@ -256,20 +297,34 @@ public class EtlOrchestratorFlowConfig {
       return;
     }
 
-    plan.completedSourceIds.add(event.sourceId());
+    Integer nextOrderToStart = null;
 
-    if (!plan.isCurrentStageCompleted()) {
-      return;
+    plan.lock.lock();
+    try {
+      if (plan.failed) {
+        return;
+      }
+
+      plan.completedSourceIds.add(event.sourceId());
+
+      if (!plan.isCurrentStageCompleted()) {
+        return;
+      }
+
+      Integer nextOrder = plan.nextOrder();
+      if (nextOrder == null) {
+        plans.remove(marketplaceKey);
+      } else {
+        plan.currentOrder = nextOrder;
+        nextOrderToStart = nextOrder;
+      }
+    } finally {
+      plan.lock.unlock();
     }
 
-    Integer nextOrder = plan.nextOrder();
-    if (nextOrder == null) {
-      plans.remove(marketplaceKey);
-      return;
+    if (nextOrderToStart != null) {
+      startStage(plan, nextOrderToStart);
     }
-
-    plan.currentOrder = nextOrder;
-    startStage(plan, nextOrder);
   }
 
   @Bean("etlOrchestrateExecutor")

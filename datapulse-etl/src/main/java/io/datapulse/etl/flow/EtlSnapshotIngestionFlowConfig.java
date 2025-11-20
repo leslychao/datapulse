@@ -57,6 +57,7 @@ public class EtlSnapshotIngestionFlowConfig {
   private final SnapshotJsonLayoutRegistry snapshotJsonLayoutRegistry;
   private final SnapshotIteratorFactory snapshotIteratorFactory;
   private final ExceptionMessageService exceptionMessageService;
+  private final EtlOrchestratorFlowConfig orchestratorFlowConfig;
 
   public record EtlSourceExecution(
       String sourceId,
@@ -123,13 +124,50 @@ public class EtlSnapshotIngestionFlowConfig {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
         .handle(EtlSourceExecution.class, (command, headers) -> {
-          Object rawSnapshot = command.source().fetchSnapshot(
-              command.accountId(),
-              command.event(),
-              command.from(),
-              command.to()
-          );
-          return requireSnapshotPayload(rawSnapshot);
+          try {
+            Object rawSnapshot = command.source().fetchSnapshot(
+                command.accountId(),
+                command.event(),
+                command.from(),
+                command.to()
+            );
+            return requireSnapshotPayload(rawSnapshot);
+          } catch (Throwable throwable) {
+            String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
+            Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
+            MarketplaceType marketplace =
+                headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
+            String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+            String eventValue = headers.get(HDR_ETL_EVENT, String.class);
+            MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
+
+            log.warn(
+                "ETL source failed before snapshot registration: requestId={}, accountId={}, "
+                    + "event={}, marketplace={}, sourceId={}",
+                requestId,
+                accountId,
+                event,
+                marketplace,
+                sourceId,
+                throwable
+            );
+
+            if (requestId != null
+                && accountId != null
+                && event != null
+                && marketplace != null
+                && sourceId != null) {
+              orchestratorFlowConfig.markSourceFailedBeforeSnapshot(
+                  requestId,
+                  accountId,
+                  event,
+                  marketplace,
+                  sourceId
+              );
+            }
+
+            throw throwable;
+          }
         })
         .enrichHeaders(enricher -> enricher
             .headerFunction(

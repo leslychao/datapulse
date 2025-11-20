@@ -12,13 +12,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier {
 
   private static final class SnapshotState {
@@ -135,9 +133,7 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
 
     state.snapshotCompleted = true;
 
-    if (!state.hasElements) {
-      tryComplete(snapshotId, state);
-    }
+    tryComplete(snapshotId, state);
   }
 
   private void tryComplete(String snapshotId, SnapshotState state) {
