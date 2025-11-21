@@ -98,7 +98,7 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlIngestFlow(Advice snapshotErrorAdvice) {
+  public IntegrationFlow etlIngestFlow() {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
         .handle(
@@ -107,7 +107,7 @@ public class EtlSnapshotIngestionFlowConfig {
                 command,
                 new MessageHeaders(headersMap)
             ),
-            endpoint -> endpoint.advice(snapshotErrorAdvice).requiresReply(true)
+            endpoint -> endpoint.requiresReply(false)
         )
         .enrichHeaders(enricher -> enricher
             .headerFunction(
@@ -115,12 +115,7 @@ public class EtlSnapshotIngestionFlowConfig {
                 message -> requireSnapshotPayload(message.getPayload()).file()
             )
         )
-        .wireTap(CH_ETL_SNAPSHOT_READY)
-        .handle(
-            Object.class,
-            (payload, headersMap) -> Boolean.TRUE,
-            endpoint -> endpoint.requiresReply(true)
-        )
+        .channel(CH_ETL_SNAPSHOT_READY)
         .get();
   }
 

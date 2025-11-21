@@ -17,7 +17,6 @@ import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.route.EtlSourceRegistry;
 import io.datapulse.etl.route.EtlSourceRegistry.RegisteredSource;
-import io.datapulse.etl.service.materialization.EtlMaterializationService;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,26 +33,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.http.dsl.Http;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHeaders;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 @Slf4j
 public class EtlOrchestratorFlowConfig {
 
-  private static final String HDR_ETL_EXPECTED_EXECUTIONS = "ETL_EXPECTED_EXECUTIONS";
-
   private final EtlSourceRegistry etlSourceRegistry;
-  private final EtlMaterializationService etlMaterializationService;
 
-  public EtlOrchestratorFlowConfig(
-      EtlSourceRegistry etlSourceRegistry,
-      EtlMaterializationService etlMaterializationService
-  ) {
+  public EtlOrchestratorFlowConfig(EtlSourceRegistry etlSourceRegistry) {
     this.etlSourceRegistry = etlSourceRegistry;
-    this.etlMaterializationService = etlMaterializationService;
   }
 
   public record EtlRunRequest(
@@ -183,24 +173,6 @@ public class EtlOrchestratorFlowConfig {
         .handle(OrchestrationCommand.class,
             (command, headers) -> buildMarketplacePlans(command)
         )
-        .enrichHeaders(h -> h.headerFunction(HDR_ETL_EXPECTED_EXECUTIONS, message -> {
-          Object payload = message.getPayload();
-          if (!(payload instanceof List<?> payloadList)) {
-            log.warn(
-                "Unexpected payload type for expected executions calculation: {}",
-                payload.getClass().getName()
-            );
-            return null;
-          }
-
-          int totalExecutions = 0;
-          for (Object element : payloadList) {
-            if (element instanceof MarketplacePlan plan) {
-              totalExecutions += plan.executions().size();
-            }
-          }
-          return totalExecutions;
-        }))
         .split()
         .enrichHeaders(h -> h
             .headerFunction(HDR_ETL_SOURCE_MP,
@@ -217,97 +189,7 @@ public class EtlOrchestratorFlowConfig {
             e -> e
                 .requestTimeout(0L)
                 .replyTimeout(0L)
-                .requiresReply(true)
-        )
-        .aggregate(a -> a
-            .correlationStrategy(message ->
-                message.getHeaders().get(HDR_ETL_REQUEST_ID)
-            )
-            .releaseStrategy(group -> {
-              Message<?> anyMessage = group.getOne();
-              if (anyMessage == null) {
-                log.warn("Orchestrator aggregate completed with empty group");
-                return true;
-              }
-
-              MessageHeaders headers = anyMessage.getHeaders();
-              Integer expected = headers.get(
-                  HDR_ETL_EXPECTED_EXECUTIONS,
-                  Integer.class
-              );
-
-              if (expected == null) {
-                log.warn(
-                    "Orchestrator aggregate has no '{}' header, releasing immediately",
-                    HDR_ETL_EXPECTED_EXECUTIONS
-                );
-                return true;
-              }
-
-              int currentSize = group.size();
-              if (currentSize > expected) {
-                log.warn(
-                    "Orchestrator aggregate group size exceeded expected executions: expected={}, actual={}",
-                    expected,
-                    currentSize
-                );
-                return true;
-              }
-
-              return currentSize == expected;
-            })
-            .outputProcessor(group -> {
-              Message<?> anyMessage = group.getOne();
-              if (anyMessage == null) {
-                log.warn("ETL orchestration aggregate completed with empty message group");
-                return null;
-              }
-
-              MessageHeaders headers = anyMessage.getHeaders();
-
-              String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-              Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-              String eventValue = headers.get(HDR_ETL_EVENT, String.class);
-              LocalDate from = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
-              LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
-
-              if (requestId == null
-                  || accountId == null
-                  || eventValue == null
-                  || from == null
-                  || to == null) {
-                log.warn(
-                    "Cannot trigger materialization: missing context headers; requestId={}, accountId={}, event={}, from={}, to={}",
-                    requestId,
-                    accountId,
-                    eventValue,
-                    from,
-                    to
-                );
-                return null;
-              }
-
-              MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
-              if (event == null) {
-                log.warn(
-                    "Cannot trigger materialization: unknown event '{}', requestId={}",
-                    eventValue,
-                    requestId
-                );
-                return null;
-              }
-
-              etlMaterializationService.materialize(
-                  accountId,
-                  event,
-                  from,
-                  to,
-                  requestId
-              );
-
-              return null;
-            })
-            .requiresReply(false)
+                .requiresReply(false)
         )
         .get();
   }
