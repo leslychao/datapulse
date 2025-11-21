@@ -11,9 +11,11 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
 
+import io.datapulse.core.service.AccountService;
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
+import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.flow.dto.IngestResult;
@@ -21,13 +23,13 @@ import io.datapulse.etl.route.EtlSourceRegistry;
 import io.datapulse.etl.route.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.service.materialization.EtlMaterializationService;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -45,20 +47,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 @Slf4j
+@RequiredArgsConstructor
 public class EtlOrchestratorFlowConfig {
 
   private static final String HDR_ETL_EXPECTED_SOURCES = "ETL_EXPECTED_SOURCES";
 
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlMaterializationService materializationService;
-
-  public EtlOrchestratorFlowConfig(
-      EtlSourceRegistry etlSourceRegistry,
-      EtlMaterializationService materializationService
-  ) {
-    this.etlSourceRegistry = etlSourceRegistry;
-    this.materializationService = materializationService;
-  }
+  private final AccountService accountService;
 
   public record EtlRunRequest(
       Long accountId,
@@ -66,10 +62,6 @@ public class EtlOrchestratorFlowConfig {
       LocalDate from,
       LocalDate to
   ) {
-
-  }
-
-  private record RequiredField(String name, Object value) {
 
   }
 
@@ -87,6 +79,10 @@ public class EtlOrchestratorFlowConfig {
       MarketplaceType marketplace,
       List<EtlSourceExecution> executions
   ) {
+
+  }
+
+  private record RequiredField(String name, Object value) {
 
   }
 
@@ -113,9 +109,10 @@ public class EtlOrchestratorFlowConfig {
   @Bean
   public IntegrationFlow etlHttpInboundFlow() {
     return IntegrationFlow
-        .from(Http.inboundGateway("/api/etl/run")
-            .requestPayloadType(EtlRunRequest.class)
-            .statusCodeFunction(m -> HttpStatus.ACCEPTED)
+        .from(
+            Http.inboundGateway("/api/etl/run")
+                .requestPayloadType(EtlRunRequest.class)
+                .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
         .gateway(CH_ETL_RUN_CORE)
@@ -126,9 +123,10 @@ public class EtlOrchestratorFlowConfig {
   public IntegrationFlow etlScheduledRunFlow() {
     return IntegrationFlow
         .fromSupplier(
-            this::buildScheduledRunRequest,
+            this::buildScheduledRunRequests,
             spec -> spec.poller(Pollers.cron("0 0 * * * *"))
         )
+        .split()
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
         .gateway(CH_ETL_RUN_CORE)
         .get();
@@ -161,96 +159,51 @@ public class EtlOrchestratorFlowConfig {
             )
         )
         .wireTap(CH_ETL_ORCHESTRATE)
-        .handle(OrchestrationCommand.class, (command, headers) -> {
-          String requestId = command.requestId();
-          Long accountId = command.accountId();
-          MarketplaceEvent event = command.event();
-          LocalDate from = command.from();
-          LocalDate to = command.to();
-          log.info(
-              "ETL orchestration requested: requestId={}, accountId={}, event={}, from={}, to={}",
-              requestId,
-              accountId,
-              event,
-              from,
-              to
-          );
-          Map<String, Object> body = new LinkedHashMap<>();
-          body.put("status", "accepted");
-          body.put("requestId", requestId);
-          body.put("event", event.name());
-          body.put("from", from);
-          body.put("to", to);
-          return body;
-        })
+        .handle(
+            OrchestrationCommand.class,
+            (command, headersMap) -> buildAcceptedResponse(command)
+        )
         .get();
-  }
-
-  private OrchestrationCommand toOrchestrationCommand(EtlRunRequest request) {
-    validateRunRequest(request);
-    MarketplaceEvent event = MarketplaceEvent.fromString(request.event());
-    if (event == null) {
-      throw new AppException(
-          MessageCodes.ETL_REQUEST_INVALID,
-          "event=" + request.event()
-      );
-    }
-    String requestId = UUID.randomUUID().toString();
-    return new OrchestrationCommand(
-        requestId,
-        request.accountId(),
-        event,
-        request.from(),
-        request.to()
-    );
-  }
-
-  private EtlRunRequest buildScheduledRunRequest() {
-    LocalDate yesterday = LocalDate.now().minusDays(1);
-    return new EtlRunRequest(
-        123L,
-        "SALES",
-        yesterday,
-        yesterday
-    );
   }
 
   @Bean
   public IntegrationFlow etlOrchestratorFlow(TaskExecutor etlOrchestrateExecutor) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATE)
-        .handle(OrchestrationCommand.class,
-            (command, headers) -> buildMarketplacePlans(command)
-        )
-        .enrichHeaders(h -> h.headerFunction(
+        .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
+        .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_EXPECTED_SOURCES,
-            m -> {
-              Object payload = m.getPayload();
-              if (payload instanceof List<?> list) {
-                return list.stream()
-                    .filter(MarketplacePlan.class::isInstance)
-                    .map(MarketplacePlan.class::cast)
-                    .mapToInt(plan -> plan.executions().size())
-                    .sum();
+            message -> {
+              Object payload = message.getPayload();
+              if (!(payload instanceof List<?> rawPlans)) {
+                log.warn(
+                    "Unexpected payload type for orchestrator expected sources calculation: {}",
+                    payload.getClass().getName()
+                );
+                return 0;
               }
-              return 0;
+              List<MarketplacePlan> plans = rawPlans.stream()
+                  .filter(MarketplacePlan.class::isInstance)
+                  .map(MarketplacePlan.class::cast)
+                  .toList();
+              return calculateExpectedSources(plans);
             }
         ))
         .split()
-        .enrichHeaders(h -> h.headerFunction(
+        .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_SOURCE_MP,
             message -> ((MarketplacePlan) message.getPayload()).marketplace()
         ))
         .transform(MarketplacePlan.class, MarketplacePlan::executions)
         .split()
-        .enrichHeaders(h -> h.headerFunction(
+        .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_SOURCE_ID,
             message -> ((EtlSourceExecution) message.getPayload()).sourceId()
         ))
-        .channel(c -> c.executor(etlOrchestrateExecutor))
+        .channel(channelSpec -> channelSpec.executor(etlOrchestrateExecutor))
         .gateway(
             CH_ETL_INGEST,
-            spec -> spec
+            gatewaySpec -> gatewaySpec
                 .requestTimeout(0L)
                 .replyTimeout(0L)
                 .requiresReply(true)
@@ -291,73 +244,129 @@ public class EtlOrchestratorFlowConfig {
               return false;
             })
             .expireGroupsUponCompletion(true)
-            .outputProcessor(group -> {
-              List<IngestResult> results = new ArrayList<>();
-              for (Message<?> msg : group.getMessages()) {
-                Object p = msg.getPayload();
-                if (p instanceof IngestResult r) {
-                  results.add(r);
-                }
-              }
-              return results;
-            })
+            .outputProcessor(group -> group.getMessages()
+                .stream()
+                .map(Message::getPayload)
+                .filter(IngestResult.class::isInstance)
+                .map(IngestResult.class::cast)
+                .toList()
+            )
         )
         .handle(
-            List.class,
-            (payload, headers) -> {
-              List<IngestResult> results = new ArrayList<>();
-              for (Object element : payload) {
-                if (element instanceof IngestResult result) {
-                  results.add(result);
-                }
-              }
-
-              String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-              Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-              String eventValue = headers.get(HDR_ETL_EVENT, String.class);
-              LocalDate from = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
-              LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
-
-              MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
-
-              List<String> failedSources = results.stream()
-                  .filter(result -> !result.success())
-                  .map(IngestResult::sourceId)
-                  .toList();
-
-              if (!failedSources.isEmpty()) {
-                log.warn(
-                    "ETL orchestration completed with failures; materialization will NOT be started: "
-                        + "requestId={}, event={}, from={}, to={}, failedSources={}",
-                    requestId,
-                    event,
-                    from,
-                    to,
-                    failedSources
-                );
-                return null;
-              }
-
-              log.info(
-                  "ETL orchestration completed successfully; starting materialization: "
-                      + "requestId={}, event={}, from={}, to={}",
-                  requestId,
-                  event,
-                  from,
-                  to
-              );
-
-              materializationService.materialize(
-                  accountId,
-                  event,
-                  from,
-                  to,
-                  requestId
-              );
-              return null;
-            }
+            Object.class,
+            this::handleOrchestratorResults,
+            endpoint -> endpoint.requiresReply(false)
         )
         .get();
+  }
+
+  private Object handleOrchestratorResults(Object payload, MessageHeaders headers) {
+    if (!(payload instanceof List<?> rawList)) {
+      log.warn(
+          "Unexpected payload type in orchestrator results: {}",
+          payload == null ? "null" : payload.getClass().getName()
+      );
+      return null;
+    }
+
+    List<IngestResult> results = rawList.stream()
+        .filter(IngestResult.class::isInstance)
+        .map(IngestResult.class::cast)
+        .toList();
+
+    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
+    Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
+    String eventValue = headers.get(HDR_ETL_EVENT, String.class);
+    LocalDate from = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
+    LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
+
+    MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
+    if (event == null) {
+      throw new AppException(
+          MessageCodes.ETL_REQUEST_INVALID,
+          "event=" + eventValue
+      );
+    }
+
+    List<String> failedSources = results.stream()
+        .filter(result -> !result.success())
+        .map(IngestResult::sourceId)
+        .toList();
+
+    if (!failedSources.isEmpty()) {
+      log.warn(
+          "ETL orchestration completed with failures; materialization will NOT be started: "
+              + "requestId={}, event={}, from={}, to={}, failedSources={}",
+          requestId,
+          event,
+          from,
+          to,
+          failedSources
+      );
+      return null;
+    }
+
+    log.info(
+        "ETL orchestration completed successfully; starting materialization: "
+            + "requestId={}, event={}, from={}, to={}",
+        requestId,
+        event,
+        from,
+        to
+    );
+
+    materializationService.materialize(
+        accountId,
+        event,
+        from,
+        to,
+        requestId
+    );
+    return null;
+  }
+
+  private Map<String, Object> buildAcceptedResponse(OrchestrationCommand command) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", "accepted");
+    body.put("requestId", command.requestId());
+    body.put("event", command.event().name());
+    body.put("from", command.from());
+    body.put("to", command.to());
+    return body;
+  }
+
+  private OrchestrationCommand toOrchestrationCommand(EtlRunRequest request) {
+    validateRunRequest(request);
+    MarketplaceEvent event = MarketplaceEvent.fromString(request.event());
+    if (event == null) {
+      throw new AppException(
+          MessageCodes.ETL_REQUEST_INVALID,
+          "event=" + request.event()
+      );
+    }
+    String requestId = UUID.randomUUID().toString();
+    return new OrchestrationCommand(
+        requestId,
+        request.accountId(),
+        event,
+        request.from(),
+        request.to()
+    );
+  }
+
+  private List<EtlRunRequest> buildScheduledRunRequests() {
+    LocalDate yesterday = LocalDate.now().minusDays(1);
+    LocalDate today = LocalDate.now();
+
+    return accountService.streamActive()
+        .map(AccountDto::getId)
+        .map(accountId -> new EtlRunRequest(
+            accountId,
+            MarketplaceEvent.SALES_FACT.name(),
+            yesterday,
+            today
+        ))
+        .toList();
   }
 
   private void validateRunRequest(EtlRunRequest request) {
@@ -389,28 +398,7 @@ public class EtlOrchestratorFlowConfig {
   private List<MarketplacePlan> buildMarketplacePlans(OrchestrationCommand command) {
     List<MarketplacePlan> plans = Stream
         .of(MarketplaceType.values())
-        .map(marketplace -> {
-          List<RegisteredSource> sources =
-              etlSourceRegistry.findSources(command.event(), marketplace);
-          if (sources.isEmpty()) {
-            return null;
-          }
-
-          List<EtlSourceExecution> executions = sources.stream()
-              .map(source -> new EtlSourceExecution(
-                  source.sourceId(),
-                  source.event(),
-                  marketplace,
-                  command.accountId(),
-                  command.from(),
-                  command.to(),
-                  source.order(),
-                  source.source()
-              ))
-              .toList();
-
-          return new MarketplacePlan(marketplace, executions);
-        })
+        .map(marketplace -> buildMarketplacePlan(command, marketplace))
         .filter(Objects::nonNull)
         .toList();
 
@@ -422,5 +410,37 @@ public class EtlOrchestratorFlowConfig {
     }
 
     return plans;
+  }
+
+  private MarketplacePlan buildMarketplacePlan(
+      OrchestrationCommand command,
+      MarketplaceType marketplace
+  ) {
+    List<RegisteredSource> sources =
+        etlSourceRegistry.findSources(command.event(), marketplace);
+    if (sources.isEmpty()) {
+      return null;
+    }
+
+    List<EtlSourceExecution> executions = sources.stream()
+        .map(source -> new EtlSourceExecution(
+            source.sourceId(),
+            source.event(),
+            marketplace,
+            command.accountId(),
+            command.from(),
+            command.to(),
+            source.order(),
+            source.source()
+        ))
+        .toList();
+
+    return new MarketplacePlan(marketplace, executions);
+  }
+
+  private int calculateExpectedSources(List<MarketplacePlan> plans) {
+    return plans.stream()
+        .mapToInt(plan -> plan.executions().size())
+        .sum();
   }
 }
