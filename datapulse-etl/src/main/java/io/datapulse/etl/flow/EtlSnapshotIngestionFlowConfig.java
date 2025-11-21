@@ -107,7 +107,7 @@ public class EtlSnapshotIngestionFlowConfig {
                 command,
                 new MessageHeaders(headersMap)
             ),
-            endpoint -> endpoint.requiresReply(false)
+            endpoint -> endpoint.requiresReply(true)
         )
         .enrichHeaders(enricher -> enricher
             .headerFunction(

@@ -184,13 +184,7 @@ public class EtlOrchestratorFlowConfig {
             .headerFunction(HDR_ETL_SOURCE_ID,
                 m -> ((EtlSourceExecution) m.getPayload()).sourceId())
         )
-        .gateway(
-            CH_ETL_INGEST,
-            e -> e
-                .requestTimeout(0L)
-                .replyTimeout(0L)
-                .requiresReply(false)
-        )
+        .channel(CH_ETL_INGEST)
         .get();
   }
 
