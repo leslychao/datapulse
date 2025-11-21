@@ -4,33 +4,40 @@ import io.datapulse.domain.MarketplaceType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
-public record SalesFactDto(
+@Getter
+@Setter
+@EqualsAndHashCode(callSuper = true)
+public class SalesFactDto extends LongBaseDto {
 
-    long accountId,
-    MarketplaceType marketplace,
+  private Long id;
 
-    LocalDate operationDate,
-    OffsetDateTime operationDateTime,
+  private long accountId;
+  private MarketplaceType marketplace;
 
-    String offerId,
-    String barcode,
-    String size,
-    String warehouseName,
-    String regionName,
+  private LocalDate operationDate;
+  private OffsetDateTime operationDateTime;
 
-    int quantity,
+  private String offerId;
+  private String barcode;
+  private String size;
+  private String warehouseName;
+  private String regionName;
 
-    BigDecimal grossAmount,
-    BigDecimal commissionAmount,
-    BigDecimal logisticsAndFeesAmount,
-    BigDecimal promoAmount,
-    BigDecimal netAmount,
+  private int quantity;
 
-    SalesOperationType operationType,
-    String externalOperationId,
-    String currencyCode
-) {
+  private BigDecimal grossAmount;
+  private BigDecimal commissionAmount;
+  private BigDecimal logisticsAndFeesAmount;
+  private BigDecimal promoAmount;
+  private BigDecimal netAmount;
+
+  private SalesOperationType operationType;
+  private String externalOperationId;
+  private String currencyCode;
 
   public enum SalesOperationType {
     SALE,

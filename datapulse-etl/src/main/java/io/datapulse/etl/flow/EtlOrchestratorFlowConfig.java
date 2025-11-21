@@ -12,10 +12,12 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
 
 import io.datapulse.core.service.AccountService;
+import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountDto;
+import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.flow.dto.IngestResult;
@@ -55,6 +57,7 @@ public class EtlOrchestratorFlowConfig {
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlMaterializationService materializationService;
   private final AccountService accountService;
+  private final EtlSyncAuditService etlSyncAuditService;
 
   public record EtlRunRequest(
       Long accountId,
@@ -84,6 +87,23 @@ public class EtlOrchestratorFlowConfig {
 
   private record RequiredField(String name, Object value) {
 
+  }
+
+  private record EtlAuditContext(
+      String requestId,
+      Long accountId,
+      String eventValue,
+      LocalDate dateFrom,
+      LocalDate dateTo
+  ) {
+
+    boolean hasAllRequiredFields() {
+      return requestId != null
+          && accountId != null
+          && eventValue != null
+          && dateFrom != null
+          && dateTo != null;
+    }
   }
 
   @Bean("etlOrchestrateExecutor")
@@ -255,6 +275,11 @@ public class EtlOrchestratorFlowConfig {
         .handle(
             Object.class,
             this::handleOrchestratorResults,
+            endpoint -> endpoint.requiresReply(true)
+        )
+        .handle(
+            Object.class,
+            this::handleAudit,
             endpoint -> endpoint.requiresReply(false)
         )
         .get();
@@ -266,7 +291,7 @@ public class EtlOrchestratorFlowConfig {
           "Unexpected payload type in orchestrator results: {}",
           payload == null ? "null" : payload.getClass().getName()
       );
-      return null;
+      return payload;
     }
 
     List<IngestResult> results = rawList.stream()
@@ -274,17 +299,13 @@ public class EtlOrchestratorFlowConfig {
         .map(IngestResult.class::cast)
         .toList();
 
-    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-    Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-    String eventValue = headers.get(HDR_ETL_EVENT, String.class);
-    LocalDate from = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
-    LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
+    EtlAuditContext context = extractAuditContext(headers);
 
-    MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
+    MarketplaceEvent event = MarketplaceEvent.fromString(context.eventValue());
     if (event == null) {
       throw new AppException(
           MessageCodes.ETL_REQUEST_INVALID,
-          "event=" + eventValue
+          "event=" + context.eventValue()
       );
     }
 
@@ -297,32 +318,77 @@ public class EtlOrchestratorFlowConfig {
       log.warn(
           "ETL orchestration completed with failures; materialization will NOT be started: "
               + "requestId={}, event={}, from={}, to={}, failedSources={}",
-          requestId,
+          context.requestId(),
           event,
-          from,
-          to,
+          context.dateFrom(),
+          context.dateTo(),
           failedSources
       );
-      return null;
+      return payload;
     }
 
     log.info(
         "ETL orchestration completed successfully; starting materialization: "
             + "requestId={}, event={}, from={}, to={}",
-        requestId,
+        context.requestId(),
         event,
-        from,
-        to
+        context.dateFrom(),
+        context.dateTo()
     );
 
     materializationService.materialize(
-        accountId,
+        context.accountId(),
         event,
-        from,
-        to,
-        requestId
+        context.dateFrom(),
+        context.dateTo(),
+        context.requestId()
     );
-    return null;
+
+    return payload;
+  }
+
+  private Object handleAudit(Object payload, MessageHeaders headers) {
+    EtlAuditContext context = extractAuditContext(headers);
+
+    if (!context.hasAllRequiredFields()) {
+      log.warn(
+          "ETL аудит пропущен: не хватает обязательных заголовков. requestId={}, accountId={}, event={}, from={}, to={}",
+          context.requestId(),
+          context.accountId(),
+          context.eventValue(),
+          context.dateFrom(),
+          context.dateTo()
+      );
+      return payload;
+    }
+
+    etlSyncAuditService.save(
+        new EtlSyncAuditDto(
+            context.requestId(),
+            context.accountId(),
+            context.eventValue(),
+            context.dateFrom(),
+            context.dateTo()
+        )
+    );
+
+    return payload;
+  }
+
+  private EtlAuditContext extractAuditContext(MessageHeaders headers) {
+    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
+    Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
+    String eventValue = headers.get(HDR_ETL_EVENT, String.class);
+    LocalDate from = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
+    LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
+
+    return new EtlAuditContext(
+        requestId,
+        accountId,
+        eventValue,
+        from,
+        to
+    );
   }
 
   private Map<String, Object> buildAcceptedResponse(OrchestrationCommand command) {

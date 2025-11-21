@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0004-create-etl-sync-audit" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      -- ================================
+      -- ETL SYNC AUDIT
+      -- ================================
+      CREATE TABLE etl_sync_audit
+      (
+        id          BIGSERIAL PRIMARY KEY,
+        request_id  VARCHAR(64) NOT NULL,
+        account_id  BIGINT      NOT NULL,
+        event       VARCHAR(64) NOT NULL,
+        date_from   DATE        NOT NULL,
+        date_to     DATE        NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_etl_sync_audit_req
+        ON etl_sync_audit (request_id);
+
+      CREATE INDEX IF NOT EXISTS idx_etl_sync_audit_acc_created
+        ON etl_sync_audit (account_id, created_at DESC);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS etl_sync_audit CASCADE;
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>
