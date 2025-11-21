@@ -6,4 +6,6 @@
   <include file="changelog/0001-init-accounts-sales.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0002-account-active.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0003-init-raw-ozon-tables.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0004-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0005-create-raw-realization-fact-wb.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

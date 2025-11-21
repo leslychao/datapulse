@@ -42,6 +42,7 @@ import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.Pollers;
 import org.springframework.integration.http.dsl.Http;
+import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
@@ -190,6 +191,7 @@ public class EtlOrchestratorFlowConfig {
   public IntegrationFlow etlOrchestratorFlow(TaskExecutor etlOrchestrateExecutor) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATE)
+        .headerFilter(MessageHeaders.REPLY_CHANNEL, MessageHeaders.ERROR_CHANNEL)
         .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
         .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_EXPECTED_SOURCES,
@@ -229,8 +231,8 @@ public class EtlOrchestratorFlowConfig {
                 .requiresReply(true)
         )
         .aggregate(aggregator -> aggregator
-            .correlationStrategy(
-                message -> message.getHeaders().get(HDR_ETL_REQUEST_ID)
+            .correlationStrategy(message ->
+                message.getHeaders().get(HDR_ETL_REQUEST_ID, String.class)
             )
             .releaseStrategy(group -> {
               Message<?> sampleMessage = group.getOne();
@@ -264,13 +266,23 @@ public class EtlOrchestratorFlowConfig {
               return false;
             })
             .expireGroupsUponCompletion(true)
-            .outputProcessor(group -> group.getMessages()
-                .stream()
-                .map(Message::getPayload)
-                .filter(IngestResult.class::isInstance)
-                .map(IngestResult.class::cast)
-                .toList()
-            )
+            .outputProcessor(group -> {
+              List<IngestResult> results = group
+                  .getMessages()
+                  .stream()
+                  .map(Message::getPayload)
+                  .filter(IngestResult.class::isInstance)
+                  .map(IngestResult.class::cast)
+                  .toList();
+
+              Message<?> sample = group.getOne();
+              MessageHeaders headers = sample != null ? sample.getHeaders() : null;
+
+              return MessageBuilder
+                  .withPayload(results)
+                  .copyHeadersIfAbsent(headers != null ? headers : Map.of())
+                  .build();
+            })
         )
         .handle(
             Object.class,
@@ -359,7 +371,7 @@ public class EtlOrchestratorFlowConfig {
           context.dateFrom(),
           context.dateTo()
       );
-      return payload;
+      return null;
     }
 
     etlSyncAuditService.save(
@@ -372,7 +384,7 @@ public class EtlOrchestratorFlowConfig {
         )
     );
 
-    return payload;
+    return null;
   }
 
   private EtlAuditContext extractAuditContext(MessageHeaders headers) {
