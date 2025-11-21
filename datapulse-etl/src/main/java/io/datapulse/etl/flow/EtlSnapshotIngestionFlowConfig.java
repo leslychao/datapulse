@@ -24,6 +24,7 @@ import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.etl.flow.batch.EtlBatchDispatcher;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
+import io.datapulse.etl.flow.dto.IngestResult;
 import io.datapulse.etl.i18n.ExceptionMessageService;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,7 +40,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.channel.DirectChannel;
+import org.springframework.integration.dsl.BaseIntegrationFlowDefinition;
 import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.integration.handler.advice.RequestHandlerRetryAdvice;
 import org.springframework.integration.util.CloseableIterator;
@@ -84,6 +87,39 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   @Bean
+  public Advice ingestResultAdvice() {
+    return new AbstractRequestHandlerAdvice() {
+      @Override
+      protected Object doInvoke(
+          ExecutionCallback callback,
+          Object target,
+          Message<?> message
+      ) {
+        try {
+          return callback.execute();
+        } catch (Exception ex) {
+          MessageHeaders headers = message.getHeaders();
+          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+
+          log.warn(
+              "ETL ingest fetchSnapshot failed: sourceId={}, exceptionClass={}, message={}",
+              sourceId,
+              ex.getClass().getName(),
+              ex.getMessage()
+          );
+
+          return new IngestResult(
+              sourceId,
+              false,
+              ex.getClass().getSimpleName(),
+              ex.getMessage()
+          );
+        }
+      }
+    };
+  }
+
+  @Bean
   public Advice snapshotErrorAdvice(
       @Qualifier(CH_ETL_ERRORS) MessageChannel etlIngestErrorChannel
   ) {
@@ -100,7 +136,7 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlIngestFlow() {
+  public IntegrationFlow etlIngestFlow(Advice ingestResultAdvice) {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
         .handle(
@@ -109,15 +145,36 @@ public class EtlSnapshotIngestionFlowConfig {
                 command,
                 new MessageHeaders(headersMap)
             ),
-            endpoint -> endpoint.requiresReply(true)
+            endpoint -> endpoint
+                .requiresReply(true)
+                .advice(ingestResultAdvice)
         )
-        .enrichHeaders(enricher -> enricher
-            .headerFunction(
-                HDR_ETL_SNAPSHOT_FILE,
-                message -> requireSnapshotPayload(message.getPayload()).file()
-            )
+        .<Object, Boolean>route(
+            payload -> payload instanceof Snapshot<?>,
+            mapping -> mapping
+                .subFlowMapping(true, subFlow -> subFlow
+                    .enrichHeaders(enricher -> enricher
+                        .headerFunction(
+                            HDR_ETL_SNAPSHOT_FILE,
+                            message -> requireSnapshotPayload(message.getPayload()).file()
+                        )
+                    )
+                    .wireTap(CH_ETL_SNAPSHOT_READY)
+                    .handle(
+                        Snapshot.class,
+                        (snapshot, headers) -> {
+                          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+                          return new IngestResult(
+                              sourceId,
+                              true,
+                              null,
+                              null
+                          );
+                        }
+                    )
+                )
+                .subFlowMapping(false, BaseIntegrationFlowDefinition::bridge)
         )
-        .channel(CH_ETL_SNAPSHOT_READY)
         .get();
   }
 
@@ -160,7 +217,9 @@ public class EtlSnapshotIngestionFlowConfig {
               persistBatch(rawBatch, headers);
               return null;
             },
-            endpoint -> endpoint.requiresReply(false).advice(snapshotErrorAdvice)
+            endpoint -> endpoint
+                .requiresReply(false)
+                .advice(snapshotErrorAdvice)
         )
         .get();
   }
