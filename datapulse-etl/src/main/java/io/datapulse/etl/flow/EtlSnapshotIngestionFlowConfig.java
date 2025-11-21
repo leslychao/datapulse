@@ -4,6 +4,7 @@ import static io.datapulse.domain.MessageCodes.DOWNLOAD_FAILED;
 import static io.datapulse.domain.MessageCodes.ETL_CONTEXT_MISSING;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ERRORS;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
+import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_PLAN_FAILED;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_SAVE_BATCH;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
@@ -22,14 +23,15 @@ import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.etl.flow.batch.EtlBatchDispatcher;
+import io.datapulse.etl.flow.dto.EarlySourceFailureContext;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.i18n.ExceptionMessageService;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
@@ -42,10 +44,10 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.MessagingException;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
-@RequiredArgsConstructor
 @Slf4j
 public class EtlSnapshotIngestionFlowConfig {
 
@@ -57,7 +59,23 @@ public class EtlSnapshotIngestionFlowConfig {
   private final SnapshotJsonLayoutRegistry snapshotJsonLayoutRegistry;
   private final SnapshotIteratorFactory snapshotIteratorFactory;
   private final ExceptionMessageService exceptionMessageService;
-  private final EtlOrchestratorFlowConfig orchestratorFlowConfig;
+  private final MessageChannel planFailedChannel;
+
+  public EtlSnapshotIngestionFlowConfig(
+      SnapshotCommitBarrier snapshotCommitBarrier,
+      EtlBatchDispatcher etlBatchDispatcher,
+      SnapshotJsonLayoutRegistry snapshotJsonLayoutRegistry,
+      SnapshotIteratorFactory snapshotIteratorFactory,
+      ExceptionMessageService exceptionMessageService,
+      @Qualifier(CH_ETL_PLAN_FAILED) MessageChannel planFailedChannel
+  ) {
+    this.snapshotCommitBarrier = snapshotCommitBarrier;
+    this.etlBatchDispatcher = etlBatchDispatcher;
+    this.snapshotJsonLayoutRegistry = snapshotJsonLayoutRegistry;
+    this.snapshotIteratorFactory = snapshotIteratorFactory;
+    this.exceptionMessageService = exceptionMessageService;
+    this.planFailedChannel = planFailedChannel;
+  }
 
   @Bean("etlIngestExecutor")
   public TaskExecutor etlIngestExecutor() {
@@ -366,46 +384,39 @@ public class EtlSnapshotIngestionFlowConfig {
       MessageHeaders headers,
       Throwable cause
   ) {
-    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-    Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-    String eventValue = headers.get(HDR_ETL_EVENT, String.class);
-    MarketplaceEvent event =
-        eventValue != null ? MarketplaceEvent.fromString(eventValue) : null;
-    MarketplaceType marketplace =
-        headers.get(HDR_ETL_SOURCE_MP, MarketplaceType.class);
-    String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+    EarlySourceFailureContext ctx = EarlySourceFailureContext.fromHeaders(headers);
 
-    if (requestId != null
-        && accountId != null
-        && event != null
-        && marketplace != null
-        && sourceId != null) {
-      orchestratorFlowConfig.markSourceFailedBeforeSnapshot(
-          requestId,
-          accountId,
-          event,
-          marketplace,
-          sourceId
+    if (ctx.isComplete()) {
+      planFailedChannel.send(
+          MessageBuilder.withPayload("ETL_SOURCE_FAILED_BEFORE_SNAPSHOT")
+              .setHeader(HDR_ETL_REQUEST_ID, ctx.requestId())
+              .setHeader(HDR_ETL_ACCOUNT_ID, ctx.accountId())
+              .setHeader(HDR_ETL_EVENT, ctx.event().name())
+              .setHeader(HDR_ETL_SOURCE_MP, ctx.marketplace())
+              .setHeader(HDR_ETL_SOURCE_ID, ctx.sourceId())
+              .build()
       );
 
       log.warn(
-          "ETL source failed before snapshot registration; "
-              + "plan will be marked as failed: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
-          requestId,
-          accountId,
-          event,
-          marketplace,
-          sourceId,
+          "ETL source failed before snapshot registration; plan failure emitted: "
+              + "requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
+          ctx.requestId(),
+          ctx.accountId(),
+          ctx.event(),
+          ctx.marketplace(),
+          ctx.sourceId(),
           cause
       );
-    } else {
-      log.warn(
-          "ETL source failed before snapshot registration but context is incomplete; "
-              + "cannot notify orchestrator reliably. headers={}",
-          headers,
-          cause
-      );
+
+      return;
     }
+
+    log.warn(
+        "ETL source failed before snapshot registration but context is incomplete; "
+            + "cannot emit plan failure event reliably. headers={}",
+        headers,
+        cause
+    );
   }
 
   private void validateRequiredEtlHeaders(MessageHeaders headers) {
