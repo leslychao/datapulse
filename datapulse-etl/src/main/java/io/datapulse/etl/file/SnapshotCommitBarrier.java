@@ -6,24 +6,6 @@ import java.nio.file.Path;
 
 public interface SnapshotCommitBarrier {
 
-  record SnapshotCompletionEvent(
-      String snapshotId,
-      Path file,
-      String requestId,
-      Long accountId,
-      MarketplaceEvent event,
-      MarketplaceType marketplace,
-      String sourceId
-  ) {
-
-  }
-
-  @FunctionalInterface
-  interface SnapshotCompletionListener {
-
-    void onSnapshotCompleted(SnapshotCompletionEvent event);
-  }
-
   String registerSnapshot(
       Path file,
       String requestId,
@@ -42,6 +24,4 @@ public interface SnapshotCommitBarrier {
   void snapshotCompleted(String snapshotId);
 
   void discard(String snapshotId, Path providedFile);
-
-  void registerListener(SnapshotCompletionListener listener);
 }

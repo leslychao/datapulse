@@ -5,12 +5,10 @@ import io.datapulse.domain.MarketplaceType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -49,12 +47,14 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
     }
 
     boolean isReadyToComplete() {
+      if (!hasElements) {
+        return snapshotCompleted;
+      }
       return snapshotCompleted && batches.get() == 0;
     }
   }
 
   private final Map<String, SnapshotState> snapshots = new ConcurrentHashMap<>();
-  private final List<SnapshotCompletionListener> listeners = new CopyOnWriteArrayList<>();
 
   @Override
   public String registerSnapshot(
@@ -73,14 +73,15 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
     Objects.requireNonNull(sourceId, "sourceId must not be null");
 
     String snapshotId = UUID.randomUUID().toString();
-    snapshots.put(snapshotId, new SnapshotState(
+    SnapshotState state = new SnapshotState(
         file,
         requestId,
         accountId,
         event,
         marketplace,
         sourceId
-    ));
+    );
+    snapshots.put(snapshotId, state);
 
     log.debug("Snapshot registered: id={}, file={}", snapshotId, file);
     return snapshotId;
@@ -88,29 +89,30 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
 
   @Override
   public void registerFirstElement(String snapshotId) {
-    SnapshotState state = snapshots.get(snapshotId);
+    SnapshotState state = findStateOrWarn(snapshotId, "registerFirstElement");
     if (state == null) {
-      log.error("registerFirstElement(): unknown snapshotId={}", snapshotId);
       return;
     }
+
     state.hasElements = true;
+    log.trace("registerFirstElement(): snapshotId={}", snapshotId);
   }
 
   @Override
   public void registerBatch(String snapshotId) {
-    SnapshotState state = snapshots.get(snapshotId);
+    SnapshotState state = findStateOrWarn(snapshotId, "registerBatch");
     if (state == null) {
-      log.error("registerBatch(): unknown snapshotId={}", snapshotId);
       return;
     }
-    state.batches.incrementAndGet();
+
+    int value = state.batches.incrementAndGet();
+    log.trace("registerBatch(): snapshotId={}, batches={}", snapshotId, value);
   }
 
   @Override
   public void batchCompleted(String snapshotId) {
-    SnapshotState state = snapshots.get(snapshotId);
+    SnapshotState state = findStateOrWarn(snapshotId, "batchCompleted");
     if (state == null) {
-      log.error("batchCompleted(): unknown snapshotId={}", snapshotId);
       return;
     }
 
@@ -118,6 +120,8 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
     if (remaining < 0) {
       state.batches.set(0);
       log.error("batchCompleted(): negative batch counter for snapshotId={}", snapshotId);
+    } else {
+      log.trace("batchCompleted(): snapshotId={}, remaining={}", snapshotId, remaining);
     }
 
     tryComplete(snapshotId, state);
@@ -125,15 +129,58 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
 
   @Override
   public void snapshotCompleted(String snapshotId) {
-    SnapshotState state = snapshots.get(snapshotId);
+    SnapshotState state = findStateOrWarn(snapshotId, "snapshotCompleted");
     if (state == null) {
-      log.error("snapshotCompleted(): unknown snapshotId={}", snapshotId);
       return;
     }
 
     state.snapshotCompleted = true;
+    log.trace(
+        "snapshotCompleted(): snapshotId={}, hasElements={}, batches={}",
+        snapshotId,
+        state.hasElements,
+        state.batches.get()
+    );
 
-    tryComplete(snapshotId, state);
+    if (!state.hasElements) {
+      tryComplete(snapshotId, state);
+    }
+  }
+
+  @Override
+  public void discard(String snapshotId, Path providedFile) {
+    Path fileToDelete = providedFile;
+
+    SnapshotState removed = snapshotId != null ? snapshots.remove(snapshotId) : null;
+    if (removed != null) {
+      fileToDelete = removed.file != null ? removed.file : providedFile;
+      log.warn(
+          "Snapshot discarded: id={}, file={}, requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
+          snapshotId,
+          fileToDelete,
+          removed.requestId,
+          removed.accountId,
+          removed.event,
+          removed.marketplace,
+          removed.sourceId
+      );
+    } else if (snapshotId == null) {
+      log.warn("discard(): null snapshotId, file={}", providedFile);
+    } else {
+      log.warn("discard(): unknown snapshotId={}, file={}", snapshotId, providedFile);
+    }
+
+    if (fileToDelete != null) {
+      deleteFile(fileToDelete, "discard");
+    }
+  }
+
+  private SnapshotState findStateOrWarn(String snapshotId, String operation) {
+    SnapshotState state = snapshots.get(snapshotId);
+    if (state == null) {
+      log.error("{}(): unknown snapshotId={}", operation, snapshotId);
+    }
+    return state;
   }
 
   private void tryComplete(String snapshotId, SnapshotState state) {
@@ -143,6 +190,7 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
 
     SnapshotState removed = snapshots.remove(snapshotId);
     if (removed != state) {
+      log.trace("tryComplete(): state already removed or changed for snapshotId={}", snapshotId);
       return;
     }
 
@@ -158,48 +206,6 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
         removed.marketplace,
         removed.sourceId
     );
-
-    SnapshotCompletionEvent event = new SnapshotCompletionEvent(
-        snapshotId,
-        removed.file,
-        removed.requestId,
-        removed.accountId,
-        removed.event,
-        removed.marketplace,
-        removed.sourceId
-    );
-
-    for (SnapshotCompletionListener listener : listeners) {
-      try {
-        listener.onSnapshotCompleted(event);
-      } catch (Exception ex) {
-        log.warn(
-            "SnapshotCompletionListener failed: snapshotId={}, listener={}",
-            snapshotId,
-            listener,
-            ex
-        );
-      }
-    }
-  }
-
-  @Override
-  public void discard(String snapshotId, Path providedFile) {
-    Path fileToDelete = providedFile;
-
-    SnapshotState removed = snapshotId != null ? snapshots.remove(snapshotId) : null;
-    if (removed != null) {
-      fileToDelete = removed.file != null ? removed.file : providedFile;
-      log.warn("Snapshot discarded: id={}, file={}", snapshotId, fileToDelete);
-    } else if (snapshotId == null) {
-      log.warn("discard(): null snapshotId, file={}", providedFile);
-    } else {
-      log.warn("discard(): unknown snapshotId={}, file={}", snapshotId, providedFile);
-    }
-
-    if (fileToDelete != null) {
-      deleteFile(fileToDelete, "discard");
-    }
   }
 
   private void deleteFile(Path file, String reason) {
@@ -209,14 +215,5 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
     } catch (IOException ex) {
       log.warn("Snapshot file delete failed: file={}, reason={}", file, reason, ex);
     }
-  }
-
-  @Override
-  public void registerListener(SnapshotCompletionListener listener) {
-    if (listener == null) {
-      return;
-    }
-    listeners.add(listener);
-    log.debug("SnapshotCompletionListener registered: {}", listener);
   }
 }

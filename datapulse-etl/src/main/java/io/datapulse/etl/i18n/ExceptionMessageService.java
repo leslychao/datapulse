@@ -2,6 +2,7 @@ package io.datapulse.etl.i18n;
 
 import io.datapulse.domain.exception.AppException;
 import java.util.Locale;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
@@ -27,7 +28,15 @@ public class ExceptionMessageService {
     return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 
+  public String resolveUserMessage(Throwable throwable) {
+    return resolveUserMessage(throwable, DEFAULT_LOCALE);
+  }
+
   public String resolveUserMessage(Throwable throwable, Locale locale) {
+    if (throwable == null) {
+      return "Неизвестная ошибка";
+    }
+
     Locale targetLocale = locale != null ? locale : DEFAULT_LOCALE;
 
     if (throwable instanceof AppException appException) {
@@ -47,10 +56,15 @@ public class ExceptionMessageService {
   }
 
   public String resolveLogMessage(Throwable throwable) {
-    return resolveUserMessage(throwable, DEFAULT_LOCALE);
+    return resolveUserMessage(Objects.requireNonNull(throwable), DEFAULT_LOCALE);
   }
 
   public void logEtlError(Throwable throwable) {
-    log.error("ETL error: {}", resolveLogMessage(throwable));
+    if (throwable == null) {
+      log.error("ETL error: неизвестная ошибка (throwable is null)");
+      return;
+    }
+    String message = resolveLogMessage(throwable);
+    log.error("ETL error: {}", message, throwable);
   }
 }
