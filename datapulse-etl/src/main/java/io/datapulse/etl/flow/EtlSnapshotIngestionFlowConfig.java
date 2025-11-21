@@ -107,7 +107,7 @@ public class EtlSnapshotIngestionFlowConfig {
                 command,
                 new MessageHeaders(headersMap)
             ),
-            endpoint -> endpoint.advice(snapshotErrorAdvice)
+            endpoint -> endpoint.advice(snapshotErrorAdvice).requiresReply(true)
         )
         .enrichHeaders(enricher -> enricher
             .headerFunction(
@@ -115,7 +115,12 @@ public class EtlSnapshotIngestionFlowConfig {
                 message -> requireSnapshotPayload(message.getPayload()).file()
             )
         )
-        .channel(CH_ETL_SNAPSHOT_READY)
+        .wireTap(CH_ETL_SNAPSHOT_READY)
+        .handle(
+            Object.class,
+            (payload, headersMap) -> Boolean.TRUE,
+            endpoint -> endpoint.requiresReply(true)
+        )
         .get();
   }
 

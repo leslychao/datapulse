@@ -1,6 +1,5 @@
 package io.datapulse.etl.flow;
 
-import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ERRORS;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
@@ -107,11 +106,6 @@ public class EtlOrchestratorFlowConfig {
     return new ExecutorChannel(etlOrchestrateExecutor);
   }
 
-  /**
-   * HTTP → fire-and-forget:
-   * - сразу возвращаем 202 + body,
-   * - оркестратор уходит в асинхрон через wireTap(CH_ETL_ORCHESTRATE).
-   */
   @Bean
   public IntegrationFlow etlHttpInboundFlow() {
     return IntegrationFlow
@@ -119,7 +113,6 @@ public class EtlOrchestratorFlowConfig {
             .requestPayloadType(EtlRunRequest.class)
             .mappedRequestHeaders("*")
             .statusCodeFunction(m -> HttpStatus.ACCEPTED)
-            .errorChannel(CH_ETL_ERRORS)
         )
         .enrichHeaders(headers -> headers
             .headerFunction(HDR_ETL_REQUEST_ID, m -> UUID.randomUUID().toString())
@@ -165,9 +158,7 @@ public class EtlOrchestratorFlowConfig {
             .headerFunction(HDR_ETL_DATE_TO,
                 m -> ((OrchestrationCommand) m.getPayload()).to())
         )
-        // Асинхронно шлём OrchestrationCommand в оркестратор
         .wireTap(CH_ETL_ORCHESTRATE)
-        // А клиенту сразу отдаём body
         .handle((payload, headers) -> {
           String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
           String event = headers.get(HDR_ETL_EVENT, String.class);
@@ -175,7 +166,7 @@ public class EtlOrchestratorFlowConfig {
           LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
 
           Map<String, Object> body = new LinkedHashMap<>();
-          body.put("status", "completed"); // как ты просил
+          body.put("status", "accepted");
           body.put("requestId", requestId);
           body.put("event", event);
           body.put("from", from);
@@ -185,11 +176,6 @@ public class EtlOrchestratorFlowConfig {
         .get();
   }
 
-  /**
-   * Orchestrator: асинхронный consumer CH_ETL_ORCHESTRATE.
-   * Строит планы, считает общее количество execution'ов, вызывает ingest
-   * и ждёт все success-reply, после чего триггерит materialization.
-   */
   @Bean
   public IntegrationFlow etlOrchestratorFlow() {
     return IntegrationFlow
@@ -197,7 +183,6 @@ public class EtlOrchestratorFlowConfig {
         .handle(OrchestrationCommand.class,
             (command, headers) -> buildMarketplacePlans(command)
         )
-        // payload: List<MarketplacePlan> — считаем ожидаемое количество execution'ов
         .enrichHeaders(h -> h.headerFunction(HDR_ETL_EXPECTED_EXECUTIONS, message -> {
           Object payload = message.getPayload();
           if (!(payload instanceof List<?> payloadList)) {
@@ -216,29 +201,24 @@ public class EtlOrchestratorFlowConfig {
           }
           return totalExecutions;
         }))
-        // Список MarketplacePlan
         .split()
         .enrichHeaders(h -> h
             .headerFunction(HDR_ETL_SOURCE_MP,
                 m -> ((MarketplacePlan) m.getPayload()).marketplace())
         )
         .transform(MarketplacePlan.class, MarketplacePlan::executions)
-        // Список EtlSourceExecution внутри каждого плана
         .split()
         .enrichHeaders(h -> h
             .headerFunction(HDR_ETL_SOURCE_ID,
                 m -> ((EtlSourceExecution) m.getPayload()).sourceId())
         )
-        // Для каждого EtlSourceExecution ждём reply от ingest-flow
         .gateway(
             CH_ETL_INGEST,
             e -> e
-                .errorChannel(CH_ETL_ERRORS)
                 .requestTimeout(0L)
                 .replyTimeout(0L)
                 .requiresReply(true)
         )
-        // Собираем все успешные replies по requestId и количеству execution'ов
         .aggregate(a -> a
             .correlationStrategy(message ->
                 message.getHeaders().get(HDR_ETL_REQUEST_ID)
