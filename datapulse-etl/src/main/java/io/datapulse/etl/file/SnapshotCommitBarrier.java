@@ -23,5 +23,5 @@ public interface SnapshotCommitBarrier {
 
   void snapshotCompleted(String snapshotId);
 
-  void discard(String snapshotId, Path providedFile);
+  void discard(String snapshotId);
 }

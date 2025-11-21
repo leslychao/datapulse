@@ -25,6 +25,8 @@ import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.etl.flow.batch.EtlBatchDispatcher;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.i18n.ExceptionMessageService;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -234,14 +236,14 @@ public class EtlSnapshotIngestionFlowConfig {
 
     String snapshotId = headers.get(HDR_ETL_SNAPSHOT_ID, String.class);
     if (snapshotId == null) {
-      snapshotCommitBarrier.discard(null, snapshot.file());
+      deleteSnapshotFileSafely(snapshot.file(), "missing-snapshot-id");
       throw new AppException(ETL_CONTEXT_MISSING, "snapshotId");
     }
 
     Class<?> rawElementType = snapshot.elementType();
     JsonArrayLocator jsonArrayLocator = snapshotJsonLayoutRegistry.resolve(rawElementType);
     if (jsonArrayLocator == null) {
-      snapshotCommitBarrier.discard(snapshotId, snapshot.file());
+      snapshotCommitBarrier.discard(snapshotId);
       throw new AppException(
           DOWNLOAD_FAILED,
           "JSON layout not found for type: " + rawElementType.getName()
@@ -308,8 +310,10 @@ public class EtlSnapshotIngestionFlowConfig {
     String snapshotId = failedHeaders.get(HDR_ETL_SNAPSHOT_ID, String.class);
     Path snapshotFile = failedHeaders.get(HDR_ETL_SNAPSHOT_FILE, Path.class);
 
-    if (snapshotId != null || snapshotFile != null) {
-      snapshotCommitBarrier.discard(snapshotId, snapshotFile);
+    if (snapshotId != null) {
+      snapshotCommitBarrier.discard(snapshotId);
+    } else if (snapshotFile != null) {
+      deleteSnapshotFileSafely(snapshotFile, "error-without-snapshot-id");
     } else {
       log.warn(
           "Snapshot ingestion error received without snapshot context; headers={}",
@@ -318,6 +322,29 @@ public class EtlSnapshotIngestionFlowConfig {
     }
 
     exceptionMessageService.logEtlError(cause);
+  }
+
+  private void deleteSnapshotFileSafely(Path file, String reason) {
+    if (file == null) {
+      log.warn("deleteSnapshotFileSafely(): null file, reason={}", reason);
+      return;
+    }
+    try {
+      boolean deleted = Files.deleteIfExists(file);
+      log.debug(
+          "Snapshot file delete (direct): file={}, deleted={}, reason={}",
+          file,
+          deleted,
+          reason
+      );
+    } catch (IOException ex) {
+      log.warn(
+          "Snapshot file delete (direct) failed: file={}, reason={}",
+          file,
+          reason,
+          ex
+      );
+    }
   }
 
   private <T> void addIfMissing(

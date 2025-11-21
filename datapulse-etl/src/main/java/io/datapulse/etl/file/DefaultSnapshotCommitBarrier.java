@@ -148,31 +148,30 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
   }
 
   @Override
-  public void discard(String snapshotId, Path providedFile) {
-    Path fileToDelete = providedFile;
-
-    SnapshotState removed = snapshotId != null ? snapshots.remove(snapshotId) : null;
-    if (removed != null) {
-      fileToDelete = removed.file != null ? removed.file : providedFile;
-      log.warn(
-          "Snapshot discarded: id={}, file={}, requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
-          snapshotId,
-          fileToDelete,
-          removed.requestId,
-          removed.accountId,
-          removed.event,
-          removed.marketplace,
-          removed.sourceId
-      );
-    } else if (snapshotId == null) {
-      log.warn("discard(): null snapshotId, file={}", providedFile);
-    } else {
-      log.warn("discard(): unknown snapshotId={}, file={}", snapshotId, providedFile);
+  public void discard(String snapshotId) {
+    if (snapshotId == null) {
+      log.warn("discard(): null snapshotId");
+      return;
     }
 
-    if (fileToDelete != null) {
-      deleteFile(fileToDelete, "discard");
+    SnapshotState removed = snapshots.remove(snapshotId);
+    if (removed == null) {
+      log.warn("discard(): unknown snapshotId={}", snapshotId);
+      return;
     }
+
+    deleteFile(removed.file, "discard");
+
+    log.warn(
+        "Snapshot discarded: id={}, file={}, requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
+        snapshotId,
+        removed.file,
+        removed.requestId,
+        removed.accountId,
+        removed.event,
+        removed.marketplace,
+        removed.sourceId
+    );
   }
 
   private SnapshotState findStateOrWarn(String snapshotId, String operation) {
@@ -209,6 +208,10 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
   }
 
   private void deleteFile(Path file, String reason) {
+    if (file == null) {
+      log.warn("deleteFile(): null file, reason={}", reason);
+      return;
+    }
     try {
       boolean deleted = Files.deleteIfExists(file);
       log.debug("Snapshot file delete: file={}, deleted={}, reason={}", file, deleted, reason);
