@@ -1,12 +1,12 @@
 package io.datapulse.etl.i18n;
 
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.etl.flow.dto.EtlSnapshotContext;
 import java.util.Locale;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -17,20 +17,6 @@ public class ExceptionMessageService {
   private static final Locale DEFAULT_LOCALE = Locale.forLanguageTag("ru");
 
   private final MessageSource messageSource;
-
-  public HttpStatus resolveStatus(Throwable throwable) {
-    if (throwable instanceof AppException appException) {
-      HttpStatus status = appException.getStatus();
-      if (status != null) {
-        return status;
-      }
-    }
-    return HttpStatus.INTERNAL_SERVER_ERROR;
-  }
-
-  public String resolveUserMessage(Throwable throwable) {
-    return resolveUserMessage(throwable, DEFAULT_LOCALE);
-  }
 
   public String resolveUserMessage(Throwable throwable, Locale locale) {
     if (throwable == null) {
@@ -66,5 +52,45 @@ public class ExceptionMessageService {
     }
     String message = resolveLogMessage(throwable);
     log.error("ETL error: {}", message, throwable);
+  }
+
+  public void logSnapshotError(
+      Throwable throwable,
+      EtlSnapshotContext context,
+      String stage
+  ) {
+    if (throwable == null) {
+      log.error(
+          "ETL snapshot error: неизвестная ошибка, stage={}, context={}",
+          stage,
+          context
+      );
+      return;
+    }
+
+    String message = resolveLogMessage(throwable);
+
+    log.error("""
+            ETL snapshot error: {}
+              stage={}
+              requestId={}
+              accountId={}
+              event={}
+              marketplace={}
+              sourceId={}
+              snapshotId={}
+              snapshotFile={}
+            """,
+        message,
+        stage,
+        context.requestId(),
+        context.accountId(),
+        context.event(),
+        context.marketplace(),
+        context.sourceId(),
+        context.snapshotId(),
+        context.snapshotFile(),
+        throwable
+    );
   }
 }
