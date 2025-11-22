@@ -55,7 +55,7 @@ POST http://localhost:8080/api/etl/run
 Content-Type: application/json
 
 {
-  "accountId": 4,
+  "accountId": 2,
   "event": "SALES_FACT",
   "from": "2025-10-07",
   "to": "2025-11-07",

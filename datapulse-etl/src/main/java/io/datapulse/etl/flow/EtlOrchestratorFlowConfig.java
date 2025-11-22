@@ -6,16 +6,21 @@ import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ERROR_MESSAGE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_FAILED_SOURCE_IDS;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 
 import io.datapulse.core.service.AccountService;
 import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
+import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
@@ -24,6 +29,7 @@ import io.datapulse.etl.flow.dto.IngestResult;
 import io.datapulse.etl.route.EtlSourceRegistry;
 import io.datapulse.etl.route.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.service.materialization.EtlMaterializationService;
+import io.micrometer.common.util.StringUtils;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,8 +58,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @Slf4j
 @RequiredArgsConstructor
 public class EtlOrchestratorFlowConfig {
-
-  private static final String HDR_ETL_EXPECTED_SOURCES = "ETL_EXPECTED_SOURCES";
 
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlMaterializationService materializationService;
@@ -194,12 +198,12 @@ public class EtlOrchestratorFlowConfig {
         .headerFilter(MessageHeaders.REPLY_CHANNEL, MessageHeaders.ERROR_CHANNEL)
         .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
         .enrichHeaders(headers -> headers.headerFunction(
-            HDR_ETL_EXPECTED_SOURCES,
+            HDR_ETL_TOTAL_EXECUTIONS,
             message -> {
               Object payload = message.getPayload();
               if (!(payload instanceof List<?> rawPlans)) {
                 log.warn(
-                    "Unexpected payload type for orchestrator expected sources calculation: {}",
+                    "Unexpected payload type for orchestrator total executions calculation: {}",
                     payload.getClass().getName()
                 );
                 return 0;
@@ -242,11 +246,11 @@ public class EtlOrchestratorFlowConfig {
               }
 
               MessageHeaders headers = sampleMessage.getHeaders();
-              Integer expected = headers.get(HDR_ETL_EXPECTED_SOURCES, Integer.class);
+              Integer expected = headers.get(HDR_ETL_TOTAL_EXECUTIONS, Integer.class);
               if (expected == null) {
                 log.warn(
                     "Orchestrator aggregate has no '{}' header, releasing immediately",
-                    HDR_ETL_EXPECTED_SOURCES
+                    HDR_ETL_TOTAL_EXECUTIONS
                 );
                 return true;
               }
@@ -255,7 +259,7 @@ public class EtlOrchestratorFlowConfig {
               if (currentSize >= expected) {
                 if (currentSize > expected) {
                   log.warn(
-                      "Orchestrator aggregate group size exceeded expected sources: expected={}, actual={}",
+                      "Orchestrator aggregate group size exceeded expected executions: expected={}, actual={}",
                       expected,
                       currentSize
                   );
@@ -275,12 +279,39 @@ public class EtlOrchestratorFlowConfig {
                   .map(IngestResult.class::cast)
                   .toList();
 
+              List<String> failedSourceIds = results.stream()
+                  .filter(result -> !result.success())
+                  .map(IngestResult::sourceId)
+                  .toList();
+
+              SyncStatus syncStatus = failedSourceIds.isEmpty()
+                  ? SyncStatus.SUCCESS
+                  : SyncStatus.ERROR;
+
+              String failedSourceIdsValue = String.join(",", failedSourceIds);
+
+              List<String> errorMessages = results.stream()
+                  .filter(result -> !result.success())
+                  .map(result -> {
+                    String errorMessage = result.errorMessage();
+                    if (StringUtils.isNotBlank(errorMessage)) {
+                      return errorMessage;
+                    }
+                    return "unknown error";
+                  })
+                  .toList();
+
+              String errorMessageValue = String.join("; ", errorMessages);
+
               Message<?> sample = group.getOne();
-              MessageHeaders headers = sample != null ? sample.getHeaders() : null;
+              MessageHeaders originalHeaders = sample != null ? sample.getHeaders() : null;
 
               return MessageBuilder
                   .withPayload(results)
-                  .copyHeadersIfAbsent(headers != null ? headers : Map.of())
+                  .copyHeadersIfAbsent(originalHeaders != null ? originalHeaders : Map.of())
+                  .setHeader(HDR_ETL_SYNC_STATUS, syncStatus)
+                  .setHeader(HDR_ETL_FAILED_SOURCE_IDS, failedSourceIdsValue)
+                  .setHeader(HDR_ETL_ERROR_MESSAGE, errorMessageValue)
                   .build();
             })
         )
@@ -298,19 +329,6 @@ public class EtlOrchestratorFlowConfig {
   }
 
   private Object handleOrchestratorResults(Object payload, MessageHeaders headers) {
-    if (!(payload instanceof List<?> rawList)) {
-      log.warn(
-          "Unexpected payload type in orchestrator results: {}",
-          payload == null ? "null" : payload.getClass().getName()
-      );
-      return payload;
-    }
-
-    List<IngestResult> results = rawList.stream()
-        .filter(IngestResult.class::isInstance)
-        .map(IngestResult.class::cast)
-        .toList();
-
     EtlAuditContext context = extractAuditContext(headers);
 
     MarketplaceEvent event = MarketplaceEvent.fromString(context.eventValue());
@@ -321,20 +339,19 @@ public class EtlOrchestratorFlowConfig {
       );
     }
 
-    List<String> failedSources = results.stream()
-        .filter(result -> !result.success())
-        .map(IngestResult::sourceId)
-        .toList();
+    SyncStatus syncStatus = headers.get(HDR_ETL_SYNC_STATUS, SyncStatus.class);
+    String failedSourceIds = headers.get(HDR_ETL_FAILED_SOURCE_IDS, String.class);
+    String failedSourceIdsValue = failedSourceIds != null ? failedSourceIds : "";
 
-    if (!failedSources.isEmpty()) {
+    if (syncStatus != SyncStatus.SUCCESS) {
       log.warn(
-          "ETL orchestration completed with failures; materialization will NOT be started: "
-              + "requestId={}, event={}, from={}, to={}, failedSources={}",
+          "ETL orchestration completed with errors; materialization will NOT be started: "
+              + "requestId={}, event={}, from={}, to={}, failedSourceIds={}",
           context.requestId(),
           event,
           context.dateFrom(),
           context.dateTo(),
-          failedSources
+          failedSourceIdsValue
       );
       return payload;
     }
@@ -374,15 +391,44 @@ public class EtlOrchestratorFlowConfig {
       return null;
     }
 
-    etlSyncAuditService.save(
-        new EtlSyncAuditDto(
-            context.requestId(),
-            context.accountId(),
-            context.eventValue(),
-            context.dateFrom(),
-            context.dateTo()
-        )
-    );
+    SyncStatus syncStatus = headers.get(HDR_ETL_SYNC_STATUS, SyncStatus.class);
+    String failedSourceIds = headers.get(HDR_ETL_FAILED_SOURCE_IDS, String.class);
+    String errorMessage = headers.get(HDR_ETL_ERROR_MESSAGE, String.class);
+
+    String failedSourceIdsValue = failedSourceIds != null ? failedSourceIds : "";
+    String errorMessageValue = errorMessage != null ? errorMessage : "";
+
+    EtlSyncAuditDto dto = new EtlSyncAuditDto();
+    dto.setRequestId(context.requestId());
+    dto.setAccountId(context.accountId());
+    dto.setEvent(context.eventValue());
+    dto.setDateFrom(context.dateFrom());
+    dto.setDateTo(context.dateTo());
+    dto.setStatus(syncStatus != null ? syncStatus : SyncStatus.ERROR);
+    dto.setFailedSources(failedSourceIdsValue);
+    dto.setErrorMessage(errorMessageValue);
+
+    etlSyncAuditService.save(dto);
+
+    if (syncStatus == SyncStatus.SUCCESS) {
+      log.info(
+          "ETL sync finished successfully (audit): requestId={}, event={}, from={}, to={}",
+          context.requestId(),
+          context.eventValue(),
+          context.dateFrom(),
+          context.dateTo()
+      );
+    } else {
+      log.warn(
+          "ETL sync finished with errors (audit): requestId={}, event={}, from={}, to={}, failedSourceIds={}, errors={}",
+          context.requestId(),
+          context.eventValue(),
+          context.dateFrom(),
+          context.dateTo(),
+          failedSourceIdsValue,
+          errorMessageValue
+      );
+    }
 
     return null;
   }

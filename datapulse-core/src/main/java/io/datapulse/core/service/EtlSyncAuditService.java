@@ -50,6 +50,9 @@ public class EtlSyncAuditService
     target.setEvent(source.getEvent());
     target.setDateFrom(source.getDateFrom());
     target.setDateTo(source.getDateTo());
+    target.setStatus(source.getStatus());
+    target.setFailedSources(source.getFailedSources());
+    target.setErrorMessage(source.getErrorMessage());
     return target;
   }
 }

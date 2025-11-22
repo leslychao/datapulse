@@ -8,4 +8,5 @@
   <include file="changelog/0003-init-raw-ozon-tables.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0004-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0005-create-raw-realization-fact-wb.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0006-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

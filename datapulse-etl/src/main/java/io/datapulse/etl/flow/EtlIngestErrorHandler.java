@@ -25,7 +25,7 @@ public final class EtlIngestErrorHandler {
     exceptionMessageService.logEtlError(throwable);
 
     String errorClass = throwable != null ? throwable.getClass().getSimpleName() : null;
-    String errorMessage = throwable != null ? throwable.getMessage() : null;
+    String errorMessage = exceptionMessageService.resolveLogMessage(throwable);
 
     return new IngestResult(
         sourceId,
