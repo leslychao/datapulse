@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0007-create-sales-fact" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      CREATE TABLE IF NOT EXISTS sales_fact
+      (
+        id                         BIGSERIAL PRIMARY KEY,
+        account_id                 BIGINT      NOT NULL,
+        marketplace                VARCHAR(32) NOT NULL,
+
+        operation_date             DATE        NOT NULL,
+        operation_datetime         TIMESTAMPTZ,
+
+        offer_id                   VARCHAR(128),
+        barcode                    VARCHAR(128),
+        size                       VARCHAR(64),
+        warehouse_name             VARCHAR(255),
+        region_name                VARCHAR(255),
+
+        quantity                   INTEGER     NOT NULL,
+
+        gross_amount               NUMERIC(19, 2),
+        commission_amount          NUMERIC(19, 2),
+        logistics_and_fees_amount  NUMERIC(19, 2),
+        promo_amount               NUMERIC(19, 2),
+        net_amount                 NUMERIC(19, 2),
+
+        operation_type             VARCHAR(32),
+        external_operation_id      VARCHAR(128),
+        currency_code              VARCHAR(8),
+
+        created_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_sales_fact_account_date
+        ON sales_fact (account_id, operation_date);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS sales_fact;
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

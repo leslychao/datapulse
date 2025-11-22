@@ -5,12 +5,15 @@ import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.entity.EtlSyncAuditEntity;
+import io.datapulse.core.entity.SalesFactEntity;
 import io.datapulse.core.mapper.AccountConnectionMapper;
 import io.datapulse.core.mapper.AccountMapper;
 import io.datapulse.core.mapper.EtlSyncAuditMapper;
+import io.datapulse.core.mapper.SalesFactMapper;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.EtlSyncAuditDto;
+import io.datapulse.domain.dto.SalesFactDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
@@ -36,6 +39,7 @@ public final class DatapulseGenericConverter implements GenericConverter {
   private final AccountMapper accountMapper;
   private final AccountConnectionMapper accountConnectionMapper;
   private final EtlSyncAuditMapper etlSyncAuditMapper;
+  private final SalesFactMapper salesFactMapper;
 
   private final Map<ConvertiblePair, Function<Object, Object>> converters = new LinkedHashMap<>();
 
@@ -88,6 +92,14 @@ public final class DatapulseGenericConverter implements GenericConverter {
     converters.put(
         new ConvertiblePair(EtlSyncAuditEntity.class, EtlSyncAuditDto.class),
         src -> etlSyncAuditMapper.toDto((EtlSyncAuditEntity) src)
+    );
+    converters.put(
+        new ConvertiblePair(SalesFactDto.class, SalesFactEntity.class),
+        src -> salesFactMapper.toEntity((SalesFactDto) src)
+    );
+    converters.put(
+        new ConvertiblePair(SalesFactEntity.class, SalesFactDto.class),
+        src -> salesFactMapper.toDto((SalesFactEntity) src)
     );
 
     // ===== DTO → RESPONSE
