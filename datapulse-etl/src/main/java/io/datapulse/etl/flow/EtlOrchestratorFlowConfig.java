@@ -15,15 +15,16 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 
+import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.AccountService;
 import io.datapulse.core.service.EtlSyncAuditService;
-import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlSourceExecution;
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.event.EtlSourceRegistry;
@@ -63,6 +64,8 @@ public class EtlOrchestratorFlowConfig {
   private final EtlMaterializationService materializationService;
   private final AccountService accountService;
   private final EtlSyncAuditService etlSyncAuditService;
+
+  private final AccountConnectionService accountConnectionService;
 
   public record EtlRunRequest(
       Long accountId,
@@ -520,8 +523,18 @@ public class EtlOrchestratorFlowConfig {
   }
 
   private List<MarketplacePlan> buildMarketplacePlans(OrchestrationCommand command) {
-    List<MarketplacePlan> plans = Stream
-        .of(MarketplaceType.values())
+
+    List<MarketplaceType> marketplaces =
+        accountConnectionService.getActiveMarketplacesByAccountId(command.accountId());
+
+    if (marketplaces.isEmpty()) {
+      throw new AppException(
+          MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
+          command.accountId()
+      );
+    }
+
+    List<MarketplacePlan> plans = marketplaces.stream()
         .map(marketplace -> buildMarketplacePlan(command, marketplace))
         .filter(Objects::nonNull)
         .toList();

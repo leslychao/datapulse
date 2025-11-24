@@ -26,6 +26,7 @@ import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -142,6 +143,18 @@ public class AccountConnectionService extends AbstractIngestApiService<
                 ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
                 accountId,
                 marketplaceType));
+  }
+
+  @Transactional(readOnly = true)
+  public List<MarketplaceType> getActiveMarketplacesByAccountId(
+      @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId
+  ) {
+    validateAccountExists(accountId);
+    return repository.findAllByAccount_IdAndActiveTrue(accountId)
+        .stream()
+        .map(AccountConnectionEntity::getMarketplace)
+        .distinct()
+        .toList();
   }
 
   @Override

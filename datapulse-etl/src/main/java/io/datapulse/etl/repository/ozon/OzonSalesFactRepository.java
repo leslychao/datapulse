@@ -1,0 +1,322 @@
+package io.datapulse.etl.repository.ozon;
+
+import io.datapulse.core.entity.SalesFactEntity;
+import java.time.LocalDate;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, Long> {
+
+  @Modifying
+  @Query(
+      value = """
+          with sales_src as (
+              select distinct on (
+                  rs.account_id,
+                  rs.marketplace,
+                  (p.doc ->> 'day')::date,
+                  p.doc ->> 'offerId',
+                  p.doc ->> 'warehouseId'
+              )
+                  rs.account_id,
+                  rs.marketplace,
+                  (p.doc ->> 'day')::date                        as sale_date,
+                  p.doc ->> 'offerId'                            as mp_offer_id,
+                  p.doc ->> 'warehouseId'                        as mp_warehouse_id,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'revenue'
+                      limit 1
+                  ), 0::numeric)                                  as revenue,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'ordered_units'
+                      limit 1
+                  ), 0::numeric)                                  as ordered_units,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'delivered_units'
+                      limit 1
+                  ), 0::numeric)                                  as delivered_units,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'returns'
+                      limit 1
+                  ), 0::numeric)                                  as returned_units,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'cancellations'
+                      limit 1
+                  ), 0::numeric)                                  as canceled_units,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'hits_view_search'
+                      limit 1
+                  ), 0::numeric)                                  as search_views,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'hits_view_pdp'
+                      limit 1
+                  ), 0::numeric)                                  as card_views,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'hits_tocart'
+                      limit 1
+                  ), 0::numeric)                                  as cart_adds,
+
+                  coalesce((
+                      select (m ->> 'value')::numeric
+                      from jsonb_array_elements(p.doc -> 'metrics') as m
+                      where m ->> 'id' = 'session_view'
+                      limit 1
+                  ), 0::numeric)                                  as sessions,
+
+                  'RUB'::char(3)                                  as currency_code
+              from raw_sales_fact_ozon rs
+              cross join lateral (
+                  select rs.payload::jsonb as doc
+              ) as p
+              where rs.account_id = :accountId
+                and rs.marketplace = 'OZON'
+                and rs.request_id = :requestId
+                and (p.doc ->> 'day')::date between :dateFrom and :dateTo
+              order by
+                  rs.account_id,
+                  rs.marketplace,
+                  (p.doc ->> 'day')::date,
+                  p.doc ->> 'offerId',
+                  p.doc ->> 'warehouseId'
+          ),
+
+          product_src as (
+              select distinct on (
+                  rp.account_id,
+                  rp.marketplace,
+                  (q.doc ->> 'offer_id')
+              )
+                  rp.account_id,
+                  rp.marketplace,
+                  (q.doc ->> 'sku')                               as mp_item_id,
+                  q.doc ->> 'offer_id'                            as mp_offer_id,
+                  (q.doc -> 'barcodes' ->> 0)                     as barcode,
+                  q.doc ->> 'name'                                as title,
+                  null::varchar                                   as brand,
+                  null::varchar                                   as category,
+                  null::varchar                                   as mp_category,
+                  null::varchar                                   as subject,
+                  coalesce((q.doc ->> 'is_kgt')::boolean, false)      as is_kgt,
+                  coalesce((q.doc ->> 'is_archived')::boolean, false) as is_archived,
+                  (q.doc ->> 'old_price')::numeric                as price_regular,
+                  (q.doc ->> 'price')::numeric                    as price_sale,
+                  (q.doc ->> 'vat')::numeric                      as vat_rate,
+                  (q.doc ->> 'updated_at')::timestamptz           as last_synced_at
+              from raw_product_info_ozon rp
+              cross join lateral (
+                  select rp.payload::jsonb as doc
+              ) as q
+              where rp.account_id = :accountId
+                and rp.marketplace = 'OZON'
+                and rp.request_id = :requestId
+              order by
+                  rp.account_id,
+                  rp.marketplace,
+                  q.doc ->> 'offer_id'
+          ),
+
+          upsert_warehouse as (
+              insert into warehouse (
+                  marketplace,
+                  mp_warehouse_id,
+                  name,
+                  region,
+                  type,
+                  last_synced_at
+              )
+              select distinct
+                  s.marketplace,
+                  s.mp_warehouse_id,
+                  concat('OZON warehouse ', s.mp_warehouse_id)      as name,
+                  null::varchar                                     as region,
+                  null::varchar                                     as type,
+                  now()                                             as last_synced_at
+              from sales_src s
+              where s.mp_warehouse_id is not null
+              on conflict (marketplace, mp_warehouse_id, name)
+                  do update set last_synced_at = excluded.last_synced_at
+          ),
+
+          upsert_catalog_item as (
+              insert into catalog_item (
+                  account_id,
+                  marketplace,
+                  mp_item_id,
+                  mp_offer_id,
+                  barcode,
+                  title,
+                  brand,
+                  category,
+                  mp_category,
+                  subject,
+                  is_kgt,
+                  is_archived,
+                  price_regular,
+                  price_sale,
+                  vat_rate,
+                  last_synced_at
+              )
+              select distinct
+                  p.account_id,
+                  p.marketplace,
+                  p.mp_item_id,
+                  p.mp_offer_id,
+                  p.barcode,
+                  p.title,
+                  p.brand,
+                  p.category,
+                  p.mp_category,
+                  p.subject,
+                  p.is_kgt,
+                  p.is_archived,
+                  p.price_regular,
+                  p.price_sale,
+                  p.vat_rate,
+                  p.last_synced_at
+              from product_src p
+              on conflict (account_id, marketplace, mp_item_id)
+                  do update set
+                      mp_offer_id    = excluded.mp_offer_id,
+                      barcode        = excluded.barcode,
+                      title          = excluded.title,
+                      brand          = excluded.brand,
+                      category       = excluded.category,
+                      mp_category    = excluded.mp_category,
+                      subject        = excluded.subject,
+                      is_kgt         = excluded.is_kgt,
+                      is_archived    = excluded.is_archived,
+                      price_regular  = excluded.price_regular,
+                      price_sale     = excluded.price_sale,
+                      vat_rate       = excluded.vat_rate,
+                      last_synced_at = excluded.last_synced_at
+          )
+
+          insert into sales_fact (
+              account_id,
+              marketplace,
+              sale_date,
+              catalog_item_id,
+              warehouse_id,
+              ordered_units,
+              delivered_units,
+              returned_units,
+              canceled_units,
+              gmv_amount,
+              payout_amount,
+              commission_amount,
+              delivery_amount,
+              storage_amount,
+              penalty_amount,
+              ads_amount,
+              other_fees_amount,
+              currency_code,
+              search_views,
+              card_views,
+              cart_adds,
+              sessions,
+              wb_open_count,
+              wb_cart_count,
+              wb_order_count,
+              wb_buyout_count,
+              created_at,
+              updated_at
+          )
+          select
+              s.account_id,
+              s.marketplace,
+              s.sale_date,
+              ci.id                                   as catalog_item_id,
+              w.id                                    as warehouse_id,
+              s.ordered_units::integer,
+              s.delivered_units::integer,
+              s.returned_units::integer,
+              s.canceled_units::integer,
+              s.revenue                               as gmv_amount,
+              s.revenue                               as payout_amount,
+              0                                       as commission_amount,
+              0                                       as delivery_amount,
+              0                                       as storage_amount,
+              0                                       as penalty_amount,
+              0                                       as ads_amount,
+              0                                       as other_fees_amount,
+              s.currency_code,
+              s.search_views::integer,
+              s.card_views::integer,
+              s.cart_adds::integer,
+              s.sessions::integer,
+              0                                       as wb_open_count,
+              0                                       as wb_cart_count,
+              0                                       as wb_order_count,
+              0                                       as wb_buyout_count,
+              now(),
+              now()
+          from sales_src s
+          join product_src p
+            on p.account_id  = s.account_id
+           and p.marketplace = s.marketplace
+           and p.mp_offer_id = s.mp_offer_id
+          join catalog_item ci
+            on ci.account_id  = p.account_id
+           and ci.marketplace = p.marketplace
+           and ci.mp_item_id  = p.mp_item_id
+          left join warehouse w
+            on w.marketplace     = s.marketplace
+           and w.mp_warehouse_id = s.mp_warehouse_id
+          on conflict (account_id, marketplace, sale_date, catalog_item_id, warehouse_id)
+              do update set
+                  ordered_units      = excluded.ordered_units,
+                  delivered_units    = excluded.delivered_units,
+                  returned_units     = excluded.returned_units,
+                  canceled_units     = excluded.canceled_units,
+                  gmv_amount         = excluded.gmv_amount,
+                  payout_amount      = excluded.payout_amount,
+                  commission_amount  = excluded.commission_amount,
+                  delivery_amount    = excluded.delivery_amount,
+                  storage_amount     = excluded.storage_amount,
+                  penalty_amount     = excluded.penalty_amount,
+                  ads_amount         = excluded.ads_amount,
+                  other_fees_amount  = excluded.other_fees_amount,
+                  currency_code      = excluded.currency_code,
+                  search_views       = excluded.search_views,
+                  card_views         = excluded.card_views,
+                  cart_adds          = excluded.cart_adds,
+                  sessions           = excluded.sessions,
+                  updated_at         = now()
+          """,
+      nativeQuery = true
+  )
+  void materializeSalesFact(
+      @Param("accountId") long accountId,
+      @Param("dateFrom") LocalDate dateFrom,
+      @Param("dateTo") LocalDate dateTo,
+      @Param("requestId") String requestId
+  );
+}

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
     event = MarketplaceEvent.SALES_FACT,
     marketplace = MarketplaceType.OZON
 )
-@Profile("!test")
+@Profile("!local")
 public final class OzonSalesFactEventSource implements EventSource {
 
   private final OzonAdapter ozonAdapter;

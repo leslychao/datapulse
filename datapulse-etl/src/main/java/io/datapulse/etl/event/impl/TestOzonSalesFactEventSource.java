@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@Profile("test")
+@Profile("local")
 @EtlSourceMeta(
     event = MarketplaceEvent.SALES_FACT,
     marketplace = MarketplaceType.OZON

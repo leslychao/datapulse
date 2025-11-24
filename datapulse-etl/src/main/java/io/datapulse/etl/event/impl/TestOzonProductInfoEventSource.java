@@ -23,7 +23,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("test")
+@Profile("local")
 @RequiredArgsConstructor
 @EtlSourceMeta(
     event = MarketplaceEvent.SALES_FACT,
