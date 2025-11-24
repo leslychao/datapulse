@@ -29,28 +29,28 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
                   p.doc ->> 'warehouseId'                        as mp_warehouse_id,
 
                   coalesce((
-                      select (m ->> 'value')::numeric
+                      select nullif(m ->> 'value', '')::numeric
                       from jsonb_array_elements(p.doc -> 'metrics') as m
                       where m ->> 'id' = 'revenue'
                       limit 1
                   ), 0::numeric)                                  as revenue,
 
                   coalesce((
-                      select (m ->> 'value')::numeric
+                      select nullif(m ->> 'value', '')::numeric
                       from jsonb_array_elements(p.doc -> 'metrics') as m
                       where m ->> 'id' = 'ordered_units'
                       limit 1
                   ), 0::numeric)                                  as ordered_units,
 
                   coalesce((
-                      select (m ->> 'value')::numeric
+                      select nullif(m ->> 'value', '')::numeric
                       from jsonb_array_elements(p.doc -> 'metrics') as m
                       where m ->> 'id' = 'returns'
                       limit 1
                   ), 0::numeric)                                  as returned_units,
 
                   coalesce((
-                      select (m ->> 'value')::numeric
+                      select nullif(m ->> 'value', '')::numeric
                       from jsonb_array_elements(p.doc -> 'metrics') as m
                       where m ->> 'id' = 'cancellations'
                       limit 1
@@ -91,9 +91,9 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
                   null::varchar                                   as subject,
                   coalesce((q.doc ->> 'is_kgt')::boolean, false)      as is_kgt,
                   coalesce((q.doc ->> 'is_archived')::boolean, false) as is_archived,
-                  (q.doc ->> 'old_price')::numeric                as price_regular,
-                  (q.doc ->> 'price')::numeric                    as price_sale,
-                  (q.doc ->> 'vat')::numeric                      as vat_rate,
+                  nullif(q.doc ->> 'old_price', '')::numeric      as price_regular,
+                  nullif(q.doc ->> 'price', '')::numeric          as price_sale,
+                  nullif(q.doc ->> 'vat', '')::numeric            as vat_rate,
                   (q.doc ->> 'updated_at')::timestamptz           as last_synced_at
               from raw_product_info_ozon rp
               cross join lateral (

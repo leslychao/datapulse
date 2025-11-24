@@ -26,7 +26,10 @@ public interface WbSalesFactRepository extends JpaRepository<SalesFactEntity, Lo
                   count(*)::numeric                     as delivered_units,
                   0::numeric                            as returned_units,
                   0::numeric                            as canceled_units,
-                  coalesce(sum((p.doc ->> 'finishedPrice')::numeric), 0::numeric) as revenue,
+                  coalesce(
+                      sum(nullif(p.doc ->> 'finishedPrice', '')::numeric),
+                      0::numeric
+                  )                                     as revenue,
                   'RUB'::char(3)                        as currency_code
               from raw_realization_fact_wb r
               cross join lateral (
@@ -53,20 +56,20 @@ public interface WbSalesFactRepository extends JpaRepository<SalesFactEntity, Lo
               )
                   r.account_id,
                   r.marketplace,
-                  (p.doc ->> 'nmId')                     as mp_item_id,
-                  (p.doc ->> 'supplierArticle')          as mp_offer_id,
-                  (p.doc ->> 'barcode')                  as barcode,
-                  null::varchar                          as title,
-                  (p.doc ->> 'brand')                    as brand,
-                  (p.doc ->> 'category')                 as category,
-                  null::varchar                          as mp_category,
-                  (p.doc ->> 'subject')                  as subject,
-                  false                                  as is_kgt,
-                  false                                  as is_archived,
-                  (p.doc ->> 'totalPrice')::numeric      as price_regular,
-                  (p.doc ->> 'finishedPrice')::numeric   as price_sale,
-                  null::numeric                          as vat_rate,
-                  (p.doc ->> 'lastChangeDate')::timestamptz as last_synced_at
+                  (p.doc ->> 'nmId')                         as mp_item_id,
+                  (p.doc ->> 'supplierArticle')              as mp_offer_id,
+                  (p.doc ->> 'barcode')                      as barcode,
+                  null::varchar                              as title,
+                  (p.doc ->> 'brand')                        as brand,
+                  (p.doc ->> 'category')                     as category,
+                  null::varchar                              as mp_category,
+                  (p.doc ->> 'subject')                      as subject,
+                  false                                      as is_kgt,
+                  false                                      as is_archived,
+                  nullif(p.doc ->> 'totalPrice', '')::numeric    as price_regular,
+                  nullif(p.doc ->> 'finishedPrice', '')::numeric as price_sale,
+                  null::numeric                              as vat_rate,
+                  (p.doc ->> 'lastChangeDate')::timestamptz  as last_synced_at
               from raw_realization_fact_wb r
               cross join lateral (
                   select r.payload::jsonb as doc
