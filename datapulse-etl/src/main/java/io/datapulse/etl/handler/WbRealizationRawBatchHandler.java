@@ -1,26 +1,26 @@
-package io.datapulse.etl.batch;
+package io.datapulse.etl.handler;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
-import io.datapulse.etl.repository.ozon.OzonSalesFactRawJdbcRepository;
+import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.etl.repository.wb.WbRealizationRawJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class OzonSalesFactRawBatchHandler implements EtlBatchHandler<OzonAnalyticsApiRaw> {
+public class WbRealizationRawBatchHandler implements EtlBatchHandler<WbRealizationRaw> {
 
-  private final OzonSalesFactRawJdbcRepository rawRepository;
+  private final WbRealizationRawJdbcRepository rawRepository;
 
   @Override
-  public Class<OzonAnalyticsApiRaw> elementType() {
-    return OzonAnalyticsApiRaw.class;
+  public Class<WbRealizationRaw> elementType() {
+    return WbRealizationRaw.class;
   }
 
   @Override
   public void handleBatch(
-      List<OzonAnalyticsApiRaw> rawBatch,
+      List<WbRealizationRaw> rawBatch,
       String requestId,
       String snapshotId,
       Long accountId,

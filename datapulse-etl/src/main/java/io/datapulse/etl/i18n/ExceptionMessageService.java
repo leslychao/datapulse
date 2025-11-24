@@ -1,7 +1,7 @@
 package io.datapulse.etl.i18n;
 
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.etl.flow.dto.EtlSnapshotContext;
+import io.datapulse.etl.dto.EtlSnapshotContext;
 import java.util.Locale;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;

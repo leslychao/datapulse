@@ -1,4 +1,4 @@
-package io.datapulse.etl.service.materialization;
+package io.datapulse.etl.service;
 
 import io.datapulse.domain.MarketplaceEvent;
 import java.time.LocalDate;

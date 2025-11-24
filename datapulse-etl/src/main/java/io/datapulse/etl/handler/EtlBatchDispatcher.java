@@ -1,4 +1,4 @@
-package io.datapulse.etl.batch;
+package io.datapulse.etl.handler;
 
 import static io.datapulse.domain.MessageCodes.ETL_BATCH_HANDLER_DUPLICATE;
 import static io.datapulse.domain.MessageCodes.ETL_BATCH_HANDLER_NOT_FOUND;

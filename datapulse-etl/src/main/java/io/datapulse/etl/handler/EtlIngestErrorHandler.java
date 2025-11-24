@@ -1,8 +1,8 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.handler;
 
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
-import io.datapulse.etl.flow.dto.IngestResult;
+import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.i18n.ExceptionMessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.Message;

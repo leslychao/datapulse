@@ -1,4 +1,4 @@
-package io.datapulse.etl.flow.dto;
+package io.datapulse.etl.dto;
 
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;

@@ -1,8 +1,9 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.handler;
 
 import io.datapulse.etl.file.SnapshotCommitBarrier;
 import io.datapulse.etl.file.SnapshotFileCleaner;
-import io.datapulse.etl.flow.dto.EtlSnapshotContext;
+import io.datapulse.etl.dto.EtlSnapshotContext;
+import io.datapulse.etl.flow.EtlSnapshotContextExtractor;
 import io.datapulse.etl.i18n.ExceptionMessageService;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;

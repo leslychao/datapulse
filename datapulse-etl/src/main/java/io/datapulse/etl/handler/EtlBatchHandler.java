@@ -1,4 +1,4 @@
-package io.datapulse.etl.batch;
+package io.datapulse.etl.handler;
 
 import io.datapulse.domain.MarketplaceType;
 import java.util.List;

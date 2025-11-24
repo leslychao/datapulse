@@ -2,6 +2,7 @@ package io.datapulse.etl.repository.wb;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,6 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class WbRealizationRawJdbcRepository {
 
-  private static final String TABLE_NAME = "raw_realization_fact_wb";
-
   private final RawBatchInsertJdbcRepository delegate;
 
   public void saveBatch(
@@ -24,6 +23,12 @@ public class WbRealizationRawJdbcRepository {
       Long accountId,
       MarketplaceType marketplace
   ) {
-    delegate.saveBatch(batch, TABLE_NAME, requestId, snapshotId, accountId, marketplace);
+    delegate.saveBatch(
+        batch,
+        RawTableNames.WB_REALIZATION,
+        requestId,
+        snapshotId,
+        accountId,
+        marketplace);
   }
 }

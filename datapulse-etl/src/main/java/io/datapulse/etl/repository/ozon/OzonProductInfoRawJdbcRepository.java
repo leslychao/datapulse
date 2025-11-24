@@ -2,6 +2,7 @@ package io.datapulse.etl.repository.ozon;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.ozon.OzonProductInfoRaw;
+import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,6 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class OzonProductInfoRawJdbcRepository {
 
-  private static final String TABLE_NAME = "raw_product_info_ozon";
-
   private final RawBatchInsertJdbcRepository delegate;
 
   public void saveBatch(
@@ -24,6 +23,12 @@ public class OzonProductInfoRawJdbcRepository {
       Long accountId,
       MarketplaceType marketplace
   ) {
-    delegate.saveBatch(batch, TABLE_NAME, requestId, snapshotId, accountId, marketplace);
+    delegate.saveBatch(
+        batch,
+        RawTableNames.OZON_PRODUCT_INFO,
+        requestId,
+        snapshotId,
+        accountId,
+        marketplace);
   }
 }

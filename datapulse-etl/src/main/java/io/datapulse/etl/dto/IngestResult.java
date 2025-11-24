@@ -1,4 +1,4 @@
-package io.datapulse.etl.flow.dto;
+package io.datapulse.etl.dto;
 
 public record IngestResult(
     String sourceId,

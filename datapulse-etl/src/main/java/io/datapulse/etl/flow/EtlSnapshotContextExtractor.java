@@ -9,7 +9,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.etl.flow.dto.EtlSnapshotContext;
+import io.datapulse.etl.dto.EtlSnapshotContext;
 import java.nio.file.Path;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Component;

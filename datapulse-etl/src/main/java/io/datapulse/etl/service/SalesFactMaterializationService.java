@@ -1,4 +1,4 @@
-package io.datapulse.etl.service.materialization;
+package io.datapulse.etl.service;
 
 import io.datapulse.etl.repository.SalesFactMaterializationRepository;
 import java.time.LocalDate;
