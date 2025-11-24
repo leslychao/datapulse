@@ -1,8 +1,8 @@
 package io.datapulse.etl.file.locator;
 
-import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
-import io.datapulse.domain.dto.raw.ozon.OzonProductInfoRaw;
-import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonAnalyticsApiRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonProductInfoRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.NonNull;

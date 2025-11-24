@@ -1,4 +1,4 @@
-package io.datapulse.domain.marketplace;
+package io.datapulse.marketplaces.dto;
 
 import java.net.URI;
 import java.nio.file.Path;

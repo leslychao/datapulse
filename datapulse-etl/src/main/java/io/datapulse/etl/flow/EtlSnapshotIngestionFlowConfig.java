@@ -9,9 +9,9 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.domain.marketplace.Snapshot;
+import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.etl.file.SnapshotCommitBarrier;
 import io.datapulse.etl.file.SnapshotFileCleaner;
 import io.datapulse.etl.file.SnapshotIteratorFactory;

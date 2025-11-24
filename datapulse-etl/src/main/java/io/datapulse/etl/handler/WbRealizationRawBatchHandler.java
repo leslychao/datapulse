@@ -1,7 +1,7 @@
 package io.datapulse.etl.handler;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
 import io.datapulse.etl.repository.wb.WbRealizationRawJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
 package io.datapulse.etl.repository.wb;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import java.util.List;

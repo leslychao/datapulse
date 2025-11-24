@@ -1,8 +1,8 @@
 package io.datapulse.marketplaces.adapter;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
-import io.datapulse.domain.marketplace.Snapshot;
+import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;

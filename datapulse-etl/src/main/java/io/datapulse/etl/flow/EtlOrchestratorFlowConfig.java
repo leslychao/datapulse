@@ -17,7 +17,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 
 import io.datapulse.core.service.AccountService;
 import io.datapulse.core.service.EtlSyncAuditService;
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.SyncStatus;

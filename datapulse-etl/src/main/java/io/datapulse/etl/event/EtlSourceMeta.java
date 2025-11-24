@@ -1,6 +1,6 @@
 package io.datapulse.etl.event;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

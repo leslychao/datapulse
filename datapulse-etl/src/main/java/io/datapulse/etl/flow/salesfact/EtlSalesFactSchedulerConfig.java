@@ -4,7 +4,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 
 import io.datapulse.core.service.AccountService;
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.flow.EtlOrchestratorFlowConfig.EtlRunRequest;
 import java.time.LocalDate;
 import java.util.List;

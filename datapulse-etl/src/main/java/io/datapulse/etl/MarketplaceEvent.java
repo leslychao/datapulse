@@ -1,4 +1,4 @@
-package io.datapulse.domain;
+package io.datapulse.etl;
 
 import static io.datapulse.domain.MessageCodes.ETL_EVENT_UNKNOWN;
 

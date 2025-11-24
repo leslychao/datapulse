@@ -1,6 +1,6 @@
 package io.datapulse.etl.service;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import java.time.LocalDate;
 
 public interface EtlMaterializationService {

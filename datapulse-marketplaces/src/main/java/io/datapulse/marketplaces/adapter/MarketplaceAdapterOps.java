@@ -1,6 +1,6 @@
 package io.datapulse.marketplaces.adapter;
 
-import io.datapulse.domain.marketplace.Snapshot;
+import io.datapulse.marketplaces.dto.Snapshot;
 import java.time.LocalDate;
 
 public interface MarketplaceAdapterOps {

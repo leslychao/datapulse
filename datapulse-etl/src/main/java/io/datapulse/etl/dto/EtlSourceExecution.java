@@ -1,6 +1,6 @@
 package io.datapulse.etl.dto;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.event.EventSource;
 import java.time.LocalDate;

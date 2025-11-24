@@ -1,4 +1,4 @@
-package io.datapulse.domain.dto.raw.wb;
+package io.datapulse.marketplaces.dto.raw.wb;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;

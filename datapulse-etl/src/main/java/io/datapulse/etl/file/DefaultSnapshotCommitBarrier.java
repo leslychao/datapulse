@@ -1,6 +1,6 @@
 package io.datapulse.etl.file;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import java.io.IOException;
 import java.nio.file.Files;

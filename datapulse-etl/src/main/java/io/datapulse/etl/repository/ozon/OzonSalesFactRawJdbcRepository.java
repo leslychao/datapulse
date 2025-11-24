@@ -1,7 +1,7 @@
 package io.datapulse.etl.repository.ozon;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonAnalyticsApiRaw;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import java.util.List;

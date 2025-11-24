@@ -1,4 +1,4 @@
-package io.datapulse.domain.dto.raw.ozon;
+package io.datapulse.marketplaces.dto.raw.ozon;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;

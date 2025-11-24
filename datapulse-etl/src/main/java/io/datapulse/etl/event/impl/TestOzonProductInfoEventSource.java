@@ -1,9 +1,9 @@
 package io.datapulse.etl.event.impl;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.ozon.OzonProductInfoRaw;
-import io.datapulse.domain.marketplace.Snapshot;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonProductInfoRaw;
+import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
