@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0008-create-catalog-item" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      CREATE TABLE IF NOT EXISTS catalog_item
+      (
+        id              BIGSERIAL   PRIMARY KEY,
+
+        account_id      BIGINT      NOT NULL,
+        marketplace     VARCHAR(32) NOT NULL,
+
+        mp_item_id      VARCHAR(64) NOT NULL,
+        mp_offer_id     VARCHAR(64),
+        barcode         VARCHAR(128),
+
+        title           VARCHAR(512),
+        brand           VARCHAR(256),
+        category        VARCHAR(256),
+        mp_category     VARCHAR(256),
+        subject         VARCHAR(256),
+
+        is_kgt          BOOLEAN,
+        is_archived     BOOLEAN     NOT NULL DEFAULT FALSE,
+
+        price_regular   NUMERIC(19, 2),
+        price_sale      NUMERIC(19, 2),
+        vat_rate        NUMERIC(4, 2),
+
+        last_synced_at  TIMESTAMPTZ,
+
+        UNIQUE (account_id, marketplace, mp_item_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_catalog_item_account_marketplace
+        ON catalog_item (account_id, marketplace);
+
+      CREATE INDEX IF NOT EXISTS idx_catalog_item_barcode
+        ON catalog_item (barcode);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS catalog_item;
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

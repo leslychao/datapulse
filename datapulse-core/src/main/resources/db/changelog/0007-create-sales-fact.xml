@@ -11,36 +11,60 @@
     <sql>
       CREATE TABLE IF NOT EXISTS sales_fact
       (
-        id                         BIGSERIAL PRIMARY KEY,
-        account_id                 BIGINT      NOT NULL,
-        marketplace                VARCHAR(32) NOT NULL,
+        id                   BIGSERIAL PRIMARY KEY,
 
-        operation_date             DATE        NOT NULL,
-        operation_datetime         TIMESTAMPTZ,
+        account_id           BIGINT        NOT NULL,
+        marketplace          VARCHAR(32)   NOT NULL,
 
-        offer_id                   VARCHAR(128),
-        barcode                    VARCHAR(128),
-        size                       VARCHAR(64),
-        warehouse_name             VARCHAR(255),
-        region_name                VARCHAR(255),
+        sale_date            DATE          NOT NULL,
+        catalog_item_id      BIGINT        NOT NULL,
+        warehouse_id         BIGINT            NULL,
 
-        quantity                   INTEGER     NOT NULL,
+        -- Units
+        ordered_units        INTEGER       NOT NULL DEFAULT 0,
+        delivered_units      INTEGER       NOT NULL DEFAULT 0,
+        returned_units       INTEGER       NOT NULL DEFAULT 0,
+        canceled_units       INTEGER       NOT NULL DEFAULT 0,
 
-        gross_amount               NUMERIC(19, 2),
-        commission_amount          NUMERIC(19, 2),
-        logistics_and_fees_amount  NUMERIC(19, 2),
-        promo_amount               NUMERIC(19, 2),
-        net_amount                 NUMERIC(19, 2),
+        -- Revenue / payout
+        gmv_amount           NUMERIC(19,2) NOT NULL DEFAULT 0,
+        payout_amount        NUMERIC(19,2) NOT NULL DEFAULT 0,
 
-        operation_type             VARCHAR(32),
-        external_operation_id      VARCHAR(128),
-        currency_code              VARCHAR(8),
+        -- Cost structure
+        commission_amount    NUMERIC(19,2) NOT NULL DEFAULT 0,
+        delivery_amount      NUMERIC(19,2) NOT NULL DEFAULT 0,
+        storage_amount       NUMERIC(19,2) NOT NULL DEFAULT 0,
+        penalty_amount       NUMERIC(19,2) NOT NULL DEFAULT 0,
+        ads_amount           NUMERIC(19,2) NOT NULL DEFAULT 0,
+        other_fees_amount    NUMERIC(19,2) NOT NULL DEFAULT 0,
 
-        created_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+        currency_code        CHAR(3)       NOT NULL DEFAULT 'RUB',
+
+        -- Traffic / conversion
+        search_views         INTEGER       NOT NULL DEFAULT 0,
+        card_views           INTEGER       NOT NULL DEFAULT 0,
+        cart_adds            INTEGER       NOT NULL DEFAULT 0,
+        sessions             INTEGER       NOT NULL DEFAULT 0,
+
+        wb_open_count        INTEGER       NOT NULL DEFAULT 0,
+        wb_cart_count        INTEGER       NOT NULL DEFAULT 0,
+        wb_order_count       INTEGER       NOT NULL DEFAULT 0,
+        wb_buyout_count      INTEGER       NOT NULL DEFAULT 0,
+
+        created_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
+        updated_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
+
+        UNIQUE (account_id, marketplace, sale_date, catalog_item_id, warehouse_id)
       );
 
       CREATE INDEX IF NOT EXISTS idx_sales_fact_account_date
-        ON sales_fact (account_id, operation_date);
+        ON sales_fact (account_id, sale_date);
+
+      CREATE INDEX IF NOT EXISTS idx_sales_fact_item
+        ON sales_fact (catalog_item_id);
+
+      CREATE INDEX IF NOT EXISTS idx_sales_fact_warehouse
+        ON sales_fact (warehouse_id);
     </sql>
 
     <rollback>
