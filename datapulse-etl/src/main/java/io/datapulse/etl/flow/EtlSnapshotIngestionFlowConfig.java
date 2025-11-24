@@ -92,9 +92,7 @@ public class EtlSnapshotIngestionFlowConfig {
           return callback.execute();
         } catch (Exception ex) {
           snapshotErrorHandler.handlePersistError(ex, message);
-          Snapshot<?> snapshot =
-              message.getHeaders().get(HDR_ETL_SNAPSHOT_ORIGINAL, Snapshot.class);
-          return snapshot;
+          return message.getHeaders().get(HDR_ETL_SNAPSHOT_ORIGINAL, Snapshot.class);
         }
       }
     };
@@ -169,9 +167,7 @@ public class EtlSnapshotIngestionFlowConfig {
             (rawBatch, headersMap) -> {
               MessageHeaders headers = new MessageHeaders(headersMap);
               persistBatch(rawBatch, headers);
-              Snapshot<?> snapshot =
-                  headers.get(HDR_ETL_SNAPSHOT_ORIGINAL, Snapshot.class);
-              return snapshot;
+              return headers.get(HDR_ETL_SNAPSHOT_ORIGINAL, Snapshot.class);
             },
             endpoint -> endpoint
                 .requiresReply(true)
