@@ -45,13 +45,6 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
                   coalesce((
                       select (m ->> 'value')::numeric
                       from jsonb_array_elements(p.doc -> 'metrics') as m
-                      where m ->> 'id' = 'delivered_units'
-                      limit 1
-                  ), 0::numeric)                                  as delivered_units,
-
-                  coalesce((
-                      select (m ->> 'value')::numeric
-                      from jsonb_array_elements(p.doc -> 'metrics') as m
                       where m ->> 'id' = 'returns'
                       limit 1
                   ), 0::numeric)                                  as returned_units,
@@ -213,7 +206,10 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
               ci.id                                   as catalog_item_id,
               w.id                                    as warehouse_id,
               s.ordered_units::integer,
-              s.delivered_units::integer,
+              greatest(
+                  s.ordered_units - s.canceled_units - s.returned_units,
+                  0
+              )::integer                              as delivered_units,
               s.returned_units::integer,
               s.canceled_units::integer,
               s.revenue                               as gmv_amount,
