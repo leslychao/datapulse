@@ -63,34 +63,6 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
                       limit 1
                   ), 0::numeric)                                  as canceled_units,
 
-                  coalesce((
-                      select (m ->> 'value')::numeric
-                      from jsonb_array_elements(p.doc -> 'metrics') as m
-                      where m ->> 'id' = 'hits_view_search'
-                      limit 1
-                  ), 0::numeric)                                  as search_views,
-
-                  coalesce((
-                      select (m ->> 'value')::numeric
-                      from jsonb_array_elements(p.doc -> 'metrics') as m
-                      where m ->> 'id' = 'hits_view_pdp'
-                      limit 1
-                  ), 0::numeric)                                  as card_views,
-
-                  coalesce((
-                      select (m ->> 'value')::numeric
-                      from jsonb_array_elements(p.doc -> 'metrics') as m
-                      where m ->> 'id' = 'hits_tocart'
-                      limit 1
-                  ), 0::numeric)                                  as cart_adds,
-
-                  coalesce((
-                      select (m ->> 'value')::numeric
-                      from jsonb_array_elements(p.doc -> 'metrics') as m
-                      where m ->> 'id' = 'session_view'
-                      limit 1
-                  ), 0::numeric)                                  as sessions,
-
                   'RUB'::char(3)                                  as currency_code
               from raw_sales_fact_ozon rs
               cross join lateral (
@@ -230,22 +202,7 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
               returned_units,
               canceled_units,
               gmv_amount,
-              payout_amount,
-              commission_amount,
-              delivery_amount,
-              storage_amount,
-              penalty_amount,
-              ads_amount,
-              other_fees_amount,
               currency_code,
-              search_views,
-              card_views,
-              cart_adds,
-              sessions,
-              wb_open_count,
-              wb_cart_count,
-              wb_order_count,
-              wb_buyout_count,
               created_at,
               updated_at
           )
@@ -260,22 +217,7 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
               s.returned_units::integer,
               s.canceled_units::integer,
               s.revenue                               as gmv_amount,
-              s.revenue                               as payout_amount,
-              0                                       as commission_amount,
-              0                                       as delivery_amount,
-              0                                       as storage_amount,
-              0                                       as penalty_amount,
-              0                                       as ads_amount,
-              0                                       as other_fees_amount,
               s.currency_code,
-              s.search_views::integer,
-              s.card_views::integer,
-              s.cart_adds::integer,
-              s.sessions::integer,
-              0                                       as wb_open_count,
-              0                                       as wb_cart_count,
-              0                                       as wb_order_count,
-              0                                       as wb_buyout_count,
               now(),
               now()
           from sales_src s
@@ -297,18 +239,7 @@ public interface OzonSalesFactRepository extends JpaRepository<SalesFactEntity, 
                   returned_units     = excluded.returned_units,
                   canceled_units     = excluded.canceled_units,
                   gmv_amount         = excluded.gmv_amount,
-                  payout_amount      = excluded.payout_amount,
-                  commission_amount  = excluded.commission_amount,
-                  delivery_amount    = excluded.delivery_amount,
-                  storage_amount     = excluded.storage_amount,
-                  penalty_amount     = excluded.penalty_amount,
-                  ads_amount         = excluded.ads_amount,
-                  other_fees_amount  = excluded.other_fees_amount,
                   currency_code      = excluded.currency_code,
-                  search_views       = excluded.search_views,
-                  card_views         = excluded.card_views,
-                  cart_adds          = excluded.cart_adds,
-                  sessions           = excluded.sessions,
                   updated_at         = now()
           """,
       nativeQuery = true
