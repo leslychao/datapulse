@@ -8,7 +8,6 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -38,11 +37,11 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
     Map<String, Object> body = Map.of(
         "date_from", from.toString(),
         "date_to", to.toString(),
-        "dimension", List.of("day", "sku"),
-        "metrics", OzonMetrics.SALES_FACT_METRICS,
+        "dimension", OzonAnalyticsSchema.SALES_FACT_DIMENSIONS,
+        "metrics", OzonAnalyticsSchema.SALES_FACT_METRICS,
         "limit", 1000L,
-        "filters", List.of(),
-        "sort", List.of()
+        "filters", java.util.List.of(),
+        "sort", java.util.List.of()
     );
     return doPost(accountId, EndpointKey.SALES, body, OzonAnalyticsApiRaw.class);
   }

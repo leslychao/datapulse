@@ -2,10 +2,17 @@ package io.datapulse.marketplaces.adapter;
 
 import java.util.List;
 
-public final class OzonMetrics {
+public final class OzonAnalyticsSchema {
 
-  private OzonMetrics() {
+  private OzonAnalyticsSchema() {
   }
+
+  public static final List<String> SALES_FACT_DIMENSIONS = List.of(
+      "day",
+      "sku",
+      "offer_id",
+      "warehouse_id"
+  );
 
   public static final List<String> SALES_FACT_METRICS = List.of(
       "revenue",
