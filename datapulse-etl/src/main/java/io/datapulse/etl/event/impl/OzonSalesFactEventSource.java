@@ -1,11 +1,11 @@
-package io.datapulse.etl.route.impl;
+package io.datapulse.etl.event.impl;
 
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
 import io.datapulse.domain.marketplace.Snapshot;
-import io.datapulse.etl.route.EtlSourceMeta;
-import io.datapulse.etl.route.EventSource;
+import io.datapulse.etl.event.EtlSourceMeta;
+import io.datapulse.etl.event.EventSource;
 import io.datapulse.marketplaces.adapter.OzonAdapter;
 import java.time.LocalDate;
 import lombok.NonNull;

@@ -1,8 +1,8 @@
-package io.datapulse.etl.flow.batch;
+package io.datapulse.etl.batch;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.wb.WbRealizationRaw;
-import io.datapulse.etl.flow.batch.repository.WbRealizationRawJdbcRepository;
+import io.datapulse.etl.repository.wb.WbRealizationRawJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

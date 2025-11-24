@@ -1,33 +1,31 @@
-package io.datapulse.etl.flow.batch.repository;
+package io.datapulse.etl.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
-import io.datapulse.domain.dto.raw.ozon.OzonProductInfoRaw;
 import io.datapulse.domain.exception.AppException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-@Slf4j
 @Repository
 @RequiredArgsConstructor
-public class OzonProductInfoRawJdbcRepository {
+public class RawBatchInsertJdbcRepository {
 
-  private static final String INSERT_SQL = """
-      insert into raw_product_info_ozon
-        (request_id, snapshot_id, account_id, marketplace, payload)
-      values (?, ?, ?, ?, cast(? as jsonb))
+  private static final String INSERT_SQL_TEMPLATE = """
+      insert into %s
+        (request_id, snapshot_id, account_id, marketplace, payload, created_at)
+      values (?, ?, ?, ?, cast(? as jsonb), now())
       """;
 
   private final JdbcTemplate jdbcTemplate;
   private final ObjectMapper objectMapper;
 
-  public void saveBatch(
-      List<OzonProductInfoRaw> batch,
+  public <T> void saveBatch(
+      List<T> batch,
+      String tableName,
       String requestId,
       String snapshotId,
       Long accountId,
@@ -37,8 +35,10 @@ public class OzonProductInfoRawJdbcRepository {
       return;
     }
 
+    String sql = INSERT_SQL_TEMPLATE.formatted(tableName);
+
     jdbcTemplate.batchUpdate(
-        INSERT_SQL,
+        sql,
         batch,
         batch.size(),
         (ps, raw) -> {
@@ -51,7 +51,7 @@ public class OzonProductInfoRawJdbcRepository {
     );
   }
 
-  private String toJson(OzonProductInfoRaw raw) {
+  private <T> String toJson(T raw) {
     try {
       return objectMapper.writeValueAsString(raw);
     } catch (JsonProcessingException ex) {

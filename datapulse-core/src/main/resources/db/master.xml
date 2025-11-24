@@ -9,4 +9,6 @@
   <include file="changelog/0004-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0005-create-raw-realization-fact-wb.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0006-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0007-create-sales-fact.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0008-create-sales-fact-materialization-fn.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

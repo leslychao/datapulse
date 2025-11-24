@@ -10,6 +10,6 @@ public interface EtlMaterializationService {
       MarketplaceEvent event,
       LocalDate from,
       LocalDate to,
-      String requestId);
-
+      String requestId
+  );
 }

@@ -17,7 +17,7 @@ import io.datapulse.etl.file.SnapshotFileCleaner;
 import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
-import io.datapulse.etl.flow.batch.EtlBatchDispatcher;
+import io.datapulse.etl.batch.EtlBatchDispatcher;
 import io.datapulse.etl.flow.dto.EtlSnapshotContext;
 import io.datapulse.etl.flow.dto.EtlSourceExecution;
 import io.datapulse.etl.flow.dto.IngestResult;

@@ -1,11 +1,11 @@
-package io.datapulse.etl.route.impl;
+package io.datapulse.etl.event.impl;
 
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
+import io.datapulse.domain.dto.raw.ozon.OzonProductInfoRaw;
 import io.datapulse.domain.marketplace.Snapshot;
-import io.datapulse.etl.route.EtlSourceMeta;
-import io.datapulse.etl.route.EventSource;
+import io.datapulse.etl.event.EtlSourceMeta;
+import io.datapulse.etl.event.EventSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -24,19 +24,21 @@ import org.springframework.stereotype.Component;
 @Profile("test")
 @EtlSourceMeta(
     event = MarketplaceEvent.SALES_FACT,
-    marketplace = MarketplaceType.OZON
+    marketplace = MarketplaceType.OZON,
+    order = 1
 )
-public final class TestOzonSalesFactEventSource implements EventSource {
+public final class TestOzonProductInfoEventSource implements EventSource {
 
-  private static final URI DUMMY_URI = URI.create("test://ozon/analytics");
-  private static final String SNAPSHOT_RESOURCE_PATH = "ozon-analytics.json";
-  private static final String TEMP_FILE_PREFIX = "ozon-sales-";
+  private static final URI DUMMY_URI = URI.create("test://ozon/product-info");
+  private static final String SNAPSHOT_RESOURCE_PATH = "ozon-product-info.json";
+  private static final String TEMP_FILE_PREFIX = "ozon-product-info-";
   private static final String TEMP_FILE_SUFFIX = ".json";
   private static final String ERROR_MESSAGE =
-      "Не удалось подготовить тестовый снапшот продаж Ozon из ресурса " + SNAPSHOT_RESOURCE_PATH;
+      "Не удалось подготовить тестовый снапшот Ozon Product Info из ресурса "
+          + SNAPSHOT_RESOURCE_PATH;
 
   @Override
-  public @NonNull Snapshot<OzonAnalyticsApiRaw> fetchSnapshot(
+  public @NonNull Snapshot<OzonProductInfoRaw> fetchSnapshot(
       long accountId,
       @NonNull MarketplaceEvent event,
       @NonNull LocalDate from,
@@ -47,7 +49,7 @@ public final class TestOzonSalesFactEventSource implements EventSource {
       long size = Files.size(snapshotFile);
 
       return new Snapshot<>(
-          OzonAnalyticsApiRaw.class,
+          OzonProductInfoRaw.class,
           snapshotFile,
           size,
           DUMMY_URI,

@@ -39,7 +39,7 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
         "date_from", from.toString(),
         "date_to", to.toString(),
         "dimension", List.of("day", "sku"),
-        "metrics", List.of("revenue", "ordered_units"),
+        "metrics", OzonMetrics.SALES_FACT_METRICS,
         "limit", 1000L,
         "filters", List.of(),
         "sort", List.of()

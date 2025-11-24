@@ -1,8 +1,8 @@
-package io.datapulse.etl.flow.batch;
+package io.datapulse.etl.batch;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.raw.ozon.OzonAnalyticsApiRaw;
-import io.datapulse.etl.flow.batch.repository.OzonSalesFactRawJdbcRepository;
+import io.datapulse.etl.repository.ozon.OzonSalesFactRawJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

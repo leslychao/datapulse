@@ -2,7 +2,7 @@ package io.datapulse.etl.flow.dto;
 
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.etl.route.EventSource;
+import io.datapulse.etl.event.EventSource;
 import java.time.LocalDate;
 
 public record EtlSourceExecution(

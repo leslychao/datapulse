@@ -1,4 +1,4 @@
-package io.datapulse.etl.route;
+package io.datapulse.etl.event;
 
 import io.datapulse.domain.MarketplaceEvent;
 import io.datapulse.domain.marketplace.Snapshot;
