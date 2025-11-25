@@ -114,5 +114,6 @@ public final class MessageCodes {
   public static final String ETL_BATCH_HANDLER_DUPLICATE = "etl.batch.handler.duplicate";
   public static final String ETL_BATCH_HANDLER_NOT_FOUND = "etl.batch.handler.not-found";
   public static final String ETL_BATCH_HANDLER_TYPE_MISMATCH = "etl.batch.handler.type-mismatch";
+  public static final String ETL_MATERIALIZATION_FALLBACK_ERROR = "etl.materialization.error.fallback";
 
 }

@@ -22,10 +22,10 @@ public final class EtlIngestErrorHandler {
     MessageHeaders headers = message.getHeaders();
     String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
 
-    exceptionMessageService.logEtlError(throwable);
+    exceptionMessageService.logError(throwable);
 
     String errorClass = throwable != null ? throwable.getClass().getSimpleName() : null;
-    String errorMessage = exceptionMessageService.resolveLogMessage(throwable);
+    String errorMessage = exceptionMessageService.userMessage(throwable);
 
     return new IngestResult(
         sourceId,

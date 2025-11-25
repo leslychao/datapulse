@@ -1,7 +1,6 @@
 package io.datapulse.etl.i18n;
 
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.etl.dto.EtlSnapshotContext;
 import java.util.Locale;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -18,79 +17,70 @@ public class ExceptionMessageService {
 
   private final MessageSource messageSource;
 
-  public String resolveUserMessage(Throwable throwable, Locale locale) {
+  public String userMessage(Throwable throwable, Locale locale) {
     if (throwable == null) {
-      return "Неизвестная ошибка";
+      return message("error.unknown", null, locale, "Неизвестная ошибка");
     }
 
-    Locale targetLocale = locale != null ? locale : DEFAULT_LOCALE;
+    Locale target = locale != null ? locale : DEFAULT_LOCALE;
 
     if (throwable instanceof AppException appException) {
-      String messageKey = appException.getMessageKey();
-      if (messageKey != null && !messageKey.isBlank()) {
-        Object[] args = appException.getArgs();
-        return messageSource.getMessage(messageKey, args, messageKey, targetLocale);
+      String key = appException.getMessageKey();
+      Object[] args = appException.getArgs();
+      if (hasText(key)) {
+        return message(key, args, target, key);
       }
     }
 
-    String message = throwable.getMessage();
-    if (message != null && !message.isBlank()) {
-      return message;
+    String msg = throwable.getMessage();
+    if (hasText(msg)) {
+      return msg;
     }
 
     return throwable.toString();
   }
 
-  public String resolveLogMessage(Throwable throwable) {
-    return resolveUserMessage(Objects.requireNonNull(throwable), DEFAULT_LOCALE);
+  public String userMessage(Throwable throwable) {
+    return userMessage(throwable, DEFAULT_LOCALE);
   }
 
-  public void logEtlError(Throwable throwable) {
-    if (throwable == null) {
-      log.error("ETL error: неизвестная ошибка (throwable is null)");
-      return;
-    }
-    String message = resolveLogMessage(throwable);
-    log.error("ETL error: {}", message, throwable);
+  public String userMessage(String code, Object... args) {
+    return message(code, args, DEFAULT_LOCALE, code);
   }
 
-  public void logSnapshotError(
-      Throwable throwable,
-      EtlSnapshotContext context,
-      String stage
-  ) {
+  public String logMessage(Throwable throwable) {
+    return userMessage(Objects.requireNonNull(throwable), DEFAULT_LOCALE);
+  }
+
+  public String logMessage(String code, Object... args) {
+    return message(code, args, DEFAULT_LOCALE, code);
+  }
+
+  public void logError(Throwable throwable) {
     if (throwable == null) {
-      log.error(
-          "ETL snapshot error: неизвестная ошибка, stage={}, context={}",
-          stage,
-          context
-      );
+      log.error("ETL error: {}", message("error.unknown"));
       return;
     }
+    log.error("ETL error: {}", logMessage(throwable), throwable);
+  }
 
-    String message = resolveLogMessage(throwable);
+  public void logError(String code, Object... args) {
+    log.error("ETL error: {}", logMessage(code, args));
+  }
 
-    log.error("""
-            ETL snapshot error: {}
-              stage={}
-              requestId={}
-              accountId={}
-              event={}
-              marketplace={}
-              sourceId={}
-              snapshotId={}
-              snapshotFile={}
-            """,
-        message,
-        stage,
-        context.requestId(),
-        context.accountId(),
-        context.event(),
-        context.marketplace(),
-        context.sourceId(),
-        context.snapshotId(),
-        context.snapshotFile(),
-        throwable
-    );
+  private String message(String key, Object[] args, Locale locale, String defaultMsg) {
+    if (!hasText(key)) {
+      return defaultMsg;
+    }
+    Locale target = locale != null ? locale : DEFAULT_LOCALE;
+    return messageSource.getMessage(key, args, defaultMsg, target);
+  }
+
+  private String message(String key) {
+    return message(key, null, DEFAULT_LOCALE, key);
+  }
+
+  private boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 }

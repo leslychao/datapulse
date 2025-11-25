@@ -1,8 +1,8 @@
 package io.datapulse.etl.handler;
 
+import io.datapulse.etl.dto.EtlSnapshotContext;
 import io.datapulse.etl.file.SnapshotCommitBarrier;
 import io.datapulse.etl.file.SnapshotFileCleaner;
-import io.datapulse.etl.dto.EtlSnapshotContext;
 import io.datapulse.etl.flow.EtlSnapshotContextExtractor;
 import io.datapulse.etl.i18n.ExceptionMessageService;
 import java.nio.file.Path;
@@ -35,10 +35,41 @@ public final class EtlSnapshotErrorHandler {
 
     cleanUpSnapshotContext(context.snapshotId(), context.snapshotFile());
 
-    exceptionMessageService.logSnapshotError(
+    logSnapshotError(
         throwable,
         context,
         STAGE_SNAPSHOT_PERSIST
+    );
+  }
+
+  public void logSnapshotError(
+      Throwable throwable,
+      EtlSnapshotContext context,
+      String stage
+  ) {
+    String message = exceptionMessageService.userMessage(throwable);
+    log.error(
+        """
+            ETL snapshot error: {}
+              stage={}
+              requestId={}
+              accountId={}
+              event={}
+              marketplace={}
+              sourceId={}
+              snapshotId={}
+              snapshotFile={}
+            """,
+        message,
+        stage,
+        context.requestId(),
+        context.accountId(),
+        context.event(),
+        context.marketplace(),
+        context.sourceId(),
+        context.snapshotId(),
+        context.snapshotFile(),
+        throwable
     );
   }
 
