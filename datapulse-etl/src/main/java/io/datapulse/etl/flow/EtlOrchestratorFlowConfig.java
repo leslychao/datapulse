@@ -29,6 +29,7 @@ import io.datapulse.etl.dto.EtlSourceExecution;
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
+import io.datapulse.etl.flow.advice.EtlMaterializationAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import io.micrometer.common.util.StringUtils;
 import java.time.LocalDate;
@@ -195,7 +196,10 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlOrchestratorFlow(TaskExecutor etlOrchestrateExecutor) {
+  public IntegrationFlow etlOrchestratorFlow(
+      TaskExecutor etlOrchestrateExecutor,
+      EtlMaterializationAdvice etlMaterializationAdvice
+  ) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATE)
         .headerFilter(MessageHeaders.REPLY_CHANNEL, MessageHeaders.ERROR_CHANNEL)
@@ -321,7 +325,9 @@ public class EtlOrchestratorFlowConfig {
         .handle(
             Object.class,
             this::handleOrchestratorResults,
-            endpoint -> endpoint.requiresReply(true)
+            endpoint -> endpoint
+                .requiresReply(true)
+                .advice(etlMaterializationAdvice)
         )
         .handle(
             Object.class,
