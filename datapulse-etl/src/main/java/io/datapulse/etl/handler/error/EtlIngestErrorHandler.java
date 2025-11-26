@@ -4,6 +4,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.dto.IngestStatus;
+import io.datapulse.etl.i18n.ExceptionMessageService;
 import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ public class EtlIngestErrorHandler {
   private static final int MAX_ERROR_MESSAGE_LENGTH = 2000;
   private static final String UNKNOWN_SOURCE_ID = "UNKNOWN_SOURCE";
 
+  private final ExceptionMessageService exceptionMessageService;
+
   public IngestResult handleIngestError(
       Throwable error,
       Message<?> message
@@ -29,8 +32,8 @@ public class EtlIngestErrorHandler {
     IngestStatus status = determineStatus(error);
 
     String errorClass = error.getClass().getName();
-    String rawErrorMessage = resolveErrorMessage(error);
-    String safeErrorMessage = truncate(rawErrorMessage, MAX_ERROR_MESSAGE_LENGTH);
+    String userErrorMessage = exceptionMessageService.userMessage(error);
+    String safeErrorMessage = truncate(userErrorMessage, MAX_ERROR_MESSAGE_LENGTH);
 
     log.warn(
         "ETL ingest failed: sourceId={}, status={}, errorClass={}, errorMessage={}",
@@ -83,14 +86,6 @@ public class EtlIngestErrorHandler {
     }
 
     return false;
-  }
-
-  private String resolveErrorMessage(Throwable error) {
-    String message = error.getMessage();
-    if (message != null && !message.isBlank()) {
-      return message;
-    }
-    return error.toString();
   }
 
   private String truncate(String value, int maxLength) {
