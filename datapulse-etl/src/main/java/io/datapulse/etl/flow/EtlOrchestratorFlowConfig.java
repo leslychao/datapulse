@@ -55,7 +55,6 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.integration.amqp.dsl.Amqp;
 import org.springframework.integration.channel.DirectChannel;
-import org.springframework.integration.channel.NullChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.Pollers;
 import org.springframework.integration.handler.LoggingHandler;
@@ -225,13 +224,12 @@ public class EtlOrchestratorFlowConfig {
                 message -> ((OrchestrationCommand) message.getPayload()).to()
             )
         )
-        .wireTap(CH_ETL_ORCHESTRATE)
         .log(
             LoggingHandler.Level.INFO,
             EtlOrchestratorFlowConfig.class.getName(),
             m -> "ETL run command sent to orchestrator from broker: " + m.getPayload()
         )
-        .channel(new NullChannel())
+        .channel(CH_ETL_ORCHESTRATE)
         .get();
   }
 

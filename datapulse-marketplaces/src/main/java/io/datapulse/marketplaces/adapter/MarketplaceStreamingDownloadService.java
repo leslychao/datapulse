@@ -1,7 +1,7 @@
 package io.datapulse.marketplaces.adapter;
 
 import io.datapulse.core.client.HttpStreamingClient;
-import io.datapulse.core.service.FileStreamingService;
+import io.datapulse.marketplaces.service.FileStreamingService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.resilience.MarketplaceRetryService;

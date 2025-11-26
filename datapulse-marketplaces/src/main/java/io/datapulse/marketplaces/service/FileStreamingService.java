@@ -1,7 +1,8 @@
-package io.datapulse.core.service;
+package io.datapulse.marketplaces.service;
 
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -35,6 +36,13 @@ public class FileStreamingService {
       return targetFile;
     } catch (Exception e) {
       safeDelete(tmp);
+
+      Throwable root = unwrap(e);
+
+      if (root instanceof TooManyRequestsBackoffRequiredException tooManyRequests) {
+        throw tooManyRequests;
+      }
+
       throw new AppException(MessageCodes.DOWNLOAD_FAILED, targetFile);
     }
   }
@@ -74,12 +82,20 @@ public class FileStreamingService {
     }
   }
 
-  private static void safeDelete(Path p) {
+  private static void safeDelete(Path path) {
     try {
-      if (p != null) {
-        Files.deleteIfExists(p);
+      if (path != null) {
+        Files.deleteIfExists(path);
       }
     } catch (IOException ignore) {
     }
+  }
+
+  private static Throwable unwrap(Throwable throwable) {
+    Throwable current = throwable;
+    while (current.getCause() != null && current.getCause() != current) {
+      current = current.getCause();
+    }
+    return current;
   }
 }
