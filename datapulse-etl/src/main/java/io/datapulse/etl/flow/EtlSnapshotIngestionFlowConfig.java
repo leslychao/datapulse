@@ -14,6 +14,7 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlSnapshotContext;
 import io.datapulse.etl.dto.EtlSourceExecution;
 import io.datapulse.etl.dto.IngestResult;
+import io.datapulse.etl.dto.IngestStatus;
 import io.datapulse.etl.file.SnapshotCommitBarrier;
 import io.datapulse.etl.file.SnapshotFileCleaner;
 import io.datapulse.etl.file.SnapshotIteratorFactory;
@@ -23,7 +24,6 @@ import io.datapulse.etl.handler.EtlBatchDispatcher;
 import io.datapulse.etl.handler.error.EtlIngestErrorHandler;
 import io.datapulse.etl.handler.error.EtlSnapshotErrorHandler;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,14 +45,6 @@ public class EtlSnapshotIngestionFlowConfig {
 
   private static final int SNAPSHOT_BATCH_SIZE = 500;
 
-  private record SnapshotPersistError(
-      String sourceId,
-      String errorClass,
-      String errorMessage
-  ) {
-
-  }
-
   private final SnapshotCommitBarrier snapshotCommitBarrier;
   private final EtlBatchDispatcher etlBatchDispatcher;
   private final SnapshotJsonLayoutRegistry snapshotJsonLayoutRegistry;
@@ -73,17 +65,6 @@ public class EtlSnapshotIngestionFlowConfig {
           return callback.execute();
         } catch (Exception ex) {
           Throwable actual = unwrapThrowable(ex);
-
-          if (actual instanceof TooManyRequestsBackoffRequiredException tooMany) {
-            log.warn(
-                "TooManyRequestsBackoffRequired detected: marketplace={}, endpoint={}; "
-                    + "delegating to Rabbit WAIT queue via DLX",
-                tooMany.getMarketplace(),
-                tooMany.getEndpoint()
-            );
-            throw tooMany;
-          }
-
           return ingestErrorHandler.handleIngestError(actual, message);
         }
       }
@@ -111,20 +92,7 @@ public class EtlSnapshotIngestionFlowConfig {
           return callback.execute();
         } catch (Exception ex) {
           snapshotErrorHandler.handlePersistError(ex, message);
-
-          MessageHeaders headers = message.getHeaders();
-          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
-
-          String errorClass = ex.getClass().getName();
-          String errorMessage = ex.getMessage() != null
-              ? ex.getMessage()
-              : "Snapshot persist failed";
-
-          return new SnapshotPersistError(
-              sourceId,
-              errorClass,
-              errorMessage
-          );
+          throw ex;
         }
       }
     };
@@ -140,10 +108,12 @@ public class EtlSnapshotIngestionFlowConfig {
                 command,
                 new MessageHeaders(headers)
             ),
-            endpoint -> endpoint.requiresReply(true).advice(ingestResultAdvice)
+            endpoint -> endpoint
+                .requiresReply(true)
+                .advice(ingestResultAdvice)
         )
         .<Object, Boolean>route(
-            payload -> payload instanceof Snapshot<?> snapshot && snapshot.file() != null,
+            payload -> payload instanceof Snapshot<?>,
             mapping -> mapping
                 .subFlowMapping(true, subFlow -> subFlow
                     .enrichHeaders(enricher -> enricher
@@ -158,47 +128,35 @@ public class EtlSnapshotIngestionFlowConfig {
                             .requestTimeout(0L)
                             .replyTimeout(-1L)
                             .requiresReply(true)
-                    )
-                    .handle(
-                        Object.class,
-                        (payload, headers) -> {
-                          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
-
-                          if (payload instanceof SnapshotPersistError error) {
-                            return new IngestResult(
-                                sourceId,
-                                false,
-                                error.errorClass(),
-                                error.errorMessage()
-                            );
-                          }
-
-                          return new IngestResult(
-                              sourceId,
-                              true,
-                              null,
-                              null
-                          );
-                        }
+                            .advice(ingestResultAdvice)
                     )
                 )
-                .subFlowMapping(false, subFlow -> subFlow
-                    .handle(
-                        Object.class,
-                        (payload, headers) -> new IngestResult(
-                            headers.get(HDR_ETL_SOURCE_ID, String.class),
-                            false,
-                            AppException.class.getName(),
-                            "Snapshot is missing or has no file"
-                        )
-                    )
-                )
+                .defaultSubFlowMapping(subFlow -> subFlow.bridge())
+        )
+        .handle(
+            Object.class,
+            (payload, headers) -> {
+              if (payload instanceof IngestResult result) {
+                return result;
+              }
+
+              String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+
+              return new IngestResult(
+                  sourceId,
+                  IngestStatus.SUCCESS,
+                  null,
+                  null
+              );
+            }
         )
         .get();
   }
 
   @Bean
-  public IntegrationFlow snapshotStreamingFlow(Advice snapshotPersistErrorAdvice) {
+  public IntegrationFlow snapshotStreamingFlow(
+      Advice snapshotPersistErrorAdvice
+  ) {
     return IntegrationFlow
         .from(CH_ETL_SNAPSHOT_READY)
         .enrichHeaders(enricher -> enricher

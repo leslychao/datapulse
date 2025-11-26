@@ -7,6 +7,7 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
+import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;

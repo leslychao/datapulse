@@ -7,6 +7,7 @@ import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
+import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import java.time.LocalDate;
 import java.util.Map;
 import org.springframework.stereotype.Component;

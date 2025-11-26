@@ -4,6 +4,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.EtlFlowConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.flow.EtlFlowConstants.EXCHANGE_EXECUTION_DLX;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
@@ -17,6 +18,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 import static io.datapulse.etl.flow.EtlFlowConstants.QUEUE_EXECUTION;
 import static io.datapulse.etl.flow.EtlFlowConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.flow.EtlFlowConstants.ROUTING_KEY_EXECUTION_WAIT;
 
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.AccountService;
@@ -181,8 +183,10 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlExecutionInboundFlow(ConnectionFactory connectionFactory,
-      MessageConverter etlExecutionMessageConverter) {
+  public IntegrationFlow etlExecutionInboundFlow(
+      ConnectionFactory connectionFactory,
+      MessageConverter etlExecutionMessageConverter
+  ) {
     return IntegrationFlow
         .from(
             Amqp.inboundAdapter(connectionFactory, QUEUE_EXECUTION)
@@ -325,7 +329,7 @@ public class EtlOrchestratorFlowConfig {
                   .toList();
 
               List<String> failedSourceIds = results.stream()
-                  .filter(result -> !result.success())
+                  .filter(IngestResult::isError)
                   .map(IngestResult::sourceId)
                   .toList();
 
@@ -336,7 +340,7 @@ public class EtlOrchestratorFlowConfig {
               String failedSourceIdsValue = String.join(",", failedSourceIds);
 
               List<String> errorMessages = results.stream()
-                  .filter(result -> !result.success())
+                  .filter(IngestResult::isError)
                   .map(result -> {
                     String errorMessage = result.errorMessage();
                     if (StringUtils.isNotBlank(errorMessage)) {
@@ -384,6 +388,54 @@ public class EtlOrchestratorFlowConfig {
           MessageCodes.ETL_REQUEST_INVALID,
           "event=" + context.eventValue()
       );
+    }
+
+    List<IngestResult> results = null;
+    if (payload instanceof List<?> rawList) {
+      results = rawList.stream()
+          .filter(IngestResult.class::isInstance)
+          .map(IngestResult.class::cast)
+          .toList();
+    }
+
+    boolean hasWait = results != null
+        && results.stream().anyMatch(IngestResult::isWait);
+
+    boolean hasError = results != null
+        && results.stream().anyMatch(IngestResult::isError);
+
+    if (hasWait && !hasError) {
+      String waitSources = results.stream()
+          .filter(IngestResult::isWait)
+          .map(IngestResult::sourceId)
+          .reduce((a, b) -> a + "," + b)
+          .orElse("");
+
+      log.warn(
+          "ETL orchestration completed with WAIT status; scheduling retry via wait queue: "
+              + "requestId={}, event={}, from={}, to={}, waitSources={}",
+          context.requestId(),
+          event,
+          context.dateFrom(),
+          context.dateTo(),
+          waitSources
+      );
+
+      OrchestrationCommand retryCommand = new OrchestrationCommand(
+          context.requestId(),
+          context.accountId(),
+          event,
+          context.dateFrom(),
+          context.dateTo()
+      );
+
+      etlExecutionRabbitTemplate.convertAndSend(
+          EXCHANGE_EXECUTION_DLX,
+          ROUTING_KEY_EXECUTION_WAIT,
+          retryCommand
+      );
+
+      return payload;
     }
 
     SyncStatus syncStatus = headers.get(HDR_ETL_SYNC_STATUS, SyncStatus.class);

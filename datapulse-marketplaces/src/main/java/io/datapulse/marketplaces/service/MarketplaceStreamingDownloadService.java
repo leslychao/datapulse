@@ -1,4 +1,4 @@
-package io.datapulse.marketplaces.adapter;
+package io.datapulse.marketplaces.service;
 
 import io.datapulse.core.client.HttpStreamingClient;
 import io.datapulse.marketplaces.service.FileStreamingService;
