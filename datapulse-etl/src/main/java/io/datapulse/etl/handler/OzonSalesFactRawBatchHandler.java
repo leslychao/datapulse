@@ -1,8 +1,11 @@
 package io.datapulse.etl.handler;
 
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.etl.RawTableNames;
+import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
+import io.datapulse.marketplaces.dto.normalized.OzonSalesAnalyticsRawDto;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonAnalyticsApiRaw;
-import io.datapulse.etl.repository.ozon.OzonSalesFactRawJdbcRepository;
+import io.datapulse.marketplaces.mapper.OzonSalesAnalyticsRawMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,7 +14,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OzonSalesFactRawBatchHandler implements EtlBatchHandler<OzonAnalyticsApiRaw> {
 
-  private final OzonSalesFactRawJdbcRepository rawRepository;
+  private final RawBatchInsertJdbcRepository rawRepository;
+  private final OzonSalesAnalyticsRawMapper mapper;
 
   @Override
   public Class<OzonAnalyticsApiRaw> elementType() {
@@ -26,6 +30,10 @@ public class OzonSalesFactRawBatchHandler implements EtlBatchHandler<OzonAnalyti
       Long accountId,
       MarketplaceType marketplace
   ) {
-    rawRepository.saveBatch(rawBatch, requestId, snapshotId, accountId, marketplace);
+    List<OzonSalesAnalyticsRawDto> normalizedBatch = rawBatch.stream()
+        .map(mapper::toDto)
+        .toList();
+    rawRepository.saveBatch(normalizedBatch, RawTableNames.OZON_SALES_FACT, requestId, snapshotId,
+        accountId, marketplace);
   }
 }

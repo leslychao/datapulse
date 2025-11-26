@@ -1,6 +1,6 @@
 package io.datapulse.etl.service;
 
-import io.datapulse.domain.MarketplaceType;
+import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.etl.repository.ozon.OzonSalesFactRepository;
 import io.datapulse.etl.repository.wb.WbSalesFactRepository;
 import java.time.LocalDate;
@@ -13,33 +13,64 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public final class SalesFactMaterializationService {
 
+  private final AccountConnectionService accountConnectionService;
   private final OzonSalesFactRepository ozonSalesFactRepository;
   private final WbSalesFactRepository wbSalesFactRepository;
 
   public void materialize(
-      MarketplaceType marketplace,
       long accountId,
       LocalDate dateFrom,
       LocalDate dateTo,
       String requestId
   ) {
+    var marketplaces = accountConnectionService.getActiveMarketplacesByAccountId(accountId);
+
+    if (marketplaces.isEmpty()) {
+      log.warn(
+          "SalesFact materialization skipped: no active marketplaces for accountId={}, requestId={}",
+          accountId,
+          requestId
+      );
+      return;
+    }
+
     log.info(
-        "SalesFact materialization started: requestId={}, marketplace={}, accountId={}, from={}, to={}",
+        "SalesFact materialization started: requestId={}, accountId={}, marketplaces={}, from={}, to={}",
         requestId,
-        marketplace,
         accountId,
+        marketplaces,
         dateFrom,
         dateTo
     );
 
-    ozonSalesFactRepository.materializeSalesFact(accountId, dateFrom, dateTo, requestId);
-    wbSalesFactRepository.materializeSalesFact(accountId, dateFrom, dateTo, requestId);
+    marketplaces.forEach(marketplace -> {
+      switch (marketplace) {
+        case OZON -> ozonSalesFactRepository.materializeSalesFact(
+            accountId,
+            dateFrom,
+            dateTo,
+            requestId
+        );
+        case WILDBERRIES -> wbSalesFactRepository.materializeSalesFact(
+            accountId,
+            dateFrom,
+            dateTo,
+            requestId
+        );
+        default -> log.warn(
+            "SalesFact materialization skipped: unsupported marketplace={}, accountId={}, requestId={}",
+            marketplace,
+            accountId,
+            requestId
+        );
+      }
+    });
 
     log.info(
-        "SalesFact materialization finished: requestId={}, marketplace={}, accountId={}, from={}, to={}",
+        "SalesFact materialization finished: requestId={}, accountId={}, marketplaces={}, from={}, to={}",
         requestId,
-        marketplace,
         accountId,
+        marketplaces,
         dateFrom,
         dateTo
     );

@@ -1,10 +1,7 @@
 package io.datapulse.etl.service;
 
-import io.datapulse.core.service.AccountConnectionService;
-import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
 import java.time.LocalDate;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class EtlMaterializationServiceImpl implements EtlMaterializationService {
 
   private final SalesFactMaterializationService salesFactMaterializationService;
-  private final AccountConnectionService accountConnectionService;
 
   @Override
   @Transactional
@@ -48,8 +44,12 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
     );
 
     switch (event) {
-      case SALES_FACT -> materializeSalesFactForAllMarketplaces(accountId, from, to, requestId);
-
+      case SALES_FACT -> salesFactMaterializationService.materialize(
+          accountId,
+          from,
+          to,
+          requestId
+      );
       default -> log.info(
           "No materialization configured for event={}, requestId={}, accountId={}",
           event,
@@ -66,32 +66,5 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
         from,
         to
     );
-  }
-
-  private void materializeSalesFactForAllMarketplaces(
-      long accountId,
-      LocalDate from,
-      LocalDate to,
-      String requestId
-  ) {
-    List<MarketplaceType> marketplaces =
-        accountConnectionService.getActiveMarketplacesByAccountId(accountId);
-
-    if (marketplaces.isEmpty()) {
-      log.warn(
-          "SalesFact materialization skipped: no active marketplaces for accountId={}, requestId={}",
-          accountId,
-          requestId
-      );
-      return;
-    }
-
-    marketplaces.forEach(marketplaceType -> salesFactMaterializationService.materialize(
-        marketplaceType,
-        accountId,
-        from,
-        to,
-        requestId
-    ));
   }
 }

@@ -1,8 +1,9 @@
 package io.datapulse.etl.handler;
 
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.etl.RawTableNames;
+import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
-import io.datapulse.etl.repository.wb.WbRealizationRawJdbcRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WbRealizationRawBatchHandler implements EtlBatchHandler<WbRealizationRaw> {
 
-  private final WbRealizationRawJdbcRepository rawRepository;
+  private final RawBatchInsertJdbcRepository rawRepository;
 
   @Override
   public Class<WbRealizationRaw> elementType() {
@@ -26,6 +27,7 @@ public class WbRealizationRawBatchHandler implements EtlBatchHandler<WbRealizati
       Long accountId,
       MarketplaceType marketplace
   ) {
-    rawRepository.saveBatch(rawBatch, requestId, snapshotId, accountId, marketplace);
+    rawRepository.saveBatch(rawBatch, RawTableNames.WB_REALIZATION, requestId, snapshotId,
+        accountId, marketplace);
   }
 }
