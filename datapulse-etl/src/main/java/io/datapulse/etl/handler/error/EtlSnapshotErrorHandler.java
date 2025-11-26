@@ -1,4 +1,4 @@
-package io.datapulse.etl.handler;
+package io.datapulse.etl.handler.error;
 
 import io.datapulse.etl.dto.EtlSnapshotContext;
 import io.datapulse.etl.file.SnapshotCommitBarrier;

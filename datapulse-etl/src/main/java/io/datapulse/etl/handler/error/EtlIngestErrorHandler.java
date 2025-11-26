@@ -1,4 +1,4 @@
-package io.datapulse.etl.handler;
+package io.datapulse.etl.handler.error;
 
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
