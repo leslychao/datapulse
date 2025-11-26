@@ -1,7 +1,7 @@
 package io.datapulse.etl.file;
 
-import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.etl.MarketplaceEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -216,7 +217,12 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
       boolean deleted = Files.deleteIfExists(file);
       log.debug("Snapshot file delete: file={}, deleted={}, reason={}", file, deleted, reason);
     } catch (IOException ex) {
-      log.warn("Snapshot file delete failed: file={}, reason={}", file, reason, ex);
+      log.warn(
+          "Snapshot file delete failed: file={}, reason={}, rootCause={}",
+          file,
+          reason,
+          ExceptionUtils.getRootCauseMessage(ex)
+      );
     }
   }
 }

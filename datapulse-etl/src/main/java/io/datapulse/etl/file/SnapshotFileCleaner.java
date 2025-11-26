@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -24,11 +25,12 @@ public final class SnapshotFileCleaner {
           reason
       );
     } catch (IOException ex) {
+      String root = ExceptionUtils.getRootCauseMessage(ex);
       log.warn(
-          "Snapshot file delete failed: file={}, reason={}",
+          "Snapshot file delete failed: file={}, reason={}, rootCause={}",
           file,
           reason,
-          ex
+          root
       );
     }
   }

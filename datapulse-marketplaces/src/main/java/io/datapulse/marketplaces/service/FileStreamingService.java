@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.stereotype.Service;
@@ -75,8 +76,13 @@ public class FileStreamingService {
       try {
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
       } catch (IOException ex) {
-        throw new AppException(MessageCodes.DOWNLOAD_MOVE_FAILED, tmp, target);
+        throw new AppException(
+            MessageCodes.DOWNLOAD_MOVE_FAILED,
+            new Object[]{ tmp, target, ExceptionUtils.getRootCauseMessage(ex) },
+            ex
+        );
       }
+
     } catch (IOException e) {
       throw new AppException(MessageCodes.DOWNLOAD_MOVE_FAILED, tmp, target);
     }
