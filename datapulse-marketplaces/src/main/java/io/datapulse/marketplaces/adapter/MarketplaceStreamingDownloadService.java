@@ -37,8 +37,11 @@ public class MarketplaceStreamingDownloadService {
     if (method == HttpMethod.GET) {
       source = httpStreamingClient.getAsDataBufferFlux(uri, headers);
     } else if (method == HttpMethod.POST) {
-      source = httpStreamingClient.postAsDataBufferFlux(uri, headers,
-          body != null ? body : Map.of());
+      source = httpStreamingClient.postAsDataBufferFlux(
+          uri,
+          headers,
+          body != null ? body : Map.of()
+      );
     } else {
       throw new IllegalArgumentException("Unsupported HTTP method: " + method);
     }

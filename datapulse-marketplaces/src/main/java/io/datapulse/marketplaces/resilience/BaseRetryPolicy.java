@@ -51,6 +51,29 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
               : expBackoff(rs.totalRetries(), base, cap);
 
           Duration d = nn(delay);
+
+          if (status == STATUS_TOO_MANY_REQUESTS
+              && isTooLongForInMemoryBackoff(marketplace, endpoint, d, cfg)) {
+
+            int seconds = (int) Math.max(0L, d.getSeconds());
+            log.warn(
+                "[{}:{}] long 429 backoff={}s detected → delegate to external backoff (Rabbit/wait-queue)",
+                marketplace, endpoint, seconds
+            );
+
+            String message = "Long 429 backoff required: marketplace=%s endpoint=%s delay=%ss"
+                .formatted(marketplace, endpoint, seconds);
+
+            return Mono.error(
+                new TooManyRequestsBackoffRequiredException(
+                    marketplace,
+                    endpoint,
+                    seconds,
+                    message
+                )
+            );
+          }
+
           log.info("[{}:{}] retry #{} in {} (status={}, headerDelay={})",
               marketplace, endpoint, attempt, d, status, headerDelay);
           return Mono.delay(d);
@@ -67,6 +90,24 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
 
       return Mono.error(error);
     }));
+  }
+
+  protected Duration maxInMemory429Backoff(
+      MarketplaceType marketplace,
+      EndpointKey endpoint,
+      RetryPolicy cfg
+  ) {
+    return Duration.ofSeconds(10);
+  }
+
+  protected boolean isTooLongForInMemoryBackoff(
+      MarketplaceType marketplace,
+      EndpointKey endpoint,
+      Duration delay,
+      RetryPolicy cfg
+  ) {
+    Duration limit = maxInMemory429Backoff(marketplace, endpoint, cfg);
+    return delay != null && limit != null && delay.compareTo(limit) > 0;
   }
 
   protected Duration computeHeaderDelay(HttpHeaders headers, int status) {

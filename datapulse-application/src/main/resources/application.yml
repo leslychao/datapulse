@@ -5,6 +5,7 @@ spring:
     import:
       - classpath:datapulse-core.yml
       - classpath:datapulse-adapter-marketplaces.yml
+      - classpath:datapulse-etl.yml
 
 logging:
   level:

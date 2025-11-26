@@ -137,7 +137,17 @@ public class EtlSnapshotIngestionFlowConfig {
                         )
                     )
                 )
-                .subFlowMapping(false, BaseIntegrationFlowDefinition::bridge)
+                .subFlowMapping(false, subFlow -> subFlow
+                    .handle(
+                        Object.class,
+                        (payload, headers) -> new IngestResult(
+                            headers.get(HDR_ETL_SOURCE_ID, String.class),
+                            false,
+                            AppException.class.getName(),
+                            "Snapshot is missing or has no file"
+                        )
+                    )
+                )
         )
         .get();
   }

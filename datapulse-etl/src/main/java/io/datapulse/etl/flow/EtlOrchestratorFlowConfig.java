@@ -3,6 +3,7 @@ package io.datapulse.etl.flow;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_RUN_CORE;
+import static io.datapulse.etl.flow.EtlFlowConstants.EXCHANGE_EXECUTION;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
@@ -14,6 +15,8 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
+import static io.datapulse.etl.flow.EtlFlowConstants.QUEUE_EXECUTION;
+import static io.datapulse.etl.flow.EtlFlowConstants.ROUTING_KEY_EXECUTION;
 
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.AccountService;
@@ -38,17 +41,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
-import org.springframework.integration.channel.ExecutorChannel;
+import org.springframework.integration.amqp.dsl.Amqp;
+import org.springframework.integration.channel.DirectChannel;
+import org.springframework.integration.channel.NullChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.Pollers;
+import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
@@ -65,8 +75,9 @@ public class EtlOrchestratorFlowConfig {
   private final EtlMaterializationService materializationService;
   private final AccountService accountService;
   private final EtlSyncAuditService etlSyncAuditService;
-
   private final AccountConnectionService accountConnectionService;
+
+  private final RabbitTemplate etlExecutionRabbitTemplate;
 
   public record EtlRunRequest(
       Long accountId,
@@ -77,7 +88,7 @@ public class EtlOrchestratorFlowConfig {
 
   }
 
-  private record OrchestrationCommand(
+  public record OrchestrationCommand(
       String requestId,
       Long accountId,
       MarketplaceEvent event,
@@ -118,21 +129,21 @@ public class EtlOrchestratorFlowConfig {
   @Bean("etlOrchestrateExecutor")
   public TaskExecutor etlOrchestrateExecutor(
       @Value("${etl.orchestrate.core-pool-size:4}") int corePoolSize,
-      @Value("${etl.orchestrate.max-pool-size:8}") int maxPoolSize,
-      @Value("${etl.orchestrate.queue-capacity:500}") int queueCapacity
+      @Value("${etl.orchestrate.max-pool-size:8}") int maxPoolSize
   ) {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(corePoolSize);
     executor.setMaxPoolSize(maxPoolSize);
-    executor.setQueueCapacity(queueCapacity);
+    executor.setQueueCapacity(0);
     executor.setThreadNamePrefix("etl-orchestrate-");
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
     executor.initialize();
     return executor;
   }
 
   @Bean(name = CH_ETL_ORCHESTRATE)
-  public MessageChannel etlOrchestrateChannel(TaskExecutor etlOrchestrateExecutor) {
-    return new ExecutorChannel(etlOrchestrateExecutor);
+  public MessageChannel etlOrchestrateChannel() {
+    return new DirectChannel();
   }
 
   @Bean
@@ -144,7 +155,12 @@ public class EtlOrchestratorFlowConfig {
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
-        .gateway(CH_ETL_RUN_CORE)
+        .wireTap(tap -> tap.handle(
+            Amqp.outboundAdapter(etlExecutionRabbitTemplate)
+                .exchangeName(EXCHANGE_EXECUTION)
+                .routingKey(ROUTING_KEY_EXECUTION)
+        ))
+        .transform(OrchestrationCommand.class, this::buildAcceptedResponse)
         .get();
   }
 
@@ -157,7 +173,27 @@ public class EtlOrchestratorFlowConfig {
         )
         .split()
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
-        .gateway(CH_ETL_RUN_CORE)
+        .handle(
+            Amqp.outboundAdapter(etlExecutionRabbitTemplate)
+                .exchangeName(EXCHANGE_EXECUTION)
+                .routingKey(ROUTING_KEY_EXECUTION)
+        )
+        .get();
+  }
+
+  @Bean
+  public IntegrationFlow etlExecutionInboundFlow(
+      ConnectionFactory connectionFactory,
+      MessageConverter etlExecutionMessageConverter
+  ) {
+    return IntegrationFlow
+        .from(
+            Amqp
+                .inboundAdapter(connectionFactory, QUEUE_EXECUTION)
+                .messageConverter(etlExecutionMessageConverter)
+        )
+        .transform(OrchestrationCommand.class, command -> command)
+        .channel(CH_ETL_RUN_CORE)
         .get();
   }
 
@@ -188,10 +224,12 @@ public class EtlOrchestratorFlowConfig {
             )
         )
         .wireTap(CH_ETL_ORCHESTRATE)
-        .handle(
-            OrchestrationCommand.class,
-            (command, headersMap) -> buildAcceptedResponse(command)
+        .log(
+            LoggingHandler.Level.INFO,
+            EtlOrchestratorFlowConfig.class.getName(),
+            m -> "ETL run command sent to orchestrator from broker: " + m.getPayload()
         )
+        .channel(new NullChannel())
         .get();
   }
 

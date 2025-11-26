@@ -26,4 +26,13 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_FAILED_SOURCE_IDS = "ETL_FAILED_SOURCE_IDS";
   public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
 
+  public static final String EXCHANGE_EXECUTION = "etl.execution.exchange";
+  public static final String EXCHANGE_EXECUTION_DLX = "etl.execution.exchange.dlx";
+
+  public static final String QUEUE_EXECUTION = "etl.execution.commands";
+  public static final String QUEUE_EXECUTION_WAIT = "etl.execution.commands.wait";
+
+  public static final String ROUTING_KEY_EXECUTION = "execution.command";
+  public static final String ROUTING_KEY_EXECUTION_WAIT = "execution.command.wait";
+
 }
