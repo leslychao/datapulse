@@ -182,17 +182,19 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlExecutionInboundFlow(
-      ConnectionFactory connectionFactory,
-      MessageConverter etlExecutionMessageConverter
-  ) {
+  public IntegrationFlow etlExecutionInboundFlow(ConnectionFactory connectionFactory,
+      MessageConverter etlExecutionMessageConverter) {
     return IntegrationFlow
         .from(
-            Amqp
-                .inboundAdapter(connectionFactory, QUEUE_EXECUTION)
+            Amqp.inboundAdapter(connectionFactory, QUEUE_EXECUTION)
                 .messageConverter(etlExecutionMessageConverter)
+                .configureContainer(container -> container
+                    .concurrentConsumers(1)
+                    .maxConcurrentConsumers(1)
+                    .prefetchCount(1)
+                    .defaultRequeueRejected(false)
+                )
         )
-        .transform(OrchestrationCommand.class, command -> command)
         .channel(CH_ETL_RUN_CORE)
         .get();
   }
@@ -261,6 +263,7 @@ public class EtlOrchestratorFlowConfig {
             }
         ))
         .split()
+        .channel(channelSpec -> channelSpec.executor(etlOrchestrateExecutor))
         .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_SOURCE_MP,
             message -> ((MarketplacePlan) message.getPayload()).marketplace()
@@ -271,7 +274,6 @@ public class EtlOrchestratorFlowConfig {
             HDR_ETL_SOURCE_ID,
             message -> ((EtlSourceExecution) message.getPayload()).sourceId()
         ))
-        .channel(channelSpec -> channelSpec.executor(etlOrchestrateExecutor))
         .gateway(
             CH_ETL_INGEST,
             gatewaySpec -> gatewaySpec

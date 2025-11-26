@@ -4,8 +4,9 @@ import static io.datapulse.domain.MessageCodes.DOWNLOAD_FAILED;
 import static io.datapulse.domain.MessageCodes.ETL_CONTEXT_MISSING;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_SNAPSHOT_READY;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_FETCHED_DATA;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_PROCESS_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.domain.exception.AppException;
@@ -22,6 +23,7 @@ import io.datapulse.etl.handler.EtlBatchDispatcher;
 import io.datapulse.etl.handler.error.EtlIngestErrorHandler;
 import io.datapulse.etl.handler.error.EtlSnapshotErrorHandler;
 import io.datapulse.marketplaces.dto.Snapshot;
+import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.aop.Advice;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.integration.dsl.BaseIntegrationFlowDefinition;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.util.CloseableIterator;
@@ -43,7 +44,14 @@ import org.springframework.messaging.MessageHeaders;
 public class EtlSnapshotIngestionFlowConfig {
 
   private static final int SNAPSHOT_BATCH_SIZE = 500;
-  private static final String HDR_ETL_SNAPSHOT_ORIGINAL = "ETL_SNAPSHOT_ORIGINAL";
+
+  private record SnapshotPersistError(
+      String sourceId,
+      String errorClass,
+      String errorMessage
+  ) {
+
+  }
 
   private final SnapshotCommitBarrier snapshotCommitBarrier;
   private final EtlBatchDispatcher etlBatchDispatcher;
@@ -65,6 +73,17 @@ public class EtlSnapshotIngestionFlowConfig {
           return callback.execute();
         } catch (Exception ex) {
           Throwable actual = unwrapThrowable(ex);
+
+          if (actual instanceof TooManyRequestsBackoffRequiredException tooMany) {
+            log.warn(
+                "TooManyRequestsBackoffRequired detected: marketplace={}, endpoint={}; "
+                    + "delegating to Rabbit WAIT queue via DLX",
+                tooMany.getMarketplace(),
+                tooMany.getEndpoint()
+            );
+            throw tooMany;
+          }
+
           return ingestErrorHandler.handleIngestError(actual, message);
         }
       }
@@ -92,7 +111,20 @@ public class EtlSnapshotIngestionFlowConfig {
           return callback.execute();
         } catch (Exception ex) {
           snapshotErrorHandler.handlePersistError(ex, message);
-          return message.getHeaders().get(HDR_ETL_SNAPSHOT_ORIGINAL, Snapshot.class);
+
+          MessageHeaders headers = message.getHeaders();
+          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+
+          String errorClass = ex.getClass().getName();
+          String errorMessage = ex.getMessage() != null
+              ? ex.getMessage()
+              : "Snapshot persist failed";
+
+          return new SnapshotPersistError(
+              sourceId,
+              errorClass,
+              errorMessage
+          );
         }
       }
     };
@@ -108,7 +140,7 @@ public class EtlSnapshotIngestionFlowConfig {
                 command,
                 new MessageHeaders(headers)
             ),
-            e -> e.requiresReply(true).advice(ingestResultAdvice)
+            endpoint -> endpoint.requiresReply(true).advice(ingestResultAdvice)
         )
         .<Object, Boolean>route(
             payload -> payload instanceof Snapshot<?> snapshot && snapshot.file() != null,
@@ -129,12 +161,25 @@ public class EtlSnapshotIngestionFlowConfig {
                     )
                     .handle(
                         Object.class,
-                        (ignored, headers) -> new IngestResult(
-                            headers.get(HDR_ETL_SOURCE_ID, String.class),
-                            true,
-                            null,
-                            null
-                        )
+                        (payload, headers) -> {
+                          String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+
+                          if (payload instanceof SnapshotPersistError error) {
+                            return new IngestResult(
+                                sourceId,
+                                false,
+                                error.errorClass(),
+                                error.errorMessage()
+                            );
+                          }
+
+                          return new IngestResult(
+                              sourceId,
+                              true,
+                              null,
+                              null
+                          );
+                        }
                     )
                 )
                 .subFlowMapping(false, subFlow -> subFlow
@@ -157,16 +202,16 @@ public class EtlSnapshotIngestionFlowConfig {
     return IntegrationFlow
         .from(CH_ETL_SNAPSHOT_READY)
         .enrichHeaders(enricher -> enricher
-            .headerFunction(HDR_ETL_SNAPSHOT_ID, this::registerSnapshotInBarrier)
+            .headerFunction(HDR_ETL_PROCESS_ID, this::registerSnapshotInBarrier)
             .headerFunction(
-                HDR_ETL_SNAPSHOT_ORIGINAL,
+                HDR_ETL_FETCHED_DATA,
                 message -> requireSnapshotPayload(message.getPayload())
             )
         )
         .split(Message.class, this::toSnapshotIterator)
         .aggregate(aggregator -> aggregator
             .correlationStrategy(message ->
-                message.getHeaders().get(HDR_ETL_SNAPSHOT_ID, String.class)
+                message.getHeaders().get(HDR_ETL_PROCESS_ID, String.class)
             )
             .releaseStrategy(group -> group.size() >= SNAPSHOT_BATCH_SIZE)
             .groupTimeout(1_000)
@@ -177,7 +222,7 @@ public class EtlSnapshotIngestionFlowConfig {
             (rawBatch, headersMap) -> {
               MessageHeaders headers = new MessageHeaders(headersMap);
               persistBatch(rawBatch, headers);
-              return headers.get(HDR_ETL_SNAPSHOT_ORIGINAL, Snapshot.class);
+              return headers.get(HDR_ETL_FETCHED_DATA, Snapshot.class);
             },
             endpoint -> endpoint
                 .requiresReply(true)
@@ -246,7 +291,7 @@ public class EtlSnapshotIngestionFlowConfig {
     Snapshot<?> snapshot = requireSnapshotPayload(message.getPayload());
     MessageHeaders headers = message.getHeaders();
 
-    String snapshotId = headers.get(HDR_ETL_SNAPSHOT_ID, String.class);
+    String snapshotId = headers.get(HDR_ETL_PROCESS_ID, String.class);
     if (snapshotId == null) {
       snapshotFileCleaner.deleteSafely(snapshot.file(), "missing-snapshot-id");
       throw new AppException(ETL_CONTEXT_MISSING, "snapshotId");

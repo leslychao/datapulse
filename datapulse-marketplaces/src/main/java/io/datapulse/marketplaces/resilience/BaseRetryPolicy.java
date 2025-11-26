@@ -25,67 +25,118 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
   protected static final String HDR_X_RETRY = "X-Ratelimit-Retry";
 
   @Override
-  public final Retry retryFor(MarketplaceType marketplace, EndpointKey endpoint, RetryPolicy cfg) {
+  public final Retry retryFor(
+      MarketplaceType marketplace,
+      EndpointKey endpoint,
+      RetryPolicy cfg
+  ) {
     final int maxAttempts = cfg.getMaxAttempts();
     final Duration base = cfg.getBaseBackoff();
     final Duration cap = cfg.getMaxBackoff();
 
-    return Retry.from(signals -> signals.flatMap(rs -> {
-      final long attempt = rs.totalRetries() + 1;
-      final Throwable error = rs.failure();
-
-      if (rs.totalRetries() >= maxAttempts - 1) {
-        log.warn("[{}:{}] retry exhausted after {} attempts; cause={}",
-            marketplace, endpoint, maxAttempts, error.getClass().getSimpleName());
-        return Mono.error(error);
-      }
+    return Retry.from(signals -> signals.flatMap(retrySignal -> {
+      long attempt = retrySignal.totalRetries() + 1;
+      Throwable error = retrySignal.failure();
+      boolean exhausted = retrySignal.totalRetries() >= maxAttempts - 1;
 
       if (error instanceof WebClientResponseException ex) {
-        final int status = ex.getStatusCode().value();
-        final HttpHeaders headers = ex.getHeaders();
+        int status = ex.getStatusCode().value();
+        HttpHeaders headers = ex.getHeaders();
 
         if (isRetryableStatus(status)) {
-          Duration headerDelay = computeHeaderDelay(headers, status);
-          Duration delay = (headerDelay != null && !headerDelay.isNegative())
-              ? headerDelay
-              : expBackoff(rs.totalRetries(), base, cap);
+          Duration effectiveDelay = computeEffectiveDelay(
+              retrySignal.totalRetries(),
+              headers,
+              status,
+              base,
+              cap
+          );
+          Duration backoff = nn(effectiveDelay);
 
-          Duration d = nn(delay);
+          if (status == STATUS_TOO_MANY_REQUESTS) {
+            if (exhausted || isTooLongForInMemoryBackoff(marketplace, endpoint, backoff, cfg)) {
+              TooManyRequestsBackoffRequiredException delegated =
+                  createTooManyRequestsBackoffException(marketplace, endpoint, backoff);
 
-          if (status == STATUS_TOO_MANY_REQUESTS
-              && isTooLongForInMemoryBackoff(marketplace, endpoint, d, cfg)) {
+              log.warn(
+                  "[{}:{}] 429 retry {} → delegate to external backoff ({}s)",
+                  marketplace,
+                  endpoint,
+                  exhausted ? "exhausted" : "too long",
+                  backoff.getSeconds()
+              );
 
-            int seconds = (int) Math.max(0L, d.getSeconds());
-            log.warn(
-                "[{}:{}] long 429 backoff={}s detected → delegate to external backoff (Rabbit/wait-queue)",
-                marketplace, endpoint, seconds
-            );
-
-            String message = "Long 429 backoff required: marketplace=%s endpoint=%s delay=%ss"
-                .formatted(marketplace, endpoint, seconds);
-
-            return Mono.error(
-                new TooManyRequestsBackoffRequiredException(
-                    marketplace,
-                    endpoint,
-                    seconds,
-                    message
-                )
-            );
+              return Mono.error(delegated);
+            }
           }
 
-          log.info("[{}:{}] retry #{} in {} (status={}, headerDelay={})",
-              marketplace, endpoint, attempt, d, status, headerDelay);
-          return Mono.delay(d);
+          if (exhausted) {
+            log.warn(
+                "[{}:{}] retry exhausted after {} attempts; lastStatus={}",
+                marketplace,
+                endpoint,
+                maxAttempts,
+                status
+            );
+            return Mono.error(error);
+          }
+
+          log.info(
+              "[{}:{}] retry #{} in {} (status={}, headerDelay={})",
+              marketplace,
+              endpoint,
+              attempt,
+              backoff,
+              status,
+              effectiveDelay
+          );
+          return Mono.delay(backoff);
+        }
+
+        if (exhausted) {
+          log.warn(
+              "[{}:{}] non-retryable status {}; giving up after {} attempts",
+              marketplace,
+              endpoint,
+              status,
+              maxAttempts
+          );
         }
 
         return Mono.error(error);
       }
 
       if (error instanceof TimeoutException) {
-        Duration d = nn(expBackoff(rs.totalRetries(), base, cap));
-        log.info("[{}:{}] timeout → retry #{} in {}", marketplace, endpoint, attempt, d);
-        return Mono.delay(d);
+        Duration backoff = nn(expBackoff(retrySignal.totalRetries(), base, cap));
+
+        if (exhausted) {
+          log.warn(
+              "[{}:{}] timeout retry exhausted after {} attempts",
+              marketplace,
+              endpoint,
+              maxAttempts
+          );
+          return Mono.error(error);
+        }
+
+        log.info(
+            "[{}:{}] timeout → retry #{} in {}",
+            marketplace,
+            endpoint,
+            attempt,
+            backoff
+        );
+        return Mono.delay(backoff);
+      }
+
+      if (exhausted) {
+        log.warn(
+            "[{}:{}] retry exhausted after {} attempts; cause={}",
+            marketplace,
+            endpoint,
+            maxAttempts,
+            error.getClass().getSimpleName()
+        );
       }
 
       return Mono.error(error);
@@ -97,7 +148,7 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
       EndpointKey endpoint,
       RetryPolicy cfg
   ) {
-    return Duration.ofSeconds(10);
+    return Duration.ofSeconds(2);
   }
 
   protected boolean isTooLongForInMemoryBackoff(
@@ -108,6 +159,20 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
   ) {
     Duration limit = maxInMemory429Backoff(marketplace, endpoint, cfg);
     return delay != null && limit != null && delay.compareTo(limit) > 0;
+  }
+
+  protected Duration computeEffectiveDelay(
+      long retries,
+      HttpHeaders headers,
+      int status,
+      Duration base,
+      Duration cap
+  ) {
+    Duration headerDelay = computeHeaderDelay(headers, status);
+    if (headerDelay != null && !headerDelay.isNegative()) {
+      return headerDelay;
+    }
+    return expBackoff(retries, base, cap);
   }
 
   protected Duration computeHeaderDelay(HttpHeaders headers, int status) {
@@ -147,5 +212,22 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
 
   protected static Duration nn(Duration d) {
     return (d == null || d.isNegative()) ? Duration.ZERO : d;
+  }
+
+  protected TooManyRequestsBackoffRequiredException createTooManyRequestsBackoffException(
+      MarketplaceType marketplace,
+      EndpointKey endpoint,
+      Duration backoff
+  ) {
+    int seconds = (int) Math.max(0L, backoff.getSeconds());
+    String message = "429 backoff required: marketplace=%s endpoint=%s delay=%ss"
+        .formatted(marketplace, endpoint, seconds);
+
+    return new TooManyRequestsBackoffRequiredException(
+        marketplace,
+        endpoint,
+        seconds,
+        message
+    );
   }
 }
