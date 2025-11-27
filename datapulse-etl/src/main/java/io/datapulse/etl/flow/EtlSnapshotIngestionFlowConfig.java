@@ -3,6 +3,7 @@ package io.datapulse.etl.flow;
 import static io.datapulse.domain.MessageCodes.DOWNLOAD_FAILED;
 import static io.datapulse.domain.MessageCodes.ETL_CONTEXT_MISSING;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
+import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST_CORE;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_SNAPSHOT_READY;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_FETCHED_DATA;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_PROCESS_ID;
@@ -36,7 +37,9 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.util.CloseableIterator;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.MessageHeaders;
+import org.springframework.messaging.MessagingException;
 
 @Configuration
 @Slf4j
@@ -64,17 +67,29 @@ public class EtlSnapshotIngestionFlowConfig {
         try {
           return callback.execute();
         } catch (Exception ex) {
-          Throwable actual = unwrapThrowable(ex);
-          return ingestErrorHandler.handleIngestError(actual, message);
+          return ingestErrorHandler.handleIngestError(unwrapProcessingError(ex), message);
         }
       }
 
-      private Throwable unwrapThrowable(Throwable throwable) {
-        if (throwable instanceof ThrowableHolderException holder
-            && holder.getCause() != null) {
-          return holder.getCause();
+      private Throwable unwrapProcessingError(Throwable error) {
+        Throwable current = error;
+
+        while (true) {
+          if (current instanceof ThrowableHolderException holder && holder.getCause() != null) {
+            current = holder.getCause();
+            continue;
+          }
+          if (current instanceof MessageHandlingException mhe && mhe.getCause() != null) {
+            current = mhe.getCause();
+            continue;
+          }
+          if (current instanceof MessagingException me && me.getCause() != null) {
+            current = me.getCause();
+            continue;
+          }
+          // первое НЕ-интеграционное исключение – наш "нормальный" эксепшен
+          return current;
         }
-        return throwable;
       }
     };
   }
@@ -102,36 +117,13 @@ public class EtlSnapshotIngestionFlowConfig {
   public IntegrationFlow etlIngestFlow(Advice ingestResultAdvice) {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
-        .handle(
-            EtlSourceExecution.class,
-            (command, headers) -> fetchSnapshotOrThrow(
-                command,
-                new MessageHeaders(headers)
-            ),
-            endpoint -> endpoint
+        .gateway(
+            CH_ETL_INGEST_CORE,
+            gatewaySpec -> gatewaySpec
+                .requestTimeout(0L)
+                .replyTimeout(-1L)
                 .requiresReply(true)
                 .advice(ingestResultAdvice)
-        )
-        .<Object, Boolean>route(
-            payload -> payload instanceof Snapshot<?>,
-            mapping -> mapping
-                .subFlowMapping(true, subFlow -> subFlow
-                    .enrichHeaders(enricher -> enricher
-                        .headerFunction(
-                            HDR_ETL_SNAPSHOT_FILE,
-                            message -> requireSnapshotPayload(message.getPayload()).file()
-                        )
-                    )
-                    .gateway(
-                        CH_ETL_SNAPSHOT_READY,
-                        gatewaySpec -> gatewaySpec
-                            .requestTimeout(0L)
-                            .replyTimeout(-1L)
-                            .requiresReply(true)
-                            .advice(ingestResultAdvice)
-                    )
-                )
-                .defaultSubFlowMapping(subFlow -> subFlow.bridge())
         )
         .handle(
             Object.class,
@@ -141,6 +133,9 @@ public class EtlSnapshotIngestionFlowConfig {
               }
 
               String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
+              if (sourceId == null) {
+                throw new AppException(ETL_CONTEXT_MISSING, "sourceId");
+              }
 
               return new IngestResult(
                   sourceId,
@@ -150,6 +145,32 @@ public class EtlSnapshotIngestionFlowConfig {
               );
             }
         )
+        .get();
+  }
+
+  @Bean
+  public IntegrationFlow etlIngestCoreFlow() {
+    return IntegrationFlow
+        .from(CH_ETL_INGEST_CORE)
+        .handle(
+            EtlSourceExecution.class,
+            (command, headers) -> fetchSnapshotOrThrow(
+                command,
+                new MessageHeaders(headers)
+            ),
+            endpoint -> endpoint.requiresReply(true)
+        )
+        .transform(
+            Object.class,
+            this::requireSnapshotPayload
+        )
+        .enrichHeaders(enricher -> enricher
+            .headerFunction(
+                HDR_ETL_SNAPSHOT_FILE,
+                message -> requireSnapshotPayload(message.getPayload()).file()
+            )
+        )
+        .channel(CH_ETL_SNAPSHOT_READY)
         .get();
   }
 
@@ -176,10 +197,13 @@ public class EtlSnapshotIngestionFlowConfig {
             .expireGroupsUponCompletion(true)
             .sendPartialResultOnExpiry(true)
         )
-        .<List<?>>handle(
-            (rawBatch, headersMap) -> {
+        .handle(
+            List.class,
+            (payload, headersMap) -> {
               MessageHeaders headers = new MessageHeaders(headersMap);
-              persistBatch(rawBatch, headers);
+              // тип payload здесь компиляторно List (без кастов), persistBatch принимает List<?>
+              persistBatch(payload, headers);
+              // reply нужен для цепочки от gateway(CH_ETL_INGEST_CORE):
               return headers.get(HDR_ETL_FETCHED_DATA, Snapshot.class);
             },
             endpoint -> endpoint
