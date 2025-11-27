@@ -8,7 +8,6 @@ import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_BASE_B
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_RETRY_AFTER_FALLBACK_REQUIRED;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
@@ -41,7 +40,7 @@ public class MarketplaceProperties {
       new EnumMap<>(MarketplaceType.class);
 
   public Provider get(MarketplaceType marketplaceType) {
-    var providerConfig = providers.get(marketplaceType);
+    Provider providerConfig = providers.get(marketplaceType);
     if (providerConfig == null) {
       throw new AppException(MARKETPLACE_CONFIG_MISSING, marketplaceType.name());
     }
@@ -72,7 +71,7 @@ public class MarketplaceProperties {
     private RetryPolicy retryPolicy;
 
     public EndpointConfig endpointConfig(EndpointKey endpointKey) {
-      var cfg = endpoints.get(endpointKey);
+      EndpointConfig cfg = endpoints.get(endpointKey);
       if (cfg == null || cfg.getUrl() == null || cfg.getUrl().isBlank()) {
         throw new AppException(MARKETPLACE_ENDPOINT_PATH_REQUIRED, endpointKey.name());
       }
@@ -84,23 +83,20 @@ public class MarketplaceProperties {
         throw new AppException(MARKETPLACE_RETRY_POLICY_REQUIRED);
       }
 
-      var endpointConfig = endpoints.get(endpointKey);
+      EndpointConfig endpointConfig = endpoints.get(endpointKey);
       if (endpointConfig == null || endpointConfig.getRetryPolicyOverride() == null) {
         return retryPolicy;
       }
 
-      var overrideConfig = endpointConfig.getRetryPolicyOverride();
+      RetryPolicyOverride overrideConfig = endpointConfig.getRetryPolicyOverride();
 
-      var mergedRetryPolicy = new RetryPolicy();
+      RetryPolicy mergedRetryPolicy = new RetryPolicy();
       mergedRetryPolicy.maxAttempts =
           chooseNotNull(overrideConfig.getMaxAttempts(), retryPolicy.getMaxAttempts());
       mergedRetryPolicy.baseBackoff =
           chooseNotNull(overrideConfig.getBaseBackoff(), retryPolicy.getBaseBackoff());
       mergedRetryPolicy.maxBackoff =
           chooseNotNull(overrideConfig.getMaxBackoff(), retryPolicy.getMaxBackoff());
-      mergedRetryPolicy.retryAfterFallback =
-          chooseNotNull(
-              overrideConfig.getRetryAfterFallback(), retryPolicy.getRetryAfterFallback());
 
       return mergedRetryPolicy;
     }
@@ -134,9 +130,6 @@ public class MarketplaceProperties {
 
     @NotNull(message = MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED)
     private Duration maxBackoff;
-
-    @NotNull(message = MARKETPLACE_RETRY_POLICY_RETRY_AFTER_FALLBACK_REQUIRED)
-    private Duration retryAfterFallback;
   }
 
   @Getter
@@ -146,6 +139,5 @@ public class MarketplaceProperties {
     private Integer maxAttempts;
     private Duration baseBackoff;
     private Duration maxBackoff;
-    private Duration retryAfterFallback;
   }
 }

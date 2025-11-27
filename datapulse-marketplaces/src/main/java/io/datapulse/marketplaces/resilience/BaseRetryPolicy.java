@@ -25,7 +25,6 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
   protected static final int STATUS_REQUEST_TIMEOUT = 408;
   protected static final int STATUS_TOO_EARLY = 425;
   protected static final int STATUS_TOO_MANY_REQUESTS = 429;
-  protected static final int STATUS_SERVICE_UNAVAILABLE = 503;
 
   protected static final String HDR_X_RETRY = "X-Ratelimit-Retry";
 
@@ -69,7 +68,6 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
               endpoint,
               retriesSoFar,
               headers,
-              status,
               base,
               cap
           );
@@ -204,29 +202,23 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
       EndpointKey endpoint,
       long retries,
       HttpHeaders headers,
-      int status,
       Duration base,
       Duration cap
   ) {
-    Duration headerDelay = computeHeaderDelay(headers, status);
-    if (headerDelay != null && !headerDelay.isNegative()) {
+    Duration headerDelay = computeHeaderDelay(headers);
+    if (headerDelay != null) {
       return headerDelay;
     }
     return expBackoff(retries, base, cap);
   }
 
-  protected Duration computeHeaderDelay(HttpHeaders headers, int status) {
+  protected Duration computeHeaderDelay(HttpHeaders headers) {
     Duration d1 = parseSeconds(headers.getFirst(HDR_X_RETRY));
-    if (d1 != null && !d1.isNegative()) {
+    if (d1 != null) {
       return d1;
     }
 
-    Duration d2 = parseRetryAfter(headers);
-    if (d2 != null && !d2.isNegative()) {
-      return d2;
-    }
-
-    return null;
+    return parseRetryAfter(headers);
   }
 
   protected static boolean isRetryableStatus(int status) {
@@ -261,7 +253,7 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
       ZonedDateTime retryAt = ZonedDateTime.parse(trimmed, DateTimeFormatter.RFC_1123_DATE_TIME);
       long seconds = Duration.between(Instant.now(), retryAt.toInstant()).getSeconds();
       if (seconds <= 0) {
-        return Duration.ZERO;
+        return null;
       }
       return Duration.ofSeconds(seconds);
     } catch (DateTimeParseException ignored) {

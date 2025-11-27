@@ -23,7 +23,8 @@ public class MarketplaceRetryService {
   private final Map<MarketplaceType, MarketplaceRetryPolicy> policyByMp = initPolicies();
 
   private Map<MarketplaceType, MarketplaceRetryPolicy> initPolicies() {
-    var map = new EnumMap<MarketplaceType, MarketplaceRetryPolicy>(MarketplaceType.class);
+    Map<MarketplaceType, MarketplaceRetryPolicy> map =
+        new EnumMap<>(MarketplaceType.class);
     map.put(MarketplaceType.WILDBERRIES, new WbRetryPolicy());
     return map;
   }
@@ -31,7 +32,8 @@ public class MarketplaceRetryService {
   public <T> Flux<T> withRetries(
       Flux<T> source,
       MarketplaceType marketplace,
-      EndpointKey endpoint) {
+      EndpointKey endpoint
+  ) {
     return source.retryWhen(retryFor(marketplace, endpoint));
   }
 

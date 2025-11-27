@@ -5,14 +5,16 @@ marketplace:
     WILDBERRIES:
       useSandbox: true
       endpoints:
-        DICT_WB_WAREHOUSES:
-          url: https://statistics-api.wildberries.ru/api/v1/warehouses
-          sandboxUrl: https://statistics-api-sandbox.wildberries.ru/api/v1/warehouses
+        WB_TARIFF_COMMISSION:
+          url: https://suppliers-api.wildberries.ru/api/v1/tariffs/commission
+        WB_TARIFF_BOX:
+          url: https://suppliers-api.wildberries.ru/api/v1/tariffs/box
+        WB_TARIFF_MONOPALLET:
+          url: https://suppliers-api.wildberries.ru/api/v1/tariffs/monopallet
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
         maxBackoff: 30s
-        retryAfterFallback: 1s
     OZON:
       useSandbox: true
       endpoints:
@@ -22,4 +24,3 @@ marketplace:
         maxAttempts: 4
         baseBackoff: 300ms
         maxBackoff: 20s
-        retryAfterFallback: 1s

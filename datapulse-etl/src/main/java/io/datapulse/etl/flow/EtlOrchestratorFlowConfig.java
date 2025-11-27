@@ -320,6 +320,8 @@ public class EtlOrchestratorFlowConfig {
               return execution.sourceId();
             }
         ))
+        .handle(EtlSourceExecution.class,
+            (execution, headers) -> RateLimitHandler.apply(execution))
         .gateway(
             CH_ETL_INGEST,
             gatewaySpec -> gatewaySpec
