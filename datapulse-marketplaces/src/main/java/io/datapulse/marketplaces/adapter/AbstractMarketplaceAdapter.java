@@ -1,8 +1,8 @@
 package io.datapulse.marketplaces.adapter;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
+import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 
@@ -118,23 +117,12 @@ public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOp
       return new Snapshot<>(elementType, resultPath, size, uri, method);
 
     } catch (IOException ex) {
-      String rootCause = ExceptionUtils.getRootCauseMessage(ex);
-
       log.error(
-          "Snapshot download failed: marketplace={}, accountId={}, endpoint={}, rootCause={}",
-          marketplaceType(),
-          accountId,
-          endpointKey,
-          rootCause,
-          ex
+          "Snapshot download failed: marketplace={}, accountId={}, endpoint={}",
+          marketplaceType(), accountId, endpointKey, ex
       );
-
-      throw new RuntimeException(
-          "Snapshot download failed for endpoint %s: %s".formatted(endpointKey, rootCause),
-          ex
-      );
+      throw new RuntimeException("Snapshot failed: " + endpointKey, ex);
     }
-
   }
 
   private Path planPath(long accountId, EndpointKey endpoint) {

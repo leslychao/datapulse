@@ -32,11 +32,6 @@ public class ExceptionMessageService {
       }
     }
 
-    String msg = throwable.getMessage();
-    if (hasText(msg)) {
-      return msg;
-    }
-
     return throwable.toString();
   }
 

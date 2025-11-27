@@ -16,7 +16,6 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -59,8 +58,7 @@ public final class TestOzonProductInfoEventSource implements EventSource {
           HttpMethod.POST
       );
     } catch (IOException ex) {
-      String msg = "Failed to prepare Ozon Product Info test snapshot: " + ExceptionUtils.getRootCauseMessage(ex);
-      throw new IllegalStateException(msg, ex);
+      throw new IllegalStateException("Failed to prepare Ozon Product Info test snapshot", ex);
     }
   }
 
