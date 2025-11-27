@@ -16,12 +16,12 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
       HttpHeaderProvider headerProvider,
       MarketplaceProperties marketplaceProperties
   ) {
-    super(downloader, headerProvider, resolver, marketplaceProperties);
+    super(
+        MarketplaceType.OZON,
+        downloader,
+        headerProvider,
+        resolver,
+        marketplaceProperties
+    );
   }
-
-  @Override
-  protected MarketplaceType marketplaceType() {
-    return MarketplaceType.OZON;
-  }
-
 }

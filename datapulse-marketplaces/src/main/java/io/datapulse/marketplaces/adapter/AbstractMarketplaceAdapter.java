@@ -24,17 +24,22 @@ import org.springframework.http.HttpMethod;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOps {
+public abstract class AbstractMarketplaceAdapter {
 
   private static final DateTimeFormatter TS_FMT =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneId.systemDefault());
+      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+          .withZone(ZoneId.systemDefault());
+
+  private final MarketplaceType marketplaceType;
 
   protected final MarketplaceStreamingDownloadService downloader;
   protected final HttpHeaderProvider headerProvider;
   protected final EndpointsResolver resolver;
   private final MarketplaceProperties properties;
 
-  protected abstract MarketplaceType marketplaceType();
+  protected final MarketplaceType marketplaceType() {
+    return marketplaceType;
+  }
 
   protected final <R> Snapshot<R> doGet(
       long accountId,
@@ -68,9 +73,9 @@ public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOp
       Map<String, ?> params
   ) {
     if (method == HttpMethod.GET && params != null) {
-      return resolver.resolve(marketplaceType(), key, params);
+      return resolver.resolve(marketplaceType, key, params);
     }
-    return resolver.resolve(marketplaceType(), key);
+    return resolver.resolve(marketplaceType, key);
   }
 
   private Map<String, ?> safe(Map<String, ?> body) {
@@ -91,14 +96,14 @@ public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOp
 
       log.info(
           "Starting snapshot download: marketplace={}, accountId={}, endpoint={}, method={}, uri={}",
-          marketplaceType(), accountId, endpointKey, method, uri
+          marketplaceType, accountId, endpointKey, method, uri
       );
 
-      HttpHeaders headers = headerProvider.build(marketplaceType(), accountId);
+      HttpHeaders headers = headerProvider.build(marketplaceType, accountId);
       Path target = planPath(accountId, endpointKey);
 
       Path resultPath = downloader.download(
-          marketplaceType(),
+          marketplaceType,
           endpointKey,
           method,
           uri,
@@ -111,7 +116,7 @@ public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOp
 
       log.info(
           "Snapshot download completed: marketplace={}, accountId={}, endpoint={}, path={}, sizeBytes={}",
-          marketplaceType(), accountId, endpointKey, resultPath, size
+          marketplaceType, accountId, endpointKey, resultPath, size
       );
 
       return new Snapshot<>(elementType, resultPath, size, uri, method);
@@ -119,7 +124,7 @@ public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOp
     } catch (IOException ex) {
       log.error(
           "Snapshot download failed: marketplace={}, accountId={}, endpoint={}",
-          marketplaceType(), accountId, endpointKey, ex
+          marketplaceType, accountId, endpointKey, ex
       );
       throw new RuntimeException("Snapshot failed: " + endpointKey, ex);
     }
@@ -130,7 +135,7 @@ public abstract class AbstractMarketplaceAdapter implements MarketplaceAdapterOp
     String uid = UUID.randomUUID().toString().replace("-", "");
 
     return baseDir()
-        .resolve(marketplaceType().name().toLowerCase())
+        .resolve(marketplaceType.name().toLowerCase())
         .resolve(Long.toString(accountId))
         .resolve(endpoint.tag())
         .resolve(ts + "-" + uid + ".json");
