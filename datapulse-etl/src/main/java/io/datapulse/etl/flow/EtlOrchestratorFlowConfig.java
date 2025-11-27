@@ -13,7 +13,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MP;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 import static io.datapulse.etl.flow.EtlFlowConstants.QUEUE_EXECUTION;
 import static io.datapulse.etl.flow.EtlFlowConstants.ROUTING_KEY_EXECUTION;
@@ -85,7 +85,6 @@ public class EtlOrchestratorFlowConfig {
       String event,
       LocalDate from,
       LocalDate to,
-
       Integer burst
   ) {
 
@@ -224,6 +223,7 @@ public class EtlOrchestratorFlowConfig {
                     .defaultRequeueRejected(false)
                 )
         )
+        .headerFilter("ETL_*")
         .channel(CH_ETL_RUN_CORE)
         .get();
   }
@@ -305,7 +305,7 @@ public class EtlOrchestratorFlowConfig {
         .split()
         .channel(channelSpec -> channelSpec.executor(etlOrchestrateExecutor))
         .enrichHeaders(headers -> headers.headerFunction(
-            HDR_ETL_SOURCE_MP,
+            HDR_ETL_SOURCE_MARKETPLACE,
             message -> {
               MarketplacePlan plan = (MarketplacePlan) message.getPayload();
               return plan.marketplace();
@@ -396,20 +396,28 @@ public class EtlOrchestratorFlowConfig {
       throw new AppException(ETL_REQUEST_INVALID, "event=" + eventValue);
     }
 
+    boolean hasError = results.stream().anyMatch(IngestResult::isError);
+    boolean hasWait = results.stream().anyMatch(IngestResult::isWait);
+
     List<String> failedSourceIds = results.stream()
-        .filter(IngestResult::isError)
+        .filter(result -> result.isError() || result.isWait())
         .map(IngestResult::sourceId)
         .distinct()
         .toList();
 
-    SyncStatus syncStatus = failedSourceIds.isEmpty()
-        ? SyncStatus.SUCCESS
-        : SyncStatus.ERROR;
+    SyncStatus syncStatus;
+    if (hasError) {
+      syncStatus = SyncStatus.ERROR;
+    } else if (hasWait) {
+      syncStatus = SyncStatus.WAIT;
+    } else {
+      syncStatus = SyncStatus.SUCCESS;
+    }
 
     String failedSourceIdsValue = String.join(",", failedSourceIds);
 
     List<String> errorMessages = results.stream()
-        .filter(IngestResult::isError)
+        .filter(result -> result.isError() || result.isWait())
         .map(result -> {
           String errorMessage = result.errorMessage();
           if (StringUtils.isNotBlank(errorMessage)) {
@@ -441,11 +449,7 @@ public class EtlOrchestratorFlowConfig {
         .from(CH_ETL_ORCHESTRATION_RESULT)
         .filter(
             OrchestrationBundle.class,
-            bundle -> {
-              boolean hasWait = bundle.results().stream().anyMatch(IngestResult::isWait);
-              boolean hasError = bundle.results().stream().anyMatch(IngestResult::isError);
-              return hasWait && !hasError;
-            }
+            bundle -> bundle.syncStatus() == SyncStatus.WAIT
         )
         .transform(
             OrchestrationBundle.class,
@@ -474,13 +478,7 @@ public class EtlOrchestratorFlowConfig {
         .from(CH_ETL_ORCHESTRATION_RESULT)
         .filter(
             OrchestrationBundle.class,
-            bundle -> {
-              boolean hasWait = bundle.results().stream().anyMatch(IngestResult::isWait);
-              if (hasWait) {
-                return false;
-              }
-              return bundle.syncStatus() == SyncStatus.SUCCESS;
-            }
+            bundle -> bundle.syncStatus() == SyncStatus.SUCCESS
         )
         .handle(
             OrchestrationBundle.class,
@@ -516,18 +514,19 @@ public class EtlOrchestratorFlowConfig {
         .from(CH_ETL_ORCHESTRATION_RESULT)
         .filter(
             OrchestrationBundle.class,
-            bundle -> bundle.syncStatus() != SyncStatus.SUCCESS
+            bundle -> bundle.syncStatus() == SyncStatus.ERROR
         )
         .handle(
             OrchestrationBundle.class,
             (bundle, headers) -> {
               log.warn(
-                  "ETL orchestration completed with errors; materialization will NOT be started: requestId={}, event={}, from={}, to={}, failedSourceIds={}",
+                  "ETL orchestration completed with errors; materialization will NOT be started: requestId={}, event={}, from={}, to={}, failedSourceIds={}, errors={}",
                   bundle.requestId(),
                   bundle.event(),
                   bundle.dateFrom(),
                   bundle.dateTo(),
-                  bundle.failedSourceIds()
+                  bundle.failedSourceIds(),
+                  bundle.errorMessage()
               );
               return null;
             },
@@ -571,25 +570,16 @@ public class EtlOrchestratorFlowConfig {
 
               etlSyncAuditService.save(dto);
 
-              if (bundle.syncStatus() == SyncStatus.SUCCESS) {
-                log.info(
-                    "ETL sync finished successfully (audit): requestId={}, event={}, from={}, to={}",
-                    bundle.requestId(),
-                    bundle.event(),
-                    bundle.dateFrom(),
-                    bundle.dateTo()
-                );
-              } else {
-                log.warn(
-                    "ETL sync finished with errors (audit): requestId={}, event={}, from={}, to={}, failedSourceIds={}, errors={}",
-                    bundle.requestId(),
-                    bundle.event(),
-                    bundle.dateFrom(),
-                    bundle.dateTo(),
-                    bundle.failedSourceIds(),
-                    bundle.errorMessage()
-                );
-              }
+              log.info(
+                  "ETL sync finished (audit): requestId={}, event={}, from={}, to={}, status={}, failedSourceIds={}, errors={}",
+                  bundle.requestId(),
+                  bundle.event(),
+                  bundle.dateFrom(),
+                  bundle.dateTo(),
+                  bundle.syncStatus(),
+                  bundle.failedSourceIds(),
+                  bundle.errorMessage()
+              );
 
               return null;
             },
