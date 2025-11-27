@@ -34,6 +34,7 @@ import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlMaterializationAdvice;
+import io.datapulse.etl.flow.advice.EtlOrchestratorPlansAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import io.micrometer.common.util.StringUtils;
 import java.time.LocalDate;
@@ -279,65 +280,89 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlOrchestratorFlow(TaskExecutor etlOrchestrateExecutor) {
+  public IntegrationFlow etlOrchestratorFlow(
+      TaskExecutor etlOrchestrateExecutor,
+      EtlOrchestratorPlansAdvice etlOrchestratorPlansAdvice
+  ) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATE)
         .headerFilter(MessageHeaders.REPLY_CHANNEL, MessageHeaders.ERROR_CHANNEL)
-        .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
-        .enrichHeaders(headers -> headers.headerFunction(
-            HDR_ETL_TOTAL_EXECUTIONS,
-            message -> {
-              Object payload = message.getPayload();
-              if (!(payload instanceof List<?> rawPlans)) {
-                log.warn(
-                    "Unexpected payload type for orchestrator total executions calculation: {}",
-                    payload.getClass().getName()
-                );
-                return 0;
-              }
-              List<MarketplacePlan> plans = rawPlans.stream()
-                  .filter(MarketplacePlan.class::isInstance)
-                  .map(MarketplacePlan.class::cast)
-                  .toList();
-              return calculateExpectedSources(plans);
-            }
-        ))
-        .split()
-        .channel(channelSpec -> channelSpec.executor(etlOrchestrateExecutor))
-        .enrichHeaders(headers -> headers.headerFunction(
-            HDR_ETL_SOURCE_MARKETPLACE,
-            message -> {
-              MarketplacePlan plan = (MarketplacePlan) message.getPayload();
-              return plan.marketplace();
-            }
-        ))
-        .transform(MarketplacePlan.class, MarketplacePlan::executions)
-        .split()
-        .enrichHeaders(headers -> headers.headerFunction(
-            HDR_ETL_SOURCE_ID,
-            message -> {
-              EtlSourceExecution execution = (EtlSourceExecution) message.getPayload();
-              return execution.sourceId();
-            }
-        ))
-        .handle(EtlSourceExecution.class,
-            (execution, headers) -> RateLimitHandler.apply(execution))
-        .gateway(
-            CH_ETL_INGEST,
-            gatewaySpec -> gatewaySpec
-                .requestTimeout(0L)
-                .replyTimeout(0L)
-                .requiresReply(true)
+        .handle(
+            OrchestrationCommand.class,
+            (command, headers) -> buildMarketplacePlans(command),
+            endpoint -> endpoint.advice(etlOrchestratorPlansAdvice)
         )
-        .aggregate(aggregator -> aggregator
-            .correlationStrategy(message ->
-                message.getHeaders().get(HDR_ETL_REQUEST_ID, String.class)
-            )
-            .releaseStrategy(this::isFullGroup)
-            .expireGroupsUponCompletion(true)
-            .outputProcessor(this::buildBundle)
+        .route(
+            Object.class,
+            payload -> (payload instanceof OrchestrationBundle) ? "ERROR" : "OK",
+            mapping -> mapping
+                .subFlowMapping("ERROR", sf -> sf
+                    .transform(OrchestrationBundle.class, bundle -> bundle)
+                    .channel(CH_ETL_ORCHESTRATION_RESULT)
+                )
+                .subFlowMapping("OK", sf -> sf
+                    .transform(List.class, p -> p)
+                    .enrichHeaders(headers -> headers.headerFunction(
+                        HDR_ETL_TOTAL_EXECUTIONS,
+                        msg -> {
+                          Object p = msg.getPayload();
+                          if (!(p instanceof List<?> rawPlans)) {
+                            log.warn(
+                                "Unexpected payload type for orchestrator total executions calculation: {}",
+                                p.getClass().getName()
+                            );
+                            return 0;
+                          }
+
+                          List<MarketplacePlan> plans = rawPlans.stream()
+                              .filter(MarketplacePlan.class::isInstance)
+                              .map(MarketplacePlan.class::cast)
+                              .toList();
+
+                          return calculateExpectedSources(plans);
+                        }
+                    ))
+                    .split()
+                    .channel(ch -> ch.executor(etlOrchestrateExecutor))
+                    .enrichHeaders(headers -> headers.headerFunction(
+                        HDR_ETL_SOURCE_MARKETPLACE,
+                        msg -> {
+                          MarketplacePlan plan = (MarketplacePlan) msg.getPayload();
+                          return plan.marketplace();
+                        }
+                    ))
+                    .transform(MarketplacePlan.class, MarketplacePlan::executions)
+                    .split()
+                    .enrichHeaders(headers -> headers.headerFunction(
+                        HDR_ETL_SOURCE_ID,
+                        msg -> {
+                          EtlSourceExecution execution =
+                              (EtlSourceExecution) msg.getPayload();
+                          return execution.sourceId();
+                        }
+                    ))
+                    .handle(
+                        EtlSourceExecution.class,
+                        (execution, headers) -> RateLimitHandler.apply(execution)
+                    )
+                    .gateway(
+                        CH_ETL_INGEST,
+                        gatewaySpec -> gatewaySpec
+                            .requestTimeout(0L)
+                            .replyTimeout(0L)
+                            .requiresReply(true)
+                    )
+                    .aggregate(aggregator -> aggregator
+                        .correlationStrategy(msg ->
+                            msg.getHeaders().get(HDR_ETL_REQUEST_ID, String.class)
+                        )
+                        .releaseStrategy(this::isFullGroup)
+                        .expireGroupsUponCompletion(true)
+                        .outputProcessor(this::buildBundle)
+                    )
+                    .channel(CH_ETL_ORCHESTRATION_RESULT)
+                )
         )
-        .channel(CH_ETL_ORCHESTRATION_RESULT)
         .get();
   }
 
