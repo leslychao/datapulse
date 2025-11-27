@@ -78,7 +78,7 @@ public class FileStreamingService {
       } catch (IOException ex) {
         throw new AppException(
             MessageCodes.DOWNLOAD_MOVE_FAILED,
-            new Object[]{ tmp, target, ExceptionUtils.getRootCauseMessage(ex) },
+            new Object[]{ tmp, target, ExceptionUtils.getRootCause(ex) },
             ex
         );
       }

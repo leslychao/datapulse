@@ -221,7 +221,7 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
           "Snapshot file delete failed: file={}, reason={}, rootCause={}",
           file,
           reason,
-          ExceptionUtils.getRootCauseMessage(ex)
+          ExceptionUtils.getRootCause(ex)
       );
     }
   }

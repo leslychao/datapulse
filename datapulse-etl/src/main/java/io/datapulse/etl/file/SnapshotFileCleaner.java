@@ -25,12 +25,11 @@ public final class SnapshotFileCleaner {
           reason
       );
     } catch (IOException ex) {
-      String root = ExceptionUtils.getRootCauseMessage(ex);
       log.warn(
           "Snapshot file delete failed: file={}, reason={}, rootCause={}",
           file,
           reason,
-          root
+          ExceptionUtils.getRootCause(ex)
       );
     }
   }
