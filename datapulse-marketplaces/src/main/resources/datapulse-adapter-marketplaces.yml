@@ -4,16 +4,10 @@ marketplace:
   providers:
     WILDBERRIES:
       useSandbox: true
-      baseUrl: https://statistics-api.wildberries.ru
-      feedbacksBaseUrl: https://feedbacks-api.wildberries.ru
-      sandbox:
-        baseUrl: https://statistics-api-sandbox.wildberries.ru
-        feedbacksBaseUrl: https://feedbacks-api-sandbox.wildberries.ru
       endpoints:
-        sales: /api/v1/supplier/sales
-        stock: /api/v1/supplier/stocks
-        finance: /api/v5/supplier/reportDetailByPeriod
-        reviews: /api/v1/questions
+        DICT_WB_WAREHOUSES:
+          url: https://statistics-api.wildberries.ru/api/v1/warehouses
+          sandboxUrl: https://statistics-api-sandbox.wildberries.ru/api/v1/warehouses
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
@@ -21,15 +15,9 @@ marketplace:
         retryAfterFallback: 1s
     OZON:
       useSandbox: true
-      baseUrl: https://api-seller.ozon.ru
-      sandbox:
-        baseUrl: https://api-seller.ozon.ru
       endpoints:
-        sales: /v1/analytics/data
-        product: /v3/product/info/list
-        stock: /v4/product/info/stocks
-        finance: /v3/finance/transaction/list
-        reviews: /v1/review/list
+        DICT_OZON_WAREHOUSES:
+          url: https://api-seller.ozon.ru/v1/warehouse/list
       retryPolicy:
         maxAttempts: 4
         baseBackoff: 300ms

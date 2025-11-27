@@ -23,62 +23,55 @@ public final class EndpointsResolver {
 
   public EndpointRef resolve(@NonNull MarketplaceType type, @NonNull EndpointKey key) {
     var provider = properties.get(type);
-    var host = resolveHost(provider, type, key);
-    var path = resolveRequiredPath(provider, key);
-    return new EndpointRef(key, buildUri(host, path));
+    var endpointConfig = provider.endpointConfig(key);
+    var uri = resolveUri(provider, endpointConfig, type);
+    return new EndpointRef(key, uri);
   }
 
   public EndpointRef resolve(
-      @NonNull MarketplaceType type, @NonNull EndpointKey key, @NonNull Map<String, ?> query
+      @NonNull MarketplaceType type,
+      @NonNull EndpointKey key,
+      @NonNull Map<String, ?> query
   ) {
     var base = resolve(type, key);
     return new EndpointRef(key, applyQuery(base.uri(), query));
   }
 
-  private static URI buildUri(String host, String path) {
-    return UriComponentsBuilder.fromHttpUrl(host).path(path).build(true).toUri();
+  private static URI resolveUri(
+      MarketplaceProperties.Provider provider,
+      MarketplaceProperties.EndpointConfig endpointConfig,
+      MarketplaceType type
+  ) {
+    final boolean sandbox = provider.isUseSandbox();
+    final String url = sandbox && endpointConfig.getSandboxUrl() != null
+        ? endpointConfig.getSandboxUrl()
+        : endpointConfig.getUrl();
+
+    if (url == null || url.isBlank()) {
+      throw new AppException(MessageCodes.MARKETPLACE_BASE_URL_MISSING, type.name());
+    }
+
+    return UriComponentsBuilder.fromHttpUrl(url).build(true).toUri();
   }
 
   private static URI applyQuery(URI base, Map<String, ?> query) {
     var uriComponentsBuilder = UriComponentsBuilder.fromUri(base);
-    query.forEach((k, v) -> {
-      if (v == null) {
+
+    query.forEach((key, value) -> {
+      if (value == null) {
         return;
       }
-      if (v.getClass().isArray()) {
-        IntStream.range(0, Array.getLength(v)).mapToObj(i -> Array.get(v, i))
-            .forEach(val -> uriComponentsBuilder.queryParam(k, val));
-      } else if (v instanceof Iterable<?> it) {
-        it.forEach(val -> uriComponentsBuilder.queryParam(k, val));
+      if (value.getClass().isArray()) {
+        IntStream.range(0, Array.getLength(value))
+            .mapToObj(index -> Array.get(value, index))
+            .forEach(element -> uriComponentsBuilder.queryParam(key, element));
+      } else if (value instanceof Iterable<?> iterable) {
+        iterable.forEach(element -> uriComponentsBuilder.queryParam(key, element));
       } else {
-        uriComponentsBuilder.queryParam(k, v);
+        uriComponentsBuilder.queryParam(key, value);
       }
     });
+
     return uriComponentsBuilder.build(true).toUri();
-  }
-
-  private static String resolveRequiredPath(
-      MarketplaceProperties.Provider provider,
-      EndpointKey key
-  ) {
-    return provider.endpoint(key);
-  }
-
-  private static String resolveHost(
-      MarketplaceProperties.Provider provider,
-      MarketplaceType type,
-      EndpointKey key
-  ) {
-    final boolean sandbox = provider.isUseSandbox() && provider.getSandbox() != null;
-    final String baseUrl = sandbox ? provider.getSandbox().getBaseUrl() : provider.getBaseUrl();
-    if (baseUrl == null || baseUrl.isBlank()) {
-      throw new AppException(MessageCodes.MARKETPLACE_BASE_URL_MISSING, type.name());
-    }
-    if (type == MarketplaceType.WILDBERRIES && key == EndpointKey.REVIEWS) {
-      final String feedbackBaseUrl =
-          sandbox ? provider.getSandbox().getFeedbacksBaseUrl() : provider.getFeedbacksBaseUrl();
-      return (feedbackBaseUrl == null || feedbackBaseUrl.isBlank()) ? baseUrl : feedbackBaseUrl;
-    }
-    return baseUrl;
   }
 }

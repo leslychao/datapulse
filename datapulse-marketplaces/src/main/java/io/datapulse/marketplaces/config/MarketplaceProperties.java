@@ -45,13 +45,13 @@ public class MarketplaceProperties {
     if (providerConfig == null) {
       throw new AppException(MARKETPLACE_CONFIG_MISSING, marketplaceType.name());
     }
-    providerConfig.validateSandboxConfig();
     return providerConfig;
   }
 
   @Getter
   @Setter
   public static class Storage {
+
     @NotNull
     private Path baseDir;
   }
@@ -63,31 +63,20 @@ public class MarketplaceProperties {
 
     private boolean useSandbox;
 
-    @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
-    private String baseUrl;
-
-    private String feedbacksBaseUrl;
-
-    @Valid
-    private Sandbox sandbox;
-
     @NotNull(message = MARKETPLACE_ENDPOINTS_REQUIRED)
-    private final Map<EndpointKey, @NotBlank(message = MARKETPLACE_ENDPOINT_PATH_REQUIRED) String>
-        endpoints = new EnumMap<>(EndpointKey.class);
+    private final Map<EndpointKey, @Valid EndpointConfig> endpoints =
+        new EnumMap<>(EndpointKey.class);
 
     @Valid
     @NotNull(message = MARKETPLACE_RETRY_POLICY_REQUIRED)
     private RetryPolicy retryPolicy;
 
-    private Map<EndpointKey, RetryPolicyOverride> retryPolicyOverrides =
-        new EnumMap<>(EndpointKey.class);
-
-    public String endpoint(EndpointKey endpointKey) {
-      var endpointPath = endpoints.get(endpointKey);
-      if (endpointPath == null || endpointPath.isBlank()) {
+    public EndpointConfig endpointConfig(EndpointKey endpointKey) {
+      var cfg = endpoints.get(endpointKey);
+      if (cfg == null || cfg.getUrl() == null || cfg.getUrl().isBlank()) {
         throw new AppException(MARKETPLACE_ENDPOINT_PATH_REQUIRED, endpointKey.name());
       }
-      return endpointPath;
+      return cfg;
     }
 
     public RetryPolicy effectiveRetryPolicy(EndpointKey endpointKey) {
@@ -95,10 +84,12 @@ public class MarketplaceProperties {
         throw new AppException(MARKETPLACE_RETRY_POLICY_REQUIRED);
       }
 
-      var overrideConfig = retryPolicyOverrides.get(endpointKey);
-      if (overrideConfig == null) {
+      var endpointConfig = endpoints.get(endpointKey);
+      if (endpointConfig == null || endpointConfig.getRetryPolicyOverride() == null) {
         return retryPolicy;
       }
+
+      var overrideConfig = endpointConfig.getRetryPolicyOverride();
 
       var mergedRetryPolicy = new RetryPolicy();
       mergedRetryPolicy.maxAttempts =
@@ -114,15 +105,6 @@ public class MarketplaceProperties {
       return mergedRetryPolicy;
     }
 
-    void validateSandboxConfig() {
-      if (!useSandbox) {
-        return;
-      }
-      if (sandbox == null || sandbox.baseUrl == null || sandbox.baseUrl.isBlank()) {
-        throw new AppException(MARKETPLACE_BASE_URL_MISSING, "sandbox.baseUrl");
-      }
-    }
-
     private static <T> T chooseNotNull(T value, T defaultValue) {
       return (value != null) ? value : defaultValue;
     }
@@ -130,12 +112,14 @@ public class MarketplaceProperties {
 
   @Getter
   @Setter
-  public static class Sandbox {
+  public static class EndpointConfig {
 
     @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
-    private String baseUrl;
+    private String url;
 
-    private String feedbacksBaseUrl;
+    private String sandboxUrl;
+
+    private RetryPolicyOverride retryPolicyOverride;
   }
 
   @Getter

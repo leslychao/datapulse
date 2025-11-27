@@ -1,7 +1,8 @@
 package io.datapulse.marketplaces.endpoint;
 
 public enum EndpointKey {
-  SALES, PRODUCT, STOCK, FINANCE, REVIEWS;
+  DICT_WB_WAREHOUSES,
+  DICT_OZON_WAREHOUSES;
 
   public String tag() {
     return name().toLowerCase();
