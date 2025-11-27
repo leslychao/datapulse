@@ -6,13 +6,13 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
-  <changeSet id="0005-create-raw-realization-fact-wb" author="vitalii.kim" dbms="postgresql">
+  <changeSet id="0005-create-raw_warehouse_list_ozon" author="vitalii.kim" dbms="postgresql">
 
     <sql>
       -- ===========================================
-      -- RAW REALIZATION FACT — WILDBERRIES (WB)
+      -- RAW WAREHOUSE LIST — OZON
       -- ===========================================
-      CREATE TABLE raw_realization_fact_wb
+      CREATE TABLE raw_warehouse_list_ozon
       (
         id          BIGSERIAL PRIMARY KEY,
         request_id  VARCHAR(64) NOT NULL,
@@ -23,18 +23,18 @@
         created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
       );
 
-      CREATE INDEX IF NOT EXISTS idx_raw_realization_wb_request
-        ON raw_realization_fact_wb (request_id);
+      CREATE INDEX IF NOT EXISTS idx_raw_warehouse_list_ozon_request
+        ON raw_warehouse_list_ozon (request_id);
 
-      CREATE INDEX IF NOT EXISTS idx_raw_realization_wb_snapshot
-        ON raw_realization_fact_wb (snapshot_id);
+      CREATE INDEX IF NOT EXISTS idx_raw_warehouse_list_ozon_snapshot
+        ON raw_warehouse_list_ozon (snapshot_id);
 
-      CREATE INDEX IF NOT EXISTS idx_raw_realization_wb_acc_mp
-        ON raw_realization_fact_wb (account_id, marketplace);
+      CREATE INDEX IF NOT EXISTS idx_raw_warehouse_list_ozon_acc_mp
+        ON raw_warehouse_list_ozon (account_id, marketplace);
     </sql>
 
     <rollback>
-      DROP TABLE IF EXISTS raw_realization_fact_wb CASCADE;
+      DROP TABLE IF EXISTS raw_warehouse_list_ozon CASCADE;
     </rollback>
 
   </changeSet>

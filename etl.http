@@ -71,16 +71,16 @@ Content-Type: application/json
   client.global.set("to",   ymd(to));
 %}
 
-### Run ETL (last 30 days) STOCK_LEVEL
+### Run ETL (last 30 days) WAREHOUSE
 POST http://localhost:8080/api/etl/run
 Content-Type: application/json
 
 {
-  "accountId": 44,
-  "event": "STOCK_LEVEL",
-  "from": "{{from}}",
-  "to": "{{to}}",
-  "burst": 4
+  "accountId": 4,
+  "event": "WAREHOUSE",
+  "from": "2025-10-22",
+  "to": "2025-11-22",
+  "burst": 1
 }
 
 > {%

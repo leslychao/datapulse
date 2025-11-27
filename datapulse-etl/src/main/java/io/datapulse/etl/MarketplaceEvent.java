@@ -8,7 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public enum MarketplaceEvent {
 
-  SALES_FACT;
+  SALES_FACT, WAREHOUSE;
 
   public static MarketplaceEvent fromString(String raw) {
     if (StringUtils.isBlank(raw)) {

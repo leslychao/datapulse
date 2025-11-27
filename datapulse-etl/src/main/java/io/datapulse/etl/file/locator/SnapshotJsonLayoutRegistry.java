@@ -1,8 +1,6 @@
 package io.datapulse.etl.file.locator;
 
-import io.datapulse.marketplaces.dto.raw.ozon.OzonAnalyticsApiRaw;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonProductInfoRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.NonNull;
@@ -14,9 +12,7 @@ public final class SnapshotJsonLayoutRegistry {
   private final Map<Class<?>, JsonArrayLocator> locators = new ConcurrentHashMap<>();
 
   public SnapshotJsonLayoutRegistry() {
-    register(WbRealizationRaw.class, JsonArrayLocators.rootArray());
-    register(OzonAnalyticsApiRaw.class, JsonArrayLocators.resultDataArray());
-    register(OzonProductInfoRaw.class, JsonArrayLocators.itemsArray());
+    register(OzonWarehouseListRaw.class, JsonArrayLocators.resultArray());
   }
 
   public void register(

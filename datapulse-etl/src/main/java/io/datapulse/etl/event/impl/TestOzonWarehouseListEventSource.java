@@ -2,7 +2,7 @@ package io.datapulse.etl.event.impl;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonProductInfoRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
@@ -23,55 +23,55 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("local")
 @RequiredArgsConstructor
+@Profile("local")
 @EtlSourceMeta(
-    event = MarketplaceEvent.SALES_FACT,
-    marketplace = MarketplaceType.OZON,
-    order = 1
+    event = MarketplaceEvent.WAREHOUSE,
+    marketplace = MarketplaceType.OZON
 )
-public final class TestOzonProductInfoEventSource implements EventSource {
+public final class TestOzonWarehouseListEventSource implements EventSource {
 
   private static final URI SNAPSHOT_SOURCE_URI =
-      URI.create("https://api-seller.ozon.ru/v3/product/info/list");
+      URI.create("https://api-seller.ozon.ru/v1/warehouse/list");
 
-  private static final String SNAPSHOT_RESOURCE_PATH = "ozon-product-info.json";
+  private static final String SNAPSHOT_RESOURCE_PATH = "ozon_warehouse_list.json";
+
+  private static final String ERROR_MESSAGE =
+      "Не удалось подготовить тестовый снапшот складов Ozon из ресурса "
+          + SNAPSHOT_RESOURCE_PATH;
 
   private final MarketplaceProperties marketplaceProperties;
 
   @Override
-  public @NonNull Snapshot<OzonProductInfoRaw> fetchSnapshot(
+  public @NonNull Snapshot<OzonWarehouseListRaw> fetchSnapshot(
       long accountId,
       @NonNull MarketplaceEvent event,
       @NonNull LocalDate from,
       @NonNull LocalDate to
   ) {
     try {
-      Path snapshotFile = copyFixtureToSnapshotFile(accountId, event, from, to);
+      Path snapshotFile = copyFixtureToSnapshotFile(accountId, event);
       long size = Files.size(snapshotFile);
 
       return new Snapshot<>(
-          OzonProductInfoRaw.class,
+          OzonWarehouseListRaw.class,
           snapshotFile,
           size,
           SNAPSHOT_SOURCE_URI,
           HttpMethod.POST
       );
     } catch (IOException ex) {
-      throw new IllegalStateException("Failed to prepare Ozon Product Info test snapshot", ex);
+      throw new IllegalStateException(ERROR_MESSAGE, ex);
     }
   }
 
-  private Path copyFixtureToSnapshotFile(
-      long accountId,
-      MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
-  ) throws IOException {
+  private Path copyFixtureToSnapshotFile(long accountId, MarketplaceEvent event) throws IOException {
 
     Resource resource = new ClassPathResource(SNAPSHOT_RESOURCE_PATH);
     if (!resource.exists()) {
-      throw new IllegalStateException("Test resource not found: " + SNAPSHOT_RESOURCE_PATH);
+      throw new IllegalStateException(
+          "Тестовый ресурс не найден в classpath: " + SNAPSHOT_RESOURCE_PATH
+      );
     }
 
     Path baseDir = marketplaceProperties.getStorage().getBaseDir();
@@ -82,17 +82,15 @@ public final class TestOzonProductInfoEventSource implements EventSource {
     Path dir = baseDir
         .resolve(marketplaceSegment)
         .resolve(eventSegment)
-        .resolve("test-product-info");
+        .resolve("test");
 
     Files.createDirectories(dir);
 
     String fileName = String.format(
-        "snapshot-%s-%s-product-info-%d-%s-%s.json",
+        "snapshot-%s-%s-%d.json",
         marketplaceSegment,
         eventSegment,
-        accountId,
-        from,
-        to
+        accountId
     );
 
     Path target = dir.resolve(fileName);

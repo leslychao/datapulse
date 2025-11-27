@@ -23,7 +23,6 @@ import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.etl.handler.EtlBatchDispatcher;
 import io.datapulse.etl.handler.error.EtlIngestErrorHandler;
-import io.datapulse.etl.handler.error.EtlSnapshotErrorHandler;
 import io.datapulse.marketplaces.dto.Snapshot;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -87,7 +86,6 @@ public class EtlSnapshotIngestionFlowConfig {
             current = me.getCause();
             continue;
           }
-          // первое НЕ-интеграционное исключение – наш "нормальный" эксепшен
           return current;
         }
       }
@@ -95,7 +93,7 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   @Bean
-  public Advice snapshotPersistErrorAdvice(EtlSnapshotErrorHandler snapshotErrorHandler) {
+  public Advice snapshotPersistErrorAdvice(EtlIngestErrorHandler ingestErrorHandler) {
     return new AbstractRequestHandlerAdvice() {
       @Override
       protected Object doInvoke(
@@ -106,8 +104,7 @@ public class EtlSnapshotIngestionFlowConfig {
         try {
           return callback.execute();
         } catch (Exception ex) {
-          snapshotErrorHandler.handlePersistError(ex, message);
-          throw ex;
+          return ingestErrorHandler.handleIngestError(ex, message);
         }
       }
     };
@@ -201,9 +198,7 @@ public class EtlSnapshotIngestionFlowConfig {
             List.class,
             (payload, headersMap) -> {
               MessageHeaders headers = new MessageHeaders(headersMap);
-              // тип payload здесь компиляторно List (без кастов), persistBatch принимает List<?>
               persistBatch(payload, headers);
-              // reply нужен для цепочки от gateway(CH_ETL_INGEST_CORE):
               return headers.get(HDR_ETL_FETCHED_DATA, Snapshot.class);
             },
             endpoint -> endpoint

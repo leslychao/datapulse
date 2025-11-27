@@ -19,12 +19,6 @@ marketplace:
         baseBackoff: 200ms
         maxBackoff: 30s
         retryAfterFallback: 1s
-      retryPolicyOverrides:
-        reviews:
-          maxAttempts: 4
-          baseBackoff: 200ms
-          maxBackoff: 10s
-          retryAfterFallback: 1s
     OZON:
       useSandbox: true
       baseUrl: https://api-seller.ozon.ru

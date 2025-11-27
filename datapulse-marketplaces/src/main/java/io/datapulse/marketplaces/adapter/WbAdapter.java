@@ -1,15 +1,10 @@
 package io.datapulse.marketplaces.adapter;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.marketplaces.dto.raw.wb.WbRealizationRaw;
-import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
-import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
-import java.time.LocalDate;
-import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -29,13 +24,4 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
     return MarketplaceType.WILDBERRIES;
   }
 
-  @Override
-  public Snapshot<WbRealizationRaw> downloadSalesSnapshot(long accountId, LocalDate from,
-      LocalDate to) {
-    Map<String, ?> params = Map.of(
-        "dateFrom", from,
-        "dateTo", to
-    );
-    return doGet(accountId, EndpointKey.SALES, params, WbRealizationRaw.class);
-  }
 }
