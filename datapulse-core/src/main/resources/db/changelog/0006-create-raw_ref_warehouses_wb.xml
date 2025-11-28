@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0006-create-raw_ref_warehouses_wb" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      -- ===========================================
+      -- RAW WAREHOUSE LIST — WILDBERRIES (WB)
+      -- ===========================================
+      CREATE TABLE raw_ref_warehouses_wb
+      (
+        id          BIGSERIAL PRIMARY KEY,
+        request_id  VARCHAR(64) NOT NULL,
+        snapshot_id VARCHAR(64) NOT NULL,
+        account_id  BIGINT      NOT NULL,
+        marketplace VARCHAR(32) NOT NULL,
+        payload     JSONB       NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_raw_ref_warehouses_wb_request
+        ON raw_ref_warehouses_wb (request_id);
+
+      CREATE INDEX IF NOT EXISTS idx_raw_ref_warehouses_wb_snapshot
+        ON raw_ref_warehouses_wb (snapshot_id);
+
+      CREATE INDEX IF NOT EXISTS idx_raw_ref_warehouses_wb_acc_mp
+        ON raw_ref_warehouses_wb (account_id, marketplace);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS raw_ref_warehouses_wb CASCADE;
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

@@ -44,7 +44,11 @@ public class FileStreamingService {
         throw tooManyRequests;
       }
 
-      throw new AppException(MessageCodes.DOWNLOAD_FAILED, targetFile);
+      throw new AppException(
+          MessageCodes.DOWNLOAD_FAILED,
+          targetFile,
+          root.toString()
+      );
     }
   }
 

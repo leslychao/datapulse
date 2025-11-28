@@ -59,7 +59,7 @@ Content-Type: application/json
   "event": "SALES_FACT",
   "from": "2025-10-22",
   "to": "2025-11-22",
-  "burst": 1000
+  "burst": 10
 }
 
 > {%

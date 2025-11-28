@@ -3,7 +3,6 @@ marketplace:
     base-dir: /var/datapulse/snapshots
   providers:
     WILDBERRIES:
-      useSandbox: true
       endpoints:
         WB_TARIFF_COMMISSION:
           url: https://suppliers-api.wildberries.ru/api/v1/tariffs/commission
@@ -11,12 +10,13 @@ marketplace:
           url: https://suppliers-api.wildberries.ru/api/v1/tariffs/box
         WB_TARIFF_MONOPALLET:
           url: https://suppliers-api.wildberries.ru/api/v1/tariffs/monopallet
+        DICT_WB_WAREHOUSES:
+          url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
         maxBackoff: 30s
     OZON:
-      useSandbox: true
       endpoints:
         DICT_OZON_WAREHOUSES:
           url: https://api-seller.ozon.ru/v1/warehouse/list

@@ -24,7 +24,7 @@ public final class EndpointsResolver {
   public EndpointRef resolve(@NonNull MarketplaceType type, @NonNull EndpointKey key) {
     var provider = properties.get(type);
     var endpointConfig = provider.endpointConfig(key);
-    var uri = resolveUri(provider, endpointConfig, type);
+    var uri = resolveUri(endpointConfig, type);
     return new EndpointRef(key, uri);
   }
 
@@ -38,14 +38,10 @@ public final class EndpointsResolver {
   }
 
   private static URI resolveUri(
-      MarketplaceProperties.Provider provider,
       MarketplaceProperties.EndpointConfig endpointConfig,
       MarketplaceType type
   ) {
-    final boolean sandbox = provider.isUseSandbox();
-    final String url = sandbox && endpointConfig.getSandboxUrl() != null
-        ? endpointConfig.getSandboxUrl()
-        : endpointConfig.getUrl();
+    final String url = endpointConfig.getUrl();
 
     if (url == null || url.isBlank()) {
       throw new AppException(MessageCodes.MARKETPLACE_BASE_URL_MISSING, type.name());

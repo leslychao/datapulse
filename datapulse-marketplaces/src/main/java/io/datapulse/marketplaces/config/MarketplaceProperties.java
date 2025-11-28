@@ -1,9 +1,9 @@
 package io.datapulse.marketplaces.config;
 
 import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
+import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_BASE_URL_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINTS_REQUIRED;
-import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED;
@@ -60,8 +60,6 @@ public class MarketplaceProperties {
   @Validated
   public static class Provider {
 
-    private boolean useSandbox;
-
     @NotNull(message = MARKETPLACE_ENDPOINTS_REQUIRED)
     private final Map<EndpointKey, @Valid EndpointConfig> endpoints =
         new EnumMap<>(EndpointKey.class);
@@ -112,8 +110,6 @@ public class MarketplaceProperties {
 
     @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
     private String url;
-
-    private String sandboxUrl;
 
     private RetryPolicyOverride retryPolicyOverride;
   }

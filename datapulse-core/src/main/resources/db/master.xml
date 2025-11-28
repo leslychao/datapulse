@@ -8,4 +8,5 @@
   <include file="changelog/0003-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0004-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0005-create-raw_warehouse_list_ozon.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0006-create-raw_ref_warehouses_wb.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
