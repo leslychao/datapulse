@@ -1,12 +1,13 @@
 package io.datapulse.etl.event.impl;
 
-import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
-import io.datapulse.marketplaces.dto.Snapshot;
+import io.datapulse.etl.MarketplaceEvent;
+import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
+import io.datapulse.marketplaces.dto.Snapshot;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -27,7 +28,8 @@ import org.springframework.stereotype.Component;
 @Profile("local")
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE,
-    marketplace = MarketplaceType.OZON
+    marketplace = MarketplaceType.OZON,
+    rawTableName = RawTableNames.OZON_WAREHOUSE_LIST
 )
 public final class TestOzonWarehouseListEventSource implements EventSource {
 
@@ -65,7 +67,8 @@ public final class TestOzonWarehouseListEventSource implements EventSource {
     }
   }
 
-  private Path copyFixtureToSnapshotFile(long accountId, MarketplaceEvent event) throws IOException {
+  private Path copyFixtureToSnapshotFile(long accountId, MarketplaceEvent event)
+      throws IOException {
 
     Resource resource = new ClassPathResource(SNAPSHOT_RESOURCE_PATH);
     if (!resource.exists()) {

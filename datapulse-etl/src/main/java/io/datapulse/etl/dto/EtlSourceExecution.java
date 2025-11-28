@@ -13,7 +13,8 @@ public record EtlSourceExecution(
     LocalDate from,
     LocalDate to,
     int order,
-    EventSource source
+    EventSource source,
+    String rawTable
 ) {
 
 }

@@ -22,8 +22,8 @@ import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
-import io.datapulse.etl.handler.EtlBatchDispatcher;
 import io.datapulse.etl.handler.error.EtlIngestErrorHandler;
+import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import io.datapulse.marketplaces.dto.Snapshot;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -47,7 +47,6 @@ public class EtlSnapshotIngestionFlowConfig {
   private static final int SNAPSHOT_BATCH_SIZE = 500;
 
   private final SnapshotCommitBarrier snapshotCommitBarrier;
-  private final EtlBatchDispatcher etlBatchDispatcher;
   private final SnapshotJsonLayoutRegistry snapshotJsonLayoutRegistry;
   private final SnapshotIteratorFactory snapshotIteratorFactory;
   private final SnapshotFileCleaner snapshotFileCleaner;
@@ -272,6 +271,8 @@ public class EtlSnapshotIngestionFlowConfig {
     );
   }
 
+  private final RawBatchInsertJdbcRepository repository;
+
   private void persistBatch(
       List<?> rawBatch,
       MessageHeaders headers
@@ -280,8 +281,9 @@ public class EtlSnapshotIngestionFlowConfig {
 
     snapshotCommitBarrier.registerBatch(context.snapshotId());
 
-    etlBatchDispatcher.dispatch(
+    repository.saveBatch(
         rawBatch,
+        context.rawTable(),
         context.requestId(),
         context.snapshotId(),
         context.accountId(),
@@ -321,6 +323,7 @@ public class EtlSnapshotIngestionFlowConfig {
     addIfMissing(missing, context.event(), "event");
     addIfMissing(missing, context.marketplace(), "marketplace");
     addIfMissing(missing, context.sourceId(), "sourceId");
+    addIfMissing(missing, context.rawTable(), "rawTable");
 
     if (snapshotRequired) {
       addIfMissing(missing, context.snapshotId(), "snapshotId");

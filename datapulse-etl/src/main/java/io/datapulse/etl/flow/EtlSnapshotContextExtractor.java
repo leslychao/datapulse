@@ -2,6 +2,7 @@ package io.datapulse.etl.flow;
 
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
+import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_RAW_TABLE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_PROCESS_ID;
@@ -26,6 +27,7 @@ public final class EtlSnapshotContextExtractor {
     String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
     String snapshotId = headers.get(HDR_ETL_PROCESS_ID, String.class);
     Path snapshotFile = headers.get(HDR_ETL_SNAPSHOT_FILE, Path.class);
+    String rawTable = headers.get(HDR_ETL_RAW_TABLE, String.class);
 
     return new EtlSnapshotContext(
         requestId,
@@ -34,7 +36,8 @@ public final class EtlSnapshotContextExtractor {
         marketplace,
         sourceId,
         snapshotId,
-        snapshotFile
+        snapshotFile,
+        rawTable
     );
   }
 }

@@ -10,7 +10,8 @@ public record EtlSnapshotContext(
     MarketplaceType marketplace,
     String sourceId,
     String snapshotId,
-    Path snapshotFile
+    Path snapshotFile,
+    String rawTable
 ) {
 
 }

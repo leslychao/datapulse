@@ -2,6 +2,7 @@ package io.datapulse.etl.event.impl;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
+import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
 import io.datapulse.marketplaces.adapter.WbAdapter;
@@ -18,7 +19,8 @@ import org.springframework.stereotype.Component;
 @Profile("local")
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE,
-    marketplace = MarketplaceType.WILDBERRIES
+    marketplace = MarketplaceType.WILDBERRIES,
+    rawTableName = RawTableNames.WB_WAREHOUSE_LIST
 )
 public final class WbWarehouseListEventSource implements EventSource {
 

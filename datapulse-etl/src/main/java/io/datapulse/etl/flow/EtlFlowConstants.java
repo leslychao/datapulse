@@ -25,6 +25,7 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_TOTAL_EXECUTIONS = "ETL_TOTAL_EXECUTIONS";
   public static final String HDR_ETL_SYNC_STATUS = "ETL_SYNC_STATUS";
   public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
+  public static final String HDR_ETL_RAW_TABLE = "ETL_RAW_TABLE";
 
   public static final String EXCHANGE_EXECUTION = "etl.execution.exchange";
   public static final String EXCHANGE_EXECUTION_DLX = "etl.execution.exchange.dlx";

@@ -1,7 +1,7 @@
 package io.datapulse.etl.event;
 
-import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.etl.MarketplaceEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -32,7 +32,8 @@ public final class EtlSourceRegistry {
               meta.marketplace(),
               meta.order(),
               type.getSimpleName(),
-              source
+              source,
+              meta.rawTableName()
           ));
     }
 
@@ -56,7 +57,8 @@ public final class EtlSourceRegistry {
       MarketplaceType marketplace,
       int order,
       String sourceId,
-      EventSource source
+      EventSource source,
+      String rawTable
   ) {
 
   }
