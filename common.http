@@ -192,7 +192,7 @@ Content-Type: application/json
 {
   "accountId": {{accountId}},
   "marketplace": "WILDBERRIES",
-  "credentials": { "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzc3MDU5Mzg0LCJpZCI6IjAxOWExNTI1LWI1ZmEtNzNiZi04ZWIwLTE3YjMwYjk1MGY2MCIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.eURulaP5UTqegdGH86XJqRX2qnBao0jnX5DFCa_wUKzku84MCJF-IWyO6cdSokf6oVn5LPqtQkn-zLONagFvcg" },
+  "credentials": { "token": "wbtokenxxx" },
   "active": true
 }
 

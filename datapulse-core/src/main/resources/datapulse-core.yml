@@ -38,7 +38,7 @@ webclient:
   write-timeout-seconds: 30
 
 crypto:
-  master-key-base64: ${DATAPULSE_CRYPTO_MASTER_KEY_BASE64:}
+  master-key-base64: ${DATAPULSE_CRYPTO_MASTER_KEY_BASE64}
   gcm-tag-length-bits: 128
 
 system-account:
@@ -47,8 +47,8 @@ system-account:
   connections:
     WILDBERRIES:
       active: true
-      token: ${WB_SYSTEM_TOKEN:eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzc3MDU5Mzg0LCJpZCI6IjAxOWExNTI1LWI1ZmEtNzNiZi04ZWIwLTE3YjMwYjk1MGY2MCIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.eURulaP5UTqegdGH86XJqRX2qnBao0jnX5DFCa_wUKzku84MCJF-IWyO6cdSokf6oVn5LPqtQkn-zLONagFvcg}
+      token: ${WB_SYSTEM_TOKEN}
     OZON:
       active: true
-      client-id: ${OZON_SYSTEM_CLIENT_ID:3528862}
-      api-key: ${OZON_SYSTEM_API_KEY:e9e97944-6e3a-414a-aed1-9b547babac05}
+      client-id: ${OZON_SYSTEM_CLIENT_ID}
+      api-key: ${OZON_SYSTEM_API_KEY}

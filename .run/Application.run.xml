@@ -1,9 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
     <option name="ACTIVE_PROFILES" value="local" />
-    <envs>
-      <env name="DATAPULSE_CRYPTO_MASTER_KEY_BASE64" value="Qcvyex3mVY2vUf8C+5rDVEcBFju0rBdq1X3Z9HIGf44=" />
-    </envs>
     <module name="datapulse-application" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="io.datapulse.Application" />
     <extension name="coverage">
