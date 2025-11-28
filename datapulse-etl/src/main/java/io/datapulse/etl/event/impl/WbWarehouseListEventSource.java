@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE,
     marketplace = MarketplaceType.WILDBERRIES,
-    rawTableName = RawTableNames.WB_WAREHOUSE_LIST
+    rawTableName = RawTableNames.RAW_WAREHOUSE_LIST_WB
 )
 public final class WbWarehouseListEventSource implements EventSource {
 

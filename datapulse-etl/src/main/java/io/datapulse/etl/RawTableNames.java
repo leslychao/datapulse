@@ -4,7 +4,8 @@ public final class RawTableNames {
 
   private RawTableNames() {
   }
-  public static final String OZON_WAREHOUSE_LIST = "raw_warehouse_list_ozon";
 
-  public static final String WB_WAREHOUSE_LIST = "raw_ref_warehouses_wb";
+  public static final String RAW_WAREHOUSE_LIST_OZON = "raw_warehouse_list_ozon";
+
+  public static final String RAW_WAREHOUSE_LIST_WB = "raw_warehouse_list_wb";
 }

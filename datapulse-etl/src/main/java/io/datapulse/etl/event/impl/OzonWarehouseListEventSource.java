@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE,
     marketplace = MarketplaceType.OZON,
-    rawTableName = RawTableNames.OZON_WAREHOUSE_LIST
+    rawTableName = RawTableNames.RAW_WAREHOUSE_LIST_OZON
 )
 public final class OzonWarehouseListEventSource implements EventSource {
 

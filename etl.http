@@ -3,7 +3,7 @@ POST http://localhost:8080/api/etl/run
 Content-Type: application/json
 
 {
-  "accountId": 6,
+  "accountId": 1,
   "event": "WAREHOUSE",
   "from": "2025-10-22",
   "to": "2025-11-22",

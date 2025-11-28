@@ -6,7 +6,7 @@
   <include file="changelog/0001-init-accounts-sales.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0002-account-active.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0003-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
-  <include file="changelog/0004-create-etl-sync-audit.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0004-alter-etl-sync-audit-add-error-message.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0005-create-raw_warehouse_list_ozon.xml" relativeToChangelogFile="true"/>
-  <include file="changelog/0006-create-raw_ref_warehouses_wb.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0006-create-raw_warehouse_list_wb.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
