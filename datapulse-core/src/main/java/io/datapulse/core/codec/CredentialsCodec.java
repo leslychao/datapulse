@@ -1,5 +1,8 @@
 package io.datapulse.core.codec;
 
+import static io.datapulse.domain.MessageCodes.CREDENTIALS_DESERIALIZATION_ERROR;
+import static io.datapulse.domain.MessageCodes.CREDENTIALS_SERIALIZATION_ERROR;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.domain.MarketplaceType;
@@ -52,7 +55,7 @@ public class CredentialsCodec {
     try {
       return om.writeValueAsString(creds);
     } catch (JsonProcessingException e) {
-      throw new AppException(e, "credentials.serialize.failed");
+      throw new AppException(e, CREDENTIALS_SERIALIZATION_ERROR);
     }
   }
 
@@ -60,7 +63,7 @@ public class CredentialsCodec {
     try {
       return om.readValue(json, MarketplaceCredentials.class);
     } catch (JsonProcessingException e) {
-      throw new AppException(e, "credentials.deserialize.failed");
+      throw new AppException(e, CREDENTIALS_DESERIALIZATION_ERROR);
     }
   }
 
