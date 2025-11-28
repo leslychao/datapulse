@@ -21,6 +21,7 @@ import io.datapulse.etl.file.SnapshotFileCleaner;
 import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
+import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
 import io.datapulse.etl.handler.EtlBatchDispatcher;
 import io.datapulse.etl.handler.error.EtlIngestErrorHandler;
 import io.datapulse.marketplaces.dto.Snapshot;
@@ -36,9 +37,7 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.util.CloseableIterator;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.MessageHeaders;
-import org.springframework.messaging.MessagingException;
 
 @Configuration
 @Slf4j
@@ -56,7 +55,7 @@ public class EtlSnapshotIngestionFlowConfig {
 
   @Bean
   public Advice ingestResultAdvice(EtlIngestErrorHandler ingestErrorHandler) {
-    return new AbstractRequestHandlerAdvice() {
+    return new EtlAbstractRequestHandlerAdvice() {
       @Override
       protected Object doInvoke(
           ExecutionCallback callback,
@@ -67,26 +66,6 @@ public class EtlSnapshotIngestionFlowConfig {
           return callback.execute();
         } catch (Exception ex) {
           return ingestErrorHandler.handleIngestError(unwrapProcessingError(ex), message);
-        }
-      }
-
-      private Throwable unwrapProcessingError(Throwable error) {
-        Throwable current = error;
-
-        while (true) {
-          if (current instanceof ThrowableHolderException holder && holder.getCause() != null) {
-            current = holder.getCause();
-            continue;
-          }
-          if (current instanceof MessageHandlingException mhe && mhe.getCause() != null) {
-            current = mhe.getCause();
-            continue;
-          }
-          if (current instanceof MessagingException me && me.getCause() != null) {
-            current = me.getCause();
-            continue;
-          }
-          return current;
         }
       }
     };

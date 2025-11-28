@@ -4,7 +4,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.dto.IngestStatus;
-import io.datapulse.etl.i18n.ExceptionMessageService;
+import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ public class EtlIngestErrorHandler {
   private static final int MAX_ERROR_MESSAGE_LENGTH = 2000;
   private static final String UNKNOWN_SOURCE_ID = "UNKNOWN_SOURCE";
 
-  private final ExceptionMessageService exceptionMessageService;
+  private final I18nMessageService i18nMessageService;
 
   public IngestResult handleIngestError(
       Throwable error,
@@ -32,7 +32,7 @@ public class EtlIngestErrorHandler {
     IngestStatus status = determineStatus(error);
 
     String errorClass = error.getClass().getName();
-    String userErrorMessage = exceptionMessageService.userMessage(error);
+    String userErrorMessage = i18nMessageService.userMessage(error);
     String safeErrorMessage = truncate(userErrorMessage, MAX_ERROR_MESSAGE_LENGTH);
 
     log.warn(

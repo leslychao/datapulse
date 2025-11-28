@@ -1,5 +1,6 @@
-package io.datapulse.etl.i18n;
+package io.datapulse.core.i18n;
 
+import static io.datapulse.domain.MessageCodes.ERROR_REASON;
 import static io.datapulse.domain.MessageCodes.ERROR_UNKNOWN;
 
 import io.datapulse.domain.exception.AppException;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class ExceptionMessageService {
+public class I18nMessageService {
 
   private static final Locale DEFAULT_LOCALE = Locale.forLanguageTag("ru");
 
@@ -26,9 +27,23 @@ public class ExceptionMessageService {
     if (throwable instanceof AppException appException) {
       String key = appException.getMessageKey();
       Object[] args = appException.getArgs();
-      if (hasText(key)) {
-        return message(key, args, target, key);
+
+      String baseMessage = hasText(key)
+          ? message(key, args, target, key)
+          : throwable.toString();
+
+      Throwable cause = appException.getCause();
+      if (cause != null) {
+        String reasonMessage = message(
+            ERROR_REASON,
+            new Object[]{cause.toString()},
+            target,
+            "Причина: " + cause
+        );
+        return baseMessage + ", " + reasonMessage;
       }
+
+      return baseMessage;
     }
 
     return throwable.toString();

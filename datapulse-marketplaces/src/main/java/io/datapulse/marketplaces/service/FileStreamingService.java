@@ -45,9 +45,9 @@ public class FileStreamingService {
       }
 
       throw new AppException(
+          root,
           MessageCodes.DOWNLOAD_FAILED,
-          targetFile,
-          root.toString()
+          targetFile
       );
     }
   }

@@ -1,6 +1,6 @@
 package io.datapulse.rest.advice;
 
-import io.datapulse.domain.MessageCodes;
+import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.domain.exception.AppException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -25,7 +24,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 public class GenericControllerAdvice {
 
   private static final Locale LOCALE_EN = Locale.ENGLISH;
-  private final MessageSource messageSource;
+
+  private final I18nMessageService i18nMessageService;
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleMethodArgNotValid(MethodArgumentNotValidException ex) {
@@ -92,23 +92,19 @@ public class GenericControllerAdvice {
       Locale locale
   ) {
     HttpStatus status = HttpStatus.BAD_REQUEST;
-    String raw = ex.getMostSpecificCause().getMessage();
 
-    String userMessage = messageSource.getMessage(
-        MessageCodes.JSON_PARSE_BODY_INVALID,
-        new Object[]{raw},
-        "Некорректное тело запроса",
-        locale
-    );
+    String msg = i18nMessageService.userMessage(ex.getMostSpecificCause(), locale);
 
-    return ResponseEntity.status(status).body(new ErrorResponse(userMessage));
+    return ResponseEntity.status(status).body(new ErrorResponse(msg));
   }
 
   @ExceptionHandler
   public ResponseEntity<ErrorResponse> handleException(Throwable ex, Locale locale) {
     HttpStatus status = resolveStatus(ex);
-    String message = resolveMessage(ex, locale);
-    String logMessage = resolveMessage(ex, LOCALE_EN);
+
+    String message = i18nMessageService.userMessage(ex, locale);
+    String logMessage = i18nMessageService.userMessage(ex, LOCALE_EN);
+
     log.error(logMessage, ex);
     return ResponseEntity.status(status).body(new ErrorResponse(message));
   }
@@ -118,17 +114,6 @@ public class GenericControllerAdvice {
       return appEx.getStatus();
     }
     return HttpStatus.INTERNAL_SERVER_ERROR;
-  }
-
-  private String resolveMessage(Throwable ex, Locale locale) {
-    if (ex instanceof AppException appEx) {
-      String key = appEx.getMessageKey();
-      Object[] args = appEx.getArgs();
-      if (key != null) {
-        return messageSource.getMessage(key, args, key, locale);
-      }
-    }
-    return ex.getMessage() != null ? ex.getMessage() : ex.toString();
   }
 
   public record ErrorResponse(String message) {

@@ -9,7 +9,7 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
 
 import io.datapulse.domain.SyncStatus;
-import io.datapulse.etl.i18n.ExceptionMessageService;
+import io.datapulse.core.i18n.I18nMessageService;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
 
-  private final ExceptionMessageService exceptionMessageService;
+  private final I18nMessageService i18nMessageService;
 
   @Override
   protected Object doInvoke(ExecutionCallback callback, Object target, Message<?> message) {
@@ -38,7 +38,7 @@ public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
       LocalDate from = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
       LocalDate to = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
 
-      String logMessage = exceptionMessageService.userMessage(ex);
+      String logMessage = i18nMessageService.userMessage(ex);
       log.error(
           "ETL materialization failed: {} requestId={}, event={}, from={}, to={}",
           logMessage,
@@ -50,7 +50,7 @@ public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
       );
 
       String existingError = headers.get(HDR_ETL_ERROR_MESSAGE, String.class);
-      String materializationError = exceptionMessageService.userMessage(ex);
+      String materializationError = i18nMessageService.userMessage(ex);
 
       String combinedError = combineMessages(existingError, materializationError);
 
@@ -76,7 +76,7 @@ public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
     if (hasExisting) {
       return existingError;
     }
-    return exceptionMessageService.userMessage(ETL_MATERIALIZATION_FALLBACK_ERROR);
+    return i18nMessageService.userMessage(ETL_MATERIALIZATION_FALLBACK_ERROR);
   }
 
   private boolean hasText(String value) {
