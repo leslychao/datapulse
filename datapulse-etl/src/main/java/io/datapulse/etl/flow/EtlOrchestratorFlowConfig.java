@@ -1,12 +1,15 @@
 package io.datapulse.etl.flow;
 
 import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
+import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
+import static io.datapulse.etl.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
+import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_RUN_CORE;
-import static io.datapulse.etl.flow.EtlFlowConstants.EXCHANGE_EXECUTION;
-import static io.datapulse.etl.flow.EtlFlowConstants.EXCHANGE_EXECUTION_DLX;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
@@ -16,9 +19,6 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
-import static io.datapulse.etl.flow.EtlFlowConstants.QUEUE_EXECUTION;
-import static io.datapulse.etl.flow.EtlFlowConstants.ROUTING_KEY_EXECUTION;
-import static io.datapulse.etl.flow.EtlFlowConstants.ROUTING_KEY_EXECUTION_WAIT;
 
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.AccountService;
@@ -30,8 +30,10 @@ import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
+import io.datapulse.etl.dto.EtlRunRequest;
 import io.datapulse.etl.dto.EtlSourceExecution;
 import io.datapulse.etl.dto.IngestResult;
+import io.datapulse.etl.dto.OrchestrationBundle;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlMaterializationAdvice;
@@ -45,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,22 +78,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @RequiredArgsConstructor
 public class EtlOrchestratorFlowConfig {
 
+  private static final String HEADER_BURST = "burst";
+
   private final RabbitTemplate etlExecutionRabbitTemplate;
   private final AccountService accountService;
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlMaterializationService materializationService;
   private final EtlSyncAuditService etlSyncAuditService;
-
-  public record EtlRunRequest(
-      Long accountId,
-      String event,
-      LocalDate from,
-      LocalDate to,
-      Integer burst
-  ) {
-
-  }
 
   public record OrchestrationCommand(
       String requestId,
@@ -112,20 +107,6 @@ public class EtlOrchestratorFlowConfig {
   private record RequiredField(
       String name,
       Object value
-  ) {
-
-  }
-
-  public record OrchestrationBundle(
-      String requestId,
-      Long accountId,
-      MarketplaceEvent event,
-      LocalDate dateFrom,
-      LocalDate dateTo,
-      SyncStatus syncStatus,
-      String failedSourceIds,
-      String errorMessage,
-      List<IngestResult> results
   ) {
 
   }
@@ -163,32 +144,35 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .enrichHeaders(enricher -> enricher.headerFunction(
-            "burst",
-            message -> {
-              EtlRunRequest request = (EtlRunRequest) message.getPayload();
-              Integer burst = request.burst();
-              return burst != null && burst > 0 ? burst : 1;
-            }
-        ))
+        .wireTap("CH_ETL_EXECUTION_BURST")
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
-        .wireTap(tap -> tap.handle(
-            OrchestrationCommand.class,
-            (command, headers) -> {
-              Integer burst = headers.get("burst", Integer.class);
-              int times = burst != null && burst > 0 ? burst : 1;
-
-              for (int i = 0; i < times; i++) {
-                etlExecutionRabbitTemplate.convertAndSend(
-                    EXCHANGE_EXECUTION,
-                    ROUTING_KEY_EXECUTION,
-                    command
-                );
-              }
-              return null;
-            }
-        ))
         .transform(OrchestrationCommand.class, this::buildAcceptedResponse)
+        .get();
+  }
+
+  @Bean
+  public IntegrationFlow etlExecutionBurstFlow() {
+    return IntegrationFlow
+        .from("CH_ETL_EXECUTION_BURST")
+        .transform(
+            EtlRunRequest.class,
+            request -> {
+              Integer rawBurst = request.burst();
+              int burst = (rawBurst != null && rawBurst > 0) ? rawBurst : 1;
+
+              return IntStream
+                  .range(0, burst)
+                  .mapToObj(i -> toOrchestrationCommand(request))
+                  .toList();
+            }
+        )
+        .split()
+        .handle(
+            Amqp.outboundAdapter(etlExecutionRabbitTemplate)
+                .exchangeName(EXCHANGE_EXECUTION)
+                .routingKey(ROUTING_KEY_EXECUTION),
+            endpoint -> endpoint.requiresReply(false)
+        )
         .get();
   }
 

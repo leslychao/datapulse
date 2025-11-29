@@ -2,11 +2,11 @@ package io.datapulse.etl.flow.advice;
 
 import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
 
+import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.etl.flow.EtlOrchestratorFlowConfig.OrchestrationBundle;
+import io.datapulse.etl.dto.OrchestrationBundle;
 import io.datapulse.etl.flow.EtlOrchestratorFlowConfig.OrchestrationCommand;
-import io.datapulse.core.i18n.I18nMessageService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
