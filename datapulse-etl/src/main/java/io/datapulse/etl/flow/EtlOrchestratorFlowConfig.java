@@ -260,57 +260,42 @@ public class EtlOrchestratorFlowConfig {
             payload -> (payload instanceof OrchestrationBundle) ? "ERROR" : "OK",
             mapping -> mapping
                 .subFlowMapping("ERROR", sf -> sf
-                    .transform(OrchestrationBundle.class, bundle -> bundle)
                     .channel(CH_ETL_ORCHESTRATION_RESULT)
                 )
                 .subFlowMapping("OK", sf -> sf
-                    .transform(List.class, p -> p)
-                    .enrichHeaders(headers -> headers.headerFunction(
+                    .enrichHeaders(h -> h.headerFunction(
                         HDR_ETL_TOTAL_EXECUTIONS,
                         msg -> {
-                          Object p = msg.getPayload();
-                          if (!(p instanceof List<?> rawPlans)) {
+                          Object payload = msg.getPayload();
+                          if (!(payload instanceof List<?> rawPlans)) {
                             log.warn(
                                 "Unexpected payload type for orchestrator total executions calculation: {}",
-                                p.getClass().getName()
+                                payload.getClass().getName()
                             );
                             return 0;
                           }
-
                           List<MarketplacePlan> plans = rawPlans.stream()
                               .filter(MarketplacePlan.class::isInstance)
                               .map(MarketplacePlan.class::cast)
                               .toList();
-
                           return calculateExpectedSources(plans);
                         }
                     ))
                     .split()
-                    .channel(ch -> ch.executor(etlOrchestrateExecutor))
-                    .enrichHeaders(headers -> headers.headerFunction(
+                    .channel(c -> c.executor(etlOrchestrateExecutor))
+                    .enrichHeaders(h -> h.headerFunction(
                         HDR_ETL_SOURCE_MARKETPLACE,
-                        msg -> {
-                          MarketplacePlan plan = (MarketplacePlan) msg.getPayload();
-                          return plan.marketplace();
-                        }
+                        msg -> ((MarketplacePlan) msg.getPayload()).marketplace()
                     ))
                     .transform(MarketplacePlan.class, MarketplacePlan::executions)
                     .split()
-                    .enrichHeaders(headers -> headers.headerFunction(
+                    .enrichHeaders(h -> h.headerFunction(
                         HDR_ETL_SOURCE_ID,
-                        msg -> {
-                          EtlSourceExecution execution =
-                              (EtlSourceExecution) msg.getPayload();
-                          return execution.sourceId();
-                        }
+                        msg -> ((EtlSourceExecution) msg.getPayload()).sourceId()
                     ))
-                    .enrichHeaders(headers -> headers.headerFunction(
+                    .enrichHeaders(h -> h.headerFunction(
                         HDR_ETL_RAW_TABLE,
-                        msg -> {
-                          EtlSourceExecution execution =
-                              (EtlSourceExecution) msg.getPayload();
-                          return execution.rawTable();
-                        }
+                        msg -> ((EtlSourceExecution) msg.getPayload()).rawTable()
                     ))
                     .handle(
                         EtlSourceExecution.class,
@@ -318,14 +303,11 @@ public class EtlOrchestratorFlowConfig {
                     )
                     .gateway(
                         CH_ETL_INGEST,
-                        gatewaySpec -> gatewaySpec
-                            .requestTimeout(0L)
-                            .replyTimeout(0L)
-                            .requiresReply(true)
+                        g -> g.requestTimeout(0L).replyTimeout(0L).requiresReply(true)
                     )
-                    .aggregate(aggregator -> aggregator
-                        .correlationStrategy(msg ->
-                            msg.getHeaders().get(HDR_ETL_REQUEST_ID, String.class)
+                    .aggregate(a -> a
+                        .correlationStrategy(m ->
+                            m.getHeaders().get(HDR_ETL_REQUEST_ID, String.class)
                         )
                         .releaseStrategy(this::isFullGroup)
                         .expireGroupsUponCompletion(true)
