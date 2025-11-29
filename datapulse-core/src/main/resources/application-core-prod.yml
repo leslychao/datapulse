@@ -1,0 +1,17 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+vault:
+  uri: http://vault.internal:8300
+  token: ${VAULT_TOKEN:}
+
+system-account:
+  enabled: true
+  connections:
+    WILDBERRIES:
+      token: ${WB_SYSTEM_TOKEN:}
+    OZON:
+      client-id: ${OZON_SYSTEM_CLIENT_ID:}
+      api-key: ${OZON_SYSTEM_API_KEY:}

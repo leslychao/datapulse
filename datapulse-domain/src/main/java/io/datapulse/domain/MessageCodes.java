@@ -26,18 +26,6 @@ public final class MessageCodes {
   public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK = "credentials.wb.token.not-blank";
   public static final String CREDENTIALS_OZON_CLIENT_ID_NOT_BLANK = "credentials.ozon.client-id.not-blank";
   public static final String CREDENTIALS_OZON_API_KEY_NOT_BLANK = "credentials.ozon.api-key.not-blank";
-  public static final String CREDENTIALS_SERIALIZATION_ERROR = "credentials.serialization.error";
-  public static final String CREDENTIALS_DESERIALIZATION_ERROR = "credentials.deserialization.error";
-
-  // ===== Crypto =====
-  public static final String CRYPTO_MASTER_KEY_MISSING = "crypto.master-key.missing";
-  public static final String CRYPTO_MASTER_KEY_INVALID_BASE64 = "crypto.master-key.invalid-base64";
-  public static final String CRYPTO_MASTER_KEY_INVALID_LENGTH = "crypto.master-key.invalid-length";
-  public static final String CRYPTO_ENCRYPTION_ERROR = "crypto.encryption.error";
-  public static final String CRYPTO_DECRYPTION_ERROR = "crypto.decryption.error";
-  public static final String CRYPTO_DECRYPTION_INVALID_FORMAT = "crypto.decryption.invalid-format";
-  public static final String CRYPTO_DECRYPTION_UNSUPPORTED_VERSION = "crypto.decryption.unsupported-version";
-  public static final String CRYPTO_DECRYPTION_INVALID_IV_LENGTH = "crypto.decryption.invalid-iv-length";
 
   // ===== Common validation =====
   public static final String SERIALIZATION_ERROR = "serialization.error";

@@ -1,5 +1,6 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.core.tx.TransactionCallbacks.afterRollback;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND;
@@ -8,6 +9,7 @@ import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_RE
 import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
 import static io.datapulse.domain.MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING;
+import static io.datapulse.domain.MessageCodes.DTO_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
 
 import io.datapulse.core.entity.AccountConnectionEntity;
@@ -15,15 +17,18 @@ import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
+import io.datapulse.core.vault.MarketplaceCredentialsVaultService;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.AccountConnectionDto;
+import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -49,16 +54,47 @@ public class AccountConnectionService extends AbstractIngestApiService<
   private final AccountConnectionRepository repository;
   private final AccountService accountService;
   private final AccountConnectionApplier accountConnectionApplier;
+  private final MarketplaceCredentialsVaultService vaultService;
 
   public AccountConnectionService(
       MapperFacade mapperFacade,
       AccountConnectionRepository repository,
       AccountService accountService,
-      AccountConnectionApplier accountConnectionApplier) {
+      AccountConnectionApplier accountConnectionApplier,
+      MarketplaceCredentialsVaultService vaultService) {
     this.mapperFacade = mapperFacade;
     this.repository = repository;
     this.accountService = accountService;
     this.accountConnectionApplier = accountConnectionApplier;
+    this.vaultService = vaultService;
+  }
+
+  private void applyCredentialsToVault(AccountConnectionDto dto) {
+    Long accountId = dto.getAccountId();
+    MarketplaceType marketplace = dto.getMarketplace();
+    MarketplaceCredentials credentials = dto.getCredentials();
+
+    if (accountId == null || marketplace == null || credentials == null) {
+      return;
+    }
+
+    vaultService.saveCredentials(accountId, marketplace, credentials);
+
+    afterRollback(() -> vaultService.deleteCredentials(accountId, marketplace));
+  }
+
+  @Override
+  public AccountConnectionDto save(
+      @Valid @NotNull(message = DTO_REQUIRED) AccountConnectionDto dto) {
+    applyCredentialsToVault(dto);
+    return super.save(dto);
+  }
+
+  @Override
+  public AccountConnectionDto update(
+      @Valid @NotNull(message = DTO_REQUIRED) AccountConnectionDto dto) {
+    applyCredentialsToVault(dto);
+    return super.update(dto);
   }
 
   @Override

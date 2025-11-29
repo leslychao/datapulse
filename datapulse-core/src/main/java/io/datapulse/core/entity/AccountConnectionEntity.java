@@ -31,8 +31,6 @@ public class AccountConnectionEntity extends LongBaseEntity {
   @Enumerated(EnumType.STRING)
   private MarketplaceType marketplace;
 
-  private String credentialsEncrypted;
-
   private Boolean active = true;
 
   private OffsetDateTime lastSyncAt;

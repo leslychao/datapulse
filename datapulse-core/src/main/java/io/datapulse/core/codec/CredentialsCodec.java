@@ -20,26 +20,25 @@ public class CredentialsCodec {
     String mask(MarketplaceCredentials creds);
   }
 
-  private static final int WB_TOKEN_TAIL = 4;
-  private static final int OZON_API_KEY_TAIL = 4;
-  private static final int OZON_CLIENT_ID_TAIL = 3;
+  private static final int HEAD_VISIBLE = 3;
 
-  private static final Map<MarketplaceType, MaskStrategy> MASKERS = new EnumMap<>(
-      MarketplaceType.class);
+  private static final Map<MarketplaceType, MaskStrategy> MASKERS =
+      new EnumMap<>(MarketplaceType.class);
 
   static {
     MASKERS.put(MarketplaceType.WILDBERRIES, creds -> {
       if (!(creds instanceof WbCredentials wb)) {
         return "***";
       }
-      return "WB{token=" + tail(wb.token(), WB_TOKEN_TAIL) + "}";
+      return "WB{token=" + head(wb.token()) + "}";
     });
+
     MASKERS.put(MarketplaceType.OZON, creds -> {
       if (!(creds instanceof OzonCredentials oz)) {
         return "***";
       }
-      return "OZON{apiKey=" + tail(oz.apiKey(), OZON_API_KEY_TAIL)
-          + ", clientId=" + tail(oz.clientId(), OZON_CLIENT_ID_TAIL) + "}";
+      return "OZON{apiKey=" + head(oz.apiKey())
+          + ", clientId=" + head(oz.clientId()) + "}";
     });
   }
 
@@ -49,12 +48,12 @@ public class CredentialsCodec {
         .orElse("***");
   }
 
-  private static String tail(String value, int visibleChars) {
+  private static String head(String value) {
     if (value == null || value.isEmpty()) {
       return "***";
     }
     int len = value.length();
-    int tailLen = Math.min(visibleChars, len);
-    return "***" + value.substring(len - tailLen);
+    int headLen = Math.min(CredentialsCodec.HEAD_VISIBLE, len);
+    return value.substring(0, headLen) + "***";
   }
 }

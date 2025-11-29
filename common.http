@@ -160,6 +160,52 @@ Content-Type: application/json
   });
 %}
 
+### ========================
+### ACCOUNT-CONNECTION — CREATE (OZON) → 201
+### ========================
+# Creates an account-connection for the OZON marketplace.
+# Required:
+#   - accountId: existing account
+#   - marketplace: "OZON"
+#   - credentials.clientId: Ozon seller API Client ID
+#   - credentials.apiKey: Ozon seller API Key
+#   - active: boolean (whether the connection should be active)
+#
+# Response: AccountConnectionResponse with id, marketplace, active, etc.
+POST {{host}}/api/account-connections
+Content-Type: application/json
+
+{
+  "accountId": {{accountId}},
+  "marketplace": "OZON",
+  "credentials": {
+    "clientId": "xxx",
+    "apiKey": "yyy"
+  },
+  "active": true
+}
+
+> {%
+  client.test("AC CREATE OZON: 201", function () {
+    client.assert(response.status === 201, "expected 201, got " + response.status);
+
+    var b = response.body || {};
+    client.global.set("acIdOzon", String(b.id || ""));
+
+    client.assert(b.marketplace === "OZON", "wrong marketplace");
+    client.assert(b.active === true, "active not true");
+  });
+%}
+
+### CLEANUP — DELETE OZON
+DELETE {{host}}/api/account-connections/{{acIdOzon}}
+
+> {%
+  client.test("AC DELETE OZON (moved): 204", function () {
+    client.assert(response.status === 204, "expected 204, got " + response.status);
+  });
+%}
+
 ### AC — UPDATE: change marketplace to FREE (WB → OZON) → 200
 # Меняем тип у существующего WB на OZON, пока другого OZON ещё нет — должно пройти.
 PUT {{host}}/api/account-connections/{{acIdWb}}

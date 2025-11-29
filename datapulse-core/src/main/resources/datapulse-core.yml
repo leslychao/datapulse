@@ -37,10 +37,6 @@ webclient:
   read-timeout-seconds: 30
   write-timeout-seconds: 30
 
-crypto:
-  master-key-base64: ${DATAPULSE_CRYPTO_MASTER_KEY_BASE64}
-  gcm-tag-length-bits: 128
-
 system-account:
   enabled: true
   name: DATAPULSE_SYSTEM
@@ -50,5 +46,9 @@ system-account:
       token: ${WB_SYSTEM_TOKEN}
     OZON:
       active: true
-      client-id: ${OZON_SYSTEM_CLIENT_ID}
-      api-key: ${OZON_SYSTEM_API_KEY}
+      client-id: ${OZON_SYSTEM_CLIENT_ID:}
+      api-key: ${OZON_SYSTEM_API_KEY:}
+
+vault:
+  uri: http://localhost:8300
+  token: ${VAULT_TOKEN:}
