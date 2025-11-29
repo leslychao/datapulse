@@ -36,27 +36,16 @@ public final class MessageCodes {
   public static final String PAGEABLE_REQUIRED = "pageable.required";
   public static final String ID_REQUIRED = "id.required";
   public static final String NOT_FOUND = "not-found";
-  public static final String JSON_PARSE_BODY_INVALID = "json.parse.body.invalid";
-  public static final String URI_REQUIRED = "uri.required";
-  public static final String TYPE_REQUIRED = "type.required";
-  public static final String REQUEST_DATE_REQUIRED = "request.date.required";
-  public static final String REQUEST_DATE_INVALID = "request.date.invalid";
   public static final String DATA_CORRUPTED_ACCOUNT_MISSING = "data.corrupted.account.missing";
-  public static final String DATA_CORRUPTED_CREDENTIALS_MISSING = "data.corrupted.credentials.missing";
   public static final String ERROR_UNKNOWN = "error.unknown";
   public static final String ERROR_REASON = "error.reason";
 
   // ===== Marketplace / HTTP =====
-  public static final String MARKETPLACE_REQUIRED = "marketplace.required";
   public static final String UNKNOWN_MARKETPLACE = "unknown-marketplace";
   public static final String WB_MISSING_TOKEN = "wb.missing-token";
   public static final String OZON_MISSING_CREDENTIALS = "ozon.missing-credentials";
   public static final String MARKETPLACE_CONFIG_MISSING = "marketplace.config.missing";
   public static final String MARKETPLACE_BASE_URL_MISSING = "marketplace.base-url.missing";
-  public static final String MARKETPLACE_FETCH_FAILED = "marketplace.fetch.failed";
-  public static final String MARKETPLACE_PARSE_FAILED = "marketplace.parse.failed";
-  public static final String MARKETPLACE_EVENT_ENDPOINTS_MISSING = "marketplace.event-endpoints.missing";
-  public static final String MARKETPLACE_ENDPOINT_PATH_MISSING = "marketplace.endpoint-path.missing";
 
   // ===== Marketplace / Config binding (Bean Validation) =====
   public static final String MARKETPLACE_ENDPOINTS_REQUIRED =
@@ -88,6 +77,7 @@ public final class MessageCodes {
   public static final String MARKETPLACE_RETRY_POLICY_BULKHEAD_WAIT_REQUIRED =
       "marketplace.retry-policy.bulkhead.wait.required";
 
+  // ===== CONVERSION =====
   public static final String CONVERSION_MAPPING_NOT_FOUND = "conversion.mapping.not.found";
 
   // ===== File download / streaming =====
@@ -101,9 +91,6 @@ public final class MessageCodes {
   public static final String ETL_EVENT_UNKNOWN = "etl.event.unknown";
   public static final String ETL_EVENT_SOURCES_MISSING = "etl.event.sources.missing";
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
-  public static final String ETL_BATCH_HANDLER_DUPLICATE = "etl.batch.handler.duplicate";
-  public static final String ETL_BATCH_HANDLER_NOT_FOUND = "etl.batch.handler.not-found";
-  public static final String ETL_BATCH_HANDLER_TYPE_MISMATCH = "etl.batch.handler.type-mismatch";
   public static final String ETL_MATERIALIZATION_FALLBACK_ERROR = "etl.materialization.error.fallback";
 
 }
