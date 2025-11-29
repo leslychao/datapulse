@@ -1,5 +1,5 @@
-### Run ETL (last 30 days) WAREHOUSE
-POST http://localhost:8080/api/etl/run
+### Run ETL (WAREHOUSE, last 30 days — руками выставляем даты)
+POST {{host}}/api/etl/run
 Content-Type: application/json
 
 {
@@ -11,10 +11,10 @@ Content-Type: application/json
 }
 
 > {%
-  const now  = new Date();
-  const to   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const from = new Date(to.getTime() - 30*24*60*60*1000);
-  function ymd(d){ return d.toISOString().slice(0,10); }
-  client.global.set("from", ymd(from));
-  client.global.set("to",   ymd(to));
+  client.test("ETL WAREHOUSE — run manual dates", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200/202, got " + response.status
+    );
+  });
 %}
