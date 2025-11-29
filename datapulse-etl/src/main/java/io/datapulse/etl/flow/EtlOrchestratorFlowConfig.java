@@ -47,7 +47,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,8 +76,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @Slf4j
 @RequiredArgsConstructor
 public class EtlOrchestratorFlowConfig {
-
-  private static final String HEADER_BURST = "burst";
 
   private final RabbitTemplate etlExecutionRabbitTemplate;
   private final AccountService accountService;
@@ -144,35 +141,16 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .wireTap("CH_ETL_EXECUTION_BURST")
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
+        .wireTap(flow -> flow
+            .handle(
+                Amqp.outboundAdapter(etlExecutionRabbitTemplate)
+                    .exchangeName(EXCHANGE_EXECUTION)
+                    .routingKey(ROUTING_KEY_EXECUTION),
+                endpoint -> endpoint.requiresReply(false)
+            )
+        )
         .transform(OrchestrationCommand.class, this::buildAcceptedResponse)
-        .get();
-  }
-
-  @Bean
-  public IntegrationFlow etlExecutionBurstFlow() {
-    return IntegrationFlow
-        .from("CH_ETL_EXECUTION_BURST")
-        .transform(
-            EtlRunRequest.class,
-            request -> {
-              Integer rawBurst = request.burst();
-              int burst = (rawBurst != null && rawBurst > 0) ? rawBurst : 1;
-
-              return IntStream
-                  .range(0, burst)
-                  .mapToObj(i -> toOrchestrationCommand(request))
-                  .toList();
-            }
-        )
-        .split()
-        .handle(
-            Amqp.outboundAdapter(etlExecutionRabbitTemplate)
-                .exchangeName(EXCHANGE_EXECUTION)
-                .routingKey(ROUTING_KEY_EXECUTION),
-            endpoint -> endpoint.requiresReply(false)
-        )
         .get();
   }
 
