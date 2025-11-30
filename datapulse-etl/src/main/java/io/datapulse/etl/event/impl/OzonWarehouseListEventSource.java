@@ -9,28 +9,28 @@ import io.datapulse.marketplaces.adapter.OzonAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
 import java.time.LocalDate;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
 @Component
+@Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE,
     marketplace = MarketplaceType.OZON,
     rawTableName = RawTableNames.RAW_WAREHOUSE_LIST_OZON
 )
-public final class OzonWarehouseListEventSource implements EventSource {
+public class OzonWarehouseListEventSource implements EventSource {
 
   private final OzonAdapter ozonAdapter;
 
   @Override
-  @NonNull
   public Snapshot<OzonWarehouseListRaw> fetchSnapshot(
       long accountId,
-      @NonNull MarketplaceEvent event,
-      @NonNull LocalDate from,
-      @NonNull LocalDate to
+      MarketplaceEvent event,
+      LocalDate from,
+      LocalDate to
   ) {
     return ozonAdapter.downloadWarehouseList(accountId);
   }

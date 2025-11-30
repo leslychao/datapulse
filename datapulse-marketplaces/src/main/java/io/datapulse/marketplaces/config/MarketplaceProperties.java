@@ -1,13 +1,16 @@
 package io.datapulse.marketplaces.config;
 
-import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
-import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_BASE_URL_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINTS_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_PROVIDERS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_BASEDIR_REQUIRED;
+
+import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
+import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
@@ -35,7 +38,7 @@ public class MarketplaceProperties {
   @Valid
   private Storage storage;
 
-  @NotNull
+  @NotNull(message = MARKETPLACE_PROVIDERS_REQUIRED)
   private final Map<MarketplaceType, @Valid Provider> providers =
       new EnumMap<>(MarketplaceType.class);
 
@@ -51,7 +54,7 @@ public class MarketplaceProperties {
   @Setter
   public static class Storage {
 
-    @NotNull
+    @NotNull(message = MARKETPLACE_STORAGE_BASEDIR_REQUIRED)
     private Path baseDir;
   }
 
@@ -131,7 +134,6 @@ public class MarketplaceProperties {
   @Getter
   @Setter
   public static class RetryPolicyOverride {
-
     private Integer maxAttempts;
     private Duration baseBackoff;
     private Duration maxBackoff;

@@ -4,13 +4,15 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.domain.dto.credentials.OzonCredentials;
 import io.datapulse.domain.dto.credentials.WbCredentials;
-import lombok.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.vault.core.VaultKeyValueOperations;
 import org.springframework.vault.support.VaultResponseSupport;
 
 @Service
-public final class MarketplaceCredentialsVaultServiceImpl implements MarketplaceCredentialsVaultService {
+@Validated
+public class MarketplaceCredentialsVaultServiceImpl implements
+    MarketplaceCredentialsVaultService {
 
   private static final String ROOT_PATH = "datapulse/accounts";
 
@@ -23,8 +25,8 @@ public final class MarketplaceCredentialsVaultServiceImpl implements Marketplace
   @Override
   public void saveCredentials(
       long accountId,
-      @NonNull MarketplaceType marketplace,
-      @NonNull MarketplaceCredentials credentials
+      MarketplaceType marketplace,
+      MarketplaceCredentials credentials
   ) {
     String path = buildPath(accountId, marketplace);
     kv.put(path, credentials);
@@ -33,7 +35,7 @@ public final class MarketplaceCredentialsVaultServiceImpl implements Marketplace
   @Override
   public MarketplaceCredentials loadCredentials(
       long accountId,
-      @NonNull MarketplaceType marketplace
+      MarketplaceType marketplace
   ) {
     String path = buildPath(accountId, marketplace);
 
@@ -49,7 +51,7 @@ public final class MarketplaceCredentialsVaultServiceImpl implements Marketplace
   @Override
   public void deleteCredentials(
       long accountId,
-      @NonNull MarketplaceType marketplace
+      MarketplaceType marketplace
   ) {
     String path = buildPath(accountId, marketplace);
     kv.delete(path);
