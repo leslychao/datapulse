@@ -297,10 +297,6 @@ public class EtlOrchestratorFlowConfig {
                         HDR_ETL_RAW_TABLE,
                         msg -> ((EtlSourceExecution) msg.getPayload()).rawTable()
                     ))
-                    .handle(
-                        EtlSourceExecution.class,
-                        (execution, headers) -> RateLimitHandler.apply(execution)
-                    )
                     .gateway(
                         CH_ETL_INGEST,
                         g -> g.requestTimeout(0L).replyTimeout(0L).requiresReply(true)
