@@ -56,20 +56,10 @@ public abstract class AccountConnectionMapper {
 
   protected String maskCredentials(AccountConnectionDto dto) {
     MarketplaceType marketplace = dto.getMarketplace();
-    if (marketplace == null) {
-      return null;
-    }
-
     MarketplaceCredentials credentials = dto.getCredentials();
-    if (credentials == null) {
-      Long accountId = dto.getAccountId();
-      if (accountId == null) {
-        return null;
-      }
-      credentials = vaultService.loadCredentials(accountId, marketplace);
-      if (credentials == null) {
-        return null;
-      }
+
+    if (marketplace == null || credentials == null) {
+      return null;
     }
 
     return credentialsCodec.mask(marketplace, credentials);
