@@ -1,5 +1,6 @@
 package io.datapulse.core.service;
 
+import static io.datapulse.core.tx.TransactionCallbacks.afterCommit;
 import static io.datapulse.core.tx.TransactionCallbacks.afterRollback;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS;
@@ -213,10 +214,18 @@ public class AccountConnectionService extends AbstractIngestApiService<
   @Override
   @Transactional
   public void delete(@NotNull(message = ID_REQUIRED) Long id) {
-    if (!repository.existsById(id)) {
-      throw new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id);
+    AccountConnectionEntity connection = repository.findById(id)
+        .orElseThrow(() -> new NotFoundException(ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
+
+    AccountEntity account = connection.getAccount();
+    MarketplaceType marketplace = connection.getMarketplace();
+
+    repository.delete(connection);
+
+    if (account != null && marketplace != null) {
+      long accountId = account.getId();
+      afterCommit(() -> vaultService.deleteCredentials(accountId, marketplace));
     }
-    repository.deleteById(id);
   }
 
   private void validateAccountExists(Long accountId) {
