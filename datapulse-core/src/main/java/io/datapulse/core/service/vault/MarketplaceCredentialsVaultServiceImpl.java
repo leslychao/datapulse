@@ -1,4 +1,4 @@
-package io.datapulse.core.vault;
+package io.datapulse.core.service.vault;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;

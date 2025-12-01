@@ -2,7 +2,7 @@ package io.datapulse.core.mapper;
 
 import io.datapulse.core.codec.CredentialsCodec;
 import io.datapulse.core.entity.AccountConnectionEntity;
-import io.datapulse.core.vault.MarketplaceCredentialsVaultService;
+import io.datapulse.core.service.vault.MarketplaceCredentialsVaultService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;

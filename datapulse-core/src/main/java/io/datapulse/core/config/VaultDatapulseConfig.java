@@ -1,4 +1,4 @@
-package io.datapulse.core.vault;
+package io.datapulse.core.config;
 
 import java.net.URI;
 import org.springframework.beans.factory.annotation.Value;

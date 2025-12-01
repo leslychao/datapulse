@@ -17,7 +17,7 @@ import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
-import io.datapulse.core.vault.MarketplaceCredentialsVaultService;
+import io.datapulse.core.service.vault.MarketplaceCredentialsVaultService;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.AccountConnectionDto;

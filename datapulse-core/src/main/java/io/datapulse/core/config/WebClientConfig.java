@@ -1,4 +1,4 @@
-package io.datapulse.core.client.config;
+package io.datapulse.core.config;
 
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
