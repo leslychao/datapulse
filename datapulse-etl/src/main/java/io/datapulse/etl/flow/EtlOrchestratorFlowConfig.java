@@ -22,12 +22,10 @@ import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
 import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 
 import io.datapulse.core.service.AccountConnectionService;
-import io.datapulse.core.service.AccountService;
 import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.SyncStatus;
-import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
@@ -42,13 +40,10 @@ import io.datapulse.etl.flow.advice.EtlOrchestratorPlansAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import io.micrometer.common.util.StringUtils;
 import java.time.LocalDate;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -64,7 +59,6 @@ import org.springframework.integration.amqp.dsl.Amqp;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.PublishSubscribeChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.dsl.Pollers;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.integration.store.MessageGroup;
@@ -80,32 +74,15 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 public class EtlOrchestratorFlowConfig {
 
   private final RabbitTemplate etlExecutionRabbitTemplate;
-  private final AccountService accountService;
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlMaterializationService materializationService;
   private final EtlSyncAuditService etlSyncAuditService;
-
-  public record OrchestrationCommand(
-      String requestId,
-      Long accountId,
-      MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
-  ) {
-
-  }
+  private final EtlOrchestrationCommandFactory orchestrationCommandFactory;
 
   private record MarketplacePlan(
       MarketplaceType marketplace,
       List<EtlSourceExecution> executions
-  ) {
-
-  }
-
-  private record RequiredField(
-      String name,
-      Object value
   ) {
 
   }
@@ -143,7 +120,7 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .transform(EtlRunRequest.class, this::toOrchestrationCommand)
+        .transform(EtlRunRequest.class, orchestrationCommandFactory::toCommand)
         .wireTap(flow -> flow
             .handle(
                 Amqp.outboundAdapter(etlExecutionRabbitTemplate)
@@ -153,23 +130,6 @@ public class EtlOrchestratorFlowConfig {
             )
         )
         .transform(OrchestrationCommand.class, this::buildAcceptedResponse)
-        .get();
-  }
-
-  @Bean
-  public IntegrationFlow etlScheduledRunFlow() {
-    return IntegrationFlow
-        .fromSupplier(
-            this::buildScheduledRunRequests,
-            spec -> spec.poller(Pollers.cron("0 0 * * * *"))
-        )
-        .split()
-        .transform(EtlRunRequest.class, this::toOrchestrationCommand)
-        .handle(
-            Amqp.outboundAdapter(etlExecutionRabbitTemplate)
-                .exchangeName(EXCHANGE_EXECUTION)
-                .routingKey(ROUTING_KEY_EXECUTION)
-        )
         .get();
   }
 
@@ -594,77 +554,13 @@ public class EtlOrchestratorFlowConfig {
   }
 
   private Map<String, Object> buildAcceptedResponse(OrchestrationCommand command) {
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("status", "accepted");
-    body.put("requestId", command.requestId());
-    body.put("event", command.event().name());
-    body.put("from", command.from());
-    body.put("to", command.to());
-    return body;
-  }
-
-  private OrchestrationCommand toOrchestrationCommand(EtlRunRequest request) {
-    validateRunRequest(request);
-
-    MarketplaceEvent event = MarketplaceEvent.fromString(request.event());
-    if (event == null) {
-      throw new AppException(
-          MessageCodes.ETL_REQUEST_INVALID,
-          "event=" + request.event()
-      );
-    }
-
-    String requestId = UUID.randomUUID().toString();
-
-    return new OrchestrationCommand(
-        requestId,
-        request.accountId(),
-        event,
-        request.from(),
-        request.to()
+    return Map.of(
+        "status", "accepted",
+        "requestId", command.requestId(),
+        "event", command.event().name(),
+        "from", command.from(),
+        "to", command.to()
     );
-  }
-
-  private List<EtlRunRequest> buildScheduledRunRequests() {
-    LocalDate yesterday = LocalDate.now().minusDays(1);
-    LocalDate today = LocalDate.now();
-
-    return accountService.streamActive()
-        .map(AccountDto::getId)
-        .map(accountId -> new EtlRunRequest(
-            accountId,
-            MarketplaceEvent.SALES_FACT.name(),
-            yesterday,
-            today,
-            1
-        ))
-        .toList();
-  }
-
-  private void validateRunRequest(EtlRunRequest request) {
-    List<String> missingFields = Stream.of(
-            new RequiredField("accountId", request.accountId()),
-            new RequiredField("event", request.event()),
-            new RequiredField("from", request.from()),
-            new RequiredField("to", request.to())
-        )
-        .filter(field -> field.value() == null)
-        .map(RequiredField::name)
-        .toList();
-
-    if (!missingFields.isEmpty()) {
-      throw new AppException(
-          MessageCodes.ETL_REQUEST_INVALID,
-          String.join(", ", missingFields)
-      );
-    }
-
-    if (request.from().isAfter(request.to())) {
-      throw new AppException(
-          MessageCodes.ETL_REQUEST_INVALID,
-          "'from' must be <= 'to'"
-      );
-    }
   }
 
   private List<MarketplacePlan> buildMarketplacePlans(OrchestrationCommand command) {

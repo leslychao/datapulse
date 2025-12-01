@@ -6,7 +6,7 @@ import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.dto.OrchestrationBundle;
-import io.datapulse.etl.flow.EtlOrchestratorFlowConfig.OrchestrationCommand;
+import io.datapulse.etl.flow.OrchestrationCommand;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
