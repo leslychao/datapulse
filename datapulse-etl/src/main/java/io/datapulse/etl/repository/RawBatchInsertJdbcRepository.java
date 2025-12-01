@@ -22,6 +22,7 @@ public class RawBatchInsertJdbcRepository {
 
   private final JdbcTemplate jdbcTemplate;
   private final ObjectMapper objectMapper;
+  private final RawTableSchemaRepository rawTableSchemaRepository;
 
   public <T> void saveBatch(
       List<T> batch,
@@ -34,6 +35,8 @@ public class RawBatchInsertJdbcRepository {
     if (batch.isEmpty()) {
       return;
     }
+
+    rawTableSchemaRepository.ensureTableExists(tableName);
 
     String sql = INSERT_SQL_TEMPLATE.formatted(tableName);
 
