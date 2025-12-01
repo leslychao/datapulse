@@ -11,8 +11,10 @@ import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseListRaw;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
 @Component
+@Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE,

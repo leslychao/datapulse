@@ -8,6 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.NonNull;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,8 +21,8 @@ public final class EtlSourceRegistry {
     Map<Key, List<RegisteredSource>> tmp = new LinkedHashMap<>();
 
     for (EventSource source : sources) {
-      Class<?> type = source.getClass();
-      EtlSourceMeta meta = type.getAnnotation(EtlSourceMeta.class);
+      Class<?> targetClass = AopUtils.getTargetClass(source);
+      EtlSourceMeta meta = AnnotationUtils.findAnnotation(targetClass, EtlSourceMeta.class);
       if (meta == null) {
         continue;
       }
@@ -31,7 +33,7 @@ public final class EtlSourceRegistry {
               meta.event(),
               meta.marketplace(),
               meta.order(),
-              type.getSimpleName(),
+              targetClass.getSimpleName(),
               source,
               meta.rawTableName()
           ));
@@ -60,13 +62,11 @@ public final class EtlSourceRegistry {
       EventSource source,
       String rawTable
   ) {
-
   }
 
   private record Key(
       MarketplaceEvent event,
       MarketplaceType marketplace
   ) {
-
   }
 }
