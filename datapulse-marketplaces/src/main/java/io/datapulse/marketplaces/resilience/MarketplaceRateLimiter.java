@@ -72,7 +72,6 @@ public class MarketplaceRateLimiter {
       );
     }
 
-
     long periodNanos = period.toNanos();
     long intervalNanos = Math.max(1L, periodNanos / (long) limit);
 
@@ -99,12 +98,20 @@ public class MarketplaceRateLimiter {
         int retryAfterSeconds =
             (int) Math.max(1L, Math.ceil(waitNanos / (double) NANOS_IN_SECOND));
 
+        String message =
+            "Rate limit exceeded. " +
+                "marketplace=%s, endpoint=%s, group=%s, retryAfterSeconds=%s"
+                    .formatted(
+                        marketplace.name(),
+                        endpoint.name(),
+                        groupName,
+                        retryAfterSeconds
+                    );
         throw new TooManyRequestsBackoffRequiredException(
             marketplace,
             endpoint,
             retryAfterSeconds,
-            "Rate limit exceeded for %s:%s (%s)".formatted(
-                marketplace.name(), endpoint.name(), groupName)
+            message
         );
       }
 
