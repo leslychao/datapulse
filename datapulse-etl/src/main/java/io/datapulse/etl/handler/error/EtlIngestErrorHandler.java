@@ -34,6 +34,7 @@ public class EtlIngestErrorHandler {
     String errorClass = error.getClass().getName();
     String userErrorMessage = i18nMessageService.userMessage(error);
     String safeErrorMessage = truncate(userErrorMessage, MAX_ERROR_MESSAGE_LENGTH);
+    Integer retryAfterSeconds = resolveRetryAfterSeconds(error);
 
     log.warn(
         "ETL ingest failed: sourceId={}, status={}, errorClass={}, errorMessage={}",
@@ -56,7 +57,8 @@ public class EtlIngestErrorHandler {
         sourceId,
         status,
         errorClass,
-        safeErrorMessage
+        safeErrorMessage,
+        retryAfterSeconds
     );
   }
 
@@ -86,6 +88,22 @@ public class EtlIngestErrorHandler {
     }
 
     return false;
+  }
+
+  private Integer resolveRetryAfterSeconds(Throwable error) {
+    if (error instanceof TooManyRequestsBackoffRequiredException tooManyRequests) {
+      return tooManyRequests.getRetryAfterSeconds();
+    }
+
+    Throwable current = error.getCause();
+    while (current != null) {
+      if (current instanceof TooManyRequestsBackoffRequiredException tooManyRequests) {
+        return tooManyRequests.getRetryAfterSeconds();
+      }
+      current = current.getCause();
+    }
+
+    return null;
   }
 
   private String truncate(String value, int maxLength) {

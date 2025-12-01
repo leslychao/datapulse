@@ -47,7 +47,8 @@ public class EtlOrchestratorPlansAdvice extends EtlAbstractRequestHandlerAdvice 
             SyncStatus.ERROR,
             "orchestrator",
             errorMessage,
-            List.of()
+            List.of(),
+            null
         );
       }
       throw new AppException(ETL_REQUEST_INVALID, "Unexpected payload type in plans advice");

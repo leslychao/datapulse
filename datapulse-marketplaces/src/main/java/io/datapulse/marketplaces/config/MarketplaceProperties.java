@@ -1,5 +1,7 @@
 package io.datapulse.marketplaces.config;
 
+import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
+import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_BASE_URL_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_PROVIDERS_REQUIRED;
@@ -9,21 +11,21 @@ import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_BA
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_BASEDIR_REQUIRED;
 
-import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
-import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
-
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
@@ -66,6 +68,9 @@ public class MarketplaceProperties {
     @NotNull(message = MARKETPLACE_ENDPOINTS_REQUIRED)
     private final Map<EndpointKey, @Valid EndpointConfig> endpoints =
         new EnumMap<>(EndpointKey.class);
+
+    @Valid
+    private RateLimit rateLimit;
 
     @Valid
     @NotNull(message = MARKETPLACE_RETRY_POLICY_REQUIRED)
@@ -115,6 +120,16 @@ public class MarketplaceProperties {
     private String url;
 
     private RetryPolicyOverride retryPolicyOverride;
+
+    private String rateLimitGroup;
+  }
+
+  @Getter
+  @Setter
+  public static class RateLimit {
+
+    @Valid
+    private final Map<String, RateLimitConfig> groups = new HashMap<>();
   }
 
   @Getter
@@ -134,8 +149,16 @@ public class MarketplaceProperties {
   @Getter
   @Setter
   public static class RetryPolicyOverride {
+
     private Integer maxAttempts;
     private Duration baseBackoff;
     private Duration maxBackoff;
+  }
+
+  public static record RateLimitConfig(
+      @NotNull @Min(1) Integer limit,
+      @NotNull @DurationMin(millis = 1) Duration period
+  ) {
+
   }
 }

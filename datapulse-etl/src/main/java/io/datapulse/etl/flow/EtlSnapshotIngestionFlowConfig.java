@@ -116,6 +116,7 @@ public class EtlSnapshotIngestionFlowConfig {
                   sourceId,
                   IngestStatus.SUCCESS,
                   null,
+                  null,
                   null
               );
             }

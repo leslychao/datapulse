@@ -6,6 +6,7 @@ import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
 import static io.datapulse.etl.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
 import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
 import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
+import static io.datapulse.etl.config.EtlExecutionRabbitConfig.DEFAULT_WAIT_TTL_MILLIS;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
@@ -52,6 +53,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -375,6 +377,13 @@ public class EtlOrchestratorFlowConfig {
     boolean hasError = results.stream().anyMatch(IngestResult::isError);
     boolean hasWait = results.stream().anyMatch(IngestResult::isWait);
 
+    Integer retryAfterSeconds = results.stream()
+        .filter(IngestResult::isWait)
+        .map(IngestResult::retryAfterSeconds)
+        .filter(Objects::nonNull)
+        .max(Integer::compareTo)
+        .orElse(null);
+
     List<String> failedSourceIds = results.stream()
         .filter(result -> result.isError() || result.isWait())
         .map(IngestResult::sourceId)
@@ -415,9 +424,23 @@ public class EtlOrchestratorFlowConfig {
         syncStatus,
         failedSourceIdsValue,
         errorMessageValue,
-        results
+        results,
+        retryAfterSeconds
     );
   }
+
+  private String resolveWaitTtlMillis(OrchestrationBundle bundle) {
+    Integer retryAfter = bundle.retryAfterSeconds();
+
+    long waitSeconds = (retryAfter != null)
+        ? Math.max(1L, retryAfter.longValue())
+        : Math.max(1L, DEFAULT_WAIT_TTL_MILLIS / 1_000L);
+
+    long ttlMillis = waitSeconds * 1_000L;
+
+    return Long.toString(ttlMillis);
+  }
+
 
   @Bean
   public IntegrationFlow etlOrchestratorWaitRetryFlow() {
@@ -426,6 +449,12 @@ public class EtlOrchestratorFlowConfig {
         .filter(
             OrchestrationBundle.class,
             bundle -> bundle.syncStatus() == SyncStatus.WAIT
+        )
+        .enrichHeaders(enricher -> enricher
+            .headerFunction(
+                AmqpHeaders.EXPIRATION,
+                message -> resolveWaitTtlMillis((OrchestrationBundle) message.getPayload())
+            )
         )
         .transform(
             OrchestrationBundle.class,

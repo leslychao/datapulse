@@ -1,9 +1,9 @@
 package io.datapulse.marketplaces.service;
 
 import io.datapulse.core.client.HttpStreamingClient;
-import io.datapulse.marketplaces.service.FileStreamingService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
+import io.datapulse.marketplaces.resilience.MarketplaceRateLimiter;
 import io.datapulse.marketplaces.resilience.MarketplaceRetryService;
 import java.net.URI;
 import java.nio.file.Path;
@@ -22,10 +22,12 @@ public class MarketplaceStreamingDownloadService {
   private final HttpStreamingClient httpStreamingClient;
   private final FileStreamingService fileStreamingService;
   private final MarketplaceRetryService retryService;
+  private final MarketplaceRateLimiter rateLimiter;
 
   public Path download(
       MarketplaceType marketplace,
       EndpointKey endpoint,
+      long accountId,
       HttpMethod method,
       URI uri,
       HttpHeaders headers,
@@ -35,13 +37,19 @@ public class MarketplaceStreamingDownloadService {
     Flux<DataBuffer> source;
 
     if (method == HttpMethod.GET) {
-      source = httpStreamingClient.getAsDataBufferFlux(uri, headers);
+      source = Flux.defer(() -> {
+        rateLimiter.ensurePermit(marketplace, endpoint, accountId);
+        return httpStreamingClient.getAsDataBufferFlux(uri, headers);
+      });
     } else if (method == HttpMethod.POST) {
-      source = httpStreamingClient.postAsDataBufferFlux(
-          uri,
-          headers,
-          body != null ? body : Map.of()
-      );
+      source = Flux.defer(() -> {
+        rateLimiter.ensurePermit(marketplace, endpoint, accountId);
+        return httpStreamingClient.postAsDataBufferFlux(
+            uri,
+            headers,
+            body != null ? body : Map.of()
+        );
+      });
     } else {
       throw new IllegalArgumentException("Unsupported HTTP method: " + method);
     }

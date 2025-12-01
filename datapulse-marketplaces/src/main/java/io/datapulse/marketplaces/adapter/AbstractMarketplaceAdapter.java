@@ -105,6 +105,7 @@ public abstract class AbstractMarketplaceAdapter {
       Path resultPath = downloader.download(
           marketplaceType,
           endpointKey,
+          accountId,
           method,
           uri,
           headers,

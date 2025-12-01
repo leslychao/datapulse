@@ -4,7 +4,8 @@ public record IngestResult(
     String sourceId,
     IngestStatus status,
     String errorClass,
-    String errorMessage
+    String errorMessage,
+    Integer retryAfterSeconds
 ) {
 
   public boolean isSuccess() {

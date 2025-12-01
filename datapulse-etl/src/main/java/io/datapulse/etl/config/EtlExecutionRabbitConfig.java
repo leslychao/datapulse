@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class EtlExecutionRabbitConfig {
 
-  private static final int WAIT_TTL_MILLIS = 300_000;
+  public static final int DEFAULT_WAIT_TTL_MILLIS = 300_000;
 
   @Bean
   public DirectExchange etlExecutionExchange() {
@@ -58,8 +58,7 @@ public class EtlExecutionRabbitConfig {
         false,
         Map.of(
             "x-dead-letter-exchange", EXCHANGE_EXECUTION,
-            "x-dead-letter-routing-key", ROUTING_KEY_EXECUTION,
-            "x-message-ttl", WAIT_TTL_MILLIS
+            "x-dead-letter-routing-key", ROUTING_KEY_EXECUTION
         )
     );
   }

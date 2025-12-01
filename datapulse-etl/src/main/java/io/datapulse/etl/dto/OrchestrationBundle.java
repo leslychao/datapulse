@@ -14,7 +14,8 @@ public record OrchestrationBundle(
     SyncStatus syncStatus,
     String failedSourceIds,
     String errorMessage,
-    List<IngestResult> results
+    List<IngestResult> results,
+    Integer retryAfterSeconds
 ) {
 
 }
