@@ -12,8 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class EtlMaterializationServiceImpl implements EtlMaterializationService {
 
-  private final SalesFactMaterializationService salesFactMaterializationService;
-
   @Override
   @Transactional
   public void materialize(
@@ -44,12 +42,6 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
     );
 
     switch (event) {
-      case SALES_FACT -> salesFactMaterializationService.materialize(
-          accountId,
-          from,
-          to,
-          requestId
-      );
       default -> log.info(
           "No materialization configured for event={}, requestId={}, accountId={}",
           event,
