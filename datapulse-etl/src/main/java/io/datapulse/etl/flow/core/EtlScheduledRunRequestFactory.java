@@ -1,4 +1,4 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.flow.core;
 
 import io.datapulse.core.service.AccountService;
 import io.datapulse.domain.dto.AccountDto;

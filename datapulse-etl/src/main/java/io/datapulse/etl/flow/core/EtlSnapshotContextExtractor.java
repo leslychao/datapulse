@@ -1,13 +1,13 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.flow.core;
 
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_RAW_TABLE;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_PROCESS_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EVENT;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_RAW_TABLE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_PROCESS_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.dto.EtlSnapshotContext;

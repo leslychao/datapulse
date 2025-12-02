@@ -1,12 +1,12 @@
 package io.datapulse.etl.flow.advice;
 
 import static io.datapulse.domain.MessageCodes.ETL_MATERIALIZATION_FALLBACK_ERROR;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_FROM;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_DATE_TO;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_ERROR_MESSAGE;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_EVENT;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_REQUEST_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_DATE_FROM;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_DATE_TO;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_ERROR_MESSAGE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EVENT;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
 
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.core.i18n.I18nMessageService;

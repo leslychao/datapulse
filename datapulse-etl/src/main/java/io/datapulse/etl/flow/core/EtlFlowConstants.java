@@ -1,4 +1,4 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.flow.core;
 
 public final class EtlFlowConstants {
 

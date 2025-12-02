@@ -1,4 +1,4 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.dto;
 
 import io.datapulse.etl.MarketplaceEvent;
 import java.time.LocalDate;

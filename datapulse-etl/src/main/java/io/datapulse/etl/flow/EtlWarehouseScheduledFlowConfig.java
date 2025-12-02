@@ -5,6 +5,8 @@ import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;
+import io.datapulse.etl.flow.core.EtlOrchestrationCommandFactory;
+import io.datapulse.etl.flow.core.EtlScheduledRunRequestFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.annotation.Bean;

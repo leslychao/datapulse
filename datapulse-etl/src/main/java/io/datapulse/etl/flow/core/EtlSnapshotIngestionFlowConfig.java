@@ -1,14 +1,14 @@
-package io.datapulse.etl.flow;
+package io.datapulse.etl.flow.core;
 
 import static io.datapulse.domain.MessageCodes.DOWNLOAD_FAILED;
 import static io.datapulse.domain.MessageCodes.ETL_CONTEXT_MISSING;
-import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST;
-import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_INGEST_CORE;
-import static io.datapulse.etl.flow.EtlFlowConstants.CH_ETL_SNAPSHOT_READY;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_FETCHED_DATA;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_PROCESS_ID;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST_CORE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_SNAPSHOT_READY;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_FETCHED_DATA;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_PROCESS_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;

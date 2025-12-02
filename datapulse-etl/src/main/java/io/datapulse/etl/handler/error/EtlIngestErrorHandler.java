@@ -1,6 +1,6 @@
 package io.datapulse.etl.handler.error;
 
-import static io.datapulse.etl.flow.EtlFlowConstants.HDR_ETL_SOURCE_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.dto.IngestStatus;
