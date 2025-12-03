@@ -1,104 +1,116 @@
 package io.datapulse.etl.file.locator;
 
+import java.util.Arrays;
+
 public final class JsonArrayLocators {
+
+  private static final String[] EMPTY_PATH = new String[0];
 
   private JsonArrayLocators() {
   }
 
   public static JsonArrayLocator rootArray() {
-    return reader -> {
-      try {
-        reader.beginArray();
-      } catch (Exception ex) {
-        throw new IllegalStateException("Expected JSON array at root", ex);
-      }
-    };
+    return arrayAtPath(EMPTY_PATH);
   }
 
-  public static JsonArrayLocator resultDataArray() {
+  public static JsonArrayLocator arrayAtPath(String path) {
+    return arrayAtPath(normalize(path));
+  }
+
+  public static JsonArrayLocator arrayAtPath(String... pathSegments) {
+    final String[] path = normalize(pathSegments);
+    final String pathDescription = describePath(path);
+
     return reader -> {
       try {
+        if (path.length == 0) {
+          reader.beginArray();
+          return;
+        }
+
         reader.beginObject();
-        while (reader.hasNext()) {
-          if (reader.nextName().equals("result")) {
-            reader.beginObject();
-            while (reader.hasNext()) {
-              if ("data".equals(reader.nextName())) {
-                reader.beginArray();
-                return;
-              }
+
+        for (int i = 0; i < path.length; i++) {
+          final String current = path[i];
+          boolean found = false;
+
+          while (reader.hasNext()) {
+            final String name = reader.nextName();
+            if (!current.equals(name)) {
               reader.skipValue();
+              continue;
             }
-            throw new IllegalStateException("Field 'data' not found inside 'result'");
-          } else {
-            reader.skipValue();
+
+            if (i == path.length - 1) {
+              reader.beginArray();
+              return;
+            }
+
+            reader.beginObject();
+            found = true;
+            break;
+          }
+
+          if (!found) {
+            throw missingFieldException(current, pathDescription);
           }
         }
-        throw new IllegalStateException("Field 'result' not found at root");
+
+        throw unexpectedEndOfPathException(pathDescription);
       } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on result.data[]", ex);
+        throw navigationFailedException(pathDescription, ex);
       }
     };
   }
 
-  public static JsonArrayLocator clustersArray() {
-    return reader -> {
-      try {
-        reader.beginObject();
-        while (reader.hasNext()) {
-          String name = reader.nextName();
-          if ("clusters".equals(name)) {
-            reader.beginArray();
-            return;
-          } else {
-            reader.skipValue();
-          }
-        }
-        throw new IllegalStateException("Field 'items' not found at root");
-      } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on items[]", ex);
-      }
-    };
+  private static String[] normalize(String... pathSegments) {
+    if (pathSegments == null || pathSegments.length == 0) {
+      return EMPTY_PATH;
+    }
+
+    String[] normalized = Arrays.stream(pathSegments)
+        .filter(segment -> segment != null && !segment.isBlank())
+        .map(String::trim)
+        .toArray(String[]::new);
+
+    return normalized.length == 0 ? EMPTY_PATH : normalized;
   }
 
-
-  public static JsonArrayLocator itemsArray() {
-    return reader -> {
-      try {
-        reader.beginObject();
-        while (reader.hasNext()) {
-          String name = reader.nextName();
-          if ("items".equals(name)) {
-            reader.beginArray();
-            return;
-          } else {
-            reader.skipValue();
-          }
-        }
-        throw new IllegalStateException("Field 'items' not found at root");
-      } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on items[]", ex);
-      }
-    };
+  private static String[] normalize(String path) {
+    if (path == null || path.isBlank()) {
+      return EMPTY_PATH;
+    }
+    return normalize(path.split("\\."));
   }
 
-  public static JsonArrayLocator resultArray() {
-    return reader -> {
-      try {
-        reader.beginObject();
-        while (reader.hasNext()) {
-          String name = reader.nextName();
-          if ("result".equals(name)) {
-            reader.beginArray();
-            return;
-          } else {
-            reader.skipValue();
-          }
-        }
-        throw new IllegalStateException("Field 'items' not found at root");
-      } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on items[]", ex);
-      }
-    };
+  private static String describePath(String[] path) {
+    if (path == null || path.length == 0) {
+      return "<root-array>";
+    }
+    return String.join(".", path);
+  }
+
+  private static IllegalStateException missingFieldException(
+      String field, String pathDescription
+  ) {
+    return new IllegalStateException(
+        String.format("Field '%s' not found while navigating '%s'", field, pathDescription)
+    );
+  }
+
+  private static IllegalStateException unexpectedEndOfPathException(String pathDescription) {
+    return new IllegalStateException(
+        String.format("Unexpected end of path '%s'", pathDescription)
+    );
+  }
+
+  private static IllegalStateException navigationFailedException(
+      String pathDescription,
+      Exception cause
+  ) {
+    return new IllegalStateException(
+        String.format("Failed to position JSON reader on path '%s'[]", pathDescription),
+        cause
+    );
   }
 }

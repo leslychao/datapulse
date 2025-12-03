@@ -14,9 +14,9 @@ public final class SnapshotJsonLayoutRegistry {
   private final Map<Class<?>, JsonArrayLocator> locators = new ConcurrentHashMap<>();
 
   public SnapshotJsonLayoutRegistry() {
-    register(OzonWarehouseListRaw.class, JsonArrayLocators.resultArray());
-    register(WbWarehouseListRaw.class, JsonArrayLocators.rootArray());
-    register(OzonLogisticClustersRaw.class, JsonArrayLocators.clustersArray());
+    register(OzonWarehouseListRaw.class, JsonArrayLocators.arrayAtPath("result"));
+    register(WbWarehouseListRaw.class, JsonArrayLocators.arrayAtPath());
+    register(OzonLogisticClustersRaw.class, JsonArrayLocators.arrayAtPath("clusters"));
   }
 
   public void register(
@@ -27,6 +27,6 @@ public final class SnapshotJsonLayoutRegistry {
   }
 
   public JsonArrayLocator resolve(@NonNull Class<?> rawType) {
-    return locators.getOrDefault(rawType, JsonArrayLocators.rootArray());
+    return locators.getOrDefault(rawType, JsonArrayLocators.arrayAtPath());
   }
 }
