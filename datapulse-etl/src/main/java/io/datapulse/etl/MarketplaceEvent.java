@@ -8,9 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public enum MarketplaceEvent {
 
-  SALES_FACT,
-  WAREHOUSE,
-  REF_SYNC_WB_TARIFFS;
+  WAREHOUSE_DICT;
 
   public String tag() {
     return name().toLowerCase();

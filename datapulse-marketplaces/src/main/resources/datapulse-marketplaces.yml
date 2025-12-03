@@ -11,29 +11,29 @@ marketplace:
           WB_ANALYTICS:
             limit: 90
             period: 60s
-          WB_WAREHOUSES:
+          WB_WAREHOUSES_FBW:
             limit: 2
             period: 20s
+          WB_WAREHOUSES_FBS:
+            limit: 300
+            period: 60s
       endpoints:
-        WB_TARIFF_COMMISSION:
-          url: https://suppliers-api.wildberries.ru/api/v1/tariffs/commission
-          rateLimitGroup: WB_TARIFFS
-        WB_TARIFF_BOX:
-          url: https://suppliers-api.wildberries.ru/api/v1/tariffs/box
-          rateLimitGroup: WB_TARIFFS
-        WB_TARIFF_MONOPALLET:
-          url: https://suppliers-api.wildberries.ru/api/v1/tariffs/monopallet
-          rateLimitGroup: WB_TARIFFS
-        DICT_WB_WAREHOUSES:
+        DICT_WB_WAREHOUSES_FBW:
           url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
-          rateLimitGroup: WB_WAREHOUSES
+          rateLimitGroup: WB_WAREHOUSES_FBW
+        DICT_WB_OFFICES_FBS:
+          url: https://marketplace-api-sandbox.wildberries.ru/api/v3/offices
+          rateLimitGroup: WB_WAREHOUSES_FBS
+        DICT_WB_WAREHOUSES_SELLER:
+          url: https://marketplace-api-sandbox.wildberries.ru/api/v3/warehouses
+          rateLimitGroup: WB_WAREHOUSES_FBS
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
         maxBackoff: 30s
     OZON:
       endpoints:
-        DICT_OZON_WAREHOUSES:
+        DICT_OZON_WAREHOUSES_FBS:
           url: https://api-seller.ozon.ru/v1/warehouse/list
         DICT_OZON_CLUSTERS:
           url: https://api-seller.ozon.ru/v1/cluster/list

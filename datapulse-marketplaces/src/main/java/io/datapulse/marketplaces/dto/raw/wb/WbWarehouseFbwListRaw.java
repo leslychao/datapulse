@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class WbWarehouseListRaw {
+public class WbWarehouseFbwListRaw {
 
   @SerializedName("ID")
   private long id;

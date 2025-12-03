@@ -2,7 +2,7 @@ package io.datapulse.marketplaces.dto.raw.ozon;
 
 import java.util.List;
 
-public record OzonWarehouseListRaw(
+public record OzonWarehouseFbsListRaw(
     boolean has_entrusted_acceptance,
     boolean is_rfbs,
     String name,

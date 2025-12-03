@@ -27,7 +27,7 @@ public class EtlWarehouseScheduledFlowConfig {
   public IntegrationFlow etlWarehouseScheduledRunFlow() {
     return IntegrationFlow
         .fromSupplier(
-            () -> etlScheduledRunRequestFactory.buildDailyRunRequests(MarketplaceEvent.WAREHOUSE),
+            () -> etlScheduledRunRequestFactory.buildDailyRunRequests(MarketplaceEvent.WAREHOUSE_DICT),
             spec -> spec.poller(Pollers.cron("0 0 * * * *"))
         )
         .split()

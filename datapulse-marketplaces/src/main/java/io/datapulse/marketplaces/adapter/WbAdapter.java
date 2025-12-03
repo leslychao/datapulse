@@ -3,7 +3,9 @@ package io.datapulse.marketplaces.adapter;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseListRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbOfficeFbsListRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseFbwListRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseSellerListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
@@ -28,11 +30,27 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
     );
   }
 
-  public Snapshot<WbWarehouseListRaw> downloadWarehouseList(long accountId) {
+  public Snapshot<WbWarehouseFbwListRaw> downloadFbwWarehouses(long accountId) {
     return doGet(
         accountId,
-        EndpointKey.DICT_WB_WAREHOUSES,
-        WbWarehouseListRaw.class
+        EndpointKey.DICT_WB_WAREHOUSES_FBW,
+        WbWarehouseFbwListRaw.class
+    );
+  }
+
+  public Snapshot<WbOfficeFbsListRaw> downloadFbsOffices(long accountId) {
+    return doGet(
+        accountId,
+        EndpointKey.DICT_WB_OFFICES_FBS,
+        WbOfficeFbsListRaw.class
+    );
+  }
+
+  public Snapshot<WbWarehouseSellerListRaw> downloadSellerWarehouses(long accountId) {
+    return doGet(
+        accountId,
+        EndpointKey.DICT_WB_WAREHOUSES_SELLER,
+        WbWarehouseSellerListRaw.class
     );
   }
 }

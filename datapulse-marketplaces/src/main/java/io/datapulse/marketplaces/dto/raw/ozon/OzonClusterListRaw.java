@@ -2,7 +2,7 @@ package io.datapulse.marketplaces.dto.raw.ozon;
 
 import java.util.List;
 
-public record OzonLogisticClustersRaw(
+public record OzonClusterListRaw(
     long id,
     String name,
     String type,

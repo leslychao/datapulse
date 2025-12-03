@@ -5,9 +5,9 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
-import io.datapulse.marketplaces.adapter.OzonAdapter;
+import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseSellerListRaw;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,21 +17,21 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    event = MarketplaceEvent.WAREHOUSE,
-    marketplace = MarketplaceType.OZON,
-    rawTableName = RawTableNames.RAW_WAREHOUSE_LIST_OZON
+    event = MarketplaceEvent.WAREHOUSE_DICT,
+    marketplace = MarketplaceType.WILDBERRIES,
+    rawTableName = RawTableNames.RAW_WB_WAREHOUSES_SELLER
 )
-public class OzonWarehouseListEventSource implements EventSource {
+public class WbWarehouseSellerEventSource implements EventSource {
 
-  private final OzonAdapter ozonAdapter;
+  private final WbAdapter wbAdapter;
 
   @Override
-  public Snapshot<OzonWarehouseListRaw> fetchSnapshot(
+  public Snapshot<WbWarehouseSellerListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
       LocalDate from,
       LocalDate to
   ) {
-    return ozonAdapter.downloadWarehouseList(accountId);
+    return wbAdapter.downloadSellerWarehouses(accountId);
   }
 }

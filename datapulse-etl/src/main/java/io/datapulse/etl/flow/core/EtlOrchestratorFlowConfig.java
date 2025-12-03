@@ -269,6 +269,8 @@ public class EtlOrchestratorFlowConfig {
                             m.getHeaders().get(HDR_ETL_REQUEST_ID, String.class)
                         )
                         .releaseStrategy(this::isFullGroup)
+                        .groupTimeout(5_000L)
+                        .sendPartialResultOnExpiry(true)
                         .expireGroupsUponCompletion(true)
                         .outputProcessor(this::buildBundle)
                     )

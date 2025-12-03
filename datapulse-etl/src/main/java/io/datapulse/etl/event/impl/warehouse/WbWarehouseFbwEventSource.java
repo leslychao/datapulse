@@ -5,9 +5,9 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
-import io.datapulse.marketplaces.adapter.OzonAdapter;
+import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonClusterListRaw;
+import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseFbwListRaw;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,20 +18,20 @@ import org.springframework.validation.annotation.Validated;
 @RequiredArgsConstructor
 @EtlSourceMeta(
     event = MarketplaceEvent.WAREHOUSE_DICT,
-    marketplace = MarketplaceType.OZON,
-    rawTableName = RawTableNames.RAW_OZON_WAREHOUSES_FBO
+    marketplace = MarketplaceType.WILDBERRIES,
+    rawTableName = RawTableNames.RAW_WB_WAREHOUSES_FBW
 )
-public class OzonClustersEventSource implements EventSource {
+public class WbWarehouseFbwEventSource implements EventSource {
 
-  private final OzonAdapter ozonAdapter;
+  private final WbAdapter wbAdapter;
 
   @Override
-  public Snapshot<OzonClusterListRaw> fetchSnapshot(
+  public Snapshot<WbWarehouseFbwListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
       LocalDate from,
       LocalDate to
   ) {
-    return ozonAdapter.downloadFboWarehouses(accountId);
+    return wbAdapter.downloadFbwWarehouses(accountId);
   }
 }

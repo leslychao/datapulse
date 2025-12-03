@@ -4,7 +4,7 @@ Content-Type: application/json
 
 {
   "accountId": 1,
-  "event": "WAREHOUSE",
+  "event": "WAREHOUSE_DICT",
   "from": "2025-10-22",
   "to": "2025-11-22",
   "burst": 1

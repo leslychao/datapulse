@@ -3,8 +3,8 @@ package io.datapulse.marketplaces.adapter;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonLogisticClustersRaw;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonClusterListRaw;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseFbsListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
@@ -30,25 +30,23 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
     );
   }
 
-  public Snapshot<OzonWarehouseListRaw> downloadWarehouseList(long accountId) {
+  public Snapshot<OzonWarehouseFbsListRaw> downloadFbsWarehouses(long accountId) {
+    Map<String, Object> body = Map.of("limit", 100);
     return doPost(
         accountId,
-        EndpointKey.DICT_OZON_WAREHOUSES,
-        Map.of(
-            "limit", 100
-        ),
-        OzonWarehouseListRaw.class
+        EndpointKey.DICT_OZON_WAREHOUSES_FBS,
+        body,
+        OzonWarehouseFbsListRaw.class
     );
   }
 
-  public Snapshot<OzonLogisticClustersRaw> downloadClusters(long accountId) {
+  public Snapshot<OzonClusterListRaw> downloadFboWarehouses(long accountId) {
+    Map<String, Object> body = Map.of("cluster_type", "CLUSTER_TYPE_OZON");
     return doPost(
         accountId,
         EndpointKey.DICT_OZON_CLUSTERS,
-        Map.of(
-            "cluster_type", "CLUSTER_TYPE_OZON"
-        ),
-        OzonLogisticClustersRaw.class
+        body,
+        OzonClusterListRaw.class
     );
   }
 }
