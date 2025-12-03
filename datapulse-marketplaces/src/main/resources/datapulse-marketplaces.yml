@@ -12,8 +12,8 @@ marketplace:
             limit: 90
             period: 60s
           WB_WAREHOUSES:
-            limit: 1
-            period: 10s
+            limit: 2
+            period: 20s
       endpoints:
         WB_TARIFF_COMMISSION:
           url: https://suppliers-api.wildberries.ru/api/v1/tariffs/commission
