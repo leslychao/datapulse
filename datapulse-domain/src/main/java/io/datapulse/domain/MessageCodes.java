@@ -107,6 +107,7 @@ public final class MessageCodes {
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
   public static final String ETL_MATERIALIZATION_FALLBACK_ERROR =
       "etl.materialization.error.fallback";
+  public static final String ETL_NO_INGEST_RESULTS = "etl.no.ingest.results";
 
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";

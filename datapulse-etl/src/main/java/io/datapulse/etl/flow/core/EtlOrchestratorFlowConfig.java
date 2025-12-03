@@ -15,12 +15,13 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_DATE_FROM;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_DATE_TO;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EVENT;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_SOURCE_IDS;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_RAW_TABLE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_TOTAL_EXECUTIONS;
 
+import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceType;
@@ -41,10 +42,15 @@ import io.datapulse.etl.flow.advice.EtlOrchestratorPlansAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import io.micrometer.common.util.StringUtils;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -80,6 +86,7 @@ public class EtlOrchestratorFlowConfig {
   private final EtlMaterializationService materializationService;
   private final EtlSyncAuditService etlSyncAuditService;
   private final EtlOrchestrationCommandFactory orchestrationCommandFactory;
+  private final I18nMessageService i18nMessageService;
 
   private record MarketplacePlan(
       MarketplaceType marketplace,
@@ -227,21 +234,11 @@ public class EtlOrchestratorFlowConfig {
                 )
                 .subFlowMapping("OK", sf -> sf
                     .enrichHeaders(h -> h.headerFunction(
-                        HDR_ETL_TOTAL_EXECUTIONS,
-                        msg -> {
-                          Object payload = msg.getPayload();
-                          if (!(payload instanceof List<?> rawPlans)) {
-                            log.warn(
-                                "Unexpected payload type for orchestrator total executions calculation: {}",
-                                payload.getClass().getName()
-                            );
-                            return 0;
-                          }
-                          List<MarketplacePlan> plans = rawPlans.stream()
-                              .filter(MarketplacePlan.class::isInstance)
-                              .map(MarketplacePlan.class::cast)
-                              .toList();
-                          return calculateExpectedSources(plans);
+                        HDR_ETL_EXPECTED_SOURCE_IDS,
+                        message -> {
+                          List<MarketplacePlan> plans = castMarketplacePlans(message.getPayload());
+                          List<String> expectedSourceIds = calculateExpectedSourceIds(plans);
+                          return expectedSourceIds.toArray(String[]::new);
                         }
                     ))
                     .split()
@@ -288,14 +285,11 @@ public class EtlOrchestratorFlowConfig {
     }
 
     MessageHeaders headers = sampleMessage.getHeaders();
-    Integer expected = headers.get(HDR_ETL_TOTAL_EXECUTIONS, Integer.class);
-    if (expected == null) {
-      log.warn(
-          "Orchestrator aggregate has no '{}' header, releasing immediately",
-          HDR_ETL_TOTAL_EXECUTIONS
-      );
-      return true;
-    }
+    String[] expectedSourceIdsArray =
+        Optional.ofNullable(headers.get(HDR_ETL_EXPECTED_SOURCE_IDS, String[].class))
+            .orElseGet(() -> new String[0]);
+    List<String> expectedSourceIds = List.of(expectedSourceIdsArray);
+    int expected = Optional.of(expectedSourceIds).map(List::size).orElse(0);
 
     int currentSize = group.size();
     if (currentSize >= expected) {
@@ -326,11 +320,17 @@ public class EtlOrchestratorFlowConfig {
         ? sample.getHeaders()
         : new MessageHeaders(Map.of());
 
-    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
+    String requestId = Optional.ofNullable(headers.get(HDR_ETL_REQUEST_ID, String.class))
+        .orElseGet(
+            () -> Optional.ofNullable(group.getGroupId()).map(Object::toString).orElse(null));
     Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
     String eventValue = headers.get(HDR_ETL_EVENT, String.class);
     LocalDate dateFrom = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
     LocalDate dateTo = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
+    String[] expectedSourceIdsArray = Optional.ofNullable(
+        headers.get(HDR_ETL_EXPECTED_SOURCE_IDS, String[].class)
+    ).orElseGet(() -> new String[0]);
+    List<String> expectedSourceIds = List.of(expectedSourceIdsArray);
 
     MarketplaceEvent event = MarketplaceEvent.fromString(eventValue);
     if (event == null) {
@@ -340,6 +340,16 @@ public class EtlOrchestratorFlowConfig {
     boolean hasError = results.stream().anyMatch(IngestResult::isError);
     boolean hasWait = results.stream().anyMatch(IngestResult::isWait);
 
+    Set<String> ingestSourceIds = results.stream()
+        .map(IngestResult::sourceId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+
+    List<String> missingSourceIds = expectedSourceIds.stream()
+        .filter(Objects::nonNull)
+        .filter(id -> !ingestSourceIds.contains(id))
+        .toList();
+
     Integer retryAfterSeconds = results.stream()
         .filter(IngestResult::isWait)
         .map(IngestResult::retryAfterSeconds)
@@ -347,14 +357,18 @@ public class EtlOrchestratorFlowConfig {
         .max(Integer::compareTo)
         .orElse(null);
 
-    List<String> failedSourceIds = results.stream()
+    Set<String> failedSourceIds = results.stream()
         .filter(result -> result.isError() || result.isWait())
         .map(IngestResult::sourceId)
-        .distinct()
-        .toList();
+        .filter(Objects::nonNull)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+
+    failedSourceIds.addAll(missingSourceIds);
 
     SyncStatus syncStatus;
-    if (hasError) {
+    boolean hasMissingSources = !missingSourceIds.isEmpty();
+
+    if (hasError || hasMissingSources) {
       syncStatus = SyncStatus.ERROR;
     } else if (hasWait) {
       syncStatus = SyncStatus.WAIT;
@@ -364,7 +378,7 @@ public class EtlOrchestratorFlowConfig {
 
     String failedSourceIdsValue = String.join(",", failedSourceIds);
 
-    List<String> errorMessages = results.stream()
+    List<String> errorMessages = new ArrayList<>(results.stream()
         .filter(result -> result.isError() || result.isWait())
         .map(result -> {
           String errorMessage = result.errorMessage();
@@ -374,9 +388,23 @@ public class EtlOrchestratorFlowConfig {
           return "unknown error";
         })
         .distinct()
+        .toList());
+
+    if (hasMissingSources) {
+      String ids = String.join(",", missingSourceIds);
+      String message = i18nMessageService.userMessage(
+          MessageCodes.ETL_NO_INGEST_RESULTS,
+          ids
+      );
+      errorMessages.add(message);
+    }
+
+    List<String> distinctErrorMessages = errorMessages.stream()
+        .filter(StringUtils::isNotBlank)
+        .distinct()
         .toList();
 
-    String errorMessageValue = String.join("; ", errorMessages);
+    String errorMessageValue = String.join("; ", distinctErrorMessages);
 
     return new OrchestrationBundle(
         requestId,
@@ -619,9 +647,25 @@ public class EtlOrchestratorFlowConfig {
     return new MarketplacePlan(marketplace, executions);
   }
 
-  private int calculateExpectedSources(List<MarketplacePlan> plans) {
+  private List<MarketplacePlan> castMarketplacePlans(Object payload) {
+    if (!(payload instanceof List<?> rawPlans)) {
+      log.warn(
+          "Unexpected payload type for orchestrator plans calculation: {}",
+          payload != null ? payload.getClass().getName() : "null"
+      );
+      return List.of();
+    }
+
+    return rawPlans.stream()
+        .filter(MarketplacePlan.class::isInstance)
+        .map(MarketplacePlan.class::cast)
+        .toList();
+  }
+
+  private List<String> calculateExpectedSourceIds(List<MarketplacePlan> plans) {
     return plans.stream()
-        .mapToInt(plan -> plan.executions().size())
-        .sum();
+        .flatMap(plan -> plan.executions().stream())
+        .map(EtlSourceExecution::sourceId)
+        .toList();
   }
 }

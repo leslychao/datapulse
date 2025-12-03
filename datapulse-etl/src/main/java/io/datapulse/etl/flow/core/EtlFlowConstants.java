@@ -22,7 +22,7 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_SNAPSHOT_FILE = "ETL_SNAPSHOT_FILE";
   public static final String HDR_ETL_FETCHED_DATA = "ETL_FETCHED_DATA";
   public static final String HDR_ETL_PROCESS_ID = "ETL_PROCESS_ID";
-  public static final String HDR_ETL_TOTAL_EXECUTIONS = "ETL_TOTAL_EXECUTIONS";
+  public static final String HDR_ETL_EXPECTED_SOURCE_IDS = "ETL_EXPECTED_SOURCE_IDS";
   public static final String HDR_ETL_SYNC_STATUS = "ETL_SYNC_STATUS";
   public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
   public static final String HDR_ETL_RAW_TABLE = "ETL_RAW_TABLE";
