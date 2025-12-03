@@ -37,7 +37,6 @@ import io.datapulse.etl.dto.OrchestrationBundle;
 import io.datapulse.etl.dto.OrchestrationCommand;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
-import io.datapulse.etl.flow.advice.EtlMaterializationAdvice;
 import io.datapulse.etl.flow.advice.EtlOrchestratorPlansAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import io.micrometer.common.util.StringUtils;
@@ -83,7 +82,6 @@ public class EtlOrchestratorFlowConfig {
   private final RabbitTemplate etlExecutionRabbitTemplate;
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
-  private final EtlMaterializationService materializationService;
   private final EtlSyncAuditService etlSyncAuditService;
   private final EtlOrchestrationCommandFactory orchestrationCommandFactory;
   private final I18nMessageService i18nMessageService;
@@ -464,44 +462,6 @@ public class EtlOrchestratorFlowConfig {
             endpoint -> endpoint.requiresReply(false)
         )
         .get();
-  }
-
-  @Bean
-  public IntegrationFlow etlOrchestratorMaterializationFlow(
-      EtlMaterializationAdvice etlMaterializationAdvice
-  ) {
-    return IntegrationFlow
-        .from(CH_ETL_ORCHESTRATION_RESULT)
-        .filter(
-            OrchestrationBundle.class,
-            bundle -> bundle.syncStatus() == SyncStatus.SUCCESS
-        )
-        .handle(
-            OrchestrationBundle.class,
-            (bundle, headers) -> {
-              log.info(
-                  "ETL orchestration completed successfully; starting materialization: requestId={}, event={}, from={}, to={}",
-                  bundle.requestId(),
-                  bundle.event(),
-                  bundle.dateFrom(),
-                  bundle.dateTo()
-              );
-
-              materializationService.materialize(
-                  bundle.accountId(),
-                  bundle.event(),
-                  bundle.dateFrom(),
-                  bundle.dateTo(),
-                  bundle.requestId()
-              );
-
-              return bundle;
-            },
-            endpoint -> endpoint
-                .requiresReply(false)
-                .advice(etlMaterializationAdvice)
-        )
-        .nullChannel();
   }
 
   @Bean
