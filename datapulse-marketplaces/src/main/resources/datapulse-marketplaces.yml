@@ -35,6 +35,8 @@ marketplace:
       endpoints:
         DICT_OZON_WAREHOUSES:
           url: https://api-seller.ozon.ru/v1/warehouse/list
+        DICT_OZON_CLUSTERS:
+          url: https://api-seller.ozon.ru/v1/cluster/list
       retryPolicy:
         maxAttempts: 4
         baseBackoff: 300ms

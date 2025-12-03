@@ -6,6 +6,7 @@ public final class RawTableNames {
   }
 
   public static final String RAW_WAREHOUSE_LIST_OZON = "raw_warehouse_list_ozon";
+  public static final String RAW_CLUSTERS_OZON = "raw_clusters_ozon";
 
   public static final String RAW_WAREHOUSE_LIST_WB = "raw_warehouse_list_wb";
 }

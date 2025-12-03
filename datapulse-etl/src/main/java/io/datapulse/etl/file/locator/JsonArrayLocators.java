@@ -41,6 +41,27 @@ public final class JsonArrayLocators {
     };
   }
 
+  public static JsonArrayLocator clustersArray() {
+    return reader -> {
+      try {
+        reader.beginObject();
+        while (reader.hasNext()) {
+          String name = reader.nextName();
+          if ("clusters".equals(name)) {
+            reader.beginArray();
+            return;
+          } else {
+            reader.skipValue();
+          }
+        }
+        throw new IllegalStateException("Field 'items' not found at root");
+      } catch (Exception ex) {
+        throw new IllegalStateException("Failed to position JSON reader on items[]", ex);
+      }
+    };
+  }
+
+
   public static JsonArrayLocator itemsArray() {
     return reader -> {
       try {

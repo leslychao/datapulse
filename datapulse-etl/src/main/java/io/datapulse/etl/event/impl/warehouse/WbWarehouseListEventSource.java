@@ -1,4 +1,4 @@
-package io.datapulse.etl.event.impl;
+package io.datapulse.etl.event.impl.warehouse;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;

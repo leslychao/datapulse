@@ -3,6 +3,7 @@ package io.datapulse.marketplaces.adapter;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
+import io.datapulse.marketplaces.dto.raw.ozon.OzonLogisticClustersRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
@@ -37,6 +38,17 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
             "limit", 100
         ),
         OzonWarehouseListRaw.class
+    );
+  }
+
+  public Snapshot<OzonLogisticClustersRaw> downloadClusters(long accountId) {
+    return doPost(
+        accountId,
+        EndpointKey.DICT_OZON_CLUSTERS,
+        Map.of(
+            "cluster_type", "CLUSTER_TYPE_OZON"
+        ),
+        OzonLogisticClustersRaw.class
     );
   }
 }

@@ -1,5 +1,6 @@
 package io.datapulse.etl.file.locator;
 
+import io.datapulse.marketplaces.dto.raw.ozon.OzonLogisticClustersRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
 import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseListRaw;
 import java.util.Map;
@@ -15,6 +16,7 @@ public final class SnapshotJsonLayoutRegistry {
   public SnapshotJsonLayoutRegistry() {
     register(OzonWarehouseListRaw.class, JsonArrayLocators.resultArray());
     register(WbWarehouseListRaw.class, JsonArrayLocators.rootArray());
+    register(OzonLogisticClustersRaw.class, JsonArrayLocators.clustersArray());
   }
 
   public void register(
