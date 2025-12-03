@@ -1,83 +1,87 @@
 package io.datapulse.etl.file.locator;
 
+import java.util.Arrays;
+
 public final class JsonArrayLocators {
 
   private JsonArrayLocators() {
   }
 
-  public static JsonArrayLocator rootArray() {
-    return reader -> {
-      try {
-        reader.beginArray();
-      } catch (Exception ex) {
-        throw new IllegalStateException("Expected JSON array at root", ex);
-      }
-    };
-  }
+  public static JsonArrayLocator arrayAtPath(String... pathSegments) {
+    String[] path = normalize(pathSegments);
+    String pathDescription = describePath(path);
 
-  public static JsonArrayLocator resultDataArray() {
     return reader -> {
       try {
+        if (path.length == 0) {
+          reader.beginArray();
+          return;
+        }
+
         reader.beginObject();
-        while (reader.hasNext()) {
-          if (reader.nextName().equals("result")) {
-            reader.beginObject();
-            while (reader.hasNext()) {
-              if ("data".equals(reader.nextName())) {
+
+        for (int i = 0; i < path.length; i++) {
+          String current = path[i];
+          boolean found = false;
+
+          while (reader.hasNext()) {
+            String name = reader.nextName();
+            if (current.equals(name)) {
+              if (i == path.length - 1) {
                 reader.beginArray();
                 return;
               }
-              reader.skipValue();
+
+              reader.beginObject();
+              found = true;
+              break;
             }
-            throw new IllegalStateException("Field 'data' not found inside 'result'");
-          } else {
+
             reader.skipValue();
           }
+
+          if (!found) {
+            throw new IllegalStateException(
+                String.format("Field '%s' not found while navigating '%s'", current, pathDescription));
+          }
         }
-        throw new IllegalStateException("Field 'result' not found at root");
+
+        throw new IllegalStateException(String.format("Unexpected end of path '%s'", pathDescription));
       } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on result.data[]", ex);
+        throw new IllegalStateException(
+            String.format("Failed to position JSON reader on path '%s'[]", pathDescription), ex);
       }
     };
   }
 
-  public static JsonArrayLocator itemsArray() {
-    return reader -> {
-      try {
-        reader.beginObject();
-        while (reader.hasNext()) {
-          String name = reader.nextName();
-          if ("items".equals(name)) {
-            reader.beginArray();
-            return;
-          } else {
-            reader.skipValue();
-          }
-        }
-        throw new IllegalStateException("Field 'items' not found at root");
-      } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on items[]", ex);
-      }
-    };
+  public static JsonArrayLocator arrayAtPath(String path) {
+    return arrayAtPath(normalize(path));
   }
 
-  public static JsonArrayLocator resultArray() {
-    return reader -> {
-      try {
-        reader.beginObject();
-        while (reader.hasNext()) {
-          String name = reader.nextName();
-          if ("result".equals(name)) {
-            reader.beginArray();
-            return;
-          } else {
-            reader.skipValue();
-          }
-        }
-        throw new IllegalStateException("Field 'items' not found at root");
-      } catch (Exception ex) {
-        throw new IllegalStateException("Failed to position JSON reader on items[]", ex);
-      }
-    };
+  private static String[] normalize(String... pathSegments) {
+    if (pathSegments == null || pathSegments.length == 0) {
+      return new String[0];
+    }
+
+    return Arrays.stream(pathSegments)
+        .filter(segment -> segment != null && !segment.isBlank())
+        .map(String::trim)
+        .toArray(String[]::new);
+  }
+
+  private static String[] normalize(String path) {
+    if (path == null || path.isBlank()) {
+      return new String[0];
+    }
+
+    return normalize(path.split("\\."));
+  }
+
+  private static String describePath(String[] path) {
+    if (path == null || path.length == 0) {
+      return "<root-array>";
+    }
+
+    return String.join(".", path);
   }
 }
