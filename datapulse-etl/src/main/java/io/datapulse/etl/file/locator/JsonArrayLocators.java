@@ -9,10 +9,6 @@ public final class JsonArrayLocators {
   private JsonArrayLocators() {
   }
 
-  public static JsonArrayLocator rootArray() {
-    return arrayAtPath(EMPTY_PATH);
-  }
-
   public static JsonArrayLocator arrayAtPath(String path) {
     return arrayAtPath(normalize(path));
   }
