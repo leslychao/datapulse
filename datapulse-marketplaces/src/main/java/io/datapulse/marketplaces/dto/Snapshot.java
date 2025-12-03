@@ -9,7 +9,22 @@ public record Snapshot<R>(
     Path file,
     long sizeBytes,
     URI sourceUri,
-    HttpMethod httpMethod
+    HttpMethod httpMethod,
+    boolean empty
 ) {
+
+  public static <R> Snapshot<R> of(
+      Class<R> elementType,
+      Path file,
+      long sizeBytes,
+      URI sourceUri,
+      HttpMethod httpMethod
+  ) {
+    return new Snapshot<>(elementType, file, sizeBytes, sourceUri, httpMethod, false);
+  }
+
+  public static <R> Snapshot<R> empty(Class<R> elementType) {
+    return new Snapshot<>(elementType, null, 0, null, null, true);
+  }
 
 }

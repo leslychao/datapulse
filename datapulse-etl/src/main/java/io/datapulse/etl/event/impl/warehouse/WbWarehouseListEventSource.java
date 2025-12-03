@@ -5,6 +5,7 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
+import io.datapulse.etl.event.util.SnapshotJsonArrayInspector;
 import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseListRaw;
@@ -24,6 +25,7 @@ import org.springframework.validation.annotation.Validated;
 public class WbWarehouseListEventSource implements EventSource {
 
   private final WbAdapter wbAdapter;
+  private final SnapshotJsonArrayInspector snapshotJsonArrayInspector;
 
   @Override
   public Snapshot<WbWarehouseListRaw> fetchSnapshot(
@@ -32,6 +34,17 @@ public class WbWarehouseListEventSource implements EventSource {
       LocalDate from,
       LocalDate to
   ) {
-    return wbAdapter.downloadWarehouseList(accountId);
+    Snapshot<WbWarehouseListRaw> snapshot = wbAdapter.downloadWarehouseList(accountId);
+
+    if (snapshot.empty()) {
+      return snapshot;
+    }
+
+    if (snapshotJsonArrayInspector.isArrayEmpty(snapshot.file())) {
+      return Snapshot.empty(WbWarehouseListRaw.class);
+    }
+
+    return snapshot;
   }
+
 }

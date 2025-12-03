@@ -113,14 +113,36 @@ public abstract class AbstractMarketplaceAdapter {
           target
       );
 
+      if (resultPath == null || !Files.exists(resultPath)) {
+        log.info(
+            "Snapshot download returned no data: marketplace={}, accountId={}, endpoint={}, uri={}",
+            marketplaceType,
+            accountId,
+            endpointKey,
+            uri
+        );
+        return Snapshot.empty(elementType);
+      }
+
       long size = Files.size(resultPath);
+
+      if (size == 0) {
+        log.info(
+            "Snapshot download completed with empty body: marketplace={}, accountId={}, endpoint={}, path={}",
+            marketplaceType,
+            accountId,
+            endpointKey,
+            resultPath
+        );
+        return Snapshot.empty(elementType);
+      }
 
       log.info(
           "Snapshot download completed: marketplace={}, accountId={}, endpoint={}, path={}, sizeBytes={}",
           marketplaceType, accountId, endpointKey, resultPath, size
       );
 
-      return new Snapshot<>(elementType, resultPath, size, uri, method);
+      return Snapshot.of(elementType, resultPath, size, uri, method);
 
     } catch (IOException ex) {
       log.error(

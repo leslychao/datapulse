@@ -5,6 +5,7 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
+import io.datapulse.etl.event.util.SnapshotJsonArrayInspector;
 import io.datapulse.marketplaces.adapter.OzonAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseListRaw;
@@ -24,6 +25,7 @@ import org.springframework.validation.annotation.Validated;
 public class OzonWarehouseListEventSource implements EventSource {
 
   private final OzonAdapter ozonAdapter;
+  private final SnapshotJsonArrayInspector snapshotJsonArrayInspector;
 
   @Override
   public Snapshot<OzonWarehouseListRaw> fetchSnapshot(
@@ -32,6 +34,17 @@ public class OzonWarehouseListEventSource implements EventSource {
       LocalDate from,
       LocalDate to
   ) {
-    return ozonAdapter.downloadWarehouseList(accountId);
+    Snapshot<OzonWarehouseListRaw> snapshot = ozonAdapter.downloadWarehouseList(accountId);
+
+    if (snapshot.empty()) {
+      return snapshot;
+    }
+
+    if (snapshotJsonArrayInspector.isArrayEmpty(snapshot.file(), "result")) {
+      return Snapshot.empty(OzonWarehouseListRaw.class);
+    }
+
+    return snapshot;
   }
+
 }
