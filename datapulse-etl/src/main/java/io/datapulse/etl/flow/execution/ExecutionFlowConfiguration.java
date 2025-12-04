@@ -29,7 +29,7 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.MessageChannels;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.scheduling.concurrent.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 @Configuration
 public class ExecutionFlowConfiguration {
@@ -51,7 +51,7 @@ public class ExecutionFlowConfiguration {
   @Bean(name = CH_EXECUTION_INBOUND)
   public MessageChannel executionInboundChannel() {
     return MessageChannels.executor(new SimpleAsyncTaskExecutor("execution-inbound-"))
-        .get();
+        .getObject();
   }
 
   @Bean(name = CH_EXECUTION_CORE)
@@ -102,7 +102,12 @@ public class ExecutionFlowConfiguration {
             mapping -> mapping
                 .subFlowMapping("WAIT", sf -> sf
                     .enrichHeaders(headers -> headers
-                        .header(HDR_RETRY_AFTER, m -> ((ExecutionOutcome) m.getPayload()).retryAfterSecondsOptional().orElse(null))
+                        .headerFunction(
+                            HDR_RETRY_AFTER,
+                            message -> ((ExecutionOutcome) message.getPayload())
+                                .retryAfterSecondsOptional()
+                                .orElse(null)
+                        )
                         .headerFunction(
                             EXPIRATION,
                             message -> computeTtl((ExecutionOutcome) message.getPayload())
