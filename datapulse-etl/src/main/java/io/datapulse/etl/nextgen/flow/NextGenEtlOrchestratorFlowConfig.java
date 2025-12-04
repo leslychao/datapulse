@@ -43,7 +43,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.dsl.IntegrationFlows;
 import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.dsl.amqp.Amqp;
 import org.springframework.messaging.Message;
@@ -139,7 +138,7 @@ public class NextGenEtlOrchestratorFlowConfig {
 
   @Bean
   public IntegrationFlow nextGenOrchestratorFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_ORCHESTRATE)
         .handle(EventCommand.class, (command, headers) -> {
           eventLifecycleService.start(command.eventId());
@@ -159,21 +158,19 @@ public class NextGenEtlOrchestratorFlowConfig {
             .headerFunction(NextGenEtlHeaders.HDR_MARKETPLACE, message -> ((ExecutionCommand) message.getPayload()).marketplace()))
         .handle(Amqp.outboundAdapter(rabbitTemplate)
             .exchangeName(EXCHANGE_EXECUTION)
-            .routingKey(ROUTING_EXECUTION))
-        .get();
+            .routingKey(ROUTING_EXECUTION));
   }
 
   @Bean
   public IntegrationFlow nextGenExecutionInboundFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(Amqp.inboundAdapter(connectionFactory, QUEUE_EXECUTION))
-        .channel(CH_NGES_REQUEST)
-        .get();
+        .channel(CH_NGES_REQUEST);
   }
 
   @Bean
   public IntegrationFlow nextGenNgesFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_NGES_REQUEST)
         .handle(ExecutionCommand.class, (command, headers) -> handleNges(command, headers),
             endpoint -> endpoint.advice(waitAdvice()))
@@ -194,8 +191,7 @@ public class NextGenEtlOrchestratorFlowConfig {
                 .handle(Amqp.outboundAdapter(rabbitTemplate)
                     .exchangeName(EXCHANGE_EXECUTION)
                     .routingKey(ROUTING_EXECUTION_WAIT))
-            ))
-        .get();
+            ));
   }
 
   private ExecutionDispatch handleNges(ExecutionCommand command, MessageHeaders headers) {
@@ -206,17 +202,16 @@ public class NextGenEtlOrchestratorFlowConfig {
 
   @Bean
   public IntegrationFlow nextGenExecutionFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_EXECUTION)
         .routeToRecipients(router -> router
             .recipient(CH_INGEST)
-            .recipient(CH_AUDIT))
-        .get();
+            .recipient(CH_AUDIT));
   }
 
   @Bean
   public IntegrationFlow nextGenIngestFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_INGEST)
         .transform(ExecutionDispatch.class, dispatch -> {
           ExecutionCommand command = new ExecutionCommand(
@@ -237,22 +232,20 @@ public class NextGenEtlOrchestratorFlowConfig {
             payload.sourceName(),
             payload.rawRowsCount()
         ))
-        .channel(CH_NORMALIZE)
-        .get();
+        .channel(CH_NORMALIZE);
   }
 
   @Bean
   public IntegrationFlow nextGenNormalizationFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_NORMALIZE)
         .handle(NormalizationPayload.class, (payload, headers) -> normalizationService.normalize(payload))
-        .channel(CH_MATERIALIZE_GATE)
-        .get();
+        .channel(CH_MATERIALIZE_GATE);
   }
 
   @Bean
   public IntegrationFlow nextGenMaterializationGateFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_MATERIALIZE_GATE)
         .handle(ExecutionResult.class, (result, headers) -> {
           auditService.recordExecution(
@@ -273,13 +266,12 @@ public class NextGenEtlOrchestratorFlowConfig {
           return null;
         }, endpoint -> endpoint.requiresReply(false))
         .filter(Objects::nonNull)
-        .channel(CH_MATERIALIZE)
-        .get();
+        .channel(CH_MATERIALIZE);
   }
 
   @Bean
   public IntegrationFlow nextGenMaterializationFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from(CH_MATERIALIZE)
         .handle(MaterializationRequest.class, (request, headers) -> {
           EventStatus status = materializationService.materialize(request);
@@ -296,8 +288,7 @@ public class NextGenEtlOrchestratorFlowConfig {
               (int) request.executionStatuses().stream().filter(s -> s == ExecutionStatus.FAILED_FINAL).count()
           );
           return status;
-        })
-        .get();
+        });
   }
 
   @Bean

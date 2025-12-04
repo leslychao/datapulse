@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.dsl.IntegrationFlows;
 import org.springframework.messaging.MessageChannel;
 
 @Configuration
@@ -25,10 +24,9 @@ public class EtlSnapshotIngestFlowConfig {
 
   @Bean
   public IntegrationFlow snapshotIngressFlow() {
-    return IntegrationFlows
+    return flow -> flow
         .from("ngSnapshotIngress")
         .transform(ExecutionDispatch.class, dispatch -> dispatch)
-        .channel(CH_INGEST)
-        .get();
+        .channel(CH_INGEST);
   }
 }
