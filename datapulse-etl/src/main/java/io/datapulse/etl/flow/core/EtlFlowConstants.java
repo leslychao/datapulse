@@ -10,6 +10,11 @@ public final class EtlFlowConstants {
   public static final String CH_ETL_INGEST_CORE = "ETL_INGEST_CORE";
   public static final String CH_ETL_SNAPSHOT_READY = "ETL_SNAPSHOT_READY";
   public static final String CH_ETL_RUN_CORE = "ETL_RUN_CORE";
+  public static final String CH_ETL_EXECUTION_DISPATCH = "ETL_EXECUTION_DISPATCH";
+  public static final String CH_ETL_EXECUTION_INBOUND = "ETL_EXECUTION_INBOUND";
+  public static final String CH_ETL_EXECUTION_PROCESS = "ETL_EXECUTION_PROCESS";
+  public static final String CH_ETL_EXECUTION_RESULT = "ETL_EXECUTION_RESULT";
+  public static final String CH_ETL_EXECUTION_WAIT = "ETL_EXECUTION_WAIT";
   public static final String CH_ETL_ORCHESTRATION_RESULT = "ETL_ORCHESTRATION_RESULT";
 
   public static final String HDR_ETL_RETRY_SOURCE_IDS = "ETL_RETRY_SOURCE_IDS";
@@ -27,4 +32,5 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_SYNC_STATUS = "ETL_SYNC_STATUS";
   public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
   public static final String HDR_ETL_RAW_TABLE = "ETL_RAW_TABLE";
+  public static final String HDR_ETL_EXECUTION = "ETL_EXECUTION";
 }
