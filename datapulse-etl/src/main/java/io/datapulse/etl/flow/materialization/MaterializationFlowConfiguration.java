@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.messaging.Message;
 
 @Configuration
 public class MaterializationFlowConfiguration {
@@ -31,8 +32,8 @@ public class MaterializationFlowConfiguration {
   @Bean
   public IntegrationFlow materializationFlow() {
     return IntegrationFlow.from(CH_EXECUTION_RESULT)
-        .filter(message -> message.getHeaders().get(HDR_EVENT_AGGREGATION) != null)
-        .filter(message -> {
+        .filter(Message.class, message -> message.getHeaders().get(HDR_EVENT_AGGREGATION) != null)
+        .filter(Message.class, message -> {
           EventAggregation aggregation = message.getHeaders().get(HDR_EVENT_AGGREGATION, EventAggregation.class);
           return aggregation != null && materializationPolicy.readyForMaterialization(aggregation);
         })

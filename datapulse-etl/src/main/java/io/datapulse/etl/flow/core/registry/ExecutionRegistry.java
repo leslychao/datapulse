@@ -19,15 +19,32 @@ import org.springframework.stereotype.Component;
 @Component
 public class ExecutionRegistry {
 
-  private record EventState(
-      Long accountId,
-      String event,
-      LocalDate from,
-      LocalDate to,
-      Map<String, ExecutionStatus> statuses,
-      Set<String> failedSources,
-      boolean hasData
-  ) {
+  private static final class EventState {
+    private final Long accountId;
+    private final String event;
+    private final LocalDate from;
+    private final LocalDate to;
+    private final Map<String, ExecutionStatus> statuses;
+    private final Set<String> failedSources;
+    private boolean hasData;
+
+    EventState(
+        Long accountId,
+        String event,
+        LocalDate from,
+        LocalDate to,
+        Map<String, ExecutionStatus> statuses,
+        Set<String> failedSources,
+        boolean hasData
+    ) {
+      this.accountId = accountId;
+      this.event = event;
+      this.from = from;
+      this.to = to;
+      this.statuses = statuses;
+      this.failedSources = failedSources;
+      this.hasData = hasData;
+    }
   }
 
   private final Map<String, EventState> events = new ConcurrentHashMap<>();
@@ -49,7 +66,7 @@ public class ExecutionRegistry {
     return new EventAggregation(
         plan.requestId(),
         plan.accountId(),
-        plan.executions().isEmpty() ? null : plan.executions().getFirst().event(),
+        plan.executions().isEmpty() ? null : plan.executions().get(0).event(),
         plan.window().from(),
         plan.window().to(),
         eventStatus,
@@ -65,24 +82,24 @@ public class ExecutionRegistry {
       return null;
     }
 
-    state.statuses().put(outcome.descriptor().sourceId(), outcome.status());
+    state.statuses.put(outcome.descriptor().sourceId(), outcome.status());
     if (outcome.status() == ExecutionStatus.ERROR) {
-      state.failedSources().add(outcome.descriptor().sourceId());
+      state.failedSources.add(outcome.descriptor().sourceId());
     }
     if (outcome.status() == ExecutionStatus.SUCCESS) {
       state.hasData = true;
     }
 
-    EventStatus eventStatus = statusPolicy.resolve(state.statuses().values());
+    EventStatus eventStatus = statusPolicy.resolve(state.statuses.values());
     return new EventAggregation(
         outcome.descriptor().requestId(),
-        state.accountId(),
+        state.accountId,
         outcome.descriptor().event(),
-        state.from(),
-        state.to(),
+        state.from,
+        state.to,
         eventStatus,
-        Map.copyOf(state.statuses()),
-        Set.copyOf(state.failedSources()),
+        Map.copyOf(state.statuses),
+        Set.copyOf(state.failedSources),
         state.hasData
     );
   }

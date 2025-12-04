@@ -1,6 +1,7 @@
 package io.datapulse.etl.flow.orchestrator;
 
 import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
 import static io.datapulse.etl.flow.core.FlowChannels.CH_ORCHESTRATE;
 import static io.datapulse.etl.flow.core.FlowHeaders.HDR_ACCOUNT_ID;
 import static io.datapulse.etl.flow.core.FlowHeaders.HDR_DATE_FROM;
@@ -10,6 +11,7 @@ import static io.datapulse.etl.flow.core.FlowHeaders.HDR_EVENT_AGGREGATION;
 import static io.datapulse.etl.flow.core.FlowHeaders.HDR_EXPECTED_SOURCE_IDS;
 import static io.datapulse.etl.flow.core.FlowHeaders.HDR_REQUEST_ID;
 import static io.datapulse.etl.flow.core.FlowHeaders.HDR_SOURCE_ID;
+import static io.datapulse.etl.flow.core.FlowHeaders.HDR_RAW_TABLE;
 
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.etl.dto.EtlRunRequest;
@@ -31,6 +33,7 @@ import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.http.dsl.Http;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -104,11 +107,11 @@ public class OrchestratorFlowConfiguration {
             HDR_EVENT_AGGREGATION,
             message -> executionRegistry.registerPlan(
                 (ExecutionPlan) message.getPayload(),
-                ((ExecutionPlan) message.getPayload()).executions().getFirst().event().name()
+                ((ExecutionPlan) message.getPayload()).executions().get(0).event().name()
             )
         ))
         .wireTap(tap -> tap
-            .transform(message -> message.getHeaders().get(HDR_EVENT_AGGREGATION, EventAggregation.class))
+            .transform(Message.class, m -> m.getHeaders().get(HDR_EVENT_AGGREGATION, EventAggregation.class))
             .filter(EventAggregation.class::isInstance)
             .channel(FlowChannels.CH_EVENT_AUDIT)
         )
@@ -128,7 +131,7 @@ public class OrchestratorFlowConfiguration {
 
   private Map<String, Object> acceptedResponse(OrchestrationCommand command) {
     return Map.of(
-        "status", SyncStatus.PENDING.name().toLowerCase(),
+        "status", SyncStatus.IN_PROGRESS.name().toLowerCase(),
         "requestId", command.requestId(),
         "event", command.event().name(),
         "from", command.from(),

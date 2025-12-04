@@ -27,7 +27,9 @@ import org.springframework.integration.amqp.dsl.Amqp;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.MessageChannels;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.scheduling.concurrent.SimpleAsyncTaskExecutor;
 
 @Configuration
 public class ExecutionFlowConfiguration {
@@ -48,7 +50,8 @@ public class ExecutionFlowConfiguration {
 
   @Bean(name = CH_EXECUTION_INBOUND)
   public MessageChannel executionInboundChannel() {
-    return MessageChannels.executor("execution-inbound").get();
+    return MessageChannels.executor(new SimpleAsyncTaskExecutor("execution-inbound-"))
+        .get();
   }
 
   @Bean(name = CH_EXECUTION_CORE)
@@ -89,7 +92,7 @@ public class ExecutionFlowConfiguration {
             message -> executionRegistry.update((ExecutionOutcome) message.getPayload())
         ))
         .wireTap(tap -> tap
-            .transform(message -> message.getHeaders().get(HDR_EVENT_AGGREGATION, EventAggregation.class))
+            .transform(Message.class, m -> m.getHeaders().get(HDR_EVENT_AGGREGATION, EventAggregation.class))
             .filter(EventAggregation.class::isInstance)
             .channel(CH_EVENT_AUDIT)
         )
