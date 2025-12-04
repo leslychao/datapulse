@@ -92,8 +92,8 @@ public class ExecutionFlowConfiguration {
             message -> executionRegistry.update((ExecutionOutcome) message.getPayload())
         ))
         .wireTap(tap -> tap
+            .filter(Message.class, m -> m.getHeaders().containsKey(HDR_EVENT_AGGREGATION))
             .transform(Message.class, m -> m.getHeaders().get(HDR_EVENT_AGGREGATION, EventAggregation.class))
-            .filter(EventAggregation.class::isInstance)
             .channel(CH_EVENT_AUDIT)
         )
         .route(
