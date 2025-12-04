@@ -19,7 +19,6 @@ public final class SnapshotGsonIterator<R> implements CloseableIterator<R> {
 
   private boolean endOfArrayReached;
   private boolean closed;
-  private boolean completionSignalled;
   private boolean firstElementRegistered;
 
   public SnapshotGsonIterator(
@@ -46,7 +45,6 @@ public final class SnapshotGsonIterator<R> implements CloseableIterator<R> {
       if (!hasNext) {
         jsonReader.endArray();
         endOfArrayReached = true;
-        signalCompletionIfNeeded();
       }
       return hasNext;
     } catch (IOException | RuntimeException ex) {
@@ -86,8 +84,6 @@ public final class SnapshotGsonIterator<R> implements CloseableIterator<R> {
     try {
       jsonReader.close();
     } catch (IOException ignore) {
-    } finally {
-      signalCompletionIfNeeded();
     }
   }
 
@@ -105,14 +101,6 @@ public final class SnapshotGsonIterator<R> implements CloseableIterator<R> {
     }
     firstElementRegistered = true;
     snapshotCommitBarrier.registerFirstElement(snapshotId);
-  }
-
-  private void signalCompletionIfNeeded() {
-    if (completionSignalled) {
-      return;
-    }
-    completionSignalled = true;
-    snapshotCommitBarrier.snapshotCompleted(snapshotId);
   }
 
   private void closeSafelyOnFailure(Throwable ignored) {
