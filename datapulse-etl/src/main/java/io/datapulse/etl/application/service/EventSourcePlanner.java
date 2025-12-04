@@ -5,7 +5,9 @@ import io.datapulse.etl.domain.entity.Event;
 import io.datapulse.etl.domain.entity.MaterializationPlan;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
+@Service
 @RequiredArgsConstructor
 public class EventSourcePlanner {
 

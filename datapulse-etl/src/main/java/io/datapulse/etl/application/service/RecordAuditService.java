@@ -3,7 +3,9 @@ package io.datapulse.etl.application.service;
 import io.datapulse.etl.domain.event.DomainEvent;
 import io.datapulse.etl.domain.repository.DomainEventOutboxRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
+@Service
 @RequiredArgsConstructor
 public class RecordAuditService {
 

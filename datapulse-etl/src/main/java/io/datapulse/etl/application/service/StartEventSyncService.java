@@ -12,7 +12,9 @@ import io.datapulse.etl.domain.repository.ExecutionRepository;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
+@Service
 @RequiredArgsConstructor
 public class StartEventSyncService {
 
