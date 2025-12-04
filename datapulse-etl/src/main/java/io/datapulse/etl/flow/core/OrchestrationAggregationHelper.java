@@ -8,11 +8,12 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EVENT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_SOURCE_IDS;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 
-import io.datapulse.domain.MarketplaceEvent;
+import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.ExecutionResult;
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.dto.OrchestrationBundle;
@@ -36,7 +37,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OrchestrationAggregationHelper {
 
-  private final io.datapulse.core.i18n.I18nMessageService i18nMessageService;
+  private final I18nMessageService i18nMessageService;
 
   public boolean isFullGroup(MessageGroup group) {
     Message<?> sampleMessage = group.getOne();

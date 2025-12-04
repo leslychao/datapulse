@@ -13,13 +13,13 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_EXECUTION_RESUL
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_EXECUTION_WAIT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.domain.SyncStatus;
-import io.datapulse.etl.dto.ExecutionResult;
 import io.datapulse.etl.dto.EtlSourceExecution;
+import io.datapulse.etl.dto.ExecutionResult;
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.dto.IngestStatus;
 import io.datapulse.etl.dto.OrchestrationBundle;
@@ -115,7 +115,8 @@ public class EtlExecutionFlowConfig {
           String marketplaceKey = execution.marketplace().name();
           MessageChannel marketplaceChannel = marketplaceExecutionChannelProvider
               .resolveForMarketplace(marketplaceKey);
-          marketplaceChannel.send(MessageBuilder.withPayload(execution).copyHeaders(headers).build());
+          marketplaceChannel.send(
+              MessageBuilder.withPayload(execution).copyHeaders(headers).build());
           return null;
         }, endpoint -> endpoint.requiresReply(false))
         .get();
@@ -133,19 +134,24 @@ public class EtlExecutionFlowConfig {
             .replyTimeout(-1L)
             .advice(executionErrorAdvice())
         )
-        .<Object, ExecutionResult>transform((payload, headers) -> new ExecutionResult(
+        .handle((payload, headers) -> new ExecutionResult(
             headers.get(HDR_ETL_EXECUTION, EtlSourceExecution.class),
-            payload instanceof IngestResult ingest ? ingest : new IngestResult(
-                headers.get(HDR_ETL_SOURCE_ID, String.class),
-                IngestStatus.SUCCESS,
-                null,
-                null,
-                null
-            )
+            payload instanceof IngestResult ingest
+                ? ingest
+                : new IngestResult(
+                    headers.get(HDR_ETL_SOURCE_ID, String.class),
+                    IngestStatus.SUCCESS,
+                    null,
+                    null,
+                    null
+                )
         ))
-        .<ExecutionResult>route(result -> result.ingestResult().isWait() ? "WAIT" : "FINAL", mapping -> mapping
-            .subFlowMapping("WAIT", sf -> sf.channel(CH_ETL_EXECUTION_WAIT))
-            .subFlowMapping("FINAL", sf -> sf.channel(CH_ETL_EXECUTION_RESULT))
+        .route(
+            ExecutionResult.class,                                   // явный тип payload
+            result -> result.ingestResult().isWait() ? "WAIT" : "FINAL", // routing key (String)
+            spec -> spec
+                .subFlowMapping("WAIT", sf -> sf.channel(CH_ETL_EXECUTION_WAIT))
+                .subFlowMapping("FINAL", sf -> sf.channel(CH_ETL_EXECUTION_RESULT))
         )
         .get();
   }

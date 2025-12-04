@@ -8,16 +8,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.dsl.IntegrationFlowContext;
 import org.springframework.integration.dsl.MessageChannels;
+import org.springframework.integration.dsl.context.IntegrationFlowContext;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
- * Provides per-marketplace serialized channels backed by dedicated single-thread executors.
- * Each marketplace gets its own flow that guarantees in-order processing while allowing
- * different marketplaces to execute in parallel.
+ * Provides per-marketplace serialized channels backed by dedicated single-thread executors. Each
+ * marketplace gets its own flow that guarantees in-order processing while allowing different
+ * marketplaces to execute in parallel.
  */
 @Component
 @RequiredArgsConstructor(onConstructor_ = {@Lazy})

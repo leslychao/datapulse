@@ -28,11 +28,9 @@ import io.datapulse.etl.dto.OrchestrationCommand;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlOrchestratorPlansAdvice;
-import io.datapulse.etl.flow.core.OrchestrationAggregationHelper;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +45,7 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.SubscribableChannel;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -253,10 +252,10 @@ public class EtlOrchestratorFlowConfig {
                     bundle.accountId(),
                     bundle.event(),
                     bundle.dateFrom(),
-                  bundle.dateTo()
-              );
-              return null;
-            }
+                    bundle.dateTo()
+                );
+                return null;
+              }
 
               EtlSyncAuditDto dto = aggregationHelper.buildAuditDto(bundle);
 
