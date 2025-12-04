@@ -1,6 +1,7 @@
 package io.datapulse.etl.service;
 
 import io.datapulse.etl.MarketplaceEvent;
+import io.datapulse.etl.dim.warehouse.WarehouseMaterializationHandler;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class EtlMaterializationServiceImpl implements EtlMaterializationService {
+
+  private final WarehouseMaterializationHandler warehouseMaterializationHandler;
 
   @Override
   @Transactional
@@ -42,6 +45,7 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
     );
 
     switch (event) {
+      case WAREHOUSE_DICT -> warehouseMaterializationHandler.materialize(accountId, requestId);
       default -> log.info(
           "No materialization configured for event={}, requestId={}, accountId={}",
           event,
