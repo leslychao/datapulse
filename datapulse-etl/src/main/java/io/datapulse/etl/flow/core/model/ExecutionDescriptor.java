@@ -2,7 +2,6 @@ package io.datapulse.etl.flow.core.model;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.event.EventSource;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -13,8 +12,7 @@ public record ExecutionDescriptor(
     EventWindow window,
     MarketplaceType marketplace,
     String sourceId,
-    String rawTable,
-    EventSource source
+    String rawTable
 ) {
   public ExecutionDescriptor {
     Objects.requireNonNull(requestId, "requestId");
@@ -24,7 +22,6 @@ public record ExecutionDescriptor(
     Objects.requireNonNull(marketplace, "marketplace");
     Objects.requireNonNull(sourceId, "sourceId");
     Objects.requireNonNull(rawTable, "rawTable");
-    Objects.requireNonNull(source, "source");
   }
 
   public LocalDate from() {

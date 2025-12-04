@@ -2,6 +2,8 @@ package io.datapulse.etl.flow.snapshot;
 
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.etl.event.EtlSourceRegistry;
+import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.core.model.ExecutionDescriptor;
 import io.datapulse.etl.flow.core.model.ExecutionOutcome;
 import io.datapulse.etl.flow.core.model.ExecutionStatus;
@@ -30,6 +32,7 @@ public class SnapshotIngestionPipeline {
   private final SnapshotFileCleaner snapshotFileCleaner;
   private final RawBatchInsertJdbcRepository rawBatchInsertJdbcRepository;
   private final EtlIngestErrorHandler ingestErrorHandler;
+  private final EtlSourceRegistry etlSourceRegistry;
 
   public SnapshotIngestionPipeline(
       SnapshotCommitBarrier snapshotCommitBarrier,
@@ -37,7 +40,8 @@ public class SnapshotIngestionPipeline {
       SnapshotIteratorFactory snapshotIteratorFactory,
       SnapshotFileCleaner snapshotFileCleaner,
       RawBatchInsertJdbcRepository rawBatchInsertJdbcRepository,
-      EtlIngestErrorHandler ingestErrorHandler
+      EtlIngestErrorHandler ingestErrorHandler,
+      EtlSourceRegistry etlSourceRegistry
   ) {
     this.snapshotCommitBarrier = snapshotCommitBarrier;
     this.snapshotJsonLayoutRegistry = snapshotJsonLayoutRegistry;
@@ -45,11 +49,12 @@ public class SnapshotIngestionPipeline {
     this.snapshotFileCleaner = snapshotFileCleaner;
     this.rawBatchInsertJdbcRepository = rawBatchInsertJdbcRepository;
     this.ingestErrorHandler = ingestErrorHandler;
+    this.etlSourceRegistry = etlSourceRegistry;
   }
 
   public ExecutionOutcome ingest(ExecutionDescriptor descriptor) {
     try {
-      Snapshot<?> snapshot = descriptor.source().fetchSnapshot(
+      Snapshot<?> snapshot = resolveSource(descriptor).fetchSnapshot(
           descriptor.accountId(),
           descriptor.event(),
           descriptor.from(),
@@ -93,6 +98,17 @@ public class SnapshotIngestionPipeline {
           null
       );
     }
+  }
+
+  private io.datapulse.etl.event.EventSource resolveSource(ExecutionDescriptor descriptor) {
+    return etlSourceRegistry.findSources(descriptor.event(), descriptor.marketplace()).stream()
+        .filter(source -> source.sourceId().equals(descriptor.sourceId()))
+        .findFirst()
+        .map(RegisteredSource::source)
+        .orElseThrow(() -> new AppException(
+            MessageCodes.ETL_EVENT_SOURCES_MISSING,
+            descriptor.event().name()
+        ));
   }
 
   private String registerSnapshot(ExecutionDescriptor descriptor, Snapshot<?> snapshot) {

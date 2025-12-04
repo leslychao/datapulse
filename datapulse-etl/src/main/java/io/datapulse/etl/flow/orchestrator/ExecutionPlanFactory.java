@@ -64,8 +64,7 @@ public class ExecutionPlanFactory {
         window,
         source.marketplace(),
         source.sourceId(),
-        Objects.requireNonNull(source.rawTable()),
-        source.source()
+        Objects.requireNonNull(source.rawTable())
     );
   }
 }
