@@ -5,12 +5,6 @@ marketplace:
     WILDBERRIES:
       rateLimit:
         groups:
-          WB_TARIFFS:
-            limit: 1
-            period: 65s
-          WB_ANALYTICS:
-            limit: 90
-            period: 60s
           WB_WAREHOUSES_FBW:
             limit: 2
             period: 20s

@@ -12,6 +12,7 @@ public final class EtlFlowConstants {
   public static final String CH_ETL_RUN_CORE = "ETL_RUN_CORE";
   public static final String CH_ETL_ORCHESTRATION_RESULT = "ETL_ORCHESTRATION_RESULT";
 
+  public static final String HDR_ETL_RETRY_SOURCE_IDS = "ETL_RETRY_SOURCE_IDS";
   public static final String HDR_ETL_REQUEST_ID = "ETL_REQUEST_ID";
   public static final String HDR_ETL_ACCOUNT_ID = "ETL_ACCOUNT_ID";
   public static final String HDR_ETL_EVENT = "ETL_EVENT";
@@ -26,5 +27,4 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_SYNC_STATUS = "ETL_SYNC_STATUS";
   public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
   public static final String HDR_ETL_RAW_TABLE = "ETL_RAW_TABLE";
-  public static final String HDR_RETRY_AFTER = "X-RETRY-AFTER";
 }
