@@ -82,7 +82,9 @@ public class OrchestratorFlowConfiguration {
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
         .transform(EtlRunRequest.class, commandMapper::fromRequest)
-        .channel(CH_ORCHESTRATE)
+        .wireTap(CH_ORCHESTRATE)
+        .log(LoggingHandler.Level.INFO, m -> "ETL request accepted, dispatching requestId="
+            + ((OrchestrationCommand) m.getPayload()).requestId())
         .transform(OrchestrationCommand.class, this::acceptedResponse)
         .get();
   }
