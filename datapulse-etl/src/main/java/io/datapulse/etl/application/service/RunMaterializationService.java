@@ -10,19 +10,14 @@ import io.datapulse.etl.domain.repository.EventRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class RunMaterializationService {
 
   private final MaterializationStrategyResolver strategyResolver;
   private final EventRepository eventRepository;
   private final DomainEventOutboxRepository outboxRepository;
-
-  public RunMaterializationService(MaterializationStrategyResolver strategyResolver,
-      EventRepository eventRepository, DomainEventOutboxRepository outboxRepository) {
-    this.strategyResolver = strategyResolver;
-    this.eventRepository = eventRepository;
-    this.outboxRepository = outboxRepository;
-  }
 
   public Optional<Event> materialize(UUID eventId, MaterializationPlan plan, Instant timestamp) {
     Optional<Event> eventOpt = eventRepository.findById(eventId);

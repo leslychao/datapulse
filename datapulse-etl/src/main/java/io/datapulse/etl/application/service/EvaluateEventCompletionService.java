@@ -10,22 +10,15 @@ import io.datapulse.etl.domain.repository.EventSummaryRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class EvaluateEventCompletionService {
 
   private final EventRepository eventRepository;
   private final EventSummaryRepository eventSummaryRepository;
   private final EventFinalStatusPolicy finalStatusPolicy;
   private final DomainEventOutboxRepository outboxRepository;
-
-  public EvaluateEventCompletionService(EventRepository eventRepository,
-      EventSummaryRepository eventSummaryRepository, EventFinalStatusPolicy finalStatusPolicy,
-      DomainEventOutboxRepository outboxRepository) {
-    this.eventRepository = eventRepository;
-    this.eventSummaryRepository = eventSummaryRepository;
-    this.finalStatusPolicy = finalStatusPolicy;
-    this.outboxRepository = outboxRepository;
-  }
 
   public Optional<Event> evaluate(UUID eventId, Instant timestamp) {
     Optional<Event> eventOpt = eventRepository.findById(eventId);

@@ -1,12 +1,18 @@
 package io.datapulse.etl.domain.entity;
 
-import java.time.Instant;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 
+@Getter
+@EqualsAndHashCode
+@Accessors(fluent = true)
 public final class Execution {
 
   private static final Map<ExecutionStatus, Set<ExecutionStatus>> TRANSITIONS =
@@ -50,30 +56,6 @@ public final class Execution {
   public static Execution initial(UUID eventId, Instant scheduledFor) {
     Instant now = scheduledFor == null ? Instant.now() : scheduledFor;
     return new Execution(UUID.randomUUID(), eventId, ExecutionStatus.PENDING, 1, now, now);
-  }
-
-  public UUID id() {
-    return id;
-  }
-
-  public UUID eventId() {
-    return eventId;
-  }
-
-  public ExecutionStatus status() {
-    return status;
-  }
-
-  public int attempt() {
-    return attempt;
-  }
-
-  public Instant scheduledFor() {
-    return scheduledFor;
-  }
-
-  public Instant updatedAt() {
-    return updatedAt;
   }
 
   public Execution start(Instant timestamp) {

@@ -4,14 +4,12 @@ import io.datapulse.etl.application.resolver.ExecutionPlanResolver;
 import io.datapulse.etl.domain.entity.Event;
 import io.datapulse.etl.domain.entity.MaterializationPlan;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class EventSourcePlanner {
 
   private final ExecutionPlanResolver executionPlanResolver;
-
-  public EventSourcePlanner(ExecutionPlanResolver executionPlanResolver) {
-    this.executionPlanResolver = executionPlanResolver;
-  }
 
   public MaterializationPlan plan(Event event, Instant timestamp) {
     if (event == null) {

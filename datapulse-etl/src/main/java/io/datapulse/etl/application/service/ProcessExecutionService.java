@@ -17,7 +17,9 @@ import io.datapulse.etl.domain.repository.ExecutionRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class ProcessExecutionService {
 
   private final EventRepository eventRepository;
@@ -25,18 +27,6 @@ public class ProcessExecutionService {
   private final NormalizationPipelineResolver normalizationPipelineResolver;
   private final MaterializationStrategyResolver materializationStrategyResolver;
   private final DomainEventOutboxRepository outboxRepository;
-
-  public ProcessExecutionService(EventRepository eventRepository,
-      ExecutionRepository executionRepository,
-      NormalizationPipelineResolver normalizationPipelineResolver,
-      MaterializationStrategyResolver materializationStrategyResolver,
-      DomainEventOutboxRepository outboxRepository) {
-    this.eventRepository = eventRepository;
-    this.executionRepository = executionRepository;
-    this.normalizationPipelineResolver = normalizationPipelineResolver;
-    this.materializationStrategyResolver = materializationStrategyResolver;
-    this.outboxRepository = outboxRepository;
-  }
 
   public Optional<Execution> process(UUID executionId, MaterializationPlan plan, Instant timestamp) {
     Optional<Execution> executionOpt = executionRepository.findById(executionId);

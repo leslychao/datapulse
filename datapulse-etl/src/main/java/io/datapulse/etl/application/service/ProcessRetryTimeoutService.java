@@ -11,22 +11,15 @@ import io.datapulse.etl.domain.repository.ExecutionRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class ProcessRetryTimeoutService {
 
   private final ExecutionRepository executionRepository;
   private final RetryPolicyResolver retryPolicyResolver;
   private final DomainEventOutboxRepository outboxRepository;
   private final EventRepository eventRepository;
-
-  public ProcessRetryTimeoutService(ExecutionRepository executionRepository,
-      RetryPolicyResolver retryPolicyResolver, DomainEventOutboxRepository outboxRepository,
-      EventRepository eventRepository) {
-    this.executionRepository = executionRepository;
-    this.retryPolicyResolver = retryPolicyResolver;
-    this.outboxRepository = outboxRepository;
-    this.eventRepository = eventRepository;
-  }
 
   public Optional<Execution> processRetry(UUID executionId, BackoffRequest request, Instant timestamp) {
     Optional<Execution> executionOpt = executionRepository.findById(executionId);

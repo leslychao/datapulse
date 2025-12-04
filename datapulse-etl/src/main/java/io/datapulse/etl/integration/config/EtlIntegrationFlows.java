@@ -19,14 +19,13 @@ import io.datapulse.etl.integration.messaging.RetryCommand;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.dsl.IntegrationFlows;
 
 @Configuration
 public class EtlIntegrationFlows {
 
   @Bean
   public IntegrationFlow executionWorkerFlow(ProcessExecutionService processExecutionService) {
-    return IntegrationFlows.from(EXECUTION_WORKER_QUEUE)
+    return IntegrationFlow.from(EXECUTION_WORKER_QUEUE)
         .handle(ExecutionCommand.class, (command, headers) -> {
           processExecutionService.process(command.executionId(), command.plan(), command.timestamp());
           return null;
@@ -36,7 +35,7 @@ public class EtlIntegrationFlows {
 
   @Bean
   public IntegrationFlow retryWaitFlow(ProcessRetryTimeoutService processRetryTimeoutService) {
-    return IntegrationFlows.from(RETRY_WAIT_QUEUE)
+    return IntegrationFlow.from(RETRY_WAIT_QUEUE)
         .handle(RetryCommand.class, (command, headers) -> {
           processRetryTimeoutService.processRetry(command.executionId(), command.request(),
               command.timestamp());
@@ -47,7 +46,7 @@ public class EtlIntegrationFlows {
 
   @Bean
   public IntegrationFlow eventOrchestratorFlow(StartEventSyncService startEventSyncService) {
-    return IntegrationFlows.from(EVENT_ORCHESTRATOR_QUEUE)
+    return IntegrationFlow.from(EVENT_ORCHESTRATOR_QUEUE)
         .handle(EventStartCommand.class, (command, headers) -> {
           startEventSyncService.start(command.eventId(), command.source(), command.payloadReference(),
               command.timestamp());
@@ -58,7 +57,7 @@ public class EtlIntegrationFlows {
 
   @Bean
   public IntegrationFlow materializationFlow(RunMaterializationService runMaterializationService) {
-    return IntegrationFlows.from(MATERIALIZATION_QUEUE)
+    return IntegrationFlow.from(MATERIALIZATION_QUEUE)
         .handle(MaterializationCommand.class, (command, headers) -> {
           runMaterializationService.materialize(command.eventId(), command.plan(), command.timestamp());
           return null;
@@ -68,7 +67,7 @@ public class EtlIntegrationFlows {
 
   @Bean
   public IntegrationFlow auditFlow(RecordAuditService recordAuditService) {
-    return IntegrationFlows.from(AUDIT_QUEUE)
+    return IntegrationFlow.from(AUDIT_QUEUE)
         .handle(DomainEvent.class, (event, headers) -> {
           recordAuditService.record(event);
           return null;

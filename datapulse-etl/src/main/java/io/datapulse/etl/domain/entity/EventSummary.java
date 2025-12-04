@@ -1,7 +1,13 @@
 package io.datapulse.etl.domain.entity;
 
 import java.util.UUID;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 
+@Getter
+@EqualsAndHashCode
+@Accessors(fluent = true)
 public final class EventSummary {
 
   private final UUID eventId;
@@ -22,19 +28,4 @@ public final class EventSummary {
     this.failedItems = failedItems;
   }
 
-  public UUID eventId() {
-    return eventId;
-  }
-
-  public int ingestedItems() {
-    return ingestedItems;
-  }
-
-  public int normalizedItems() {
-    return normalizedItems;
-  }
-
-  public int failedItems() {
-    return failedItems;
-  }
 }

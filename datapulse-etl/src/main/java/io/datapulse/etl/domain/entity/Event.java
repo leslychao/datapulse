@@ -2,7 +2,13 @@ package io.datapulse.etl.domain.entity;
 
 import java.time.Instant;
 import java.util.UUID;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 
+@Getter
+@EqualsAndHashCode
+@Accessors(fluent = true)
 public final class Event {
 
   private final UUID id;
@@ -42,30 +48,6 @@ public final class Event {
 
   public static Event received(UUID id, String source, String payloadReference, Instant timestamp) {
     return new Event(id, source, payloadReference, EventStatus.RECEIVED, timestamp, timestamp);
-  }
-
-  public UUID id() {
-    return id;
-  }
-
-  public String source() {
-    return source;
-  }
-
-  public String payloadReference() {
-    return payloadReference;
-  }
-
-  public EventStatus status() {
-    return status;
-  }
-
-  public Instant createdAt() {
-    return createdAt;
-  }
-
-  public Instant updatedAt() {
-    return updatedAt;
   }
 
   public Event startProcessing(Instant timestamp) {

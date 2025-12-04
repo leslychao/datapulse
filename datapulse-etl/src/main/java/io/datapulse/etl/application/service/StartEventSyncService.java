@@ -11,22 +11,15 @@ import io.datapulse.etl.domain.repository.EventRepository;
 import io.datapulse.etl.domain.repository.ExecutionRepository;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class StartEventSyncService {
 
   private final EventRepository eventRepository;
   private final ExecutionRepository executionRepository;
   private final ExecutionPlanResolver executionPlanResolver;
   private final DomainEventOutboxRepository outboxRepository;
-
-  public StartEventSyncService(EventRepository eventRepository,
-      ExecutionRepository executionRepository, ExecutionPlanResolver executionPlanResolver,
-      DomainEventOutboxRepository outboxRepository) {
-    this.eventRepository = eventRepository;
-    this.executionRepository = executionRepository;
-    this.executionPlanResolver = executionPlanResolver;
-    this.outboxRepository = outboxRepository;
-  }
 
   public Execution start(UUID eventId, String source, String payloadReference, Instant timestamp) {
     Event event = Event.received(eventId, source, payloadReference, timestamp);
