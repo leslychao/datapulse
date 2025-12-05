@@ -1,6 +1,6 @@
 package io.datapulse.etl.handler.error;
 
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
+import static io.datapulse.etl.flow.core.FlowHeaders.HDR_SOURCE_ID;
 
 import io.datapulse.etl.dto.IngestResult;
 import io.datapulse.etl.dto.IngestStatus;
@@ -63,7 +63,7 @@ public class EtlIngestErrorHandler {
   }
 
   private String resolveSourceId(MessageHeaders headers) {
-    String headerValue = headers.get(HDR_ETL_SOURCE_ID, String.class);
+    String headerValue = headers.get(HDR_SOURCE_ID, String.class);
     if (headerValue != null && !headerValue.isBlank()) {
       return headerValue;
     }

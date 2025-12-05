@@ -142,10 +142,7 @@ public final class DefaultSnapshotCommitBarrier implements SnapshotCommitBarrier
         state.hasElements,
         state.batches.get()
     );
-
-    if (!state.hasElements) {
-      tryComplete(snapshotId, state);
-    }
+    tryComplete(snapshotId, state);
   }
 
   @Override
