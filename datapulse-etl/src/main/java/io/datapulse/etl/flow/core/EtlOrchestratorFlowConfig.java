@@ -3,31 +3,27 @@ package io.datapulse.etl.flow.core;
 import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
 import static io.datapulse.etl.config.EtlExecutionRabbitConfig.DEFAULT_WAIT_TTL_MILLIS;
 import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
 import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
 import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_ACCOUNT_ID;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_DATE_FROM;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_DATE_TO;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EVENT;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_RAW_TABLE;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_RETRY_SOURCE_IDS;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_MARKETPLACE;
 
-import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.SyncStatus;
+import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;
 import io.datapulse.etl.dto.EtlSourceExecution;
+import io.datapulse.etl.dto.ExecutionAggregationResult;
 import io.datapulse.etl.dto.ExecutionOutcome;
 import io.datapulse.etl.dto.IngestStatus;
 import io.datapulse.etl.dto.OrchestrationCommand;
@@ -35,10 +31,9 @@ import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
 import io.datapulse.etl.flow.core.handler.EtlIngestErrorHandler;
-import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import io.datapulse.etl.service.EtlMaterializationService;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +45,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.aop.Advice;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -61,12 +57,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.integration.amqp.dsl.Amqp;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.http.dsl.Http;
 import org.springframework.integration.store.MessageGroup;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHeaders;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
@@ -74,30 +68,15 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @RequiredArgsConstructor
 public class EtlOrchestratorFlowConfig {
 
-  private static final String HDR_ORCHESTRATION_COMMAND = "ETL_ORCHESTRATION_COMMAND";
-
   private final RabbitTemplate etlExecutionRabbitTemplate;
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlSyncAuditService etlSyncAuditService;
   private final EtlMaterializationService etlMaterializationService;
-  private final RawBatchInsertJdbcRepository repository;
 
   private record MarketplacePlan(
       MarketplaceType marketplace,
       List<EtlSourceExecution> executions
-  ) {
-
-  }
-
-  private record ExecutionAggregationResult(
-      String requestId,
-      long accountId,
-      MarketplaceEvent event,
-      LocalDate dateFrom,
-      LocalDate dateTo,
-      List<String> expectedSourceIds,
-      List<ExecutionOutcome> outcomes
   ) {
 
   }
@@ -178,7 +157,8 @@ public class EtlOrchestratorFlowConfig {
         request.accountId(),
         MarketplaceEvent.fromString(request.event()),
         dateFrom,
-        dateTo
+        dateTo,
+        List.of()
     );
   }
 
@@ -208,11 +188,39 @@ public class EtlOrchestratorFlowConfig {
 
       @Override
       protected Object doInvoke(ExecutionCallback callback, Object target, Message<?> message) {
-        try {
+        String requestId = message.getHeaders().get(HDR_ETL_REQUEST_ID, String.class);
+        if (requestId == null) {
+          throw new AppException(ETL_REQUEST_INVALID, "Missing ETL requestId header");
+        }
+
+        Object payload = message.getPayload();
+        if (!(payload instanceof EtlSourceExecution execution)) {
           return callback.execute();
+        }
+
+        try {
+          callback.execute();
+
+          long rowsCount = 0L;
+
+          return new ExecutionOutcome(
+              requestId,
+              execution.accountId(),
+              execution.sourceId(),
+              execution.marketplace(),
+              execution.event(),
+              IngestStatus.SUCCESS,
+              rowsCount,
+              null,
+              null
+          );
+
         } catch (Exception ex) {
           Throwable cause = unwrapProcessingError(ex);
-          return ingestErrorHandler.handleIngestError(cause, message);
+          return ingestErrorHandler.handleIngestError(
+              cause,
+              message
+          );
         }
       }
     };
@@ -221,37 +229,13 @@ public class EtlOrchestratorFlowConfig {
   @Bean
   public IntegrationFlow etlRunCoreFlow(
       TaskExecutor etlOrchestrateExecutor,
-      Advice etlIngestExecutionErrorAdvice
+      Advice etlIngestExecutionAdvice
   ) {
     return IntegrationFlow
         .from(CH_ETL_RUN_CORE)
-        .enrichHeaders(e -> e
-            .headerFunction(HDR_ETL_REQUEST_ID,
-                (Message<OrchestrationCommand> m) -> m.getPayload().requestId()
-            )
-            .headerFunction(HDR_ETL_ACCOUNT_ID,
-                (Message<OrchestrationCommand> m) -> m.getPayload().accountId()
-            )
-            .headerFunction(HDR_ETL_EVENT,
-                (Message<OrchestrationCommand> m) -> m.getPayload().event()
-            )
-            .headerFunction(HDR_ETL_DATE_FROM,
-                (Message<OrchestrationCommand> m) -> m.getPayload().dateFrom()
-            )
-            .headerFunction(HDR_ETL_DATE_TO,
-                (Message<OrchestrationCommand> m) -> m.getPayload().dateTo()
-            )
-            .headerFunction(HDR_ORCHESTRATION_COMMAND,
-                (Message<OrchestrationCommand> m) -> m.getPayload()
-            )
-        )
-        .transform(Message.class, this::buildMarketplacePlans)
+        .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
         .split()
         .channel(c -> c.executor(etlOrchestrateExecutor))
-        .log(LoggingHandler.Level.INFO, message ->
-            "Building executions for marketplace=" +
-                message.getPayload(MarketplacePlan.class).marketplace()
-        )
         .transform(MarketplacePlan.class, MarketplacePlan::executions)
         .split()
         .gateway(
@@ -259,36 +243,18 @@ public class EtlOrchestratorFlowConfig {
             gateway -> gateway
                 .requestTimeout(0L)
                 .replyTimeout(0L)
-                .requiresReply(false)
-                .advice(etlIngestExecutionErrorAdvice)
+                .advice(etlIngestExecutionAdvice)
         )
-        .handle(
-            EtlSourceExecution.class,
-            (execution, headersMap) -> {
-              MessageHeaders headers = new MessageHeaders(headersMap);
-              String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-
-              long totalRows = repository.countByRequestId(
-                  execution.rawTable(),
-                  requestId
-              );
-
-              return totalRows;
-            }
+        .enrichHeaders(h -> h
+            .headerExpression(
+                HDR_ETL_EXECUTION_GROUP_ID,
+                "payload.requestId + ':' + payload.accountId + ':' + payload.event.name()"
+            )
         )
         .aggregate(aggregator -> aggregator
-            .correlationStrategy(message -> {
-              MessageHeaders headers = message.getHeaders();
-              String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-              Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-              MarketplaceEvent event = headers.get(HDR_ETL_EVENT, MarketplaceEvent.class);
-              if (requestId == null || accountId == null || event == null) {
-                throw new IllegalStateException(
-                    "Missing correlation headers for ETL aggregation: requestId/accountId/event"
-                );
-              }
-              return requestId + ":" + accountId + ":" + event.name();
-            })
+            .correlationStrategy(message ->
+                message.getHeaders().get(HDR_ETL_EXECUTION_GROUP_ID, String.class)
+            )
             .outputProcessor(this::buildExecutionAggregationResult)
             .expireGroupsUponCompletion(true)
         )
@@ -301,117 +267,67 @@ public class EtlOrchestratorFlowConfig {
         .get();
   }
 
-  private List<MarketplacePlan> buildMarketplacePlans(Message<OrchestrationCommand> message) {
-    OrchestrationCommand command = message.getPayload();
-    MessageHeaders headers = message.getHeaders();
-
+  private List<MarketplacePlan> buildMarketplacePlans(OrchestrationCommand command) {
     long accountId = command.accountId();
     MarketplaceEvent event = command.event();
-    LocalDate from = command.dateFrom();
-    LocalDate to = command.dateTo();
 
     List<RegisteredSource> registeredSources = etlSourceRegistry.getSources(event);
-
-    if (registeredSources.isEmpty()) {
+    if (CollectionUtils.isEmpty(registeredSources)) {
       throw new AppException(ETL_REQUEST_INVALID, "No ETL sources registered for event " + event);
     }
 
-    Set<String> retrySourceIds = resolveRetrySourceIds(headers);
+    Set<String> filteredSourceIds = CollectionUtils.isEmpty(command.sourceIds())
+        ? Set.of()
+        : new LinkedHashSet<>(command.sourceIds());
 
-    List<RegisteredSource> filteredSources = registeredSources
-        .stream()
-        .filter(source -> shouldExecuteSource(source, retrySourceIds))
+    Set<MarketplaceType> activeMarketplaces = accountConnectionService.getActiveMarketplacesByAccountId(
+        accountId);
+
+    List<EtlSourceExecution> executions = registeredSources.stream()
+        .filter(src -> filteredSourceIds.isEmpty() || filteredSourceIds.contains(src.sourceId()))
+        .filter(src -> {
+          boolean active = activeMarketplaces.contains(src.marketplace());
+          if (!active) {
+            log.info(
+                "Skip source due to no active connection: accountId={}, marketplace={}, sourceId={}",
+                accountId, src.marketplace(), src.sourceId()
+            );
+          }
+          return active;
+        })
+        .map(src -> new EtlSourceExecution(
+            src.sourceId(),
+            event,
+            src.marketplace(),
+            accountId,
+            command.dateFrom(),
+            command.dateTo(),
+            src.order(),
+            src.source(),
+            src.rawTable()
+        ))
         .toList();
 
-    if (filteredSources.isEmpty()) {
-      log.info(
-          "No sources to execute after retry filtering: requestId={}, accountId={}, event={}",
-          command.requestId(),
-          command.accountId(),
-          command.event()
-      );
-    }
-
-    List<EtlSourceExecution> executions = new ArrayList<>();
-    for (RegisteredSource source : filteredSources) {
-      if (!accountConnectionService.hasActiveConnection(accountId, source.marketplace())) {
-        log.info(
-            "Skip source due to no active connection: accountId={}, marketplace={}, sourceId={}",
-            accountId,
-            source.marketplace(),
-            source.sourceId()
-        );
-        continue;
-      }
-
-      EtlSourceExecution execution = new EtlSourceExecution(
-          command.requestId(),
-          accountId,
-          event,
-          source.marketplace(),
-          source.sourceId(),
-          source.rawTable(),
-          from,
-          to,
-          source.source()
-      );
-      executions.add(execution);
-    }
-
-    Map<MarketplaceType, List<EtlSourceExecution>> byMarketplace = executions
-        .stream()
+    Map<MarketplaceType, List<EtlSourceExecution>> byMarketplace = executions.stream()
         .collect(Collectors.groupingBy(
             EtlSourceExecution::marketplace,
-            LinkedHashSet::new,
+            LinkedHashMap::new,
             Collectors.toList()
         ));
 
-    List<MarketplacePlan> plans = new ArrayList<>();
-    for (Map.Entry<MarketplaceType, List<EtlSourceExecution>> entry : byMarketplace.entrySet()) {
-      plans.add(new MarketplacePlan(entry.getKey(), entry.getValue()));
-    }
-
-    List<String> sourceIds = executions
-        .stream()
-        .map(EtlSourceExecution::sourceId)
-        .distinct()
+    List<MarketplacePlan> plans = byMarketplace.entrySet().stream()
+        .map(e -> new MarketplacePlan(e.getKey(), e.getValue()))
         .toList();
 
     log.info(
-        "Orchestration plan built: requestId={}, accountId={}, event={}, sources={}",
-        command.requestId(),
+        "Orchestration plan built: accountId={}, event={}, sources={}",
         accountId,
         event,
-        sourceIds
+        plans
     );
 
     return plans;
   }
-
-  private Set<String> resolveRetrySourceIds(MessageHeaders headers) {
-    String[] retryArray = headers.get(HDR_ETL_RETRY_SOURCE_IDS, String[].class);
-    if (retryArray == null || retryArray.length == 0) {
-      return Set.of();
-    }
-    Set<String> result = new LinkedHashSet<>();
-    for (String id : retryArray) {
-      if (id != null && !id.isBlank()) {
-        result.add(id);
-      }
-    }
-    return result;
-  }
-
-  private boolean shouldExecuteSource(RegisteredSource source, Set<String> retrySourceIds) {
-    if (retrySourceIds.isEmpty()) {
-      return true;
-    }
-    return retrySourceIds.contains(source.sourceId());
-  }
-
-  // ==========================
-  //  Агрегация результатов ExecutionOutcome → ExecutionAggregationResult
-  // ==========================
 
   private ExecutionAggregationResult buildExecutionAggregationResult(MessageGroup group) {
     Message<?> sample = group.getOne();
@@ -419,32 +335,18 @@ public class EtlOrchestratorFlowConfig {
       throw new IllegalStateException("Empty message group in ETL aggregation");
     }
 
-    MessageHeaders headers = sample.getHeaders();
+    ExecutionOutcome sampleOutcome = sample.getPayload(ExecutionOutcome.class);
 
-    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-    Long accountId = headers.get(HDR_ETL_ACCOUNT_ID, Long.class);
-    MarketplaceEvent event = headers.get(HDR_ETL_EVENT, MarketplaceEvent.class);
-    LocalDate dateFrom = headers.get(HDR_ETL_DATE_FROM, LocalDate.class);
-    LocalDate dateTo = headers.get(HDR_ETL_DATE_TO, LocalDate.class);
-
-    if (requestId == null || accountId == null || event == null || dateFrom == null
-        || dateTo == null) {
-      throw new IllegalStateException("Missing required headers for ExecutionAggregationResult");
-    }
+    String requestId = sampleOutcome.requestId();
+    long accountId = sampleOutcome.accountId();
+    MarketplaceEvent event = sampleOutcome.event();
+    LocalDate dateFrom = sampleOutcome.dateFrom();
+    LocalDate dateTo = sampleOutcome.dateTo();
 
     List<ExecutionOutcome> outcomes = group
         .getMessages()
         .stream()
-        .map(Message::getPayload)
-        .filter(ExecutionOutcome.class::isInstance)
-        .map(ExecutionOutcome.class::cast)
-        .toList();
-
-    List<String> expectedSourceIds = outcomes
-        .stream()
-        .map(ExecutionOutcome::sourceId)
-        .filter(Objects::nonNull)
-        .distinct()
+        .map(m -> m.getPayload(ExecutionOutcome.class))
         .toList();
 
     return new ExecutionAggregationResult(
@@ -453,14 +355,9 @@ public class EtlOrchestratorFlowConfig {
         event,
         dateFrom,
         dateTo,
-        expectedSourceIds,
         outcomes
     );
   }
-
-  // ==========================
-  //  Финальное решение по группе: audit + materialization + WAIT (ретрай)
-  // ==========================
 
   private Object finalizeExecutionGroup(
       ExecutionAggregationResult aggregation,
@@ -468,22 +365,35 @@ public class EtlOrchestratorFlowConfig {
   ) {
     List<ExecutionOutcome> outcomes = aggregation.outcomes();
 
-    boolean hasSuccess = outcomes.stream().anyMatch(o -> o.status() == IngestStatus.SUCCESS);
+    boolean hasSuccess = outcomes.stream()
+        .anyMatch(o -> o.status() == IngestStatus.SUCCESS);
     boolean hasWaitingRetry = outcomes.stream()
         .anyMatch(o -> o.status() == IngestStatus.WAITING_RETRY);
-    boolean hasFailed = outcomes.stream().anyMatch(o -> o.status() == IngestStatus.FAILED);
+    boolean hasFailed = outcomes.stream()
+        .anyMatch(o -> o.status() == IngestStatus.FAILED);
+    boolean hasNoData = outcomes.stream()
+        .anyMatch(o -> o.status() == IngestStatus.NO_DATA);
 
     SyncStatus eventStatus;
+
     if (hasWaitingRetry) {
+      // Есть хотя бы один WAITING_RETRY — событие ещё в работе
       eventStatus = SyncStatus.IN_PROGRESS;
-    } else if (hasFailed && hasSuccess) {
+    } else if (hasSuccess && hasFailed) {
+      // Часть источников успешна, часть — упала
       eventStatus = SyncStatus.PARTIAL_SUCCESS;
-    } else if (hasFailed) {
-      eventStatus = SyncStatus.FAILED;
     } else if (hasSuccess) {
+      // Все, кто запускался и не застрял, отработали SUCCESS/NO_DATA
       eventStatus = SyncStatus.SUCCESS;
-    } else {
+    } else if (hasNoData && !hasFailed) {
+      // Никто не упал, но и успеха не было — "нет данных" по всем источникам
       eventStatus = SyncStatus.NO_DATA;
+    } else if (hasFailed) {
+      // Только фейлы
+      eventStatus = SyncStatus.FAILED;
+    } else {
+      // Защитный fallback: теоретически сюда попасть не должны
+      eventStatus = SyncStatus.FAILED;
     }
 
     updateAudit(aggregation, eventStatus, outcomes);
@@ -502,14 +412,28 @@ public class EtlOrchestratorFlowConfig {
       SyncStatus eventStatus,
       List<ExecutionOutcome> outcomes
   ) {
-    // TODO: сюда вставляется твоя реальная логика обновления аудита через etlSyncAuditService.
-    log.info(
-        "ETL event aggregation completed: requestId={}, accountId={}, event={}, status={}, outcomes={}",
+    List<String> failedSourceIds = outcomes.stream()
+        .filter(o -> o.status() == IngestStatus.FAILED)
+        .map(ExecutionOutcome::sourceId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+
+    String failedSourcesSummary = failedSourceIds.isEmpty()
+        ? null
+        : String.join(",", failedSourceIds);
+
+    String errorMessage = buildEventErrorMessage(eventStatus, failedSourceIds);
+
+    etlSyncAuditService.update(
         aggregation.requestId(),
         aggregation.accountId(),
         aggregation.event(),
+        aggregation.dateFrom(),
+        aggregation.dateTo(),
         eventStatus,
-        outcomes.size()
+        failedSourcesSummary,
+        errorMessage
     );
   }
 
@@ -532,10 +456,6 @@ public class EtlOrchestratorFlowConfig {
       );
     }
   }
-
-  // ==========================
-  //  Планирование WAIT-ретрая в Rabbit
-  // ==========================
 
   private void scheduleWaitRetry(
       ExecutionAggregationResult aggregation,
@@ -562,35 +482,21 @@ public class EtlOrchestratorFlowConfig {
         .min(Long::compareTo)
         .orElse(DEFAULT_WAIT_TTL_MILLIS);
 
-    OrchestrationCommand command = new OrchestrationCommand(
+    OrchestrationCommand retryCommand = new OrchestrationCommand(
         aggregation.requestId(),
         aggregation.accountId(),
         aggregation.event(),
         aggregation.dateFrom(),
-        aggregation.dateTo()
+        aggregation.dateTo(),
+        retrySourceIds
     );
 
     etlExecutionRabbitTemplate.convertAndSend(
         EXCHANGE_EXECUTION_DLX,
         ROUTING_KEY_EXECUTION_WAIT,
-        command,
+        retryCommand,
         message -> {
           message.getMessageProperties().setExpiration(Long.toString(ttlMillis));
-
-          message.getMessageProperties()
-              .setHeader(HDR_ETL_REQUEST_ID, aggregation.requestId());
-          message.getMessageProperties()
-              .setHeader(HDR_ETL_ACCOUNT_ID, aggregation.accountId());
-          message.getMessageProperties()
-              .setHeader(HDR_ETL_EVENT, aggregation.event().name());
-          message.getMessageProperties()
-              .setHeader(HDR_ETL_DATE_FROM, aggregation.dateFrom().toString());
-          message.getMessageProperties()
-              .setHeader(HDR_ETL_DATE_TO, aggregation.dateTo().toString());
-          // ВАЖНО: HDR_ETL_RETRY_SOURCE_IDS как String[], чтобы не ловить ошибку типов.
-          message.getMessageProperties()
-              .setHeader(HDR_ETL_RETRY_SOURCE_IDS, retrySourceIds.toArray(new String[0]));
-
           return message;
         }
     );

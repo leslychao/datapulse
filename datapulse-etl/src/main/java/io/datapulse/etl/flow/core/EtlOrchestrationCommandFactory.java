@@ -6,6 +6,7 @@ import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;
+import io.datapulse.etl.dto.OrchestrationCommand;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -38,8 +39,9 @@ public class EtlOrchestrationCommandFactory {
         requestId,
         request.accountId(),
         event,
-        request.from(),
-        request.to()
+        request.dateFrom(),
+        request.dateTo(),
+        List.of()
     );
   }
 
@@ -47,8 +49,8 @@ public class EtlOrchestrationCommandFactory {
     List<String> missingFields = Stream.of(
             new RequiredField("accountId", request.accountId()),
             new RequiredField("event", request.event()),
-            new RequiredField("from", request.from()),
-            new RequiredField("to", request.to())
+            new RequiredField("from", request.dateFrom()),
+            new RequiredField("to", request.dateTo())
         )
         .filter(field -> field.value() == null)
         .map(RequiredField::name)
@@ -61,7 +63,7 @@ public class EtlOrchestrationCommandFactory {
       );
     }
 
-    if (request.from().isAfter(request.to())) {
+    if (request.dateFrom().isAfter(request.dateTo())) {
       throw new AppException(
           ETL_REQUEST_INVALID,
           "'from' must be <= 'to'"

@@ -109,7 +109,7 @@ public class EtlIngestErrorHandler {
   }
 
   private IngestStatus determineStatus(Throwable error) {
-    return isBackoffRequired(error) ? IngestStatus.WAIT : IngestStatus.FAILED;
+    return isBackoffRequired(error) ? IngestStatus.WAITING_RETRY : IngestStatus.FAILED;
   }
 
   private boolean isBackoffRequired(Throwable error) {

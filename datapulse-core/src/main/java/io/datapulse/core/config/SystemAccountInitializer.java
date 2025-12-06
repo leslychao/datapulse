@@ -116,7 +116,7 @@ public class SystemAccountInitializer {
 
   private boolean connectionExists(Long accountId, MarketplaceType marketplace) {
     try {
-      accountConnectionService.getByAccountIdAndMarketplaceType(accountId, marketplace);
+      accountConnectionService.assertActiveConnectionExists(accountId, marketplace);
       return true;
     } catch (NotFoundException ex) {
       return false;

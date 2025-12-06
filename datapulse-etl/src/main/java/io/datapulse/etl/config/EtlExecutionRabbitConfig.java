@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class EtlExecutionRabbitConfig {
 
-  public static final int DEFAULT_WAIT_TTL_MILLIS = 300_000;
+  public static final long DEFAULT_WAIT_TTL_MILLIS = 300_000L;
 
   @Bean
   public DirectExchange etlExecutionExchange() {

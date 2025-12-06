@@ -4,6 +4,6 @@ public enum IngestStatus {
   SUCCESS,
   PARTIAL_SUCCESS,
   FAILED,
-  WAIT,
+  WAITING_RETRY,
   NO_DATA
 }

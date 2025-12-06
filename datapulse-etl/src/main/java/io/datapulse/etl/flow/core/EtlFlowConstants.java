@@ -21,4 +21,5 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
   public static final String HDR_ETL_RAW_TABLE = "ETL_RAW_TABLE";
   public static final String HDR_ETL_RETRY_SOURCE_IDS = "ETL_RETRY_SOURCE_IDS";
+  public static final String HDR_ETL_EXECUTION_GROUP_ID = "ETL_EXECUTION_GROUP_ID";
 }
