@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record ExecutionAggregationResult(
-    String requestId,
     long accountId,
     MarketplaceEvent event,
     LocalDate dateFrom,

@@ -13,6 +13,7 @@ import io.datapulse.core.i18n.I18nMessageService;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@Qualifier("etlMaterializationAdvice")
 @RequiredArgsConstructor
 public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
 
@@ -57,7 +59,7 @@ public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
       return MessageBuilder
           .withPayload(message.getPayload())
           .copyHeaders(message.getHeaders())
-          .setHeader(HDR_ETL_SYNC_STATUS, SyncStatus.ERROR)
+          .setHeader(HDR_ETL_SYNC_STATUS, SyncStatus.FAILED)
           .setHeader(HDR_ETL_ERROR_MESSAGE, combinedError)
           .build();
     }

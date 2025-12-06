@@ -8,7 +8,6 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;
 import io.datapulse.etl.dto.OrchestrationCommand;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
@@ -33,10 +32,7 @@ public class EtlOrchestrationCommandFactory {
       );
     }
 
-    String requestId = UUID.randomUUID().toString();
-
     return new OrchestrationCommand(
-        requestId,
         request.accountId(),
         event,
         request.dateFrom(),

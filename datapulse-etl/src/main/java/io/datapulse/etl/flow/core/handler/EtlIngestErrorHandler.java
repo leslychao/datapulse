@@ -1,7 +1,6 @@
 package io.datapulse.etl.flow.core.handler;
 
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.domain.MarketplaceType;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Component;
 public class EtlIngestErrorHandler {
 
   private static final int MAX_ERROR_MESSAGE_LENGTH = 2000;
-  private static final String UNKNOWN_SOURCE_ID = "UNKNOWN_SOURCE";
 
   private final I18nMessageService i18nMessageService;
 
@@ -36,7 +34,7 @@ public class EtlIngestErrorHandler {
     Object payload = message.getPayload();
 
     long accountId = 0L;
-    String sourceId;
+    String sourceId = null;
     MarketplaceType marketplace = null;
     MarketplaceEvent event = null;
 
@@ -45,8 +43,6 @@ public class EtlIngestErrorHandler {
       sourceId = execution.sourceId();
       marketplace = execution.marketplace();
       event = execution.event();
-    } else {
-      sourceId = resolveSourceId(headers);
     }
 
     IngestStatus status = determineStatus(error);
@@ -83,7 +79,6 @@ public class EtlIngestErrorHandler {
     }
 
     return new ExecutionOutcome(
-        requestId,
         accountId,
         sourceId,
         marketplace,
@@ -98,14 +93,6 @@ public class EtlIngestErrorHandler {
   private String resolveRequestId(MessageHeaders headers) {
     String value = headers.get(HDR_ETL_REQUEST_ID, String.class);
     return value != null ? value : "";
-  }
-
-  private String resolveSourceId(MessageHeaders headers) {
-    String headerValue = headers.get(HDR_ETL_SOURCE_ID, String.class);
-    if (headerValue != null && !headerValue.isBlank()) {
-      return headerValue;
-    }
-    return UNKNOWN_SOURCE_ID;
   }
 
   private IngestStatus determineStatus(Throwable error) {

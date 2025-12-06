@@ -12,13 +12,12 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_ORCHESTRATION_COMMAND;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.domain.SyncStatus;
-import io.datapulse.domain.dto.EtlSyncAuditDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;
@@ -49,6 +48,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +61,7 @@ import org.springframework.integration.http.dsl.Http;
 import org.springframework.integration.store.MessageGroup;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
@@ -119,6 +120,9 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
+        .enrichHeaders(h ->
+            h.headerFunction(HDR_ETL_REQUEST_ID, message -> UUID.randomUUID().toString())
+        )
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
         .wireTap(flow -> flow
             .handle(
@@ -128,11 +132,15 @@ public class EtlOrchestratorFlowConfig {
                 endpoint -> endpoint.requiresReply(false)
             )
         )
-        .transform(OrchestrationCommand.class, command -> Map.of(
-            "requestId", command.requestId(),
-            "accountId", command.accountId(),
-            "event", command.event().name()
-        ))
+        .handle(
+            OrchestrationCommand.class,
+            (command, headers) -> Map.of(
+                "requestId", Objects.requireNonNull(headers.get(HDR_ETL_REQUEST_ID, String.class)),
+                "accountId", command.accountId(),
+                "event", command.event().name()
+            ),
+            endpoint -> endpoint.requiresReply(true)
+        )
         .get();
   }
 
@@ -150,10 +158,7 @@ public class EtlOrchestratorFlowConfig {
       throw new AppException(ETL_REQUEST_INVALID);
     }
 
-    String requestId = UUID.randomUUID().toString();
-
     return new OrchestrationCommand(
-        requestId,
         request.accountId(),
         MarketplaceEvent.fromString(request.event()),
         dateFrom,
@@ -182,29 +187,21 @@ public class EtlOrchestratorFlowConfig {
         .get();
   }
 
-  @Bean
+  @Bean("etlIngestExecutionAdvice")
+  @Qualifier("etlIngestExecutionAdvice")
   public Advice etlIngestExecutionAdvice(EtlIngestErrorHandler ingestErrorHandler) {
     return new EtlAbstractRequestHandlerAdvice() {
 
       @Override
       protected Object doInvoke(ExecutionCallback callback, Object target, Message<?> message) {
-        String requestId = message.getHeaders().get(HDR_ETL_REQUEST_ID, String.class);
-        if (requestId == null) {
-          throw new AppException(ETL_REQUEST_INVALID, "Missing ETL requestId header");
-        }
-
         Object payload = message.getPayload();
         if (!(payload instanceof EtlSourceExecution execution)) {
           return callback.execute();
         }
-
         try {
           callback.execute();
-
           long rowsCount = 0L;
-
           return new ExecutionOutcome(
-              requestId,
               execution.accountId(),
               execution.sourceId(),
               execution.marketplace(),
@@ -214,7 +211,6 @@ public class EtlOrchestratorFlowConfig {
               null,
               null
           );
-
         } catch (Exception ex) {
           Throwable cause = unwrapProcessingError(ex);
           return ingestErrorHandler.handleIngestError(
@@ -330,78 +326,51 @@ public class EtlOrchestratorFlowConfig {
   }
 
   private ExecutionAggregationResult buildExecutionAggregationResult(MessageGroup group) {
-    Message<?> sample = group.getOne();
-    if (sample == null) {
+    var messages = group.getMessages();
+    if (messages.isEmpty()) {
       throw new IllegalStateException("Empty message group in ETL aggregation");
     }
 
-    ExecutionOutcome sampleOutcome = sample.getPayload(ExecutionOutcome.class);
+    Message<?> sample = messages.iterator().next();
 
-    String requestId = sampleOutcome.requestId();
-    long accountId = sampleOutcome.accountId();
-    MarketplaceEvent event = sampleOutcome.event();
-    LocalDate dateFrom = sampleOutcome.dateFrom();
-    LocalDate dateTo = sampleOutcome.dateTo();
+    OrchestrationCommand command =
+        sample.getHeaders().get(HDR_ETL_ORCHESTRATION_COMMAND, OrchestrationCommand.class);
+
+    if (command == null) {
+      throw new IllegalStateException(
+          "Missing OrchestrationCommand header in ETL aggregation group"
+      );
+    }
 
     List<ExecutionOutcome> outcomes = group
-        .getMessages()
-        .stream()
-        .map(m -> m.getPayload(ExecutionOutcome.class))
+        .streamMessages()
+        .map(Message::getPayload)
+        .map(ExecutionOutcome.class::cast)
         .toList();
 
     return new ExecutionAggregationResult(
-        requestId,
-        accountId,
-        event,
-        dateFrom,
-        dateTo,
+        command.accountId(),
+        command.event(),
+        command.dateFrom(),
+        command.dateTo(),
         outcomes
     );
   }
 
   private Object finalizeExecutionGroup(
       ExecutionAggregationResult aggregation,
-      Map<String, Object> headersMap
+      MessageHeaders messageHeaders
   ) {
     List<ExecutionOutcome> outcomes = aggregation.outcomes();
-
-    boolean hasSuccess = outcomes.stream()
-        .anyMatch(o -> o.status() == IngestStatus.SUCCESS);
+    String requestId = messageHeaders.get(HDR_ETL_REQUEST_ID, String.class);
+    updateAudit(aggregation, outcomes);
+    boolean hasSuccess = outcomes.stream().anyMatch(o -> o.status() == IngestStatus.SUCCESS);
     boolean hasWaitingRetry = outcomes.stream()
         .anyMatch(o -> o.status() == IngestStatus.WAITING_RETRY);
-    boolean hasFailed = outcomes.stream()
-        .anyMatch(o -> o.status() == IngestStatus.FAILED);
-    boolean hasNoData = outcomes.stream()
-        .anyMatch(o -> o.status() == IngestStatus.NO_DATA);
-
-    SyncStatus eventStatus;
-
     if (hasWaitingRetry) {
-      // Есть хотя бы один WAITING_RETRY — событие ещё в работе
-      eventStatus = SyncStatus.IN_PROGRESS;
-    } else if (hasSuccess && hasFailed) {
-      // Часть источников успешна, часть — упала
-      eventStatus = SyncStatus.PARTIAL_SUCCESS;
+      scheduleWaitRetry(aggregation, outcomes, requestId);
     } else if (hasSuccess) {
-      // Все, кто запускался и не застрял, отработали SUCCESS/NO_DATA
-      eventStatus = SyncStatus.SUCCESS;
-    } else if (hasNoData && !hasFailed) {
-      // Никто не упал, но и успеха не было — "нет данных" по всем источникам
-      eventStatus = SyncStatus.NO_DATA;
-    } else if (hasFailed) {
-      // Только фейлы
-      eventStatus = SyncStatus.FAILED;
-    } else {
-      // Защитный fallback: теоретически сюда попасть не должны
-      eventStatus = SyncStatus.FAILED;
-    }
-
-    updateAudit(aggregation, eventStatus, outcomes);
-
-    if (hasWaitingRetry) {
-      scheduleWaitRetry(aggregation, outcomes);
-    } else if (hasSuccess) {
-      startMaterialization(aggregation);
+      startMaterialization(aggregation, requestId);
     }
 
     return null;
@@ -409,7 +378,6 @@ public class EtlOrchestratorFlowConfig {
 
   private void updateAudit(
       ExecutionAggregationResult aggregation,
-      SyncStatus eventStatus,
       List<ExecutionOutcome> outcomes
   ) {
     List<String> failedSourceIds = outcomes.stream()
@@ -422,34 +390,22 @@ public class EtlOrchestratorFlowConfig {
     String failedSourcesSummary = failedSourceIds.isEmpty()
         ? null
         : String.join(",", failedSourceIds);
-
-    String errorMessage = buildEventErrorMessage(eventStatus, failedSourceIds);
-
-    etlSyncAuditService.update(
-        aggregation.requestId(),
-        aggregation.accountId(),
-        aggregation.event(),
-        aggregation.dateFrom(),
-        aggregation.dateTo(),
-        eventStatus,
-        failedSourcesSummary,
-        errorMessage
-    );
+    System.out.println(failedSourcesSummary);
   }
 
-  private void startMaterialization(ExecutionAggregationResult aggregation) {
+  private void startMaterialization(ExecutionAggregationResult aggregation, String requestId) {
     try {
       etlMaterializationService.materialize(
-          aggregation.requestId(),
           aggregation.accountId(),
           aggregation.event(),
           aggregation.dateFrom(),
-          aggregation.dateTo()
+          aggregation.dateTo(),
+          requestId
       );
     } catch (Exception ex) {
       log.error(
           "Materialization failed: requestId={}, accountId={}, event={}",
-          aggregation.requestId(),
+          requestId,
           aggregation.accountId(),
           aggregation.event(),
           ex
@@ -459,7 +415,8 @@ public class EtlOrchestratorFlowConfig {
 
   private void scheduleWaitRetry(
       ExecutionAggregationResult aggregation,
-      List<ExecutionOutcome> outcomes
+      List<ExecutionOutcome> outcomes,
+      String requestId
   ) {
     List<String> retrySourceIds = outcomes
         .stream()
@@ -483,7 +440,6 @@ public class EtlOrchestratorFlowConfig {
         .orElse(DEFAULT_WAIT_TTL_MILLIS);
 
     OrchestrationCommand retryCommand = new OrchestrationCommand(
-        aggregation.requestId(),
         aggregation.accountId(),
         aggregation.event(),
         aggregation.dateFrom(),
@@ -503,7 +459,7 @@ public class EtlOrchestratorFlowConfig {
 
     log.info(
         "Scheduled WAIT retry: requestId={}, accountId={}, event={}, retrySourceIds={}, ttlMillis={}",
-        aggregation.requestId(),
+        requestId,
         aggregation.accountId(),
         aggregation.event(),
         retrySourceIds,

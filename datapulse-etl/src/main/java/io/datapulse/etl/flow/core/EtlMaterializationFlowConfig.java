@@ -1,8 +1,10 @@
 package io.datapulse.etl.flow.core;
 
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 
-import io.datapulse.domain.SyncStatus;
+import io.datapulse.etl.dto.ExecutionAggregationResult;
+import io.datapulse.etl.dto.IngestStatus;
 import io.datapulse.etl.flow.advice.EtlMaterializationAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.integration.handler.LoggingHandler;
 public class EtlMaterializationFlowConfig {
 
   private final EtlMaterializationService materializationService;
+
   private final EtlMaterializationAdvice etlMaterializationAdvice;
 
   @Bean
@@ -25,15 +28,16 @@ public class EtlMaterializationFlowConfig {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATION_RESULT)
         .filter(
-            OrchestrationBundle.class,
-            bundle -> bundle.syncStatus() == SyncStatus.SUCCESS
+            ExecutionAggregationResult.class,
+            bundle -> bundle.outcomes().stream().anyMatch(
+                executionOutcome -> executionOutcome.status() == IngestStatus.SUCCESS)
         )
         .handle(
-            OrchestrationBundle.class,
+            ExecutionAggregationResult.class,
             (bundle, headers) -> {
               log.info(
                   "Materialization: requestId={}, event={}, from={}, to={}",
-                  bundle.requestId(),
+                  headers.get(HDR_ETL_REQUEST_ID, String.class),
                   bundle.event(),
                   bundle.dateFrom(),
                   bundle.dateTo()
@@ -44,7 +48,7 @@ public class EtlMaterializationFlowConfig {
                   bundle.event(),
                   bundle.dateFrom(),
                   bundle.dateTo(),
-                  bundle.requestId()
+                  headers.get(HDR_ETL_REQUEST_ID, String.class)
               );
               return null;
             },
@@ -54,8 +58,8 @@ public class EtlMaterializationFlowConfig {
         )
         .log(
             LoggingHandler.Level.INFO,
-            m -> "Materialization completed for requestId=" +
-                ((OrchestrationBundle) m.getPayload()).requestId()
+            m -> "Materialization completed for requestId=" + m.getHeaders()
+                .get(HDR_ETL_REQUEST_ID, String.class)
         )
         .nullChannel();
   }
