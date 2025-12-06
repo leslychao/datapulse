@@ -8,12 +8,11 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EVENT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SYNC_STATUS;
 
-import io.datapulse.domain.SyncStatus;
 import io.datapulse.core.i18n.I18nMessageService;
+import io.datapulse.domain.SyncStatus;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@Qualifier("etlMaterializationAdvice")
 @RequiredArgsConstructor
 public class EtlMaterializationAdvice extends AbstractRequestHandlerAdvice {
 

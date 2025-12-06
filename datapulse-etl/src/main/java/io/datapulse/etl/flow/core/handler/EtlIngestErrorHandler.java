@@ -79,6 +79,7 @@ public class EtlIngestErrorHandler {
     }
 
     return new ExecutionOutcome(
+        requestId,
         accountId,
         sourceId,
         marketplace,

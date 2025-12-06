@@ -40,13 +40,13 @@ public class EtlSnapshotIngestionFlowConfig {
   private final RawBatchInsertJdbcRepository repository;
 
   @Bean
-  public IntegrationFlow etlIngestFlow(Advice ingestErrorAdvice) {
+  public IntegrationFlow etlIngestFlow(Advice etlIngestExecutionAdvice) {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
         .handle(
             EtlSourceExecution.class,
             this::fetchSnapshotAndBuildContext,
-            endpoint -> endpoint.advice(ingestErrorAdvice)
+            endpoint -> endpoint.advice(etlIngestExecutionAdvice)
         )
         .log(message -> {
           IngestContext ingestContext = (IngestContext) message.getPayload();
@@ -123,7 +123,7 @@ public class EtlSnapshotIngestionFlowConfig {
             IngestBatch.class,
             this::handleBatch,
             endpoint -> endpoint
-                .advice(ingestErrorAdvice)
+                .advice(etlIngestExecutionAdvice)
                 .requiresReply(false)
         )
         .get();

@@ -6,6 +6,7 @@ import io.datapulse.etl.event.EventSource;
 import java.time.LocalDate;
 
 public record EtlSourceExecution(
+    String requestId,
     String sourceId,
     MarketplaceEvent event,
     MarketplaceType marketplace,

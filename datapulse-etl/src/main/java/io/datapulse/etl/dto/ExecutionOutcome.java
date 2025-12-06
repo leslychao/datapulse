@@ -5,6 +5,7 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.IngestStatus;
 
 public record ExecutionOutcome(
+    String requestId,
     long accountId,
     String sourceId,
     MarketplaceType marketplace,

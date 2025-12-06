@@ -45,10 +45,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.aop.Advice;
 import org.apache.commons.collections4.CollectionUtils;
+import org.checkerframework.checker.units.qual.h;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -120,9 +120,6 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .enrichHeaders(h ->
-            h.headerFunction(HDR_ETL_REQUEST_ID, message -> UUID.randomUUID().toString())
-        )
         .transform(EtlRunRequest.class, this::toOrchestrationCommand)
         .wireTap(flow -> flow
             .handle(
@@ -158,7 +155,10 @@ public class EtlOrchestratorFlowConfig {
       throw new AppException(ETL_REQUEST_INVALID);
     }
 
+    String requestId = UUID.randomUUID().toString();
+
     return new OrchestrationCommand(
+        requestId,
         request.accountId(),
         MarketplaceEvent.fromString(request.event()),
         dateFrom,
@@ -187,8 +187,7 @@ public class EtlOrchestratorFlowConfig {
         .get();
   }
 
-  @Bean("etlIngestExecutionAdvice")
-  @Qualifier("etlIngestExecutionAdvice")
+  @Bean
   public Advice etlIngestExecutionAdvice(EtlIngestErrorHandler ingestErrorHandler) {
     return new EtlAbstractRequestHandlerAdvice() {
 
@@ -202,6 +201,7 @@ public class EtlOrchestratorFlowConfig {
           callback.execute();
           long rowsCount = 0L;
           return new ExecutionOutcome(
+              execution.requestId(),
               execution.accountId(),
               execution.sourceId(),
               execution.marketplace(),
@@ -229,6 +229,12 @@ public class EtlOrchestratorFlowConfig {
   ) {
     return IntegrationFlow
         .from(CH_ETL_RUN_CORE)
+        .enrichHeaders(enricher -> enricher
+            .headerFunction(
+                HDR_ETL_ORCHESTRATION_COMMAND,
+                Message::getPayload
+            )
+        )
         .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
         .split()
         .channel(c -> c.executor(etlOrchestrateExecutor))
@@ -292,6 +298,7 @@ public class EtlOrchestratorFlowConfig {
           return active;
         })
         .map(src -> new EtlSourceExecution(
+            command.requestId(),
             src.sourceId(),
             event,
             src.marketplace(),
@@ -349,6 +356,7 @@ public class EtlOrchestratorFlowConfig {
         .toList();
 
     return new ExecutionAggregationResult(
+        command.requestId(),
         command.accountId(),
         command.event(),
         command.dateFrom(),
@@ -362,15 +370,14 @@ public class EtlOrchestratorFlowConfig {
       MessageHeaders messageHeaders
   ) {
     List<ExecutionOutcome> outcomes = aggregation.outcomes();
-    String requestId = messageHeaders.get(HDR_ETL_REQUEST_ID, String.class);
     updateAudit(aggregation, outcomes);
     boolean hasSuccess = outcomes.stream().anyMatch(o -> o.status() == IngestStatus.SUCCESS);
     boolean hasWaitingRetry = outcomes.stream()
         .anyMatch(o -> o.status() == IngestStatus.WAITING_RETRY);
     if (hasWaitingRetry) {
-      scheduleWaitRetry(aggregation, outcomes, requestId);
+      scheduleWaitRetry(aggregation, outcomes);
     } else if (hasSuccess) {
-      startMaterialization(aggregation, requestId);
+      startMaterialization(aggregation);
     }
 
     return null;
@@ -393,19 +400,19 @@ public class EtlOrchestratorFlowConfig {
     System.out.println(failedSourcesSummary);
   }
 
-  private void startMaterialization(ExecutionAggregationResult aggregation, String requestId) {
+  private void startMaterialization(ExecutionAggregationResult aggregation) {
     try {
       etlMaterializationService.materialize(
           aggregation.accountId(),
           aggregation.event(),
           aggregation.dateFrom(),
           aggregation.dateTo(),
-          requestId
+          aggregation.requestId()
       );
     } catch (Exception ex) {
       log.error(
           "Materialization failed: requestId={}, accountId={}, event={}",
-          requestId,
+          aggregation.requestId(),
           aggregation.accountId(),
           aggregation.event(),
           ex
@@ -415,8 +422,7 @@ public class EtlOrchestratorFlowConfig {
 
   private void scheduleWaitRetry(
       ExecutionAggregationResult aggregation,
-      List<ExecutionOutcome> outcomes,
-      String requestId
+      List<ExecutionOutcome> outcomes
   ) {
     List<String> retrySourceIds = outcomes
         .stream()
@@ -440,6 +446,7 @@ public class EtlOrchestratorFlowConfig {
         .orElse(DEFAULT_WAIT_TTL_MILLIS);
 
     OrchestrationCommand retryCommand = new OrchestrationCommand(
+        aggregation.requestId(),
         aggregation.accountId(),
         aggregation.event(),
         aggregation.dateFrom(),
@@ -459,7 +466,7 @@ public class EtlOrchestratorFlowConfig {
 
     log.info(
         "Scheduled WAIT retry: requestId={}, accountId={}, event={}, retrySourceIds={}, ttlMillis={}",
-        requestId,
+        aggregation.requestId(),
         aggregation.accountId(),
         aggregation.event(),
         retrySourceIds,
