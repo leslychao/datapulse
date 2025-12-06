@@ -9,12 +9,12 @@ marketplace:
             limit: 2
             period: 20s
           WB_WAREHOUSES_FBS:
-            limit: 300
-            period: 60s
+            limit: 1
+            period: 10s
       endpoints:
         DICT_WB_WAREHOUSES_FBW:
           url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
-          rateLimitGroup: WB_WAREHOUSES_FBW
+          rateLimitGroup: WB_WAREHOUSES_FBS
         DICT_WB_OFFICES_FBS:
           url: https://marketplace-api-sandbox.wildberries.ru/api/v3/offices
           rateLimitGroup: WB_WAREHOUSES_FBS

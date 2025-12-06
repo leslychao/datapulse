@@ -107,7 +107,18 @@ public final class MessageCodes {
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
   public static final String ETL_MATERIALIZATION_FALLBACK_ERROR =
       "etl.materialization.error.fallback";
-  public static final String ETL_NO_INGEST_RESULTS = "etl.no.ingest.results";
+
+
+  // ===== ETL / Ingest / Snapshot =====
+  public static final String ETL_INGEST_SNAPSHOT_REQUIRED =
+      "etl.ingest.snapshot.required";
+  public static final String ETL_INGEST_SNAPSHOT_FILE_REQUIRED =
+      "etl.ingest.snapshot.file.required";
+  public static final String ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED =
+      "etl.ingest.snapshot.element-type.required";
+  public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND =
+      "etl.ingest.json-layout.not-found";
+  public static final String ETL_INGEST_SOURCE_NO_DATA = "etl.ingest.source.no-data";
 
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";

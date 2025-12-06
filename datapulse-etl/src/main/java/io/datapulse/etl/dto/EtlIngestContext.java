@@ -3,13 +3,12 @@ package io.datapulse.etl.dto;
 import io.datapulse.domain.MarketplaceType;
 import java.nio.file.Path;
 
-public record EtlSnapshotContext(
+public record EtlIngestContext(
     String requestId,
     Long accountId,
     String event,
     MarketplaceType marketplace,
     String sourceId,
-    String snapshotId,
     Path snapshotFile,
     String rawTable
 ) {

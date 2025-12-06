@@ -64,4 +64,6 @@ public final class ValidationKeys {
       "{" + MessageCodes.ETL_DATE_FROM_REQUIRED + "}";
   public static final String ETL_DATE_TO_REQUIRED =
       "{" + MessageCodes.ETL_DATE_TO_REQUIRED + "}";
+  public static final String ETL_EVENT_SOURCES_MISSING =
+      "{" + MessageCodes.ETL_EVENT_SOURCES_MISSING + "}";
 }

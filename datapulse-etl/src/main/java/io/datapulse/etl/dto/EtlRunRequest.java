@@ -5,8 +5,8 @@ import java.time.LocalDate;
 public record EtlRunRequest(
     Long accountId,
     String event,
-    LocalDate from,
-    LocalDate to,
+    LocalDate dateFrom,
+    LocalDate dateTo,
     Integer burst
 ) {
 

@@ -3,7 +3,6 @@ package io.datapulse.etl.flow.core;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 
 import io.datapulse.domain.SyncStatus;
-import io.datapulse.etl.dto.OrchestrationBundle;
 import io.datapulse.etl.flow.advice.EtlMaterializationAdvice;
 import io.datapulse.etl.service.EtlMaterializationService;
 import lombok.RequiredArgsConstructor;

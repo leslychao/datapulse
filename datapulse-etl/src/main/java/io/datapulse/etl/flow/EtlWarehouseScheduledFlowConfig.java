@@ -1,7 +1,7 @@
 package io.datapulse.etl.flow;
 
-import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
-import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;

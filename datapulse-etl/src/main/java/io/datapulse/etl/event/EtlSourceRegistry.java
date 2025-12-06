@@ -1,13 +1,17 @@
 package io.datapulse.etl.event;
 
+import static io.datapulse.domain.MessageCodes.ETL_EVENT_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.ETL_EVENT_SOURCES_MISSING;
+
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
+import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.NonNull;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;
@@ -15,43 +19,61 @@ import org.springframework.stereotype.Component;
 @Component
 public final class EtlSourceRegistry {
 
-  private final Map<Key, List<RegisteredSource>> sourcesByKey;
+  private final Map<MarketplaceEvent, List<RegisteredSource>> sourcesByEvent;
 
-  public EtlSourceRegistry(@NonNull List<EventSource> sources) {
-    Map<Key, List<RegisteredSource>> tmp = new LinkedHashMap<>();
+  public EtlSourceRegistry(
+      @NotNull(message = ETL_EVENT_SOURCES_MISSING)
+      List<EventSource> sources
+  ) {
+    Map<MarketplaceEvent, List<RegisteredSource>> tmp = new LinkedHashMap<>();
 
     for (EventSource source : sources) {
+      if (source == null) {
+        continue;
+      }
+
       Class<?> targetClass = AopUtils.getTargetClass(source);
       EtlSourceMeta meta = AnnotationUtils.findAnnotation(targetClass, EtlSourceMeta.class);
       if (meta == null) {
         continue;
       }
 
-      Key key = new Key(meta.event(), meta.marketplace());
-      tmp.computeIfAbsent(key, k -> new ArrayList<>())
-          .add(new RegisteredSource(
-              meta.event(),
-              meta.marketplace(),
-              meta.order(),
-              targetClass.getSimpleName(),
-              source,
-              meta.rawTableName()
-          ));
+      MarketplaceEvent event = meta.event();
+      MarketplaceType marketplace = meta.marketplace();
+
+      RegisteredSource registeredSource = new RegisteredSource(
+          event,
+          marketplace,
+          meta.order(),
+          targetClass.getSimpleName(),
+          source,
+          meta.rawTableName()
+      );
+
+      tmp.computeIfAbsent(event, e -> new ArrayList<>()).add(registeredSource);
     }
 
-    tmp.replaceAll((key, list) -> list.stream()
-        .sorted(Comparator.comparingInt(RegisteredSource::order))
-        .toList());
+    tmp.replaceAll((event, list) ->
+        list.stream()
+            .sorted(Comparator.comparingInt(RegisteredSource::order))
+            .toList()
+    );
 
-    this.sourcesByKey = Map.copyOf(tmp);
+    this.sourcesByEvent = Map.copyOf(tmp);
   }
 
-  public List<RegisteredSource> findSources(
-      @NonNull MarketplaceEvent event,
-      @NonNull MarketplaceType marketplace
+  public List<RegisteredSource> getSources(
+      @NotNull(message = ETL_EVENT_REQUIRED) MarketplaceEvent event
   ) {
-    Key key = new Key(event, marketplace);
-    return sourcesByKey.getOrDefault(key, List.of());
+    List<RegisteredSource> registeredSources = sourcesByEvent.get(event);
+    if (registeredSources == null || registeredSources.isEmpty()) {
+      throw new AppException(
+          ETL_EVENT_SOURCES_MISSING,
+          "No ETL sources registered for event " + event.name()
+      );
+    }
+
+    return registeredSources;
   }
 
   public record RegisteredSource(
@@ -62,11 +84,6 @@ public final class EtlSourceRegistry {
       EventSource source,
       String rawTable
   ) {
-  }
 
-  private record Key(
-      MarketplaceEvent event,
-      MarketplaceType marketplace
-  ) {
   }
 }

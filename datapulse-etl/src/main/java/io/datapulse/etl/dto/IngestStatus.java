@@ -2,6 +2,8 @@ package io.datapulse.etl.dto;
 
 public enum IngestStatus {
   SUCCESS,
-  ERROR,
-  WAIT
+  PARTIAL_SUCCESS,
+  FAILED,
+  WAIT,
+  NO_DATA
 }
