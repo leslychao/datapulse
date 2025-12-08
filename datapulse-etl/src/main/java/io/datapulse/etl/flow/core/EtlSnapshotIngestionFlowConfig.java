@@ -84,6 +84,7 @@ public class EtlSnapshotIngestionFlowConfig {
               );
             })
             .releaseStrategy(group -> group.size() >= SNAPSHOT_BATCH_SIZE)
+            .sendPartialResultOnExpiry(true)
             .groupTimeout(5_000L)
             .outputProcessor(group -> {
               Message<?> sampleMessage = group.getOne();
