@@ -11,16 +11,6 @@ public final class EtlFlowConstants {
   public static final String CH_ETL_ORCHESTRATION_RESULT = "ETL_ORCHESTRATION_RESULT";
 
   public static final String HDR_ETL_REQUEST_ID = "ETL_REQUEST_ID";
-  public static final String HDR_ETL_ACCOUNT_ID = "ETL_ACCOUNT_ID";
-  public static final String HDR_ETL_EVENT = "ETL_EVENT";
-  public static final String HDR_ETL_DATE_FROM = "ETL_DATE_FROM";
-  public static final String HDR_ETL_DATE_TO = "ETL_DATE_TO";
-  public static final String HDR_ETL_SOURCE_MARKETPLACE = "ETL_SOURCE_MARKETPLACE";
-  public static final String HDR_ETL_SOURCE_ID = "ETL_SOURCE_ID";
-  public static final String HDR_ETL_SYNC_STATUS = "ETL_SYNC_STATUS";
-  public static final String HDR_ETL_ERROR_MESSAGE = "ETL_ERROR_MESSAGE";
-  public static final String HDR_ETL_RAW_TABLE = "ETL_RAW_TABLE";
-  public static final String HDR_ETL_RETRY_SOURCE_IDS = "ETL_RETRY_SOURCE_IDS";
   public static final String HDR_ETL_EXECUTION_GROUP_ID = "ETL_EXECUTION_GROUP_ID";
   public static final String HDR_ETL_ORCHESTRATION_COMMAND = "ETL_ORCHESTRATION_COMMAND";
 }

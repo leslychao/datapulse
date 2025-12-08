@@ -99,15 +99,11 @@ public final class MessageCodes {
   // ===== ETL / Events =====
   public static final String ETL_DATE_FROM_REQUIRED = "etl.date-from.required";
   public static final String ETL_DATE_TO_REQUIRED = "etl.date-to.required";
-  public static final String ETL_CONTEXT_MISSING = "etl.context.missing";
   public static final String ETL_EVENT_REQUIRED = "etl.event.required";
   public static final String ETL_EVENT_UNKNOWN = "etl.event.unknown";
   public static final String ETL_EVENT_SOURCES_MISSING =
       "etl.event.sources.missing";
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
-  public static final String ETL_MATERIALIZATION_FALLBACK_ERROR =
-      "etl.materialization.error.fallback";
-
 
   // ===== ETL / Ingest / Snapshot =====
   public static final String ETL_INGEST_SNAPSHOT_REQUIRED =
@@ -118,7 +114,6 @@ public final class MessageCodes {
       "etl.ingest.snapshot.element-type.required";
   public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND =
       "etl.ingest.json-layout.not-found";
-  public static final String ETL_INGEST_SOURCE_NO_DATA = "etl.ingest.source.no-data";
 
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";

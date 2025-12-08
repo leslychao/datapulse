@@ -5,7 +5,6 @@ import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_
 import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_FILE_REQUIRED;
 import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_REQUIRED;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.dto.EtlSourceExecution;
@@ -26,7 +25,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.util.CloseableIterator;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHeaders;
 
 @Configuration
 @Slf4j
@@ -51,8 +49,7 @@ public class EtlSnapshotIngestionFlowConfig {
         .log(message -> {
           IngestContext ingestContext = (IngestContext) message.getPayload();
           EtlSourceExecution execution = ingestContext.execution();
-          MessageHeaders headers = message.getHeaders();
-          String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
+          String requestId = execution.requestId();
 
           return String.format(
               "ETL snapshot ready for ingest: requestId=%s, accountId=%s, event=%s, " +
@@ -77,7 +74,7 @@ public class EtlSnapshotIngestionFlowConfig {
                 EtlSourceExecution e = ingestItem.context().execution();
                 return String.format(
                     "%s:%s:%s:%s:%s",
-                    message.getHeaders().get(HDR_ETL_REQUEST_ID, String.class),
+                    e.requestId(),
                     e.accountId(),
                     e.event(),
                     e.marketplace(),
@@ -186,11 +183,9 @@ public class EtlSnapshotIngestionFlowConfig {
       return null;
     }
 
-    MessageHeaders headers = new MessageHeaders(headersMap);
-    String requestId = headers.get(HDR_ETL_REQUEST_ID, String.class);
-
     IngestContext context = batch.context();
     EtlSourceExecution execution = context.execution();
+    String requestId = execution.requestId();
 
     repository.saveBatch(
         rows,

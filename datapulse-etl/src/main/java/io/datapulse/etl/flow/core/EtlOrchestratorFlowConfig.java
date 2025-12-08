@@ -13,7 +13,6 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_R
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_ORCHESTRATION_COMMAND;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_REQUEST_ID;
 
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.core.service.EtlSyncAuditService;
@@ -45,7 +44,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.aop.Advice;
 import org.apache.commons.collections4.CollectionUtils;
-import org.checkerframework.checker.units.qual.h;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -74,6 +72,7 @@ public class EtlOrchestratorFlowConfig {
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlSyncAuditService etlSyncAuditService;
   private final EtlMaterializationService etlMaterializationService;
+  private final EtlOrchestrationCommandFactory etlOrchestrationCommandFactory;
 
   private record MarketplacePlan(
       MarketplaceType marketplace,
@@ -120,7 +119,10 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .transform(EtlRunRequest.class, this::toOrchestrationCommand)
+        .transform(
+            EtlRunRequest.class,
+            etlOrchestrationCommandFactory::toCommand
+        )
         .wireTap(flow -> flow
             .handle(
                 Amqp.outboundAdapter(etlExecutionRabbitTemplate)
@@ -132,39 +134,13 @@ public class EtlOrchestratorFlowConfig {
         .handle(
             OrchestrationCommand.class,
             (command, headers) -> Map.of(
-                "requestId", Objects.requireNonNull(headers.get(HDR_ETL_REQUEST_ID, String.class)),
+                "requestId", command.requestId(),
                 "accountId", command.accountId(),
                 "event", command.event().name()
             ),
             endpoint -> endpoint.requiresReply(true)
         )
         .get();
-  }
-
-  private OrchestrationCommand toOrchestrationCommand(EtlRunRequest request) {
-    if (request == null) {
-      throw new AppException(ETL_REQUEST_INVALID);
-    }
-    if (request.accountId() == null || request.event() == null) {
-      throw new AppException(ETL_REQUEST_INVALID);
-    }
-
-    LocalDate dateFrom = request.dateFrom();
-    LocalDate dateTo = request.dateTo();
-    if (dateFrom == null || dateTo == null || dateTo.isBefore(dateFrom)) {
-      throw new AppException(ETL_REQUEST_INVALID);
-    }
-
-    String requestId = UUID.randomUUID().toString();
-
-    return new OrchestrationCommand(
-        requestId,
-        request.accountId(),
-        MarketplaceEvent.fromString(request.event()),
-        dateFrom,
-        dateTo,
-        List.of()
-    );
   }
 
   @Bean

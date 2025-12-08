@@ -46,11 +46,14 @@ public class EtlOrchestrationCommandFactory {
   }
 
   private void validateRunRequest(EtlRunRequest request) {
+    if (request == null) {
+      throw new AppException(ETL_REQUEST_INVALID, "request is null");
+    }
     List<String> missingFields = Stream.of(
             new RequiredField("accountId", request.accountId()),
             new RequiredField("event", request.event()),
-            new RequiredField("from", request.dateFrom()),
-            new RequiredField("to", request.dateTo())
+            new RequiredField("dateFrom", request.dateFrom()),
+            new RequiredField("dateTo", request.dateTo())
         )
         .filter(field -> field.value() == null)
         .map(RequiredField::name)
