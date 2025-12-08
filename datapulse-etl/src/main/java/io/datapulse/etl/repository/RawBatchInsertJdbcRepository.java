@@ -52,6 +52,13 @@ public class RawBatchInsertJdbcRepository {
     );
   }
 
+  public long countByRequestId(String tableName, String requestId) {
+    rawTableSchemaRepository.ensureTableExists(tableName);
+    String sql = "select count(*) from %s where request_id = ?".formatted(tableName);
+    Long result = jdbcTemplate.queryForObject(sql, Long.class, requestId);
+    return result != null ? result : 0L;
+  }
+
   private <T> String toJson(T raw) {
     try {
       return objectMapper.writeValueAsString(raw);

@@ -29,6 +29,7 @@ import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
 import io.datapulse.etl.flow.core.handler.EtlIngestErrorHandler;
+import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import io.datapulse.etl.service.EtlMaterializationService;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -162,7 +163,9 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public Advice etlIngestExecutionAdvice(EtlIngestErrorHandler ingestErrorHandler) {
+  public Advice etlIngestExecutionAdvice(
+      EtlIngestErrorHandler ingestErrorHandler,
+      RawBatchInsertJdbcRepository rawBatchInsertJdbcRepository) {
     return new EtlAbstractRequestHandlerAdvice() {
 
       @Override
@@ -173,14 +176,20 @@ public class EtlOrchestratorFlowConfig {
         }
         try {
           callback.execute();
-          long rowsCount = 0L;
+          long rowsCount = rawBatchInsertJdbcRepository.countByRequestId(
+              execution.rawTable(),
+              execution.requestId()
+          );
+          IngestStatus status = (rowsCount > 0L)
+              ? IngestStatus.SUCCESS
+              : IngestStatus.NO_DATA;
           return new ExecutionOutcome(
               execution.requestId(),
               execution.accountId(),
               execution.sourceId(),
               execution.marketplace(),
               execution.event(),
-              IngestStatus.SUCCESS,
+              status,
               rowsCount,
               null,
               null
@@ -362,7 +371,6 @@ public class EtlOrchestratorFlowConfig {
       List<ExecutionOutcome> outcomes
   ) {
     List<String> failedSourceIds = outcomes.stream()
-        .filter(o -> o.status() == IngestStatus.FAILED)
         .map(ExecutionOutcome::sourceId)
         .filter(Objects::nonNull)
         .distinct()
@@ -371,7 +379,10 @@ public class EtlOrchestratorFlowConfig {
     String failedSourcesSummary = failedSourceIds.isEmpty()
         ? null
         : String.join(",", failedSourceIds);
-    System.out.println(failedSourcesSummary);
+
+    outcomes.forEach(executionOutcome -> {
+      System.out.println("AUDIT====================: " + executionOutcome);
+    });
   }
 
   private void startMaterialization(ExecutionAggregationResult aggregation) {

@@ -83,9 +83,19 @@ public class EtlSnapshotIngestionFlowConfig {
                   "Unexpected payload type in correlationStrategy: " + payload.getClass().getName()
               );
             })
-            .releaseStrategy(group -> group.size() >= SNAPSHOT_BATCH_SIZE)
+            .releaseStrategy(group -> {
+              if (group.size() >= SNAPSHOT_BATCH_SIZE) {
+                return true;
+              }
+
+              return group.getMessages()
+                  .stream()
+                  .map(Message::getPayload)
+                  .filter(IngestItem.class::isInstance)
+                  .map(payload -> (IngestItem<?>) payload)
+                  .anyMatch(IngestItem::last);
+            })
             .sendPartialResultOnExpiry(true)
-            .groupTimeout(5_000L)
             .outputProcessor(group -> {
               Message<?> sampleMessage = group.getOne();
               Object samplePayload = sampleMessage.getPayload();
@@ -212,7 +222,8 @@ public class EtlSnapshotIngestionFlowConfig {
 
   public record IngestItem<T>(
       IngestContext context,
-      T row
+      T row,
+      boolean last
   ) {
 
   }
