@@ -10,7 +10,5 @@ public final class EtlFlowConstants {
   public static final String CH_ETL_RUN_CORE = "ETL_RUN_CORE";
   public static final String CH_ETL_ORCHESTRATION_RESULT = "ETL_ORCHESTRATION_RESULT";
 
-  public static final String HDR_ETL_REQUEST_ID = "ETL_REQUEST_ID";
   public static final String HDR_ETL_EXECUTION_GROUP_ID = "ETL_EXECUTION_GROUP_ID";
-  public static final String HDR_ETL_ORCHESTRATION_COMMAND = "ETL_ORCHESTRATION_COMMAND";
 }

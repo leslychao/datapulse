@@ -2,7 +2,7 @@ package io.datapulse.etl.dto;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.IngestStatus;
+import java.time.LocalDate;
 
 public record ExecutionOutcome(
     String requestId,
@@ -10,6 +10,8 @@ public record ExecutionOutcome(
     String sourceId,
     MarketplaceType marketplace,
     MarketplaceEvent event,
+    LocalDate dateFrom,
+    LocalDate dateTo,
     IngestStatus status,
     long rowsCount,
     String errorMessage,

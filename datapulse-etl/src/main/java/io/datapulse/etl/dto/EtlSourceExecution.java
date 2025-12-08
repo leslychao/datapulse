@@ -11,8 +11,8 @@ public record EtlSourceExecution(
     MarketplaceEvent event,
     MarketplaceType marketplace,
     Long accountId,
-    LocalDate from,
-    LocalDate to,
+    LocalDate dateFrom,
+    LocalDate dateTo,
     int order,
     EventSource source,
     String rawTable

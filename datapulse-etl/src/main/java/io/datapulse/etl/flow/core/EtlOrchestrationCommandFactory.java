@@ -69,7 +69,7 @@ public class EtlOrchestrationCommandFactory {
     if (request.dateFrom().isAfter(request.dateTo())) {
       throw new AppException(
           ETL_REQUEST_INVALID,
-          "'from' must be <= 'to'"
+          "'dateFrom' must be <= 'dateTo'"
       );
     }
   }

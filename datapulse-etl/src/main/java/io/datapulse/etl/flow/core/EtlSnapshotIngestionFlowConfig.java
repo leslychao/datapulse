@@ -142,8 +142,8 @@ public class EtlSnapshotIngestionFlowConfig {
         .fetchSnapshot(
             execution.accountId(),
             execution.event(),
-            execution.from(),
-            execution.to()
+            execution.dateFrom(),
+            execution.dateTo()
         );
 
     if (snapshot == null) {

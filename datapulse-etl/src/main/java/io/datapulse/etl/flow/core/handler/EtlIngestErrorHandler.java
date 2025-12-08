@@ -25,10 +25,11 @@ public class EtlIngestErrorHandler {
       Throwable error,
       Message<?> message
   ) {
-    if (!(message.getPayload() instanceof EtlSourceExecution execution)) {
+    Object payload = message.getPayload();
+    if (!(payload instanceof EtlSourceExecution execution)) {
       throw new IllegalStateException(
           "ETL ingest error handler expects EtlSourceExecution payload, but got: "
-              + message.getPayload().getClass().getName()
+              + payload.getClass().getName()
       );
     }
 
@@ -79,6 +80,8 @@ public class EtlIngestErrorHandler {
         sourceId,
         marketplace,
         event,
+        execution.dateFrom(),
+        execution.dateTo(),
         status,
         0L,
         safeErrorMessage,

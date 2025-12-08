@@ -26,7 +26,7 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
   ) {
     if (accountId == null) {
       log.warn(
-          "ETL materialization skipped: null accountId, requestId={}, event={}, from={}, to={}",
+          "ETL materialization skipped: null accountId, requestId={}, event={}, dateFrom={}, dateTo={}",
           requestId,
           event,
           from,
@@ -36,7 +36,7 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
     }
 
     log.info(
-        "ETL materialization started: requestId={}, accountId={}, event={}, from={}, to={}",
+        "ETL materialization started: requestId={}, accountId={}, event={}, dateFrom={}, dateTo={}",
         requestId,
         accountId,
         event,
@@ -55,7 +55,7 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
     }
 
     log.info(
-        "ETL materialization finished: requestId={}, accountId={}, event={}, from={}, to={}",
+        "ETL materialization finished: requestId={}, accountId={}, event={}, dateFrom={}, dateTo={}",
         requestId,
         accountId,
         event,
