@@ -78,6 +78,7 @@ public class EtlOrchestratorFlowConfig {
       MarketplaceType marketplace,
       List<EtlSourceExecution> executions
   ) {
+
   }
 
   @Bean(name = CH_ETL_RUN_CORE)
@@ -369,33 +370,22 @@ public class EtlOrchestratorFlowConfig {
       );
     }
 
-    List<ExecutionOutcome> outcomes = group
-        .streamMessages()
+    Map<String, List<IngestStatus>> statusesBySourceId = group.streamMessages()
         .map(Message::getPayload)
         .filter(ExecutionOutcome.class::isInstance)
         .map(ExecutionOutcome.class::cast)
-        .toList();
+        .filter(outcome -> outcome.sourceId() != null)
+        .collect(Collectors.groupingBy(
+            ExecutionOutcome::sourceId,
+            Collectors.mapping(ExecutionOutcome::status, Collectors.toList())
+        ));
 
-    if (outcomes.isEmpty()) {
+    if (statusesBySourceId.isEmpty() || statusesBySourceId.size() < expected) {
       return false;
     }
 
-    Set<String> allSourceIds = outcomes.stream()
-        .map(ExecutionOutcome::sourceId)
-        .filter(Objects::nonNull)
-        .collect(Collectors.toSet());
-
-    if (allSourceIds.size() < expected) {
-      return false;
-    }
-
-    return allSourceIds.stream()
-        .allMatch(sourceId -> outcomes.stream()
-            .anyMatch(o ->
-                sourceId.equals(o.sourceId())
-                    && o.status() != IngestStatus.WAITING_RETRY
-            )
-        );
+    return statusesBySourceId.values().stream()
+        .allMatch(statuses -> statuses.stream().anyMatch(IngestStatus::isTerminal));
   }
 
   private ExecutionAggregationResult buildExecutionAggregationResult(MessageGroup group) {
