@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.aopalliance.aop.Advice;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
@@ -38,13 +37,12 @@ public class EtlSnapshotIngestionFlowConfig {
   private final RawBatchInsertJdbcRepository repository;
 
   @Bean
-  public IntegrationFlow etlIngestFlow(Advice etlIngestExecutionAdvice) {
+  public IntegrationFlow etlIngestFlow() {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
         .handle(
             EtlSourceExecution.class,
-            this::fetchSnapshotAndBuildContext,
-            endpoint -> endpoint.advice(etlIngestExecutionAdvice)
+            this::fetchSnapshotAndBuildContext
         )
         .log(message -> {
           IngestContext ingestContext = (IngestContext) message.getPayload();
@@ -119,9 +117,7 @@ public class EtlSnapshotIngestionFlowConfig {
         .handle(
             IngestBatch.class,
             this::handleBatch,
-            endpoint -> endpoint
-                .advice(etlIngestExecutionAdvice)
-                .requiresReply(false)
+            endpoint -> endpoint.requiresReply(false)
         )
         .get();
   }
