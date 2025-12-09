@@ -8,8 +8,6 @@ import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.etl.dto.ExecutionAggregationResult;
 import io.datapulse.etl.dto.ExecutionOutcome;
 import io.datapulse.etl.dto.IngestStatus;
-import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
-import io.datapulse.etl.flow.core.handler.EtlMaterializationErrorHandler;
 import io.datapulse.etl.service.EtlMaterializationService;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +21,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.channel.PublishSubscribeChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 
 @Configuration
@@ -32,7 +29,6 @@ import org.springframework.messaging.MessageChannel;
 public class EtlAggregationResultFlowConfig {
 
   private final EtlMaterializationService etlMaterializationService;
-  private final EtlMaterializationErrorHandler materializationErrorHandler;
   private final EtlExecutionAuditService etlExecutionAuditService;
 
   @Bean(name = CH_ETL_ORCHESTRATION_RESULT)
@@ -40,51 +36,6 @@ public class EtlAggregationResultFlowConfig {
       @Qualifier("etlOrchestrateExecutor") TaskExecutor etlOrchestrateExecutor
   ) {
     return new PublishSubscribeChannel(etlOrchestrateExecutor);
-  }
-
-  @Bean
-  public Advice etlMaterializationExecutionAdvice() {
-    return new EtlAbstractRequestHandlerAdvice() {
-
-      @Override
-      protected Object doInvoke(
-          ExecutionCallback callback,
-          Object target,
-          Message<?> message
-      ) {
-        ExecutionAggregationResult aggregation =
-            (ExecutionAggregationResult) message.getPayload();
-
-        try {
-          return callback.execute();
-        } catch (Exception ex) {
-          Throwable cause = unwrapProcessingError(ex);
-          materializationErrorHandler.handleMaterializationError(cause, aggregation);
-          return null;
-        }
-      }
-    };
-  }
-
-  @Bean
-  public Advice etlExecutionAuditAdvice() {
-    return new EtlAbstractRequestHandlerAdvice() {
-
-      @Override
-      protected Object doInvoke(
-          ExecutionCallback callback,
-          Object target,
-          Message<?> message
-      ) {
-        try {
-          return callback.execute();
-        } catch (Exception ex) {
-          Throwable cause = unwrapProcessingError(ex);
-          log.error("Failed to persist ETL execution audit: {}", cause.getMessage(), cause);
-          return null;
-        }
-      }
-    };
   }
 
   @Bean
@@ -120,7 +71,8 @@ public class EtlAggregationResultFlowConfig {
 
   @Bean
   public IntegrationFlow etlAggregationMaterializationFlow(
-      Advice etlMaterializationExecutionAdvice) {
+      Advice etlMaterializationExecutionAdvice
+  ) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATION_RESULT)
         .filter(
@@ -142,7 +94,8 @@ public class EtlAggregationResultFlowConfig {
   }
 
   private List<EtlExecutionAuditDto> buildExecutionAuditDtos(
-      ExecutionAggregationResult aggregation) {
+      ExecutionAggregationResult aggregation
+  ) {
     Map<String, List<ExecutionOutcome>> bySource = aggregation.outcomes().stream()
         .filter(outcome -> outcome.sourceId() != null)
         .collect(Collectors.groupingBy(ExecutionOutcome::sourceId));
@@ -167,8 +120,14 @@ public class EtlAggregationResultFlowConfig {
         .filter(o -> o.status().isTerminal())
         .toList();
 
-    ExecutionOutcome finalOutcome = terminalOutcomes.get(terminalOutcomes.size() - 1);
+    if (terminalOutcomes.isEmpty()) {
+      throw new IllegalStateException(
+          "No terminal ingest outcomes found for sourceId=" + sourceId
+              + ", requestId=" + aggregation.requestId()
+      );
+    }
 
+    ExecutionOutcome finalOutcome = terminalOutcomes.get(terminalOutcomes.size() - 1);
     SyncStatus syncStatus = mapFinalIngestStatus(finalOutcome.status());
 
     EtlExecutionAuditDto dto = new EtlExecutionAuditDto();
