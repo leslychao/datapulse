@@ -2,6 +2,9 @@ package io.datapulse.etl.flow.core;
 
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 
+import io.datapulse.core.service.EtlExecutionAuditService;
+import io.datapulse.domain.SyncStatus;
+import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.etl.dto.ExecutionAggregationResult;
 import io.datapulse.etl.dto.ExecutionOutcome;
 import io.datapulse.etl.dto.IngestStatus;
@@ -9,7 +12,8 @@ import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
 import io.datapulse.etl.flow.core.handler.EtlMaterializationErrorHandler;
 import io.datapulse.etl.service.EtlMaterializationService;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.aop.Advice;
@@ -29,6 +33,7 @@ public class EtlAggregationResultFlowConfig {
 
   private final EtlMaterializationService etlMaterializationService;
   private final EtlMaterializationErrorHandler materializationErrorHandler;
+  private final EtlExecutionAuditService etlExecutionAuditService;
 
   @Bean(name = CH_ETL_ORCHESTRATION_RESULT)
   public MessageChannel etlOrchestrationResultChannel(
@@ -62,32 +67,66 @@ public class EtlAggregationResultFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlAggregationAuditFlow() {
+  public Advice etlExecutionAuditAdvice() {
+    return new EtlAbstractRequestHandlerAdvice() {
+
+      @Override
+      protected Object doInvoke(
+          ExecutionCallback callback,
+          Object target,
+          Message<?> message
+      ) {
+        try {
+          return callback.execute();
+        } catch (Exception ex) {
+          Throwable cause = unwrapProcessingError(ex);
+          log.error("Failed to persist ETL execution audit: {}", cause.getMessage(), cause);
+          return null;
+        }
+      }
+    };
+  }
+
+  @Bean
+  public IntegrationFlow etlExecutionAuditFlow(Advice etlExecutionAuditAdvice) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATION_RESULT)
+        .transform(ExecutionAggregationResult.class, this::buildExecutionAuditDtos)
+        .split()
         .handle(
-            ExecutionAggregationResult.class,
-            (aggregation, headers) -> {
-              onIngestionCompletedForAudit(aggregation);
+            EtlExecutionAuditDto.class,
+            (dto, headers) -> {
+              etlExecutionAuditService.save(dto);
+              log.info(
+                  "ETL execution audit saved: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}, retries={}, attempts={}",
+                  dto.getRequestId(),
+                  dto.getAccountId(),
+                  dto.getEvent(),
+                  dto.getMarketplace(),
+                  dto.getSourceId(),
+                  dto.getStatus(),
+                  dto.getRowsCount(),
+                  dto.getRetryCount(),
+                  dto.getAttemptsTotal()
+              );
               return null;
             },
-            endpoint -> endpoint.requiresReply(false)
+            endpoint -> endpoint
+                .requiresReply(false)
+                .advice(etlExecutionAuditAdvice)
         )
         .get();
   }
 
   @Bean
   public IntegrationFlow etlAggregationMaterializationFlow(
-      Advice etlMaterializationExecutionAdvice
-  ) {
+      Advice etlMaterializationExecutionAdvice) {
     return IntegrationFlow
         .from(CH_ETL_ORCHESTRATION_RESULT)
         .filter(
             ExecutionAggregationResult.class,
             this::hasSuccessfulOutcome,
-            spec -> spec.discardFlow(df -> df
-                .handle((payload, headers) -> null)
-            )
+            spec -> spec.discardFlow(df -> df.handle((payload, headers) -> null))
         )
         .handle(
             ExecutionAggregationResult.class,
@@ -102,31 +141,61 @@ public class EtlAggregationResultFlowConfig {
         .get();
   }
 
-  private void onIngestionCompletedForAudit(
-      ExecutionAggregationResult aggregation
-  ) {
-    List<ExecutionOutcome> outcomes = aggregation.outcomes();
+  private List<EtlExecutionAuditDto> buildExecutionAuditDtos(
+      ExecutionAggregationResult aggregation) {
+    Map<String, List<ExecutionOutcome>> bySource = aggregation.outcomes().stream()
+        .filter(outcome -> outcome.sourceId() != null)
+        .collect(Collectors.groupingBy(ExecutionOutcome::sourceId));
 
-    List<String> failedSourceIds = outcomes.stream()
-        .filter(o -> o.status() == IngestStatus.FAILED || o.status() == IngestStatus.WAITING_RETRY)
-        .map(ExecutionOutcome::sourceId)
-        .filter(Objects::nonNull)
-        .distinct()
+    return bySource.entrySet().stream()
+        .map(entry -> toAuditDto(aggregation, entry.getKey(), entry.getValue()))
+        .toList();
+  }
+
+  private EtlExecutionAuditDto toAuditDto(
+      ExecutionAggregationResult aggregation,
+      String sourceId,
+      List<ExecutionOutcome> outcomes
+  ) {
+    long retryCount = outcomes.stream()
+        .filter(o -> o.status() == IngestStatus.WAITING_RETRY)
+        .count();
+
+    int attemptsTotal = outcomes.size();
+
+    List<ExecutionOutcome> terminalOutcomes = outcomes.stream()
+        .filter(o -> o.status().isTerminal())
         .toList();
 
-    String failedSourcesSummary = failedSourceIds.isEmpty()
-        ? null
-        : String.join(",", failedSourceIds);
+    ExecutionOutcome finalOutcome = terminalOutcomes.get(terminalOutcomes.size() - 1);
 
-    // TODO: заменить на реальный вызов etlSyncAuditService, пока только лог
-    log.info(
-        "ETL aggregation audit: requestId={}, accountId={}, event={}, totalOutcomes={}, failedSources={}",
-        aggregation.requestId(),
-        aggregation.accountId(),
-        aggregation.event(),
-        outcomes.size(),
-        failedSourcesSummary
-    );
+    SyncStatus syncStatus = mapFinalIngestStatus(finalOutcome.status());
+
+    EtlExecutionAuditDto dto = new EtlExecutionAuditDto();
+    dto.setRequestId(aggregation.requestId());
+    dto.setAccountId(aggregation.accountId());
+    dto.setEvent(aggregation.event().name());
+    dto.setMarketplace(finalOutcome.marketplace());
+    dto.setSourceId(sourceId);
+    dto.setDateFrom(aggregation.dateFrom());
+    dto.setDateTo(aggregation.dateTo());
+    dto.setStatus(syncStatus);
+    dto.setRowsCount(finalOutcome.rowsCount());
+    dto.setRetryCount((int) retryCount);
+    dto.setAttemptsTotal(attemptsTotal);
+    dto.setErrorMessage(finalOutcome.errorMessage());
+    return dto;
+  }
+
+  private SyncStatus mapFinalIngestStatus(IngestStatus ingestStatus) {
+    return switch (ingestStatus) {
+      case SUCCESS -> SyncStatus.SUCCESS;
+      case NO_DATA -> SyncStatus.NO_DATA;
+      case FAILED -> SyncStatus.FAILED;
+      default -> throw new IllegalStateException(
+          "Unexpected terminal ingest status for audit: " + ingestStatus
+      );
+    };
   }
 
   private boolean hasSuccessfulOutcome(ExecutionAggregationResult aggregation) {

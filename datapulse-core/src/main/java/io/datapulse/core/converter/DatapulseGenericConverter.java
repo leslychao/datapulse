@@ -4,13 +4,13 @@ import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
-import io.datapulse.core.entity.EtlSyncAuditEntity;
+import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.mapper.AccountConnectionMapper;
 import io.datapulse.core.mapper.AccountMapper;
-import io.datapulse.core.mapper.EtlSyncAuditMapper;
+import io.datapulse.core.mapper.EtlExecutionAuditMapper;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.AccountDto;
-import io.datapulse.domain.dto.EtlSyncAuditDto;
+import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
@@ -35,7 +35,7 @@ public final class DatapulseGenericConverter implements GenericConverter {
 
   private final AccountMapper accountMapper;
   private final AccountConnectionMapper accountConnectionMapper;
-  private final EtlSyncAuditMapper etlSyncAuditMapper;
+  private final EtlExecutionAuditMapper etlSyncAuditMapper;
 
   private final Map<ConvertiblePair, Function<Object, Object>> converters = new LinkedHashMap<>();
 
@@ -82,12 +82,12 @@ public final class DatapulseGenericConverter implements GenericConverter {
     );
 
     converters.put(
-        new ConvertiblePair(EtlSyncAuditDto.class, EtlSyncAuditEntity.class),
-        src -> etlSyncAuditMapper.toEntity((EtlSyncAuditDto) src)
+        new ConvertiblePair(EtlExecutionAuditDto.class, EtlExecutionAuditEntity.class),
+        src -> etlSyncAuditMapper.toEntity((EtlExecutionAuditDto) src)
     );
     converters.put(
-        new ConvertiblePair(EtlSyncAuditEntity.class, EtlSyncAuditDto.class),
-        src -> etlSyncAuditMapper.toDto((EtlSyncAuditEntity) src)
+        new ConvertiblePair(EtlExecutionAuditEntity.class, EtlExecutionAuditDto.class),
+        src -> etlSyncAuditMapper.toDto((EtlExecutionAuditEntity) src)
     );
 
     // ===== DTO → RESPONSE

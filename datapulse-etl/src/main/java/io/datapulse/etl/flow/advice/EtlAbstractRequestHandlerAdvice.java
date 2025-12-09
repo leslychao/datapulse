@@ -4,7 +4,7 @@ import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvi
 import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.MessagingException;
 
-public abstract class EtlAbstractRequestHandlerAdvice extends AbstractRequestHandlerAdvice {
+public abstract class  EtlAbstractRequestHandlerAdvice extends AbstractRequestHandlerAdvice {
 
 
   protected Throwable unwrapProcessingError(Throwable error) {

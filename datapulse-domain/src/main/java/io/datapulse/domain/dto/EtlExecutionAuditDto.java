@@ -1,26 +1,28 @@
 package io.datapulse.domain.dto;
 
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.SyncStatus;
 import java.time.LocalDate;
-import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-@Getter
-@Setter
+@Data
 @EqualsAndHashCode(callSuper = true)
-@AllArgsConstructor
-@NoArgsConstructor
-public class EtlSyncAuditDto extends LongBaseDto {
+public class EtlExecutionAuditDto extends LongBaseDto {
 
   private String requestId;
   private Long accountId;
   private String event;
+  private MarketplaceType marketplace;
+  private String sourceId;
   private LocalDate dateFrom;
   private LocalDate dateTo;
+
   private SyncStatus status;
-  private String failedSources;
+
+  private Long rowsCount;
+  private Integer retryCount;
+  private Integer attemptsTotal;
+
   private String errorMessage;
 }
