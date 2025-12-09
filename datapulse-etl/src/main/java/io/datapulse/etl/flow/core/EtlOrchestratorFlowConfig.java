@@ -297,7 +297,7 @@ public class EtlOrchestratorFlowConfig {
           boolean active = activeMarketplaces.contains(src.marketplace());
           if (!active) {
             log.info(
-                "Skip source due dateTo no active connection: accountId={}, marketplace={}, sourceId={}",
+                "Skip source due to no active connection: accountId={}, marketplace={}, sourceId={}",
                 accountId, src.marketplace(), src.sourceId()
             );
           }
