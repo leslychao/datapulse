@@ -6,7 +6,6 @@ import org.springframework.messaging.MessagingException;
 
 public abstract class EtlAbstractRequestHandlerAdvice extends AbstractRequestHandlerAdvice {
 
-
   protected Throwable unwrapProcessingError(Throwable error) {
     Throwable current = error;
 
