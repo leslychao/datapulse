@@ -285,7 +285,7 @@ public class EtlOrchestratorFlowConfig {
         .channel(CH_ETL_ORCHESTRATION_RESULT)
         .handle(
             ExecutionAggregationResult.class,
-            this::finalizeExecutionGroup,
+            this::onIngestionCompleted,
             endpoint -> endpoint.requiresReply(false)
         )
         .get();
@@ -411,12 +411,12 @@ public class EtlOrchestratorFlowConfig {
     );
   }
 
-  private Object finalizeExecutionGroup(
+  private Object onIngestionCompleted(
       ExecutionAggregationResult aggregation,
       MessageHeaders messageHeaders
   ) {
+    updateAudit(aggregation);
     List<ExecutionOutcome> outcomes = aggregation.outcomes();
-    updateAudit(aggregation, outcomes);
     boolean hasSuccess = outcomes.stream().anyMatch(o -> o.status() == IngestStatus.SUCCESS);
     if (hasSuccess) {
       startMaterialization(aggregation);
@@ -424,24 +424,13 @@ public class EtlOrchestratorFlowConfig {
     return null;
   }
 
-  private void updateAudit(
-      ExecutionAggregationResult aggregation,
-      List<ExecutionOutcome> outcomes
-  ) {
-    List<String> failedSourceIds = outcomes.stream()
+  private void updateAudit(ExecutionAggregationResult aggregation) {
+    List<String> failedSourceIds = aggregation.outcomes().stream()
         .filter(o -> o.status() == IngestStatus.FAILED || o.status() == IngestStatus.WAITING_RETRY)
         .map(ExecutionOutcome::sourceId)
         .filter(Objects::nonNull)
         .distinct()
         .toList();
-
-    String failedSourcesSummary = failedSourceIds.isEmpty()
-        ? null
-        : String.join(",", failedSourceIds);
-
-    outcomes.forEach(executionOutcome -> {
-      System.out.println("AUDIT====================: " + executionOutcome);
-    });
   }
 
   private void startMaterialization(ExecutionAggregationResult aggregation) {
