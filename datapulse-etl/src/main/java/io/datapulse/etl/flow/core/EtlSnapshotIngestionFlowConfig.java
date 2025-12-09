@@ -67,20 +67,16 @@ public class EtlSnapshotIngestionFlowConfig {
         )
         .aggregate(aggregator -> aggregator
             .correlationStrategy(message -> {
-              Object payload = message.getPayload();
-              if (payload instanceof IngestItem<?> ingestItem) {
-                EtlSourceExecution e = ingestItem.context().execution();
-                return String.format(
-                    "%s:%s:%s:%s:%s",
-                    e.requestId(),
-                    e.accountId(),
-                    e.event(),
-                    e.marketplace(),
-                    e.sourceId()
-                );
-              }
-              throw new IllegalStateException(
-                  "Unexpected payload type in correlationStrategy: " + payload.getClass().getName()
+              IngestItem<?> ingestItem = (IngestItem<?>) message.getPayload();
+              EtlSourceExecution execution = ingestItem.context().execution();
+
+              return String.format(
+                  "%s:%s:%s:%s:%s",
+                  execution.requestId(),
+                  execution.accountId(),
+                  execution.event(),
+                  execution.marketplace(),
+                  execution.sourceId()
               );
             })
             .releaseStrategy(group -> {
@@ -98,25 +94,14 @@ public class EtlSnapshotIngestionFlowConfig {
             .sendPartialResultOnExpiry(true)
             .outputProcessor(group -> {
               Message<?> sampleMessage = group.getOne();
-              Object samplePayload = sampleMessage.getPayload();
-              if (!(samplePayload instanceof IngestItem<?> sampleItem)) {
-                throw new IllegalStateException(
-                    "Unexpected payload type in outputProcessor: " + samplePayload.getClass()
-                        .getName()
-                );
-              }
+              IngestItem<?> sampleItem = (IngestItem<?>) sampleMessage.getPayload();
 
               IngestContext context = sampleItem.context();
 
               List<?> rows = group.getMessages()
                   .stream()
-                  .map(Message::getPayload)
-                  .map(payload -> {
-                    if (!(payload instanceof IngestItem<?> ingestItem)) {
-                      throw new IllegalStateException(
-                          "Unexpected payload type in batch group: " + payload.getClass().getName()
-                      );
-                    }
+                  .map(message -> {
+                    IngestItem<?> ingestItem = (IngestItem<?>) message.getPayload();
                     return ingestItem.row();
                   })
                   .toList();

@@ -1,5 +1,7 @@
 package io.datapulse.etl.flow.core;
 
+import static io.datapulse.domain.MessageCodes.ETL_AGGREGATION_EMPTY_GROUP;
+import static io.datapulse.domain.MessageCodes.ETL_EVENT_SOURCES_MISSING;
 import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
 import static io.datapulse.etl.config.EtlExecutionRabbitConfig.DEFAULT_WAIT_TTL_MILLIS;
 import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
@@ -169,22 +171,21 @@ public class EtlOrchestratorFlowConfig {
       RawBatchInsertJdbcRepository rawBatchInsertJdbcRepository
   ) {
     return new EtlAbstractRequestHandlerAdvice() {
-
       @Override
       protected Object doInvoke(ExecutionCallback callback, Object target, Message<?> message) {
-        Object payload = message.getPayload();
-        if (!(payload instanceof EtlSourceExecution execution)) {
-          return callback.execute();
-        }
+        EtlSourceExecution execution = (EtlSourceExecution) message.getPayload();
+
         try {
           callback.execute();
+
           long rowsCount = rawBatchInsertJdbcRepository.countByRequestId(
               execution.rawTable(),
               execution.requestId()
           );
-          IngestStatus status = rowsCount > 0L
-              ? IngestStatus.SUCCESS
-              : IngestStatus.NO_DATA;
+
+          IngestStatus status =
+              rowsCount > 0L ? IngestStatus.SUCCESS : IngestStatus.NO_DATA;
+
           return new ExecutionOutcome(
               execution.requestId(),
               execution.accountId(),
@@ -200,10 +201,7 @@ public class EtlOrchestratorFlowConfig {
           );
         } catch (Exception ex) {
           Throwable cause = unwrapProcessingError(ex);
-          return ingestErrorHandler.handleIngestError(
-              cause,
-              message
-          );
+          return ingestErrorHandler.handleIngestError(cause, execution);
         }
       }
     };
@@ -299,7 +297,7 @@ public class EtlOrchestratorFlowConfig {
 
     List<RegisteredSource> registeredSources = etlSourceRegistry.getSources(event);
     if (registeredSources.isEmpty()) {
-      throw new AppException(ETL_REQUEST_INVALID, "No ETL sources registered for event " + event);
+      throw new AppException(ETL_EVENT_SOURCES_MISSING, event);
     }
 
     Set<String> filteredSourceIds = command.sourceIds().isEmpty()
@@ -365,8 +363,9 @@ public class EtlOrchestratorFlowConfig {
     Message<?> sample = messages.iterator().next();
     Integer expected = sample.getHeaders().get(HDR_ETL_EXPECTED_EXECUTIONS, Integer.class);
     if (expected == null) {
-      throw new IllegalStateException(
-          "Missing expected executions header in ETL aggregation group"
+      throw new AppException(
+          ETL_REQUEST_INVALID,
+          HDR_ETL_EXPECTED_EXECUTIONS
       );
     }
 
@@ -397,7 +396,7 @@ public class EtlOrchestratorFlowConfig {
         .toList();
 
     if (outcomes.isEmpty()) {
-      throw new IllegalStateException("Empty message group in ETL aggregation");
+      throw new AppException(ETL_AGGREGATION_EMPTY_GROUP);
     }
 
     ExecutionOutcome sample = outcomes.iterator().next();

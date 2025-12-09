@@ -9,7 +9,6 @@ import io.datapulse.etl.dto.IngestStatus;
 import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -23,16 +22,8 @@ public class EtlIngestErrorHandler {
 
   public ExecutionOutcome handleIngestError(
       Throwable error,
-      Message<?> message
+      EtlSourceExecution execution
   ) {
-    Object payload = message.getPayload();
-    if (!(payload instanceof EtlSourceExecution execution)) {
-      throw new IllegalStateException(
-          "ETL ingest error handler expects EtlSourceExecution payload, but got: "
-              + payload.getClass().getName()
-      );
-    }
-
     String requestId = execution.requestId();
     long accountId = execution.accountId();
     String sourceId = execution.sourceId();
