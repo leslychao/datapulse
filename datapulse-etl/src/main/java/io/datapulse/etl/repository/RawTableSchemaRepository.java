@@ -56,7 +56,6 @@ public class RawTableSchemaRepository {
             (
               id          bigserial primary key,
               request_id  varchar(64) not null,
-              snapshot_id varchar(64) not null,
               account_id  bigint      not null,
               marketplace varchar(32) not null,
               payload     jsonb       not null,
@@ -66,10 +65,6 @@ public class RawTableSchemaRepository {
         """
             create index if not exists idx_%s_request
               on %s (request_id);
-            """.formatted(tableName, tableName),
-        """
-            create index if not exists idx_%s_snapshot
-              on %s (snapshot_id);
             """.formatted(tableName, tableName),
         """
             create index if not exists idx_%s_acc_mp

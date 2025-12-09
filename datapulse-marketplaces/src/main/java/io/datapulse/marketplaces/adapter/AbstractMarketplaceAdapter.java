@@ -120,7 +120,7 @@ public abstract class AbstractMarketplaceAdapter {
           marketplaceType, accountId, endpointKey, resultPath, size
       );
 
-      return new Snapshot<>(elementType, resultPath, size, uri, method);
+      return new Snapshot<>(elementType, resultPath);
 
     } catch (IOException ex) {
       log.error(

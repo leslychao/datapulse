@@ -1,11 +1,11 @@
 package io.datapulse.etl.config;
 
-import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
-import static io.datapulse.etl.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
-import static io.datapulse.etl.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
-import static io.datapulse.etl.EtlExecutionAmqpConstants.QUEUE_EXECUTION_WAIT;
-import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
-import static io.datapulse.etl.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION_WAIT;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class EtlExecutionRabbitConfig {
 
-  public static final int DEFAULT_WAIT_TTL_MILLIS = 300_000;
+  public static final long DEFAULT_WAIT_TTL_MILLIS = 300_000L;
 
   @Bean
   public DirectExchange etlExecutionExchange() {

@@ -1,43 +1,29 @@
 package io.datapulse.etl.flow.core;
 
-import static io.datapulse.domain.MessageCodes.DOWNLOAD_FAILED;
-import static io.datapulse.domain.MessageCodes.ETL_CONTEXT_MISSING;
+import static io.datapulse.domain.MessageCodes.ETL_INGEST_JSON_LAYOUT_NOT_FOUND;
+import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_FILE_REQUIRED;
+import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_REQUIRED;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST_CORE;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_SNAPSHOT_READY;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_FETCHED_DATA;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_PROCESS_ID;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SNAPSHOT_FILE;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_SOURCE_ID;
 
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.EtlSnapshotContext;
 import io.datapulse.etl.dto.EtlSourceExecution;
-import io.datapulse.etl.dto.IngestResult;
-import io.datapulse.etl.dto.IngestStatus;
-import io.datapulse.etl.file.SnapshotCommitBarrier;
-import io.datapulse.etl.file.SnapshotFileCleaner;
+import io.datapulse.etl.file.IngestItemIterator;
 import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
-import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
-import io.datapulse.etl.handler.error.EtlIngestErrorHandler;
 import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
 import io.datapulse.marketplaces.dto.Snapshot;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.aopalliance.aop.Advice;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.handler.advice.AbstractRequestHandlerAdvice;
 import org.springframework.integration.util.CloseableIterator;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHeaders;
 
 @Configuration
 @Slf4j
@@ -46,309 +32,191 @@ public class EtlSnapshotIngestionFlowConfig {
 
   private static final int SNAPSHOT_BATCH_SIZE = 500;
 
-  private final SnapshotCommitBarrier snapshotCommitBarrier;
   private final SnapshotJsonLayoutRegistry snapshotJsonLayoutRegistry;
   private final SnapshotIteratorFactory snapshotIteratorFactory;
-  private final SnapshotFileCleaner snapshotFileCleaner;
-  private final EtlSnapshotContextExtractor snapshotContextExtractor;
+  private final RawBatchInsertJdbcRepository repository;
 
   @Bean
-  public Advice ingestResultAdvice(EtlIngestErrorHandler ingestErrorHandler) {
-    return new EtlAbstractRequestHandlerAdvice() {
-      @Override
-      protected Object doInvoke(
-          ExecutionCallback callback,
-          Object target,
-          Message<?> message
-      ) {
-        try {
-          return callback.execute();
-        } catch (Exception ex) {
-          return ingestErrorHandler.handleIngestError(unwrapProcessingError(ex), message);
-        }
-      }
-    };
-  }
-
-  @Bean
-  public Advice snapshotPersistErrorAdvice(EtlIngestErrorHandler ingestErrorHandler) {
-    return new AbstractRequestHandlerAdvice() {
-      @Override
-      protected Object doInvoke(
-          ExecutionCallback callback,
-          Object target,
-          Message<?> message
-      ) {
-        try {
-          return callback.execute();
-        } catch (Exception ex) {
-          return ingestErrorHandler.handleIngestError(ex, message);
-        }
-      }
-    };
-  }
-
-  @Bean
-  public IntegrationFlow etlIngestFlow(Advice ingestResultAdvice) {
+  public IntegrationFlow etlIngestFlow() {
     return IntegrationFlow
         .from(CH_ETL_INGEST)
-        .gateway(
-            CH_ETL_INGEST_CORE,
-            gatewaySpec -> gatewaySpec
-                .requestTimeout(0L)
-                .replyTimeout(-1L)
-                .requiresReply(true)
-                .advice(ingestResultAdvice)
-        )
-        .handle(
-            Object.class,
-            (payload, headers) -> {
-              if (payload instanceof IngestResult result) {
-                return result;
-              }
-
-              String sourceId = headers.get(HDR_ETL_SOURCE_ID, String.class);
-              if (sourceId == null) {
-                throw new AppException(ETL_CONTEXT_MISSING, "sourceId");
-              }
-
-              return new IngestResult(
-                  sourceId,
-                  IngestStatus.SUCCESS,
-                  null,
-                  null,
-                  null
-              );
-            }
-        )
-        .get();
-  }
-
-  @Bean
-  public IntegrationFlow etlIngestCoreFlow() {
-    return IntegrationFlow
-        .from(CH_ETL_INGEST_CORE)
         .handle(
             EtlSourceExecution.class,
-            (command, headers) -> fetchSnapshotOrThrow(
-                command,
-                new MessageHeaders(headers)
-            ),
-            endpoint -> endpoint.requiresReply(true)
+            this::fetchSnapshotAndBuildContext
         )
-        .transform(
-            Object.class,
-            this::requireSnapshotPayload
-        )
-        .enrichHeaders(enricher -> enricher
-            .headerFunction(
-                HDR_ETL_SNAPSHOT_FILE,
-                message -> requireSnapshotPayload(message.getPayload()).file()
-            )
-        )
-        .channel(CH_ETL_SNAPSHOT_READY)
-        .get();
-  }
+        .log(message -> {
+          IngestContext ingestContext = (IngestContext) message.getPayload();
+          EtlSourceExecution execution = ingestContext.execution();
+          String requestId = execution.requestId();
 
-  @Bean
-  public IntegrationFlow snapshotStreamingFlow(
-      Advice snapshotPersistErrorAdvice
-  ) {
-    return IntegrationFlow
-        .from(CH_ETL_SNAPSHOT_READY)
-        .enrichHeaders(enricher -> enricher
-            .headerFunction(HDR_ETL_PROCESS_ID, this::registerSnapshotInBarrier)
-            .headerFunction(
-                HDR_ETL_FETCHED_DATA,
-                message -> requireSnapshotPayload(message.getPayload())
-            )
+          return String.format(
+              "ETL snapshot ready for ingest: requestId=%s, accountId=%s, event=%s, " +
+                  "marketplace=%s, sourceId=%s, rawTable=%s, file=%s",
+              requestId,
+              execution.accountId(),
+              execution.event(),
+              execution.marketplace(),
+              execution.sourceId(),
+              execution.rawTable(),
+              ingestContext.snapshotFile()
+          );
+        })
+        .split(
+            IngestContext.class,
+            this::toIngestItemIterator
         )
-        .split(Message.class, this::toSnapshotIterator)
         .aggregate(aggregator -> aggregator
-            .correlationStrategy(message ->
-                message.getHeaders().get(HDR_ETL_PROCESS_ID, String.class)
-            )
-            .releaseStrategy(group -> group.size() >= SNAPSHOT_BATCH_SIZE)
-            .groupTimeout(1_000)
-            .expireGroupsUponCompletion(true)
+            .correlationStrategy(message -> {
+              IngestItem<?> ingestItem = (IngestItem<?>) message.getPayload();
+              EtlSourceExecution execution = ingestItem.context().execution();
+
+              return String.format(
+                  "%s:%s:%s:%s:%s",
+                  execution.requestId(),
+                  execution.accountId(),
+                  execution.event(),
+                  execution.marketplace(),
+                  execution.sourceId()
+              );
+            })
+            .releaseStrategy(group -> {
+              if (group.size() >= SNAPSHOT_BATCH_SIZE) {
+                return true;
+              }
+
+              return group.getMessages()
+                  .stream()
+                  .map(Message::getPayload)
+                  .filter(IngestItem.class::isInstance)
+                  .map(payload -> (IngestItem<?>) payload)
+                  .anyMatch(IngestItem::last);
+            })
             .sendPartialResultOnExpiry(true)
+            .outputProcessor(group -> {
+              Message<?> sampleMessage = group.getOne();
+              IngestItem<?> sampleItem = (IngestItem<?>) sampleMessage.getPayload();
+
+              IngestContext context = sampleItem.context();
+
+              List<?> rows = group.getMessages()
+                  .stream()
+                  .map(message -> {
+                    IngestItem<?> ingestItem = (IngestItem<?>) message.getPayload();
+                    return ingestItem.row();
+                  })
+                  .toList();
+
+              return new IngestBatch<>(context, rows);
+            })
+            .expireGroupsUponCompletion(true)
         )
         .handle(
-            List.class,
-            (payload, headersMap) -> {
-              MessageHeaders headers = new MessageHeaders(headersMap);
-              persistBatch(payload, headers);
-              return headers.get(HDR_ETL_FETCHED_DATA, Snapshot.class);
-            },
-            endpoint -> endpoint
-                .requiresReply(true)
-                .advice(snapshotPersistErrorAdvice)
+            IngestBatch.class,
+            this::handleBatch,
+            endpoint -> endpoint.requiresReply(false)
         )
         .get();
   }
 
-  private Object fetchSnapshotOrThrow(
-      EtlSourceExecution command,
-      MessageHeaders headers
+  private IngestContext fetchSnapshotAndBuildContext(
+      EtlSourceExecution execution,
+      Map<String, Object> headersMap
   ) {
-    EtlSnapshotContext context = requireEtlContext(headers, false);
+    Snapshot<?> snapshot = execution
+        .source()
+        .fetchSnapshot(
+            execution.accountId(),
+            execution.event(),
+            execution.dateFrom(),
+            execution.dateTo()
+        );
 
-    MarketplaceEvent event = MarketplaceEvent.fromString(context.event());
-
-    Object rawSnapshot = command.source().fetchSnapshot(
-        command.accountId(),
-        command.event(),
-        command.from(),
-        command.to()
-    );
-
-    log.info(
-        "ETL snapshot fetched: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}",
-        context.requestId(),
-        context.accountId(),
-        event,
-        context.marketplace(),
-        context.sourceId()
-    );
-    return rawSnapshot;
-  }
-
-  private String registerSnapshotInBarrier(Message<?> message) {
-    Snapshot<?> snapshot = requireSnapshotPayload(message.getPayload());
-    MessageHeaders headers = message.getHeaders();
-
-    EtlSnapshotContext context = requireEtlContext(headers, false);
-
-    MarketplaceEvent event = MarketplaceEvent.fromString(context.event());
-
-    Path snapshotFile = snapshot.file();
-    String snapshotId = snapshotCommitBarrier.registerSnapshot(
-        snapshotFile,
-        context.requestId(),
-        context.accountId(),
-        event,
-        context.marketplace(),
-        context.sourceId()
-    );
-
-    log.info(
-        "ETL snapshot registered in barrier: requestId={}, snapshotId={}, event={}, marketplace={}, sourceId={}",
-        context.requestId(),
-        snapshotId,
-        event,
-        context.marketplace(),
-        context.sourceId()
-    );
-
-    return snapshotId;
-  }
-
-  private CloseableIterator<?> toSnapshotIterator(Message<?> message) {
-    Snapshot<?> snapshot = requireSnapshotPayload(message.getPayload());
-    MessageHeaders headers = message.getHeaders();
-
-    String snapshotId = headers.get(HDR_ETL_PROCESS_ID, String.class);
-    if (snapshotId == null) {
-      snapshotFileCleaner.deleteSafely(snapshot.file(), "missing-snapshot-id");
-      throw new AppException(ETL_CONTEXT_MISSING, "snapshotId");
+    if (snapshot == null) {
+      throw new AppException(ETL_INGEST_SNAPSHOT_REQUIRED);
     }
 
-    Class<?> rawElementType = snapshot.elementType();
-    JsonArrayLocator jsonArrayLocator = snapshotJsonLayoutRegistry.resolve(rawElementType);
-    if (jsonArrayLocator == null) {
-      snapshotCommitBarrier.discard(snapshotId);
+    Path file = snapshot.file();
+    if (file == null) {
+      throw new AppException(ETL_INGEST_SNAPSHOT_FILE_REQUIRED);
+    }
+
+    Class<?> elementType = snapshot.elementType();
+    if (elementType == null) {
+      throw new AppException(ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED);
+    }
+
+    return new IngestContext(execution, file, elementType);
+  }
+
+  private CloseableIterator<IngestItem<?>> toIngestItemIterator(IngestContext ingestContext) {
+    JsonArrayLocator locator = snapshotJsonLayoutRegistry.resolve(ingestContext.elementType());
+    if (locator == null) {
       throw new AppException(
-          DOWNLOAD_FAILED,
-          "JSON layout not found for type: " + rawElementType.getName()
+          ETL_INGEST_JSON_LAYOUT_NOT_FOUND,
+          ingestContext.elementType()
       );
     }
 
-    return snapshotIteratorFactory.createIterator(
-        snapshot.file(),
-        rawElementType,
-        snapshotId,
-        jsonArrayLocator,
-        snapshotCommitBarrier
+    CloseableIterator<?> delegate = snapshotIteratorFactory.createIterator(
+        ingestContext.snapshotFile(),
+        ingestContext.elementType(),
+        locator
     );
+
+    return new IngestItemIterator(delegate, ingestContext);
   }
 
-  private final RawBatchInsertJdbcRepository repository;
-
-  private void persistBatch(
-      List<?> rawBatch,
-      MessageHeaders headers
+  private Object handleBatch(
+      IngestBatch<?> batch,
+      Map<String, Object> headersMap
   ) {
-    EtlSnapshotContext context = requireEtlContext(headers, true);
+    List<?> rows = batch.rows();
+    if (rows.isEmpty()) {
+      return null;
+    }
 
-    snapshotCommitBarrier.registerBatch(context.snapshotId());
+    IngestContext context = batch.context();
+    EtlSourceExecution execution = context.execution();
+    String requestId = execution.requestId();
 
     repository.saveBatch(
-        rawBatch,
-        context.rawTable(),
-        context.requestId(),
-        context.snapshotId(),
-        context.accountId(),
-        context.marketplace()
+        rows,
+        execution.rawTable(),
+        requestId,
+        execution.accountId(),
+        execution.marketplace()
     );
-    snapshotCommitBarrier.batchCompleted(context.snapshotId());
 
     log.debug(
-        "ETL snapshot batch persisted: requestId={}, snapshotId={}, sourceId={}, batchSize={}",
-        context.requestId(),
-        context.snapshotId(),
-        context.sourceId(),
-        rawBatch.size()
+        "ETL snapshot batch persisted: requestId={}, sourceId={}, batchSize={}",
+        requestId,
+        execution.sourceId(),
+        rows.size()
     );
+
+    return null;
   }
 
-  private <T> void addIfMissing(
-      List<String> missing,
-      T value,
-      String name
+  public record IngestContext(
+      EtlSourceExecution execution,
+      Path snapshotFile,
+      Class<?> elementType
   ) {
-    if (value == null) {
-      missing.add(name);
-    }
+
   }
 
-  private EtlSnapshotContext requireEtlContext(
-      MessageHeaders headers,
-      boolean snapshotRequired
+  public record IngestItem<T>(
+      IngestContext context,
+      T row,
+      boolean last
   ) {
-    EtlSnapshotContext context = snapshotContextExtractor.extract(headers);
 
-    List<String> missing = new ArrayList<>();
-
-    addIfMissing(missing, context.requestId(), "requestId");
-    addIfMissing(missing, context.accountId(), "accountId");
-    addIfMissing(missing, context.event(), "event");
-    addIfMissing(missing, context.marketplace(), "marketplace");
-    addIfMissing(missing, context.sourceId(), "sourceId");
-    addIfMissing(missing, context.rawTable(), "rawTable");
-
-    if (snapshotRequired) {
-      addIfMissing(missing, context.snapshotId(), "snapshotId");
-      addIfMissing(missing, context.snapshotFile(), "snapshotFile");
-    }
-
-    if (!missing.isEmpty()) {
-      throw new AppException(ETL_CONTEXT_MISSING, String.join(", ", missing));
-    }
-
-    return context;
   }
 
-  private Snapshot<?> requireSnapshotPayload(Object payload) {
-    if (!(payload instanceof Snapshot<?> snapshot)) {
-      String payloadType = payload != null ? payload.getClass().getName() : "null";
-      throw new AppException(DOWNLOAD_FAILED, payloadType);
-    }
-    if (snapshot.file() == null) {
-      throw new AppException(DOWNLOAD_FAILED, "snapshot file is null");
-    }
-    if (snapshot.elementType() == null) {
-      throw new AppException(DOWNLOAD_FAILED, "snapshot elementType is null");
-    }
-    return snapshot;
+  public record IngestBatch<T>(
+      IngestContext context,
+      List<T> rows
+  ) {
+
   }
 }

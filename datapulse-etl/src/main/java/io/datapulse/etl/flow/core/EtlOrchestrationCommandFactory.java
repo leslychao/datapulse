@@ -39,17 +39,21 @@ public class EtlOrchestrationCommandFactory {
         requestId,
         request.accountId(),
         event,
-        request.from(),
-        request.to()
+        request.dateFrom(),
+        request.dateTo(),
+        List.of()
     );
   }
 
   private void validateRunRequest(EtlRunRequest request) {
+    if (request == null) {
+      throw new AppException(ETL_REQUEST_INVALID, "request is null");
+    }
     List<String> missingFields = Stream.of(
             new RequiredField("accountId", request.accountId()),
             new RequiredField("event", request.event()),
-            new RequiredField("from", request.from()),
-            new RequiredField("to", request.to())
+            new RequiredField("dateFrom", request.dateFrom()),
+            new RequiredField("dateTo", request.dateTo())
         )
         .filter(field -> field.value() == null)
         .map(RequiredField::name)
@@ -62,10 +66,10 @@ public class EtlOrchestrationCommandFactory {
       );
     }
 
-    if (request.from().isAfter(request.to())) {
+    if (request.dateFrom().isAfter(request.dateTo())) {
       throw new AppException(
           ETL_REQUEST_INVALID,
-          "'from' must be <= 'to'"
+          "'dateFrom' must be <= 'dateTo'"
       );
     }
   }

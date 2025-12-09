@@ -16,8 +16,8 @@ public class RawBatchInsertJdbcRepository {
 
   private static final String INSERT_SQL_TEMPLATE = """
       insert into %s
-        (request_id, snapshot_id, account_id, marketplace, payload, created_at)
-      values (?, ?, ?, ?, cast(? as jsonb), now())
+        (request_id, account_id, marketplace, payload, created_at)
+      values (?, ?, ?, cast(? as jsonb), now())
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -28,7 +28,6 @@ public class RawBatchInsertJdbcRepository {
       List<T> batch,
       String tableName,
       String requestId,
-      String snapshotId,
       Long accountId,
       MarketplaceType marketplace
   ) {
@@ -46,12 +45,18 @@ public class RawBatchInsertJdbcRepository {
         batch.size(),
         (ps, raw) -> {
           ps.setObject(1, requestId);
-          ps.setObject(2, snapshotId);
-          ps.setLong(3, accountId);
-          ps.setString(4, marketplace.name());
-          ps.setString(5, toJson(raw));
+          ps.setLong(2, accountId);
+          ps.setString(3, marketplace.name());
+          ps.setString(4, toJson(raw));
         }
     );
+  }
+
+  public long countByRequestId(String tableName, String requestId) {
+    rawTableSchemaRepository.ensureTableExists(tableName);
+    String sql = "select count(*) from %s where request_id = ?".formatted(tableName);
+    Long result = jdbcTemplate.queryForObject(sql, Long.class, requestId);
+    return result != null ? result : 0L;
   }
 
   private <T> String toJson(T raw) {

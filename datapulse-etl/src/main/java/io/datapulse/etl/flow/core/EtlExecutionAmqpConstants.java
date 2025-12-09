@@ -1,4 +1,4 @@
-package io.datapulse.etl;
+package io.datapulse.etl.flow.core;
 
 public class EtlExecutionAmqpConstants {
 

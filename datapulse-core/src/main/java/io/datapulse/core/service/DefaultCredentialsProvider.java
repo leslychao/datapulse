@@ -20,7 +20,7 @@ public class DefaultCredentialsProvider implements CredentialsProvider {
   @Override
   @Transactional(readOnly = true)
   public MarketplaceCredentials resolve(long accountId, MarketplaceType type) {
-    accountConnectionService.getByAccountIdAndMarketplaceType(accountId, type);
+    accountConnectionService.assertActiveConnectionExists(accountId, type);
 
     MarketplaceCredentials credentials = vaultService.loadCredentials(accountId, type);
     if (credentials == null) {

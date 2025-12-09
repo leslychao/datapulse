@@ -1,5 +1,6 @@
 package io.datapulse.core.entity;
 
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.SyncStatus;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,18 +11,29 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "etl_sync_audit")
+@Table(name = "etl_execution_audit")
 @Getter
 @Setter
-public class EtlSyncAuditEntity extends LongBaseEntity {
+public class EtlExecutionAuditEntity extends LongBaseEntity {
 
   private String requestId;
   private Long accountId;
   private String event;
+
+  @Enumerated(EnumType.STRING)
+  private MarketplaceType marketplace;
+
+  private String sourceId;
+
   private LocalDate dateFrom;
   private LocalDate dateTo;
+
   @Enumerated(EnumType.STRING)
   private SyncStatus status;
-  private String failedSources;
+
+  private Long rowsCount;
+  private Integer retryCount;
+  private Integer attemptsTotal;
+
   private String errorMessage;
 }

@@ -47,8 +47,7 @@ public final class MessageCodes {
   public static final String PAGEABLE_REQUIRED = "pageable.required";
   public static final String ID_REQUIRED = "id.required";
   public static final String NOT_FOUND = "not-found";
-  public static final String DATA_CORRUPTED_ACCOUNT_MISSING =
-      "data.corrupted.account.missing";
+  public static final String DATA_CORRUPTED_ACCOUNT_MISSING = "data.corrupted.account.missing";
   public static final String ERROR_UNKNOWN = "error.unknown";
   public static final String ERROR_REASON = "error.reason";
 
@@ -57,57 +56,44 @@ public final class MessageCodes {
   public static final String WB_MISSING_TOKEN = "wb.missing-token";
   public static final String OZON_MISSING_CREDENTIALS = "ozon.missing-credentials";
   public static final String MARKETPLACE_CONFIG_MISSING = "marketplace.config.missing";
-  public static final String MARKETPLACE_BASE_URL_MISSING =
-      "marketplace.base-url.missing";
+  public static final String MARKETPLACE_BASE_URL_MISSING = "marketplace.base-url.missing";
 
   // ===== Marketplace / Config binding (Bean Validation) =====
-  public static final String MARKETPLACE_ENDPOINTS_REQUIRED =
-      "marketplace.endpoints.required";
-  public static final String MARKETPLACE_ENDPOINT_PATH_REQUIRED =
-      "marketplace.endpoint.path.required";
-  public static final String MARKETPLACE_RETRY_POLICY_REQUIRED =
-      "marketplace.retry-policy.required";
-  public static final String MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED =
-      "marketplace.retry-policy.maxAttempts.required";
-  public static final String MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED =
-      "marketplace.retry-policy.baseBackoff.required";
-  public static final String MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED =
-      "marketplace.retry-policy.maxBackoff.required";
-  public static final String MARKETPLACE_RATE_LIMIT_RULES_REQUIRED =
-      "marketplace.rate-limit.rules.required";
-  public static final String MARKETPLACE_RATE_LIMIT_MAX_PER_MINUTE_INVALID =
-      "marketplace.rate-limit.max-per-minute.invalid";
-  public static final String MARKETPLACE_RATE_LIMIT_MIN_INTERVAL_REQUIRED =
-      "marketplace.rate-limit.min-interval.required";
-  public static final String MARKETPLACE_PROVIDERS_REQUIRED =
-      "marketplace.providers.required";
-  public static final String MARKETPLACE_STORAGE_BASEDIR_REQUIRED =
-      "marketplace.storage.base-dir.required";
+  public static final String MARKETPLACE_ENDPOINTS_REQUIRED = "marketplace.endpoints.required";
+  public static final String MARKETPLACE_ENDPOINT_PATH_REQUIRED = "marketplace.endpoint.path.required";
+  public static final String MARKETPLACE_RETRY_POLICY_REQUIRED = "marketplace.retry-policy.required";
+  public static final String MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED = "marketplace.retry-policy.maxAttempts.required";
+  public static final String MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED = "marketplace.retry-policy.baseBackoff.required";
+  public static final String MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED = "marketplace.retry-policy.maxBackoff.required";
+  public static final String MARKETPLACE_RATE_LIMIT_RULES_REQUIRED = "marketplace.rate-limit.rules.required";
+  public static final String MARKETPLACE_RATE_LIMIT_MAX_PER_MINUTE_INVALID = "marketplace.rate-limit.max-per-minute.invalid";
+  public static final String MARKETPLACE_RATE_LIMIT_MIN_INTERVAL_REQUIRED = "marketplace.rate-limit.min-interval.required";
+  public static final String MARKETPLACE_PROVIDERS_REQUIRED = "marketplace.providers.required";
+  public static final String MARKETPLACE_STORAGE_BASEDIR_REQUIRED = "marketplace.storage.base-dir.required";
 
   // ===== CONVERSION =====
-  public static final String CONVERSION_MAPPING_NOT_FOUND =
-      "conversion.mapping.not.found";
+  public static final String CONVERSION_MAPPING_NOT_FOUND = "conversion.mapping.not.found";
 
   // ===== File download / streaming =====
   public static final String DOWNLOAD_FAILED = "download.failed";
-  public static final String DOWNLOAD_DIR_CREATE_FAILED =
-      "download.dir.create.failed";
-  public static final String DOWNLOAD_TMP_CREATE_FAILED =
-      "download.tmp.create.failed";
+  public static final String DOWNLOAD_DIR_CREATE_FAILED = "download.dir.create.failed";
+  public static final String DOWNLOAD_TMP_CREATE_FAILED = "download.tmp.create.failed";
   public static final String DOWNLOAD_MOVE_FAILED = "download.move.failed";
 
   // ===== ETL / Events =====
   public static final String ETL_DATE_FROM_REQUIRED = "etl.date-from.required";
   public static final String ETL_DATE_TO_REQUIRED = "etl.date-to.required";
-  public static final String ETL_CONTEXT_MISSING = "etl.context.missing";
   public static final String ETL_EVENT_REQUIRED = "etl.event.required";
   public static final String ETL_EVENT_UNKNOWN = "etl.event.unknown";
-  public static final String ETL_EVENT_SOURCES_MISSING =
-      "etl.event.sources.missing";
+  public static final String ETL_EVENT_SOURCES_MISSING = "etl.event.sources.missing";
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
-  public static final String ETL_MATERIALIZATION_FALLBACK_ERROR =
-      "etl.materialization.error.fallback";
-  public static final String ETL_NO_INGEST_RESULTS = "etl.no.ingest.results";
+
+  // ===== ETL / Ingest / Snapshot =====
+  public static final String ETL_INGEST_SNAPSHOT_REQUIRED = "etl.ingest.snapshot.required";
+  public static final String ETL_INGEST_SNAPSHOT_FILE_REQUIRED = "etl.ingest.snapshot.file.required";
+  public static final String ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED = "etl.ingest.snapshot.element-type.required";
+  public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND = "etl.ingest.json-layout.not-found";
+  public static final String ETL_AGGREGATION_EMPTY_GROUP = "etl.aggregation.empty-group";
 
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";

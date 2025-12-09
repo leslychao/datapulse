@@ -36,7 +36,7 @@ public class AccountConnectionEntity extends LongBaseEntity {
   private OffsetDateTime lastSyncAt;
 
   @Enumerated(EnumType.STRING)
-  private SyncStatus lastSyncStatus = SyncStatus.NEVER;
+  private SyncStatus lastSyncStatus = SyncStatus.NEW;
 
   private OffsetDateTime createdAt = OffsetDateTime.now();
 

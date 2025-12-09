@@ -32,8 +32,9 @@ import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -169,29 +170,31 @@ public class AccountConnectionService extends AbstractIngestApiService<
   }
 
   @Transactional(readOnly = true)
-  public AccountConnectionDto getByAccountIdAndMarketplaceType(
+  public void assertActiveConnectionExists(
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
   ) {
-    return repository.findByAccount_IdAndMarketplaceAndActiveTrue(accountId, marketplaceType)
-        .map(accountConnection -> mapper().to(accountConnection, AccountConnectionDto.class))
-        .orElseThrow(() ->
-            new NotFoundException(
-                ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
-                accountId,
-                marketplaceType));
+    boolean exists = repository
+        .existsByAccount_IdAndMarketplaceAndActiveTrue(accountId, marketplaceType);
+
+    if (!exists) {
+      throw new NotFoundException(
+          ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
+          accountId,
+          marketplaceType
+      );
+    }
   }
 
   @Transactional(readOnly = true)
-  public List<MarketplaceType> getActiveMarketplacesByAccountId(
+  public Set<MarketplaceType> getActiveMarketplacesByAccountId(
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId
   ) {
     validateAccountExists(accountId);
     return repository.findAllByAccount_IdAndActiveTrue(accountId)
         .stream()
         .map(AccountConnectionEntity::getMarketplace)
-        .distinct()
-        .toList();
+        .collect(Collectors.toSet());
   }
 
   @Override
