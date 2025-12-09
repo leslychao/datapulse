@@ -20,8 +20,8 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
   public void materialize(
       Long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to,
+      LocalDate dateFrom,
+      LocalDate dateTo,
       String requestId
   ) {
     if (accountId == null) {
@@ -29,8 +29,8 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
           "ETL materialization skipped: null accountId, requestId={}, event={}, dateFrom={}, dateTo={}",
           requestId,
           event,
-          from,
-          to
+          dateFrom,
+          dateTo
       );
       return;
     }
@@ -40,8 +40,8 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
         requestId,
         accountId,
         event,
-        from,
-        to
+        dateFrom,
+        dateTo
     );
 
     switch (event) {
@@ -59,8 +59,8 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
         requestId,
         accountId,
         event,
-        from,
-        to
+        dateFrom,
+        dateTo
     );
   }
 }
