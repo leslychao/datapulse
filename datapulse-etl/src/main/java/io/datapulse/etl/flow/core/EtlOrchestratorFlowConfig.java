@@ -16,7 +16,6 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
 
 import io.datapulse.core.service.AccountConnectionService;
-import io.datapulse.core.service.EtlSyncAuditService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
@@ -31,12 +30,10 @@ import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
 import io.datapulse.etl.flow.core.handler.EtlIngestErrorHandler;
 import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
-import io.datapulse.etl.service.EtlMaterializationService;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -59,7 +56,6 @@ import org.springframework.integration.http.dsl.Http;
 import org.springframework.integration.store.MessageGroup;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHeaders;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
@@ -72,8 +68,6 @@ public class EtlOrchestratorFlowConfig {
   private final RabbitTemplate etlExecutionRabbitTemplate;
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
-  private final EtlSyncAuditService etlSyncAuditService;
-  private final EtlMaterializationService etlMaterializationService;
   private final EtlOrchestrationCommandFactory etlOrchestrationCommandFactory;
 
   private record MarketplacePlan(
@@ -90,11 +84,6 @@ public class EtlOrchestratorFlowConfig {
 
   @Bean(name = CH_ETL_ORCHESTRATE)
   public MessageChannel etlOrchestrateChannel() {
-    return new DirectChannel();
-  }
-
-  @Bean(name = CH_ETL_ORCHESTRATION_RESULT)
-  public MessageChannel etlOrchestrationResultChannel() {
     return new DirectChannel();
   }
 
@@ -283,11 +272,6 @@ public class EtlOrchestratorFlowConfig {
             .expireGroupsUponCompletion(true)
         )
         .channel(CH_ETL_ORCHESTRATION_RESULT)
-        .handle(
-            ExecutionAggregationResult.class,
-            this::onIngestionCompleted,
-            endpoint -> endpoint.requiresReply(false)
-        )
         .get();
   }
 
@@ -409,47 +393,5 @@ public class EtlOrchestratorFlowConfig {
         sample.dateTo(),
         outcomes
     );
-  }
-
-  private Object onIngestionCompleted(
-      ExecutionAggregationResult aggregation,
-      MessageHeaders messageHeaders
-  ) {
-    updateAudit(aggregation);
-    List<ExecutionOutcome> outcomes = aggregation.outcomes();
-    boolean hasSuccess = outcomes.stream().anyMatch(o -> o.status() == IngestStatus.SUCCESS);
-    if (hasSuccess) {
-      startMaterialization(aggregation);
-    }
-    return null;
-  }
-
-  private void updateAudit(ExecutionAggregationResult aggregation) {
-    List<String> failedSourceIds = aggregation.outcomes().stream()
-        .filter(o -> o.status() == IngestStatus.FAILED || o.status() == IngestStatus.WAITING_RETRY)
-        .map(ExecutionOutcome::sourceId)
-        .filter(Objects::nonNull)
-        .distinct()
-        .toList();
-  }
-
-  private void startMaterialization(ExecutionAggregationResult aggregation) {
-    try {
-      etlMaterializationService.materialize(
-          aggregation.accountId(),
-          aggregation.event(),
-          aggregation.dateFrom(),
-          aggregation.dateTo(),
-          aggregation.requestId()
-      );
-    } catch (Exception ex) {
-      log.error(
-          "Materialization failed: requestId={}, accountId={}, event={}",
-          aggregation.requestId(),
-          aggregation.accountId(),
-          aggregation.event(),
-          ex
-      );
-    }
   }
 }
