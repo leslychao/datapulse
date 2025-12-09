@@ -26,9 +26,8 @@ import org.springframework.http.HttpMethod;
 @RequiredArgsConstructor
 public abstract class AbstractMarketplaceAdapter {
 
-  private static final DateTimeFormatter TS_FMT =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
-          .withZone(ZoneId.systemDefault());
+  private static final DateTimeFormatter TS_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSX").withZone(ZoneId.systemDefault());
 
   private final MarketplaceType marketplaceType;
 
@@ -132,14 +131,22 @@ public abstract class AbstractMarketplaceAdapter {
   }
 
   private Path planPath(long accountId, EndpointKey endpoint) {
-    String ts = TS_FMT.format(Instant.now());
+    String timestamp = TS_FORMAT.format(Instant.now());
     String uid = UUID.randomUUID().toString().replace("-", "");
+    String endpointTag = sanitize(endpoint.tag());
+    String marketplace = sanitize(marketplaceType.name().toLowerCase());
+
+    String fileName = "%s__%s__%s.json".formatted(timestamp, endpointTag, uid);
 
     return baseDir()
-        .resolve(marketplaceType.name().toLowerCase())
+        .resolve(marketplace)
         .resolve(Long.toString(accountId))
-        .resolve(endpoint.tag())
-        .resolve(ts + "-" + uid + ".json");
+        .resolve(endpointTag)
+        .resolve(fileName);
+  }
+
+  private String sanitize(String value) {
+    return value == null ? "unknown" : value.trim().toLowerCase().replaceAll("[^a-z0-9._-]", "_");
   }
 
   private Path baseDir() {

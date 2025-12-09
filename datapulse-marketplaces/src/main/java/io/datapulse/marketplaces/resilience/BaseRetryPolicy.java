@@ -303,7 +303,8 @@ public abstract class BaseRetryPolicy implements MarketplaceRetryPolicy {
       EndpointKey endpoint,
       Duration backoff
   ) {
-    int seconds = (int) Math.max(0L, backoff.getSeconds());
+    long secondsRaw = backoff != null ? backoff.getSeconds() : 0L;
+    int seconds = (int) Math.max(1L, secondsRaw);
     return new TooManyRequestsBackoffRequiredException(
         marketplace,
         endpoint,
