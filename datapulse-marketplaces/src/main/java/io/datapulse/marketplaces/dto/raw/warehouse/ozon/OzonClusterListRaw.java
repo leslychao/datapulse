@@ -1,4 +1,4 @@
-package io.datapulse.marketplaces.dto.raw.ozon;
+package io.datapulse.marketplaces.dto.raw.warehouse.ozon;
 
 import java.util.List;
 

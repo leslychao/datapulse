@@ -1,10 +1,13 @@
 package io.datapulse.etl.file.locator;
 
-import io.datapulse.marketplaces.dto.raw.ozon.OzonClusterListRaw;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseFbsListRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbOfficeFbsListRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseFbwListRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseSellerListRaw;
+import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
+import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
+import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbOfficeFbsListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseFbwListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseSellerListRaw;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.NonNull;
@@ -21,6 +24,9 @@ public final class SnapshotJsonLayoutRegistry {
     register(WbWarehouseFbwListRaw.class, JsonArrayLocators.arrayAtPath());
     register(WbOfficeFbsListRaw.class, JsonArrayLocators.arrayAtPath());
     register(WbWarehouseSellerListRaw.class, JsonArrayLocators.arrayAtPath());
+    register(OzonCategoryTreeRaw.class, JsonArrayLocators.arrayAtPath("result"));
+    register(WbCategoryParentListRaw.class, JsonArrayLocators.arrayAtPath("data"));
+    register(WbSubjectListRaw.class, JsonArrayLocators.arrayAtPath("data"));
   }
 
   public void register(@NonNull Class<?> rawType, @NonNull JsonArrayLocator locator) {

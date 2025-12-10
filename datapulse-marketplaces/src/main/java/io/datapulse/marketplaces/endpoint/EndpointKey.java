@@ -7,7 +7,12 @@ public enum EndpointKey {
   DICT_WB_WAREHOUSES_SELLER,
 
   DICT_OZON_WAREHOUSES_FBS,
-  DICT_OZON_CLUSTERS;
+  DICT_OZON_CLUSTERS,
+
+  DICT_OZON_CATEGORY_TREE,
+
+  DICT_WB_CATEGORIES_PARENT,
+  DICT_WB_SUBJECTS;
 
   public String tag() {
     return name().toLowerCase();

@@ -14,6 +14,9 @@ marketplace:
           WB_WAREHOUSES_FBS:
             limit: 300
             period: 60s
+          WB_CATEGORIES:
+            limit: 100
+            period: 60s
       endpoints:
         DICT_WB_WAREHOUSES_FBW:
           url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
@@ -24,16 +27,25 @@ marketplace:
         DICT_WB_WAREHOUSES_SELLER:
           url: https://marketplace-api-sandbox.wildberries.ru/api/v3/warehouses
           rateLimitGroup: WB_WAREHOUSES_FBS
+        DICT_WB_CATEGORIES_PARENT:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/object/parent/all
+          rateLimitGroup: WB_CATEGORIES
+        DICT_WB_SUBJECTS:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/object/all
+          rateLimitGroup: WB_CATEGORIES
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
         maxBackoff: 30s
+
     OZON:
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
           url: https://api-seller.ozon.ru/v1/warehouse/list
         DICT_OZON_CLUSTERS:
           url: https://api-seller.ozon.ru/v1/cluster/list
+        DICT_OZON_CATEGORY_TREE:
+          url: https://api-seller.ozon.ru/v1/description-category/tree
       retryPolicy:
         maxAttempts: 4
         baseBackoff: 300ms

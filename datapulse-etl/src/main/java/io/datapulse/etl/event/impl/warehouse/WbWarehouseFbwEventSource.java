@@ -7,7 +7,7 @@ import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
 import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseFbwListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseFbwListRaw;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

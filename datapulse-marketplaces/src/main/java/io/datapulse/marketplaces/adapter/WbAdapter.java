@@ -3,9 +3,11 @@ package io.datapulse.marketplaces.adapter;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.wb.WbOfficeFbsListRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseFbwListRaw;
-import io.datapulse.marketplaces.dto.raw.wb.WbWarehouseSellerListRaw;
+import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
+import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbOfficeFbsListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseFbwListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseSellerListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
@@ -52,5 +54,13 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
         EndpointKey.DICT_WB_WAREHOUSES_SELLER,
         WbWarehouseSellerListRaw.class
     );
+  }
+
+  public Snapshot<WbCategoryParentListRaw> downloadParentCategories(long accountId) {
+    return doGet(accountId, EndpointKey.DICT_WB_CATEGORIES_PARENT, WbCategoryParentListRaw.class);
+  }
+
+  public Snapshot<WbSubjectListRaw> downloadSubjects(long accountId) {
+    return doGet(accountId, EndpointKey.DICT_WB_SUBJECTS, WbSubjectListRaw.class);
   }
 }

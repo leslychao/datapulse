@@ -18,3 +18,24 @@ Content-Type: application/json
     );
   });
 %}
+
+### Run ETL (CATEGORY_DICT)
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "CATEGORY_DICT",
+  "dateFrom": "2025-11-10",
+  "dateTo": "2025-12-10",
+  "burst": 1
+}
+
+> {%
+  client.test("ETL CATEGORY_DICT — run manual dates", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200/202, got " + response.status
+    );
+  });
+%}

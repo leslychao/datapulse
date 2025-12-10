@@ -1,4 +1,4 @@
-package io.datapulse.etl.event.impl.warehouse;
+package io.datapulse.etl.event.impl.category;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
@@ -7,7 +7,7 @@ import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
 import io.datapulse.marketplaces.adapter.OzonAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
+import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,21 +17,21 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    event = MarketplaceEvent.WAREHOUSE_DICT,
+    event = MarketplaceEvent.CATEGORY_DICT,
     marketplace = MarketplaceType.OZON,
-    rawTableName = RawTableNames.RAW_OZON_WAREHOUSES_FBS
+    rawTableName = RawTableNames.RAW_OZON_CATEGORY_TREE
 )
-public class OzonWarehouseFbsEventSource implements EventSource {
+public class OzonCategoryEventSource implements EventSource {
 
   private final OzonAdapter ozonAdapter;
 
   @Override
-  public Snapshot<OzonWarehouseFbsListRaw> fetchSnapshot(
+  public Snapshot<OzonCategoryTreeRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
       LocalDate from,
       LocalDate to
   ) {
-    return ozonAdapter.downloadFbsWarehouses(accountId);
+    return ozonAdapter.downloadCategoryTree(accountId);
   }
 }

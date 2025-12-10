@@ -1,4 +1,4 @@
-package io.datapulse.marketplaces.dto.raw.wb;
+package io.datapulse.marketplaces.dto.raw.warehouse.wb;
 
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;

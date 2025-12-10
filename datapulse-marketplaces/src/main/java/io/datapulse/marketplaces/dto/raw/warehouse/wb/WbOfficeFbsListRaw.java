@@ -1,4 +1,4 @@
-package io.datapulse.marketplaces.dto.raw.wb;
+package io.datapulse.marketplaces.dto.raw.warehouse.wb;
 
 public record WbOfficeFbsListRaw(
     String address,

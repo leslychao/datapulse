@@ -3,8 +3,9 @@ package io.datapulse.marketplaces.adapter;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonClusterListRaw;
-import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseFbsListRaw;
+import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
+import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
@@ -48,5 +49,10 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
         body,
         OzonClusterListRaw.class
     );
+  }
+
+  public Snapshot<OzonCategoryTreeRaw> downloadCategoryTree(long accountId) {
+    return doPost(accountId, EndpointKey.DICT_OZON_CATEGORY_TREE, Map.of("language", "DEFAULT"),
+        OzonCategoryTreeRaw.class);
   }
 }
