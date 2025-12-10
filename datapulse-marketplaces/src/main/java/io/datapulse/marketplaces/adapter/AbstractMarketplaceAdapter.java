@@ -82,13 +82,22 @@ public abstract class AbstractMarketplaceAdapter {
       EndpointRef ref = resolveEndpoint(endpointKey, method, queryParams);
       URI uri = ref.uri();
 
+      HttpHeaders headers = headerProvider.build(marketplaceType, accountId);
+      Path target = planPath(accountId, endpointKey);
+
+      if (Files.exists(target)) {
+        long size = Files.size(target);
+        log.info(
+            "Snapshot reused from local cache: marketplace={}, accountId={}, endpoint={}, path={}, sizeBytes={}",
+            marketplaceType, accountId, endpointKey, target, size
+        );
+        return new Snapshot<>(elementType, target);
+      }
+
       log.info(
           "Starting snapshot download: marketplace={}, accountId={}, endpoint={}, method={}, uri={}",
           marketplaceType, accountId, endpointKey, method, uri
       );
-
-      HttpHeaders headers = headerProvider.build(marketplaceType, accountId);
-      Path target = planPath(accountId, endpointKey);
 
       Path resultPath = downloader.download(
           marketplaceType,

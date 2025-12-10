@@ -6,7 +6,6 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.resilience.MarketplaceRateLimiter;
 import io.datapulse.marketplaces.resilience.MarketplaceRetryService;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -35,10 +34,6 @@ public class MarketplaceStreamingDownloadService {
       Map<String, ?> body,
       Path targetFile
   ) {
-    if (Files.exists(targetFile)) {
-      return targetFile;
-    }
-
     Flux<DataBuffer> source;
 
     if (method == HttpMethod.GET) {
