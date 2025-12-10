@@ -1,4 +1,4 @@
-package io.datapulse.etl.dim.warehouse;
+package io.datapulse.etl.materialization.dim.warehouse;
 
 import io.datapulse.marketplaces.dto.raw.ozon.OzonClusterListRaw.OzonWarehouseRaw;
 import io.datapulse.marketplaces.dto.raw.ozon.OzonWarehouseFbsListRaw;

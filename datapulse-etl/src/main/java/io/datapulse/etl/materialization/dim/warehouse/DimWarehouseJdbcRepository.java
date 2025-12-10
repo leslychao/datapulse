@@ -1,4 +1,4 @@
-package io.datapulse.etl.dim.warehouse;
+package io.datapulse.etl.materialization.dim.warehouse;
 
 import java.util.Collection;
 import lombok.RequiredArgsConstructor;

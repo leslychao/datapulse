@@ -1,7 +1,7 @@
 package io.datapulse.etl.service;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dim.warehouse.WarehouseMaterializationHandler;
+import io.datapulse.etl.materialization.dim.warehouse.WarehouseMaterializationHandler;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

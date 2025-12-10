@@ -1,4 +1,4 @@
-package io.datapulse.etl.dim.warehouse;
+package io.datapulse.etl.materialization.dim.warehouse;
 
 import io.datapulse.etl.common.BatchStreamProcessor;
 import java.util.function.Function;
