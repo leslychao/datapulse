@@ -8,30 +8,36 @@
 
   <changeSet id="0004-create-dim-warehouses" author="assistant" dbms="postgresql">
     <sql>
-      -- ================================
-      -- DIM WAREHOUSES
-      -- ================================
-      CREATE TABLE dim_warehouses
+      CREATE TABLE dim_warehouse_ozon
       (
-        id              BIGSERIAL PRIMARY KEY,
-        marketplace     VARCHAR(32) NOT NULL,
-        warehouse_role  VARCHAR(64) NOT NULL,
-        warehouse_id    BIGINT      NOT NULL,
-        name            TEXT        NOT NULL,
-        active          BOOLEAN     NOT NULL DEFAULT TRUE,
-        fbs             BOOLEAN     NOT NULL DEFAULT FALSE,
-        created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at      TIMESTAMPTZ,
-        CONSTRAINT uq_dim_warehouses UNIQUE (marketplace, warehouse_role, warehouse_id)
+        warehouse_id   BIGSERIAL PRIMARY KEY,
+        warehouse_type VARCHAR(32) NOT NULL,
+        name           TEXT        NOT NULL,
+        is_active      BOOLEAN     NOT NULL DEFAULT TRUE,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
       );
 
-      CREATE INDEX IF NOT EXISTS idx_dim_warehouses_marketplace_role
-        ON dim_warehouses (marketplace, warehouse_role);
+      CREATE INDEX IF NOT EXISTS idx_dim_warehouse_ozon_type
+        ON dim_warehouse_ozon (warehouse_type);
+
+      CREATE TABLE dim_warehouse_wb
+      (
+        warehouse_id   BIGSERIAL PRIMARY KEY,
+        warehouse_type VARCHAR(32) NOT NULL,
+        name           TEXT        NOT NULL,
+        is_active      BOOLEAN     NOT NULL DEFAULT TRUE,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dim_warehouse_wb_type
+        ON dim_warehouse_wb (warehouse_type);
     </sql>
 
     <rollback>
-      DROP TABLE IF EXISTS dim_warehouses CASCADE;
+      DROP TABLE IF EXISTS dim_warehouse_ozon CASCADE;
+      DROP TABLE IF EXISTS dim_warehouse_wb CASCADE;
     </rollback>
   </changeSet>
-
 </databaseChangeLog>
