@@ -1,12 +1,14 @@
 package io.datapulse.etl.dim.warehouse;
 
-import java.util.ArrayList;
-import java.util.List;
+import io.datapulse.etl.common.BatchStreamProcessor;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WarehouseMaterializationHandler {
@@ -16,50 +18,54 @@ public class WarehouseMaterializationHandler {
   private final WarehouseNormalizer normalizer;
   private final DimWarehouseRepository repository;
   private final WarehouseRawReader rawReader;
+  private final BatchStreamProcessor batchStreamProcessor;
 
-  public void materialize(Long accountId, String requestId) {
-    try (var ozonFbsStream = rawReader.streamOzonFbs(accountId, requestId)) {
-      processStream(ozonFbsStream, normalizer::fromOzonFbs);
-    }
+  public void materialize(
+      Long accountId,
+      String requestId
+  ) {
+    process(
+        "ozon_fbs",
+        () -> rawReader.streamOzonFbs(accountId, requestId),
+        normalizer::fromOzonFbs
+    );
 
-    try (var ozonFboStream = rawReader.streamOzonFboWarehouses(accountId, requestId)) {
-      processStream(ozonFboStream, normalizer::fromOzonFbo);
-    }
+    process(
+        "ozon_fbo",
+        () -> rawReader.streamOzonFboWarehouses(accountId, requestId),
+        normalizer::fromOzonFbo
+    );
 
-    try (var wbFbwStream = rawReader.streamWbFbw(accountId, requestId)) {
-      processStream(wbFbwStream, normalizer::fromWbFbw);
-    }
+    process(
+        "wb_fbw",
+        () -> rawReader.streamWbFbw(accountId, requestId),
+        normalizer::fromWbFbw
+    );
 
-    try (var wbFbsOfficesStream = rawReader.streamWbFbsOffices(accountId, requestId)) {
-      processStream(wbFbsOfficesStream, normalizer::fromWbFbsOffice);
-    }
+    process(
+        "wb_fbs_offices",
+        () -> rawReader.streamWbFbsOffices(accountId, requestId),
+        normalizer::fromWbFbsOffice
+    );
 
-    try (var wbSellerStream = rawReader.streamWbSellerWarehouses(accountId, requestId)) {
-      processStream(wbSellerStream, normalizer::fromWbSeller);
-    }
+    process(
+        "wb_seller",
+        () -> rawReader.streamWbSellerWarehouses(accountId, requestId),
+        normalizer::fromWbSeller
+    );
   }
 
-  private <T> void processStream(
-      Stream<T> stream,
+  private <T> void process(
+      String sourceName,
+      Supplier<Stream<T>> streamSupplier,
       Function<T, DimWarehouse> mapper
   ) {
-    List<DimWarehouse> buffer = new ArrayList<>(BATCH_SIZE);
-
-    stream.forEach(raw -> {
-      DimWarehouse dimWarehouse = mapper.apply(raw);
-      if (dimWarehouse == null) {
-        return;
-      }
-
-      buffer.add(dimWarehouse);
-      if (buffer.size() >= BATCH_SIZE) {
-        repository.saveAll(buffer);
-        buffer.clear();
-      }
-    });
-
-    if (!buffer.isEmpty()) {
-      repository.saveAll(buffer);
-    }
+    batchStreamProcessor.process(
+        sourceName,
+        streamSupplier,
+        mapper,
+        repository::saveAll,
+        BATCH_SIZE
+    );
   }
 }
