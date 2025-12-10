@@ -49,16 +49,14 @@ public class EtlAggregationResultFlowConfig {
             (dto, headers) -> {
               etlExecutionAuditService.save(dto);
               log.info(
-                  "ETL execution audit saved: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}, retries={}, attempts={}",
+                  "ETL execution audit saved: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}",
                   dto.getRequestId(),
                   dto.getAccountId(),
                   dto.getEvent(),
                   dto.getMarketplace(),
                   dto.getSourceId(),
                   dto.getStatus(),
-                  dto.getRowsCount(),
-                  dto.getRetryCount(),
-                  dto.getAttemptsTotal()
+                  dto.getRowsCount()
               );
               return null;
             },
@@ -110,12 +108,6 @@ public class EtlAggregationResultFlowConfig {
       String sourceId,
       List<ExecutionOutcome> outcomes
   ) {
-    long retryCount = outcomes.stream()
-        .filter(o -> o.status() == IngestStatus.WAITING_RETRY)
-        .count();
-
-    int attemptsTotal = outcomes.size();
-
     List<ExecutionOutcome> terminalOutcomes = outcomes.stream()
         .filter(o -> o.status().isTerminal())
         .toList();
@@ -140,8 +132,6 @@ public class EtlAggregationResultFlowConfig {
     dto.setDateTo(aggregation.dateTo());
     dto.setStatus(syncStatus);
     dto.setRowsCount(finalOutcome.rowsCount());
-    dto.setRetryCount((int) retryCount);
-    dto.setAttemptsTotal(attemptsTotal);
     dto.setErrorMessage(finalOutcome.errorMessage());
     return dto;
   }

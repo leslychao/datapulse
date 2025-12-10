@@ -257,6 +257,10 @@ public class EtlOrchestratorFlowConfig {
                 endpoint -> endpoint.requiresReply(false)
             )
         )
+        .filter(
+            ExecutionOutcome.class,
+            outcome -> outcome.status().isTerminal()
+        )
         .enrichHeaders(h -> h
             .headerExpression(
                 HDR_ETL_EXECUTION_GROUP_ID,
@@ -353,22 +357,15 @@ public class EtlOrchestratorFlowConfig {
       );
     }
 
-    Map<String, List<IngestStatus>> statusesBySourceId = group.streamMessages()
+    long distinctSources = group.streamMessages()
         .map(Message::getPayload)
         .filter(ExecutionOutcome.class::isInstance)
         .map(ExecutionOutcome.class::cast)
-        .filter(outcome -> outcome.sourceId() != null)
-        .collect(Collectors.groupingBy(
-            ExecutionOutcome::sourceId,
-            Collectors.mapping(ExecutionOutcome::status, Collectors.toList())
-        ));
+        .map(ExecutionOutcome::sourceId)
+        .distinct()
+        .count();
 
-    if (statusesBySourceId.isEmpty() || statusesBySourceId.size() < expected) {
-      return false;
-    }
-
-    return statusesBySourceId.values().stream()
-        .allMatch(statuses -> statuses.stream().anyMatch(IngestStatus::isTerminal));
+    return distinctSources >= expected;
   }
 
   private ExecutionAggregationResult buildExecutionAggregationResult(MessageGroup group) {

@@ -21,8 +21,6 @@ public class EtlExecutionAuditDto extends LongBaseDto {
   private SyncStatus status;
 
   private Long rowsCount;
-  private Integer retryCount;
-  private Integer attemptsTotal;
 
   private String errorMessage;
 }

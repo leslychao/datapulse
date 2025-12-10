@@ -56,8 +56,6 @@ public class EtlExecutionAuditService
     target.setDateTo(source.getDateTo());
     target.setStatus(source.getStatus());
     target.setRowsCount(source.getRowsCount());
-    target.setRetryCount(source.getRetryCount());
-    target.setAttemptsTotal(source.getAttemptsTotal());
     target.setErrorMessage(source.getErrorMessage());
     return target;
   }

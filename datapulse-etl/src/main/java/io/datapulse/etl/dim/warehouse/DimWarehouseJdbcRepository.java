@@ -10,13 +10,23 @@ import org.springframework.stereotype.Repository;
 public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
 
   private static final String UPSERT_SQL = """
-      insert into dim_warehouses (marketplace, warehouse_role, warehouse_id, name, active, fbs)
-      values (?, ?, ?, ?, ?, ?)
-      on conflict (marketplace, warehouse_role, warehouse_id) do update
-        set name = excluded.name,
-            active = excluded.active,
-            fbs = excluded.fbs
-      """;
+    insert into dim_warehouses (
+        marketplace,
+        warehouse_role,
+        warehouse_id,
+        name,
+        active,
+        fbs,
+        created_at,
+        updated_at
+    )
+    values (?, ?, ?, ?, ?, ?, now(), now())
+    on conflict (marketplace, warehouse_role, warehouse_id) do update
+      set name       = excluded.name,
+          active     = excluded.active,
+          fbs        = excluded.fbs,
+          updated_at = now()
+    """;
 
   private final JdbcTemplate jdbcTemplate;
 
