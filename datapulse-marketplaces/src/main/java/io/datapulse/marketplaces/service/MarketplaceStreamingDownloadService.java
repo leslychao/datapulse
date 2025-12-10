@@ -6,10 +6,10 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.resilience.MarketplaceRateLimiter;
 import io.datapulse.marketplaces.resilience.MarketplaceRetryService;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -25,10 +25,6 @@ public class MarketplaceStreamingDownloadService {
   private final MarketplaceRetryService retryService;
   private final MarketplaceRateLimiter rateLimiter;
 
-  @Cacheable(
-      value = "marketplace-files",
-      key = "{#marketplace, #endpoint, #accountId, #uri}"
-  )
   public Path download(
       MarketplaceType marketplace,
       EndpointKey endpoint,
@@ -39,6 +35,10 @@ public class MarketplaceStreamingDownloadService {
       Map<String, ?> body,
       Path targetFile
   ) {
+    if (Files.exists(targetFile)) {
+      return targetFile;
+    }
+
     Flux<DataBuffer> source;
 
     if (method == HttpMethod.GET) {

@@ -12,11 +12,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -26,19 +22,12 @@ import org.springframework.http.HttpMethod;
 @RequiredArgsConstructor
 public abstract class AbstractMarketplaceAdapter {
 
-  private static final DateTimeFormatter TS_FORMAT =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSX").withZone(ZoneId.systemDefault());
-
   private final MarketplaceType marketplaceType;
 
   protected final MarketplaceStreamingDownloadService downloader;
   protected final HttpHeaderProvider headerProvider;
   protected final EndpointsResolver resolver;
   private final MarketplaceProperties properties;
-
-  protected final MarketplaceType marketplaceType() {
-    return marketplaceType;
-  }
 
   protected final <R> Snapshot<R> doGet(
       long accountId,
@@ -131,12 +120,10 @@ public abstract class AbstractMarketplaceAdapter {
   }
 
   private Path planPath(long accountId, EndpointKey endpoint) {
-    String timestamp = TS_FORMAT.format(Instant.now());
-    String uid = UUID.randomUUID().toString().replace("-", "");
     String endpointTag = sanitize(endpoint.tag());
     String marketplace = sanitize(marketplaceType.name().toLowerCase());
 
-    String fileName = "%s__%s__%s.json".formatted(timestamp, endpointTag, uid);
+    String fileName = "%s.json".formatted(endpointTag);
 
     return baseDir()
         .resolve(marketplace)

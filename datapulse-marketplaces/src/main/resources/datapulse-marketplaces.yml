@@ -38,8 +38,3 @@ marketplace:
         maxAttempts: 4
         baseBackoff: 300ms
         maxBackoff: 20s
-spring:
-  cache:
-    cache-names: marketplace-files
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=4h
