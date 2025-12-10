@@ -38,6 +38,14 @@ public final class ValidationKeys {
       "{" + MessageCodes.MARKETPLACE_PROVIDERS_REQUIRED + "}";
   public static final String MARKETPLACE_STORAGE_BASEDIR_REQUIRED =
       "{" + MessageCodes.MARKETPLACE_STORAGE_BASEDIR_REQUIRED + "}";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED =
+      "{" + MessageCodes.MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED + "}";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN =
+      "{" + MessageCodes.MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN + "}";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED =
+      "{" + MessageCodes.MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED + "}";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN =
+      "{" + MessageCodes.MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN + "}";
 
   // ===== Retry policy =====
   public static final String MARKETPLACE_RETRY_POLICY_REQUIRED =
@@ -50,12 +58,14 @@ public final class ValidationKeys {
       "{" + MessageCodes.MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED + "}";
 
   // ===== Rate limit =====
-  public static final String MARKETPLACE_RATE_LIMIT_RULES_REQUIRED =
-      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_RULES_REQUIRED + "}";
-  public static final String MARKETPLACE_RATE_LIMIT_MAX_PER_MINUTE_INVALID =
-      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_MAX_PER_MINUTE_INVALID + "}";
-  public static final String MARKETPLACE_RATE_LIMIT_MIN_INTERVAL_REQUIRED =
-      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_MIN_INTERVAL_REQUIRED + "}";
+  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED =
+      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED + "}";
+  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_MIN =
+      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_LIMIT_MIN + "}";
+  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED =
+      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED + "}";
+  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_MIN =
+      "{" + MessageCodes.MARKETPLACE_RATE_LIMIT_PERIOD_MIN + "}";
 
   // ===== ETL / EventSource =====
   public static final String ETL_EVENT_REQUIRED =

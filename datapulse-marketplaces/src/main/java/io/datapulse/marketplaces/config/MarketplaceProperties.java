@@ -5,11 +5,19 @@ import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRE
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_BASE_URL_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_PROVIDERS_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RATE_LIMIT_LIMIT_MIN;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RATE_LIMIT_PERIOD_MIN;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RETRY_POLICY_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_BASEDIR_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
@@ -58,6 +66,9 @@ public class MarketplaceProperties {
 
     @NotNull(message = MARKETPLACE_STORAGE_BASEDIR_REQUIRED)
     private Path baseDir;
+
+    @Valid
+    private Cleanup cleanup = new Cleanup();
   }
 
   @Getter
@@ -155,9 +166,36 @@ public class MarketplaceProperties {
     private Duration maxBackoff;
   }
 
-  public static record RateLimitConfig(
-      @NotNull @Min(1) Integer limit,
-      @NotNull @DurationMin(millis = 1) Duration period
+  @Getter
+  @Setter
+  public static class Cleanup {
+
+    @NotNull(message = MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED)
+    @DurationMin(
+        seconds = 30,
+        message = MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN
+    )
+    private Duration maxAge = Duration.ofHours(6);
+
+    @NotNull(message = MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED)
+    @DurationMin(
+        seconds = 15,
+        message = MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN
+    )
+    private Duration interval = Duration.ofHours(1);
+  }
+
+  public record RateLimitConfig(
+      @NotNull(message = MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED)
+      @Min(value = 1, message = MARKETPLACE_RATE_LIMIT_LIMIT_MIN)
+      Integer limit,
+
+      @NotNull(message = MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED)
+      @DurationMin(
+          millis = 1,
+          message = MARKETPLACE_RATE_LIMIT_PERIOD_MIN
+      )
+      Duration period
   ) {
 
   }

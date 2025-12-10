@@ -9,6 +9,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -24,6 +25,10 @@ public class MarketplaceStreamingDownloadService {
   private final MarketplaceRetryService retryService;
   private final MarketplaceRateLimiter rateLimiter;
 
+  @Cacheable(
+      value = "marketplace-files",
+      key = "{#marketplace, #endpoint, #accountId, #uri}"
+  )
   public Path download(
       MarketplaceType marketplace,
       EndpointKey endpoint,

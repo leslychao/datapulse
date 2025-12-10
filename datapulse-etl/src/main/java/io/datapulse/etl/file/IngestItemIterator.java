@@ -2,12 +2,8 @@ package io.datapulse.etl.file;
 
 import io.datapulse.etl.flow.core.EtlSnapshotIngestionFlowConfig.IngestContext;
 import io.datapulse.etl.flow.core.EtlSnapshotIngestionFlowConfig.IngestItem;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.integration.util.CloseableIterator;
 
 @Slf4j
@@ -59,25 +55,7 @@ public final class IngestItemIterator implements CloseableIterator<IngestItem<?>
     try {
       delegate.close();
     } finally {
-      deleteSnapshot();
-    }
-  }
-
-  private void deleteSnapshot() {
-    Path file = context.snapshotFile();
-    if (file == null) {
-      log.warn("Snapshot file delete skipped: null file");
-      return;
-    }
-    try {
-      boolean deleted = Files.deleteIfExists(file);
-      log.info("Snapshot file delete: file={}, deleted={}", file, deleted);
-    } catch (IOException ex) {
-      log.warn(
-          "Snapshot file delete failed: file={}, rootCause={}",
-          file,
-          ExceptionUtils.getRootCause(ex)
-      );
+      log.debug("Snapshot file retained for reuse: {}", context.snapshotFile());
     }
   }
 }

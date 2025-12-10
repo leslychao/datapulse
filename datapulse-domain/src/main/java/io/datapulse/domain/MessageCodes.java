@@ -41,7 +41,7 @@ public final class MessageCodes {
   public static final String ACCOUNT_CONNECTION_ALREADY_EXISTS =
       "account.connection.already-exists";
   public static final String ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH =
-      "account_connection.credentials.type.mismatch";
+      "account.connection.credentials.type.mismatch";
 
   // ===== Credentials =====
   public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK =
@@ -68,15 +68,25 @@ public final class MessageCodes {
       "marketplace.retry-policy.baseBackoff.required";
   public static final String MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED =
       "marketplace.retry-policy.maxBackoff.required";
-  public static final String MARKETPLACE_RATE_LIMIT_RULES_REQUIRED =
-      "marketplace.rate-limit.rules.required";
-  public static final String MARKETPLACE_RATE_LIMIT_MAX_PER_MINUTE_INVALID =
-      "marketplace.rate-limit.max-per-minute.invalid";
-  public static final String MARKETPLACE_RATE_LIMIT_MIN_INTERVAL_REQUIRED =
-      "marketplace.rate-limit.min-interval.required";
+  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED =
+      "marketplace.rate-limit.limit.required";
+  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_MIN =
+      "marketplace.rate-limit.limit.min";
+  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED =
+      "marketplace.rate-limit.period.required";
+  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_MIN =
+      "marketplace.rate-limit.period.min";
   public static final String MARKETPLACE_PROVIDERS_REQUIRED = "marketplace.providers.required";
   public static final String MARKETPLACE_STORAGE_BASEDIR_REQUIRED =
       "marketplace.storage.base-dir.required";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED =
+      "marketplace.storage.cleanup.max-age.required";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN =
+      "marketplace.storage.cleanup.max-age.min";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED =
+      "marketplace.storage.cleanup.interval.required";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN =
+      "marketplace.storage.cleanup.interval.min";
 
   // ===== CONVERSION =====
   public static final String CONVERSION_MAPPING_NOT_FOUND = "conversion.mapping.not.found";
