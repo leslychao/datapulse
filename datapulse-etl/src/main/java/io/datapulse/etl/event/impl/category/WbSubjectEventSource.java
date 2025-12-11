@@ -29,8 +29,8 @@ public class WbSubjectEventSource implements EventSource {
   public Snapshot<WbSubjectListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return wbAdapter.downloadSubjects(accountId);
   }

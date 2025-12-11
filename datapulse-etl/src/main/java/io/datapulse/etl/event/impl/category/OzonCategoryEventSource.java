@@ -29,8 +29,8 @@ public class OzonCategoryEventSource implements EventSource {
   public Snapshot<OzonCategoryTreeRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return ozonAdapter.downloadCategoryTree(accountId);
   }

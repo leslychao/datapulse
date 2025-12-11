@@ -29,8 +29,8 @@ public class OzonClustersEventSource implements EventSource {
   public Snapshot<OzonClusterListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return ozonAdapter.downloadFboWarehouses(accountId);
   }

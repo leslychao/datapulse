@@ -29,8 +29,8 @@ public class WbOfficeFbsEventSource implements EventSource {
   public Snapshot<WbOfficeFbsListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return wbAdapter.downloadFbsOffices(accountId);
   }

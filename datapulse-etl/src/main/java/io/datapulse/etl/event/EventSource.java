@@ -19,10 +19,8 @@ public interface EventSource {
       @NotNull(message = ValidationKeys.ETL_EVENT_REQUIRED)
       MarketplaceEvent event,
 
-      @NotNull(message = ValidationKeys.ETL_DATE_FROM_REQUIRED)
-      LocalDate from,
+      LocalDate dateFrom,
 
-      @NotNull(message = ValidationKeys.ETL_DATE_TO_REQUIRED)
-      LocalDate to
+      LocalDate dateTo
   );
 }

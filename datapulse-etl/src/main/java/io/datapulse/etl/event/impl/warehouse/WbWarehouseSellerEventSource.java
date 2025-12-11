@@ -29,8 +29,8 @@ public class WbWarehouseSellerEventSource implements EventSource {
   public Snapshot<WbWarehouseSellerListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return wbAdapter.downloadSellerWarehouses(accountId);
   }

@@ -29,8 +29,8 @@ public class OzonWarehouseFbsEventSource implements EventSource {
   public Snapshot<OzonWarehouseFbsListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return ozonAdapter.downloadFbsWarehouses(accountId);
   }

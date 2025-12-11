@@ -1,12 +1,10 @@
-### Run ETL (WAREHOUSE, last 30 days — руками выставляем даты)
+### Run ETL (WAREHOUSE)
 POST {{host}}/api/etl/run
 Content-Type: application/json
 
 {
   "accountId": 1,
   "event": "WAREHOUSE_DICT",
-  "dateFrom": "2025-10-22",
-  "dateTo": "2025-11-22",
   "burst": 1
 }
 
@@ -26,8 +24,6 @@ Content-Type: application/json
 {
   "accountId": 1,
   "event": "CATEGORY_DICT",
-  "dateFrom": "2025-11-10",
-  "dateTo": "2025-12-10",
   "burst": 1
 }
 

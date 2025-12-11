@@ -29,8 +29,8 @@ public class WbCategoryParentEventSource implements EventSource {
   public Snapshot<WbCategoryParentListRaw> fetchSnapshot(
       long accountId,
       MarketplaceEvent event,
-      LocalDate from,
-      LocalDate to
+      LocalDate dateFrom,
+      LocalDate dateTo
   ) {
     return wbAdapter.downloadParentCategories(accountId);
   }
