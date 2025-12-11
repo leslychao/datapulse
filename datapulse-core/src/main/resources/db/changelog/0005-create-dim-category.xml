@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0005-create-dim-category" author="assistant" dbms="postgresql">
+    <sql>
+      CREATE TABLE IF NOT EXISTS dim_category
+      (
+        id                  BIGSERIAL   PRIMARY KEY,
+        source_platform     TEXT        NOT NULL,
+        source_category_id  BIGINT      NOT NULL,
+        category_name       TEXT        NOT NULL,
+        parent_id           BIGINT      NULL,
+        parent_name         TEXT        NULL,
+        is_leaf             BOOLEAN     NOT NULL,
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+        CONSTRAINT uq_dim_category_source
+          UNIQUE (source_platform, source_category_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dim_category_parent
+        ON dim_category (source_platform, parent_id);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS dim_category CASCADE;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

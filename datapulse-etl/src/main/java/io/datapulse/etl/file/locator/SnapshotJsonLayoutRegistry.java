@@ -24,6 +24,7 @@ public final class SnapshotJsonLayoutRegistry {
     register(WbWarehouseFbwListRaw.class, JsonArrayLocators.arrayAtPath());
     register(WbOfficeFbsListRaw.class, JsonArrayLocators.arrayAtPath());
     register(WbWarehouseSellerListRaw.class, JsonArrayLocators.arrayAtPath());
+
     register(OzonCategoryTreeRaw.class, JsonArrayLocators.arrayAtPath("result"));
     register(WbCategoryParentListRaw.class, JsonArrayLocators.arrayAtPath("data"));
     register(WbSubjectListRaw.class, JsonArrayLocators.arrayAtPath("data"));
