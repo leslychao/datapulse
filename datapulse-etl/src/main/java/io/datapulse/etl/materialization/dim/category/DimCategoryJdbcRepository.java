@@ -46,40 +46,51 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
     String platform = MarketplaceType.OZON.tag();
 
     String selectQuery = """
-        with recursive category_tree(source_platform, source_category_id, category_name, parent_id, parent_name, is_leaf, node) as (
+        with recursive category_tree (
+            source_platform,
+            source_category_id,
+            category_name,
+            parent_id,
+            parent_name,
+            node
+        ) as (
             select
                 '%1$s' as source_platform,
-                (payload::jsonb ->> 'description_category_id')::bigint,
-                payload::jsonb ->> 'category_name',
-                null::bigint,
-                null::text,
-                case when jsonb_array_length(payload::jsonb -> 'children') = 0 then true else false end,
-                payload::jsonb
+                (payload::jsonb ->> 'description_category_id')::bigint as source_category_id,
+                payload::jsonb ->> 'category_name'                     as category_name,
+                null::bigint                                          as parent_id,
+                null::text                                            as parent_name,
+                payload::jsonb                                        as node
             from %2$s
             where account_id = ? and request_id = ?
 
             union all
 
             select
-                '%1$s',
-                (child ->> 'description_category_id')::bigint,
-                child ->> 'category_name',
-                (parent.node ->> 'description_category_id')::bigint,
-                parent.node ->> 'category_name',
-                case when jsonb_array_length(child -> 'children') = 0 then true else false end,
-                child
-            from category_tree parent,
-                 jsonb_array_elements(parent.node -> 'children') as child
+                '%1$s'                                               as source_platform,
+                (child ->> 'description_category_id')::bigint        as source_category_id,
+                child ->> 'category_name'                            as category_name,
+                parent.source_category_id                            as parent_id,
+                parent.category_name                                 as parent_name,
+                child                                                as node
+            from category_tree parent
+            join lateral jsonb_array_elements(
+                     coalesce(parent.node -> 'children', '[]'::jsonb)
+                 ) child
+                 on (child ->> 'description_category_id') is not null
         )
         select
-            source_platform,
-            source_category_id,
-            category_name,
-            parent_id,
-            parent_name,
-            is_leaf
-        from category_tree
-        where source_category_id is not null
+            ct.source_platform,
+            ct.source_category_id,
+            ct.category_name,
+            ct.parent_id,
+            ct.parent_name,
+            not exists (
+                select 1
+                from category_tree child
+                where child.parent_id = ct.source_category_id
+            ) as is_leaf
+        from category_tree ct
         """.formatted(platform, RawTableNames.RAW_OZON_CATEGORY_TREE);
 
     String sql = INSERT_TEMPLATE.formatted(selectQuery);
