@@ -3,6 +3,7 @@ package io.datapulse.etl.file.locator;
 import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
+import io.datapulse.marketplaces.dto.raw.tariff.WbTariffCommissionRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbOfficeFbsListRaw;
@@ -28,6 +29,7 @@ public final class SnapshotJsonLayoutRegistry {
     register(OzonCategoryTreeRaw.class, JsonArrayLocators.arrayAtPath("result"));
     register(WbCategoryParentListRaw.class, JsonArrayLocators.arrayAtPath("data"));
     register(WbSubjectListRaw.class, JsonArrayLocators.arrayAtPath("data"));
+    register(WbTariffCommissionRaw.class, JsonArrayLocators.arrayAtPath("report"));
   }
 
   public void register(@NonNull Class<?> rawType, @NonNull JsonArrayLocator locator) {

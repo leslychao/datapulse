@@ -5,6 +5,7 @@ import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
+import io.datapulse.marketplaces.dto.raw.tariff.WbTariffCommissionRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbOfficeFbsListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseFbwListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseSellerListRaw;
@@ -62,5 +63,13 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
 
   public Snapshot<WbSubjectListRaw> downloadSubjects(long accountId) {
     return doGet(accountId, EndpointKey.DICT_WB_SUBJECTS, WbSubjectListRaw.class);
+  }
+
+  public Snapshot<WbTariffCommissionRaw> downloadTariffsCommission(long accountId) {
+    return doGet(
+        accountId,
+        EndpointKey.DICT_WB_TARIFFS_COMMISSION,
+        WbTariffCommissionRaw.class
+    );
   }
 }

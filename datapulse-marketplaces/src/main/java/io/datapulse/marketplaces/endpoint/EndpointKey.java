@@ -12,7 +12,9 @@ public enum EndpointKey {
   DICT_OZON_CATEGORY_TREE,
 
   DICT_WB_CATEGORIES_PARENT,
-  DICT_WB_SUBJECTS;
+  DICT_WB_SUBJECTS,
+
+  DICT_WB_TARIFFS_COMMISSION;
 
   public String tag() {
     return name().toLowerCase();

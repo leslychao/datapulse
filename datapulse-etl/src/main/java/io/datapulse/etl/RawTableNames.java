@@ -17,4 +17,5 @@ public final class RawTableNames {
   public static final String RAW_WB_CATEGORIES_PARENT = "raw_wb_categories_parent";
   public static final String RAW_WB_SUBJECTS = "raw_wb_subjects";
 
+  public static final String RAW_WB_TARIFFS_COMMISSION = "raw_wb_tariffs_commission";
 }
