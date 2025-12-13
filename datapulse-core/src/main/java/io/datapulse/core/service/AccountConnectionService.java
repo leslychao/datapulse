@@ -169,7 +169,6 @@ public class AccountConnectionService extends AbstractIngestApiService<
     return entity;
   }
 
-  @Transactional(readOnly = true)
   public void assertActiveConnectionExists(
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
@@ -186,7 +185,6 @@ public class AccountConnectionService extends AbstractIngestApiService<
     }
   }
 
-  @Transactional(readOnly = true)
   public Set<MarketplaceType> getActiveMarketplacesByAccountId(
       @NotNull(message = ACCOUNT_ID_REQUIRED) Long accountId
   ) {

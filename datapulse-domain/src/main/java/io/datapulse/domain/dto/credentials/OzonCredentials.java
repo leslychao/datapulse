@@ -8,4 +8,6 @@ public record OzonCredentials(
     String clientId,
     @NotBlank(message = ValidationKeys.CREDENTIALS_OZON_API_KEY_NOT_BLANK)
     String apiKey
-) implements MarketplaceCredentials { }
+) implements MarketplaceCredentials {
+
+}

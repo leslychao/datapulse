@@ -34,10 +34,7 @@ public record AccountConnectionUpdateRequest(
     if (credentials == null || marketplace == null) {
       return true;
     }
-    return switch (marketplace) {
-      case WILDBERRIES -> credentials instanceof WbCredentials;
-      case OZON -> credentials instanceof OzonCredentials;
-    };
+    return marketplace.supports(credentials);
   }
 
   @AssertTrue(message = ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)

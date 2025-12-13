@@ -2,8 +2,6 @@ package io.datapulse.core.service.vault;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
-import io.datapulse.domain.dto.credentials.OzonCredentials;
-import io.datapulse.domain.dto.credentials.WbCredentials;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.vault.core.VaultKeyValueOperations;
@@ -39,10 +37,7 @@ public class MarketplaceCredentialsVaultServiceImpl implements
   ) {
     String path = buildPath(accountId, marketplace);
 
-    Class<? extends MarketplaceCredentials> type = switch (marketplace) {
-      case OZON -> OzonCredentials.class;
-      case WILDBERRIES -> WbCredentials.class;
-    };
+    Class<? extends MarketplaceCredentials> type = marketplace.credentialsType();
 
     VaultResponseSupport<? extends MarketplaceCredentials> resp = kv.get(path, type);
     return resp != null ? resp.getData() : null;

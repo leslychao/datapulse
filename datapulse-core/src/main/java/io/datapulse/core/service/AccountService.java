@@ -131,7 +131,6 @@ public class AccountService extends AbstractIngestApiService<
     repository.deleteById(id);
   }
 
-  @Transactional(readOnly = true)
   public boolean exists(@NotNull(message = ID_REQUIRED) Long id) {
     return repository.existsById(id);
   }

@@ -10,10 +10,11 @@ import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTI
 import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
 import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_PREPARE_RAW_SCHEMA;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_EXECUTIONS;
 
 import io.datapulse.core.service.AccountConnectionService;
 import io.datapulse.domain.MarketplaceType;
@@ -24,7 +25,9 @@ import io.datapulse.etl.dto.EtlSourceExecution;
 import io.datapulse.etl.dto.ExecutionAggregationResult;
 import io.datapulse.etl.dto.ExecutionOutcome;
 import io.datapulse.etl.dto.IngestStatus;
+import io.datapulse.etl.dto.MarketplacePlan;
 import io.datapulse.etl.dto.OrchestrationCommand;
+import io.datapulse.etl.dto.OrchestrationPlan;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
@@ -63,27 +66,18 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @RequiredArgsConstructor
 public class EtlOrchestratorFlowConfig {
 
-  private static final String HDR_ETL_EXPECTED_EXECUTIONS = "ETL_EXPECTED_EXECUTIONS";
-
   private final RabbitTemplate etlExecutionRabbitTemplate;
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlOrchestrationCommandFactory etlOrchestrationCommandFactory;
 
-  private record MarketplacePlan(
-      MarketplaceType marketplace,
-      List<EtlSourceExecution> executions
-  ) {
-
+  @Bean(name = CH_ETL_PREPARE_RAW_SCHEMA)
+  public MessageChannel etlPrepareRawSchemaChannel() {
+    return new DirectChannel();
   }
 
   @Bean(name = CH_ETL_RUN_CORE)
   public MessageChannel etlRunCoreChannel() {
-    return new DirectChannel();
-  }
-
-  @Bean(name = CH_ETL_ORCHESTRATE)
-  public MessageChannel etlOrchestrateChannel() {
     return new DirectChannel();
   }
 
@@ -110,10 +104,7 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .transform(
-            EtlRunRequest.class,
-            etlOrchestrationCommandFactory::toCommand
-        )
+        .transform(EtlRunRequest.class, etlOrchestrationCommandFactory::toCommand)
         .wireTap(flow -> flow
             .handle(
                 Amqp.outboundAdapter(etlExecutionRabbitTemplate)
@@ -203,16 +194,13 @@ public class EtlOrchestratorFlowConfig {
   ) {
     return IntegrationFlow
         .from(CH_ETL_RUN_CORE)
-        .transform(OrchestrationCommand.class, this::buildMarketplacePlans)
+        .transform(OrchestrationCommand.class, this::buildOrchestrationPlan)
+        .gateway(CH_ETL_PREPARE_RAW_SCHEMA)
         .enrichHeaders(h -> h.headerFunction(
             HDR_ETL_EXPECTED_EXECUTIONS,
-            (Message<List<MarketplacePlan>> msg) ->
-                msg.getPayload()
-                    .stream()
-                    .mapToInt(plan -> plan.executions().size())
-                    .sum()
+            (Message<OrchestrationPlan> msg) -> msg.getPayload().expectedExecutions()
         ))
-        .split()
+        .split(OrchestrationPlan.class, OrchestrationPlan::plans)
         .channel(c -> c.executor(etlOrchestrateExecutor))
         .transform(MarketplacePlan.class, MarketplacePlan::executions)
         .split()
@@ -257,10 +245,7 @@ public class EtlOrchestratorFlowConfig {
                 endpoint -> endpoint.requiresReply(false)
             )
         )
-        .filter(
-            ExecutionOutcome.class,
-            outcome -> outcome.status().isTerminal()
-        )
+        .filter(ExecutionOutcome.class, outcome -> outcome.status().isTerminal())
         .enrichHeaders(h -> h
             .headerExpression(
                 HDR_ETL_EXECUTION_GROUP_ID,
@@ -279,7 +264,7 @@ public class EtlOrchestratorFlowConfig {
         .get();
   }
 
-  private List<MarketplacePlan> buildMarketplacePlans(OrchestrationCommand command) {
+  private OrchestrationPlan buildOrchestrationPlan(OrchestrationCommand command) {
     long accountId = command.accountId();
     MarketplaceEvent event = command.event();
 
@@ -332,14 +317,19 @@ public class EtlOrchestratorFlowConfig {
         .map(e -> new MarketplacePlan(e.getKey(), e.getValue()))
         .toList();
 
+    int expectedExecutions = plans.stream()
+        .mapToInt(plan -> plan.executions().size())
+        .sum();
+
     log.info(
-        "Orchestration plan built: accountId={}, event={}, sources={}",
+        "Orchestration plan built: accountId={}, event={}, marketplaces={}, expectedExecutions={}",
         accountId,
         event,
-        plans
+        plans.stream().map(MarketplacePlan::marketplace).toList(),
+        expectedExecutions
     );
 
-    return plans;
+    return new OrchestrationPlan(plans, expectedExecutions);
   }
 
   private boolean isAggregationComplete(MessageGroup group) {
@@ -351,10 +341,7 @@ public class EtlOrchestratorFlowConfig {
     Message<?> sample = messages.iterator().next();
     Integer expected = sample.getHeaders().get(HDR_ETL_EXPECTED_EXECUTIONS, Integer.class);
     if (expected == null) {
-      throw new AppException(
-          ETL_REQUEST_INVALID,
-          HDR_ETL_EXPECTED_EXECUTIONS
-      );
+      throw new AppException(ETL_REQUEST_INVALID, HDR_ETL_EXPECTED_EXECUTIONS);
     }
 
     long distinctSources = group.streamMessages()

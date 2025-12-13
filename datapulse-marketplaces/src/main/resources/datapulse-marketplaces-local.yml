@@ -1,0 +1,18 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+marketplace:
+  providers:
+    WILDBERRIES:
+      endpoints:
+        DICT_WB_WAREHOUSES_FBW:
+          url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
+        DICT_WB_OFFICES_FBS:
+          url: https://marketplace-api-sandbox.wildberries.ru/api/v3/offices
+        DICT_WB_WAREHOUSES_SELLER:
+          url: https://marketplace-api-sandbox.wildberries.ru/api/v3/warehouses
+        DICT_WB_CATEGORIES_PARENT:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/object/parent/all
+        DICT_WB_SUBJECTS:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/object/all
