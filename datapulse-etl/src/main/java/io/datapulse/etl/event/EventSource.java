@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
+import java.util.List;
 
 public interface EventSource {
 
@@ -23,4 +24,14 @@ public interface EventSource {
 
       LocalDate dateTo
   );
+
+  default List<Snapshot<?>> fetchSnapshots(
+      long accountId,
+      MarketplaceEvent event,
+      LocalDate dateFrom,
+      LocalDate dateTo
+  ) {
+    Snapshot<?> snapshot = fetchSnapshot(accountId, event, dateFrom, dateTo);
+    return snapshot == null ? List.of() : List.of(snapshot);
+  }
 }

@@ -22,8 +22,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.integration.splitter.DefaultMessageSplitter;
 import org.springframework.integration.util.CloseableIterator;
 import org.springframework.messaging.Message;
+import org.springframework.util.CollectionUtils;
 
 @Configuration
 @Slf4j
@@ -42,25 +44,27 @@ public class EtlSnapshotIngestionFlowConfig {
         .from(CH_ETL_INGEST)
         .handle(
             EtlSourceExecution.class,
-            this::fetchSnapshotAndBuildContext
+            this::fetchSnapshotsAndBuildContexts
         )
         .log(message -> {
-          IngestContext ingestContext = (IngestContext) message.getPayload();
-          EtlSourceExecution execution = ingestContext.execution();
-          String requestId = execution.requestId();
+          List<?> contexts = (List<?>) message.getPayload();
+          IngestContext context = (IngestContext) contexts.get(0);
+          EtlSourceExecution execution = context.execution();
 
           return String.format(
-              "ETL snapshot ready for ingest: requestId=%s, accountId=%s, event=%s, " +
-                  "marketplace=%s, sourceId=%s, rawTable=%s, file=%s",
-              requestId,
+              "ETL snapshots ready for ingest: requestId=%s, accountId=%s, event=%s, " +
+                  "marketplace=%s, sourceId=%s, rawTable=%s, snapshots=%s, firstFile=%s",
+              execution.requestId(),
               execution.accountId(),
               execution.event(),
               execution.marketplace(),
               execution.sourceId(),
               execution.rawTable(),
-              ingestContext.snapshotFile()
+              contexts.size(),
+              context.snapshotFile()
           );
         })
+        .split(new DefaultMessageSplitter())
         .split(
             IngestContext.class,
             this::toIngestItemIterator
@@ -118,34 +122,42 @@ public class EtlSnapshotIngestionFlowConfig {
         .get();
   }
 
-  private IngestContext fetchSnapshotAndBuildContext(
+  private List<IngestContext> fetchSnapshotsAndBuildContexts(
       EtlSourceExecution execution,
       Map<String, Object> headersMap
   ) {
-    Snapshot<?> snapshot = execution
+    List<Snapshot<?>> snapshots = execution
         .source()
-        .fetchSnapshot(
+        .fetchSnapshots(
             execution.accountId(),
             execution.event(),
             execution.dateFrom(),
             execution.dateTo()
         );
 
-    if (snapshot == null) {
+    if (CollectionUtils.isEmpty(snapshots)) {
       throw new AppException(ETL_INGEST_SNAPSHOT_REQUIRED);
     }
 
-    Path file = snapshot.file();
-    if (file == null) {
-      throw new AppException(ETL_INGEST_SNAPSHOT_FILE_REQUIRED);
-    }
+    return snapshots.stream()
+        .map(snapshot -> {
+          if (snapshot == null) {
+            throw new AppException(ETL_INGEST_SNAPSHOT_REQUIRED);
+          }
 
-    Class<?> elementType = snapshot.elementType();
-    if (elementType == null) {
-      throw new AppException(ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED);
-    }
+          Path file = snapshot.file();
+          if (file == null) {
+            throw new AppException(ETL_INGEST_SNAPSHOT_FILE_REQUIRED);
+          }
 
-    return new IngestContext(execution, file, elementType);
+          Class<?> elementType = snapshot.elementType();
+          if (elementType == null) {
+            throw new AppException(ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED);
+          }
+
+          return new IngestContext(execution, file, elementType);
+        })
+        .toList();
   }
 
   private CloseableIterator<IngestItem<?>> toIngestItemIterator(IngestContext ingestContext) {

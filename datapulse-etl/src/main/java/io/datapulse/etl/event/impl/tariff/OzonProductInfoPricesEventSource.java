@@ -9,6 +9,8 @@ import io.datapulse.marketplaces.adapter.OzonAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -23,6 +25,8 @@ import org.springframework.validation.annotation.Validated;
 )
 public class OzonProductInfoPricesEventSource implements EventSource {
 
+  private static final int PAGE_SIZE = 100;
+
   private final OzonAdapter ozonAdapter;
 
   @Override
@@ -32,6 +36,37 @@ public class OzonProductInfoPricesEventSource implements EventSource {
       LocalDate dateFrom,
       LocalDate dateTo
   ) {
-    return ozonAdapter.downloadProductInfoPrices(accountId);
+    return ozonAdapter.downloadProductInfoPricesPage(accountId, "", PAGE_SIZE);
+  }
+
+  @Override
+  public List<Snapshot<?>> fetchSnapshots(
+      long accountId,
+      MarketplaceEvent event,
+      LocalDate dateFrom,
+      LocalDate dateTo
+  ) {
+    List<Snapshot<?>> snapshots = new ArrayList<>();
+
+    String cursor = "";
+
+    while (true) {
+      Snapshot<OzonProductInfoPricesItemRaw> snapshot =
+          ozonAdapter.downloadProductInfoPricesPage(accountId, cursor, PAGE_SIZE);
+
+      snapshots.add(snapshot);
+
+      String next = snapshot.nextToken();
+      if (next == null) {
+        break;
+      }
+      if (next.equals(cursor)) {
+        break;
+      }
+
+      cursor = next;
+    }
+
+    return snapshots;
   }
 }
