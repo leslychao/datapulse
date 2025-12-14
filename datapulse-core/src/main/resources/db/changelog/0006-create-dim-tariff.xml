@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0006-create-dim-tariff" author="assistant" dbms="postgresql">
+    <sql>
+      CREATE TABLE IF NOT EXISTS dim_tariff
+      (
+        id                    BIGSERIAL   PRIMARY KEY,
+
+        source_platform       TEXT        NOT NULL,
+
+        parent_id             BIGINT      NOT NULL,
+        parent_name           TEXT        NOT NULL,
+
+        subject_id            BIGINT      NOT NULL,
+        subject_name          TEXT        NOT NULL,
+
+        kgvp_booking          NUMERIC(9,4)  NOT NULL,
+        kgvp_marketplace      NUMERIC(9,4)  NOT NULL,
+        kgvp_pickup           NUMERIC(9,4)  NOT NULL,
+        kgvp_supplier         NUMERIC(9,4)  NOT NULL,
+        kgvp_supplier_express NUMERIC(9,4)  NOT NULL,
+        paid_storage_kgvp     NUMERIC(9,4)  NOT NULL,
+
+        valid_from            DATE        NOT NULL DEFAULT CURRENT_DATE,
+        valid_to              DATE        NULL,
+
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+        CONSTRAINT uq_dim_tariff_source
+          UNIQUE (source_platform, subject_id, valid_from)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dim_tariff_subject
+        ON dim_tariff (source_platform, subject_id);
+
+      CREATE INDEX IF NOT EXISTS idx_dim_tariff_parent
+        ON dim_tariff (source_platform, parent_id);
+
+      CREATE INDEX IF NOT EXISTS idx_dim_tariff_valid_period
+        ON dim_tariff (valid_from, valid_to);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS dim_tariff CASCADE;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

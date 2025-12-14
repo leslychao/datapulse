@@ -8,4 +8,5 @@
   <include file="changelog/0003-create-etl-execution-audit.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0004-create-dim-warehouses.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0005-create-dim-category.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0006-create-dim-tariff.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

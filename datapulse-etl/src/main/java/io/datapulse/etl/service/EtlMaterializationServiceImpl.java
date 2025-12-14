@@ -2,6 +2,7 @@ package io.datapulse.etl.service;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.dim.category.CategoryMaterializationHandler;
+import io.datapulse.etl.materialization.dim.tariff.TariffMaterializationHandler;
 import io.datapulse.etl.materialization.dim.warehouse.WarehouseMaterializationHandler;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
 
   private final WarehouseMaterializationHandler warehouseMaterializationHandler;
   private final CategoryMaterializationHandler categoryMaterializationHandler;
+  private final TariffMaterializationHandler tariffMaterializationHandler;
 
   @Override
   @Transactional
@@ -49,6 +51,7 @@ public class EtlMaterializationServiceImpl implements EtlMaterializationService 
     switch (event) {
       case WAREHOUSE_DICT -> warehouseMaterializationHandler.materialize(accountId, requestId);
       case CATEGORY_DICT -> categoryMaterializationHandler.materialize(accountId, requestId);
+      case COMMISSION_DICT -> tariffMaterializationHandler.materialize(accountId, requestId);
       default -> log.info(
           "No materialization configured for event={}, requestId={}, accountId={}",
           event,
