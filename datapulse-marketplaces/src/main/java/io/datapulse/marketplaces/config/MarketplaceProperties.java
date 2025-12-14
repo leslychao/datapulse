@@ -4,6 +4,7 @@ import static io.datapulse.domain.MessageCodes.MARKETPLACE_CONFIG_MISSING;
 import static io.datapulse.domain.MessageCodes.MARKETPLACE_ENDPOINT_PATH_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_BASE_URL_MISSING;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINTS_REQUIRED;
+import static io.datapulse.domain.ValidationKeys.MARKETPLACE_ENDPOINT_AUTH_SCOPE_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_PROVIDERS_REQUIRED;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RATE_LIMIT_LIMIT_MIN;
 import static io.datapulse.domain.ValidationKeys.MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED;
@@ -21,6 +22,7 @@ import static io.datapulse.domain.ValidationKeys.MARKETPLACE_STORAGE_CLEANUP_MAX
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.marketplaces.endpoint.EndpointAuthScope;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -92,7 +94,14 @@ public class MarketplaceProperties {
       if (cfg == null || cfg.getUrl() == null || cfg.getUrl().isBlank()) {
         throw new AppException(MARKETPLACE_ENDPOINT_PATH_REQUIRED, endpointKey.name());
       }
+      if (cfg.getAuthScope() == null) {
+        throw new AppException(MARKETPLACE_ENDPOINT_AUTH_SCOPE_REQUIRED, endpointKey.name());
+      }
       return cfg;
+    }
+
+    public EndpointAuthScope authScope(EndpointKey endpointKey) {
+      return endpointConfig(endpointKey).getAuthScope();
     }
 
     public RetryPolicy effectiveRetryPolicy(EndpointKey endpointKey) {
@@ -129,6 +138,9 @@ public class MarketplaceProperties {
 
     @NotBlank(message = MARKETPLACE_BASE_URL_MISSING)
     private String url;
+
+    @NotNull(message = MARKETPLACE_ENDPOINT_AUTH_SCOPE_REQUIRED)
+    private EndpointAuthScope authScope;
 
     private RetryPolicyOverride retryPolicyOverride;
 
@@ -171,17 +183,11 @@ public class MarketplaceProperties {
   public static class Cleanup {
 
     @NotNull(message = MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED)
-    @DurationMin(
-        seconds = 30,
-        message = MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN
-    )
+    @DurationMin(seconds = 30, message = MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN)
     private Duration maxAge = Duration.ofHours(6);
 
     @NotNull(message = MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED)
-    @DurationMin(
-        seconds = 15,
-        message = MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN
-    )
+    @DurationMin(seconds = 15, message = MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN)
     private Duration interval = Duration.ofHours(1);
   }
 
@@ -191,10 +197,7 @@ public class MarketplaceProperties {
       Integer limit,
 
       @NotNull(message = MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED)
-      @DurationMin(
-          millis = 1,
-          message = MARKETPLACE_RATE_LIMIT_PERIOD_MIN
-      )
+      @DurationMin(millis = 1, message = MARKETPLACE_RATE_LIMIT_PERIOD_MIN)
       Duration period
   ) {
 

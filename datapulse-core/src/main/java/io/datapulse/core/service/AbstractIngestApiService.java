@@ -1,9 +1,7 @@
 package io.datapulse.core.service;
 
-import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
-import static io.datapulse.domain.MessageCodes.REQUEST_REQUIRED;
-
 import io.datapulse.core.entity.LongBaseEntity;
+import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.LongBaseDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -22,7 +20,11 @@ public abstract class AbstractIngestApiService<
   }
 
   @Transactional
-  public R createFromRequest(@Valid @NotNull(message = REQUEST_REQUIRED) CR request) {
+  public R createFromRequest(
+      @Valid
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED)
+      CR request
+  ) {
     D draft = mapper().to(request, dtoType());
     D saved = save(draft);
     return toResponse(saved);
@@ -30,8 +32,13 @@ public abstract class AbstractIngestApiService<
 
   @Transactional
   public R updateFromRequest(
-      @NotNull(message = ID_REQUIRED) Long id,
-      @Valid @NotNull(message = REQUEST_REQUIRED) UR request) {
+      @NotNull(message = ValidationKeys.ID_REQUIRED)
+      Long id,
+
+      @Valid
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED)
+      UR request
+  ) {
     D patch = mapper().to(request, dtoType());
     patch.setId(id);
     D updated = update(patch);

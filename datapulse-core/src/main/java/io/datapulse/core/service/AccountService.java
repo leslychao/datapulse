@@ -1,15 +1,12 @@
 package io.datapulse.core.service;
 
-import static io.datapulse.domain.MessageCodes.ACCOUNT_ALREADY_EXISTS;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_NAME_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ACCOUNT_NOT_FOUND;
-import static io.datapulse.domain.MessageCodes.ID_REQUIRED;
-
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountRepository;
 import io.datapulse.domain.CommonConstants;
+import io.datapulse.domain.MessageCodes;
+import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.request.AccountUpdateRequest;
@@ -45,7 +42,8 @@ public class AccountService extends AbstractIngestApiService<
   public AccountService(
       MapperFacade mapperFacade,
       AccountRepository repository,
-      AccountApplier accountApplier) {
+      AccountApplier accountApplier
+  ) {
     this.repository = repository;
     this.mapperFacade = mapperFacade;
     this.accountApplier = accountApplier;
@@ -78,12 +76,12 @@ public class AccountService extends AbstractIngestApiService<
 
   @Override
   protected void validateOnCreate(AccountDto draft) {
-    String name = draft.getName();
+    String name = StringUtils.trimToNull(draft.getName());
     if (name == null) {
-      throw new BadRequestException(ACCOUNT_NAME_REQUIRED);
+      throw new BadRequestException(MessageCodes.ACCOUNT_NAME_REQUIRED);
     }
     if (repository.existsByNameIgnoreCase(name)) {
-      throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, name);
+      throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, name);
     }
   }
 
@@ -91,19 +89,19 @@ public class AccountService extends AbstractIngestApiService<
   protected void validateOnUpdate(Long id, AccountDto dto, AccountEntity existing) {
     String newName = StringUtils.trimToNull(dto.getName());
     if (newName == null) {
-      throw new BadRequestException(ACCOUNT_NAME_REQUIRED);
+      throw new BadRequestException(MessageCodes.ACCOUNT_NAME_REQUIRED);
     }
+
     String oldName = StringUtils.trimToNull(existing.getName());
-    if (!StringUtils.equalsIgnoreCase(newName, oldName)) {
-      if (repository.existsByNameIgnoreCaseAndIdNot(newName, id)) {
-        throw new BadRequestException(ACCOUNT_ALREADY_EXISTS, newName);
-      }
+    if (!StringUtils.equalsIgnoreCase(newName, oldName)
+        && repository.existsByNameIgnoreCaseAndIdNot(newName, id)) {
+      throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, newName);
     }
   }
 
   @Override
   protected AccountEntity beforeSave(AccountEntity entity) {
-    var now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
+    OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
     entity.setCreatedAt(now);
     entity.setUpdatedAt(now);
     entity.setActive(true);
@@ -124,32 +122,25 @@ public class AccountService extends AbstractIngestApiService<
 
   @Override
   @Transactional
-  public void delete(@NotNull(message = ID_REQUIRED) Long id) {
+  public void delete(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
     if (!repository.existsById(id)) {
-      throw new NotFoundException(ACCOUNT_NOT_FOUND, id);
+      throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id);
     }
     repository.deleteById(id);
   }
 
-  public boolean exists(@NotNull(message = ID_REQUIRED) Long id) {
+  public boolean exists(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
     return repository.existsById(id);
   }
 
   public List<AccountDto> getActive() {
-    return streamActive()
-        .map(accountEntity -> mapperFacade.to(accountEntity, AccountDto.class)).toList();
-  }
-
-  public List<Long> getActiveIds() {
-    return streamActive()
-        .map(accountEntity -> mapperFacade.to(accountEntity, AccountDto.class))
-        .map(AccountDto::getId)
-        .toList();
+    return streamActive().toList();
   }
 
   public Stream<AccountDto> streamActive() {
-    return repository.findAllByActiveIsTrue().stream()
-        .map(accountEntity -> mapperFacade.to(accountEntity, AccountDto.class));
+    return repository.findAllByActiveIsTrue()
+        .stream()
+        .map(entity -> mapperFacade.to(entity, AccountDto.class));
   }
 
   @Mapper(componentModel = "spring", config = BaseMapperConfig.class)

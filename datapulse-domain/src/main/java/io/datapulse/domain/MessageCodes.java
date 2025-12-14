@@ -26,69 +26,52 @@ public final class MessageCodes {
   public static final String ACCOUNT_NOT_FOUND = "account.not-found";
 
   // ===== Account-Connection =====
-  public static final String ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED =
-      "account.connection.marketplace.required";
-  public static final String ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED =
-      "account.connection.credentials.required";
-  public static final String ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE =
-      "account.connection.account.immutable";
-  public static final String ACCOUNT_CONNECTION_BY_ID_NOT_FOUND =
-      "account.connection.by-id.not-found";
-  public static final String ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND =
-      "account.connection.by-account-marketplace.not-found";
-  public static final String ACCOUNT_CONNECTION_INVALID_JSON =
-      "account.connection.credentials.invalid-json";
-  public static final String ACCOUNT_CONNECTION_ALREADY_EXISTS =
-      "account.connection.already-exists";
-  public static final String ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH =
-      "account.connection.credentials.type.mismatch";
+  public static final String ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED = "account.connection.marketplace.required";
+  public static final String ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED = "account.connection.credentials.required";
+  public static final String ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE = "account.connection.account.immutable";
+  public static final String ACCOUNT_CONNECTION_BY_ID_NOT_FOUND = "account.connection.by-id.not-found";
+  public static final String ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND = "account.connection.by-account-marketplace.not-found";
+  public static final String ACCOUNT_CONNECTION_INVALID_JSON = "account.connection.credentials.invalid-json";
+  public static final String ACCOUNT_CONNECTION_ALREADY_EXISTS = "account.connection.already-exists";
+  public static final String ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH = "account.connection.credentials.type.mismatch";
 
   // ===== Credentials =====
-  public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK =
-      "credentials.wb.token.not-blank";
-  public static final String CREDENTIALS_OZON_CLIENT_ID_NOT_BLANK =
-      "credentials.ozon.client-id.not-blank";
-  public static final String CREDENTIALS_OZON_API_KEY_NOT_BLANK =
-      "credentials.ozon.api-key.not-blank";
+  public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK = "credentials.wb.token.not-blank";
+  public static final String CREDENTIALS_OZON_CLIENT_ID_NOT_BLANK = "credentials.ozon.client-id.not-blank";
+  public static final String CREDENTIALS_OZON_API_KEY_NOT_BLANK = "credentials.ozon.api-key.not-blank";
 
   // ===== Marketplace / HTTP =====
   public static final String UNKNOWN_MARKETPLACE = "unknown-marketplace";
   public static final String WB_MISSING_TOKEN = "wb.missing-token";
   public static final String OZON_MISSING_CREDENTIALS = "ozon.missing-credentials";
+
+  // ===== Marketplace / Config =====
   public static final String MARKETPLACE_CONFIG_MISSING = "marketplace.config.missing";
   public static final String MARKETPLACE_BASE_URL_MISSING = "marketplace.base-url.missing";
+  public static final String MARKETPLACE_ENDPOINT_AUTH_SCOPE_REQUIRED = "marketplace.endpoint.auth-scope.required";
 
   // ===== Marketplace / Config binding (Bean Validation) =====
+  public static final String MARKETPLACE_PROVIDERS_REQUIRED = "marketplace.providers.required";
   public static final String MARKETPLACE_ENDPOINTS_REQUIRED = "marketplace.endpoints.required";
   public static final String MARKETPLACE_ENDPOINT_PATH_REQUIRED = "marketplace.endpoint.path.required";
-  public static final String MARKETPLACE_RETRY_POLICY_REQUIRED = "marketplace.retry-policy.required";
-  public static final String MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED =
-      "marketplace.retry-policy.maxAttempts.required";
-  public static final String MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED =
-      "marketplace.retry-policy.baseBackoff.required";
-  public static final String MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED =
-      "marketplace.retry-policy.maxBackoff.required";
-  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED =
-      "marketplace.rate-limit.limit.required";
-  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_MIN =
-      "marketplace.rate-limit.limit.min";
-  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED =
-      "marketplace.rate-limit.period.required";
-  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_MIN =
-      "marketplace.rate-limit.period.min";
-  public static final String MARKETPLACE_PROVIDERS_REQUIRED = "marketplace.providers.required";
-  public static final String MARKETPLACE_STORAGE_BASEDIR_REQUIRED =
-      "marketplace.storage.base-dir.required";
-  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED =
-      "marketplace.storage.cleanup.max-age.required";
-  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN =
-      "marketplace.storage.cleanup.max-age.min";
-  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED =
-      "marketplace.storage.cleanup.interval.required";
-  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN =
-      "marketplace.storage.cleanup.interval.min";
 
-  // ===== CONVERSION =====
+  public static final String MARKETPLACE_RETRY_POLICY_REQUIRED = "marketplace.retry-policy.required";
+  public static final String MARKETPLACE_RETRY_POLICY_MAX_ATTEMPTS_REQUIRED = "marketplace.retry-policy.maxAttempts.required";
+  public static final String MARKETPLACE_RETRY_POLICY_BASE_BACKOFF_REQUIRED = "marketplace.retry-policy.baseBackoff.required";
+  public static final String MARKETPLACE_RETRY_POLICY_MAX_BACKOFF_REQUIRED = "marketplace.retry-policy.maxBackoff.required";
+
+  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_REQUIRED = "marketplace.rate-limit.limit.required";
+  public static final String MARKETPLACE_RATE_LIMIT_LIMIT_MIN = "marketplace.rate-limit.limit.min";
+  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_REQUIRED = "marketplace.rate-limit.period.required";
+  public static final String MARKETPLACE_RATE_LIMIT_PERIOD_MIN = "marketplace.rate-limit.period.min";
+
+  public static final String MARKETPLACE_STORAGE_BASEDIR_REQUIRED = "marketplace.storage.base-dir.required";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_REQUIRED = "marketplace.storage.cleanup.max-age.required";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_MAX_AGE_MIN = "marketplace.storage.cleanup.max-age.min";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_REQUIRED = "marketplace.storage.cleanup.interval.required";
+  public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN = "marketplace.storage.cleanup.interval.min";
+
+  // ===== Conversion =====
   public static final String CONVERSION_MAPPING_NOT_FOUND = "conversion.mapping.not.found";
 
   // ===== File download / streaming =====
@@ -98,8 +81,6 @@ public final class MessageCodes {
   public static final String DOWNLOAD_MOVE_FAILED = "download.move.failed";
 
   // ===== ETL / Events =====
-  public static final String ETL_DATE_FROM_REQUIRED = "etl.date-from.required";
-  public static final String ETL_DATE_TO_REQUIRED = "etl.date-to.required";
   public static final String ETL_DATE_RANGE_INVALID = "etl.date-range.invalid";
   public static final String ETL_EVENT_REQUIRED = "etl.event.required";
   public static final String ETL_EVENT_UNKNOWN = "etl.event.unknown";
@@ -108,12 +89,9 @@ public final class MessageCodes {
 
   // ===== ETL / Ingest / Snapshot =====
   public static final String ETL_INGEST_SNAPSHOT_REQUIRED = "etl.ingest.snapshot.required";
-  public static final String ETL_INGEST_SNAPSHOT_FILE_REQUIRED =
-      "etl.ingest.snapshot.file.required";
-  public static final String ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED =
-      "etl.ingest.snapshot.element-type.required";
-  public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND =
-      "etl.ingest.json-layout.not-found";
+  public static final String ETL_INGEST_SNAPSHOT_FILE_REQUIRED = "etl.ingest.snapshot.file.required";
+  public static final String ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED = "etl.ingest.snapshot.element-type.required";
+  public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND = "etl.ingest.json-layout.not-found";
   public static final String ETL_AGGREGATION_EMPTY_GROUP = "etl.aggregation.empty-group";
 
   // ===== RAW / Schema =====

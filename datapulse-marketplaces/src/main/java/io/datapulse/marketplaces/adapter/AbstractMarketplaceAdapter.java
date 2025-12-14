@@ -84,7 +84,7 @@ public abstract class AbstractMarketplaceAdapter {
       Map<String, ?> body,
       Class<R> elementType
   ) {
-    EndpointAuthScope scope = endpointKey.authScope();
+    EndpointAuthScope scope = properties.get(marketplaceType).authScope(endpointKey);
     long authAccountId = authAccountIdResolver.resolveAuthAccountId(scope, targetAccountId);
 
     try {
