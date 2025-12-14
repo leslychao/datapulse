@@ -15,7 +15,9 @@ public enum EndpointKey {
   // ===== Ozon =====
   DICT_OZON_WAREHOUSES_FBS,
   DICT_OZON_CLUSTERS,
-  DICT_OZON_CATEGORY_TREE;
+  DICT_OZON_CATEGORY_TREE,
+
+  DICT_OZON_PRODUCT_INFO_PRICES;
 
   public String tag() {
     return name().toLowerCase();

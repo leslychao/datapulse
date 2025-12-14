@@ -9,12 +9,14 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TariffMaterializationHandler {
 
-  private final DimTariffRepository repository;
+  private final DimTariffRepository dimTariffRepository;
+  private final OzonProductCommissionRepository ozonProductCommissionRepository;
 
   public void materialize(
       Long accountId,
       String requestId
   ) {
-    repository.upsertWildberries(accountId, requestId);
+    dimTariffRepository.upsertWildberries(accountId, requestId);
+    ozonProductCommissionRepository.upsertOzon(accountId, requestId);
   }
 }

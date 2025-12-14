@@ -60,6 +60,9 @@ marketplace:
         DICT_OZON_CATEGORY_TREE:
           url: https://api-seller.ozon.ru/v1/description-category/tree
           authScope: SYSTEM_ACCOUNT
+        DICT_OZON_PRODUCT_INFO_PRICES:
+          url: https://api-seller.ozon.ru/v5/product/info/prices
+          authScope: TARGET_ACCOUNT
       retryPolicy:
         maxAttempts: 4
         baseBackoff: 300ms

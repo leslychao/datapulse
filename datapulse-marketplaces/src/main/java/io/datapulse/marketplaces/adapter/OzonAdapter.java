@@ -4,6 +4,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
+import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
@@ -57,5 +58,22 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
   public Snapshot<OzonCategoryTreeRaw> downloadCategoryTree(long accountId) {
     return doPost(accountId, EndpointKey.DICT_OZON_CATEGORY_TREE, Map.of("language", "DEFAULT"),
         OzonCategoryTreeRaw.class);
+  }
+
+  public Snapshot<OzonProductInfoPricesItemRaw> downloadProductInfoPrices(long accountId) {
+    Map<String, Object> body = Map.of(
+        "cursor", "",
+        "filter", Map.of(
+            "visibility", "ALL"
+        ),
+        "limit", 1000
+    );
+
+    return doPost(
+        accountId,
+        EndpointKey.DICT_OZON_PRODUCT_INFO_PRICES,
+        body,
+        OzonProductInfoPricesItemRaw.class
+    );
   }
 }

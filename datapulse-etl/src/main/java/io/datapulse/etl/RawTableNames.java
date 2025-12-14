@@ -18,4 +18,6 @@ public final class RawTableNames {
   public static final String RAW_WB_SUBJECTS = "raw_wb_subjects";
 
   public static final String RAW_WB_TARIFFS_COMMISSION = "raw_wb_tariffs_commission";
+
+  public static final String RAW_OZON_PRODUCT_INFO_PRICES = "raw_ozon_product_info_prices";
 }
