@@ -134,7 +134,8 @@ public abstract class AbstractMarketplaceAdapter {
 
       log.info(
           "Snapshot download completed: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, path={}, sizeBytes={}",
-          marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, resultPath, size
+          marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, resultPath,
+          size
       );
 
       return new Snapshot<>(elementType, resultPath);
