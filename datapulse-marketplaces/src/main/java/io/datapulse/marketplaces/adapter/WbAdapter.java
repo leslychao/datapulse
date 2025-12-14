@@ -12,6 +12,7 @@ import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseSellerListRaw;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
+import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import org.springframework.stereotype.Component;
 
@@ -22,14 +23,16 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
       EndpointsResolver resolver,
       MarketplaceStreamingDownloadService downloader,
       HttpHeaderProvider headerProvider,
-      MarketplaceProperties marketplaceProperties
+      MarketplaceProperties marketplaceProperties,
+      AuthAccountIdResolver authAccountIdResolver
   ) {
     super(
         MarketplaceType.WILDBERRIES,
         downloader,
         headerProvider,
         resolver,
-        marketplaceProperties
+        marketplaceProperties,
+        authAccountIdResolver
     );
   }
 

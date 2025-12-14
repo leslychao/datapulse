@@ -1,12 +1,17 @@
 package io.datapulse.marketplaces.adapter;
 
+import static io.datapulse.domain.MessageCodes.DOWNLOAD_FAILED;
+
 import io.datapulse.domain.MarketplaceType;
+import io.datapulse.domain.exception.AppException;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
+import io.datapulse.marketplaces.endpoint.EndpointAuthScope;
 import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointRef;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
+import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import java.io.IOException;
 import java.net.URI;
@@ -28,6 +33,7 @@ public abstract class AbstractMarketplaceAdapter {
   protected final HttpHeaderProvider headerProvider;
   protected final EndpointsResolver resolver;
   private final MarketplaceProperties properties;
+  private final AuthAccountIdResolver authAccountIdResolver;
 
   protected final <R> Snapshot<R> doGet(
       long accountId,
@@ -71,38 +77,41 @@ public abstract class AbstractMarketplaceAdapter {
   }
 
   private <R> Snapshot<R> execute(
-      long accountId,
+      long targetAccountId,
       EndpointKey endpointKey,
       HttpMethod method,
       Map<String, ?> queryParams,
       Map<String, ?> body,
       Class<R> elementType
   ) {
+    EndpointAuthScope scope = endpointKey.authScope();
+    long authAccountId = authAccountIdResolver.resolveAuthAccountId(scope, targetAccountId);
+
     try {
       EndpointRef ref = resolveEndpoint(endpointKey, method, queryParams);
       URI uri = ref.uri();
 
-      HttpHeaders headers = headerProvider.build(marketplaceType, accountId);
-      Path target = planPath(accountId, endpointKey);
+      HttpHeaders headers = headerProvider.build(marketplaceType, authAccountId);
+      Path target = planPath(authAccountId, endpointKey);
 
       if (Files.exists(target)) {
         long size = Files.size(target);
         log.info(
-            "Snapshot reused from local cache: marketplace={}, accountId={}, endpoint={}, path={}, sizeBytes={}",
-            marketplaceType, accountId, endpointKey, target, size
+            "Snapshot reused from local cache: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, path={}, sizeBytes={}",
+            marketplaceType, targetAccountId, authAccountId, endpointKey, target, size
         );
         return new Snapshot<>(elementType, target);
       }
 
       log.info(
-          "Starting snapshot download: marketplace={}, accountId={}, endpoint={}, method={}, uri={}",
-          marketplaceType, accountId, endpointKey, method, uri
+          "Starting snapshot download: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, method={}, uri={}",
+          marketplaceType, targetAccountId, authAccountId, endpointKey, method, uri
       );
 
       Path resultPath = downloader.download(
           marketplaceType,
           endpointKey,
-          accountId,
+          authAccountId,
           method,
           uri,
           headers,
@@ -113,22 +122,22 @@ public abstract class AbstractMarketplaceAdapter {
       long size = Files.size(resultPath);
 
       log.info(
-          "Snapshot download completed: marketplace={}, accountId={}, endpoint={}, path={}, sizeBytes={}",
-          marketplaceType, accountId, endpointKey, resultPath, size
+          "Snapshot download completed: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, path={}, sizeBytes={}",
+          marketplaceType, targetAccountId, authAccountId, endpointKey, resultPath, size
       );
 
       return new Snapshot<>(elementType, resultPath);
 
     } catch (IOException ex) {
       log.error(
-          "Snapshot download failed: marketplace={}, accountId={}, endpoint={}",
-          marketplaceType, accountId, endpointKey, ex
+          "Snapshot download failed: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}",
+          marketplaceType, targetAccountId, authAccountId, endpointKey, ex
       );
-      throw new RuntimeException("Snapshot failed: " + endpointKey, ex);
+      throw new AppException(DOWNLOAD_FAILED, endpointKey, ex);
     }
   }
 
-  private Path planPath(long accountId, EndpointKey endpoint) {
+  private Path planPath(long authAccountId, EndpointKey endpoint) {
     String endpointTag = sanitize(endpoint.tag());
     String marketplace = sanitize(marketplaceType.name().toLowerCase());
 
@@ -136,7 +145,7 @@ public abstract class AbstractMarketplaceAdapter {
 
     return baseDir()
         .resolve(marketplace)
-        .resolve(Long.toString(accountId))
+        .resolve(Long.toString(authAccountId))
         .resolve(endpointTag)
         .resolve(fileName);
   }

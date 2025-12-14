@@ -1,29 +1,21 @@
 spring:
-  application:
-    name: datapulse
-
   datasource:
-    url: "jdbc:postgresql://127.0.0.1:5434/datapulse?currentSchema=datapulse&reWriteBatchedInserts=true"
+    url: "jdbc:postgresql://127.0.0.1:5434/datapulse?reWriteBatchedInserts=true"
     username: "datapulse"
     password: "datapulse"
     hikari:
+      schema: datapulse
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
-
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: none
     properties:
-      hibernate.default_schema: datapulse
-      hibernate.format_sql: true
       hibernate.jdbc.batch_size: 500
-      hibernate.jdbc.fetch_size: 200
       hibernate.order_inserts: true
       hibernate.order_updates: true
-      hibernate.generate_statistics: false
-      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
   liquibase:
     enabled: true
     change-log: classpath:/db/master.xml
@@ -31,7 +23,7 @@ spring:
     liquibase-schema: datapulse
 
 webclient:
-  max-in-memory-size: 262144
+  max-in-memory-size: 5242880
   connect-timeout-millis: 10000
   response-timeout-seconds: 30
   read-timeout-seconds: 30
@@ -48,6 +40,14 @@ system-account:
       active: true
       client-id: ${OZON_SYSTEM_CLIENT_ID:}
       api-key: ${OZON_SYSTEM_API_KEY:}
+
+sandbox-account:
+  enabled: true
+  name: DATAPULSE_SANDBOX
+  connections:
+    WILDBERRIES:
+      active: true
+      token: ${WB_SANDBOX_TOKEN:}
 
 vault:
   uri: http://localhost:8300

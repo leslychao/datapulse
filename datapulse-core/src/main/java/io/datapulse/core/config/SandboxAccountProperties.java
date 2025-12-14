@@ -18,8 +18,8 @@ import org.springframework.validation.annotation.Validated;
 @Configuration
 @Validated
 @ValidMarketplaceConnections
-@ConfigurationProperties(prefix = "system-account")
-public class SystemAccountProperties {
+@ConfigurationProperties(prefix = "sandbox-account")
+public class SandboxAccountProperties {
 
   private boolean enabled;
 
