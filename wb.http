@@ -1,0 +1,117 @@
+### 0) Создание карточки товара (async)
+POST {{wbContentBaseUrl}}/content/v2/cards/upload
+Authorization: {{wbToken}}
+Content-Type: application/json
+Accept: application/json
+
+[
+  {
+    "subjectID": 105,
+    "variants": [
+      {
+        "vendorCode": "АртикулПродавца_2",
+        "title": "Наименование товара 1",
+        "description": "Описание товара",
+        "brand": "Бренд",
+        "dimensions": { "length": 12, "width": 7, "height": 5, "weightBrutto": 1.242 },
+        "characteristics": [
+          { "id": 14177449, "value": ["красный"] }
+        ],
+        "sizes": [
+          { "techSize": "S", "wbSize": "42", "price": 5000, "skus": ["8800555353501"] }
+        ]
+      },
+      {
+        "vendorCode": "АртикулПродавца_3",
+        "title": "Наименование товара 2",
+        "description": "Описание товара",
+        "brand": "Бренд",
+        "dimensions": { "length": 12, "width": 7, "height": 5, "weightBrutto": 1.242 },
+        "characteristics": [
+          { "id": 14177449, "value": ["красный"] }
+        ],
+        "sizes": [
+          { "techSize": "M", "wbSize": "44",
+            "price": 5200,
+            "skus": ["8800555353502"]
+          }
+        ]
+      },
+      {
+        "vendorCode": "АртикулПродавца_4",
+        "title": "Наименование товара 3",
+        "description": "Описание товара",
+        "brand": "Бренд",
+        "dimensions": { "length": 12, "width": 7, "height": 5, "weightBrutto": 1.242 },
+        "characteristics": [
+          { "id": 14177449, "value": ["красный"] }
+        ],
+        "sizes": [
+          { "techSize": "L", "wbSize": "46",
+            "price": 5400,
+            "skus": ["8800555353503"]
+          }
+        ]
+      },
+      {
+        "vendorCode": "АртикулПродавца_5",
+        "title": "Наименование товара 4",
+        "description": "Описание товара",
+        "brand": "Бренд",
+        "dimensions": { "length": 12, "width": 7, "height": 5, "weightBrutto": 1.242 },
+        "characteristics": [
+          { "id": 14177449, "value": ["красный"] }
+        ],
+        "sizes": [
+          { "techSize": "XL", "wbSize": "48",
+            "price": 5600,
+            "skus": ["8800555353504"]
+          }
+        ]
+      },
+      {
+        "vendorCode": "АртикулПродавца_6",
+        "title": "Наименование товара 5",
+        "description": "Описание товара",
+        "brand": "Бренд",
+        "dimensions": { "length": 12, "width": 7, "height": 5, "weightBrutto": 1.242 },
+        "characteristics": [
+          { "id": 14177449, "value": ["красный"] }
+        ],
+        "sizes": [
+          { "techSize": "XXL", "wbSize": "50",
+            "price": 5800,
+            "skus": ["8800555353505"]
+          }
+        ]
+      }
+    ]
+  }
+]
+
+### 1) Список карточек (включая без фото)
+POST {{wbContentBaseUrl}}/content/v2/get/cards/list
+Authorization: {{wbToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "settings": {
+    "filter": {
+      "withPhoto": -1
+    },
+    "cursor": {
+      "limit": 100
+    }
+  }
+}
+
+### 3) Несозданные карточки с ошибками
+POST {{wbContentBaseUrl}}/content/v2/cards/error/list
+Authorization: {{wbToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "limit": 100
+}
