@@ -1,5 +1,6 @@
 HELP.md
 datapulse-core/src/main/resources/datapulse-core-local.yml
+http-client.env.json
 data/
 target/
 .mvn/wrapper/maven-wrapper.jar
