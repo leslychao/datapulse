@@ -30,16 +30,6 @@ public class WbProductsEventSource implements EventSource {
   private final WbAdapter wbAdapter;
 
   @Override
-  public Snapshot<WbProductCardRaw> fetchSnapshot(
-      long accountId,
-      MarketplaceEvent event,
-      LocalDate dateFrom,
-      LocalDate dateTo
-  ) {
-    return wbAdapter.downloadProductCards(accountId, "", PAGE_SIZE);
-  }
-
-  @Override
   public List<Snapshot<?>> fetchSnapshots(
       long accountId,
       MarketplaceEvent event,
@@ -48,7 +38,7 @@ public class WbProductsEventSource implements EventSource {
   ) {
     List<Snapshot<?>> snapshots = new ArrayList<>();
 
-    String cursor = null;
+    String cursor = "";
 
     while (true) {
       Snapshot<WbProductCardRaw> snapshot =
@@ -56,15 +46,12 @@ public class WbProductsEventSource implements EventSource {
 
       snapshots.add(snapshot);
 
-      String next = snapshot.nextToken();
-      if (next == null) {
-        break;
-      }
-      if (next.equals(cursor)) {
+      String nextCursor = snapshot.nextToken();
+      if (nextCursor == null || nextCursor.isBlank() || nextCursor.equals(cursor)) {
         break;
       }
 
-      cursor = next;
+      cursor = nextCursor;
     }
 
     return snapshots;

@@ -13,7 +13,7 @@ public interface EventSource {
 
   @NotNull
   @Valid
-  Snapshot<?> fetchSnapshot(
+  List<Snapshot<?>> fetchSnapshots(
       @Min(value = 1L, message = ValidationKeys.ACCOUNT_ID_REQUIRED)
       long accountId,
 
@@ -21,17 +21,6 @@ public interface EventSource {
       MarketplaceEvent event,
 
       LocalDate dateFrom,
-
       LocalDate dateTo
   );
-
-  default List<Snapshot<?>> fetchSnapshots(
-      long accountId,
-      MarketplaceEvent event,
-      LocalDate dateFrom,
-      LocalDate dateTo
-  ) {
-    Snapshot<?> snapshot = fetchSnapshot(accountId, event, dateFrom, dateTo);
-    return snapshot == null ? List.of() : List.of(snapshot);
-  }
 }

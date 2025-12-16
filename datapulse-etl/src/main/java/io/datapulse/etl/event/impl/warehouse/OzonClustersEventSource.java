@@ -9,6 +9,7 @@ import io.datapulse.marketplaces.adapter.OzonAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -26,12 +27,15 @@ public class OzonClustersEventSource implements EventSource {
   private final OzonAdapter ozonAdapter;
 
   @Override
-  public Snapshot<OzonClusterListRaw> fetchSnapshot(
+  public List<Snapshot<?>> fetchSnapshots(
       long accountId,
       MarketplaceEvent event,
       LocalDate dateFrom,
       LocalDate dateTo
   ) {
-    return ozonAdapter.downloadFboWarehouses(accountId);
+    Snapshot<OzonClusterListRaw> snapshot =
+        ozonAdapter.downloadFboWarehouses(accountId);
+
+    return List.of(snapshot);
   }
 }

@@ -9,6 +9,7 @@ import io.datapulse.marketplaces.adapter.WbAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -26,12 +27,15 @@ public class WbSubjectEventSource implements EventSource {
   private final WbAdapter wbAdapter;
 
   @Override
-  public Snapshot<WbSubjectListRaw> fetchSnapshot(
+  public List<Snapshot<?>> fetchSnapshots(
       long accountId,
       MarketplaceEvent event,
       LocalDate dateFrom,
       LocalDate dateTo
   ) {
-    return wbAdapter.downloadSubjects(accountId);
+    Snapshot<WbSubjectListRaw> snapshot =
+        wbAdapter.downloadSubjects(accountId);
+
+    return List.of(snapshot);
   }
 }

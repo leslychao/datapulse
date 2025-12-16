@@ -30,16 +30,6 @@ public class OzonProductsEventSource implements EventSource {
   private final OzonAdapter ozonAdapter;
 
   @Override
-  public Snapshot<OzonProductListItemRaw> fetchSnapshot(
-      long accountId,
-      MarketplaceEvent event,
-      LocalDate dateFrom,
-      LocalDate dateTo
-  ) {
-    return ozonAdapter.downloadProductsPage(accountId, "", PAGE_SIZE);
-  }
-
-  @Override
   public List<Snapshot<?>> fetchSnapshots(
       long accountId,
       MarketplaceEvent event,
@@ -48,23 +38,20 @@ public class OzonProductsEventSource implements EventSource {
   ) {
     List<Snapshot<?>> snapshots = new ArrayList<>();
 
-    String cursor = "";
+    String lastId = "";
 
     while (true) {
       Snapshot<OzonProductListItemRaw> snapshot =
-          ozonAdapter.downloadProductsPage(accountId, cursor, PAGE_SIZE);
+          ozonAdapter.downloadProductsPage(accountId, lastId, PAGE_SIZE);
 
       snapshots.add(snapshot);
 
-      String next = snapshot.nextToken();
-      if (next == null) {
-        break;
-      }
-      if (next.equals(cursor)) {
+      String nextLastId = snapshot.nextToken();
+      if (nextLastId == null || nextLastId.isBlank() || nextLastId.equals(lastId)) {
         break;
       }
 
-      cursor = next;
+      lastId = nextLastId;
     }
 
     return snapshots;
