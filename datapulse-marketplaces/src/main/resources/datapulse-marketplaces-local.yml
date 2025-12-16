@@ -2,6 +2,7 @@ spring:
   config:
     activate:
       on-profile: local
+
 marketplace:
   providers:
     WILDBERRIES:
@@ -9,25 +10,40 @@ marketplace:
         DICT_WB_WAREHOUSES_FBW:
           url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
           authScope: SANDBOX_ACCOUNT
+
         DICT_WB_OFFICES_FBS:
           url: https://marketplace-api-sandbox.wildberries.ru/api/v3/offices
           authScope: SANDBOX_ACCOUNT
+
         DICT_WB_WAREHOUSES_SELLER:
           url: https://marketplace-api-sandbox.wildberries.ru/api/v3/warehouses
           authScope: SANDBOX_ACCOUNT
+
         DICT_WB_CATEGORIES_PARENT:
           url: https://content-api-sandbox.wildberries.ru/content/v2/object/parent/all
           authScope: SANDBOX_ACCOUNT
+
         DICT_WB_SUBJECTS:
           url: https://content-api-sandbox.wildberries.ru/content/v2/object/all
           authScope: SANDBOX_ACCOUNT
+
         DICT_WB_TARIFFS_COMMISSION:
           authScope: SYSTEM_ACCOUNT
+
+        DICT_WB_PRODUCTS:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/get/cards/list
+          authScope: SANDBOX_ACCOUNT
+
     OZON:
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
           authScope: SYSTEM_ACCOUNT
+
         DICT_OZON_CLUSTERS:
           authScope: SYSTEM_ACCOUNT
+
         DICT_OZON_CATEGORY_TREE:
+          authScope: SYSTEM_ACCOUNT
+
+        DICT_OZON_PRODUCTS:
           authScope: SYSTEM_ACCOUNT

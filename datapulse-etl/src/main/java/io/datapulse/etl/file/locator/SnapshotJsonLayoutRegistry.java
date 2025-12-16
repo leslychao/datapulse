@@ -3,6 +3,8 @@ package io.datapulse.etl.file.locator;
 import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
+import io.datapulse.marketplaces.dto.raw.product.OzonProductListItemRaw;
+import io.datapulse.marketplaces.dto.raw.product.WbProductCardRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.WbTariffCommissionRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
@@ -21,17 +23,26 @@ public final class SnapshotJsonLayoutRegistry {
   private final Map<Class<?>, JsonArrayLocator> locators = new ConcurrentHashMap<>();
 
   public SnapshotJsonLayoutRegistry() {
+
+    // ===== Warehouses =====
     register(OzonWarehouseFbsListRaw.class, JsonArrayLocators.arrayAtPath("result"));
     register(OzonClusterListRaw.class, JsonArrayLocators.arrayAtPath("clusters"));
     register(WbWarehouseFbwListRaw.class, JsonArrayLocators.arrayAtPath());
     register(WbOfficeFbsListRaw.class, JsonArrayLocators.arrayAtPath());
     register(WbWarehouseSellerListRaw.class, JsonArrayLocators.arrayAtPath());
 
+    // ===== Categories =====
     register(OzonCategoryTreeRaw.class, JsonArrayLocators.arrayAtPath("result"));
     register(WbCategoryParentListRaw.class, JsonArrayLocators.arrayAtPath("data"));
     register(WbSubjectListRaw.class, JsonArrayLocators.arrayAtPath("data"));
+
+    // ===== Tariffs / Commissions =====
     register(WbTariffCommissionRaw.class, JsonArrayLocators.arrayAtPath("report"));
     register(OzonProductInfoPricesItemRaw.class, JsonArrayLocators.arrayAtPath("items"));
+
+    // ===== Products =====
+    register(OzonProductListItemRaw.class, JsonArrayLocators.arrayAtPath("result", "items"));
+    register(WbProductCardRaw.class, JsonArrayLocators.arrayAtPath("cards"));
   }
 
   public void register(@NonNull Class<?> rawType, @NonNull JsonArrayLocator locator) {

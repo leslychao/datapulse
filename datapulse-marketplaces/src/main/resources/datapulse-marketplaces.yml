@@ -4,6 +4,7 @@ marketplace:
     cleanup:
       max-age: 60s
       interval: 15s
+
   providers:
     WILDBERRIES:
       rateLimit:
@@ -20,49 +21,73 @@ marketplace:
           WB_TARIFFS_COMMISSION:
             limit: 1
             period: 60s
+          WB_PRODUCTS:
+            limit: 100
+            period: 60s
+
       endpoints:
         DICT_WB_WAREHOUSES_FBW:
           url: https://supplies-api.wildberries.ru/api/v1/warehouses
           authScope: TARGET_ACCOUNT
           rateLimitGroup: WB_WAREHOUSES_FBW
+
         DICT_WB_OFFICES_FBS:
           url: https://marketplace-api.wildberries.ru/api/v3/offices
           authScope: TARGET_ACCOUNT
           rateLimitGroup: WB_WAREHOUSES_FBS
+
         DICT_WB_WAREHOUSES_SELLER:
           url: https://marketplace-api.wildberries.ru/api/v3/warehouses
           authScope: TARGET_ACCOUNT
           rateLimitGroup: WB_WAREHOUSES_FBS
+
         DICT_WB_CATEGORIES_PARENT:
           url: https://content-api.wildberries.ru/content/v2/object/parent/all
           authScope: SYSTEM_ACCOUNT
           rateLimitGroup: WB_CATEGORIES
+
         DICT_WB_SUBJECTS:
           url: https://content-api.wildberries.ru/content/v2/object/all
           authScope: SYSTEM_ACCOUNT
           rateLimitGroup: WB_CATEGORIES
+
         DICT_WB_TARIFFS_COMMISSION:
           url: https://common-api.wildberries.ru/api/v1/tariffs/commission
           authScope: SYSTEM_ACCOUNT
           rateLimitGroup: WB_TARIFFS_COMMISSION
+
+        DICT_WB_PRODUCTS:
+          url: https://content-api.wildberries.ru/content/v2/get/cards/list
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: WB_PRODUCTS
+
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
         maxBackoff: 30s
+
     OZON:
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
           url: https://api-seller.ozon.ru/v1/warehouse/list
           authScope: TARGET_ACCOUNT
+
         DICT_OZON_CLUSTERS:
           url: https://api-seller.ozon.ru/v1/cluster/list
           authScope: SYSTEM_ACCOUNT
+
         DICT_OZON_CATEGORY_TREE:
           url: https://api-seller.ozon.ru/v1/description-category/tree
           authScope: SYSTEM_ACCOUNT
+
         DICT_OZON_PRODUCT_INFO_PRICES:
           url: https://api-seller.ozon.ru/v5/product/info/prices
           authScope: TARGET_ACCOUNT
+
+        DICT_OZON_PRODUCTS:
+          url: https://api-seller.ozon.ru/v3/product/list
+          authScope: TARGET_ACCOUNT
+
       retryPolicy:
         maxAttempts: 4
         baseBackoff: 300ms

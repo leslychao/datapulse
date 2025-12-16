@@ -139,7 +139,7 @@ public class EtlOrchestrationCommandFactory {
 
   private EtlDateMode defaultDateMode(MarketplaceEvent event) {
     return switch (event) {
-      case WAREHOUSE_DICT, CATEGORY_DICT, COMMISSION_DICT -> EtlDateMode.NONE;
+      case WAREHOUSE_DICT, CATEGORY_DICT, COMMISSION_DICT, PRODUCT_DICT -> EtlDateMode.NONE;
     };
   }
 

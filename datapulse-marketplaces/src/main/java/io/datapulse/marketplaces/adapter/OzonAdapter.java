@@ -4,6 +4,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
+import io.datapulse.marketplaces.dto.raw.product.OzonProductListItemRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
@@ -11,6 +12,7 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.json.OzonCursorExtractor;
+import io.datapulse.marketplaces.json.OzonLastIdExtractor;
 import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import java.util.Map;
@@ -92,5 +94,32 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
 
     String nextCursor = OzonCursorExtractor.extractCursor(downloaded.file());
     return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextCursor);
+  }
+
+  public Snapshot<OzonProductListItemRaw> downloadProductsPage(
+      long accountId,
+      String lastId,
+      int limit
+  ) {
+    String effectiveLastId = lastId == null ? "" : lastId;
+
+    Map<String, Object> body = Map.of(
+        "filter", Map.of("visibility", "ALL"),
+        "last_id", effectiveLastId,
+        "limit", limit
+    );
+
+    String partitionKey = partitionKeyGenerator.generate(effectiveLastId, limit);
+
+    Snapshot<OzonProductListItemRaw> downloaded = doPostPartitioned(
+        accountId,
+        EndpointKey.DICT_OZON_PRODUCTS,
+        body,
+        partitionKey,
+        OzonProductListItemRaw.class
+    );
+
+    String nextLastId = OzonLastIdExtractor.extractLastId(downloaded.file());
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextLastId);
   }
 }
