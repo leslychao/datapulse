@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- ===================================================================== -->
+  <!-- DIM PRODUCT :: OZON -->
+  <!-- ===================================================================== -->
+
+  <changeSet id="0008-create-dim-product-ozon" author="assistant" dbms="postgresql">
+    <sql>
+      create table if not exists dim_product_ozon
+      (
+        id               bigserial primary key,
+
+        product_id       bigint not null,
+        offer_id         text,
+
+        title            text,
+
+        is_archived      boolean not null default false,
+        has_fbo_stocks   boolean not null default false,
+        has_fbs_stocks   boolean not null default false,
+
+        created_at       timestamptz not null default now(),
+        updated_at       timestamptz not null default now(),
+
+        constraint uq_dim_product_ozon_product
+          unique (product_id)
+      );
+
+      create index if not exists idx_dim_product_ozon_offer
+        on dim_product_ozon (offer_id);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS dim_product_ozon CASCADE;
+    </rollback>
+  </changeSet>
+
+
+  <!-- ===================================================================== -->
+  <!-- DIM PRODUCT :: WILDBERRIES -->
+  <!-- ===================================================================== -->
+
+  <changeSet id="0009-create-dim-product-wb" author="assistant" dbms="postgresql">
+    <sql>
+      create table if not exists dim_product_wb
+      (
+        id            bigserial primary key,
+
+        nm_id         bigint not null,
+        imt_id        bigint,
+
+        vendor_code   text,
+
+        subject_id    bigint,
+        subject_name  text,
+
+        brand         text,
+        title         text,
+
+        created_at    timestamptz not null default now(),
+        updated_at    timestamptz not null default now(),
+
+        constraint uq_dim_product_wb_nm
+          unique (nm_id)
+      );
+
+      create index if not exists idx_dim_product_wb_imt
+        on dim_product_wb (imt_id);
+
+      create index if not exists idx_dim_product_wb_subject
+        on dim_product_wb (subject_id);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS dim_product_wb CASCADE;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>
