@@ -5,6 +5,8 @@ import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
 import io.datapulse.marketplaces.dto.raw.product.OzonProductListItemRaw;
+import io.datapulse.marketplaces.dto.raw.sales.OzonFinanceTransactionOperationRaw;
+import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFbsRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
@@ -12,14 +14,26 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.json.OzonCursorExtractor;
+import io.datapulse.marketplaces.json.OzonHasNextExtractor;
 import io.datapulse.marketplaces.json.OzonLastIdExtractor;
+import io.datapulse.marketplaces.json.OzonPageCountExtractor;
 import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
 public final class OzonAdapter extends AbstractMarketplaceAdapter {
+
+  private static final DateTimeFormatter RFC3339_MILLIS_UTC =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
+
+  private static final DateTimeFormatter RFC3339_SECONDS_UTC =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
 
   private final CursorLimitPartitionKeyGenerator partitionKeyGenerator;
 
@@ -121,5 +135,96 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
 
     String nextLastId = OzonLastIdExtractor.extractLastId(downloaded.file());
     return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextLastId);
+  }
+
+  public Snapshot<OzonPostingFbsRaw> downloadPostingsFbsPage(
+      long accountId,
+      LocalDate dateFrom,
+      LocalDate dateTo,
+      long offset,
+      int limit
+  ) {
+    Map<String, Object> body = Map.of(
+        "dir", "ASC",
+        "filter", Map.of(
+            "since", rfc3339StartOfDayUtcSeconds(dateFrom),
+            "to", rfc3339EndOfDayUtcSeconds(dateTo)
+        ),
+        "limit", limit,
+        "offset", offset,
+        "with", Map.of(
+            "financial_data", true,
+            "analytics_data", false,
+            "barcodes", false,
+            "translit", false
+        )
+    );
+
+    String offsetTag = String.valueOf(offset);
+    String partitionKey = partitionKeyGenerator.generate(offsetTag, limit);
+
+    Snapshot<OzonPostingFbsRaw> downloaded = doPostPartitioned(
+        accountId,
+        EndpointKey.FACT_OZON_POSTING_FBS_LIST,
+        body,
+        partitionKey,
+        OzonPostingFbsRaw.class
+    );
+
+    boolean hasNext = OzonHasNextExtractor.extractHasNext(downloaded.file());
+    String nextOffset = hasNext ? String.valueOf(offset + limit) : null;
+
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextOffset);
+  }
+
+  public Snapshot<OzonFinanceTransactionOperationRaw> downloadFinanceTransactionsPage(
+      long accountId,
+      LocalDate dateFrom,
+      LocalDate dateTo,
+      long page,
+      int pageSize
+  ) {
+    Map<String, Object> body = Map.of(
+        "filter", Map.of(
+            "date", Map.of(
+                "from", rfc3339StartOfDayUtcMillis(dateFrom),
+                "to", rfc3339StartOfDayUtcMillis(dateTo)
+            ),
+            "transaction_type", "all"
+        ),
+        "page", page,
+        "page_size", pageSize
+    );
+
+    String pageTag = String.valueOf(page);
+    String partitionKey = partitionKeyGenerator.generate(pageTag, pageSize);
+
+    Snapshot<OzonFinanceTransactionOperationRaw> downloaded = doPostPartitioned(
+        accountId,
+        EndpointKey.FACT_OZON_FINANCE_TRANSACTION_LIST,
+        body,
+        partitionKey,
+        OzonFinanceTransactionOperationRaw.class
+    );
+
+    long pageCount = OzonPageCountExtractor.extractPageCount(downloaded.file());
+    String nextPage = (pageCount > 0 && page < pageCount) ? String.valueOf(page + 1) : null;
+
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextPage);
+  }
+
+  private static String rfc3339StartOfDayUtcMillis(LocalDate date) {
+    Instant instant = date.atStartOfDay().toInstant(ZoneOffset.UTC);
+    return RFC3339_MILLIS_UTC.format(instant);
+  }
+
+  private static String rfc3339StartOfDayUtcSeconds(LocalDate date) {
+    Instant instant = date.atStartOfDay().toInstant(ZoneOffset.UTC);
+    return RFC3339_SECONDS_UTC.format(instant);
+  }
+
+  private static String rfc3339EndOfDayUtcSeconds(LocalDate date) {
+    Instant instant = date.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC);
+    return RFC3339_SECONDS_UTC.format(instant);
   }
 }

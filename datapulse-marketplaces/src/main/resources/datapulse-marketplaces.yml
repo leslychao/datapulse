@@ -24,6 +24,9 @@ marketplace:
           WB_PRODUCTS:
             limit: 100
             period: 60s
+          WB_REPORT_DETAIL_BY_PERIOD:
+            limit: 1
+            period: 60s
 
       endpoints:
         DICT_WB_WAREHOUSES_FBW:
@@ -61,12 +64,26 @@ marketplace:
           authScope: TARGET_ACCOUNT
           rateLimitGroup: WB_PRODUCTS
 
+        FACT_WB_SALES_REPORT_DETAIL_BY_PERIOD:
+          url: https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: WB_REPORT_DETAIL_BY_PERIOD
+
       retryPolicy:
         maxAttempts: 3
         baseBackoff: 200ms
         maxBackoff: 30s
 
     OZON:
+      rateLimit:
+        groups:
+          OZON_POSTINGS_FBS:
+            limit: 100
+            period: 60s
+          OZON_FINANCE_TX:
+            limit: 60
+            period: 60s
+
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
           url: https://api-seller.ozon.ru/v1/warehouse/list
@@ -87,6 +104,16 @@ marketplace:
         DICT_OZON_PRODUCTS:
           url: https://api-seller.ozon.ru/v3/product/list
           authScope: TARGET_ACCOUNT
+
+        FACT_OZON_POSTING_FBS_LIST:
+          url: https://api-seller.ozon.ru/v3/posting/fbs/list
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: OZON_POSTINGS_FBS
+
+        FACT_OZON_FINANCE_TRANSACTION_LIST:
+          url: https://api-seller.ozon.ru/v3/finance/transaction/list
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: OZON_FINANCE_TX
 
       retryPolicy:
         maxAttempts: 4

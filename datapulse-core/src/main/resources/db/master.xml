@@ -11,4 +11,5 @@
   <include file="changelog/0006-create-dim-tariff.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0007-create-fact-product-commission-ozon.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0008-create-dim-product.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0010-create-fact-sales.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

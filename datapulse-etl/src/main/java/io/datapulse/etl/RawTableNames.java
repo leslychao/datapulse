@@ -26,4 +26,9 @@ public final class RawTableNames {
   // ===== Products =====
   public static final String RAW_OZON_PRODUCTS = "raw_ozon_products";
   public static final String RAW_WB_PRODUCTS = "raw_wb_products";
+
+  // ===== Sales fact (RAW) =====
+  public static final String RAW_WB_SALES_REPORT_DETAIL = "raw_wb_sales_report_detail";
+  public static final String RAW_OZON_POSTINGS_FBS = "raw_ozon_postings_fbs";
+  public static final String RAW_OZON_FINANCE_TRANSACTIONS = "raw_ozon_finance_transactions";
 }

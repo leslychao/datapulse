@@ -34,16 +34,24 @@ marketplace:
           url: https://content-api-sandbox.wildberries.ru/content/v2/get/cards/list
           authScope: SANDBOX_ACCOUNT
 
+        FACT_WB_SALES_REPORT_DETAIL_BY_PERIOD:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v5/supplier/reportDetailByPeriod
+          authScope: SANDBOX_ACCOUNT
+
     OZON:
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
           authScope: SYSTEM_ACCOUNT
-
         DICT_OZON_CLUSTERS:
           authScope: SYSTEM_ACCOUNT
-
         DICT_OZON_CATEGORY_TREE:
           authScope: SYSTEM_ACCOUNT
-
+        DICT_OZON_PRODUCT_INFO_PRICES:
+          authScope: TARGET_ACCOUNT
         DICT_OZON_PRODUCTS:
-          authScope: SYSTEM_ACCOUNT
+          authScope: TARGET_ACCOUNT
+
+        FACT_OZON_POSTING_FBS_LIST:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_FINANCE_TRANSACTION_LIST:
+          authScope: TARGET_ACCOUNT

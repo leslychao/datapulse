@@ -6,6 +6,7 @@ import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
 import io.datapulse.marketplaces.dto.raw.product.WbProductCardRaw;
+import io.datapulse.marketplaces.dto.raw.sales.WbSalesReportDetailRowRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.WbTariffCommissionRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbOfficeFbsListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseFbwListRaw;
@@ -14,8 +15,10 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.json.WbCardsCursorExtractor;
+import io.datapulse.marketplaces.json.WbRrdIdExtractor;
 import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
+import java.time.LocalDate;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -106,7 +109,10 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
         )
     );
 
-    String partitionKey = partitionKeyGenerator.generate(effectiveCursor == null ? "" : effectiveCursor, limit);
+    String partitionKey = partitionKeyGenerator.generate(
+        effectiveCursor == null ? "" : effectiveCursor,
+        limit
+    );
 
     Snapshot<WbProductCardRaw> downloaded = doPostPartitioned(
         accountId,
@@ -118,6 +124,35 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
 
     String nextCursor = WbCardsCursorExtractor.extractCursor(downloaded.file());
     return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextCursor);
+  }
+
+  public Snapshot<WbSalesReportDetailRowRaw> downloadSalesReportDetailByPeriodPage(
+      long accountId,
+      LocalDate dateFrom,
+      LocalDate dateTo,
+      long rrdid,
+      int limit,
+      String period
+  ) {
+    Map<String, Object> queryParams = Map.of(
+        "dateFrom", dateFrom.toString(),
+        "dateTo", dateTo.toString(),
+        "limit", limit,
+        "rrdid", rrdid,
+        "period", period
+    );
+
+    Snapshot<WbSalesReportDetailRowRaw> downloaded = doGet(
+        accountId,
+        EndpointKey.FACT_WB_SALES_REPORT_DETAIL_BY_PERIOD,
+        queryParams,
+        WbSalesReportDetailRowRaw.class
+    );
+
+    Long lastRrdId = WbRrdIdExtractor.extractLastRrdId(downloaded.file());
+    String next = lastRrdId == null ? null : String.valueOf(lastRrdId);
+
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), next);
   }
 
   private static String normalizeCursor(String cursor) {
