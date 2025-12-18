@@ -27,6 +27,9 @@ marketplace:
           WB_REPORT_DETAIL_BY_PERIOD:
             limit: 1
             period: 60s
+          WB_SUPPLIER_SALES:
+            limit: 1
+            period: 60s
 
       endpoints:
         DICT_WB_WAREHOUSES_FBW:
@@ -68,6 +71,11 @@ marketplace:
           url: https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod
           authScope: TARGET_ACCOUNT
           rateLimitGroup: WB_REPORT_DETAIL_BY_PERIOD
+
+        FACT_WB_SUPPLIER_SALES:
+          url: https://statistics-api.wildberries.ru/api/v1/supplier/sales
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: WB_SUPPLIER_SALES
 
       retryPolicy:
         maxAttempts: 3

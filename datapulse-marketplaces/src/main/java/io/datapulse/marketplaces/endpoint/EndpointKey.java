@@ -18,6 +18,7 @@ public enum EndpointKey {
    * GET /api/v5/supplier/reportDetailByPeriod
    */
   FACT_WB_SALES_REPORT_DETAIL_BY_PERIOD,
+  FACT_WB_SUPPLIER_SALES,
 
   // ===== Ozon =====
   DICT_OZON_WAREHOUSES_FBS,

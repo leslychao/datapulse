@@ -38,6 +38,10 @@ marketplace:
           url: https://statistics-api-sandbox.wildberries.ru/api/v5/supplier/reportDetailByPeriod
           authScope: SANDBOX_ACCOUNT
 
+        FACT_WB_SUPPLIER_SALES:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/sales
+          authScope: SANDBOX_ACCOUNT
+
     OZON:
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:

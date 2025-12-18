@@ -7,6 +7,7 @@ import io.datapulse.marketplaces.dto.raw.category.WbCategoryParentListRaw;
 import io.datapulse.marketplaces.dto.raw.category.WbSubjectListRaw;
 import io.datapulse.marketplaces.dto.raw.product.WbProductCardRaw;
 import io.datapulse.marketplaces.dto.raw.sales.WbSalesReportDetailRowRaw;
+import io.datapulse.marketplaces.dto.raw.sales.WbSupplierSaleRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.WbTariffCommissionRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbOfficeFbsListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.wb.WbWarehouseFbwListRaw;
@@ -15,6 +16,7 @@ import io.datapulse.marketplaces.endpoint.EndpointKey;
 import io.datapulse.marketplaces.endpoint.EndpointsResolver;
 import io.datapulse.marketplaces.http.HttpHeaderProvider;
 import io.datapulse.marketplaces.json.WbCardsCursorExtractor;
+import io.datapulse.marketplaces.json.WbLastChangeDateExtractor;
 import io.datapulse.marketplaces.json.WbRrdIdExtractor;
 import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
@@ -177,5 +179,35 @@ public final class WbAdapter extends AbstractMarketplaceAdapter {
       throw new IllegalArgumentException("Invalid WB cursor format: expected 'updatedAt|nmID'");
     }
     return Long.parseLong(cursor.substring(sep + 1));
+  }
+
+  public Snapshot<WbSupplierSaleRaw> downloadSupplierSalesPage(
+      long accountId,
+      String dateFrom,
+      int flag
+  ) {
+    String effectiveDateFrom = normalizeCursor(dateFrom);
+    if (effectiveDateFrom == null) {
+      throw new IllegalArgumentException(
+          "WB supplier/sales requires dateFrom (date or date-time, MSK).");
+    }
+    if (flag != 0 && flag != 1) {
+      throw new IllegalArgumentException("WB supplier/sales flag must be 0 or 1.");
+    }
+
+    Map<String, Object> queryParams = Map.of(
+        "dateFrom", effectiveDateFrom,
+        "flag", flag
+    );
+
+    Snapshot<WbSupplierSaleRaw> downloaded = doGet(
+        accountId,
+        EndpointKey.FACT_WB_SUPPLIER_SALES,
+        queryParams,
+        WbSupplierSaleRaw.class
+    );
+
+    String next = WbLastChangeDateExtractor.extractLastChangeDate(downloaded.file());
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), next);
   }
 }

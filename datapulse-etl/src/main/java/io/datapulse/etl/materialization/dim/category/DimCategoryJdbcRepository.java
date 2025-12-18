@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class DimCategoryJdbcRepository implements DimCategoryRepository {
 
-  private static final String INSERT_TEMPLATE = """
+  private static final String UPSERT_TEMPLATE = """
       insert into dim_category (
           source_platform,
           source_category_id,
@@ -63,6 +63,8 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
                 payload::jsonb                                        as node
             from %2$s
             where account_id = ? and request_id = ?
+              and (payload::jsonb ->> 'description_category_id') is not null
+              and coalesce((payload::jsonb ->> 'disabled')::boolean, false) = false
 
             union all
 
@@ -78,6 +80,7 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
                      coalesce(parent.node -> 'children', '[]'::jsonb)
                  ) child
                  on (child ->> 'description_category_id') is not null
+                and coalesce((child ->> 'disabled')::boolean, false) = false
         )
         select
             ct.source_platform,
@@ -93,43 +96,64 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
         from category_tree ct
         """.formatted(platform, RawTableNames.RAW_OZON_CATEGORY_TREE);
 
-    String sql = INSERT_TEMPLATE.formatted(selectQuery);
-    jdbcTemplate.update(sql, accountId, requestId);
+    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
   }
 
   @Override
   public void upsertWildberries(Long accountId, String requestId) {
     String platform = MarketplaceType.WILDBERRIES.tag();
 
-    String wbSelectQuery = """
-        select
-            '%1$s' as source_platform,
-            (parent.payload::jsonb ->> 'id')::bigint as source_category_id,
-            parent.payload::jsonb ->> 'name' as category_name,
-            null::bigint as parent_id,
-            null::text as parent_name,
-            false as is_leaf
-        from %2$s parent
-        where parent.account_id = ? and parent.request_id = ?
+    String selectQuery = """
+        with source_union as (
+            select
+                '%1$s' as source_platform,
+                (parent.payload::jsonb ->> 'id')::bigint as source_category_id,
+                parent.payload::jsonb ->> 'name'        as category_name,
+                null::bigint                            as parent_id,
+                null::text                              as parent_name,
+                not exists (
+                    select 1
+                    from %3$s s
+                    where (s.payload::jsonb ->> 'parentID')::bigint = (parent.payload::jsonb ->> 'id')::bigint
+                      and s.account_id = parent.account_id
+                      and s.request_id = parent.request_id
+                ) as is_leaf
+            from %2$s parent
+            where parent.account_id = ? and parent.request_id = ?
+              and (parent.payload::jsonb ->> 'id') is not null
 
-        union all
+            union all
 
-        select
-            '%1$s' as source_platform,
-            (subject.payload::jsonb ->> 'subjectID')::bigint as source_category_id,
-            subject.payload::jsonb ->> 'subjectName' as category_name,
-            (subject.payload::jsonb ->> 'parentID')::bigint as parent_id,
-            parent.payload::jsonb ->> 'name' as parent_name,
-            true as is_leaf
-        from %3$s subject
-        left join %2$s parent
-          on (subject.payload::jsonb ->> 'parentID')::bigint = (parent.payload::jsonb ->> 'id')::bigint
-        where subject.account_id = ? and subject.request_id = ?
-          and parent.account_id = subject.account_id and parent.request_id = subject.request_id
-        """.formatted(platform, RawTableNames.RAW_WB_CATEGORIES_PARENT,
-        RawTableNames.RAW_WB_SUBJECTS);
+            select
+                '%1$s' as source_platform,
+                (subject.payload::jsonb ->> 'subjectID')::bigint as source_category_id,
+                subject.payload::jsonb ->> 'subjectName'         as category_name,
+                (subject.payload::jsonb ->> 'parentID')::bigint  as parent_id,
+                subject.payload::jsonb ->> 'parentName'          as parent_name,
+                true                                             as is_leaf
+            from %3$s subject
+            where subject.account_id = ? and subject.request_id = ?
+              and (subject.payload::jsonb ->> 'subjectID') is not null
+        )
+        select distinct on (source_platform, source_category_id)
+            source_platform,
+            source_category_id,
+            category_name,
+            parent_id,
+            parent_name,
+            is_leaf
+        from source_union
+        order by
+            source_platform,
+            source_category_id,
+            (case when parent_id is not null then 1 else 0 end) desc
+        """.formatted(
+        platform,
+        RawTableNames.RAW_WB_CATEGORIES_PARENT,
+        RawTableNames.RAW_WB_SUBJECTS
+    );
 
-    String sql = INSERT_TEMPLATE.formatted(wbSelectQuery);
-    jdbcTemplate.update(sql, accountId, requestId, accountId, requestId);
+    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId, accountId,
+        requestId);
   }
 }

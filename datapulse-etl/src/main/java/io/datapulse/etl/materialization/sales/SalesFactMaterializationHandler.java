@@ -24,7 +24,6 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
 
     repository.upsertWildberries(accountId, requestId);
     repository.upsertOzonPostingsFbs(accountId, requestId);
-    repository.upsertOzonFinanceTransactions(accountId, requestId);
 
     log.info("Sales fact materialization finished: requestId={}, accountId={}", requestId, accountId);
   }

@@ -12,54 +12,53 @@
 
   <changeSet id="0010-create-fact-sales" author="assistant" dbms="postgresql">
     <sql>
-      create table if not exists fact_sales
+      -- =====================================================================
+-- FACT SALES :: UNIFIED (ALL MARKETPLACES) — ONLY SALES
+-- =====================================================================
+
+      create table if not exists datapulse.fact_sales
       (
-        id                   bigserial primary key,
+        id                bigserial primary key,
 
-        account_id            bigint not null,
+        account_id         bigint not null,
 
-        source_platform       text not null,
-        source_event_id       text not null,
+        source_platform    text not null,
+        source_event_id    text not null,
 
-        order_id              text,
-        product_id            text,
-        offer_id              text,
+        order_id           text,
+        product_id         text,
+        offer_id           text,
 
-        warehouse_id          bigint,
-        category_id           bigint,
+        warehouse_id       bigint,
 
-        quantity              integer,
+        category_id        bigint,
 
-        gross_amount          numeric(14,2),
-        commission_amount     numeric(14,2),
-        net_amount            numeric(14,2),
+        quantity           integer,
 
-        currency_code         text,
-        sale_date             date,
+        gross_amount       numeric(14,2),
+        commission_amount  numeric(14,2),
+        net_amount         numeric(14,2),
 
-        operation_type        text,
+        currency_code      text,
+        sale_date          date,
 
-        created_at            timestamptz not null default now(),
-        updated_at            timestamptz not null default now(),
+        operation_type     text,
+
+        created_at         timestamptz not null default now(),
+        updated_at         timestamptz not null default now(),
 
         constraint uq_fact_sales_source
           unique (source_platform, source_event_id)
       );
 
       create index if not exists idx_fact_sales_account_date
-        on fact_sales (account_id, sale_date);
+        on datapulse.fact_sales (account_id, sale_date);
 
       create index if not exists idx_fact_sales_account_platform
-        on fact_sales (account_id, source_platform);
+        on datapulse.fact_sales (account_id, source_platform);
 
       create index if not exists idx_fact_sales_order
-        on fact_sales (order_id);
-
-      create index if not exists idx_fact_sales_product
-        on fact_sales (product_id);
-
-      create index if not exists idx_fact_sales_offer
-        on fact_sales (offer_id);
+        on datapulse.fact_sales (order_id);
     </sql>
 
     <rollback>
