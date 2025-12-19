@@ -1,7 +1,9 @@
 package io.datapulse.etl.repository.jdbc;
 
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.DimProductRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -10,154 +12,150 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class DimProductJdbcRepository implements DimProductRepository {
 
-  private static final String INSERT_OZON_TEMPLATE = """
-      insert into dim_product_ozon (
+  private static final String UPSERT_OZON = """
+      insert into dim_product (
           account_id,
-          product_id,
+          source_platform,
+          source_product_id,
           offer_id,
-          is_archived,
-          has_fbo_stocks,
-          has_fbs_stocks,
+          category_id,
           created_at,
           updated_at
       )
       select
-          account_id,
-          product_id,
-          offer_id,
-          is_archived,
-          has_fbo_stocks,
-          has_fbs_stocks,
+          s.account_id,
+          '%s' as source_platform,
+          s.source_product_id,
+          s.offer_id,
+          c.id as category_id,
           now(),
           now()
-      from (%s) as source
-      on conflict (account_id, product_id) do update
-        set offer_id = excluded.offer_id,
-            is_archived = excluded.is_archived,
-            has_fbo_stocks = excluded.has_fbo_stocks,
-            has_fbs_stocks = excluded.has_fbs_stocks,
-            updated_at = now();
-      """;
-
-  private static final String INSERT_WB_TEMPLATE = """
-      insert into dim_product_wb (
-          account_id,
-          nm_id,
-          imt_id,
-          vendor_code,
-          subject_id,
-          subject_name,
-          brand,
-          title,
-          created_at,
-          updated_at
-      )
-      select
-          account_id,
-          nm_id,
-          imt_id,
-          vendor_code,
-          subject_id,
-          subject_name,
-          brand,
-          title,
-          now(),
-          now()
-      from (%s) as source
-      on conflict (account_id, nm_id) do update
-        set imt_id = excluded.imt_id,
-            vendor_code = excluded.vendor_code,
-            subject_id = excluded.subject_id,
-            subject_name = excluded.subject_name,
-            brand = excluded.brand,
-            title = excluded.title,
-            updated_at = now();
-      """;
-
-  /**
-   * Важно: дедупликация сделана через DISTINCT ON и сортировку по created_at. Если в RAW таблице
-   * нет created_at, замени "created_at desc" на "id desc" (или на твою колонку времени/порядка).
-   */
-  private static final String OZON_SELECT = """
-      select distinct on (product_id)
-          account_id,
-          product_id,
-          offer_id,
-          is_archived,
-          has_fbo_stocks,
-          has_fbs_stocks
       from (
-          select
+          select distinct on (account_id, product_id)
               account_id,
               (payload::jsonb ->> 'product_id')::bigint as product_id,
+              (payload::jsonb ->> 'product_id') as source_product_id,
               payload::jsonb ->> 'offer_id' as offer_id,
-              coalesce((payload::jsonb ->> 'archived')::boolean, false) as is_archived,
-              coalesce((payload::jsonb ->> 'has_fbo_stocks')::boolean, false) as has_fbo_stocks,
-              coalesce((payload::jsonb ->> 'has_fbs_stocks')::boolean, false) as has_fbs_stocks,
               created_at
           from %s
           where account_id = ? and request_id = ?
-            and marketplace = 'OZON'
+            and marketplace = '%s'
             and nullif(payload::jsonb ->> 'product_id', '') is not null
-      ) as s
-      order by product_id, created_at desc
+          order by account_id, product_id, created_at desc
+      ) s
+      left join (
+          select distinct on (account_id, product_id)
+              account_id,
+              (payload::jsonb ->> 'id')::bigint as product_id,
+              (payload::jsonb ->> 'description_category_id')::bigint as description_category_id,
+              created_at
+          from %s
+          where account_id = ?
+            and marketplace = '%s'
+            and nullif(payload::jsonb ->> 'id', '') is not null
+            and nullif(payload::jsonb ->> 'description_category_id', '') is not null
+          order by account_id, product_id, created_at desc
+      ) i
+        on i.account_id = s.account_id
+       and i.product_id = s.product_id
+      left join dim_category c
+        on c.source_platform = '%s'
+       and c.source_category_id = i.description_category_id
+      on conflict (account_id, source_platform, source_product_id) do update
+        set offer_id = excluded.offer_id,
+            category_id = excluded.category_id,
+            updated_at = now();
       """;
 
-  private static final String WB_SELECT = """
-      select distinct on (nm_id)
+  private static final String UPSERT_WB = """
+      insert into dim_product (
           account_id,
-          nm_id,
-          imt_id,
-          vendor_code,
-          subject_id,
-          subject_name,
-          brand,
-          title
+          source_platform,
+          source_product_id,
+          offer_id,
+          category_id,
+          created_at,
+          updated_at
+      )
+      select
+          s.account_id,
+          '%s' as source_platform,
+          s.source_product_id,
+          s.offer_id,
+          c.id as category_id,
+          now(),
+          now()
       from (
-          select
+          select distinct on (account_id, nm_id)
               account_id,
               (payload::jsonb ->> 'nmID')::bigint as nm_id,
-              nullif(payload::jsonb ->> 'imtID', '')::bigint as imt_id,
-              payload::jsonb ->> 'vendorCode' as vendor_code,
+              (payload::jsonb ->> 'nmID') as source_product_id,
+              payload::jsonb ->> 'vendorCode' as offer_id,
               nullif(payload::jsonb ->> 'subjectID', '')::bigint as subject_id,
-              payload::jsonb ->> 'subjectName' as subject_name,
-              payload::jsonb ->> 'brand' as brand,
-              payload::jsonb ->> 'title' as title,
               created_at
           from %s
           where account_id = ? and request_id = ?
-            and marketplace = 'WILDBERRIES'
+            and marketplace = '%s'
             and nullif(payload::jsonb ->> 'nmID', '') is not null
-      ) as s
-      order by nm_id, created_at desc
+          order by account_id, nm_id, created_at desc
+      ) s
+      left join dim_category c
+        on c.source_platform = '%s'
+       and c.source_category_id = s.subject_id
+      on conflict (account_id, source_platform, source_product_id) do update
+        set offer_id = excluded.offer_id,
+            category_id = excluded.category_id,
+            updated_at = now();
       """;
 
   private final JdbcTemplate jdbcTemplate;
 
   @Override
   public void upsertOzon(Long accountId, String requestId) {
-    String rawTable = RawTableNames.RAW_OZON_PRODUCTS;
-    if (!relationExists(rawTable)) {
+    requireNotNull(accountId, "accountId");
+    requireNotNull(requestId, "requestId");
+
+    if (!relationExists(RawTableNames.RAW_OZON_PRODUCTS)) {
       return;
     }
 
-    String sql = INSERT_OZON_TEMPLATE.formatted(
-        OZON_SELECT.formatted(rawTable)
+    String sql = UPSERT_OZON.formatted(
+        MarketplaceType.OZON.tag(),
+        RawTableNames.RAW_OZON_PRODUCTS,
+        MarketplaceType.OZON.name(),
+        RawTableNames.RAW_OZON_PRODUCT_INFO,
+        MarketplaceType.OZON.name(),
+        MarketplaceType.OZON.tag()
     );
-    jdbcTemplate.update(sql, accountId, requestId);
+
+    jdbcTemplate.update(sql, accountId, requestId, accountId);
   }
 
   @Override
   public void upsertWildberries(Long accountId, String requestId) {
-    String rawTable = RawTableNames.RAW_WB_PRODUCTS;
-    if (!relationExists(rawTable)) {
+    requireNotNull(accountId, "accountId");
+    requireNotNull(requestId, "requestId");
+
+    if (!relationExists(RawTableNames.RAW_WB_PRODUCTS)) {
       return;
     }
 
-    String sql = INSERT_WB_TEMPLATE.formatted(
-        WB_SELECT.formatted(rawTable)
+    String sql = UPSERT_WB.formatted(
+        MarketplaceType.WILDBERRIES.tag(),
+        RawTableNames.RAW_WB_PRODUCTS,
+        MarketplaceType.WILDBERRIES.name(),
+        MarketplaceType.WILDBERRIES.tag()
     );
+
     jdbcTemplate.update(sql, accountId, requestId);
+  }
+
+  private static void requireNotNull(Object value, String argumentName) {
+    if (Objects.isNull(value)) {
+      throw new IllegalArgumentException(
+          "Аргумент '" + argumentName + "' не должен быть null."
+      );
+    }
   }
 
   private boolean relationExists(String relationName) {

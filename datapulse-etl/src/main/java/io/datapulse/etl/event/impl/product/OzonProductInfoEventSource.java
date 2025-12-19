@@ -5,7 +5,7 @@ import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.event.EtlSourceMeta;
 import io.datapulse.etl.event.EventSource;
-import io.datapulse.etl.repository.jdbc.OzonProductIdJdbcRepository;
+import io.datapulse.etl.repository.jdbc.RawOzonProductRepository;
 import io.datapulse.marketplaces.adapter.OzonAdapter;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.product.OzonProductInfoItemRaw;
@@ -34,7 +34,7 @@ public class OzonProductInfoEventSource implements EventSource {
   private static final int BATCH_SIZE = 1_000;
 
   private final OzonAdapter ozonAdapter;
-  private final OzonProductIdJdbcRepository productIdRepository;
+  private final RawOzonProductRepository rawOzonProductRepository;
 
   @Override
   public List<Snapshot<?>> fetchSnapshots(
@@ -43,7 +43,7 @@ public class OzonProductInfoEventSource implements EventSource {
       LocalDate dateFrom,
       LocalDate dateTo
   ) {
-    List<Long> productIds = productIdRepository.fetchAllProductIds(accountId);
+    List<Long> productIds = rawOzonProductRepository.fetchAllProductIds(accountId);
     if (productIds.isEmpty()) {
       log.info("Ozon product info: no productIds found, nothing to load. accountId={}", accountId);
       return Collections.emptyList();

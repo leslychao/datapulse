@@ -6,87 +6,30 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
-  <!-- ===================================================================== -->
-  <!-- DIM PRODUCT :: OZON -->
-  <!-- ===================================================================== -->
-
-  <changeSet id="0008-create-dim-product-ozon" author="assistant" dbms="postgresql">
+  <changeSet id="0008-create-dim-product" author="vitalii.kim" dbms="postgresql">
     <sql>
-      create table if not exists dim_product_ozon
+      create table if not exists dim_product
       (
-        id               bigserial primary key,
+        id                bigserial primary key,
 
-        account_id       bigint not null,
+        account_id        bigint      not null,
 
-        product_id       bigint not null,
-        offer_id         text,
+        source_platform   text        not null,
+        source_product_id text        not null,
 
-        is_archived      boolean not null default false,
-        has_fbo_stocks   boolean not null default false,
-        has_fbs_stocks   boolean not null default false,
+        offer_id          text,
+        category_id       bigint,
 
-        created_at       timestamptz not null default now(),
-        updated_at       timestamptz not null default now(),
+        created_at        timestamptz not null default now(),
+        updated_at        timestamptz not null default now(),
 
-        constraint uq_dim_product_ozon_account_product
-          unique (account_id, product_id)
+        constraint uq_dim_product_source
+          unique (account_id, source_platform, source_product_id)
       );
-
-      create index if not exists idx_dim_product_ozon_offer
-        on dim_product_ozon (offer_id);
-
-      create index if not exists idx_dim_product_ozon_account
-        on dim_product_ozon (account_id);
     </sql>
 
     <rollback>
-      DROP TABLE IF EXISTS dim_product_ozon CASCADE;
-    </rollback>
-  </changeSet>
-
-
-  <!-- ===================================================================== -->
-  <!-- DIM PRODUCT :: WILDBERRIES -->
-  <!-- ===================================================================== -->
-
-  <changeSet id="0009-create-dim-product-wb" author="assistant" dbms="postgresql">
-    <sql>
-      create table if not exists dim_product_wb
-      (
-        id            bigserial primary key,
-
-        account_id    bigint not null,
-
-        nm_id         bigint not null,
-        imt_id        bigint,
-
-        vendor_code   text,
-
-        subject_id    bigint,
-        subject_name  text,
-
-        brand         text,
-        title         text,
-
-        created_at    timestamptz not null default now(),
-        updated_at    timestamptz not null default now(),
-
-        constraint uq_dim_product_wb_account_nm
-          unique (account_id, nm_id)
-      );
-
-      create index if not exists idx_dim_product_wb_imt
-        on dim_product_wb (imt_id);
-
-      create index if not exists idx_dim_product_wb_subject
-        on dim_product_wb (subject_id);
-
-      create index if not exists idx_dim_product_wb_account
-        on dim_product_wb (account_id);
-    </sql>
-
-    <rollback>
-      DROP TABLE IF EXISTS dim_product_wb CASCADE;
+      drop table if exists dim_product cascade;
     </rollback>
   </changeSet>
 
