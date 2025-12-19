@@ -1,6 +1,6 @@
-package io.datapulse.etl.materialization.dim.product;
+package io.datapulse.etl.repository;
 
-public interface DimProductRepository {
+public interface DimWarehouseRepository {
 
   void upsertOzon(Long accountId, String requestId);
 

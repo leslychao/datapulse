@@ -1,4 +1,4 @@
-package io.datapulse.etl.materialization.dim.tariff;
+package io.datapulse.etl.repository;
 
 public interface OzonProductCommissionRepository {
 

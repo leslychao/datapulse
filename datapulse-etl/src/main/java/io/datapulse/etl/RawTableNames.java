@@ -26,6 +26,7 @@ public final class RawTableNames {
   // ===== Products =====
   public static final String RAW_OZON_PRODUCTS = "raw_ozon_products";
   public static final String RAW_WB_PRODUCTS = "raw_wb_products";
+  public static final String RAW_OZON_PRODUCT_INFO = "raw_ozon_product_info";
 
   // ===== Sales fact (RAW) =====
   public static final String RAW_WB_SUPPLIER_SALES = "raw_wb_supplier_sales";

@@ -1,4 +1,4 @@
-package io.datapulse.etl.repository;
+package io.datapulse.etl.repository.jdbc;
 
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class RawTableSchemaRepository {
+public class RawTableSchemaJdbcRepository {
 
   private final JdbcTemplate jdbcTemplate;
 

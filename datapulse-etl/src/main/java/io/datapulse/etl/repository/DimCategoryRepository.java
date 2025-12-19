@@ -1,4 +1,4 @@
-package io.datapulse.etl.materialization.dim.category;
+package io.datapulse.etl.repository;
 
 public interface DimCategoryRepository {
 

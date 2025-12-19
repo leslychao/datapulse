@@ -4,6 +4,7 @@ import io.datapulse.domain.MarketplaceType;
 import io.datapulse.marketplaces.config.MarketplaceProperties;
 import io.datapulse.marketplaces.dto.Snapshot;
 import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
+import io.datapulse.marketplaces.dto.raw.product.OzonProductInfoItemRaw;
 import io.datapulse.marketplaces.dto.raw.product.OzonProductListItemRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonFinanceTransactionOperationRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFbsRaw;
@@ -23,11 +24,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
 public final class OzonAdapter extends AbstractMarketplaceAdapter {
+
+  private static final int MAX_INFO_LIST_BATCH_SIZE = 1000;
 
   private static final DateTimeFormatter RFC3339_MILLIS_UTC =
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
@@ -135,6 +139,45 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
 
     String nextLastId = OzonLastIdExtractor.extractLastId(downloaded.file());
     return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextLastId);
+  }
+
+  public Snapshot<OzonProductInfoItemRaw> downloadProductInfoListBatch(
+      long accountId,
+      List<Long> productIds
+  ) {
+    if (productIds.isEmpty()) {
+      throw new IllegalArgumentException(
+          "productIds list is empty: /v3/product/info/list will not be called.");
+    }
+
+    if (productIds.size() > MAX_INFO_LIST_BATCH_SIZE) {
+      throw new IllegalArgumentException(
+          "Batch size for /v3/product/info/list is too large: " + productIds.size()
+              + ". Maximum allowed: " + MAX_INFO_LIST_BATCH_SIZE + ".");
+    }
+
+    Map<String, Object> body = Map.of(
+        "product_id", productIds,
+        "offer_id", List.of(),
+        "sku", List.of()
+    );
+
+    String partitionKey = partitionKeyForProductIds(productIds);
+
+    return doPostPartitioned(
+        accountId,
+        EndpointKey.DICT_OZON_PRODUCT_INFO_LIST,
+        body,
+        partitionKey,
+        OzonProductInfoItemRaw.class
+    );
+  }
+
+  private String partitionKeyForProductIds(List<Long> productIds) {
+    Long first = productIds.get(0);
+    Long last = productIds.get(productIds.size() - 1);
+    String cursorTag = "product_ids_" + first + "_" + last;
+    return partitionKeyGenerator.generate(cursorTag, productIds.size());
   }
 
   public Snapshot<OzonPostingFbsRaw> downloadPostingsFbsPage(

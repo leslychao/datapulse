@@ -1,4 +1,4 @@
-package io.datapulse.etl.materialization.sales;
+package io.datapulse.etl.repository;
 
 public interface SalesFactRepository {
 

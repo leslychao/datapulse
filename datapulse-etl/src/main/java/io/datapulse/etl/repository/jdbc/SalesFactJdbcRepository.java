@@ -1,7 +1,8 @@
-package io.datapulse.etl.materialization.sales;
+package io.datapulse.etl.repository.jdbc;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
+import io.datapulse.etl.repository.SalesFactRepository;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;

@@ -1,4 +1,4 @@
-package io.datapulse.etl.repository;
+package io.datapulse.etl.repository.jdbc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +22,7 @@ public class RawBatchInsertJdbcRepository {
 
   private final JdbcTemplate jdbcTemplate;
   private final ObjectMapper objectMapper;
-  private final RawTableSchemaRepository rawTableSchemaRepository;
+  private final RawTableSchemaJdbcRepository rawTableSchemaJdbcRepository;
 
   public <T> void saveBatch(
       List<T> batch,
@@ -35,7 +35,7 @@ public class RawBatchInsertJdbcRepository {
       return;
     }
 
-    rawTableSchemaRepository.ensureTableExists(tableName);
+    rawTableSchemaJdbcRepository.ensureTableExists(tableName);
 
     String sql = INSERT_SQL_TEMPLATE.formatted(tableName);
 
@@ -53,7 +53,7 @@ public class RawBatchInsertJdbcRepository {
   }
 
   public long countByRequestId(String tableName, String requestId) {
-    rawTableSchemaRepository.ensureTableExists(tableName);
+    rawTableSchemaJdbcRepository.ensureTableExists(tableName);
     String sql = "select count(*) from %s where request_id = ?".formatted(tableName);
     Long result = jdbcTemplate.queryForObject(sql, Long.class, requestId);
     return result != null ? result : 0L;

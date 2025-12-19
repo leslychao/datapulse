@@ -1,6 +1,7 @@
-package io.datapulse.etl.materialization.dim.warehouse;
+package io.datapulse.etl.repository.jdbc;
 
 import io.datapulse.etl.RawTableNames;
+import io.datapulse.etl.repository.DimWarehouseRepository;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

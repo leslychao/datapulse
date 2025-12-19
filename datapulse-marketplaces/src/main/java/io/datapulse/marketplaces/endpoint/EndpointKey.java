@@ -12,6 +12,7 @@ public enum EndpointKey {
 
   DICT_WB_TARIFFS_COMMISSION,
   DICT_WB_PRODUCTS,
+  DICT_OZON_PRODUCT_INFO_LIST,
 
   /**
    * Отчёт о продажах по реализации (детализация)

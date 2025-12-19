@@ -1,6 +1,7 @@
-package io.datapulse.etl.materialization.dim.tariff;
+package io.datapulse.etl.repository.jdbc;
 
 import io.datapulse.etl.RawTableNames;
+import io.datapulse.etl.repository.OzonProductCommissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

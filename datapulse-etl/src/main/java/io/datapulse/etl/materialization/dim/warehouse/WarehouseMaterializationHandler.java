@@ -2,6 +2,7 @@ package io.datapulse.etl.materialization.dim.warehouse;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
+import io.datapulse.etl.repository.DimWarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

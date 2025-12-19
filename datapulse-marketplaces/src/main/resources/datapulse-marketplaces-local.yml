@@ -54,6 +54,8 @@ marketplace:
           authScope: TARGET_ACCOUNT
         DICT_OZON_PRODUCTS:
           authScope: TARGET_ACCOUNT
+        DICT_OZON_PRODUCT_INFO_LIST:
+          authScope: TARGET_ACCOUNT
 
         FACT_OZON_POSTING_FBS_LIST:
           authScope: TARGET_ACCOUNT

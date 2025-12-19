@@ -2,6 +2,8 @@ package io.datapulse.etl.materialization.dim.tariff;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
+import io.datapulse.etl.repository.DimTariffRepository;
+import io.datapulse.etl.repository.OzonProductCommissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

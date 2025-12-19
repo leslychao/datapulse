@@ -32,7 +32,7 @@ import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
 import io.datapulse.etl.flow.core.handler.EtlIngestErrorHandler;
-import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
+import io.datapulse.etl.repository.jdbc.RawBatchInsertJdbcRepository;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;

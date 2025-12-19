@@ -113,6 +113,10 @@ marketplace:
           url: https://api-seller.ozon.ru/v3/product/list
           authScope: TARGET_ACCOUNT
 
+        DICT_OZON_PRODUCT_INFO_LIST:
+          url: https://api-seller.ozon.ru/v3/product/info/list
+          authScope: TARGET_ACCOUNT
+
         FACT_OZON_POSTING_FBS_LIST:
           url: https://api-seller.ozon.ru/v3/posting/fbs/list
           authScope: TARGET_ACCOUNT

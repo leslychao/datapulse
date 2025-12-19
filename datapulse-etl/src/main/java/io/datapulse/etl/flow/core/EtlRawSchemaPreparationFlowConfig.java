@@ -4,7 +4,7 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_PREPARE_RAW_SCH
 
 import io.datapulse.etl.dto.EtlSourceExecution;
 import io.datapulse.etl.dto.OrchestrationPlan;
-import io.datapulse.etl.repository.RawTableSchemaRepository;
+import io.datapulse.etl.repository.jdbc.RawTableSchemaJdbcRepository;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -19,7 +19,7 @@ import org.springframework.integration.dsl.IntegrationFlow;
 @RequiredArgsConstructor
 public class EtlRawSchemaPreparationFlowConfig {
 
-  private final RawTableSchemaRepository rawTableSchemaRepository;
+  private final RawTableSchemaJdbcRepository rawTableSchemaJdbcRepository;
 
   @Bean
   public IntegrationFlow etlPrepareRawSchemaFlow() {
@@ -33,7 +33,7 @@ public class EtlRawSchemaPreparationFlowConfig {
                   .map(EtlSourceExecution::rawTable)
                   .collect(Collectors.toCollection(LinkedHashSet::new));
 
-              rawTables.forEach(rawTableSchemaRepository::ensureTableExists);
+              rawTables.forEach(rawTableSchemaJdbcRepository::ensureTableExists);
 
               log.info(
                   "ETL raw schema prepared: tablesCount={}, expectedExecutions={}",

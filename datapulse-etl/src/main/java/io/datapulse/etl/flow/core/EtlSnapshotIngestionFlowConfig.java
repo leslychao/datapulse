@@ -12,7 +12,7 @@ import io.datapulse.etl.file.IngestItemIterator;
 import io.datapulse.etl.file.SnapshotIteratorFactory;
 import io.datapulse.etl.file.locator.JsonArrayLocator;
 import io.datapulse.etl.file.locator.SnapshotJsonLayoutRegistry;
-import io.datapulse.etl.repository.RawBatchInsertJdbcRepository;
+import io.datapulse.etl.repository.jdbc.RawBatchInsertJdbcRepository;
 import io.datapulse.marketplaces.dto.Snapshot;
 import java.nio.file.Path;
 import java.util.List;
