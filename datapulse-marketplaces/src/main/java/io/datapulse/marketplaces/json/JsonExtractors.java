@@ -54,6 +54,7 @@ final class JsonExtractors {
 
   @FunctionalInterface
   interface StringExtractor {
+
     String extract(JsonReader reader) throws IOException;
   }
 }

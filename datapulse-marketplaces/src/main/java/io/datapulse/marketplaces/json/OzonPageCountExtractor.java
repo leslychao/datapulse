@@ -31,7 +31,8 @@ public final class OzonPageCountExtractor {
       return 0L;
 
     } catch (IOException ex) {
-      throw new IllegalStateException("Failed to extract Ozon page_count from snapshot file: " + jsonFile, ex);
+      throw new IllegalStateException(
+          "Failed to extract Ozon page_count from snapshot file: " + jsonFile, ex);
     }
   }
 

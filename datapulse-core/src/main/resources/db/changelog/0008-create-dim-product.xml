@@ -10,22 +10,29 @@
     <sql>
       create table if not exists dim_product
       (
-        id                bigserial primary key,
+        id                   bigserial primary key,
 
-        account_id        bigint      not null,
+        account_id           bigint      not null,
 
-        source_platform   text        not null,
-        source_product_id text        not null,
+        source_platform      text        not null,
+        source_product_id    text        not null,
 
-        offer_id          text,
-        category_id       bigint,
+        offer_id             text,
 
-        created_at        timestamptz not null default now(),
-        updated_at        timestamptz not null default now(),
+        external_category_id bigint,
+
+        created_at           timestamptz not null default now(),
+        updated_at           timestamptz not null default now(),
 
         constraint uq_dim_product_source
           unique (account_id, source_platform, source_product_id)
       );
+
+      create index if not exists idx_dim_product_offer
+        on dim_product (account_id, source_platform, offer_id);
+
+      create index if not exists idx_dim_product_external_category
+        on dim_product (source_platform, external_category_id);
     </sql>
 
     <rollback>

@@ -14,10 +14,6 @@ public enum EndpointKey {
   DICT_WB_PRODUCTS,
   DICT_OZON_PRODUCT_INFO_LIST,
 
-  /**
-   * Отчёт о продажах по реализации (детализация)
-   * GET /api/v5/supplier/reportDetailByPeriod
-   */
   FACT_WB_SALES_REPORT_DETAIL_BY_PERIOD,
   FACT_WB_SUPPLIER_SALES,
 
@@ -29,14 +25,9 @@ public enum EndpointKey {
   DICT_OZON_PRODUCT_INFO_PRICES,
   DICT_OZON_PRODUCTS,
 
-  /**
-   * POST /v3/posting/fbs/list
-   */
+  FACT_OZON_POSTING_FBO_LIST,
   FACT_OZON_POSTING_FBS_LIST,
 
-  /**
-   * POST /v3/finance/transaction/list
-   */
   FACT_OZON_FINANCE_TRANSACTION_LIST;
 
   public String tag() {

@@ -88,6 +88,9 @@ marketplace:
           OZON_POSTINGS_FBS:
             limit: 100
             period: 60s
+          OZON_POSTINGS_FBO:
+            limit: 60
+            period: 60s
           OZON_FINANCE_TX:
             limit: 60
             period: 60s
@@ -121,6 +124,11 @@ marketplace:
           url: https://api-seller.ozon.ru/v3/posting/fbs/list
           authScope: TARGET_ACCOUNT
           rateLimitGroup: OZON_POSTINGS_FBS
+
+        FACT_OZON_POSTING_FBO_LIST:
+          url: https://api-seller.ozon.ru/v2/posting/fbo/list
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: OZON_POSTINGS_FBO
 
         FACT_OZON_FINANCE_TRANSACTION_LIST:
           url: https://api-seller.ozon.ru/v3/finance/transaction/list

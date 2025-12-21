@@ -7,6 +7,7 @@ import io.datapulse.marketplaces.dto.raw.category.OzonCategoryTreeRaw;
 import io.datapulse.marketplaces.dto.raw.product.OzonProductInfoItemRaw;
 import io.datapulse.marketplaces.dto.raw.product.OzonProductListItemRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonFinanceTransactionOperationRaw;
+import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFboRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFbsRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
@@ -18,6 +19,7 @@ import io.datapulse.marketplaces.json.OzonCursorExtractor;
 import io.datapulse.marketplaces.json.OzonHasNextExtractor;
 import io.datapulse.marketplaces.json.OzonLastIdExtractor;
 import io.datapulse.marketplaces.json.OzonPageCountExtractor;
+import io.datapulse.marketplaces.json.OzonResultSizeExtractor;
 import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import java.time.Instant;
@@ -218,6 +220,60 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
     String nextOffset = hasNext ? String.valueOf(offset + limit) : null;
 
     return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextOffset);
+  }
+
+  public Snapshot<OzonPostingFboRaw> downloadPostingsFboPage(
+      long accountId,
+      LocalDate dateFrom,
+      LocalDate dateTo,
+      long offset,
+      int limit,
+      String status
+  ) {
+    String effectiveStatus = status == null ? "" : status;
+
+    Map<String, Object> body = Map.of(
+        "dir", "ASC",
+        "filter", Map.of(
+            "since", rfc3339StartOfDayUtcMillis(dateFrom),
+            "to", rfc3339EndOfDayUtcMillis(dateTo),
+            "status", effectiveStatus
+        ),
+        "limit", limit,
+        "offset", offset,
+        "translit", false,
+        "with", Map.of(
+            "analytics_data", true,
+            "financial_data", true,
+            "legal_info", false
+        )
+    );
+
+    String offsetTag = String.valueOf(offset);
+    String partitionKey = partitionKeyGenerator.generate(offsetTag, limit);
+
+    Snapshot<OzonPostingFboRaw> downloaded = doPostPartitioned(
+        accountId,
+        EndpointKey.FACT_OZON_POSTING_FBO_LIST,
+        body,
+        partitionKey,
+        OzonPostingFboRaw.class
+    );
+
+    int resultSize = OzonResultSizeExtractor.extractResultSize(downloaded.file());
+    boolean hasNext = resultSize == limit;
+
+    long nextOffsetValue = offset + limit;
+    boolean canPaginateByOffset = nextOffsetValue <= 20000L;
+
+    String nextOffset = (hasNext && canPaginateByOffset) ? String.valueOf(nextOffsetValue) : null;
+
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextOffset);
+  }
+
+  private static String rfc3339EndOfDayUtcMillis(LocalDate date) {
+    Instant instant = date.plusDays(1).atStartOfDay().minusNanos(1).toInstant(ZoneOffset.UTC);
+    return RFC3339_MILLIS_UTC.format(instant);
   }
 
   public Snapshot<OzonFinanceTransactionOperationRaw> downloadFinanceTransactionsPage(

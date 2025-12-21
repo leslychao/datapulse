@@ -18,7 +18,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
           source_platform,
           source_product_id,
           offer_id,
-          category_id,
+          external_category_id,
           created_at,
           updated_at
       )
@@ -27,7 +27,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
           '%s' as source_platform,
           s.source_product_id,
           s.offer_id,
-          c.id as category_id,
+          i.description_category_id as external_category_id,
           now(),
           now()
       from (
@@ -58,12 +58,9 @@ public class DimProductJdbcRepository implements DimProductRepository {
       ) i
         on i.account_id = s.account_id
        and i.product_id = s.product_id
-      left join dim_category c
-        on c.source_platform = '%s'
-       and c.source_category_id = i.description_category_id
       on conflict (account_id, source_platform, source_product_id) do update
         set offer_id = excluded.offer_id,
-            category_id = excluded.category_id,
+            external_category_id = excluded.external_category_id,
             updated_at = now();
       """;
 
@@ -73,7 +70,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
           source_platform,
           source_product_id,
           offer_id,
-          category_id,
+          external_category_id,
           created_at,
           updated_at
       )
@@ -82,7 +79,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
           '%s' as source_platform,
           s.source_product_id,
           s.offer_id,
-          c.id as category_id,
+          s.subject_id as external_category_id,
           now(),
           now()
       from (
@@ -99,12 +96,9 @@ public class DimProductJdbcRepository implements DimProductRepository {
             and nullif(payload::jsonb ->> 'nmID', '') is not null
           order by account_id, nm_id, created_at desc
       ) s
-      left join dim_category c
-        on c.source_platform = '%s'
-       and c.source_category_id = s.subject_id
       on conflict (account_id, source_platform, source_product_id) do update
         set offer_id = excluded.offer_id,
-            category_id = excluded.category_id,
+            external_category_id = excluded.external_category_id,
             updated_at = now();
       """;
 
@@ -124,8 +118,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
         RawTableNames.RAW_OZON_PRODUCTS,
         MarketplaceType.OZON.name(),
         RawTableNames.RAW_OZON_PRODUCT_INFO,
-        MarketplaceType.OZON.name(),
-        MarketplaceType.OZON.tag()
+        MarketplaceType.OZON.name()
     );
 
     jdbcTemplate.update(sql, accountId, requestId, accountId);
@@ -143,8 +136,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
     String sql = UPSERT_WB.formatted(
         MarketplaceType.WILDBERRIES.tag(),
         RawTableNames.RAW_WB_PRODUCTS,
-        MarketplaceType.WILDBERRIES.name(),
-        MarketplaceType.WILDBERRIES.tag()
+        MarketplaceType.WILDBERRIES.name()
     );
 
     jdbcTemplate.update(sql, accountId, requestId);

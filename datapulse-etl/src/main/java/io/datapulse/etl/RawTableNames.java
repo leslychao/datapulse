@@ -32,5 +32,6 @@ public final class RawTableNames {
   public static final String RAW_WB_SUPPLIER_SALES = "raw_wb_supplier_sales";
   public static final String RAW_WB_SALES_REPORT_DETAIL = "raw_wb_sales_report_detail";
   public static final String RAW_OZON_POSTINGS_FBS = "raw_ozon_postings_fbs";
+  public static final String RAW_OZON_POSTINGS_FBO = "raw_ozon_postings_fbo";
   public static final String RAW_OZON_FINANCE_TRANSACTIONS = "raw_ozon_finance_transactions";
 }

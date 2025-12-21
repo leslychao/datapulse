@@ -147,6 +147,7 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
         RawTableNames.RAW_WB_SUBJECTS
     );
 
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId, accountId, requestId);
+    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId, accountId,
+        requestId);
   }
 }

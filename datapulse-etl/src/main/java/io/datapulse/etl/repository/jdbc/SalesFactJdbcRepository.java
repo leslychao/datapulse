@@ -148,7 +148,7 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
 
                 w.warehouse_id                                                     as warehouse_id,
 
-                dp.category_id                                                     as category_id,
+                dc.id                                                              as category_id,
 
                 nullif(item ->> 'quantity','')::int                                as quantity,
 
@@ -166,6 +166,10 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
              and dp.source_platform = '%1$s'
              and dp.offer_id = nullif(item ->> 'offer_id','')
 
+            left join dim_category dc
+              on dc.source_platform = '%1$s'
+             and dc.source_category_id = dp.external_category_id
+
             where p.account_id = ?
               and p.request_id = ?
               and nullif(p.payload::jsonb ->> 'posting_number','') is not null
@@ -175,6 +179,73 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
         ) t
         order by source_event_id, created_at desc nulls last
         """.formatted(platform, RawTableNames.RAW_OZON_POSTINGS_FBS);
+
+    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
+  }
+
+  @Override
+  public void upsertOzonPostingsFbo(long accountId, String requestId) {
+    Objects.requireNonNull(requestId, "requestId обязателен.");
+
+    String platform = MarketplaceType.OZON.tag();
+
+    String selectQuery = """
+        select distinct on (source_event_id)
+            account_id,
+            source_platform,
+            source_event_id,
+            order_id,
+            source_product_id,
+            offer_id,
+            warehouse_id,
+            category_id,
+            quantity,
+            sale_date
+        from (
+            select
+                p.account_id                                                      as account_id,
+                '%1$s'                                                            as source_platform,
+
+                (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
+
+                nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
+
+                nullif(item ->> 'sku','')                                          as source_product_id,
+                nullif(item ->> 'offer_id','')                                     as offer_id,
+
+                w.warehouse_id                                                     as warehouse_id,
+
+                dc.id                                                              as category_id,
+
+                nullif(item ->> 'quantity','')::int                                as quantity,
+
+                (p.payload::jsonb ->> 'created_at')::timestamptz::date              as sale_date,
+
+                p.created_at                                                       as created_at
+            from %2$s p
+            join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
+
+            left join dim_warehouse_ozon w
+              on w.warehouse_id = nullif(p.payload::jsonb -> 'analytics_data' ->> 'warehouse_id','')::bigint
+
+            left join dim_product dp
+              on dp.account_id = p.account_id
+             and dp.source_platform = '%1$s'
+             and dp.offer_id = nullif(item ->> 'offer_id','')
+
+            left join dim_category dc
+              on dc.source_platform = '%1$s'
+             and dc.source_category_id = dp.external_category_id
+
+            where p.account_id = ?
+              and p.request_id = ?
+              and nullif(p.payload::jsonb ->> 'posting_number','') is not null
+              and nullif(item ->> 'sku','') is not null
+              and nullif(item ->> 'quantity','') is not null
+              and nullif(p.payload::jsonb ->> 'created_at','') is not null
+        ) t
+        order by source_event_id, created_at desc nulls last
+        """.formatted(platform, RawTableNames.RAW_OZON_POSTINGS_FBO);
 
     jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
   }
