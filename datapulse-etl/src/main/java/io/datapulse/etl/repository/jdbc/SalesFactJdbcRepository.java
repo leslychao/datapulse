@@ -83,7 +83,7 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 nullif(r.payload::jsonb ->> 'nmId','')                                   as source_product_id,
                 nullif(r.payload::jsonb ->> 'supplierArticle','')                        as offer_id,
 
-                w.warehouse_id                                                           as warehouse_id,
+                w.id                                                                     as warehouse_id,
 
                 dc.id                                                                    as category_id,
 
@@ -97,8 +97,13 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 r.created_at                                                             as created_at
             from %2$s r
 
-            left join dim_warehouse_wb w
-              on lower(trim(w.name)) = lower(trim(nullif(r.payload::jsonb ->> 'warehouseName','')))
+            left join dim_warehouse w
+              on w.account_id = r.account_id
+             and lower(w.source_platform) = lower('%1$s')
+             and (
+                  w.external_warehouse_id = nullif(r.payload::jsonb ->> 'warehouseId','')
+                  or lower(trim(w.warehouse_name)) = lower(trim(nullif(r.payload::jsonb ->> 'warehouseName','')))
+                 )
 
             left join dim_category dc
               on dc.source_platform = '%1$s'
@@ -146,7 +151,7 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 nullif(item ->> 'sku','')                                          as source_product_id,
                 nullif(item ->> 'offer_id','')                                     as offer_id,
 
-                w.warehouse_id                                                     as warehouse_id,
+                w.id                                                              as warehouse_id,
 
                 dc.id                                                              as category_id,
 
@@ -158,8 +163,16 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             from %2$s p
             join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
 
-            left join dim_warehouse_ozon w
-              on lower(trim(w.name)) = lower(trim(nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouse','')))
+            left join dim_warehouse w
+              on w.account_id = p.account_id
+             and lower(w.source_platform) = lower('%1$s')
+             and (
+                  w.external_warehouse_id = coalesce(
+                      nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouse_id',''),
+                      nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouseId','')
+                  )
+                  or lower(trim(w.warehouse_name)) = lower(trim(nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouse','')))
+                 )
 
             left join dim_product dp
               on dp.account_id = p.account_id
@@ -213,7 +226,7 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 nullif(item ->> 'sku','')                                          as source_product_id,
                 nullif(item ->> 'offer_id','')                                     as offer_id,
 
-                w.warehouse_id                                                     as warehouse_id,
+                w.id                                                              as warehouse_id,
 
                 dc.id                                                              as category_id,
 
@@ -225,8 +238,10 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             from %2$s p
             join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
 
-            left join dim_warehouse_ozon w
-              on w.warehouse_id = nullif(p.payload::jsonb -> 'analytics_data' ->> 'warehouse_id','')::bigint
+            left join dim_warehouse w
+              on w.account_id = p.account_id
+             and lower(w.source_platform) = lower('%1$s')
+             and w.external_warehouse_id = nullif(p.payload::jsonb -> 'analytics_data' ->> 'warehouse_id','')
 
             left join dim_product dp
               on dp.account_id = p.account_id

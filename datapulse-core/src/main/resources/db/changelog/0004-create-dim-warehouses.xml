@@ -6,38 +6,32 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
-  <changeSet id="0004-create-dim-warehouses" author="vitalii.kim" dbms="postgresql">
+  <changeSet id="0004-create-dim-warehouse" author="vitalii.kim" dbms="postgresql">
     <sql>
-      CREATE TABLE dim_warehouse_ozon
+      create table if not exists dim_warehouse
       (
-        warehouse_id   BIGSERIAL PRIMARY KEY,
-        warehouse_type VARCHAR(32) NOT NULL,
-        name           TEXT        NOT NULL,
-        is_active      BOOLEAN     NOT NULL DEFAULT TRUE,
-        created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+        id                    bigserial primary key,
+
+        account_id            bigint      not null,
+        source_platform       text        not null,
+
+        external_warehouse_id text        not null,
+        warehouse_name        text        not null,
+
+        fulfillment_model     varchar(16) not null,
+        is_active             boolean     not null default true,
+
+        created_at            timestamptz not null default now(),
+        updated_at            timestamptz not null default now(),
+
+        constraint uq_dim_warehouse_source
+          unique (account_id, source_platform, external_warehouse_id)
       );
-
-      CREATE INDEX IF NOT EXISTS idx_dim_warehouse_ozon_type
-        ON dim_warehouse_ozon (warehouse_type);
-
-      CREATE TABLE dim_warehouse_wb
-      (
-        warehouse_id   BIGSERIAL PRIMARY KEY,
-        warehouse_type VARCHAR(32) NOT NULL,
-        name           TEXT        NOT NULL,
-        is_active      BOOLEAN     NOT NULL DEFAULT TRUE,
-        created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_dim_warehouse_wb_type
-        ON dim_warehouse_wb (warehouse_type);
     </sql>
 
     <rollback>
-      DROP TABLE IF EXISTS dim_warehouse_ozon CASCADE;
-      DROP TABLE IF EXISTS dim_warehouse_wb CASCADE;
+      drop table if exists dim_warehouse cascade;
     </rollback>
   </changeSet>
+
 </databaseChangeLog>

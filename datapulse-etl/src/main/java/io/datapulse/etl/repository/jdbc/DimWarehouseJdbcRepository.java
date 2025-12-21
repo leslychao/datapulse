@@ -2,6 +2,8 @@ package io.datapulse.etl.repository.jdbc;
 
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.DimWarehouseRepository;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -12,136 +14,181 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
 
-  private static final String INSERT_TEMPLATE = """
-      insert into %s (
-          warehouse_id,
-          warehouse_type,
-          name,
+  private static final String UPSERT_TEMPLATE = """
+      insert into dim_warehouse (
+          account_id,
+          source_platform,
+          external_warehouse_id,
+          warehouse_name,
+          fulfillment_model,
           is_active,
           created_at,
           updated_at
       )
-      select warehouse_id, warehouse_type, name, is_active, now(), now()
-      from (%s) as source
-      on conflict (warehouse_id) do update
-        set warehouse_type = excluded.warehouse_type,
-            name = excluded.name,
+      select
+          s.account_id,
+          s.source_platform,
+          s.external_warehouse_id,
+          s.warehouse_name,
+          s.fulfillment_model,
+          s.is_active,
+          now(),
+          now()
+      from (
+          select distinct on (u.account_id, u.source_platform, u.external_warehouse_id)
+              u.account_id,
+              u.source_platform,
+              u.external_warehouse_id,
+              u.warehouse_name,
+              u.fulfillment_model,
+              u.is_active
+          from (
+              %s
+          ) u
+          order by
+              u.account_id,
+              u.source_platform,
+              u.external_warehouse_id,
+              u.priority desc
+      ) s
+      on conflict (account_id, source_platform, external_warehouse_id) do update
+        set warehouse_name = excluded.warehouse_name,
+            fulfillment_model = excluded.fulfillment_model,
             is_active = excluded.is_active,
             updated_at = now();
       """;
 
-  private static final String OZON_FBS_SELECT_TEMPLATE = """
+  private static final String OZON_FBS_SELECT = """
       select
-          (payload::jsonb ->> 'warehouse_id')::bigint as warehouse_id,
-          'FBS_POINT' as warehouse_type,
-          payload::jsonb ->> 'name' as name,
-          lower(payload::jsonb ->> 'status') in ('created', 'working') as is_active
-      from %s
-      where account_id = ? and request_id = ?
+          t.account_id as account_id,
+          'OZON'::text as source_platform,
+          (t.payload::jsonb ->> 'warehouse_id')::text as external_warehouse_id,
+          (t.payload::jsonb ->> 'name')::text as warehouse_name,
+          case
+            when coalesce((t.payload::jsonb ->> 'is_rfbs')::boolean, false) then 'RFBS'
+            else 'FBS'
+          end as fulfillment_model,
+          lower(t.payload::jsonb ->> 'status') in ('created', 'working') as is_active,
+          20 as priority
+      from %s t
+      where t.account_id = ? and t.request_id = ?
       """;
 
-  private static final String OZON_FBO_SELECT_TEMPLATE = """
+  private static final String OZON_FBO_SELECT = """
       select
-          (warehouse ->> 'warehouse_id')::bigint as warehouse_id,
-          'FBO' as warehouse_type,
-          warehouse ->> 'name' as name,
-          true as is_active
-      from %s,
-           jsonb_array_elements(coalesce(payload::jsonb -> 'logistic_clusters', '[]'::jsonb)) cluster,
-           jsonb_array_elements(coalesce(cluster -> 'warehouses', '[]'::jsonb)) warehouse
-      where account_id = ? and request_id = ?
+          t.account_id as account_id,
+          'OZON'::text as source_platform,
+          (w ->> 'warehouse_id')::text as external_warehouse_id,
+          (w ->> 'name')::text as warehouse_name,
+          'FBO' as fulfillment_model,
+          true as is_active,
+          10 as priority
+      from %s t,
+           jsonb_array_elements(coalesce(t.payload::jsonb -> 'logistic_clusters', '[]'::jsonb)) c,
+           jsonb_array_elements(coalesce(c -> 'warehouses', '[]'::jsonb)) w
+      where t.account_id = ? and t.request_id = ?
       """;
 
-  private static final String WB_FBW_SELECT_TEMPLATE = """
+  private static final String WB_FBW_SELECT = """
       select
-          (payload::jsonb ->> 'id')::bigint as warehouse_id,
-          'FBO' as warehouse_type,
-          payload::jsonb ->> 'name' as name,
-          (payload::jsonb ->> 'active')::boolean as is_active
-      from %s
-      where account_id = ? and request_id = ?
+          t.account_id as account_id,
+          'WILDBERRIES'::text as source_platform,
+          (t.payload::jsonb ->> 'id')::text as external_warehouse_id,
+          (t.payload::jsonb ->> 'name')::text as warehouse_name,
+          'FBO' as fulfillment_model,
+          coalesce((t.payload::jsonb ->> 'active')::boolean, false) as is_active,
+          20 as priority
+      from %s t
+      where t.account_id = ? and t.request_id = ?
       """;
 
-  private static final String WB_FBS_OFFICES_SELECT_TEMPLATE = """
+  private static final String WB_FBS_OFFICES_SELECT = """
       select
-          (payload::jsonb ->> 'id')::bigint as warehouse_id,
-          'FBS_POINT' as warehouse_type,
-          payload::jsonb ->> 'name' as name,
-          coalesce((payload::jsonb ->> 'selected')::boolean, false) as is_active
-      from %s
-      where account_id = ? and request_id = ?
+          t.account_id as account_id,
+          'WILDBERRIES'::text as source_platform,
+          (t.payload::jsonb ->> 'id')::text as external_warehouse_id,
+          (t.payload::jsonb ->> 'name')::text as warehouse_name,
+          'FBS' as fulfillment_model,
+          coalesce((t.payload::jsonb ->> 'selected')::boolean, false) as is_active,
+          10 as priority
+      from %s t
+      where t.account_id = ? and t.request_id = ?
       """;
 
-  private static final String WB_SELLER_SELECT_TEMPLATE = """
+  private static final String WB_SELLER_SELECT = """
       select
-          (payload::jsonb ->> 'id')::bigint as warehouse_id,
-          'SELLER' as warehouse_type,
-          payload::jsonb ->> 'name' as name,
-          not coalesce((payload::jsonb ->> 'isDeleting')::boolean, false) as is_active
-      from %s
-      where account_id = ? and request_id = ?
+          t.account_id as account_id,
+          'WILDBERRIES'::text as source_platform,
+          (t.payload::jsonb ->> 'id')::text as external_warehouse_id,
+          (t.payload::jsonb ->> 'name')::text as warehouse_name,
+          'FBS' as fulfillment_model,
+          not coalesce((t.payload::jsonb ->> 'isDeleting')::boolean, false) as is_active,
+          5 as priority
+      from %s t
+      where t.account_id = ? and t.request_id = ?
       """;
 
   private final JdbcTemplate jdbcTemplate;
 
   @Override
   public void upsertOzon(Long accountId, String requestId) {
-    List<String> selectQueries = new ArrayList<>();
+    List<String> selects = new ArrayList<>();
 
     if (tableExists(RawTableNames.RAW_OZON_WAREHOUSES_FBS)) {
-      selectQueries.add(OZON_FBS_SELECT_TEMPLATE.formatted(RawTableNames.RAW_OZON_WAREHOUSES_FBS));
+      selects.add(OZON_FBS_SELECT.formatted(RawTableNames.RAW_OZON_WAREHOUSES_FBS));
     }
-
     if (tableExists(RawTableNames.RAW_OZON_WAREHOUSES_FBO)) {
-      selectQueries.add(OZON_FBO_SELECT_TEMPLATE.formatted(RawTableNames.RAW_OZON_WAREHOUSES_FBO));
+      selects.add(OZON_FBO_SELECT.formatted(RawTableNames.RAW_OZON_WAREHOUSES_FBO));
     }
 
-    executeUpsert("dim_warehouse_ozon", selectQueries, accountId, requestId);
+    executeUpsert(selects, accountId, requestId);
   }
 
   @Override
   public void upsertWildberries(Long accountId, String requestId) {
-    List<String> selectQueries = new ArrayList<>();
+    List<String> selects = new ArrayList<>();
 
     if (tableExists(RawTableNames.RAW_WB_WAREHOUSES_FBW)) {
-      selectQueries.add(WB_FBW_SELECT_TEMPLATE.formatted(RawTableNames.RAW_WB_WAREHOUSES_FBW));
+      selects.add(WB_FBW_SELECT.formatted(RawTableNames.RAW_WB_WAREHOUSES_FBW));
     }
-
     if (tableExists(RawTableNames.RAW_WB_OFFICES_FBS)) {
-      selectQueries.add(WB_FBS_OFFICES_SELECT_TEMPLATE.formatted(RawTableNames.RAW_WB_OFFICES_FBS));
+      selects.add(WB_FBS_OFFICES_SELECT.formatted(RawTableNames.RAW_WB_OFFICES_FBS));
     }
-
     if (tableExists(RawTableNames.RAW_WB_WAREHOUSES_SELLER)) {
-      selectQueries.add(WB_SELLER_SELECT_TEMPLATE.formatted(RawTableNames.RAW_WB_WAREHOUSES_SELLER));
+      selects.add(WB_SELLER_SELECT.formatted(RawTableNames.RAW_WB_WAREHOUSES_SELLER));
     }
 
-    executeUpsert("dim_warehouse_wb", selectQueries, accountId, requestId);
+    executeUpsert(selects, accountId, requestId);
   }
 
-  private void executeUpsert(String tableName, List<String> selectQueries, Long accountId,
-      String requestId) {
-    if (selectQueries.isEmpty()) {
+  private void executeUpsert(List<String> selects, Long accountId, String requestId) {
+    if (selects.isEmpty()) {
       return;
     }
 
-    String unionQueries = String.join("\nunion all\n", selectQueries);
-    String sql = INSERT_TEMPLATE.formatted(tableName, unionQueries);
+    String union = String.join("\nunion all\n", selects);
+    String sql = UPSERT_TEMPLATE.formatted(union);
 
-    int paramsPerQuery = 2; // account_id, request_id
-    Object[] params = new Object[selectQueries.size() * paramsPerQuery];
-    for (int i = 0; i < selectQueries.size(); i++) {
-      params[i * paramsPerQuery] = accountId;
-      params[i * paramsPerQuery + 1] = requestId;
-    }
-
-    jdbcTemplate.update(sql, params);
+    jdbcTemplate.update(sql,
+        preparedStatement -> bind(preparedStatement, selects.size(), accountId, requestId));
   }
 
-  private boolean tableExists(String table) {
+  private void bind(PreparedStatement preparedStatement, int selectCount, Long accountId,
+      String requestId)
+      throws SQLException {
+
+    int index = 1;
+    for (int i = 0; i < selectCount; i++) {
+      preparedStatement.setLong(index++, accountId);
+      preparedStatement.setString(index++, requestId);
+    }
+  }
+
+  private boolean tableExists(String tableName) {
     Boolean exists = jdbcTemplate.queryForObject(
         "select exists (select 1 from information_schema.tables where table_name = ?)",
         Boolean.class,
-        table
+        tableName
     );
     return Boolean.TRUE.equals(exists);
   }
