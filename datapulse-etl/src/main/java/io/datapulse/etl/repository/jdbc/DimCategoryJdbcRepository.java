@@ -3,6 +3,7 @@ package io.datapulse.etl.repository.jdbc;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.DimCategoryRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -102,59 +103,50 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
 
   @Override
   public void upsertWildberries(Long accountId, String requestId) {
+    Objects.requireNonNull(accountId, "accountId обязателен.");
+    Objects.requireNonNull(requestId, "requestId обязателен.");
+
     String platform = MarketplaceType.WILDBERRIES.tag();
 
     String selectQuery = """
-        with source_union as (
-            select
-                '%1$s' as source_platform,
-                (parent.payload::jsonb ->> 'id')::bigint as source_category_id,
-                parent.payload::jsonb ->> 'name'        as category_name,
-                null::bigint                            as parent_id,
-                null::text                              as parent_name,
-                not exists (
-                    select 1
-                    from %3$s s
-                    where (s.payload::jsonb ->> 'parentID')::bigint = (parent.payload::jsonb ->> 'id')::bigint
-                      and s.account_id = parent.account_id
-                      and s.request_id = parent.request_id
-                ) as is_leaf
-            from %2$s parent
-            where parent.account_id = ? and parent.request_id = ?
-              and (parent.payload::jsonb ->> 'id') is not null
-
-            union all
-
-            select
-                '%1$s' as source_platform,
-                (subject.payload::jsonb ->> 'subjectID')::bigint as source_category_id,
-                subject.payload::jsonb ->> 'subjectName'         as category_name,
-                (subject.payload::jsonb ->> 'parentID')::bigint  as parent_id,
-                subject.payload::jsonb ->> 'parentName'          as parent_name,
-                true                                             as is_leaf
-            from %3$s subject
-            where subject.account_id = ? and subject.request_id = ?
-              and (subject.payload::jsonb ->> 'subjectID') is not null
+        with parent_latest as (
+            select distinct on ((p.payload::jsonb ->> 'id')::bigint)
+                '%1$s'                                       as source_platform,
+                (p.payload::jsonb ->> 'id')::bigint          as source_category_id,
+                p.payload::jsonb ->> 'name'                  as category_name,
+                null::bigint                                 as parent_id,
+                null::text                                   as parent_name,
+                p.created_at                                 as created_at
+            from %2$s p
+            where p.account_id = ?
+              and p.request_id = ?
+              and (p.payload::jsonb ->> 'id') is not null
+              and coalesce((p.payload::jsonb ->> 'isVisible')::boolean, true) = true
+            order by
+                (p.payload::jsonb ->> 'id')::bigint,
+                p.created_at desc
         )
-        select distinct on (source_platform, source_category_id)
-            source_platform,
-            source_category_id,
-            category_name,
-            parent_id,
-            parent_name,
-            is_leaf
-        from source_union
-        order by
-            source_platform,
-            source_category_id,
-            (case when parent_id is not null then 1 else 0 end) desc
+        select
+            pl.source_platform,
+            pl.source_category_id,
+            pl.category_name,
+            pl.parent_id,
+            pl.parent_name,
+            not exists (
+                select 1
+                from %3$s s
+                where s.account_id = ?
+                  and s.request_id = ?
+                  and (s.payload::jsonb ->> 'parentID')::bigint = pl.source_category_id
+                  and (s.payload::jsonb ->> 'subjectID') is not null
+            ) as is_leaf
+        from parent_latest pl
         """.formatted(
         platform,
         RawTableNames.RAW_WB_CATEGORIES_PARENT,
         RawTableNames.RAW_WB_SUBJECTS
     );
 
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId, accountId,
-        requestId);
+    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId, accountId, requestId);
   }
 }

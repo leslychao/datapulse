@@ -32,8 +32,6 @@
         quantity          integer     not null,
         sale_date         date        not null,
 
-        operation_type    text        not null,
-
         created_at        timestamptz not null default now(),
         updated_at        timestamptz not null default now(),
 
