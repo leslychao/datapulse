@@ -87,10 +87,14 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
 
                 dc.id                                                                    as category_id,
 
-                case
-                  when coalesce((r.payload::jsonb ->> 'isRealization')::boolean, true) then 1
-                  else -1
-                end                                                                      as quantity,
+                (
+                  coalesce(nullif(r.payload::jsonb ->> 'quantity','')::int, 1)
+                  *
+                  case
+                    when coalesce((r.payload::jsonb ->> 'isRealization')::boolean, true) then 1
+                    else -1
+                  end
+                )                                                                        as quantity,
 
                 (r.payload::jsonb ->> 'date')::timestamptz::date                          as sale_date,
 
