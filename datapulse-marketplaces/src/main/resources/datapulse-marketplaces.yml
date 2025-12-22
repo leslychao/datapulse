@@ -2,8 +2,8 @@ marketplace:
   storage:
     base-dir: /var/datapulse/snapshots
     cleanup:
-      max-age: 60s
-      interval: 15s
+      max-age: 30m
+      interval: 5m
 
   providers:
     WILDBERRIES:
