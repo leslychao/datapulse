@@ -42,6 +42,14 @@ marketplace:
           url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/sales
           authScope: SANDBOX_ACCOUNT
 
+        FACT_WB_STOCKS:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/stocks
+          authScope: SANDBOX_ACCOUNT
+
+        FACT_WB_INCOMES:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/incomes
+          authScope: SANDBOX_ACCOUNT
+
     OZON:
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
@@ -61,4 +69,8 @@ marketplace:
         FACT_OZON_POSTING_FBO_LIST:
           authScope: TARGET_ACCOUNT
         FACT_OZON_FINANCE_TRANSACTION_LIST:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_PRODUCT_INFO_STOCKS:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_ANALYTICS_STOCKS:
           authScope: TARGET_ACCOUNT

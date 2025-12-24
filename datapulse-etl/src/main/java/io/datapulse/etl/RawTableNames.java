@@ -34,4 +34,10 @@ public final class RawTableNames {
   public static final String RAW_OZON_POSTINGS_FBS = "raw_ozon_postings_fbs";
   public static final String RAW_OZON_POSTINGS_FBO = "raw_ozon_postings_fbo";
   public static final String RAW_OZON_FINANCE_TRANSACTIONS = "raw_ozon_finance_transactions";
+
+  // ===== Inventory / Supply Chain (RAW) =====
+  public static final String RAW_WB_STOCKS = "raw_wb_stocks";
+  public static final String RAW_WB_INCOMES = "raw_wb_incomes";
+  public static final String RAW_OZON_PRODUCT_INFO_STOCKS = "raw_ozon_product_info_stocks";
+  public static final String RAW_OZON_ANALYTICS_STOCKS = "raw_ozon_analytics_stocks";
 }

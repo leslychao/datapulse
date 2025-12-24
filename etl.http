@@ -93,3 +93,23 @@ Content-Type: application/json
     );
   });
 %}
+
+### Run ETL — INVENTORY_FACT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "INVENTORY_FACT",
+  "burst": 1,
+  "dateMode": "LAST_DAYS"
+}
+
+> {%
+  client.test("ETL SALES_FACT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
