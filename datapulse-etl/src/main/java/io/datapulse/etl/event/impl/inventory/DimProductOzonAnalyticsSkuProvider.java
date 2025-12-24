@@ -13,11 +13,6 @@ public final class DimProductOzonAnalyticsSkuProvider implements OzonAnalyticsSk
 
   @Override
   public List<String> resolveSkus(long accountId) {
-    List<String> skus = repository.fetchAllSkus(accountId);
-
-    return skus.stream()
-        .distinct()
-        .sorted()
-        .toList();
+    return repository.fetchAllSkus(accountId);
   }
 }
