@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class DimProductJdbcRepository implements DimProductRepository {
 
-  private static final String SELECT_OZON_SKU = """
+  private static final String SELECT_SOURCE_PRODUCT_IDS = """
       select distinct
           source_product_id as sku
       from dim_product
@@ -120,7 +120,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
   @Override
   public List<Long> fetchSourceProductIds(long accountId, MarketplaceType marketplaceType) {
     return jdbcTemplate.queryForList(
-        SELECT_OZON_SKU,
+        SELECT_SOURCE_PRODUCT_IDS,
         Long.class,
         accountId,
         marketplaceType.tag()
