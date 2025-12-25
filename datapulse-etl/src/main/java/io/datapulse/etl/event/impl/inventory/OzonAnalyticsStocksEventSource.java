@@ -39,14 +39,14 @@ public class OzonAnalyticsStocksEventSource implements EventSource {
   ) {
     List<Snapshot<?>> snapshots = new ArrayList<>();
 
-    List<String> skus = skuProvider.resolveSkus(accountId);
+    List<Long> skus = skuProvider.resolveSkus(accountId);
     if (skus.isEmpty()) {
       return snapshots;
     }
 
     for (int fromIndex = 0; fromIndex < skus.size(); fromIndex += MAX_SKUS_PER_REQUEST) {
       int toIndex = Math.min(fromIndex + MAX_SKUS_PER_REQUEST, skus.size());
-      List<String> batch = skus.subList(fromIndex, toIndex);
+      List<Long> batch = skus.subList(fromIndex, toIndex);
 
       Snapshot<OzonAnalyticsStocksRaw> snapshot = ozonAdapter.downloadAnalyticsStocks(
           accountId,

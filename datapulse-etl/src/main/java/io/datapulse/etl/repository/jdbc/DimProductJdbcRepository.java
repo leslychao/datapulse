@@ -3,6 +3,7 @@ package io.datapulse.etl.repository.jdbc;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.DimProductRepository;
+import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +12,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 @RequiredArgsConstructor
 public class DimProductJdbcRepository implements DimProductRepository {
+
+  private static final String SELECT_OZON_SKU = """
+      select distinct
+          source_product_id as sku
+      from dim_product
+      where account_id = ?
+        and source_platform = ?
+        and coalesce(source_product_id, '') <> ''
+      order by sku
+      """;
 
   private static final String UPSERT_OZON = """
       insert into dim_product (
@@ -25,7 +36,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
       select
           s.account_id,
           '%s' as source_platform,
-          s.source_product_id,
+          i.sku as source_product_id,
           s.offer_id,
           i.description_category_id as external_category_id,
           now(),
@@ -34,7 +45,6 @@ public class DimProductJdbcRepository implements DimProductRepository {
           select distinct on (account_id, product_id)
               account_id,
               (payload::jsonb ->> 'product_id')::bigint as product_id,
-              (payload::jsonb ->> 'product_id') as source_product_id,
               payload::jsonb ->> 'offer_id' as offer_id,
               created_at
           from %s
@@ -47,17 +57,20 @@ public class DimProductJdbcRepository implements DimProductRepository {
           select distinct on (account_id, product_id)
               account_id,
               (payload::jsonb ->> 'id')::bigint as product_id,
+              payload::jsonb ->> 'sku' as sku,
               (payload::jsonb ->> 'description_category_id')::bigint as description_category_id,
               created_at
           from %s
           where account_id = ?
             and marketplace = '%s'
             and nullif(payload::jsonb ->> 'id', '') is not null
+            and nullif(payload::jsonb ->> 'sku', '') is not null
             and nullif(payload::jsonb ->> 'description_category_id', '') is not null
           order by account_id, product_id, created_at desc
       ) i
         on i.account_id = s.account_id
        and i.product_id = s.product_id
+      where i.sku is not null
       on conflict (account_id, source_platform, source_product_id) do update
         set offer_id = excluded.offer_id,
             external_category_id = excluded.external_category_id,
@@ -103,6 +116,16 @@ public class DimProductJdbcRepository implements DimProductRepository {
       """;
 
   private final JdbcTemplate jdbcTemplate;
+
+  @Override
+  public List<Long> fetchSourceProductIds(long accountId, MarketplaceType marketplaceType) {
+    return jdbcTemplate.queryForList(
+        SELECT_OZON_SKU,
+        Long.class,
+        accountId,
+        marketplaceType.tag()
+    );
+  }
 
   @Override
   public void upsertOzon(Long accountId, String requestId) {

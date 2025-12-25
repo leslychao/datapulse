@@ -360,7 +360,7 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
 
   public Snapshot<OzonAnalyticsStocksRaw> downloadAnalyticsStocks(
       long accountId,
-      List<String> skus
+      List<Long> skus
   ) {
     if (skus == null || skus.isEmpty()) {
       throw new IllegalArgumentException("Ozon /v1/analytics/stocks requires skus (1..100).");

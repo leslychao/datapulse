@@ -4,5 +4,5 @@ import java.util.List;
 
 public interface OzonAnalyticsSkuProvider {
 
-  List<String> resolveSkus(long accountId);
+  List<Long> resolveSkus(long accountId);
 }

@@ -1,6 +1,7 @@
 package io.datapulse.etl.event.impl.inventory;
 
-import io.datapulse.etl.repository.jdbc.RawOzonProductInfoRepository;
+import io.datapulse.domain.MarketplaceType;
+import io.datapulse.etl.repository.DimProductRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -9,10 +10,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public final class DimProductOzonAnalyticsSkuProvider implements OzonAnalyticsSkuProvider {
 
-  private final RawOzonProductInfoRepository repository;
+  private final DimProductRepository repository;
 
   @Override
-  public List<String> resolveSkus(long accountId) {
-    return repository.fetchAllSkus(accountId);
+  public List<Long> resolveSkus(long accountId) {
+    return repository.fetchSourceProductIds(accountId, MarketplaceType.OZON);
   }
 }
