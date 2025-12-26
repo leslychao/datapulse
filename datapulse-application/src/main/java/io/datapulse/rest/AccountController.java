@@ -6,6 +6,7 @@ import io.datapulse.domain.dto.request.AccountUpdateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/accounts", produces = "application/json")
+@RequestMapping(value = "/api/accounts", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class AccountController {
 

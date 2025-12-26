@@ -1,0 +1,168 @@
+### =========================================================
+### 1. INVENTORY-SNAPSHOT API — базовые сценарии выборки
+### =========================================================
+
+### 1.0 ТЕСТОВЫЕ ПЕРЕМЕННЫЕ
+# Предполагается, что:
+#   - {{host}} уже задан в environment;
+#   - {{accountId}} — id тестового аккаунта;
+#   - {{snapshotDate}} — дата, по которой точно есть данные (формат YYYY-MM-DD).
+#
+# Пример:
+#   {{accountId}} = 1
+#   {{snapshotDate}} = 2025-12-26
+
+### 1.1 INVENTORY-SNAPSHOT — базовая выборка по accountId + marketplace (200)
+# Scenario: получить первую страницу снапшотов по обязательным accountId и marketplace.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&marketplace=OZON&page=0&size=20&sort=snapshotDate,desc
+
+> {%
+  client.test("InventorySnapshot /list — base by accountId+marketplace 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+
+    var b = response.body || {};
+    client.assert(Array.isArray(b.content), "content is not an array");
+    client.assert(typeof b.totalElements === "number", "totalElements is not a number");
+    client.assert(typeof b.totalPages === "number", "totalPages is not a number");
+  });
+%}
+
+### 1.2 INVENTORY-SNAPSHOT — выборка с явным диапазоном дат (200)
+# Scenario: выборка снапшотов с ограничением по fromDate/toDate (один день).
+# ВНИМАНИЕ: warehouseId/sourceProductId опциональны и пока не участвуют в фильтрации,
+#           чтобы не ловить 400 из-за неверных типов, не передаём их.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&marketplace=OZON&fromDate={{snapshotDate}}&toDate={{snapshotDate}}&page=0&size=50
+
+> {%
+  client.test("InventorySnapshot /list — filter by date range 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+
+    var b = response.body || {};
+    client.assert(Array.isArray(b.content), "content is not an array");
+    client.assert(typeof b.totalElements === "number", "totalElements is not a number");
+  });
+%}
+
+### 1.3 INVENTORY-SNAPSHOT — пагинация: вторая страница (200)
+# Scenario: запрос второй страницы с теми же базовыми фильтрами.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&marketplace=OZON&fromDate={{snapshotDate}}&toDate={{snapshotDate}}&page=1&size=10&sort=snapshotDate,desc
+
+> {%
+  client.test("InventorySnapshot /list — page=1 size=10 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+
+    var b = response.body || {};
+    client.assert(Array.isArray(b.content), "content is not an array");
+
+    if (typeof b.size === "number") {
+      client.assert(b.size === 10, "page size is not 10 (actual: " + b.size + ")");
+    }
+
+    if (b.number !== undefined) {
+      client.assert(b.number === 1, "page number is not 1 (actual: " + b.number + ")");
+    }
+  });
+%}
+
+
+### =========================================================
+### 2. INVENTORY-SNAPSHOT API — негативные валидации
+### =========================================================
+
+### 2.1 INVENTORY-SNAPSHOT — NEGATIVE: отсутствует обязательный accountId → 400
+# Scenario: вызов без обязательного accountId — ожидаем 400 и подсказку про обязательный параметр.
+GET {{host}}/api/inventory-snapshots?marketplace=OZON&page=0&size=20
+
+> {%
+  client.test("InventorySnapshot /list — missing accountId 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg =
+        (b && b.message) ||
+        (b && b.error) ||
+        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
+        "";
+
+    // Bean Validation даёт текст вроде "не должно равняться null"
+    client.assert(/accountId|аккаунт|обязател|null|не\sдолжно?/i.test(msg),
+        "no accountId-required hint: " + msg);
+  });
+%}
+
+### 2.2 INVENTORY-SNAPSHOT — NEGATIVE: отсутствует обязательный marketplace → 400
+# Scenario: вызов без обязательного marketplace — ожидаем 400.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&page=0&size=20
+
+> {%
+  client.test("InventorySnapshot /list — missing marketplace 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg =
+        (b && b.message) ||
+        (b && b.error) ||
+        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
+        "";
+
+    client.assert(/marketplace|обязател|null|не\sдолжно?/i.test(msg),
+        "no marketplace-required hint: " + msg);
+  });
+%}
+
+### 2.3 INVENTORY-SNAPSHOT — NEGATIVE: fromDate > toDate → 500 (пока)
+# Scenario: некорректный диапазон дат (fromDate позже toDate).
+# Сейчас сервис даёт 500 (нет явной бизнес-валидации),
+# когда добавишь проверку и маппинг на 400 — здесь можно вернуть ожидание 400.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&marketplace=OZON&fromDate=2099-12-31&toDate=2000-01-01&page=0&size=20
+
+> {%
+  client.test("InventorySnapshot /list — invalid date range 5xx", function () {
+    client.assert(String(response.status).startsWith("5"),
+        "expected 5xx (current behavior), got " + response.status);
+
+    var b = response.body || {};
+    var msg =
+        (b && b.message) ||
+        (b && b.error) ||
+        "";
+
+    // Просто фиксируем, что вернулся какой-то текст ошибки
+    client.assert(typeof msg === "string" && msg.length > 0,
+        "no error message for invalid date range");
+  });
+%}
+
+### 2.4 INVENTORY-SNAPSHOT — NEGATIVE: неверное значение enum marketplace → 400
+# Scenario: передаём несуществующее значение для marketplace — 400 и подсказка про enum.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&marketplace=UNKNOWN_MP&page=0&size=20
+
+> {%
+  client.test("InventorySnapshot /list — invalid marketplace enum 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg =
+        (b && b.message) ||
+        (b && b.error) ||
+        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
+        "";
+
+    client.assert(/marketplace|enum|перечислен/i.test(msg),
+        "no enum validation hint: " + msg);
+  });
+%}
+
+### 2.5 INVENTORY-SNAPSHOT — NEGATIVE: некорректные параметры пагинации → 200 (фактическое поведение)
+# Scenario: отрицательный номер страницы и нулевой размер сейчас "нормализуются"
+#           Spring'ом, сервер отвечает 200. Просто фиксируем это поведение.
+GET {{host}}/api/inventory-snapshots?accountId={{accountId}}&marketplace=OZON&page=-1&size=0
+
+> {%
+  client.test("InventorySnapshot /list — invalid pagination params normalized 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+
+    var b = response.body || {};
+    client.assert(Array.isArray(b.content), "content is not an array");
+  });
+%}
