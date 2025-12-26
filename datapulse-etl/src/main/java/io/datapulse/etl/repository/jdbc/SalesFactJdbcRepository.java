@@ -82,41 +82,30 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 offer_id,
                 warehouse_id,
                 category_id,
-                sum(quantity)    as quantity,
+                sum(quantity)   as quantity,
                 sale_date,
-                max(created_at)  as created_at
+                max(created_at) as created_at
             from (
                 select
-                    r.account_id                                                       as account_id,
-                    '%1$s'                                                             as source_platform,
+                    r.account_id                                                      as account_id,
+                    '%1$s'                                                            as source_platform,
 
-                    nullif(r.payload::jsonb ->> 'saleID','')                           as source_event_id,
-                    nullif(r.payload::jsonb ->> 'srid','')                             as order_id,
+                    nullif(r.payload::jsonb ->> 'saleID','')                          as source_event_id,
+                    nullif(r.payload::jsonb ->> 'srid','')                            as order_id,
 
-                    nullif(r.payload::jsonb ->> 'supplierArticle','')                  as offer_id,
+                    nullif(r.payload::jsonb ->> 'supplierArticle','')                 as offer_id,
 
-                    w.id                                                               as warehouse_id,
+                    w.id                                                              as warehouse_id,
 
-                    dc.id                                                              as category_id,
+                    dc.id                                                             as category_id,
 
-                    (
-                      coalesce(nullif(r.payload::jsonb ->> 'quantity','')::int, 1)
-                      *
-                      case
-                        when coalesce(
-                                 (r.payload::jsonb ->> 'isRealization')::boolean,
-                                 true
-                             )
-                        then 1
-                        else -1
-                      end
-                    )                                                                  as quantity,
+                    1                                                                 as quantity,
 
-                    (r.payload::jsonb ->> 'date')::timestamptz::date                   as sale_date,
+                    (r.payload::jsonb ->> 'date')::timestamptz::date                  as sale_date,
 
-                    dp.id                                                              as dim_product_id,
+                    dp.id                                                             as dim_product_id,
 
-                    r.created_at                                                       as created_at
+                    r.created_at                                                      as created_at
                 from %2$s r
 
                 left join dim_product dp
@@ -142,9 +131,10 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                   and nullif(r.payload::jsonb ->> 'saleID','') is not null
                   and nullif(r.payload::jsonb ->> 'nmId','')   is not null
                   and nullif(r.payload::jsonb ->> 'date','')   is not null
+                  and nullif(r.payload::jsonb ->> 'forPay','') is not null
+                  and (r.payload::jsonb ->> 'forPay')::numeric > 0
                   and dp.id is not null
             ) s
-            where quantity <> 0
             group by
                 account_id,
                 source_platform,
