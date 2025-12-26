@@ -87,10 +87,11 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 dc.id                                                                    as category_id,
 
                 (
-                  coalesce(nullif(r.payload::jsonb ->> 'quantity','')::int, 1)
+                  nullif(r.payload::jsonb ->> 'quantity','')::int
                   *
                   case
-                    when coalesce((r.payload::jsonb ->> 'isRealization')::boolean, true) then 1
+                    when (r.payload::jsonb ->> 'isRealization')::boolean
+                         is distinct from false then 1
                     else -1
                   end
                 )                                                                        as quantity,
@@ -121,11 +122,13 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
 
             where r.account_id = ?
               and r.request_id = ?
-              and nullif(r.payload::jsonb ->> 'saleID','') is not null
-              and nullif(r.payload::jsonb ->> 'nmId','')   is not null
-              and nullif(r.payload::jsonb ->> 'date','')   is not null
+              and nullif(r.payload::jsonb ->> 'saleID','')    is not null
+              and nullif(r.payload::jsonb ->> 'nmId','')      is not null
+              and nullif(r.payload::jsonb ->> 'date','')      is not null
+              and nullif(r.payload::jsonb ->> 'quantity','')  is not null
               and dp.id is not null
         ) t
+        where quantity > 0
         order by source_event_id, created_at desc nulls last
         """.formatted(platform, RawTableNames.RAW_WB_SUPPLIER_SALES);
 
