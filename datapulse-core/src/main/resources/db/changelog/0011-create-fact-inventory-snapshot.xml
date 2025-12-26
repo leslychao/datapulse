@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- ===================================================================== -->
+  <!-- FACT INVENTORY :: SNAPSHOT (ALL MARKETPLACES) -->
+  <!-- ===================================================================== -->
+
+  <changeSet id="0011-create-fact-inventory-snapshot" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      create table if not exists fact_inventory_snapshot
+      (
+        id                            bigserial   not null,
+
+        account_id                    bigint      not null,
+        source_platform               text        not null,
+
+        snapshot_date                 date        not null,
+
+        source_product_id             text        not null,
+
+        warehouse_id                  bigint      not null,
+
+        quantity_total                integer,
+        quantity_available            integer,
+        quantity_reserved             integer,
+        quantity_in_way_to_client     integer,
+        quantity_in_way_from_client   integer,
+        quantity_return_to_seller     integer,
+        quantity_return_from_customer integer,
+
+        created_at                    timestamptz not null default now(),
+        updated_at                    timestamptz not null default now(),
+
+        constraint pk_fact_inventory_snapshot
+          primary key (id),
+
+        constraint uq_fact_inventory_snapshot_nk
+          unique (
+                  account_id,
+                  source_platform,
+                  snapshot_date,
+                  source_product_id,
+                  warehouse_id
+            ),
+
+        constraint fk_fact_inventory_snapshot_dim_warehouse
+          foreign key (warehouse_id)
+            references dim_warehouse (id)
+      );
+    </sql>
+
+    <rollback>
+      drop table if exists fact_inventory_snapshot;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>
