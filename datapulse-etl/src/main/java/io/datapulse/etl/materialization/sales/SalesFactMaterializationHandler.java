@@ -2,6 +2,7 @@ package io.datapulse.etl.materialization.sales;
 
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
+import io.datapulse.etl.repository.DimProductRepository;
 import io.datapulse.etl.repository.SalesFactRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public final class SalesFactMaterializationHandler implements MaterializationHandler {
 
-  private final SalesFactRepository repository;
+  private final DimProductRepository dimProductRepository;
+  private final SalesFactRepository salesFactRepository;
 
   @Override
   public MarketplaceEvent supportedEvent() {
@@ -21,12 +23,21 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
 
   @Override
   public void materialize(long accountId, String requestId) {
-    log.info("Sales fact materialization started: requestId={}, accountId={}", requestId, accountId);
+    log.info("Sales fact materialization started: requestId={}, accountId={}", requestId,
+        accountId);
 
-    repository.upsertWildberries(accountId, requestId);
-    repository.upsertOzonPostingsFbs(accountId, requestId);
-    repository.upsertOzonPostingsFbo(accountId, requestId);
+    dimProductRepository.upsertOzon(accountId, requestId);
+    dimProductRepository.upsertWildberries(accountId, requestId);
 
-    log.info("Sales fact materialization finished: requestId={}, accountId={}", requestId, accountId);
+    dimProductRepository.upsertOzonFromPostingsFbs(accountId, requestId);
+    dimProductRepository.upsertOzonFromPostingsFbo(accountId, requestId);
+    dimProductRepository.upsertWildberriesFromSales(accountId, requestId);
+
+    salesFactRepository.upsertWildberries(accountId, requestId);
+    salesFactRepository.upsertOzonPostingsFbs(accountId, requestId);
+    salesFactRepository.upsertOzonPostingsFbo(accountId, requestId);
+
+    log.info("Sales fact materialization finished: requestId={}, accountId={}", requestId,
+        accountId);
   }
 }

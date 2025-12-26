@@ -10,4 +10,10 @@ public interface DimProductRepository {
   void upsertWildberries(Long accountId, String requestId);
 
   List<Long> fetchSourceProductIds(long accountId, MarketplaceType marketplaceType);
+
+  void upsertOzonFromPostingsFbs(long accountId, String requestId);
+
+  void upsertOzonFromPostingsFbo(long accountId, String requestId);
+
+  void upsertWildberriesFromSales(long accountId, String requestId);
 }

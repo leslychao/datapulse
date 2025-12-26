@@ -7,7 +7,7 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <!-- ===================================================================== -->
-  <!-- FACT SALES :: UNIFIED (ALL MARKETPLACES) — EVENT FACT (NO MONEY) -->
+  <!-- FACT SALES :: UNIFIED (ALL MARKETPLACES) — EVENT FACT (NO MONEY)      -->
   <!-- ===================================================================== -->
 
   <changeSet id="0009-create-fact-sales" author="vitalii.kim" dbms="postgresql">
@@ -23,7 +23,7 @@
 
         order_id          text,
 
-        source_product_id text,
+        dim_product_id    bigint      not null,
         offer_id          text,
 
         warehouse_id      bigint,
@@ -36,7 +36,10 @@
         updated_at        timestamptz not null default now(),
 
         constraint uq_fact_sales_source
-          unique (account_id, source_platform, source_event_id)
+          unique (account_id, source_platform, source_event_id),
+
+        constraint fk_fact_sales_dim_product
+          foreign key (dim_product_id) references dim_product (id)
       );
     </sql>
 

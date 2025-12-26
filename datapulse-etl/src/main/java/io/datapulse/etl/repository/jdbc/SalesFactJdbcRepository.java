@@ -17,8 +17,8 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           account_id,
           source_platform,
           source_event_id,
+          dim_product_id,
           order_id,
-          source_product_id,
           offer_id,
           warehouse_id,
           category_id,
@@ -31,8 +31,8 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           account_id,
           source_platform,
           source_event_id,
+          dim_product_id,
           order_id,
-          source_product_id,
           offer_id,
           warehouse_id,
           category_id,
@@ -42,14 +42,14 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           now()
       from (%s) as source
       on conflict (account_id, source_platform, source_event_id) do update
-        set order_id          = excluded.order_id,
-            source_product_id = excluded.source_product_id,
-            offer_id          = excluded.offer_id,
-            warehouse_id      = excluded.warehouse_id,
-            category_id       = excluded.category_id,
-            quantity          = excluded.quantity,
-            sale_date         = excluded.sale_date,
-            updated_at        = now();
+        set dim_product_id = excluded.dim_product_id,
+            order_id       = excluded.order_id,
+            offer_id       = excluded.offer_id,
+            warehouse_id   = excluded.warehouse_id,
+            category_id    = excluded.category_id,
+            quantity       = excluded.quantity,
+            sale_date      = excluded.sale_date,
+            updated_at     = now();
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -65,8 +65,8 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             account_id,
             source_platform,
             source_event_id,
+            dim_product_id,
             order_id,
-            source_product_id,
             offer_id,
             warehouse_id,
             category_id,
@@ -80,7 +80,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 nullif(r.payload::jsonb ->> 'saleID','')                                 as source_event_id,
                 nullif(r.payload::jsonb ->> 'srid','')                                   as order_id,
 
-                nullif(r.payload::jsonb ->> 'nmId','')                                   as source_product_id,
                 nullif(r.payload::jsonb ->> 'supplierArticle','')                        as offer_id,
 
                 w.id                                                                     as warehouse_id,
@@ -96,10 +95,17 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                   end
                 )                                                                        as quantity,
 
-                (r.payload::jsonb ->> 'date')::timestamptz::date                          as sale_date,
+                (r.payload::jsonb ->> 'date')::timestamptz::date                         as sale_date,
+
+                dp.id                                                                    as dim_product_id,
 
                 r.created_at                                                             as created_at
             from %2$s r
+
+            left join dim_product dp
+              on dp.account_id        = r.account_id
+             and dp.source_platform   = '%1$s'
+             and dp.source_product_id = nullif(r.payload::jsonb ->> 'nmId','')
 
             left join dim_warehouse w
               on w.account_id = r.account_id
@@ -110,14 +116,15 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                  )
 
             left join dim_category dc
-              on dc.source_platform = '%1$s'
-             and lower(trim(dc.category_name)) = lower(trim(nullif(r.payload::jsonb ->> 'category','')))
+              on dc.source_platform    = '%1$s'
+             and dc.source_category_id = dp.external_category_id
 
             where r.account_id = ?
               and r.request_id = ?
               and nullif(r.payload::jsonb ->> 'saleID','') is not null
-              and nullif(r.payload::jsonb ->> 'nmId','') is not null
-              and nullif(r.payload::jsonb ->> 'date','') is not null
+              and nullif(r.payload::jsonb ->> 'nmId','')   is not null
+              and nullif(r.payload::jsonb ->> 'date','')   is not null
+              and dp.id is not null
         ) t
         order by source_event_id, created_at desc nulls last
         """.formatted(platform, RawTableNames.RAW_WB_SUPPLIER_SALES);
@@ -136,8 +143,8 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             account_id,
             source_platform,
             source_event_id,
+            dim_product_id,
             order_id,
-            source_product_id,
             offer_id,
             warehouse_id,
             category_id,
@@ -145,27 +152,33 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             sale_date
         from (
             select
-                p.account_id                                                      as account_id,
-                '%1$s'                                                            as source_platform,
+                p.account_id                                                       as account_id,
+                '%1$s'                                                             as source_platform,
 
                 (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
 
                 nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
 
-                nullif(item ->> 'sku','')                                          as source_product_id,
                 nullif(item ->> 'offer_id','')                                     as offer_id,
 
-                w.id                                                              as warehouse_id,
+                w.id                                                               as warehouse_id,
 
                 dc.id                                                              as category_id,
 
                 nullif(item ->> 'quantity','')::int                                as quantity,
 
-                (p.payload::jsonb ->> 'shipment_date')::timestamptz::date           as sale_date,
+                (p.payload::jsonb ->> 'shipment_date')::timestamptz::date          as sale_date,
+
+                dp.id                                                              as dim_product_id,
 
                 p.created_at                                                       as created_at
             from %2$s p
             join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
+
+            left join dim_product dp
+              on dp.account_id        = p.account_id
+             and dp.source_platform   = '%1$s'
+             and dp.source_product_id = nullif(item ->> 'sku','')
 
             left join dim_warehouse w
               on w.account_id = p.account_id
@@ -178,21 +191,17 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                   or lower(trim(w.warehouse_name)) = lower(trim(nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouse','')))
                  )
 
-            left join dim_product dp
-              on dp.account_id = p.account_id
-             and dp.source_platform = '%1$s'
-             and dp.offer_id = nullif(item ->> 'offer_id','')
-
             left join dim_category dc
-              on dc.source_platform = '%1$s'
+              on dc.source_platform    = '%1$s'
              and dc.source_category_id = dp.external_category_id
 
             where p.account_id = ?
               and p.request_id = ?
               and nullif(p.payload::jsonb ->> 'posting_number','') is not null
-              and nullif(item ->> 'sku','') is not null
+              and nullif(item ->> 'sku','')      is not null
               and nullif(item ->> 'quantity','') is not null
               and nullif(p.payload::jsonb ->> 'shipment_date','') is not null
+              and dp.id is not null
         ) t
         order by source_event_id, created_at desc nulls last
         """.formatted(platform, RawTableNames.RAW_OZON_POSTINGS_FBS);
@@ -211,8 +220,8 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             account_id,
             source_platform,
             source_event_id,
+            dim_product_id,
             order_id,
-            source_product_id,
             offer_id,
             warehouse_id,
             category_id,
@@ -220,48 +229,50 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             sale_date
         from (
             select
-                p.account_id                                                      as account_id,
-                '%1$s'                                                            as source_platform,
+                p.account_id                                                       as account_id,
+                '%1$s'                                                             as source_platform,
 
                 (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
 
                 nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
 
-                nullif(item ->> 'sku','')                                          as source_product_id,
                 nullif(item ->> 'offer_id','')                                     as offer_id,
 
-                w.id                                                              as warehouse_id,
+                w.id                                                               as warehouse_id,
 
                 dc.id                                                              as category_id,
 
                 nullif(item ->> 'quantity','')::int                                as quantity,
 
-                (p.payload::jsonb ->> 'created_at')::timestamptz::date              as sale_date,
+                (p.payload::jsonb ->> 'created_at')::timestamptz::date             as sale_date,
+
+                dp.id                                                              as dim_product_id,
 
                 p.created_at                                                       as created_at
             from %2$s p
             join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
+
+            left join dim_product dp
+              on dp.account_id        = p.account_id
+             and dp.source_platform   = '%1$s'
+             and dp.source_product_id = nullif(item ->> 'sku','')
 
             left join dim_warehouse w
               on w.account_id = p.account_id
              and lower(w.source_platform) = lower('%1$s')
              and w.external_warehouse_id = nullif(p.payload::jsonb -> 'analytics_data' ->> 'warehouse_id','')
 
-            left join dim_product dp
-              on dp.account_id = p.account_id
-             and dp.source_platform = '%1$s'
-             and dp.offer_id = nullif(item ->> 'offer_id','')
-
             left join dim_category dc
-              on dc.source_platform = '%1$s'
+              on dc.source_platform    = '%1$s'
              and dc.source_category_id = dp.external_category_id
 
             where p.account_id = ?
               and p.request_id = ?
               and nullif(p.payload::jsonb ->> 'posting_number','') is not null
-              and nullif(item ->> 'sku','') is not null
+              and nullif(item ->> 'sku','')      is not null
               and nullif(item ->> 'quantity','') is not null
               and nullif(p.payload::jsonb ->> 'created_at','') is not null
+              and dp.id is not null
         ) t
         order by source_event_id, created_at desc nulls last
         """.formatted(platform, RawTableNames.RAW_OZON_POSTINGS_FBO);
