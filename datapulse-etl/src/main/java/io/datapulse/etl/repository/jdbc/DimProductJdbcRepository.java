@@ -92,7 +92,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
           '%s' as source_platform,
           s.source_product_id,
           s.offer_id,
-          s.subject_id as external_category_id,
+          null as external_category_id,
           now(),
           now()
       from (
@@ -101,7 +101,6 @@ public class DimProductJdbcRepository implements DimProductRepository {
               (payload::jsonb ->> 'nmID')::bigint as nm_id,
               (payload::jsonb ->> 'nmID') as source_product_id,
               payload::jsonb ->> 'vendorCode' as offer_id,
-              nullif(payload::jsonb ->> 'subjectID', '')::bigint as subject_id,
               created_at
           from %s
           where account_id = ? and request_id = ?
@@ -110,57 +109,52 @@ public class DimProductJdbcRepository implements DimProductRepository {
           order by account_id, nm_id, created_at desc
       ) s
       on conflict (account_id, source_platform, source_product_id) do update
-        set offer_id             = excluded.offer_id,
-            external_category_id = excluded.external_category_id,
-            updated_at           = now();
+        set offer_id   = excluded.offer_id,
+            updated_at = now();
       """;
 
-  /**
-   * WB из продаж: по payload.category маппимся на dim_category.category_name и в
-   * external_category_id пишем dim_category.source_category_id.
-   */
   private static final String UPSERT_WB_FROM_SALES = """
-    insert into dim_product (
-        account_id,
-        source_platform,
-        source_product_id,
-        offer_id,
-        external_category_id,
-        created_at,
-        updated_at
-    )
-    select
-        s.account_id,
-        '%s' as source_platform,
-        s.source_product_id,
-        s.offer_id,
-        s.external_category_id,
-        now(),
-        now()
-    from (
-        select distinct
-            r.account_id                                      as account_id,
-            nullif(r.payload::jsonb ->> 'nmId','')            as source_product_id,
-            nullif(r.payload::jsonb ->> 'supplierArticle','') as offer_id,
-            dc.source_category_id                             as external_category_id
-        from %s r
-        left join dim_category dc
-          on dc.source_platform = '%s'
-         and lower(trim(dc.category_name)) =
-             lower(trim(nullif(r.payload::jsonb ->> 'category','')))
-        where r.account_id = ?
-          and r.request_id = ?
-          and nullif(r.payload::jsonb ->> 'nmId','') is not null
-          and dc.source_category_id is not null
-    ) s
-    on conflict (account_id, source_platform, source_product_id) do update
-      set external_category_id = coalesce(
-            dim_product.external_category_id,
-            excluded.external_category_id
-          ),
-          offer_id   = excluded.offer_id,
-          updated_at = now();
-    """;
+      insert into dim_product (
+          account_id,
+          source_platform,
+          source_product_id,
+          offer_id,
+          external_category_id,
+          created_at,
+          updated_at
+      )
+      select
+          s.account_id,
+          '%s' as source_platform,
+          s.source_product_id,
+          s.offer_id,
+          s.external_category_id,
+          now(),
+          now()
+      from (
+          select distinct
+              r.account_id                                      as account_id,
+              nullif(r.payload::jsonb ->> 'nmId','')            as source_product_id,
+              nullif(r.payload::jsonb ->> 'supplierArticle','') as offer_id,
+              dc.source_category_id                             as external_category_id
+          from %s r
+          left join dim_category dc
+            on dc.source_platform = '%s'
+           and lower(trim(dc.category_name)) =
+               lower(trim(nullif(r.payload::jsonb ->> 'category','')))
+          where r.account_id = ?
+            and r.request_id = ?
+            and nullif(r.payload::jsonb ->> 'nmId','') is not null
+            and dc.source_category_id is not null
+      ) s
+      on conflict (account_id, source_platform, source_product_id) do update
+        set external_category_id = coalesce(
+              dim_product.external_category_id,
+              excluded.external_category_id
+            ),
+            offer_id   = excluded.offer_id,
+            updated_at = now();
+      """;
 
   private static final String UPSERT_OZON_FROM_POSTINGS_TEMPLATE = """
       insert into dim_product (
@@ -262,10 +256,9 @@ public class DimProductJdbcRepository implements DimProductRepository {
     }
 
     String sql = UPSERT_WB_FROM_SALES.formatted(
-        MarketplaceType.WILDBERRIES.tag(),          // для insert.source_platform
-        RawTableNames.RAW_WB_SUPPLIER_SALES,        // таблица sales
-        MarketplaceType.WILDBERRIES.tag(),          // dim_category.source_platform
-        MarketplaceType.WILDBERRIES.tag()           // dim_product.source_platform
+        MarketplaceType.WILDBERRIES.tag(),
+        RawTableNames.RAW_WB_SUPPLIER_SALES,
+        MarketplaceType.WILDBERRIES.tag()
     );
 
     jdbcTemplate.update(sql, accountId, requestId);
@@ -310,7 +303,7 @@ public class DimProductJdbcRepository implements DimProductRepository {
   private static void requireNotNull(Object value, String argumentName) {
     if (Objects.isNull(value)) {
       throw new IllegalArgumentException(
-          "Аргумент '" + argumentName + "' не должен быть null."
+          "Argument '" + argumentName + "' must not be null."
       );
     }
   }
