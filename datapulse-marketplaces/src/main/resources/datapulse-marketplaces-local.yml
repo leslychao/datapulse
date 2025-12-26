@@ -74,3 +74,5 @@ marketplace:
           authScope: TARGET_ACCOUNT
         FACT_OZON_ANALYTICS_STOCKS:
           authScope: TARGET_ACCOUNT
+        FACT_OZON_RETURNS_LIST:
+          authScope: TARGET_ACCOUNT

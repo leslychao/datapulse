@@ -14,4 +14,5 @@
   <include file="changelog/0009-create-fact-sales.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0010-create-dim-subject-wb.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0011-create-fact-inventory-snapshot.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0012-create-fact-returns.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

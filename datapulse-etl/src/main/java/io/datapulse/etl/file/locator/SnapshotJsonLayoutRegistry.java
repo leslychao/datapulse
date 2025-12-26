@@ -12,6 +12,7 @@ import io.datapulse.marketplaces.dto.raw.product.WbProductCardRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonFinanceTransactionOperationRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFboRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFbsRaw;
+import io.datapulse.marketplaces.dto.raw.sales.OzonReturnRaw;
 import io.datapulse.marketplaces.dto.raw.sales.WbSalesReportDetailRowRaw;
 import io.datapulse.marketplaces.dto.raw.sales.WbSupplierSaleRaw;
 import io.datapulse.marketplaces.dto.raw.supply.WbIncomeRaw;
@@ -62,6 +63,7 @@ public final class SnapshotJsonLayoutRegistry {
     register(OzonFinanceTransactionOperationRaw.class,
         JsonArrayLocators.arrayAtPath("result.operations"));
     register(WbSupplierSaleRaw.class, JsonArrayLocators.arrayAtPath());
+    register(OzonReturnRaw.class, JsonArrayLocators.arrayAtPath("returns"));
 
     // ===== Supply Chain =====
     register(WbStockRaw.class, JsonArrayLocators.arrayAtPath());

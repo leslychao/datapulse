@@ -11,6 +11,7 @@ import io.datapulse.marketplaces.dto.raw.product.OzonProductListItemRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonFinanceTransactionOperationRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFboRaw;
 import io.datapulse.marketplaces.dto.raw.sales.OzonPostingFbsRaw;
+import io.datapulse.marketplaces.dto.raw.sales.OzonReturnRaw;
 import io.datapulse.marketplaces.dto.raw.tariff.OzonProductInfoPricesItemRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonClusterListRaw;
 import io.datapulse.marketplaces.dto.raw.warehouse.ozon.OzonWarehouseFbsListRaw;
@@ -22,6 +23,8 @@ import io.datapulse.marketplaces.json.OzonHasNextExtractor;
 import io.datapulse.marketplaces.json.OzonLastIdExtractor;
 import io.datapulse.marketplaces.json.OzonPageCountExtractor;
 import io.datapulse.marketplaces.json.OzonResultSizeExtractor;
+import io.datapulse.marketplaces.json.OzonReturnsHasNextExtractor;
+import io.datapulse.marketplaces.json.OzonReturnsLastIdExtractor;
 import io.datapulse.marketplaces.service.AuthAccountIdResolver;
 import io.datapulse.marketplaces.service.MarketplaceStreamingDownloadService;
 import java.time.Instant;
@@ -36,8 +39,8 @@ import org.springframework.stereotype.Component;
 public final class OzonAdapter extends AbstractMarketplaceAdapter {
 
   private static final int MAX_INFO_LIST_BATCH_SIZE = 1000;
-
   private static final int MAX_ANALYTICS_STOCKS_SKUS_SIZE = 100;
+  private static final int MAX_RETURNS_PAGE_SIZE = 500;
 
   private static final DateTimeFormatter RFC3339_MILLIS_UTC =
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
@@ -64,6 +67,52 @@ public final class OzonAdapter extends AbstractMarketplaceAdapter {
         authAccountIdResolver
     );
     this.partitionKeyGenerator = partitionKeyGenerator;
+  }
+
+  // ===== Returns (FBO/FBS) =====
+
+  public Snapshot<OzonReturnRaw> downloadReturnsPage(
+      long accountId,
+      LocalDate dateFrom,
+      LocalDate dateTo,
+      long lastId,
+      int limit
+  ) {
+    if (limit <= 0 || limit > MAX_RETURNS_PAGE_SIZE) {
+      throw new IllegalArgumentException(
+          "Ozon /v1/returns/list page size must be in range 1.." + MAX_RETURNS_PAGE_SIZE
+              + ", actual: " + limit + "."
+      );
+    }
+
+    Map<String, Object> body = Map.of(
+        "filter", Map.of(
+            "logistic_return_date", Map.of(
+                "time_from", rfc3339StartOfDayUtcMillis(dateFrom),
+                "time_to", rfc3339EndOfDayUtcMillis(dateTo)
+            )
+        ),
+        "limit", limit,
+        "last_id", lastId
+    );
+
+    String lastIdTag = String.valueOf(lastId);
+    String partitionKey = partitionKeyGenerator.generate(lastIdTag, limit);
+
+    Snapshot<OzonReturnRaw> downloaded = doPostPartitioned(
+        accountId,
+        EndpointKey.FACT_OZON_RETURNS_LIST,
+        body,
+        partitionKey,
+        OzonReturnRaw.class
+    );
+
+    boolean hasNext = OzonReturnsHasNextExtractor.extractHasNext(downloaded.file());
+    String nextToken = hasNext
+        ? OzonReturnsLastIdExtractor.extractLastId(downloaded.file())
+        : null;
+
+    return new Snapshot<>(downloaded.elementType(), downloaded.file(), nextToken);
   }
 
   // ===== Warehouses =====

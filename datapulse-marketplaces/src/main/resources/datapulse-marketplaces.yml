@@ -110,6 +110,9 @@ marketplace:
           OZON_FINANCE_TX:
             limit: 60
             period: 60s
+          OZON_RETURNS:
+            limit: 60
+            period: 60s
 
       endpoints:
         DICT_OZON_WAREHOUSES_FBS:
@@ -158,6 +161,11 @@ marketplace:
         FACT_OZON_ANALYTICS_STOCKS:
           url: https://api-seller.ozon.ru/v1/analytics/stocks
           authScope: TARGET_ACCOUNT
+
+        FACT_OZON_RETURNS_LIST:
+          url: https://api-seller.ozon.ru/v1/returns/list
+          authScope: TARGET_ACCOUNT
+          rateLimitGroup: OZON_RETURNS
 
       retryPolicy:
         maxAttempts: 4

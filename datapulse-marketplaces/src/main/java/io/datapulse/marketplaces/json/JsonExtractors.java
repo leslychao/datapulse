@@ -29,6 +29,14 @@ final class JsonExtractors {
     return reader.nextLong();
   }
 
+  static Boolean readNullableBoolean(JsonReader reader) throws IOException {
+    if (reader.peek() == JsonToken.NULL) {
+      reader.nextNull();
+      return null;
+    }
+    return reader.nextBoolean();
+  }
+
   static String normalizeNullableBlank(String value) {
     if (value == null) {
       return null;
@@ -52,9 +60,30 @@ final class JsonExtractors {
     }
   }
 
+  static Boolean extractBoolean(
+      Path jsonFile,
+      String failureMessagePrefix,
+      BooleanExtractor extractor
+  ) {
+    try (BufferedReader reader = Files.newBufferedReader(jsonFile, StandardCharsets.UTF_8);
+        JsonReader jsonReader = new JsonReader(reader)) {
+
+      return extractor.extract(jsonReader);
+
+    } catch (IOException ex) {
+      throw new IllegalStateException(failureMessagePrefix + jsonFile, ex);
+    }
+  }
+
   @FunctionalInterface
   interface StringExtractor {
 
     String extract(JsonReader reader) throws IOException;
+  }
+
+  @FunctionalInterface
+  interface BooleanExtractor {
+
+    Boolean extract(JsonReader reader) throws IOException;
   }
 }
