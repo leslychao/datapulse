@@ -3,6 +3,7 @@ package io.datapulse.etl.repository.jdbc;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.DimTariffRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -14,13 +15,8 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
   private static final String UPSERT_WB_SCD2_TEMPLATE = """
       with source as (
           select
-              '%1$s' as source_platform,
-
-              (t.payload::jsonb ->> 'parentID')::bigint   as parent_id,
-              (t.payload::jsonb ->> 'parentName')::text   as parent_name,
-
-              (t.payload::jsonb ->> 'subjectID')::bigint  as subject_id,
-              (t.payload::jsonb ->> 'subjectName')::text  as subject_name,
+              '%1$s'                                          as source_platform,
+              c.id                                            as dim_category_id,
 
               (t.payload::jsonb ->> 'kgvpBooking')::numeric          as kgvp_booking,
               (t.payload::jsonb ->> 'kgvpMarketplace')::numeric      as kgvp_marketplace,
@@ -29,32 +25,29 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
               (t.payload::jsonb ->> 'kgvpSupplierExpress')::numeric  as kgvp_supplier_express,
               (t.payload::jsonb ->> 'paidStorageKgvp')::numeric      as paid_storage_kgvp
           from %2$s t
+          join dim_category c
+            on c.source_platform    = '%1$s'
+           and c.source_category_id = (t.payload::jsonb ->> 'subjectID')::bigint
           where t.account_id = ?
             and t.request_id = ?
       ),
       closed as (
           update dim_tariff d
-          set valid_to = current_date - 1,
+          set valid_to  = current_date - 1,
               updated_at = now()
           from source s
-          where d.source_platform = s.source_platform
-            and d.subject_id      = s.subject_id
+          where d.source_platform  = s.source_platform
+            and d.dim_category_id  = s.dim_category_id
             and d.valid_to is null
             and (
-              (d.parent_id,
-               d.parent_name,
-               d.subject_name,
-               d.kgvp_booking,
+              (d.kgvp_booking,
                d.kgvp_marketplace,
                d.kgvp_pickup,
                d.kgvp_supplier,
                d.kgvp_supplier_express,
                d.paid_storage_kgvp)
               is distinct from
-              (s.parent_id,
-               s.parent_name,
-               s.subject_name,
-               s.kgvp_booking,
+              (s.kgvp_booking,
                s.kgvp_marketplace,
                s.kgvp_pickup,
                s.kgvp_supplier,
@@ -64,10 +57,7 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
       )
       insert into dim_tariff (
           source_platform,
-          parent_id,
-          parent_name,
-          subject_id,
-          subject_name,
+          dim_category_id,
           kgvp_booking,
           kgvp_marketplace,
           kgvp_pickup,
@@ -81,10 +71,7 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
       )
       select
           s.source_platform,
-          s.parent_id,
-          s.parent_name,
-          s.subject_id,
-          s.subject_name,
+          s.dim_category_id,
           s.kgvp_booking,
           s.kgvp_marketplace,
           s.kgvp_pickup,
@@ -99,24 +86,18 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
       where not exists (
           select 1
           from dim_tariff d
-          where d.source_platform = s.source_platform
-            and d.subject_id      = s.subject_id
+          where d.source_platform  = s.source_platform
+            and d.dim_category_id  = s.dim_category_id
             and d.valid_to is null
             and (
-              (d.parent_id,
-               d.parent_name,
-               d.subject_name,
-               d.kgvp_booking,
+              (d.kgvp_booking,
                d.kgvp_marketplace,
                d.kgvp_pickup,
                d.kgvp_supplier,
                d.kgvp_supplier_express,
                d.paid_storage_kgvp)
               is not distinct from
-              (s.parent_id,
-               s.parent_name,
-               s.subject_name,
-               s.kgvp_booking,
+              (s.kgvp_booking,
                s.kgvp_marketplace,
                s.kgvp_pickup,
                s.kgvp_supplier,
@@ -130,6 +111,9 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
 
   @Override
   public void upsertWildberries(Long accountId, String requestId) {
+    Objects.requireNonNull(accountId, "accountId обязателен.");
+    Objects.requireNonNull(requestId, "requestId обязателен.");
+
     String platform = MarketplaceType.WILDBERRIES.tag();
 
     String sql = UPSERT_WB_SCD2_TEMPLATE.formatted(

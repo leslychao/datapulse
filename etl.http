@@ -17,6 +17,25 @@ Content-Type: application/json
   });
 %}
 
+### Run ETL — COMMISSION_DICT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "COMMISSION_DICT",
+  "burst": 1
+}
+
+> {%
+  client.test("ETL COMMISSION_DICT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
 ### Run ETL — CATEGORY_DICT
 POST {{host}}/api/etl/run
 Content-Type: application/json
