@@ -19,7 +19,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           source_event_id,
           dim_product_id,
           order_id,
-          offer_id,
           warehouse_id,
           category_id,
           quantity,
@@ -33,7 +32,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           source_event_id,
           dim_product_id,
           order_id,
-          offer_id,
           warehouse_id,
           category_id,
           quantity,
@@ -44,7 +42,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
       on conflict (account_id, source_platform, source_event_id) do update
         set dim_product_id = excluded.dim_product_id,
             order_id       = excluded.order_id,
-            offer_id       = excluded.offer_id,
             warehouse_id   = excluded.warehouse_id,
             category_id    = excluded.category_id,
             quantity       = excluded.quantity,
@@ -67,7 +64,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             source_event_id,
             dim_product_id,
             order_id,
-            offer_id,
             warehouse_id,
             category_id,
             quantity,
@@ -79,7 +75,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 source_event_id,
                 dim_product_id,
                 order_id,
-                offer_id,
                 warehouse_id,
                 category_id,
                 sum(quantity)   as quantity,
@@ -92,8 +87,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
 
                     nullif(r.payload::jsonb ->> 'saleID','')                          as source_event_id,
                     nullif(r.payload::jsonb ->> 'srid','')                            as order_id,
-
-                    nullif(r.payload::jsonb ->> 'supplierArticle','')                 as offer_id,
 
                     w.id                                                              as warehouse_id,
 
@@ -141,7 +134,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 source_event_id,
                 dim_product_id,
                 order_id,
-                offer_id,
                 warehouse_id,
                 category_id,
                 sale_date
@@ -166,7 +158,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             source_event_id,
             dim_product_id,
             order_id,
-            offer_id,
             warehouse_id,
             category_id,
             quantity,
@@ -179,8 +170,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
 
                 nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
-
-                nullif(item ->> 'offer_id','')                                     as offer_id,
 
                 w.id                                                               as warehouse_id,
 
@@ -243,7 +232,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
             source_event_id,
             dim_product_id,
             order_id,
-            offer_id,
             warehouse_id,
             category_id,
             quantity,
@@ -256,8 +244,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
 
                 nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
-
-                nullif(item ->> 'offer_id','')                                     as offer_id,
 
                 w.id                                                               as warehouse_id,
 
