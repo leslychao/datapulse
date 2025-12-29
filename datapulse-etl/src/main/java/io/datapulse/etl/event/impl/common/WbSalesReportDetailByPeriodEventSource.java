@@ -1,4 +1,6 @@
-package io.datapulse.etl.event.impl.sales;
+package io.datapulse.etl.event.impl.common;
+
+import static io.datapulse.etl.MarketplaceEvent.FACT_LOGISTICS_COSTS;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
@@ -19,7 +21,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = { MarketplaceEvent.SALES_FACT },
+    events = { MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS },
     marketplace = MarketplaceType.WILDBERRIES,
     rawTableName = RawTableNames.RAW_WB_SALES_REPORT_DETAIL
 )

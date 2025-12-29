@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- ===================================================================== -->
+  <!-- FACT LOGISTICS COSTS :: агрегированный money-fact                     -->
+  <!-- Зерно:                                                                -->
+  <!--   account × platform × date × warehouse × logistics_type             -->
+  <!-- Источники RAW:                                                        -->
+  <!--   WB  : /api/v5/supplier/reportDetailByPeriod                         -->
+  <!--   Ozon: /v3/finance/transaction/list                                  -->
+  <!-- ===================================================================== -->
+
+  <changeSet id="0013-create-fact-logistics-costs" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      create table if not exists fact_logistics_costs
+      (
+        id                bigserial primary key,
+
+        account_id        bigint         not null,
+
+        source_platform   text           not null,
+        source_event_id   text           not null,
+
+        operation_date    date           not null,
+
+        warehouse_id      bigint,
+
+        logistics_type    text           not null, -- DELIVERY_TO_CUSTOMER / RETURN_FROM_CUSTOMER / STORAGE / INBOUND / OTHER_LOGISTICS
+        amount            numeric(18, 4) not null,
+        currency          text           not null,
+
+        created_at        timestamptz    not null default now(),
+        updated_at        timestamptz    not null default now(),
+
+        constraint uq_fact_logistics_costs_source
+          unique (account_id, source_platform, operation_date, warehouse_id, logistics_type),
+
+        constraint fk_fact_logistics_dim_warehouse
+          foreign key (warehouse_id) references dim_warehouse (id)
+      );
+
+      create index if not exists idx_fact_logistics_account_date
+        on fact_logistics_costs (account_id, source_platform, operation_date);
+
+      create index if not exists idx_fact_logistics_warehouse
+        on fact_logistics_costs (warehouse_id);
+    </sql>
+
+    <rollback>
+      drop table if exists fact_logistics_costs cascade;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

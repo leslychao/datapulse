@@ -9,10 +9,12 @@
   <include file="changelog/0004-create-dim-warehouses.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0005-create-dim-category.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0006-create-dim-tariff.xml" relativeToChangelogFile="true"/>
-  <include file="changelog/0007-create-fact-product-commission-ozon.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0007-create-fact-product-commission-ozon.xml"
+    relativeToChangelogFile="true"/>
   <include file="changelog/0008-create-dim-product.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0009-create-fact-sales.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0010-create-dim-subject-wb.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0011-create-fact-inventory-snapshot.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0012-create-fact-returns.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0013-create-fact-logistics-costs.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
