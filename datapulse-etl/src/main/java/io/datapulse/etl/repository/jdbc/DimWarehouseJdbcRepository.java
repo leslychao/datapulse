@@ -115,7 +115,6 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
       where t.account_id = ? and t.request_id = ?
       """;
 
-  // Минимальный патч: используем officeId как внешний ключ склада WB
   private static final String WB_SELLER_SELECT = """
       select
           t.account_id as account_id,
