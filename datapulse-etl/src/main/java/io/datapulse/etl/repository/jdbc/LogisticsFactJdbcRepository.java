@@ -12,17 +12,6 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
 
-  /**
-   * Идемпотентный upsert без ON CONFLICT:
-   *
-   * <ol>
-   *   <li>source as (%s) — считаем grain:
-   *       account × platform × date × warehouse × logistics_type</li>
-   *   <li>delete ... using ... — удаляем старые строки с тем же grain
-   *       (учитывая NULL в warehouse_id через IS NOT DISTINCT FROM)</li>
-   *   <li>insert ... select ... — вставляем новые агрегаты</li>
-   * </ol>
-   */
   private static final String UPSERT_TEMPLATE = """
       with source as (
           %s
@@ -39,7 +28,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
       insert into fact_logistics_costs (
           account_id,
           source_platform,
-          source_event_id,
+          order_id,
           operation_date,
           warehouse_id,
           logistics_type,
@@ -51,7 +40,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
       select
           account_id,
           source_platform,
-          source_event_id,
+          order_id,
           operation_date,
           warehouse_id,
           logistics_type,
@@ -74,7 +63,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
         select
             account_id,
             source_platform,
-            source_event_id,
+            order_id,
             operation_date,
             warehouse_id,
             logistics_type,
@@ -82,29 +71,21 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
             currency
         from (
             select
-                s.account_id           as account_id,
-                s.source_platform      as source_platform,
-                min(s.source_event_id) as source_event_id,
-                s.operation_date       as operation_date,
-                s.warehouse_id         as warehouse_id,
-                s.logistics_type       as logistics_type,
-                sum(s.amount)          as amount,
-                max(s.currency)        as currency
+                s.account_id        as account_id,
+                s.source_platform   as source_platform,
+                min(s.order_id)     as order_id,
+                s.operation_date    as operation_date,
+                s.warehouse_id      as warehouse_id,
+                s.logistics_type    as logistics_type,
+                sum(s.amount)       as amount,
+                max(s.currency)     as currency
             from (
                 select
                     r.account_id                                       as account_id,
                     '%1$s'                                             as source_platform,
 
-                    -- гарантируем not null для source_event_id
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'order_uid',''),
-                        nullif(r.payload::jsonb ->> 'srid',''),
-                        concat_ws(
-                            ':',
-                            nullif(r.payload::jsonb ->> 'realizationreport_id',''),
-                            nullif((r.payload::jsonb ->> 'rrd_id'),'')
-                        )
-                    )                                                 as source_event_id,
+                    -- жёсткий ключ заказа/цепочки WB: только srid
+                    nullif(r.payload::jsonb ->> 'srid','')            as order_id,
 
                     (r.payload::jsonb ->> 'rr_dt')::date              as operation_date,
 
@@ -153,11 +134,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                 where r.account_id = ?
                   and r.request_id = ?
                   and nullif(r.payload::jsonb ->> 'rr_dt','') is not null
-                  and (
-                        nullif(r.payload::jsonb ->> 'order_uid','') is not null
-                        or nullif(r.payload::jsonb ->> 'srid','') is not null
-                        or nullif(r.payload::jsonb ->> 'realizationreport_id','') is not null
-                     )
+                  and nullif(r.payload::jsonb ->> 'srid','')  is not null
             ) s
             group by
                 s.account_id,
@@ -181,7 +158,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
         select
             account_id,
             source_platform,
-            source_event_id,
+            order_id,
             operation_date,
             warehouse_id,
             logistics_type,
@@ -189,20 +166,22 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
             currency
         from (
             select
-                s.account_id           as account_id,
-                s.source_platform      as source_platform,
-                min(s.source_event_id) as source_event_id,
-                s.operation_date       as operation_date,
-                s.warehouse_id         as warehouse_id,
-                s.logistics_type       as logistics_type,
-                sum(s.amount)          as amount,
-                max(s.currency)        as currency
+                s.account_id        as account_id,
+                s.source_platform   as source_platform,
+                min(s.order_id)     as order_id,
+                s.operation_date    as operation_date,
+                s.warehouse_id      as warehouse_id,
+                s.logistics_type    as logistics_type,
+                sum(s.amount)       as amount,
+                max(s.currency)     as currency
             from (
                 select
                     r.account_id                                     as account_id,
                     '%1$s'                                           as source_platform,
 
-                    nullif(r.payload::jsonb ->> 'operation_id','')  as source_event_id,
+                    -- жёсткий ключ отгрузки Ozon: только posting.posting_number
+                    nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
+                                                                    as order_id,
 
                     (r.payload::jsonb ->> 'operation_date')::timestamptz::date
                                                                     as operation_date,
@@ -276,7 +255,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                 where r.account_id = ?
                   and r.request_id = ?
                   and nullif(r.payload::jsonb ->> 'operation_date','') is not null
-                  and nullif(r.payload::jsonb ->> 'operation_id','')   is not null
+                  and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') is not null
                   and nullif(r.payload::jsonb ->> 'amount','')         is not null
               ) s
             where s.logistics_type is not null     -- только логистические операции
