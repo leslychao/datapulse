@@ -30,9 +30,6 @@ import io.datapulse.etl.dto.OrchestrationCommand;
 import io.datapulse.etl.dto.OrchestrationPlan;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
-import io.datapulse.etl.flow.advice.EtlAbstractRequestHandlerAdvice;
-import io.datapulse.etl.flow.core.handler.EtlIngestErrorHandler;
-import io.datapulse.etl.repository.jdbc.RawBatchInsertJdbcRepository;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -143,48 +140,6 @@ public class EtlOrchestratorFlowConfig {
         )
         .channel(CH_ETL_RUN_CORE)
         .get();
-  }
-
-  @Bean
-  public Advice etlIngestExecutionAdvice(
-      EtlIngestErrorHandler ingestErrorHandler,
-      RawBatchInsertJdbcRepository rawBatchInsertJdbcRepository
-  ) {
-    return new EtlAbstractRequestHandlerAdvice() {
-      @Override
-      protected Object doInvoke(ExecutionCallback callback, Object target, Message<?> message) {
-        EtlSourceExecution execution = (EtlSourceExecution) message.getPayload();
-
-        try {
-          callback.execute();
-
-          long rowsCount = rawBatchInsertJdbcRepository.countByRequestId(
-              execution.rawTable(),
-              execution.requestId()
-          );
-
-          IngestStatus status =
-              rowsCount > 0L ? IngestStatus.SUCCESS : IngestStatus.NO_DATA;
-
-          return new ExecutionOutcome(
-              execution.requestId(),
-              execution.accountId(),
-              execution.sourceId(),
-              execution.marketplace(),
-              execution.event(),
-              execution.dateFrom(),
-              execution.dateTo(),
-              status,
-              rowsCount,
-              null,
-              null
-          );
-        } catch (Exception ex) {
-          Throwable cause = unwrapProcessingError(ex);
-          return ingestErrorHandler.handleIngestError(cause, execution);
-        }
-      }
-    };
   }
 
   @Bean
