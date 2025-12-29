@@ -3,7 +3,12 @@ package io.datapulse.core.service;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.EtlExecutionAuditRepository;
+import io.datapulse.domain.CommonConstants;
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -40,13 +45,30 @@ public class EtlExecutionAuditService
   }
 
   @Override
-  protected void validateOnUpdate(Long id, EtlExecutionAuditDto dto,
-      EtlExecutionAuditEntity existing) {
+  protected void validateOnUpdate(
+      Long id,
+      EtlExecutionAuditDto dto,
+      EtlExecutionAuditEntity existing
+  ) {
   }
 
   @Override
-  protected EtlExecutionAuditEntity merge(EtlExecutionAuditEntity target,
-      EtlExecutionAuditDto source) {
+  protected EtlExecutionAuditEntity beforeSave(EtlExecutionAuditEntity entity) {
+    OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
+    entity.setCreatedAt(now);
+    return entity;
+  }
+
+  @Override
+  protected EtlExecutionAuditEntity beforeUpdate(EtlExecutionAuditEntity entity) {
+    return entity;
+  }
+
+  @Override
+  protected EtlExecutionAuditEntity merge(
+      EtlExecutionAuditEntity target,
+      EtlExecutionAuditDto source
+  ) {
     target.setRequestId(source.getRequestId());
     target.setAccountId(source.getAccountId());
     target.setEvent(source.getEvent());
@@ -58,5 +80,23 @@ public class EtlExecutionAuditService
     target.setRowsCount(source.getRowsCount());
     target.setErrorMessage(source.getErrorMessage());
     return target;
+  }
+
+  public Optional<EtlExecutionAuditDto> findLatestSync(
+      long accountId,
+      MarketplaceType marketplace,
+      String sourceId,
+      LocalDate dateFrom,
+      LocalDate dateTo
+  ) {
+    return repository
+        .findTopByAccountIdAndMarketplaceAndSourceIdAndDateFromAndDateToOrderByCreatedAtDesc(
+            accountId,
+            marketplace,
+            sourceId,
+            dateFrom,
+            dateTo
+        )
+        .map(entity -> mapperFacade.to(entity, EtlExecutionAuditDto.class));
   }
 }

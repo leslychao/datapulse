@@ -94,6 +94,10 @@ public final class MessageCodes {
   public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND = "etl.ingest.json-layout.not-found";
   public static final String ETL_AGGREGATION_EMPTY_GROUP = "etl.aggregation.empty-group";
 
+  // ===== ETL / RAW reuse =====
+  public static final String ETL_RAW_SYNC_REUSE_ENTRY_NOT_FOUND =
+      "etl.raw-sync.reuse.entry.not-found";
+
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";
   public static final String RAW_TABLE_INIT_FAILED = "raw.table.init.failed";

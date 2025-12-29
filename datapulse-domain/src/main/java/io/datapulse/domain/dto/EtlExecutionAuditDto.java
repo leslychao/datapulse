@@ -3,6 +3,7 @@ package io.datapulse.domain.dto;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.SyncStatus;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -23,4 +24,6 @@ public class EtlExecutionAuditDto extends LongBaseDto {
   private Long rowsCount;
 
   private String errorMessage;
+
+  private OffsetDateTime createdAt;
 }

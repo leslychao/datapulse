@@ -12,6 +12,7 @@ import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_E
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_PREPARE_RAW_SCHEMA;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RAW_SYNC_OR_REUSE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_EXECUTIONS;
@@ -30,6 +31,7 @@ import io.datapulse.etl.dto.OrchestrationCommand;
 import io.datapulse.etl.dto.OrchestrationPlan;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
+import io.datapulse.etl.sync.RawSyncReusePolicy;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -67,6 +69,7 @@ public class EtlOrchestratorFlowConfig {
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlOrchestrationCommandFactory etlOrchestrationCommandFactory;
+  private final RawSyncReusePolicy rawSyncReusePolicy;
 
   @Bean(name = CH_ETL_PREPARE_RAW_SCHEMA)
   public MessageChannel etlPrepareRawSchemaChannel() {
@@ -75,6 +78,11 @@ public class EtlOrchestratorFlowConfig {
 
   @Bean(name = CH_ETL_RUN_CORE)
   public MessageChannel etlRunCoreChannel() {
+    return new DirectChannel();
+  }
+
+  @Bean(name = CH_ETL_RAW_SYNC_OR_REUSE)
+  public MessageChannel etlRawSyncOrReuseChannel() {
     return new DirectChannel();
   }
 
@@ -143,38 +151,58 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlRunCoreFlow(
-      TaskExecutor etlOrchestrateExecutor,
-      Advice etlIngestExecutionAdvice
-  ) {
+  public IntegrationFlow etlRawSyncOrReuseFlow(Advice etlIngestExecutionAdvice) {
+    return IntegrationFlow
+        .from(CH_ETL_RAW_SYNC_OR_REUSE)
+        .route(
+            EtlSourceExecution.class,
+            rawSyncReusePolicy::requiresSync,
+            mapping -> mapping
+                .subFlowMapping(
+                    Boolean.TRUE,
+                    subflow -> subflow.gateway(
+                        CH_ETL_INGEST,
+                        gateway -> gateway
+                            .requestTimeout(0L)
+                            .replyTimeout(0L)
+                            .advice(etlIngestExecutionAdvice)
+                    )
+                )
+                .subFlowMapping(
+                    Boolean.FALSE,
+                    subflow -> subflow.transform(
+                        EtlSourceExecution.class,
+                        rawSyncReusePolicy::reuseFromAudit
+                    )
+                )
+        )
+        .get();
+  }
+
+  @Bean
+  public IntegrationFlow etlRunCoreFlow(TaskExecutor etlOrchestrateExecutor) {
     return IntegrationFlow
         .from(CH_ETL_RUN_CORE)
         .transform(OrchestrationCommand.class, this::buildOrchestrationPlan)
         .gateway(CH_ETL_PREPARE_RAW_SCHEMA)
-        .enrichHeaders(h -> h.headerFunction(
+        .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_EXPECTED_EXECUTIONS,
-            (Message<OrchestrationPlan> msg) -> msg.getPayload().expectedExecutions()
+            (Message<OrchestrationPlan> message) -> message.getPayload().expectedExecutions()
         ))
         .split(OrchestrationPlan.class, OrchestrationPlan::plans)
-        .channel(c -> c.executor(etlOrchestrateExecutor))
+        .channel(channel -> channel.executor(etlOrchestrateExecutor))
         .transform(MarketplacePlan.class, MarketplacePlan::executions)
         .split()
-        .gateway(
-            CH_ETL_INGEST,
-            gateway -> gateway
-                .requestTimeout(0L)
-                .replyTimeout(0L)
-                .advice(etlIngestExecutionAdvice)
-        )
+        .gateway(CH_ETL_RAW_SYNC_OR_REUSE)
         .wireTap(flow -> flow
             .filter(
                 ExecutionOutcome.class,
                 outcome -> outcome.status() == IngestStatus.WAITING_RETRY
             )
-            .enrichHeaders(h -> h.headerFunction(
+            .enrichHeaders(headers -> headers.headerFunction(
                 AmqpHeaders.EXPIRATION,
-                (Message<ExecutionOutcome> msg) -> {
-                  ExecutionOutcome outcome = msg.getPayload();
+                (Message<ExecutionOutcome> message) -> {
+                  ExecutionOutcome outcome = message.getPayload();
                   Long retryAfter = outcome.retryAfterMillis();
                   long ttl = (retryAfter != null && retryAfter > 0L)
                       ? retryAfter
@@ -201,7 +229,7 @@ public class EtlOrchestratorFlowConfig {
             )
         )
         .filter(ExecutionOutcome.class, outcome -> outcome.status().isTerminal())
-        .enrichHeaders(h -> h
+        .enrichHeaders(headers -> headers
             .headerExpression(
                 HDR_ETL_EXECUTION_GROUP_ID,
                 "payload.requestId + ':' + payload.accountId + ':' + payload.event.name()"
@@ -269,7 +297,7 @@ public class EtlOrchestratorFlowConfig {
         ));
 
     List<MarketplacePlan> plans = byMarketplace.entrySet().stream()
-        .map(e -> new MarketplacePlan(e.getKey(), e.getValue()))
+        .map(entry -> new MarketplacePlan(entry.getKey(), entry.getValue()))
         .toList();
 
     int expectedExecutions = plans.stream()
