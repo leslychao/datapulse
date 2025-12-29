@@ -49,8 +49,9 @@ public class EtlAggregationResultFlowConfig {
             (dto, headers) -> {
               etlExecutionAuditService.save(dto);
               log.info(
-                  "ETL execution audit saved: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}",
+                  "ETL execution audit saved: requestId={}, rawSyncId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}",
                   dto.getRequestId(),
+                  dto.getRawSyncId(),
                   dto.getAccountId(),
                   dto.getEvent(),
                   dto.getMarketplace(),

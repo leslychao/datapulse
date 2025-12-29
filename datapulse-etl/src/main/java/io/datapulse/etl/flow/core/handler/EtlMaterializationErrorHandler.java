@@ -20,6 +20,7 @@ public class EtlMaterializationErrorHandler {
       ExecutionAggregationResult aggregation
   ) {
     String requestId = aggregation.requestId();
+    String rawSyncId = aggregation.rawSyncId();
     long accountId = aggregation.accountId();
 
     String errorClass = error.getClass().getName();
@@ -27,8 +28,9 @@ public class EtlMaterializationErrorHandler {
     String safeErrorMessage = truncate(userErrorMessage);
 
     log.error(
-        "ETL materialization failed: requestId={}, accountId={}, event={}, errorClass={}, errorMessage={}",
+        "ETL materialization failed: requestId={}, rawSyncId={}, accountId={}, event={}, errorClass={}, errorMessage={}",
         requestId,
+        rawSyncId,
         accountId,
         aggregation.event(),
         errorClass,
