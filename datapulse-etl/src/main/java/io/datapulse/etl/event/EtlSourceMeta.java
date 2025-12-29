@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface EtlSourceMeta {
 
-  MarketplaceEvent event();
+  MarketplaceEvent[] events() default {};
 
   MarketplaceType marketplace();
 

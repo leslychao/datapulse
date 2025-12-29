@@ -3,6 +3,7 @@ package io.datapulse.etl.sync;
 import static java.time.OffsetDateTime.now;
 
 import io.datapulse.core.service.EtlExecutionAuditService;
+import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.dto.EtlSourceExecution;
@@ -10,7 +11,9 @@ import io.datapulse.etl.dto.ExecutionOutcome;
 import io.datapulse.etl.dto.IngestStatus;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,6 +24,10 @@ import org.springframework.stereotype.Component;
 public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
 
   private static final Duration DEFAULT_REUSE_TTL = Duration.ofMinutes(60);
+
+  private static final Set<SyncStatus> REUSABLE_STATUSES =
+      EnumSet.of(SyncStatus.SUCCESS, SyncStatus.NO_DATA);
+
   private final EtlExecutionAuditService auditService;
 
   @Override
@@ -52,7 +59,7 @@ public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
       } else {
         EtlExecutionAuditDto audit = latestAudit.get();
         log.debug(
-            "Raw sync decision: requiresSync={}, status={}, createdAt={}, " +
+            "Raw sync decision: requiresSync={}, auditStatus={}, auditCreatedAt={}, " +
                 "requestId={}, accountId={}, marketplace={}, sourceId={}, dateFrom={}, dateTo={}",
             requiresSync,
             audit.getStatus(),
@@ -101,10 +108,14 @@ public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
     long rowsCount = audit.getRowsCount() != null ? audit.getRowsCount() : 0L;
     IngestStatus status = rowsCount > 0L ? IngestStatus.SUCCESS : IngestStatus.NO_DATA;
 
+    String reusedRequestId = audit.getRequestId();
+
     log.info(
-        "Raw sync reused from audit: requestId={}, accountId={}, marketplace={}, sourceId={}, " +
-            "event={}, dateFrom={}, dateTo={}, status={}, rowsCount={}, auditCreatedAt={}",
+        "Raw sync reused from audit: orchestrationRequestId={}, reusedRequestId={}, " +
+            "accountId={}, marketplace={}, sourceId={}, event={}, " +
+            "dateFrom={}, dateTo={}, status={}, rowsCount={}, auditCreatedAt={}",
         execution.requestId(),
+        reusedRequestId,
         execution.accountId(),
         execution.marketplace(),
         audit.getSourceId(),
@@ -117,7 +128,7 @@ public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
     );
 
     return new ExecutionOutcome(
-        execution.requestId(),
+        reusedRequestId,
         execution.accountId(),
         audit.getSourceId(),
         execution.marketplace(),
@@ -136,10 +147,15 @@ public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
   }
 
   private boolean isReusable(EtlExecutionAuditDto audit) {
+    if (audit.getStatus() == null || !REUSABLE_STATUSES.contains(audit.getStatus())) {
+      return false;
+    }
+
     OffsetDateTime createdAt = audit.getCreatedAt();
     if (createdAt == null) {
       return false;
     }
+
     OffsetDateTime threshold = now().minus(DEFAULT_REUSE_TTL);
     return !createdAt.isBefore(threshold);
   }

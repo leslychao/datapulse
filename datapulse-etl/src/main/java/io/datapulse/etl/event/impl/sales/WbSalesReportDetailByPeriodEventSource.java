@@ -19,7 +19,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    event = MarketplaceEvent.SALES_FACT,
+    events = { MarketplaceEvent.SALES_FACT },
     marketplace = MarketplaceType.WILDBERRIES,
     rawTableName = RawTableNames.RAW_WB_SALES_REPORT_DETAIL
 )
