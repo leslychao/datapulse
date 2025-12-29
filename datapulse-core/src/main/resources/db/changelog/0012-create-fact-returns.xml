@@ -24,7 +24,6 @@
         order_id          text,
 
         dim_product_id    bigint      not null,
-        offer_id          text,
 
         warehouse_id      bigint,
         category_id       bigint,
