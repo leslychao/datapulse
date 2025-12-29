@@ -354,6 +354,7 @@ public class EtlOrchestratorFlowConfig {
 
     return new ExecutionAggregationResult(
         sample.requestId(),
+        sample.rawSyncId(),
         sample.accountId(),
         sample.event(),
         sample.dateFrom(),

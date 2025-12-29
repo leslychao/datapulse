@@ -6,6 +6,7 @@ import java.time.LocalDate;
 
 public record ExecutionOutcome(
     String requestId,
+    String rawSyncId,
     long accountId,
     String sourceId,
     MarketplaceType marketplace,

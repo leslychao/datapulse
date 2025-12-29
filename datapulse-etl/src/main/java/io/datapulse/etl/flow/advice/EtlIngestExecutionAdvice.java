@@ -32,6 +32,7 @@ public class EtlIngestExecutionAdvice extends EtlAbstractRequestHandlerAdvice {
 
       return new ExecutionOutcome(
           execution.requestId(),
+          execution.requestId(),
           execution.accountId(),
           execution.sourceId(),
           execution.marketplace(),

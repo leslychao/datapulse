@@ -70,6 +70,7 @@ public class EtlExecutionAuditService
       EtlExecutionAuditDto source
   ) {
     target.setRequestId(source.getRequestId());
+    target.setRawSyncId(source.getRawSyncId());
     target.setAccountId(source.getAccountId());
     target.setEvent(source.getEvent());
     target.setMarketplace(source.getMarketplace());

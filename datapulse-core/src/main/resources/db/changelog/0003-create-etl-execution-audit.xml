@@ -17,6 +17,7 @@
         id            BIGSERIAL PRIMARY KEY,
 
         request_id    VARCHAR(64)  NOT NULL,
+        raw_sync_id   VARCHAR(64)  NOT NULL,
         account_id    BIGINT       NOT NULL,
         event         VARCHAR(64)  NOT NULL,
         marketplace   VARCHAR(32)  NOT NULL,

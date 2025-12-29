@@ -124,6 +124,7 @@ public class EtlAggregationResultFlowConfig {
 
     EtlExecutionAuditDto dto = new EtlExecutionAuditDto();
     dto.setRequestId(aggregation.requestId());
+    dto.setRawSyncId(finalOutcome.rawSyncId());
     dto.setAccountId(aggregation.accountId());
     dto.setEvent(aggregation.event().name());
     dto.setMarketplace(finalOutcome.marketplace());
@@ -159,7 +160,7 @@ public class EtlAggregationResultFlowConfig {
         aggregation.event(),
         aggregation.dateFrom(),
         aggregation.dateTo(),
-        aggregation.requestId()
+        aggregation.rawSyncId()
     );
   }
 }

@@ -108,14 +108,14 @@ public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
     long rowsCount = audit.getRowsCount() != null ? audit.getRowsCount() : 0L;
     IngestStatus status = rowsCount > 0L ? IngestStatus.SUCCESS : IngestStatus.NO_DATA;
 
-    String reusedRequestId = audit.getRequestId();
+    String reusedRequestId = execution.requestId();
 
     log.info(
-        "Raw sync reused from audit: orchestrationRequestId={}, reusedRequestId={}, " +
+        "Raw sync reused from audit: orchestrationRequestId={}, rawSyncId={}, " +
             "accountId={}, marketplace={}, sourceId={}, event={}, " +
             "dateFrom={}, dateTo={}, status={}, rowsCount={}, auditCreatedAt={}",
         execution.requestId(),
-        reusedRequestId,
+        audit.getRawSyncId(),
         execution.accountId(),
         execution.marketplace(),
         audit.getSourceId(),
@@ -129,6 +129,7 @@ public final class RawSyncReusePolicyImpl implements RawSyncReusePolicy {
 
     return new ExecutionOutcome(
         reusedRequestId,
+        audit.getRawSyncId(),
         execution.accountId(),
         audit.getSourceId(),
         execution.marketplace(),

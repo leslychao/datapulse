@@ -6,6 +6,7 @@ import java.util.List;
 
 public record ExecutionAggregationResult(
     String requestId,
+    String rawSyncId,
     long accountId,
     MarketplaceEvent event,
     LocalDate dateFrom,
