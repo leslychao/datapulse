@@ -56,6 +56,7 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
             parent_name,
             node
         ) as (
+            -- корневые категории
             select
                 '%1$s' as source_platform,
                 (payload::jsonb ->> 'description_category_id')::bigint as source_category_id,
@@ -66,10 +67,10 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
             from %2$s
             where account_id = ? and request_id = ?
               and (payload::jsonb ->> 'description_category_id') is not null
-              and coalesce((payload::jsonb ->> 'disabled')::boolean, false) = false
 
             union all
 
+            -- дочерние узлы (берём всех, без фильтра по disabled)
             select
                 '%1$s'                                               as source_platform,
                 (child ->> 'description_category_id')::bigint        as source_category_id,
@@ -82,7 +83,6 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
                      coalesce(parent.node -> 'children', '[]'::jsonb)
                  ) child
                  on (child ->> 'description_category_id') is not null
-                and coalesce((child ->> 'disabled')::boolean, false) = false
         )
         select
             ct.source_platform,
@@ -111,43 +111,97 @@ public class DimCategoryJdbcRepository implements DimCategoryRepository {
     String selectQuery = """
         with parent_latest as (
             select distinct on ((p.payload::jsonb ->> 'id')::bigint)
-                '%1$s'                                       as source_platform,
-                (p.payload::jsonb ->> 'id')::bigint          as source_category_id,
-                p.payload::jsonb ->> 'name'                  as category_name,
-                null::bigint                                 as parent_id,
-                null::text                                   as parent_name,
-                p.created_at                                 as created_at
+                '%1$s'                              as source_platform,
+                (p.payload::jsonb ->> 'id')::bigint as source_category_id,
+                p.payload::jsonb ->> 'name'         as category_name,
+                null::bigint                        as parent_id,
+                null::text                          as parent_name,
+                p.created_at                        as created_at
             from %2$s p
             where p.account_id = ?
               and p.request_id = ?
               and (p.payload::jsonb ->> 'id') is not null
-              and coalesce((p.payload::jsonb ->> 'isVisible')::boolean, true) = true
             order by
                 (p.payload::jsonb ->> 'id')::bigint,
                 p.created_at desc
+        ),
+        parent_enriched as (
+            select
+                pl.source_platform,
+                pl.source_category_id,
+                pl.category_name,
+                pl.parent_id,
+                pl.parent_name,
+                not exists (
+                    select 1
+                    from %3$s s
+                    where s.account_id = ?
+                      and s.request_id = ?
+                      and (s.payload::jsonb ->> 'parentID')::bigint = pl.source_category_id
+                      and nullif(s.payload::jsonb ->> 'subjectID','') is not null
+                ) as is_leaf,
+                pl.created_at
+            from parent_latest pl
+        ),
+        subjects_latest as (
+            select distinct on ((s.payload::jsonb ->> 'subjectID')::bigint)
+                '%1$s'                                        as source_platform,
+                (s.payload::jsonb ->> 'subjectID')::bigint    as source_category_id,
+                s.payload::jsonb ->> 'subjectName'            as category_name,
+                (s.payload::jsonb ->> 'parentID')::bigint     as parent_id,
+                cp.payload::jsonb ->> 'name'                  as parent_name,
+                true                                          as is_leaf,
+                s.created_at                                  as created_at
+            from %3$s s
+            left join %2$s cp
+              on cp.account_id = s.account_id
+             and cp.request_id = s.request_id
+             and (cp.payload::jsonb ->> 'id')::bigint =
+                 (s.payload::jsonb ->> 'parentID')::bigint
+            where s.account_id = ?
+              and s.request_id = ?
+              and nullif(s.payload::jsonb ->> 'subjectID','') is not null
+            order by
+                (s.payload::jsonb ->> 'subjectID')::bigint,
+                s.created_at desc
         )
         select
-            pl.source_platform,
-            pl.source_category_id,
-            pl.category_name,
-            pl.parent_id,
-            pl.parent_name,
-            not exists (
-                select 1
-                from %3$s s
-                where s.account_id = ?
-                  and s.request_id = ?
-                  and (s.payload::jsonb ->> 'parentID')::bigint = pl.source_category_id
-                  and (s.payload::jsonb ->> 'subjectID') is not null
-            ) as is_leaf
-        from parent_latest pl
+            source_platform,
+            source_category_id,
+            category_name,
+            parent_id,
+            parent_name,
+            is_leaf
+        from (
+            select
+                source_platform,
+                source_category_id,
+                category_name,
+                parent_id,
+                parent_name,
+                is_leaf
+            from parent_enriched
+            union all
+            select
+                source_platform,
+                source_category_id,
+                category_name,
+                parent_id,
+                parent_name,
+                is_leaf
+            from subjects_latest
+        ) all_categories
         """.formatted(
         platform,
         RawTableNames.RAW_WB_CATEGORIES_PARENT,
         RawTableNames.RAW_WB_SUBJECTS
     );
 
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId, accountId,
-        requestId);
+    jdbcTemplate.update(
+        UPSERT_TEMPLATE.formatted(selectQuery),
+        accountId, requestId,
+        accountId, requestId,
+        accountId, requestId
+    );
   }
 }
