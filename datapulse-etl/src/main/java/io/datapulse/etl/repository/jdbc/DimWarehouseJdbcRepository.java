@@ -115,11 +115,12 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
       where t.account_id = ? and t.request_id = ?
       """;
 
+  // Минимальный патч: используем officeId как внешний ключ склада WB
   private static final String WB_SELLER_SELECT = """
       select
           t.account_id as account_id,
           'WILDBERRIES'::text as source_platform,
-          (t.payload::jsonb ->> 'id')::text as external_warehouse_id,
+          (t.payload::jsonb ->> 'officeId')::text as external_warehouse_id,
           (t.payload::jsonb ->> 'name')::text as warehouse_name,
           'FBS' as fulfillment_model,
           not coalesce((t.payload::jsonb ->> 'isDeleting')::boolean, false) as is_active,
@@ -169,14 +170,18 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
     String union = String.join("\nunion all\n", selects);
     String sql = UPSERT_TEMPLATE.formatted(union);
 
-    jdbcTemplate.update(sql,
-        preparedStatement -> bind(preparedStatement, selects.size(), accountId, requestId));
+    jdbcTemplate.update(
+        sql,
+        preparedStatement -> bind(preparedStatement, selects.size(), accountId, requestId)
+    );
   }
 
-  private void bind(PreparedStatement preparedStatement, int selectCount, Long accountId,
-      String requestId)
-      throws SQLException {
-
+  private void bind(
+      PreparedStatement preparedStatement,
+      int selectCount,
+      Long accountId,
+      String requestId
+  ) throws SQLException {
     int index = 1;
     for (int i = 0; i < selectCount; i++) {
       preparedStatement.setLong(index++, accountId);
