@@ -151,7 +151,10 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlRawSyncOrReuseFlow(Advice etlIngestExecutionAdvice) {
+  public IntegrationFlow etlRawSyncOrReuseFlow(
+      Advice etlIngestExecutionAdvice,
+      Advice etlEventDependencyAdvice
+  ) {
     return IntegrationFlow
         .from(CH_ETL_RAW_SYNC_OR_REUSE)
         .route(
@@ -165,7 +168,7 @@ public class EtlOrchestratorFlowConfig {
                         gateway -> gateway
                             .requestTimeout(0L)
                             .replyTimeout(0L)
-                            .advice(etlIngestExecutionAdvice)
+                            .advice(etlIngestExecutionAdvice, etlEventDependencyAdvice)
                     )
                 )
                 .subFlowMapping(

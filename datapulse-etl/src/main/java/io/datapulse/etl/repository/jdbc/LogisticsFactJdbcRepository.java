@@ -13,18 +13,6 @@ import org.springframework.stereotype.Repository;
 public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
 
   private static final String UPSERT_TEMPLATE = """
-      with source as (
-          %s
-      ),
-      deleted as (
-          delete from fact_logistics_costs f
-          using source s
-          where f.account_id      = s.account_id
-            and f.source_platform = s.source_platform
-            and f.operation_date  = s.operation_date
-            and f.logistics_type  = s.logistics_type
-            and f.warehouse_id is not distinct from s.warehouse_id
-      )
       insert into fact_logistics_costs (
           account_id,
           source_platform,
@@ -48,7 +36,16 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
           currency,
           now(),
           now()
-      from source;
+      from (
+          %s
+      ) as source
+      on conflict (account_id, source_platform, operation_date, warehouse_id, logistics_type)
+      do update
+      set
+          order_id   = excluded.order_id,
+          amount     = excluded.amount,
+          currency   = excluded.currency,
+          updated_at = now();
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -83,54 +80,30 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                 select
                     r.account_id                                       as account_id,
                     '%1$s'                                             as source_platform,
-
-                    -- жёсткий ключ заказа/цепочки WB: только srid
                     nullif(r.payload::jsonb ->> 'srid','')            as order_id,
-
                     (r.payload::jsonb ->> 'rr_dt')::date              as operation_date,
-
                     w.id                                              as warehouse_id,
-
                     l.logistics_type                                  as logistics_type,
                     l.amount                                          as amount,
-
                     coalesce(
                         nullif(r.payload::jsonb ->> 'currency_name',''),
                         'RUB'
                     )                                                 as currency
                 from %2$s r
-
                 left join dim_warehouse w
                   on w.account_id = r.account_id
                  and lower(w.source_platform) = lower('%1$s')
                  and w.external_warehouse_id =
                      nullif(r.payload::jsonb ->> 'ppvz_office_id','')
-
                 join lateral (
                     values
-                      (
-                        'DELIVERY_TO_CUSTOMER',
-                        nullif(r.payload::jsonb ->> 'delivery_amount','')::numeric
-                      ),
-                      (
-                        'RETURN_FROM_CUSTOMER',
-                        nullif(r.payload::jsonb ->> 'return_amount','')::numeric
-                      ),
-                      (
-                        'INBOUND',
-                        nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric
-                      ),
-                      (
-                        'STORAGE',
-                        nullif(r.payload::jsonb ->> 'storage_fee','')::numeric
-                      ),
-                      (
-                        'INBOUND',
-                        nullif(r.payload::jsonb ->> 'acceptance','')::numeric
-                      )
+                      ('DELIVERY_TO_CUSTOMER', nullif(r.payload::jsonb ->> 'delivery_amount','')::numeric),
+                      ('RETURN_FROM_CUSTOMER', nullif(r.payload::jsonb ->> 'return_amount','')::numeric),
+                      ('INBOUND', nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric),
+                      ('STORAGE', nullif(r.payload::jsonb ->> 'storage_fee','')::numeric),
+                      ('INBOUND', nullif(r.payload::jsonb ->> 'acceptance','')::numeric)
                 ) as l(logistics_type, amount)
                   on l.amount is not null and l.amount <> 0
-
                 where r.account_id = ?
                   and r.request_id = ?
                   and nullif(r.payload::jsonb ->> 'rr_dt','') is not null
@@ -178,18 +151,10 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                 select
                     r.account_id                                     as account_id,
                     '%1$s'                                           as source_platform,
-
-                    -- жёсткий ключ отгрузки Ozon: только posting.posting_number
-                    nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
-                                                                    as order_id,
-
-                    (r.payload::jsonb ->> 'operation_date')::timestamptz::date
-                                                                    as operation_date,
-
+                    nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') as order_id,
+                    (r.payload::jsonb ->> 'operation_date')::timestamptz::date    as operation_date,
                     w.id                                            as warehouse_id,
-
                     case
-                      -- доставка к покупателю (стоимость доставки заказа)
                       when ot in (
                           'OperationAgentDeliveredToCustomer',
                           'OperationAgentDeliveredToCustomerCanceled',
@@ -198,68 +163,49 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                           'MarketplaceServiceItemDirectFlowLogisticVDC',
                           'MarketplaceServiceItemDeliveryKGT'
                       ) then 'DELIVERY_TO_CUSTOMER'
-
-                      -- обратная логистика (возврат/невыкуп)
                       when ot in (
                           'OperationReturnGoodsFBSofRMS',
                           'OperationItemReturn',
                           'MarketplaceServiceItemReturnFlowLogistic'
                       ) then 'RETURN_FROM_CUSTOMER'
-
-                      -- входящая логистика (на склад / кросс-докинг / dropoff)
                       when ot in (
                           'OperationMarketplaceCrossDockServiceWriteOff',
                           'MarketplaceServiceItemRedistributionReturnsPVZ',
                           'MarketplaceServiceItemDropoffPPZ'
                       ) then 'INBOUND'
-
-                      -- хранение
                       when ot in (
                           'OperationMarketplaceServiceStorage',
                           'MarketplaceReturnStorageServiceAtThePickupPointFbsItem',
                           'MarketplaceReturnStorageServiceInTheWarehouseFbsItem'
                       ) then 'STORAGE'
-
                       else null
                     end                                              as logistics_type,
-
-                    -- сырое движение по расчётам
-                    nullif(r.payload::jsonb ->> 'amount','')::numeric
-                                                                    as raw_amount,
-
-                    -- нормализованный расход на логистику: только минусы, по модулю
                     case
                       when nullif(r.payload::jsonb ->> 'amount','')::numeric < 0
                         then - nullif(r.payload::jsonb ->> 'amount','')::numeric
                       else null
                     end                                              as amount,
-
                     coalesce(
                         nullif(r.payload::jsonb ->> 'currency_code',''),
                         'RUB'
-                    )                                               as currency,
-
-                    r.created_at                                    as created_at
+                    )                                               as currency
                 from %2$s r
-
                 left join dim_warehouse w
                   on w.account_id = r.account_id
                  and lower(w.source_platform) = lower('%1$s')
                  and w.external_warehouse_id =
                      nullif(r.payload::jsonb -> 'posting' ->> 'warehouse_id','')
-
                 cross join lateral (
                    values (r.payload::jsonb ->> 'operation_type')
                 ) ot(ot)
-
                 where r.account_id = ?
                   and r.request_id = ?
                   and nullif(r.payload::jsonb ->> 'operation_date','') is not null
                   and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') is not null
                   and nullif(r.payload::jsonb ->> 'amount','')         is not null
               ) s
-            where s.logistics_type is not null     -- только логистические операции
-              and s.amount is not null             -- только реальные расходы (amount < 0 в RAW)
+            where s.logistics_type is not null
+              and s.amount is not null
             group by
                 s.account_id,
                 s.source_platform,

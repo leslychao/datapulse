@@ -3,11 +3,12 @@ package io.datapulse.core.service;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.EtlExecutionAuditRepository;
-import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,7 +55,7 @@ public class EtlExecutionAuditService
 
   @Override
   protected EtlExecutionAuditEntity beforeSave(EtlExecutionAuditEntity entity) {
-    OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
+    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
     entity.setCreatedAt(now);
     return entity;
   }
@@ -99,5 +100,19 @@ public class EtlExecutionAuditService
             dateTo
         )
         .map(entity -> mapperFacade.to(entity, EtlExecutionAuditDto.class));
+  }
+
+  public boolean existsExecutionForSources(
+      long accountId,
+      MarketplaceType marketplace,
+      String eventKey,
+      List<String> sourceIds
+  ) {
+    return repository.existsExecutionForSources(
+        accountId,
+        marketplace,
+        eventKey,
+        sourceIds
+    );
   }
 }

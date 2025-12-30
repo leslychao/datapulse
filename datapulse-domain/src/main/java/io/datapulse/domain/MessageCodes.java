@@ -86,6 +86,7 @@ public final class MessageCodes {
   public static final String ETL_EVENT_UNKNOWN = "etl.event.unknown";
   public static final String ETL_EVENT_SOURCES_MISSING = "etl.event.sources.missing";
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
+  public static final String ETL_EVENT_DEPENDENCY_NOT_SATISFIED = "etl.event.dependency.not-satisfied";
 
   // ===== ETL / Ingest / Snapshot =====
   public static final String ETL_INGEST_SNAPSHOT_REQUIRED = "etl.ingest.snapshot.required";

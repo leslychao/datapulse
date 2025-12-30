@@ -13,18 +13,6 @@ import org.springframework.stereotype.Repository;
 public class CommissionFactJdbcRepository implements CommissionFactRepository {
 
   private static final String UPSERT_TEMPLATE = """
-      with source as (
-          %s
-      ),
-      deleted as (
-          delete from fact_commission f
-          using source s
-          where f.account_id      = s.account_id
-            and f.source_platform = s.source_platform
-            and f.operation_date  = s.operation_date
-            and f.order_id is not distinct from s.order_id
-            and f.commission_type = s.commission_type
-      )
       insert into fact_commission (
           account_id,
           source_platform,
@@ -46,7 +34,15 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           currency,
           now(),
           now()
-      from source;
+      from (
+          %s
+      ) as source
+      on conflict (account_id, source_platform, operation_date, order_id, commission_type)
+      do update
+      set
+          amount     = excluded.amount,
+          currency   = excluded.currency,
+          updated_at = now();
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -70,18 +66,13 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             select
                 r.account_id                                   as account_id,
                 '%1$s'                                         as source_platform,
-
                 nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
                                                              as order_id,
-
                 (r.payload::jsonb ->> 'operation_date')::timestamptz::date
                                                              as operation_date,
-
                 nullif(r.payload::jsonb ->> 'type','')        as commission_type,
-
                 nullif(r.payload::jsonb ->> 'sale_commission','')::numeric
                                                              as amount_signed,
-
                 coalesce(
                     nullif(r.payload::jsonb ->> 'currency_code',''),
                     'RUB'
@@ -120,31 +111,25 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             order_id,
             operation_date,
             commission_type,
-            sum(amount) as amount,
-            max(currency) as currency
+            sum(amount)     as amount,
+            max(currency)   as currency
         from (
             select
                 r.account_id                              as account_id,
                 '%1$s'                                    as source_platform,
-
                 nullif(r.payload::jsonb ->> 'srid','')   as order_id,
-
                 (r.payload::jsonb ->> 'rr_dt')::date     as operation_date,
-
                 'SALES_COMMISSION'                       as commission_type,
-
                 abs(
                     nullif(
                         r.payload::jsonb ->> 'ppvz_sales_commission',
                         ''
                     )::numeric
                 )                                        as amount,
-
                 coalesce(
                     nullif(r.payload::jsonb ->> 'currency_name',''),
                     'RUB'
                 )                                        as currency
-
             from %2$s r
             where r.account_id = ?
               and r.request_id = ?
