@@ -1,6 +1,6 @@
 package io.datapulse.etl.flow.core;
 
-import io.datapulse.core.service.AccountService;
+import io.datapulse.core.service.account.AccountService;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlRunRequest;

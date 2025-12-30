@@ -1,10 +1,11 @@
-package io.datapulse.core.service;
+package io.datapulse.core.service.account;
 
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
+import io.datapulse.core.service.AbstractIngestApiService;
 import io.datapulse.core.service.vault.MarketplaceCredentialsVaultService;
 import io.datapulse.core.tx.TransactionCallbacks;
 import io.datapulse.domain.CommonConstants;

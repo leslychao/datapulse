@@ -17,7 +17,7 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_EXECUTIONS;
 
-import io.datapulse.core.service.AccountConnectionService;
+import io.datapulse.core.service.account.AccountConnectionService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;

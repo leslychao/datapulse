@@ -1,7 +1,7 @@
 package io.datapulse.core.config;
 
-import io.datapulse.core.service.AccountConnectionService;
-import io.datapulse.core.service.AccountService;
+import io.datapulse.core.service.account.AccountConnectionService;
+import io.datapulse.core.service.account.AccountService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountDto;

@@ -1,6 +1,6 @@
 package io.datapulse.rest;
 
-import io.datapulse.core.service.AccountConnectionService;
+import io.datapulse.core.service.account.AccountConnectionService;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;

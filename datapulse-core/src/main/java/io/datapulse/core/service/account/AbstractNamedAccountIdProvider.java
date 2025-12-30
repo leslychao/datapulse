@@ -1,6 +1,5 @@
 package io.datapulse.core.service.account;
 
-import io.datapulse.core.service.AccountService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.LongBaseDto;
 import io.datapulse.domain.exception.AppException;
