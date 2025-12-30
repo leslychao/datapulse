@@ -36,6 +36,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <caffeine.version>3.1.8</caffeine.version>
     <spring-vault.version>3.1.2</spring-vault.version>
+    <poi.version>5.3.0</poi.version>
   </properties>
 
   <dependencyManagement>
@@ -52,7 +53,6 @@
         <artifactId>datapulse-domain</artifactId>
         <version>${project.version}</version>
       </dependency>
-
       <dependency>
         <groupId>com.github.ben-manes.caffeine</groupId>
         <artifactId>caffeine</artifactId>
@@ -98,6 +98,11 @@
         <groupId>org.springframework.vault</groupId>
         <artifactId>spring-vault-core</artifactId>
         <version>${spring-vault.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-ooxml</artifactId>
+        <version>${poi.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

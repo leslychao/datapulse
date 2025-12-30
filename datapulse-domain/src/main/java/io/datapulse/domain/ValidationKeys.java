@@ -55,4 +55,7 @@ public final class ValidationKeys {
   // ===== ETL / Events =====
   public static final String ETL_EVENT_REQUIRED = "{" + MessageCodes.ETL_EVENT_REQUIRED + "}";
   public static final String ETL_EVENT_SOURCES_MISSING = "{" + MessageCodes.ETL_EVENT_SOURCES_MISSING + "}";
+
+  // ===== Product / Product cost =====
+  public static final String PRODUCT_ID_REQUIRED = "{" + MessageCodes.PRODUCT_ID_REQUIRED + "}";
 }

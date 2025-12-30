@@ -6,14 +6,17 @@ import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.entity.inventory.FactInventorySnapshotEntity;
+import io.datapulse.core.entity.productcost.ProductCostEntity;
 import io.datapulse.core.mapper.AccountConnectionMapper;
 import io.datapulse.core.mapper.AccountMapper;
 import io.datapulse.core.mapper.EtlExecutionAuditMapper;
 import io.datapulse.core.mapper.inventory.InventorySnapshotMapper;
+import io.datapulse.core.mapper.productcost.ProductCostMapper;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.domain.dto.inventory.InventorySnapshotDto;
+import io.datapulse.domain.dto.productcost.ProductCostDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
@@ -42,12 +45,12 @@ public final class DatapulseGenericConverter implements GenericConverter {
   private final AccountConnectionMapper accountConnectionMapper;
   private final EtlExecutionAuditMapper etlSyncAuditMapper;
   private final InventorySnapshotMapper inventorySnapshotMapper;
+  private final ProductCostMapper productCostMapper;
 
   private final Map<ConvertiblePair, Function<Object, Object>> converters = new LinkedHashMap<>();
 
   @PostConstruct
   void init() {
-    // ===== REQUEST → DTO
     converters.put(
         new ConvertiblePair(AccountCreateRequest.class, AccountDto.class),
         src -> accountMapper.toDto((AccountCreateRequest) src)
@@ -68,13 +71,11 @@ public final class DatapulseGenericConverter implements GenericConverter {
         src -> accountConnectionMapper.toDto((AccountConnectionUpdateRequest) src)
     );
 
-    // === INVENTORY: REQUEST → DTO (фильтр)
     converters.put(
         new ConvertiblePair(InventorySnapshotQueryRequest.class, InventorySnapshotDto.class),
         src -> inventorySnapshotMapper.toDto((InventorySnapshotQueryRequest) src)
     );
 
-    // ===== DTO ↔ ENTITY
     converters.put(
         new ConvertiblePair(AccountDto.class, AccountEntity.class),
         src -> accountMapper.toEntity((AccountDto) src)
@@ -102,13 +103,11 @@ public final class DatapulseGenericConverter implements GenericConverter {
         src -> etlSyncAuditMapper.toDto((EtlExecutionAuditEntity) src)
     );
 
-    // === INVENTORY: ENTITY → DTO
     converters.put(
         new ConvertiblePair(FactInventorySnapshotEntity.class, InventorySnapshotDto.class),
         src -> inventorySnapshotMapper.toDto((FactInventorySnapshotEntity) src)
     );
 
-    // ===== DTO → RESPONSE
     converters.put(
         new ConvertiblePair(AccountDto.class, AccountResponse.class),
         src -> accountMapper.toResponse((AccountDto) src)
@@ -119,10 +118,18 @@ public final class DatapulseGenericConverter implements GenericConverter {
         src -> accountConnectionMapper.toResponse((AccountConnectionDto) src)
     );
 
-    // === INVENTORY: DTO → RESPONSE
     converters.put(
         new ConvertiblePair(InventorySnapshotDto.class, InventorySnapshotResponse.class),
         src -> inventorySnapshotMapper.toResponse((InventorySnapshotDto) src)
+    );
+
+    converters.put(
+        new ConvertiblePair(ProductCostDto.class, ProductCostEntity.class),
+        src -> productCostMapper.toEntity((ProductCostDto) src)
+    );
+    converters.put(
+        new ConvertiblePair(ProductCostEntity.class, ProductCostDto.class),
+        src -> productCostMapper.toDto((ProductCostEntity) src)
     );
   }
 

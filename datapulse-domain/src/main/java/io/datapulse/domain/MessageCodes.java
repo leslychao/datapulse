@@ -102,4 +102,18 @@ public final class MessageCodes {
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";
   public static final String RAW_TABLE_INIT_FAILED = "raw.table.init.failed";
+
+  // ===== Product / Product cost =====
+  public static final String PRODUCT_ID_REQUIRED = "product.id.required";
+  public static final String PRODUCT_COST_VALUE_REQUIRED = "product.cost.value.required";
+  public static final String PRODUCT_COST_VALID_FROM_REQUIRED = "product.cost.valid-from.required";
+  public static final String PRODUCT_COST_ACCOUNT_IMMUTABLE = "product.cost.account.immutable";
+  public static final String PRODUCT_COST_PRODUCT_IMMUTABLE = "product.cost.product.immutable";
+
+  public static final String PRODUCT_COST_EXCEL_READ_FAILED = "product.cost.excel.read.failed";
+  public static final String PRODUCT_COST_PRODUCT_BY_SOURCE_ID_NOT_FOUND = "product-cost.product-by-source-id.not-found";
+  public static final String PRODUCT_COST_EXCEL_FIELD_EMPTY = "product.cost.excel.field.empty";
+  public static final String PRODUCT_COST_EXCEL_FIELD_NOT_INTEGER = "product.cost.excel.field.not-integer";
+  public static final String PRODUCT_COST_EXCEL_FIELD_NOT_NUMBER = "product.cost.excel.field.not-number";
+  public static final String PRODUCT_COST_EXCEL_FIELD_NOT_DATE = "product.cost.excel.field.not-date";
 }
