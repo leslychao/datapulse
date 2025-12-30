@@ -18,7 +18,6 @@ import lombok.Setter;
 public class EtlExecutionAuditEntity extends LongBaseEntity {
 
   private String requestId;
-  private String rawSyncId;
   private Long accountId;
   private String event;
 

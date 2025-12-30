@@ -86,7 +86,6 @@ public final class MessageCodes {
   public static final String ETL_EVENT_UNKNOWN = "etl.event.unknown";
   public static final String ETL_EVENT_SOURCES_MISSING = "etl.event.sources.missing";
   public static final String ETL_REQUEST_INVALID = "etl.request.invalid";
-  public static final String ETL_EVENT_DEPENDENCY_NOT_SATISFIED = "etl.event.dependency.not-satisfied";
 
   // ===== ETL / Ingest / Snapshot =====
   public static final String ETL_INGEST_SNAPSHOT_REQUIRED = "etl.ingest.snapshot.required";
@@ -94,10 +93,6 @@ public final class MessageCodes {
   public static final String ETL_INGEST_SNAPSHOT_ELEMENT_TYPE_REQUIRED = "etl.ingest.snapshot.element-type.required";
   public static final String ETL_INGEST_JSON_LAYOUT_NOT_FOUND = "etl.ingest.json-layout.not-found";
   public static final String ETL_AGGREGATION_EMPTY_GROUP = "etl.aggregation.empty-group";
-
-  // ===== ETL / RAW reuse =====
-  public static final String ETL_RAW_SYNC_REUSE_ENTRY_NOT_FOUND =
-      "etl.raw-sync.reuse.entry.not-found";
 
   // ===== RAW / Schema =====
   public static final String RAW_TABLE_UNSUPPORTED = "raw.table.unsupported";

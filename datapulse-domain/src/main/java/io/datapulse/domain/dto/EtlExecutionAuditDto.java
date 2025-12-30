@@ -12,7 +12,6 @@ import lombok.EqualsAndHashCode;
 public class EtlExecutionAuditDto extends LongBaseDto {
 
   private String requestId;
-  private String rawSyncId;
   private Long accountId;
   private String event;
   private MarketplaceType marketplace;
