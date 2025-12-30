@@ -1,6 +1,7 @@
 package io.datapulse.etl.event.impl.common;
 
 import static io.datapulse.etl.MarketplaceEvent.FACT_COMMISSION;
+import static io.datapulse.etl.MarketplaceEvent.FACT_FINANCE;
 import static io.datapulse.etl.MarketplaceEvent.FACT_LOGISTICS_COSTS;
 
 import io.datapulse.domain.MarketplaceType;
@@ -22,7 +23,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = {MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS, FACT_COMMISSION},
+    events = {MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS, FACT_COMMISSION, FACT_FINANCE},
     marketplace = MarketplaceType.WILDBERRIES,
     rawTableName = RawTableNames.RAW_WB_SALES_REPORT_DETAIL
 )

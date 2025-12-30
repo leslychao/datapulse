@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- =============================================================== -->
+  <!-- FACT FINANCE — нормализованный факт, 1:1 к fact_sales          -->
+  <!-- grain хранится в fact_sales, здесь только деньги / признаки    -->
+  <!-- =============================================================== -->
+
+  <changeSet id="0016-create-fact-finance" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      create table if not exists fact_finance
+      (
+        id                   bigserial primary key,
+
+        fact_sales_id        bigint         not null,
+
+        revenue_gross_amount numeric(18, 2) not null,
+        revenue_net_amount   numeric(18, 2) not null,
+        currency             text           not null,
+
+        is_refund            boolean        not null default false,
+
+        created_at           timestamptz    not null default now(),
+        updated_at           timestamptz    not null default now(),
+
+        constraint uq_fact_finance_sales
+          unique (fact_sales_id),
+
+        constraint fk_fact_finance_fact_sales
+          foreign key (fact_sales_id) references fact_sales (id)
+      );
+
+      create index if not exists idx_fact_finance_sales
+        on fact_finance (fact_sales_id);
+    </sql>
+
+    <rollback>
+      drop table if exists fact_finance cascade;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

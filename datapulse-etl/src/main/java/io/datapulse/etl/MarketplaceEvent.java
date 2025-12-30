@@ -19,6 +19,7 @@ public enum MarketplaceEvent {
   SUPPLY_ACCEPTED_FACT,
   INVENTORY_FACT,
   FACT_LOGISTICS_COSTS,
+  FACT_FINANCE,
   FACT_COMMISSION;
 
   public String tag() {
@@ -41,6 +42,7 @@ public enum MarketplaceEvent {
       case WAREHOUSE_DICT, CATEGORY_DICT, TARIFF_DICT, PRODUCT_DICT -> Collections.emptySet();
 
       case SALES_FACT,
+          FACT_FINANCE,
           SHIPMENT_FACT,
           SUPPLY_ACCEPTED_FACT,
           INVENTORY_FACT,
