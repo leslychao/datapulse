@@ -3,12 +3,9 @@ package io.datapulse.core.service;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.EtlExecutionAuditRepository;
-import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -81,23 +78,4 @@ public class EtlExecutionAuditService
     target.setErrorMessage(source.getErrorMessage());
     return target;
   }
-
-  public Optional<EtlExecutionAuditDto> findLatestSync(
-      long accountId,
-      MarketplaceType marketplace,
-      String sourceId,
-      LocalDate dateFrom,
-      LocalDate dateTo
-  ) {
-    return repository
-        .findTopByAccountIdAndMarketplaceAndSourceIdAndDateFromAndDateToOrderByCreatedAtDesc(
-            accountId,
-            marketplace,
-            sourceId,
-            dateFrom,
-            dateTo
-        )
-        .map(entity -> mapperFacade.to(entity, EtlExecutionAuditDto.class));
-  }
-
 }
