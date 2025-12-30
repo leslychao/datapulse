@@ -19,7 +19,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = { MarketplaceEvent.SALES_FACT },
+    events = {MarketplaceEvent.SALES_FACT},
     marketplace = MarketplaceType.OZON,
     rawTableName = RawTableNames.RAW_OZON_POSTINGS_FBO
 )

@@ -29,9 +29,6 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
     log.info("Sales fact materialization started: requestId={}, accountId={}", requestId,
         accountId);
 
-    dimProductRepository.upsertOzon(accountId, requestId);
-    dimProductRepository.upsertWildberries(accountId, requestId);
-
     dimProductRepository.upsertOzonFromPostingsFbs(accountId, requestId);
     dimProductRepository.upsertOzonFromPostingsFbo(accountId, requestId);
     dimProductRepository.upsertWildberriesFromSales(accountId, requestId);

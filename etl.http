@@ -36,18 +36,18 @@ Content-Type: application/json
   });
 %}
 
-### Run ETL — COMMISSION_DICT
+### Run ETL — TARIFF_DICT
 POST {{host}}/api/etl/run
 Content-Type: application/json
 
 {
   "accountId": 1,
-  "event": "COMMISSION_DICT",
+  "event": "TARIFF_DICT",
   "burst": 1
 }
 
 > {%
-  client.test("ETL COMMISSION_DICT — run", function () {
+  client.test("ETL TARIFF_DICT — run", function () {
     client.assert(
         response.status === 200 || response.status === 202,
         "expected 200 or 202, got " + response.status
@@ -127,6 +127,26 @@ Content-Type: application/json
 
 > {%
   client.test("ETL SALES_FACT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — FACT_COMMISSION
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "FACT_COMMISSION",
+  "burst": 1,
+  "dateMode": "LAST_DAYS"
+}
+
+> {%
+  client.test("ETL FACT_COMMISSION — run", function () {
     client.assert(
         response.status === 200 || response.status === 202,
         "expected 200 or 202, got " + response.status

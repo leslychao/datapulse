@@ -18,7 +18,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = { MarketplaceEvent.COMMISSION_DICT },
+    events = {MarketplaceEvent.TARIFF_DICT},
     marketplace = MarketplaceType.WILDBERRIES,
     rawTableName = RawTableNames.RAW_WB_TARIFFS_COMMISSION
 )

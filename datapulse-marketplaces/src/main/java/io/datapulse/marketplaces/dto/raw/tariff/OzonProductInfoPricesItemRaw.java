@@ -9,6 +9,10 @@ import lombok.Data;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class OzonProductInfoPricesItemRaw {
 
+  @SerializedName("acquiring")
+  @JsonProperty("acquiring")
+  private Double acquiring;
+
   @SerializedName("product_id")
   @JsonProperty("product_id")
   private Long productId;
@@ -28,10 +32,6 @@ public class OzonProductInfoPricesItemRaw {
   @SerializedName("commissions")
   @JsonProperty("commissions")
   private CommissionsRaw commissions;
-
-  // -------------------------------------------------------------------------
-  // Nested DTOs
-  // -------------------------------------------------------------------------
 
   @Data
   @JsonInclude(JsonInclude.Include.NON_NULL)
