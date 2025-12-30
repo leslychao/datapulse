@@ -55,7 +55,7 @@ public final class IngestItemIterator implements CloseableIterator<IngestItem<?>
     try {
       delegate.close();
     } finally {
-      log.debug("Snapshot file retained for reuse: {}", context.snapshotFile());
+      log.debug("Snapshot file retained: {}", context.snapshotFile());
     }
   }
 }

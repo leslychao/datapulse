@@ -12,7 +12,6 @@ import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_E
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_INGEST;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_PREPARE_RAW_SCHEMA;
-import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RAW_SYNC_OR_REUSE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_EXECUTIONS;
@@ -31,7 +30,6 @@ import io.datapulse.etl.dto.OrchestrationCommand;
 import io.datapulse.etl.dto.OrchestrationPlan;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
-import io.datapulse.etl.sync.RawSyncReusePolicy;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -69,7 +67,6 @@ public class EtlOrchestratorFlowConfig {
   private final AccountConnectionService accountConnectionService;
   private final EtlSourceRegistry etlSourceRegistry;
   private final EtlOrchestrationCommandFactory etlOrchestrationCommandFactory;
-  private final RawSyncReusePolicy rawSyncReusePolicy;
 
   @Bean(name = CH_ETL_PREPARE_RAW_SCHEMA)
   public MessageChannel etlPrepareRawSchemaChannel() {
@@ -78,11 +75,6 @@ public class EtlOrchestratorFlowConfig {
 
   @Bean(name = CH_ETL_RUN_CORE)
   public MessageChannel etlRunCoreChannel() {
-    return new DirectChannel();
-  }
-
-  @Bean(name = CH_ETL_RAW_SYNC_OR_REUSE)
-  public MessageChannel etlRawSyncOrReuseChannel() {
     return new DirectChannel();
   }
 
@@ -151,39 +143,10 @@ public class EtlOrchestratorFlowConfig {
   }
 
   @Bean
-  public IntegrationFlow etlRawSyncOrReuseFlow(
-      Advice etlIngestExecutionAdvice,
-      Advice etlEventDependencyAdvice
+  public IntegrationFlow etlRunCoreFlow(
+      TaskExecutor etlOrchestrateExecutor,
+      Advice etlIngestExecutionAdvice
   ) {
-    return IntegrationFlow
-        .from(CH_ETL_RAW_SYNC_OR_REUSE)
-        .route(
-            EtlSourceExecution.class,
-            rawSyncReusePolicy::requiresSync,
-            mapping -> mapping
-                .subFlowMapping(
-                    Boolean.TRUE,
-                    subflow -> subflow.gateway(
-                        CH_ETL_INGEST,
-                        gateway -> gateway
-                            .requestTimeout(0L)
-                            .replyTimeout(0L)
-                            .advice(etlIngestExecutionAdvice, etlEventDependencyAdvice)
-                    )
-                )
-                .subFlowMapping(
-                    Boolean.FALSE,
-                    subflow -> subflow.transform(
-                        EtlSourceExecution.class,
-                        rawSyncReusePolicy::reuseFromAudit
-                    )
-                )
-        )
-        .get();
-  }
-
-  @Bean
-  public IntegrationFlow etlRunCoreFlow(TaskExecutor etlOrchestrateExecutor) {
     return IntegrationFlow
         .from(CH_ETL_RUN_CORE)
         .transform(OrchestrationCommand.class, this::buildOrchestrationPlan)
@@ -196,7 +159,13 @@ public class EtlOrchestratorFlowConfig {
         .channel(channel -> channel.executor(etlOrchestrateExecutor))
         .transform(MarketplacePlan.class, MarketplacePlan::executions)
         .split()
-        .gateway(CH_ETL_RAW_SYNC_OR_REUSE)
+        .gateway(
+            CH_ETL_INGEST,
+            gateway -> gateway
+                .requestTimeout(0L)
+                .replyTimeout(0L)
+                .advice(etlIngestExecutionAdvice)
+        )
         .wireTap(flow -> flow
             .filter(
                 ExecutionOutcome.class,
@@ -357,7 +326,6 @@ public class EtlOrchestratorFlowConfig {
 
     return new ExecutionAggregationResult(
         sample.requestId(),
-        sample.rawSyncId(),
         sample.accountId(),
         sample.event(),
         sample.dateFrom(),

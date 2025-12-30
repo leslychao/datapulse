@@ -8,7 +8,6 @@ import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -71,7 +70,6 @@ public class EtlExecutionAuditService
       EtlExecutionAuditDto source
   ) {
     target.setRequestId(source.getRequestId());
-    target.setRawSyncId(source.getRawSyncId());
     target.setAccountId(source.getAccountId());
     target.setEvent(source.getEvent());
     target.setMarketplace(source.getMarketplace());
@@ -102,17 +100,4 @@ public class EtlExecutionAuditService
         .map(entity -> mapperFacade.to(entity, EtlExecutionAuditDto.class));
   }
 
-  public boolean existsExecutionForSources(
-      long accountId,
-      MarketplaceType marketplace,
-      String eventKey,
-      List<String> sourceIds
-  ) {
-    return repository.existsExecutionForSources(
-        accountId,
-        marketplace,
-        eventKey,
-        sourceIds
-    );
-  }
 }

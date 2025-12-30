@@ -49,9 +49,8 @@ public class EtlAggregationResultFlowConfig {
             (dto, headers) -> {
               etlExecutionAuditService.save(dto);
               log.info(
-                  "ETL execution audit saved: requestId={}, rawSyncId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}",
+                  "ETL execution audit saved: requestId={}, accountId={}, event={}, marketplace={}, sourceId={}, status={}, rowsCount={}",
                   dto.getRequestId(),
-                  dto.getRawSyncId(),
                   dto.getAccountId(),
                   dto.getEvent(),
                   dto.getMarketplace(),
@@ -125,7 +124,6 @@ public class EtlAggregationResultFlowConfig {
 
     EtlExecutionAuditDto dto = new EtlExecutionAuditDto();
     dto.setRequestId(aggregation.requestId());
-    dto.setRawSyncId(finalOutcome.rawSyncId());
     dto.setAccountId(aggregation.accountId());
     dto.setEvent(aggregation.event().name());
     dto.setMarketplace(finalOutcome.marketplace());
@@ -161,7 +159,7 @@ public class EtlAggregationResultFlowConfig {
         aggregation.event(),
         aggregation.dateFrom(),
         aggregation.dateTo(),
-        aggregation.rawSyncId()
+        aggregation.requestId()
     );
   }
 }
