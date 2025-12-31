@@ -5,14 +5,15 @@ import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.FinanceFactRepository;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
 public class FinanceFactJdbcRepository implements FinanceFactRepository {
 
-  private final JdbcTemplate jdbcTemplate;
+  private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
   @Override
   public void upsertFromWildberries(long accountId, String requestId) {
@@ -35,10 +36,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               on dp.id = fs.dim_product_id
             join %2$s r
               on r.account_id = fs.account_id
-             and r.request_id = ?
+             and r.request_id = :requestId
              and nullif(r.payload::jsonb ->> 'srid','') = fs.order_id
              and nullif(r.payload::jsonb ->> 'nm_id','') = dp.source_product_id
-            where fs.account_id = ?
+            where fs.account_id = :accountId
               and fs.source_platform = '%1$s'
         ),
         finance_raw as (
@@ -57,7 +58,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               on dp.id = ss.dim_product_id
             join %2$s r
               on r.account_id = ss.account_id
-             and r.request_id = ?
+             and r.request_id = :requestId
              and nullif(r.payload::jsonb ->> 'srid','') = ss.order_id
              and nullif(r.payload::jsonb ->> 'nm_id','') = dp.source_product_id
             group by ss.fact_sales_id
@@ -112,7 +113,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             select
                 ss.fact_sales_id                                            as fact_sales_id,
                 coalesce(fr.revenue_gross_amount, 0)                         as revenue_gross_amount,
-                (coalesce(fr.net_from_marketplace, 0)
+                (coalesce(fr.revenue_gross_amount, 0)
                     - coalesce(cc.total_commission, 0)
                     - coalesce(lc.total_logistics, 0)
                     - coalesce(pc.total_product_cost, 0)
@@ -152,7 +153,11 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         from finalized
         """.formatted(platform, RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
-    jdbcTemplate.update(query, requestId, accountId, requestId);
+    MapSqlParameterSource params = new MapSqlParameterSource()
+        .addValue("accountId", accountId)
+        .addValue("requestId", requestId);
+
+    namedParameterJdbcTemplate.update(query, params);
   }
 
   @Override
@@ -174,8 +179,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                                                               as currency
             from %2$s r
             join lateral jsonb_array_elements(r.payload::jsonb -> 'products') item on true
-            where r.account_id = ?
-              and r.request_id = ?
+            where r.account_id = :accountId
+              and r.request_id = :requestId
             union all
             select
                 r.account_id                                   as account_id,
@@ -188,8 +193,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                                                               as currency
             from %3$s r
             join lateral jsonb_array_elements(r.payload::jsonb -> 'products') item on true
-            where r.account_id = ?
-              and r.request_id = ?
+            where r.account_id = :accountId
+              and r.request_id = :requestId
         ),
         source_sales as (
             select distinct
@@ -210,7 +215,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               on rp.account_id = fs.account_id
              and rp.order_id = fs.order_id
              and rp.source_product_id = dp.source_product_id
-            where fs.account_id = ?
+            where fs.account_id = :accountId
               and fs.source_platform = '%1$s'
         ),
         posting_totals as (
@@ -241,8 +246,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                     lower(nullif(r.payload::jsonb ->> 'type','')) in ('return', 'refund')
                 )                                                 as is_refund_raw
             from %4$s r
-            where r.account_id = ?
-              and r.request_id = ?
+            where r.account_id = :accountId
+              and r.request_id = :requestId
               and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') is not null
             group by r.account_id, order_id
         ),
@@ -322,7 +327,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             select
                 ss.fact_sales_id                                            as fact_sales_id,
                 coalesce(sf.revenue_gross_amount, 0)                         as revenue_gross_amount,
-                (coalesce(sf.net_from_marketplace, 0)
+                (coalesce(sf.revenue_gross_amount, 0)
                     - coalesce(cc.total_commission, 0)
                     - coalesce(lc.total_logistics, 0)
                     - coalesce(pc.total_product_cost, 0)
@@ -367,15 +372,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS
     );
 
-    jdbcTemplate.update(
-        query,
-        accountId,
-        requestId,
-        accountId,
-        requestId,
-        accountId,
-        accountId,
-        requestId
-    );
+    MapSqlParameterSource params = new MapSqlParameterSource()
+        .addValue("accountId", accountId)
+        .addValue("requestId", requestId);
+
+    namedParameterJdbcTemplate.update(query, params);
   }
 }

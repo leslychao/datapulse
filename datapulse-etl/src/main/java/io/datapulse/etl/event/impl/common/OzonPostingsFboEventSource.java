@@ -1,4 +1,4 @@
-package io.datapulse.etl.event.impl.sales;
+package io.datapulse.etl.event.impl.common;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
@@ -19,7 +19,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = {MarketplaceEvent.SALES_FACT},
+    events = {MarketplaceEvent.SALES_FACT, MarketplaceEvent.FACT_FINANCE},
     marketplace = MarketplaceType.OZON,
     rawTableName = RawTableNames.RAW_OZON_POSTINGS_FBO
 )
