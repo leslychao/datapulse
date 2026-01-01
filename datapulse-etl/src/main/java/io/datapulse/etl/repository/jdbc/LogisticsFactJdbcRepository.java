@@ -16,7 +16,6 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
       insert into fact_logistics_costs (
           account_id,
           source_platform,
-          order_id,
           operation_date,
           warehouse_id,
           logistics_type,
@@ -28,7 +27,6 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
       select
           account_id,
           source_platform,
-          order_id,
           operation_date,
           warehouse_id,
           logistics_type,
@@ -42,7 +40,6 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
       on conflict (account_id, source_platform, operation_date, warehouse_id, logistics_type)
       do update
       set
-          order_id   = excluded.order_id,
           amount     = excluded.amount,
           currency   = excluded.currency,
           updated_at = now();
@@ -60,7 +57,6 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
         select
             account_id,
             source_platform,
-            order_id,
             operation_date,
             warehouse_id,
             logistics_type,
@@ -68,19 +64,17 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
             currency
         from (
             select
-                s.account_id        as account_id,
-                s.source_platform   as source_platform,
-                min(s.order_id)     as order_id,
-                s.operation_date    as operation_date,
-                s.warehouse_id      as warehouse_id,
-                s.logistics_type    as logistics_type,
-                sum(s.amount)       as amount,
-                max(s.currency)     as currency
+                s.account_id      as account_id,
+                s.source_platform as source_platform,
+                s.operation_date  as operation_date,
+                s.warehouse_id    as warehouse_id,
+                s.logistics_type  as logistics_type,
+                sum(s.amount)     as amount,
+                max(s.currency)   as currency
             from (
                 select
                     r.account_id                                       as account_id,
                     '%1$s'                                             as source_platform,
-                    nullif(r.payload::jsonb ->> 'srid','')            as order_id,
                     (r.payload::jsonb ->> 'rr_dt')::date              as operation_date,
                     w.id                                              as warehouse_id,
                     l.logistics_type                                  as logistics_type,
@@ -97,11 +91,16 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                      nullif(r.payload::jsonb ->> 'ppvz_office_id','')
                 join lateral (
                     values
-                      ('DELIVERY_TO_CUSTOMER', nullif(r.payload::jsonb ->> 'delivery_amount','')::numeric),
-                      ('RETURN_FROM_CUSTOMER', nullif(r.payload::jsonb ->> 'return_amount','')::numeric),
-                      ('INBOUND', nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric),
-                      ('STORAGE', nullif(r.payload::jsonb ->> 'storage_fee','')::numeric),
-                      ('INBOUND', nullif(r.payload::jsonb ->> 'acceptance','')::numeric)
+                      ('DELIVERY_TO_CUSTOMER',
+                       nullif(r.payload::jsonb ->> 'delivery_amount','')::numeric),
+                      ('RETURN_FROM_CUSTOMER',
+                       nullif(r.payload::jsonb ->> 'return_amount','')::numeric),
+                      ('INBOUND',
+                       nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric),
+                      ('STORAGE',
+                       nullif(r.payload::jsonb ->> 'storage_fee','')::numeric),
+                      ('INBOUND',
+                       nullif(r.payload::jsonb ->> 'acceptance','')::numeric)
                 ) as l(logistics_type, amount)
                   on l.amount is not null and l.amount <> 0
                 where r.account_id = ?
@@ -131,7 +130,6 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
         select
             account_id,
             source_platform,
-            order_id,
             operation_date,
             warehouse_id,
             logistics_type,
@@ -139,20 +137,19 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
             currency
         from (
             select
-                s.account_id        as account_id,
-                s.source_platform   as source_platform,
-                min(s.order_id)     as order_id,
-                s.operation_date    as operation_date,
-                s.warehouse_id      as warehouse_id,
-                s.logistics_type    as logistics_type,
-                sum(s.amount)       as amount,
-                max(s.currency)     as currency
+                s.account_id      as account_id,
+                s.source_platform as source_platform,
+                s.operation_date  as operation_date,
+                s.warehouse_id    as warehouse_id,
+                s.logistics_type  as logistics_type,
+                sum(s.amount)     as amount,
+                max(s.currency)   as currency
             from (
                 select
                     r.account_id                                     as account_id,
                     '%1$s'                                           as source_platform,
-                    nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') as order_id,
-                    (r.payload::jsonb ->> 'operation_date')::timestamptz::date    as operation_date,
+                    (r.payload::jsonb ->> 'operation_date')::timestamptz::date
+                                                                    as operation_date,
                     w.id                                            as warehouse_id,
                     case
                       when ot in (

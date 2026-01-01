@@ -22,15 +22,13 @@
         id              bigserial primary key,
 
         account_id      bigint         not null,
-
         source_platform text           not null,
-        order_id        text           not null,
 
         operation_date  date           not null,
 
         warehouse_id    bigint,
 
-        logistics_type  text           not null, -- DELIVERY_TO_CUSTOMER / RETURN_FROM_CUSTOMER / STORAGE / INBOUND / OTHER_LOGISTICS
+        logistics_type  text           not null, -- DELIVERY_TO_CUSTOMER / RETURN_FROM_CUSTOMER / STORAGE / INBOUND / ...
         amount          numeric(18, 4) not null,
         currency        text           not null,
 
