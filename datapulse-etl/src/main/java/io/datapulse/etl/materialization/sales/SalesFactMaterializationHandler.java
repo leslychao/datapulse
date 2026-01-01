@@ -3,6 +3,7 @@ package io.datapulse.etl.materialization.sales;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
 import io.datapulse.etl.repository.DimProductRepository;
+import io.datapulse.etl.repository.DimWarehouseRepository;
 import io.datapulse.etl.repository.ReturnsFactRepository;
 import io.datapulse.etl.repository.SalesFactRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,8 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
   private final SalesFactRepository salesFactRepository;
 
   private final ReturnsFactRepository returnsFactRepository;
+
+  private final DimWarehouseRepository dimWarehouseRepository;
 
   @Override
   public MarketplaceEvent supportedEvent() {
@@ -39,6 +42,8 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
 
     returnsFactRepository.upsertWildberries(accountId, requestId);
     returnsFactRepository.upsertOzonReturns(accountId, requestId);
+
+    dimWarehouseRepository.upsertOzonFromPostings(accountId, requestId);
 
     log.info("Sales fact materialization finished: requestId={}, accountId={}", requestId,
         accountId);

@@ -89,6 +89,36 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
       where t.account_id = ? and t.request_id = ?
       """;
 
+  private static final String OZON_FBS_FROM_POSTINGS_SELECT = """
+      select
+          t.account_id                                   as account_id,
+          'OZON'::text                                   as source_platform,
+          (t.payload::jsonb -> 'delivery_method' ->> 'warehouse_id')::text  as external_warehouse_id,
+          (t.payload::jsonb -> 'delivery_method' ->> 'warehouse')::text     as warehouse_name,
+          'FBS'                                          as fulfillment_model,
+          true                                           as is_active,
+          15                                             as priority
+      from %s t
+      where t.account_id = ?
+        and t.request_id = ?
+        and t.payload::jsonb -> 'delivery_method' ->> 'warehouse_id' is not null
+      """;
+
+  private static final String OZON_FBO_FROM_POSTINGS_SELECT = """
+      select
+          t.account_id                                           as account_id,
+          'OZON'::text                                           as source_platform,
+          (t.payload::jsonb -> 'analytics_data' ->> 'warehouse_id')::text   as external_warehouse_id,
+          (t.payload::jsonb -> 'analytics_data' ->> 'warehouse_name')::text as warehouse_name,
+          'FBO'                                                  as fulfillment_model,
+          true                                                   as is_active,
+          5                                                      as priority
+      from %s t
+      where t.account_id = ?
+        and t.request_id = ?
+        and t.payload::jsonb -> 'analytics_data' ->> 'warehouse_id' is not null
+      """;
+
   private static final String WB_FBW_SELECT = """
       select
           t.account_id as account_id,
@@ -139,6 +169,20 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
     }
     if (tableExists(RawTableNames.RAW_OZON_WAREHOUSES_FBO)) {
       selects.add(OZON_FBO_SELECT.formatted(RawTableNames.RAW_OZON_WAREHOUSES_FBO));
+    }
+
+    executeUpsert(selects, accountId, requestId);
+  }
+
+  @Override
+  public void upsertOzonFromPostings(Long accountId, String requestId) {
+    List<String> selects = new ArrayList<>();
+
+    if (tableExists(RawTableNames.RAW_OZON_POSTINGS_FBS)) {
+      selects.add(OZON_FBS_FROM_POSTINGS_SELECT.formatted(RawTableNames.RAW_OZON_POSTINGS_FBS));
+    }
+    if (tableExists(RawTableNames.RAW_OZON_POSTINGS_FBO)) {
+      selects.add(OZON_FBO_FROM_POSTINGS_SELECT.formatted(RawTableNames.RAW_OZON_POSTINGS_FBO));
     }
 
     executeUpsert(selects, accountId, requestId);
