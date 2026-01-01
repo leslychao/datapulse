@@ -19,4 +19,5 @@
   <include file="changelog/0014-create-fact-commission.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0015-create-fact-product-cost.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0016-create-fact-finance.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0017-create-fact-penalties.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

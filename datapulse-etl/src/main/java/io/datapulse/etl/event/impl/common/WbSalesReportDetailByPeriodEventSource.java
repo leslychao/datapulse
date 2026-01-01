@@ -3,6 +3,7 @@ package io.datapulse.etl.event.impl.common;
 import static io.datapulse.etl.MarketplaceEvent.FACT_COMMISSION;
 import static io.datapulse.etl.MarketplaceEvent.FACT_FINANCE;
 import static io.datapulse.etl.MarketplaceEvent.FACT_LOGISTICS_COSTS;
+import static io.datapulse.etl.MarketplaceEvent.FACT_PENALTIES;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
@@ -23,14 +24,14 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = {MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS, FACT_COMMISSION, FACT_FINANCE},
+    events = {MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS, FACT_COMMISSION, FACT_FINANCE, FACT_PENALTIES},
     marketplace = MarketplaceType.WILDBERRIES,
     rawTableName = RawTableNames.RAW_WB_SALES_REPORT_DETAIL
 )
 public class WbSalesReportDetailByPeriodEventSource implements EventSource {
 
   private static final int PAGE_LIMIT = 100000;
-  private static final String PERIOD = "daily";
+  private static final String PERIOD = "weekly";
 
   private final WbAdapter wbAdapter;
 

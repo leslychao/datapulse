@@ -18,7 +18,8 @@ public enum MarketplaceEvent {
   INVENTORY_FACT,
   FACT_LOGISTICS_COSTS,
   FACT_FINANCE,
-  FACT_COMMISSION;
+  FACT_COMMISSION,
+  FACT_PENALTIES;
 
   public String tag() {
     return name().toLowerCase();

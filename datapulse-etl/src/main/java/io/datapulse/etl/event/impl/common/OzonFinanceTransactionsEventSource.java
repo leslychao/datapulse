@@ -3,6 +3,7 @@ package io.datapulse.etl.event.impl.common;
 import static io.datapulse.etl.MarketplaceEvent.FACT_COMMISSION;
 import static io.datapulse.etl.MarketplaceEvent.FACT_FINANCE;
 import static io.datapulse.etl.MarketplaceEvent.FACT_LOGISTICS_COSTS;
+import static io.datapulse.etl.MarketplaceEvent.FACT_PENALTIES;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
@@ -23,7 +24,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @RequiredArgsConstructor
 @EtlSourceMeta(
-    events = {MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS, FACT_COMMISSION, FACT_FINANCE},
+    events = {MarketplaceEvent.SALES_FACT, FACT_LOGISTICS_COSTS, FACT_COMMISSION, FACT_FINANCE, FACT_PENALTIES},
     marketplace = MarketplaceType.OZON,
     rawTableName = RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS
 )
