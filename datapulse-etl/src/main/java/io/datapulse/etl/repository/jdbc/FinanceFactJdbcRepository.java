@@ -30,7 +30,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 fs.order_id        as order_id,
                 fs.dim_product_id  as dim_product_id,
                 fs.quantity        as quantity,
-                fs.sale_date       as sale_date
+                fs.sale_date       as sale_date,
+                fs.warehouse_id    as warehouse_id
             from fact_sales fs
             join dim_product dp
               on dp.id = fs.dim_product_id
@@ -95,9 +96,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 sum(fl.amount)   as total_logistics
             from source_sales ss
             left join fact_logistics_costs fl
-              on fl.account_id = ss.account_id
+              on fl.account_id      = ss.account_id
              and fl.source_platform = ss.source_platform
-             and fl.order_id = ss.order_id
+             and fl.operation_date  = ss.sale_date
+             and fl.warehouse_id    = ss.warehouse_id
             group by ss.fact_sales_id
         ),
         product_costs as (
@@ -228,6 +230,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 fs.dim_product_id  as dim_product_id,
                 fs.quantity        as quantity,
                 fs.sale_date       as sale_date,
+                fs.warehouse_id    as warehouse_id,
                 rp.quantity        as posting_quantity,
                 rp.price           as posting_price,
                 rp.currency        as posting_currency
@@ -341,9 +344,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 sum(fl.amount)   as total_logistics
             from source_sales ss
             left join fact_logistics_costs fl
-              on fl.account_id = ss.account_id
+              on fl.account_id      = ss.account_id
              and fl.source_platform = ss.source_platform
-             and fl.order_id = ss.order_id
+             and fl.operation_date  = ss.sale_date
+             and fl.warehouse_id    = ss.warehouse_id
             group by ss.fact_sales_id
         ),
         product_costs as (
