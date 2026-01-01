@@ -85,9 +85,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 sum(fc.amount)   as total_commission
             from source_sales ss
             left join fact_commission fc
-              on fc.account_id = ss.account_id
+              on fc.account_id      = ss.account_id
              and fc.source_platform = ss.source_platform
-             and fc.order_id = ss.order_id
+             and fc.order_id        = ss.order_id
+             and fc.commission_kind = 'SALES'
             group by ss.fact_sales_id
         ),
         logistics_costs as (
@@ -337,9 +338,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 sum(fc.amount)   as total_commission
             from source_sales ss
             left join fact_commission fc
-              on fc.account_id = ss.account_id
+              on fc.account_id      = ss.account_id
              and fc.source_platform = ss.source_platform
-             and fc.order_id = ss.order_id
+             and fc.order_id        = ss.order_id
+             and fc.commission_kind = 'SALES'
             group by ss.fact_sales_id
         ),
         logistics_costs as (

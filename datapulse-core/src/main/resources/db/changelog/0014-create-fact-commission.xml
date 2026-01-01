@@ -10,22 +10,19 @@
     <sql>
       CREATE TABLE IF NOT EXISTS fact_commission
       (
-        id               BIGSERIAL     PRIMARY KEY,
-
-        account_id       BIGINT        NOT NULL,
-        source_platform  TEXT          NOT NULL,
-
-        order_id         TEXT          NULL,
-        operation_date   DATE          NOT NULL,
-
-        commission_type  TEXT          NOT NULL,
-
-        amount           NUMERIC(18,4) NOT NULL,
-        currency         TEXT          NOT NULL,
-
-        created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
-        updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
-
+        id              BIGSERIAL PRIMARY KEY,
+        account_id      BIGINT         NOT NULL,
+        source_platform TEXT           NOT NULL,
+        order_id        TEXT           NULL,
+        operation_date  DATE           NOT NULL,
+        commission_type TEXT           NOT NULL,
+        amount          NUMERIC(18, 4) NOT NULL,
+        currency        TEXT           NOT NULL,
+        amount_raw      NUMERIC(18, 4) NOT NULL,
+        amount_abs      NUMERIC(18, 4) NOT NULL,
+        commission_kind TEXT           NOT NULL,
+        created_at      TIMESTAMPTZ    NOT NULL DEFAULT now(),
+        updated_at      TIMESTAMPTZ    NOT NULL DEFAULT now(),
         CONSTRAINT uq_fact_commission_source
           UNIQUE (account_id, source_platform, operation_date, order_id, commission_type)
       );

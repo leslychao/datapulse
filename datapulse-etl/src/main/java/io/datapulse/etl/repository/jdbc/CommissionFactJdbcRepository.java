@@ -21,6 +21,9 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           commission_type,
           amount,
           currency,
+          amount_raw,
+          amount_abs,
+          commission_kind,
           created_at,
           updated_at
       )
@@ -32,6 +35,9 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           commission_type,
           amount,
           currency,
+          amount_raw,
+          amount_abs,
+          commission_kind,
           now(),
           now()
       from (
@@ -40,9 +46,12 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
       on conflict (account_id, source_platform, operation_date, order_id, commission_type)
       do update
       set
-          amount     = excluded.amount,
-          currency   = excluded.currency,
-          updated_at = now();
+          amount          = excluded.amount,
+          currency        = excluded.currency,
+          amount_raw      = excluded.amount_raw,
+          amount_abs      = excluded.amount_abs,
+          commission_kind = excluded.commission_kind,
+          updated_at      = now();
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -59,9 +68,15 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             source_platform,
             order_id,
             operation_date,
-            commission_type,
-            -sum(amount_signed) as amount,
-            max(currency)       as currency
+            case
+              when sum(amount_signed) < 0 then 'SALES_COMMISSION_CHARGE'
+              else 'SALES_COMMISSION_REFUND'
+            end                                              as commission_type,
+            -sum(amount_signed)                              as amount,
+            max(currency)                                    as currency,
+            sum(amount_signed)                               as amount_raw,
+            abs(sum(amount_signed))                          as amount_abs,
+            'SALES'                                          as commission_kind
         from (
             select
                 r.account_id                                   as account_id,
@@ -70,7 +85,6 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
                                                              as order_id,
                 (r.payload::jsonb ->> 'operation_date')::timestamptz::date
                                                              as operation_date,
-                nullif(r.payload::jsonb ->> 'type','')        as commission_type,
                 nullif(r.payload::jsonb ->> 'sale_commission','')::numeric
                                                              as amount_signed,
                 coalesce(
@@ -87,8 +101,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             account_id,
             source_platform,
             order_id,
-            operation_date,
-            commission_type
+            operation_date
         having sum(amount_signed) <> 0
         """.formatted(
         platform,
@@ -110,22 +123,25 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             source_platform,
             order_id,
             operation_date,
-            commission_type,
-            sum(amount)     as amount,
-            max(currency)   as currency
+            case
+              when sum(amount_signed) > 0 then 'SALES_COMMISSION_CHARGE'
+              else 'SALES_COMMISSION_REFUND'
+            end                                              as commission_type,
+            sum(amount_signed)                                as amount,
+            max(currency)                                     as currency,
+            sum(amount_signed)                                as amount_raw,
+            abs(sum(amount_signed))                           as amount_abs,
+            'SALES'                                           as commission_kind
         from (
             select
                 r.account_id                              as account_id,
                 '%1$s'                                    as source_platform,
                 nullif(r.payload::jsonb ->> 'srid','')   as order_id,
                 (r.payload::jsonb ->> 'rr_dt')::date     as operation_date,
-                'SALES_COMMISSION'                       as commission_type,
-                abs(
-                    nullif(
-                        r.payload::jsonb ->> 'ppvz_sales_commission',
-                        ''
-                    )::numeric
-                )                                        as amount,
+                nullif(
+                    r.payload::jsonb ->> 'ppvz_sales_commission',
+                    ''
+                )::numeric                               as amount_signed,
                 coalesce(
                     nullif(r.payload::jsonb ->> 'currency_name',''),
                     'RUB'
@@ -133,17 +149,17 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             from %2$s r
             where r.account_id = ?
               and r.request_id = ?
-              and nullif(r.payload::jsonb ->> 'rr_dt','') is not null
-              and nullif(r.payload::jsonb ->> 'srid','')  is not null
+              and nullif(r.payload::jsonb ->> 'rr_dt','')  is not null
+              and nullif(r.payload::jsonb ->> 'srid','')   is not null
               and nullif(r.payload::jsonb ->> 'ppvz_sales_commission','') is not null
+              and (r.payload::jsonb ->> 'supplier_oper_name') = 'Продажа'
         ) s
         group by
             account_id,
             source_platform,
             order_id,
-            operation_date,
-            commission_type
-        having sum(amount) <> 0
+            operation_date
+        having sum(amount_signed) <> 0
         """.formatted(
         platform,
         RawTableNames.RAW_WB_SALES_REPORT_DETAIL
