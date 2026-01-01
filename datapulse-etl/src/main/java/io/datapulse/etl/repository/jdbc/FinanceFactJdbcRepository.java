@@ -148,11 +148,6 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             left join logistics_costs lc  on lc.fact_sales_id = ss.fact_sales_id
             left join product_costs pc   on pc.fact_sales_id = ss.fact_sales_id
             left join return_flags rf    on rf.fact_sales_id = ss.fact_sales_id
-        ),
-        deleted as (
-            delete from fact_finance ff
-            using source_sales ss
-            where ff.fact_sales_id = ss.fact_sales_id
         )
         insert into fact_finance (
             fact_sales_id,
@@ -176,6 +171,15 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             now(),
             now()
         from finalized
+        on conflict (fact_sales_id) do update
+        set
+            revenue_gross_amount    = excluded.revenue_gross_amount,
+            revenue_net_amount      = excluded.revenue_net_amount,
+            payout_from_marketplace = excluded.payout_from_marketplace,
+            mp_based_net            = excluded.mp_based_net,
+            currency                = excluded.currency,
+            is_refund               = excluded.is_refund,
+            updated_at              = now()
         """.formatted(platform, RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
     MapSqlParameterSource params = new MapSqlParameterSource()
@@ -396,11 +400,6 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             left join logistics_costs lc  on lc.fact_sales_id = ss.fact_sales_id
             left join product_costs pc   on pc.fact_sales_id = ss.fact_sales_id
             left join return_flags rf    on rf.fact_sales_id = ss.fact_sales_id
-        ),
-        deleted as (
-            delete from fact_finance ff
-            using source_sales ss
-            where ff.fact_sales_id = ss.fact_sales_id
         )
         insert into fact_finance (
             fact_sales_id,
@@ -424,6 +423,15 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             now(),
             now()
         from finalized
+        on conflict (fact_sales_id) do update
+        set
+            revenue_gross_amount    = excluded.revenue_gross_amount,
+            revenue_net_amount      = excluded.revenue_net_amount,
+            payout_from_marketplace = excluded.payout_from_marketplace,
+            mp_based_net            = excluded.mp_based_net,
+            currency                = excluded.currency,
+            is_refund               = excluded.is_refund,
+            updated_at              = now()
         """.formatted(
         platform,
         RawTableNames.RAW_OZON_POSTINGS_FBS,
