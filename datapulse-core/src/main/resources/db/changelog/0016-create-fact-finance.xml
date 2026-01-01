@@ -16,18 +16,25 @@
     <sql>
       create table if not exists fact_finance
       (
-        id                   bigserial primary key,
+        id                      bigserial primary key,
 
-        fact_sales_id        bigint         not null,
+        fact_sales_id           bigint         not null,
 
-        revenue_gross_amount numeric(18, 2) not null,
-        revenue_net_amount   numeric(18, 2) not null,
-        currency             text           not null,
+        revenue_gross_amount    numeric(18, 2) not null,
+        revenue_net_amount      numeric(18, 2) not null,
 
-        is_refund            boolean        not null default false,
+        -- Сколько фактически заплатил маркетплейс по продаже (по их данным)
+        payout_from_marketplace numeric(18, 2) not null,
 
-        created_at           timestamptz    not null default now(),
-        updated_at           timestamptz    not null default now(),
+        -- Маржа "по версии маркетплейса": payout_from_marketplace - себестоимость
+        mp_based_net            numeric(18, 2) not null,
+
+        currency                text           not null,
+
+        is_refund               boolean        not null default false,
+
+        created_at              timestamptz    not null default now(),
+        updated_at              timestamptz    not null default now(),
 
         constraint uq_fact_finance_sales
           unique (fact_sales_id),

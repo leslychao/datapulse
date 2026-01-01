@@ -44,15 +44,30 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         finance_raw as (
             select
-                ss.fact_sales_id                                                as fact_sales_id,
-                sum(nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub','')::numeric)
-                                                                              as revenue_gross_amount,
-                sum(nullif(r.payload::jsonb ->> 'ppvz_for_pay','')::numeric)    as net_from_marketplace,
-                max(coalesce(nullif(r.payload::jsonb ->> 'currency_name',''),'RUB'))
-                                                                              as currency,
-                bool_or(nullif(r.payload::jsonb ->> 'doc_type_name','') in (
-                    'Возврат', 'Сторно продажи'
-                ))                                                             as is_refund_raw
+                ss.fact_sales_id as fact_sales_id,
+                sum(
+                    coalesce(
+                        nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub','')::numeric,
+                        0
+                    )
+                ) as revenue_gross_amount,
+                sum(
+                    coalesce(
+                        nullif(r.payload::jsonb ->> 'ppvz_for_pay','')::numeric,
+                        0
+                    )
+                ) as payout_from_marketplace_raw,
+                max(
+                    coalesce(
+                        nullif(r.payload::jsonb ->> 'currency_name',''),
+                        'RUB'
+                    )
+                ) as currency,
+                bool_or(
+                    nullif(r.payload::jsonb ->> 'doc_type_name','') in (
+                        'Возврат', 'Сторно продажи'
+                    )
+                ) as is_refund_raw
             from source_sales ss
             join dim_product dp
               on dp.id = ss.dim_product_id
@@ -87,8 +102,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         product_costs as (
             select
-                ss.fact_sales_id                      as fact_sales_id,
-                sum(fpc.cost_value * ss.quantity)     as total_product_cost
+                ss.fact_sales_id                  as fact_sales_id,
+                sum(fpc.cost_value * ss.quantity) as total_product_cost
             from source_sales ss
             left join fact_product_cost fpc
               on fpc.account_id = ss.account_id
@@ -99,8 +114,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         return_flags as (
             select
-                ss.fact_sales_id            as fact_sales_id,
-                bool_or(fr.id is not null)  as has_returns
+                ss.fact_sales_id           as fact_sales_id,
+                bool_or(fr.id is not null) as has_returns
             from source_sales ss
             left join fact_returns fr
               on fr.account_id = ss.account_id
@@ -118,15 +133,19 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                     - coalesce(lc.total_logistics, 0)
                     - coalesce(pc.total_product_cost, 0)
                 )                                                            as revenue_net_amount,
+                coalesce(fr.payout_from_marketplace_raw, 0)                  as payout_from_marketplace,
+                (coalesce(fr.payout_from_marketplace_raw, 0)
+                    - coalesce(pc.total_product_cost, 0)
+                )                                                            as mp_based_net,
                 coalesce(fr.currency, 'RUB')                                 as currency,
                 coalesce(fr.is_refund_raw, false) or coalesce(rf.has_returns, false)
                                                                              as is_refund
             from source_sales ss
-            left join finance_raw fr on fr.fact_sales_id = ss.fact_sales_id
+            left join finance_raw fr    on fr.fact_sales_id = ss.fact_sales_id
             left join commission_costs cc on cc.fact_sales_id = ss.fact_sales_id
-            left join logistics_costs lc on lc.fact_sales_id = ss.fact_sales_id
-            left join product_costs pc on pc.fact_sales_id = ss.fact_sales_id
-            left join return_flags rf on rf.fact_sales_id = ss.fact_sales_id
+            left join logistics_costs lc  on lc.fact_sales_id = ss.fact_sales_id
+            left join product_costs pc   on pc.fact_sales_id = ss.fact_sales_id
+            left join return_flags rf    on rf.fact_sales_id = ss.fact_sales_id
         ),
         deleted as (
             delete from fact_finance ff
@@ -137,6 +156,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fact_sales_id,
             revenue_gross_amount,
             revenue_net_amount,
+            payout_from_marketplace,
+            mp_based_net,
             currency,
             is_refund,
             created_at,
@@ -146,6 +167,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             finalized.fact_sales_id,
             finalized.revenue_gross_amount,
             finalized.revenue_net_amount,
+            finalized.payout_from_marketplace,
+            finalized.mp_based_net,
             finalized.currency,
             finalized.is_refund,
             now(),
@@ -220,9 +243,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         posting_totals as (
             select
-                account_id                   as account_id,
-                order_id                     as order_id,
-                sum(coalesce(price, 0) * coalesce(quantity, 0)) as total_posting_price
+                account_id as account_id,
+                order_id   as order_id,
+                sum(coalesce(price, 0) * coalesce(quantity, 0))
+                           as total_posting_price
             from raw_postings
             group by account_id, order_id
         ),
@@ -231,19 +255,40 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 r.account_id                                     as account_id,
                 nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
                                                                   as order_id,
-                sum(nullif(r.payload::jsonb ->> 'accruals_for_sale','')::numeric)
-                                                                  as gross_total,
+                sum(
+                    coalesce(
+                        nullif(r.payload::jsonb ->> 'accruals_for_sale','')::numeric,
+                        0
+                    )
+                )                                                 as gross_total,
                 sum(
                     case
-                      when lower(nullif(r.payload::jsonb ->> 'type','')) in ('sale', 'return', 'refund')
-                        then nullif(r.payload::jsonb ->> 'amount','')::numeric
+                      when lower(
+                               coalesce(
+                                   nullif(r.payload::jsonb ->> 'type',''),
+                                   ''
+                               )
+                           ) in ('orders', 'returns', 'compensation')
+                        then coalesce(
+                                 nullif(r.payload::jsonb ->> 'amount','')::numeric,
+                                 0
+                             )
                       else 0
                     end
                 )                                                 as net_total,
-                max(coalesce(nullif(r.payload::jsonb ->> 'currency_code',''),'RUB'))
-                                                                  as currency,
+                max(
+                    coalesce(
+                        nullif(r.payload::jsonb ->> 'currency_code',''),
+                        'RUB'
+                    )
+                )                                                 as currency,
                 bool_or(
-                    lower(nullif(r.payload::jsonb ->> 'type','')) in ('return', 'refund')
+                    lower(
+                        coalesce(
+                            nullif(r.payload::jsonb ->> 'type',''),
+                            ''
+                        )
+                    ) = 'returns'
                 )                                                 as is_refund_raw
             from %4$s r
             where r.account_id = :accountId
@@ -253,22 +298,24 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         sales_finance as (
             select
-                ss.fact_sales_id                                         as fact_sales_id,
+                ss.fact_sales_id as fact_sales_id,
                 coalesce(
                     fr.gross_total
                     * (coalesce(ss.posting_price, 0) * coalesce(ss.posting_quantity, 0))
                     / nullif(pt.total_posting_price, 0),
                     coalesce(ss.posting_price, 0) * coalesce(ss.posting_quantity, 0),
                     0
-                )                                                       as revenue_gross_amount,
+                )                               as revenue_gross_amount,
                 coalesce(
                     fr.net_total
                     * (coalesce(ss.posting_price, 0) * coalesce(ss.posting_quantity, 0))
                     / nullif(pt.total_posting_price, 0),
                     0
-                )                                                       as net_from_marketplace,
-                coalesce(fr.currency, ss.posting_currency, 'RUB')        as currency,
-                coalesce(fr.is_refund_raw, false)                        as is_refund_raw
+                )                               as net_from_marketplace,
+                coalesce(fr.currency, ss.posting_currency, 'RUB')
+                                                 as currency,
+                coalesce(fr.is_refund_raw, false)
+                                                 as is_refund_raw
             from source_sales ss
             left join posting_totals pt
               on pt.account_id = ss.account_id
@@ -301,8 +348,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         product_costs as (
             select
-                ss.fact_sales_id                      as fact_sales_id,
-                sum(fpc.cost_value * ss.quantity)     as total_product_cost
+                ss.fact_sales_id                  as fact_sales_id,
+                sum(fpc.cost_value * ss.quantity) as total_product_cost
             from source_sales ss
             left join fact_product_cost fpc
               on fpc.account_id = ss.account_id
@@ -313,8 +360,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         ),
         return_flags as (
             select
-                ss.fact_sales_id            as fact_sales_id,
-                bool_or(fr.id is not null)  as has_returns
+                ss.fact_sales_id           as fact_sales_id,
+                bool_or(fr.id is not null) as has_returns
             from source_sales ss
             left join fact_returns fr
               on fr.account_id = ss.account_id
@@ -332,15 +379,19 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                     - coalesce(lc.total_logistics, 0)
                     - coalesce(pc.total_product_cost, 0)
                 )                                                            as revenue_net_amount,
+                coalesce(sf.net_from_marketplace, 0)                         as payout_from_marketplace,
+                (coalesce(sf.net_from_marketplace, 0)
+                    - coalesce(pc.total_product_cost, 0)
+                )                                                            as mp_based_net,
                 coalesce(sf.currency, 'RUB')                                 as currency,
                 coalesce(sf.is_refund_raw, false) or coalesce(rf.has_returns, false)
                                                                              as is_refund
             from source_sales ss
-            left join sales_finance sf on sf.fact_sales_id = ss.fact_sales_id
+            left join sales_finance   sf on sf.fact_sales_id = ss.fact_sales_id
             left join commission_costs cc on cc.fact_sales_id = ss.fact_sales_id
-            left join logistics_costs lc on lc.fact_sales_id = ss.fact_sales_id
-            left join product_costs pc on pc.fact_sales_id = ss.fact_sales_id
-            left join return_flags rf on rf.fact_sales_id = ss.fact_sales_id
+            left join logistics_costs lc  on lc.fact_sales_id = ss.fact_sales_id
+            left join product_costs pc   on pc.fact_sales_id = ss.fact_sales_id
+            left join return_flags rf    on rf.fact_sales_id = ss.fact_sales_id
         ),
         deleted as (
             delete from fact_finance ff
@@ -351,6 +402,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fact_sales_id,
             revenue_gross_amount,
             revenue_net_amount,
+            payout_from_marketplace,
+            mp_based_net,
             currency,
             is_refund,
             created_at,
@@ -360,6 +413,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             finalized.fact_sales_id,
             finalized.revenue_gross_amount,
             finalized.revenue_net_amount,
+            finalized.payout_from_marketplace,
+            finalized.mp_based_net,
             finalized.currency,
             finalized.is_refund,
             now(),
