@@ -84,7 +84,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                         'RUB'
                     )                                                 as currency
                 from %2$s r
-                left join dim_warehouse w
+                join dim_warehouse w
                   on w.account_id = r.account_id
                  and lower(w.source_platform) = lower('%1$s')
                  and w.external_warehouse_id =
@@ -187,7 +187,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                         'RUB'
                     )                                               as currency
                 from %2$s r
-                left join dim_warehouse w
+                join dim_warehouse w
                   on w.account_id = r.account_id
                  and lower(w.source_platform) = lower('%1$s')
                  and w.external_warehouse_id =
