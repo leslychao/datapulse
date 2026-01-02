@@ -36,6 +36,7 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
     dimProductRepository.upsertOzonFromPostingsFbo(accountId, requestId);
     dimProductRepository.upsertWildberriesFromSales(accountId, requestId);
 
+    dimWarehouseRepository.upsertWildberries(accountId, requestId);
     salesFactRepository.upsertWildberries(accountId, requestId);
     salesFactRepository.upsertOzonPostingsFbs(accountId, requestId);
     salesFactRepository.upsertOzonPostingsFbo(accountId, requestId);
