@@ -14,6 +14,7 @@
         account_id      BIGINT         NOT NULL,
         source_platform TEXT           NOT NULL,
         order_id        TEXT           NULL,
+        dim_product_id  BIGINT         NULL,
         operation_date  DATE           NOT NULL,
         commission_type TEXT           NOT NULL,
         amount          NUMERIC(18, 4) NOT NULL,
@@ -24,7 +25,16 @@
         created_at      TIMESTAMPTZ    NOT NULL DEFAULT now(),
         updated_at      TIMESTAMPTZ    NOT NULL DEFAULT now(),
         CONSTRAINT uq_fact_commission_source
-          UNIQUE (account_id, source_platform, operation_date, order_id, commission_type)
+          UNIQUE (
+            account_id,
+            source_platform,
+            operation_date,
+            order_id,
+            commission_type,
+            dim_product_id
+          ),
+        CONSTRAINT fk_fact_commission_dim_product
+          FOREIGN KEY (dim_product_id) REFERENCES dim_product (id)
       );
 
       CREATE INDEX IF NOT EXISTS idx_fact_commission_account_date
