@@ -7,18 +7,22 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <!-- =============================================================== -->
-  <!-- FACT PENALTIES — штрафы / удержания по заказу                  -->
-  <!-- grain: (account_id, platform, penalty_date, order_id, type)    -->
-  <!-- дата берётся как "дата операции пенальти"                      -->
-  <!-- сюда попадают:                                                 -->
-  <!--  - Ozon: удержания по /v3/finance/transaction/list (type      -->
-  <!--    services/other, без sale_commission, не-логистика)         -->
-  <!--  - WB: penalty, storage_fee, deduction, acceptance            -->
-  <!--    из reportDetailByPeriod                                    -->
+  <!-- FACT PENALTIES — реальные штрафы / санкции по заказам          -->
+  <!-- grain: (account_id, platform, penalty_date, order_id)           -->
+  <!--                                                                -->
+  <!-- Сюда попадают ТОЛЬКО штрафы маркетплейсов:                     -->
+  <!--   • OZON: OperationMarketplaceWithHoldingForUndeliverableGoods -->
+  <!--   • WB: penalty, bonus_type_name LIKE 'Штраф%'                 -->
+  <!--                                                                -->
+  <!-- В ЭТОТ ФАКТ НЕ ПОПАДАЮТ:                                       -->
+  <!--   ✗ логистика (delivery / return / inbound / storage)          -->
+  <!--   ✗ комиссии и эквайринг                                       -->
+  <!--   ✗ маркетинг и продвижение                                    -->
+  <!--   ✗ сервис-фии                                                 -->
+  <!--   ✗ компенсации / корректировки                                -->
   <!-- =============================================================== -->
 
   <changeSet id="0017-create-fact-penalties" author="vitalii.kim" dbms="postgresql">
-
     <sql>
       create table if not exists fact_penalties
       (
@@ -27,29 +31,19 @@
         account_id          bigint         not null,
         source_platform     text           not null,
 
-        -- Дата возникновения/фиксации штрафа (по данным маркетплейса)
         penalty_date        date           not null,
-
-        -- Заказ/отправление: WB.srid / Ozon.posting_number
         order_id            text           not null,
 
-        -- Тип пенальти: логический код (например: ORDER_PENALTY,
-        -- UNDERDELIVERY_PENALTY, SERVICE_FEE, STORAGE_FEE и т.п.)
-        penalty_type        text           not null,
-
-        -- "Сырой" код источника пенальти (operation_type / bonus_type_name / поле WB)
         penalty_source_code text           not null,
 
-        -- Сумма штрафа в валюте отчёта (всегда > 0)
         amount              numeric(18, 2) not null,
-
         currency            text           not null,
 
         created_at          timestamptz    not null default now(),
         updated_at          timestamptz    not null default now(),
 
-        constraint uq_fact_penalties_order_with_type
-          unique (account_id, source_platform, penalty_date, order_id, penalty_type)
+        constraint uq_fact_penalties_order
+          unique (account_id, source_platform, penalty_date, order_id)
       );
 
       create index if not exists idx_fact_penalties_account_date
@@ -63,5 +57,4 @@
       drop table if exists fact_penalties cascade;
     </rollback>
   </changeSet>
-
 </databaseChangeLog>
