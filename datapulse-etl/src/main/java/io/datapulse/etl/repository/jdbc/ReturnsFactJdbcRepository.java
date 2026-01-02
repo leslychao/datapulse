@@ -82,42 +82,27 @@ public class ReturnsFactJdbcRepository implements ReturnsFactRepository {
                 max(created_at) as created_at
             from (
                 select
-                    r.account_id                                                      as account_id,
-                    '%1$s'                                                            as source_platform,
+                    fs.account_id                                                    as account_id,
+                    '%1$s'                                                           as source_platform,
 
-                    nullif(r.payload::jsonb ->> 'saleID','')                          as source_event_id,
-                    nullif(r.payload::jsonb ->> 'srid','')                            as order_id,
+                    nullif(r.payload::jsonb ->> 'saleID','')                         as source_event_id,
 
-                    w.id                                                              as warehouse_id,
+                    fs.dim_product_id                                                as dim_product_id,
+                    fs.order_id                                                      as order_id,
+                    fs.warehouse_id                                                 as warehouse_id,
+                    fs.category_id                                                  as category_id,
 
-                    dc.id                                                             as category_id,
+                    1                                                                as quantity,
 
-                    1                                                                 as quantity,
+                    (r.payload::jsonb ->> 'date')::timestamptz::date                 as return_date,
 
-                    (r.payload::jsonb ->> 'date')::timestamptz::date                  as return_date,
-
-                    dp.id                                                             as dim_product_id,
-
-                    r.created_at                                                      as created_at
+                    r.created_at                                                     as created_at
                 from %2$s r
 
-                left join dim_product dp
-                  on dp.account_id        = r.account_id
-                 and dp.source_platform   = '%1$s'
-                 and dp.source_product_id = nullif(r.payload::jsonb ->> 'nmId','')
-
-                left join dim_warehouse w
-                  on w.account_id = r.account_id
-                 and lower(w.source_platform) = lower('%1$s')
-                 and (
-                      w.external_warehouse_id = nullif(r.payload::jsonb ->> 'warehouseId','')
-                      or lower(trim(w.warehouse_name)) =
-                         lower(trim(nullif(r.payload::jsonb ->> 'warehouseName','')))
-                     )
-
-                left join dim_category dc
-                  on dc.source_platform    = '%1$s'
-                 and dc.source_category_id = dp.external_category_id
+                join fact_sales fs
+                  on fs.account_id      = r.account_id
+                 and fs.source_platform = '%1$s'
+                 and fs.source_event_id = nullif(r.payload::jsonb ->> 'saleID','')
 
                 where r.account_id = ?
                   and r.request_id = ?
@@ -126,7 +111,6 @@ public class ReturnsFactJdbcRepository implements ReturnsFactRepository {
                   and nullif(r.payload::jsonb ->> 'date','')   is not null
                   and nullif(r.payload::jsonb ->> 'forPay','') is not null
                   and (r.payload::jsonb ->> 'forPay')::numeric < 0
-                  and dp.id is not null
             ) s
             group by
                 account_id,
@@ -164,45 +148,39 @@ public class ReturnsFactJdbcRepository implements ReturnsFactRepository {
             return_date
         from (
             select
-                r.account_id                                                       as account_id,
-                '%1$s'                                                             as source_platform,
+                fs.account_id                                                     as account_id,
+                '%1$s'                                                            as source_platform,
 
-                nullif(r.payload::jsonb ->> 'id','')                               as source_event_id,
+                nullif(r.payload::jsonb ->> 'id','')                              as source_event_id,
 
-                nullif(r.payload::jsonb ->> 'posting_number','')                   as order_id,
-
-                null::bigint                                                       as warehouse_id,
-
-                dc.id                                                              as category_id,
+                fs.dim_product_id                                                 as dim_product_id,
+                fs.order_id                                                       as order_id,
+                fs.warehouse_id                                                  as warehouse_id,
+                fs.category_id                                                   as category_id,
 
                 coalesce(
                     nullif(r.payload::jsonb -> 'product' ->> 'quantity','')::int,
                     1
-                )                                                                  as quantity,
+                )                                                                 as quantity,
 
                 (r.payload::jsonb -> 'logistic' ->> 'return_date')::timestamptz::date
-                                                                                   as return_date,
+                                                                                  as return_date,
 
-                dp.id                                                              as dim_product_id,
-
-                r.created_at                                                       as created_at
+                r.created_at                                                      as created_at
             from %2$s r
 
-            left join dim_product dp
-              on dp.account_id        = r.account_id
-             and dp.source_platform   = '%1$s'
-             and dp.source_product_id = nullif(r.payload::jsonb -> 'product' ->> 'sku','')
-
-            left join dim_category dc
-              on dc.source_platform    = '%1$s'
-             and dc.source_category_id = dp.external_category_id
+            join fact_sales fs
+              on fs.account_id      = r.account_id
+             and fs.source_platform = '%1$s'
+             and fs.source_event_id =
+                 nullif(r.payload::jsonb ->> 'posting_number','') || ':' ||
+                 nullif(r.payload::jsonb -> 'product' ->> 'sku','')
 
             where r.account_id = ?
               and r.request_id = ?
               and nullif(r.payload::jsonb ->> 'id','') is not null
               and nullif(r.payload::jsonb -> 'product' ->> 'sku','') is not null
               and nullif(r.payload::jsonb -> 'logistic' ->> 'return_date','') is not null
-              and dp.id is not null
         ) t
         order by source_event_id, created_at desc nulls last
         """.formatted(platform, RawTableNames.RAW_OZON_RETURNS);
