@@ -6,33 +6,26 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
-  <!-- ===================================================================== -->
-  <!-- FACT SALES :: UNIFIED (ALL MARKETPLACES) — EVENT FACT (NO MONEY)      -->
-  <!-- ===================================================================== -->
+  <changeSet id="0100-create-fact-sales" author="vitalii.kim" dbms="postgresql">
 
-  <changeSet id="0009-create-fact-sales" author="vitalii.kim" dbms="postgresql">
     <sql>
       create table if not exists fact_sales
       (
-        id                bigserial primary key,
+        id              bigserial primary key,
 
-        account_id        bigint      not null,
+        account_id      bigint      not null,
+        source_platform text        not null,
+        source_event_id text        not null,
 
-        source_platform   text        not null,
-        source_event_id   text        not null,
+        dim_product_id  bigint      not null,
+        warehouse_id    bigint,
+        category_id     bigint,
 
-        order_id          text,
+        quantity        integer     not null,
+        sale_date       date        not null,
 
-        dim_product_id    bigint      not null,
-
-        warehouse_id      bigint,
-        category_id       bigint,
-
-        quantity          integer     not null,
-        sale_date         date        not null,
-
-        created_at        timestamptz not null default now(),
-        updated_at        timestamptz not null default now(),
+        created_at      timestamptz not null default now(),
+        updated_at      timestamptz not null default now(),
 
         constraint uq_fact_sales_source
           unique (account_id, source_platform, source_event_id),

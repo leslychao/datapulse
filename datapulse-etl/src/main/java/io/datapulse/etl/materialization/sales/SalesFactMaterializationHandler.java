@@ -31,6 +31,8 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
   public void materialize(long accountId, String requestId) {
     log.info("Sales fact materialization started: requestId={}, accountId={}", requestId,
         accountId);
+    dimWarehouseRepository.upsertOzonFromPostings(accountId, requestId);
+    dimWarehouseRepository.upsertOzonFromReturns(accountId, requestId);
 
     dimProductRepository.upsertOzonFromPostingsFbs(accountId, requestId);
     dimProductRepository.upsertOzonFromPostingsFbo(accountId, requestId);
@@ -42,8 +44,6 @@ public final class SalesFactMaterializationHandler implements MaterializationHan
 
     returnsFactRepository.upsertWildberries(accountId, requestId);
     returnsFactRepository.upsertOzonReturns(accountId, requestId);
-
-    dimWarehouseRepository.upsertOzonFromPostings(accountId, requestId);
 
     log.info("Sales fact materialization finished: requestId={}, accountId={}", requestId,
         accountId);

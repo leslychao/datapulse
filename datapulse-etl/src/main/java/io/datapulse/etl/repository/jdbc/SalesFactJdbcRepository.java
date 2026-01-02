@@ -1,11 +1,11 @@
 package io.datapulse.etl.repository.jdbc;
 
 import io.datapulse.domain.MarketplaceType;
-import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.SalesFactRepository;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -18,7 +18,6 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           source_platform,
           source_event_id,
           dim_product_id,
-          order_id,
           warehouse_id,
           category_id,
           quantity,
@@ -31,258 +30,146 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           source_platform,
           source_event_id,
           dim_product_id,
-          order_id,
           warehouse_id,
           category_id,
           quantity,
           sale_date,
           now(),
           now()
-      from (%s) as source
-      on conflict (account_id, source_platform, source_event_id) do update
-        set dim_product_id = excluded.dim_product_id,
-            order_id       = excluded.order_id,
-            warehouse_id   = excluded.warehouse_id,
-            category_id    = excluded.category_id,
-            quantity       = excluded.quantity,
-            sale_date      = excluded.sale_date,
-            updated_at     = now();
+      from (
+          %s
+      ) as source
+      on conflict (account_id, source_platform, source_event_id)
+      do update
+      set
+          dim_product_id = excluded.dim_product_id,
+          warehouse_id   = excluded.warehouse_id,
+          category_id    = excluded.category_id,
+          quantity       = excluded.quantity,
+          sale_date      = excluded.sale_date,
+          updated_at     = now();
       """;
 
-  private final JdbcTemplate jdbcTemplate;
+  private static final String WB_SOURCE_SELECT = """
+      select distinct
+          :accountId                               as account_id,
+          :platform                                as source_platform,
+          (r.payload::jsonb ->> 'rrd_id')          as source_event_id,
+          dp.id                                    as dim_product_id,
+          dw.id                                    as warehouse_id,
+          dc.id                                    as category_id,
+          (r.payload::jsonb ->> 'quantity')::int   as quantity,
+          (r.payload::jsonb ->> 'sale_dt')::date   as sale_date
+      from raw_wb_sales_report_detail r
+      join dim_product dp
+        on dp.account_id        = r.account_id
+       and dp.source_platform   = :platform
+       and dp.source_product_id = (r.payload::jsonb ->> 'nm_id')
+      left join dim_warehouse dw
+        on dw.account_id            = r.account_id
+       and dw.source_platform       = :platform
+       and dw.external_warehouse_id = (r.payload::jsonb ->> 'ppvz_office_id')
+      left join dim_category dc
+        on dc.source_platform    = :platform
+       and dc.source_category_id = dp.external_category_id
+      where r.account_id = :accountId
+        and r.request_id = :requestId
+        and coalesce(r.payload::jsonb ->> 'doc_type_name', '') = 'Продажа'
+      """;
+
+  private static final String OZON_FBS_SOURCE_SELECT = """
+      select distinct
+          :accountId                                                   as account_id,
+          :platform                                                    as source_platform,
+          (r.payload::jsonb ->> 'posting_number') || ':' ||
+          (p.value ->> 'sku')                                          as source_event_id,
+          dp.id                                                        as dim_product_id,
+          dw.id                                                        as warehouse_id,
+          dc.id                                                        as category_id,
+          (p.value ->> 'quantity')::int                                as quantity,
+          (r.payload::jsonb ->> 'in_process_at')::date                 as sale_date
+      from raw_ozon_postings_fbs r
+      cross join lateral jsonb_array_elements(r.payload::jsonb -> 'products') as p(value)
+      join dim_product dp
+        on dp.account_id        = r.account_id
+       and dp.source_platform   = :platform
+       and dp.source_product_id = (p.value ->> 'sku')
+      left join dim_warehouse dw
+        on dw.account_id            = r.account_id
+       and dw.source_platform       = :platform
+       and dw.external_warehouse_id = (r.payload::jsonb #>> '{delivery_method,warehouse_id}')
+      left join dim_category dc
+        on dc.source_platform    = :platform
+       and dc.source_category_id = dp.external_category_id
+      where r.account_id = :accountId
+        and r.request_id = :requestId
+        and r.payload::jsonb ->> 'status' = 'delivered'
+      """;
+
+  private static final String OZON_FBO_SOURCE_SELECT = """
+      select distinct
+          :accountId                                                   as account_id,
+          :platform                                                    as source_platform,
+          (r.payload::jsonb ->> 'posting_number') || ':' ||
+          (p.value ->> 'sku')                                          as source_event_id,
+          dp.id                                                        as dim_product_id,
+          dw.id                                                        as warehouse_id,
+          dc.id                                                        as category_id,
+          (p.value ->> 'quantity')::int                                as quantity,
+          (r.payload::jsonb ->> 'in_process_at')::date                 as sale_date
+      from raw_ozon_postings_fbo r
+      cross join lateral jsonb_array_elements(r.payload::jsonb -> 'products') as p(value)
+      join dim_product dp
+        on dp.account_id        = r.account_id
+       and dp.source_platform   = :platform
+       and dp.source_product_id = (p.value ->> 'sku')
+      left join dim_warehouse dw
+        on dw.account_id            = r.account_id
+       and dw.source_platform       = :platform
+       and dw.external_warehouse_id = (r.payload::jsonb #>> '{analytics_data,warehouse_id}')
+      left join dim_category dc
+        on dc.source_platform    = :platform
+       and dc.source_category_id = dp.external_category_id
+      where r.account_id = :accountId
+        and r.request_id = :requestId
+        and r.payload::jsonb ->> 'status' = 'delivered'
+      """;
+
+  private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
   @Override
   public void upsertWildberries(long accountId, String requestId) {
     Objects.requireNonNull(requestId, "requestId обязателен.");
-
     String platform = MarketplaceType.WILDBERRIES.tag();
-
-    String selectQuery = """
-        select distinct on (source_event_id)
-            account_id,
-            source_platform,
-            source_event_id,
-            dim_product_id,
-            order_id,
-            warehouse_id,
-            category_id,
-            quantity,
-            sale_date
-        from (
-            select
-                account_id,
-                source_platform,
-                source_event_id,
-                dim_product_id,
-                order_id,
-                warehouse_id,
-                category_id,
-                sum(quantity)   as quantity,
-                sale_date,
-                max(created_at) as created_at
-            from (
-                select
-                    r.account_id                                                      as account_id,
-                    '%1$s'                                                            as source_platform,
-
-                    nullif(r.payload::jsonb ->> 'saleID','')                          as source_event_id,
-                    nullif(r.payload::jsonb ->> 'srid','')                            as order_id,
-
-                    w.id                                                              as warehouse_id,
-
-                    dc.id                                                             as category_id,
-
-                    1                                                                 as quantity,
-
-                    (r.payload::jsonb ->> 'date')::timestamptz::date                  as sale_date,
-
-                    dp.id                                                             as dim_product_id,
-
-                    r.created_at                                                      as created_at
-                from %2$s r
-
-                left join dim_product dp
-                  on dp.account_id        = r.account_id
-                 and dp.source_platform   = '%1$s'
-                 and dp.source_product_id = nullif(r.payload::jsonb ->> 'nmId','')
-
-                left join dim_warehouse w
-                  on w.account_id = r.account_id
-                 and lower(w.source_platform) = lower('%1$s')
-                 and (
-                      w.external_warehouse_id = nullif(r.payload::jsonb ->> 'warehouseId','')
-                      or lower(trim(w.warehouse_name)) = lower(trim(nullif(r.payload::jsonb ->> 'warehouseName','')))
-                     )
-
-                left join dim_category dc
-                  on dc.source_platform    = '%1$s'
-                 and dc.source_category_id = dp.external_category_id
-
-                where r.account_id = ?
-                  and r.request_id = ?
-                  and nullif(r.payload::jsonb ->> 'saleID','') is not null
-                  and nullif(r.payload::jsonb ->> 'nmId','')   is not null
-                  and nullif(r.payload::jsonb ->> 'date','')   is not null
-                  and nullif(r.payload::jsonb ->> 'forPay','') is not null
-                  and (r.payload::jsonb ->> 'forPay')::numeric > 0
-                  and dp.id is not null
-            ) s
-            group by
-                account_id,
-                source_platform,
-                source_event_id,
-                dim_product_id,
-                order_id,
-                warehouse_id,
-                category_id,
-                sale_date
-        ) t
-        where quantity > 0
-        order by source_event_id, created_at desc nulls last
-        """.formatted(platform, RawTableNames.RAW_WB_SUPPLIER_SALES);
-
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
+    String query = UPSERT_TEMPLATE.formatted(WB_SOURCE_SELECT);
+    MapSqlParameterSource params = new MapSqlParameterSource()
+        .addValue("accountId", accountId)
+        .addValue("requestId", requestId)
+        .addValue("platform", platform);
+    namedParameterJdbcTemplate.update(query, params);
   }
 
   @Override
   public void upsertOzonPostingsFbs(long accountId, String requestId) {
     Objects.requireNonNull(requestId, "requestId обязателен.");
-
     String platform = MarketplaceType.OZON.tag();
-
-    String selectQuery = """
-        select distinct on (source_event_id)
-            account_id,
-            source_platform,
-            source_event_id,
-            dim_product_id,
-            order_id,
-            warehouse_id,
-            category_id,
-            quantity,
-            sale_date
-        from (
-            select
-                p.account_id                                                       as account_id,
-                '%1$s'                                                             as source_platform,
-
-                (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
-
-                nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
-
-                w.id                                                               as warehouse_id,
-
-                dc.id                                                              as category_id,
-
-                nullif(item ->> 'quantity','')::int                                as quantity,
-
-                (p.payload::jsonb ->> 'shipment_date')::timestamptz::date          as sale_date,
-
-                dp.id                                                              as dim_product_id,
-
-                p.created_at                                                       as created_at
-            from %2$s p
-            join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
-
-            left join dim_product dp
-              on dp.account_id        = p.account_id
-             and dp.source_platform   = '%1$s'
-             and dp.source_product_id = nullif(item ->> 'sku','')
-
-            left join dim_warehouse w
-              on w.account_id = p.account_id
-             and lower(w.source_platform) = lower('%1$s')
-             and (
-                  w.external_warehouse_id = coalesce(
-                      nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouse_id',''),
-                      nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouseId','')
-                  )
-                  or lower(trim(w.warehouse_name)) = lower(trim(nullif(p.payload::jsonb -> 'delivery_method' ->> 'warehouse','')))
-                 )
-
-            left join dim_category dc
-              on dc.source_platform    = '%1$s'
-             and dc.source_category_id = dp.external_category_id
-
-            where p.account_id = ?
-              and p.request_id = ?
-              and nullif(p.payload::jsonb ->> 'posting_number','') is not null
-              and nullif(item ->> 'sku','')      is not null
-              and nullif(item ->> 'quantity','') is not null
-              and nullif(p.payload::jsonb ->> 'shipment_date','') is not null
-              and dp.id is not null
-        ) t
-        order by source_event_id, created_at desc nulls last
-        """.formatted(platform, RawTableNames.RAW_OZON_POSTINGS_FBS);
-
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
+    String query = UPSERT_TEMPLATE.formatted(OZON_FBS_SOURCE_SELECT);
+    MapSqlParameterSource params = new MapSqlParameterSource()
+        .addValue("accountId", accountId)
+        .addValue("requestId", requestId)
+        .addValue("platform", platform);
+    namedParameterJdbcTemplate.update(query, params);
   }
 
   @Override
   public void upsertOzonPostingsFbo(long accountId, String requestId) {
     Objects.requireNonNull(requestId, "requestId обязателен.");
-
     String platform = MarketplaceType.OZON.tag();
-
-    String selectQuery = """
-        select distinct on (source_event_id)
-            account_id,
-            source_platform,
-            source_event_id,
-            dim_product_id,
-            order_id,
-            warehouse_id,
-            category_id,
-            quantity,
-            sale_date
-        from (
-            select
-                p.account_id                                                       as account_id,
-                '%1$s'                                                             as source_platform,
-
-                (p.payload::jsonb ->> 'posting_number') || ':' || (item ->> 'sku') as source_event_id,
-
-                nullif(p.payload::jsonb ->> 'posting_number','')                   as order_id,
-
-                w.id                                                               as warehouse_id,
-
-                dc.id                                                              as category_id,
-
-                nullif(item ->> 'quantity','')::int                                as quantity,
-
-                (p.payload::jsonb ->> 'created_at')::timestamptz::date             as sale_date,
-
-                dp.id                                                              as dim_product_id,
-
-                p.created_at                                                       as created_at
-            from %2$s p
-            join lateral jsonb_array_elements(p.payload::jsonb -> 'products') item on true
-
-            left join dim_product dp
-              on dp.account_id        = p.account_id
-             and dp.source_platform   = '%1$s'
-             and dp.source_product_id = nullif(item ->> 'sku','')
-
-            left join dim_warehouse w
-              on w.account_id = p.account_id
-             and lower(w.source_platform) = lower('%1$s')
-             and w.external_warehouse_id = nullif(p.payload::jsonb -> 'analytics_data' ->> 'warehouse_id','')
-
-            left join dim_category dc
-              on dc.source_platform    = '%1$s'
-             and dc.source_category_id = dp.external_category_id
-
-            where p.account_id = ?
-              and p.request_id = ?
-              and nullif(p.payload::jsonb ->> 'posting_number','') is not null
-              and nullif(item ->> 'sku','')      is not null
-              and nullif(item ->> 'quantity','') is not null
-              and nullif(p.payload::jsonb ->> 'created_at','') is not null
-              and dp.id is not null
-        ) t
-        order by source_event_id, created_at desc nulls last
-        """.formatted(platform, RawTableNames.RAW_OZON_POSTINGS_FBO);
-
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
+    String query = UPSERT_TEMPLATE.formatted(OZON_FBO_SOURCE_SELECT);
+    MapSqlParameterSource params = new MapSqlParameterSource()
+        .addValue("accountId", accountId)
+        .addValue("requestId", requestId)
+        .addValue("platform", platform);
+    namedParameterJdbcTemplate.update(query, params);
   }
 }
