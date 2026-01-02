@@ -35,7 +35,7 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
           now(),
           now()
       from (%s) as source
-      on conflict (account_id, source_platform, penalty_date, order_id)
+      on conflict (account_id, source_platform, penalty_date, order_id, penalty_source_code)
       do update
       set
           penalty_source_code = excluded.penalty_source_code,

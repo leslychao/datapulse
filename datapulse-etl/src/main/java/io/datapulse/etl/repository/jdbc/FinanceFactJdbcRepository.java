@@ -83,6 +83,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               on fc.account_id      = ss.account_id
              and fc.source_platform = ss.source_platform
              and fc.order_id        = ss.order_id
+             and fc.dim_product_id  = ss.dim_product_id
              and fc.commission_kind = 'SALES'
             group by ss.fact_sales_id
         ),
@@ -94,8 +95,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             left join fact_logistics_costs fl
               on fl.account_id      = ss.account_id
              and fl.source_platform = ss.source_platform
-             and fl.operation_date  = ss.sale_date
-             and fl.warehouse_id    = ss.warehouse_id
+             and fl.order_id        = ss.order_id
+             and fl.dim_product_id  = ss.dim_product_id
             group by ss.fact_sales_id
         ),
         product_costs as (
@@ -325,6 +326,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               on fc.account_id      = ss.account_id
              and fc.source_platform = ss.source_platform
              and fc.order_id        = ss.order_id
+             and fc.dim_product_id  = ss.dim_product_id
              and fc.commission_kind = 'SALES'
             group by ss.fact_sales_id
         ),
@@ -336,8 +338,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             left join fact_logistics_costs fl
               on fl.account_id      = ss.account_id
              and fl.source_platform = ss.source_platform
-             and fl.operation_date  = ss.sale_date
-             and fl.warehouse_id    = ss.warehouse_id
+             and fl.order_id        = ss.order_id
+             and fl.dim_product_id  = ss.dim_product_id
             group by ss.fact_sales_id
         ),
         product_costs as (

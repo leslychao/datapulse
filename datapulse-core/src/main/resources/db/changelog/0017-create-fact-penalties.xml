@@ -43,7 +43,7 @@
         updated_at          timestamptz    not null default now(),
 
         constraint uq_fact_penalties_order
-          unique (account_id, source_platform, penalty_date, order_id)
+          unique (account_id, source_platform, penalty_date, order_id, penalty_source_code)
       );
 
       create index if not exists idx_fact_penalties_account_date

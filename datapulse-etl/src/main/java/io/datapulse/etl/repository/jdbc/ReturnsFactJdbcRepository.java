@@ -111,6 +111,50 @@ public class ReturnsFactJdbcRepository implements ReturnsFactRepository {
                   and nullif(r.payload::jsonb ->> 'date','')   is not null
                   and nullif(r.payload::jsonb ->> 'forPay','') is not null
                   and (r.payload::jsonb ->> 'forPay')::numeric < 0
+                union all
+                select
+                    r.account_id                                                     as account_id,
+                    '%1$s'                                                           as source_platform,
+
+                    nullif(r.payload::jsonb ->> 'rrd_id','')                          as source_event_id,
+
+                    dp.id                                                            as dim_product_id,
+                    nullif(r.payload::jsonb ->> 'srid','')                            as order_id,
+                    w.id                                                             as warehouse_id,
+                    dc.id                                                            as category_id,
+
+                    coalesce(nullif(r.payload::jsonb ->> 'quantity','')::int, 1)      as quantity,
+
+                    (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                 as return_date,
+
+                    r.created_at                                                     as created_at
+                from %3$s r
+
+                join dim_product dp
+                  on dp.account_id        = r.account_id
+                 and dp.source_platform   = '%1$s'
+                 and dp.source_product_id = nullif(r.payload::jsonb ->> 'nm_id','')
+
+                left join dim_warehouse w
+                  on w.account_id = r.account_id
+                 and lower(w.source_platform) = lower('%1$s')
+                 and w.external_warehouse_id =
+                     nullif(r.payload::jsonb ->> 'ppvz_office_id','')
+
+                left join dim_category dc
+                  on dc.source_platform    = '%1$s'
+                 and dc.source_category_id = dp.external_category_id
+
+                where r.account_id = ?
+                  and r.request_id = ?
+                  and nullif(r.payload::jsonb ->> 'rrd_id','') is not null
+                  and nullif(r.payload::jsonb ->> 'srid','')   is not null
+                  and nullif(r.payload::jsonb ->> 'nm_id','')  is not null
+                  and nullif(r.payload::jsonb ->> 'rr_dt','')  is not null
+                  and (
+                    nullif(r.payload::jsonb ->> 'doc_type_name','') in ('Возврат', 'Сторно продажи')
+                    or nullif(r.payload::jsonb ->> 'supplier_oper_name','') in ('Возврат', 'Сторно продажи')
+                  )
             ) s
             group by
                 account_id,
@@ -124,9 +168,19 @@ public class ReturnsFactJdbcRepository implements ReturnsFactRepository {
         ) t
         where quantity > 0
         order by source_event_id, created_at desc nulls last
-        """.formatted(platform, RawTableNames.RAW_WB_SUPPLIER_SALES);
+        """.formatted(
+        platform,
+        RawTableNames.RAW_WB_SUPPLIER_SALES,
+        RawTableNames.RAW_WB_SALES_REPORT_DETAIL
+    );
 
-    jdbcTemplate.update(UPSERT_RETURNS_TEMPLATE.formatted(selectQuery), accountId, requestId);
+    jdbcTemplate.update(
+        UPSERT_RETURNS_TEMPLATE.formatted(selectQuery),
+        accountId,
+        requestId,
+        accountId,
+        requestId
+    );
   }
 
   @Override
