@@ -109,7 +109,10 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
                 left join dim_warehouse w
                   on w.account_id = r.account_id
                  and lower(w.source_platform) = lower('%1$s')
-                 and w.external_warehouse_id = nullif(r.payload::jsonb ->> 'warehouseId','')
+                 and (
+                      w.external_warehouse_id = nullif(r.payload::jsonb ->> 'warehouseId','')
+                      or lower(trim(w.warehouse_name)) = lower(trim(nullif(r.payload::jsonb ->> 'warehouseName','')))
+                     )
 
                 left join dim_category dc
                   on dc.source_platform    = '%1$s'
