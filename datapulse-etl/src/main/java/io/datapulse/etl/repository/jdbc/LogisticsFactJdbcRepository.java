@@ -73,16 +73,16 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                 max(s.currency)   as currency
             from (
                 select
-                    r.account_id                                       as account_id,
-                    '%1$s'                                             as source_platform,
-                    (r.payload::jsonb ->> 'rr_dt')::date              as operation_date,
-                    w.id                                              as warehouse_id,
-                    l.logistics_type                                  as logistics_type,
-                    l.amount                                          as amount,
+                    r.account_id                                      as account_id,
+                    '%1$s'                                            as source_platform,
+                    (r.payload::jsonb ->> 'rr_dt')::date             as operation_date,
+                    w.id                                             as warehouse_id,
+                    l.logistics_type                                 as logistics_type,
+                    l.amount                                         as amount,
                     coalesce(
                         nullif(r.payload::jsonb ->> 'currency_name',''),
                         'RUB'
-                    )                                                 as currency
+                    )                                                as currency
                 from %2$s r
                 join dim_warehouse w
                   on w.account_id = r.account_id
@@ -91,14 +91,19 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                      nullif(r.payload::jsonb ->> 'ppvz_office_id','')
                 join lateral (
                     values
+                      -- доставка до клиента: денежная величина в поле delivery_rub
                       ('DELIVERY_TO_CUSTOMER',
-                       nullif(r.payload::jsonb ->> 'delivery_amount','')::numeric),
+                       nullif(r.payload::jsonb ->> 'delivery_rub','')::numeric),
+                      -- логистика возврата от клиента
                       ('RETURN_FROM_CUSTOMER',
                        nullif(r.payload::jsonb ->> 'return_amount','')::numeric),
+                      -- входящая логистика / доп. логистика
                       ('INBOUND',
                        nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric),
+                      -- хранение на складах WB
                       ('STORAGE',
                        nullif(r.payload::jsonb ->> 'storage_fee','')::numeric),
+                      -- приёмка / дополнительная входящая логистика
                       ('INBOUND',
                        nullif(r.payload::jsonb ->> 'acceptance','')::numeric)
                 ) as l(logistics_type, amount)
