@@ -91,19 +91,14 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                      nullif(r.payload::jsonb ->> 'ppvz_office_id','')
                 join lateral (
                     values
-                      -- доставка до клиента: денежная величина в поле delivery_rub
                       ('DELIVERY_TO_CUSTOMER',
                        nullif(r.payload::jsonb ->> 'delivery_rub','')::numeric),
-                      -- логистика возврата от клиента
                       ('RETURN_FROM_CUSTOMER',
                        nullif(r.payload::jsonb ->> 'return_amount','')::numeric),
-                      -- входящая логистика / доп. логистика
                       ('INBOUND',
                        nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric),
-                      -- хранение на складах WB
                       ('STORAGE',
                        nullif(r.payload::jsonb ->> 'storage_fee','')::numeric),
-                      -- приёмка / дополнительная входящая логистика
                       ('INBOUND',
                        nullif(r.payload::jsonb ->> 'acceptance','')::numeric)
                 ) as l(logistics_type, amount)
