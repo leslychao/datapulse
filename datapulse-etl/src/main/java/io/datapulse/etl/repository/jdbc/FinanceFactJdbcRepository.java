@@ -3,7 +3,6 @@ package io.datapulse.etl.repository.jdbc;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.FinanceFactRepository;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -17,12 +16,40 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
 
   @Override
   public void upsertFromWildberries(long accountId, String requestId) {
-    Objects.requireNonNull(requestId, "requestId обязателен.");
-
     String platform = MarketplaceType.WILDBERRIES.tag();
 
     String query = """
-        with source_sales as (
+        with raw_sales as (
+            select
+                r.account_id                                         as account_id,
+                nullif(r.payload::jsonb ->> 'srid','')               as order_id,
+                nullif(r.payload::jsonb ->> 'nm_id','')              as source_product_id,
+                coalesce(
+                    nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub','')::numeric,
+                    0
+                )                                                    as revenue_gross_amount,
+                coalesce(
+                    nullif(r.payload::jsonb ->> 'ppvz_for_pay','')::numeric,
+                    0
+                )                                                    as payout_from_marketplace_raw,
+                coalesce(
+                    nullif(r.payload::jsonb ->> 'currency_name',''),
+                    'RUB'
+                )                                                    as currency
+            from %2$s r
+            where r.account_id = :accountId
+              and nullif(r.payload::jsonb ->> 'srid','') is not null
+              and nullif(r.payload::jsonb ->> 'nm_id','') is not null
+              and (
+                nullif(r.payload::jsonb ->> 'doc_type_name','') is null
+                or nullif(r.payload::jsonb ->> 'doc_type_name','') not in ('Возврат', 'Сторно продажи')
+              )
+              and (
+                nullif(r.payload::jsonb ->> 'supplier_oper_name','') is null
+                or nullif(r.payload::jsonb ->> 'supplier_oper_name','') not in ('Возврат', 'Сторно продажи')
+              )
+        ),
+        source_sales as (
             select distinct
                 fs.id              as fact_sales_id,
                 fs.account_id      as account_id,
@@ -35,43 +62,26 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             from fact_sales fs
             join dim_product dp
               on dp.id = fs.dim_product_id
-            join %2$s r
-              on r.account_id = fs.account_id
-             and r.request_id = :requestId
-             and nullif(r.payload::jsonb ->> 'srid','') = fs.order_id
-             and nullif(r.payload::jsonb ->> 'nm_id','') = dp.source_product_id
+            join raw_sales rs
+              on rs.account_id = fs.account_id
+             and rs.order_id = fs.order_id
+             and rs.source_product_id = dp.source_product_id
             where fs.account_id = :accountId
               and fs.source_platform = '%1$s'
         ),
         finance_raw as (
             select
                 ss.fact_sales_id as fact_sales_id,
-                sum(
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub','')::numeric,
-                        0
-                    )
-                ) as revenue_gross_amount,
-                sum(
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'ppvz_for_pay','')::numeric,
-                        0
-                    )
-                ) as payout_from_marketplace_raw,
-                max(
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'currency_name',''),
-                        'RUB'
-                    )
-                ) as currency
+                sum(rs.revenue_gross_amount)           as revenue_gross_amount,
+                sum(rs.payout_from_marketplace_raw)    as payout_from_marketplace_raw,
+                max(rs.currency)                       as currency
             from source_sales ss
             join dim_product dp
               on dp.id = ss.dim_product_id
-            join %2$s r
-              on r.account_id = ss.account_id
-             and r.request_id = :requestId
-             and nullif(r.payload::jsonb ->> 'srid','') = ss.order_id
-             and nullif(r.payload::jsonb ->> 'nm_id','') = dp.source_product_id
+            join raw_sales rs
+              on rs.account_id = ss.account_id
+             and rs.order_id = ss.order_id
+             and rs.source_product_id = dp.source_product_id
             group by ss.fact_sales_id
         ),
         commission_costs as (
@@ -179,16 +189,13 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         """.formatted(platform, RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
     MapSqlParameterSource params = new MapSqlParameterSource()
-        .addValue("accountId", accountId)
-        .addValue("requestId", requestId);
+        .addValue("accountId", accountId);
 
     namedParameterJdbcTemplate.update(query, params);
   }
 
   @Override
   public void upsertFromOzon(long accountId, String requestId) {
-    Objects.requireNonNull(requestId, "requestId обязателен.");
-
     String platform = MarketplaceType.OZON.tag();
 
     String query = """
@@ -205,7 +212,6 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             from %2$s r
             join lateral jsonb_array_elements(r.payload::jsonb -> 'products') item on true
             where r.account_id = :accountId
-              and r.request_id = :requestId
             union all
             select
                 r.account_id                                   as account_id,
@@ -219,7 +225,6 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             from %3$s r
             join lateral jsonb_array_elements(r.payload::jsonb -> 'products') item on true
             where r.account_id = :accountId
-              and r.request_id = :requestId
         ),
         source_sales as (
             select distinct
@@ -287,7 +292,6 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 )                                                 as currency
             from %4$s r
             where r.account_id = :accountId
-              and r.request_id = :requestId
               and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') is not null
             group by r.account_id, order_id
         ),
@@ -427,8 +431,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
     );
 
     MapSqlParameterSource params = new MapSqlParameterSource()
-        .addValue("accountId", accountId)
-        .addValue("requestId", requestId);
+        .addValue("accountId", accountId);
 
     namedParameterJdbcTemplate.update(query, params);
   }
