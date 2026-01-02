@@ -52,29 +52,30 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
 
   private static final String WB_SOURCE_SELECT = """
       select distinct
-          :accountId                               as account_id,
-          :platform                                as source_platform,
-          (r.payload::jsonb ->> 'rrd_id')          as source_event_id,
-          dp.id                                    as dim_product_id,
-          dw.id                                    as warehouse_id,
-          dc.id                                    as category_id,
-          (r.payload::jsonb ->> 'quantity')::int   as quantity,
-          (r.payload::jsonb ->> 'sale_dt')::date   as sale_date
-      from raw_wb_sales_report_detail r
+          :accountId                                                                 as account_id,
+          :platform                                                                  as source_platform,
+          (r.payload::jsonb ->> 'saleID') || ':' || (r.payload::jsonb ->> 'nmId')    as source_event_id,
+          dp.id                                                                      as dim_product_id,
+          dw.id                                                                      as warehouse_id,
+          dc.id                                                                      as category_id,
+          1                                                                          as quantity,
+          (r.payload::jsonb ->> 'date')::timestamptz::date                           as sale_date
+      from raw_wb_supplier_sales r
       join dim_product dp
         on dp.account_id        = r.account_id
        and dp.source_platform   = :platform
-       and dp.source_product_id = (r.payload::jsonb ->> 'nm_id')
+       and dp.source_product_id = (r.payload::jsonb ->> 'nmId')
       left join dim_warehouse dw
-        on dw.account_id            = r.account_id
-       and dw.source_platform       = :platform
-       and dw.external_warehouse_id = (r.payload::jsonb ->> 'ppvz_office_id')
+        on dw.account_id      = r.account_id
+       and dw.source_platform = :platform
+       and dw.warehouse_name  = (r.payload::jsonb ->> 'warehouseName')
       left join dim_category dc
         on dc.source_platform    = :platform
        and dc.source_category_id = dp.external_category_id
       where r.account_id = :accountId
         and r.request_id = :requestId
-        and coalesce(r.payload::jsonb ->> 'doc_type_name', '') = 'Продажа'
+        and coalesce((r.payload::jsonb ->> 'isRealization')::boolean, false)
+        and (r.payload::jsonb ->> 'saleID') like 'S%%'
       """;
 
   private static final String OZON_FBS_SOURCE_SELECT = """
