@@ -51,15 +51,15 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
       """;
 
   private static final String WB_SOURCE_SELECT = """
-      select distinct
-          :accountId                                                                 as account_id,
-          :platform                                                                  as source_platform,
-          (r.payload::jsonb ->> 'saleID') || ':' || (r.payload::jsonb ->> 'nmId')    as source_event_id,
-          dp.id                                                                      as dim_product_id,
-          dw.id                                                                      as warehouse_id,
-          dc.id                                                                      as category_id,
-          1                                                                          as quantity,
-          (r.payload::jsonb ->> 'date')::timestamptz::date                           as sale_date
+      select
+          :accountId                                                               as account_id,
+          :platform                                                                as source_platform,
+          (r.payload::jsonb ->> 'saleID') || ':' || (r.payload::jsonb ->> 'nmId')  as source_event_id,
+          dp.id                                                                    as dim_product_id,
+          dw.id                                                                    as warehouse_id,
+          dc.id                                                                    as category_id,
+          count(*)                                                                 as quantity,
+          min((r.payload::jsonb ->> 'date')::timestamptz)::date                   as sale_date
       from raw_wb_supplier_sales r
       join dim_product dp
         on dp.account_id        = r.account_id
@@ -76,6 +76,12 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
         and r.request_id = :requestId
         and coalesce((r.payload::jsonb ->> 'isRealization')::boolean, false)
         and (r.payload::jsonb ->> 'saleID') like 'S%%'
+      group by
+        (r.payload::jsonb ->> 'saleID'),
+        (r.payload::jsonb ->> 'nmId'),
+        dp.id,
+        dw.id,
+        dc.id
       """;
 
   private static final String OZON_FBS_SOURCE_SELECT = """

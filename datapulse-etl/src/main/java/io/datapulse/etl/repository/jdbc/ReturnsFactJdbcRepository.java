@@ -51,30 +51,45 @@ public class ReturnsFactJdbcRepository implements ReturnsFactRepository {
       """;
 
   private static final String WB_SOURCE_SELECT = """
-      select distinct
-          :accountId                                                                 as account_id,
-          :platform                                                                  as source_platform,
-          (r.payload::jsonb ->> 'saleID') || ':' || (r.payload::jsonb ->> 'nmId')    as source_event_id,
-          dp.id                                                                      as dim_product_id,
-          dw.id                                                                      as warehouse_id,
-          dc.id                                                                      as category_id,
-          1                                                                          as quantity,
-          (r.payload::jsonb ->> 'date')::timestamptz::date                           as return_date
-      from raw_wb_supplier_sales r
-      join dim_product dp
-        on dp.account_id        = r.account_id
-       and dp.source_platform   = :platform
-       and dp.source_product_id = (r.payload::jsonb ->> 'nmId')
-      left join dim_warehouse dw
-        on dw.account_id      = r.account_id
-       and dw.source_platform = :platform
-       and dw.warehouse_name  = (r.payload::jsonb ->> 'warehouseName')
-      left join dim_category dc
-        on dc.source_platform    = :platform
-       and dc.source_category_id = dp.external_category_id
-      where r.account_id = :accountId
-        and r.request_id = :requestId
-        and (r.payload::jsonb ->> 'saleID') ~ '^[RA]'
+      select
+          :accountId                 as account_id,
+          :platform                  as source_platform,
+          s.source_event_id          as source_event_id,
+          s.dim_product_id           as dim_product_id,
+          s.warehouse_id             as warehouse_id,
+          s.category_id              as category_id,
+          s.quantity                 as quantity,
+          s.return_date              as return_date
+      from (
+          select
+              (r.payload::jsonb ->> 'saleID') || ':' || (r.payload::jsonb ->> 'nmId') as source_event_id,
+              dp.id                                                                   as dim_product_id,
+              dw.id                                                                   as warehouse_id,
+              dc.id                                                                   as category_id,
+              count(*)                                                                as quantity,
+              min((r.payload::jsonb ->> 'date')::timestamptz)::date                   as return_date
+          from raw_wb_supplier_sales r
+          join dim_product dp
+            on dp.account_id        = r.account_id
+           and dp.source_platform   = :platform
+           and dp.source_product_id = (r.payload::jsonb ->> 'nmId')
+          left join dim_warehouse dw
+            on dw.account_id      = r.account_id
+           and dw.source_platform = :platform
+           and dw.warehouse_name  = (r.payload::jsonb ->> 'warehouseName')
+          left join dim_category dc
+            on dc.source_platform    = :platform
+           and dc.source_category_id = dp.external_category_id
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and (r.payload::jsonb ->> 'saleID') ~ '^[RA]'
+          group by
+            (r.payload::jsonb ->> 'saleID'),
+            (r.payload::jsonb ->> 'nmId'),
+            dp.id,
+            dw.id,
+            dc.id
+      ) as s
       """;
 
   private static final String OZON_SOURCE_SELECT = """
