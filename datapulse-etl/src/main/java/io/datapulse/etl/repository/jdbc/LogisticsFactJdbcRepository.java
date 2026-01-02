@@ -106,7 +106,7 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
                     l.amount                                         as amount_raw,
                     abs(l.amount)                                    as amount_abs
                 from %2$s r
-                join dim_warehouse w
+                left join dim_warehouse w
                   on w.account_id = r.account_id
                  and lower(w.source_platform) = lower('%1$s')
                  and w.external_warehouse_id =
