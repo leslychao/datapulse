@@ -6,47 +6,55 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
+  <!-- =============================================================== -->
+  <!-- FACT COMMISSION — комиссии маркетплейса и эквайринг             -->
+  <!-- grain: account + platform + source_event + commission_type      -->
+  <!-- =============================================================== -->
+
   <changeSet id="0014-create-fact-commission" author="vitalii.kim" dbms="postgresql">
+
     <sql>
-      CREATE TABLE IF NOT EXISTS fact_commission
+      create table if not exists fact_commission
       (
-        id              BIGSERIAL PRIMARY KEY,
-        account_id      BIGINT         NOT NULL,
-        source_platform TEXT           NOT NULL,
-        order_id        TEXT           NULL,
-        dim_product_id  BIGINT         NULL,
-        operation_date  DATE           NOT NULL,
-        commission_type TEXT           NOT NULL,
-        amount          NUMERIC(18, 4) NOT NULL,
-        currency        TEXT           NOT NULL,
-        amount_raw      NUMERIC(18, 4) NOT NULL,
-        amount_abs      NUMERIC(18, 4) NOT NULL,
-        commission_kind TEXT           NOT NULL,
-        created_at      TIMESTAMPTZ    NOT NULL DEFAULT now(),
-        updated_at      TIMESTAMPTZ    NOT NULL DEFAULT now(),
-        CONSTRAINT uq_fact_commission_source
-          UNIQUE (
-            account_id,
-            source_platform,
-            operation_date,
-            order_id,
-            commission_type,
-            dim_product_id
-          ),
-        CONSTRAINT fk_fact_commission_dim_product
-          FOREIGN KEY (dim_product_id) REFERENCES dim_product (id)
+        id              bigserial primary key,
+
+        account_id      bigint         not null,
+        source_platform text           not null,
+        source_event_id text           not null,
+
+        order_id        text,
+        dim_product_id  bigint,
+        warehouse_id    bigint,
+        category_id     bigint,
+
+        operation_date  date           not null,
+        commission_type text           not null,
+        amount          numeric(18, 2) not null,
+        currency        text           not null,
+
+        created_at      timestamptz    not null default now(),
+        updated_at      timestamptz    not null default now(),
+
+        constraint uq_fact_commission_source
+          unique (account_id, source_platform, source_event_id, commission_type)
       );
-
-      CREATE INDEX IF NOT EXISTS idx_fact_commission_account_date
-        ON fact_commission (account_id, operation_date);
-
-      CREATE INDEX IF NOT EXISTS idx_fact_commission_order
-        ON fact_commission (account_id, source_platform, order_id);
     </sql>
 
-    <rollback>
-      DROP TABLE IF EXISTS fact_commission CASCADE;
-    </rollback>
+    <sql>
+      create index if not exists idx_fact_commission_account_date
+        on fact_commission (account_id, operation_date);
+    </sql>
+
+    <sql>
+      create index if not exists idx_fact_commission_product
+        on fact_commission (dim_product_id);
+    </sql>
+
+    <sql>
+      create index if not exists idx_fact_commission_order
+        on fact_commission (order_id);
+    </sql>
+
   </changeSet>
 
 </databaseChangeLog>
