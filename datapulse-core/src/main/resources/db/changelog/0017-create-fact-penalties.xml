@@ -7,54 +7,41 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <!-- =============================================================== -->
-  <!-- FACT PENALTIES — реальные штрафы / санкции по заказам          -->
-  <!-- grain: (account_id, platform, penalty_date, order_id)           -->
-  <!--                                                                -->
-  <!-- Сюда попадают ТОЛЬКО штрафы маркетплейсов:                     -->
-  <!--   • OZON: OperationMarketplaceWithHoldingForUndeliverableGoods -->
-  <!--   • WB: penalty, bonus_type_name LIKE 'Штраф%'                 -->
-  <!--                                                                -->
-  <!-- В ЭТОТ ФАКТ НЕ ПОПАДАЮТ:                                       -->
-  <!--   ✗ логистика (delivery / return / inbound / storage)          -->
-  <!--   ✗ комиссии и эквайринг                                       -->
-  <!--   ✗ маркетинг и продвижение                                    -->
-  <!--   ✗ сервис-фии                                                 -->
-  <!--   ✗ компенсации / корректировки                                -->
+  <!-- FACT PENALTIES — штрафы и санкции                               -->
+  <!-- grain: account + platform + source_event + penalty_type         -->
   <!-- =============================================================== -->
 
   <changeSet id="0017-create-fact-penalties" author="vitalii.kim" dbms="postgresql">
+
     <sql>
       create table if not exists fact_penalties
       (
-        id                  bigserial primary key,
+        id              bigserial primary key,
 
-        account_id          bigint         not null,
-        source_platform     text           not null,
+        account_id      bigint         not null,
+        source_platform text           not null,
+        source_event_id text           not null,
 
-        penalty_date        date           not null,
-        order_id            text           not null,
+        order_id        text,
 
-        penalty_source_code text           not null,
+        penalty_type    text           not null,
+        penalty_ts      timestamptz    not null,
+        penalty_date    date           not null,
 
-        amount              numeric(18, 2) not null,
-        currency            text           not null,
+        amount          numeric(18, 2) not null,
+        currency        text           not null,
 
-        created_at          timestamptz    not null default now(),
-        updated_at          timestamptz    not null default now(),
+        created_at      timestamptz    not null default now(),
+        updated_at      timestamptz    not null default now(),
 
-        constraint uq_fact_penalties_order
-          unique (account_id, source_platform, penalty_date, order_id, penalty_source_code)
+        constraint uq_fact_penalties_source
+          unique (account_id, source_platform, source_event_id, penalty_type)
       );
-
-      create index if not exists idx_fact_penalties_account_date
-        on fact_penalties (account_id, source_platform, penalty_date);
-
-      create index if not exists idx_fact_penalties_order
-        on fact_penalties (order_id);
     </sql>
 
     <rollback>
       drop table if exists fact_penalties cascade;
     </rollback>
   </changeSet>
+
 </databaseChangeLog>
