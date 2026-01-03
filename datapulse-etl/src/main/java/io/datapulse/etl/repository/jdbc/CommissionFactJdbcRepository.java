@@ -24,9 +24,6 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           source_platform,
           source_event_id,
           order_id,
-          dim_product_id,
-          warehouse_id,
-          category_id,
           operation_date,
           commission_type,
           amount,
@@ -39,9 +36,6 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           source_platform,
           source_event_id,
           order_id,
-          dim_product_id,
-          warehouse_id,
-          category_id,
           operation_date,
           commission_type,
           amount,
@@ -55,9 +49,6 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
       do update
       set
           order_id       = excluded.order_id,
-          dim_product_id = excluded.dim_product_id,
-          warehouse_id   = excluded.warehouse_id,
-          category_id    = excluded.category_id,
           operation_date = excluded.operation_date,
           amount         = excluded.amount,
           currency       = excluded.currency,
@@ -70,18 +61,11 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           :sourcePlatform                                                            as source_platform,
           r.payload::jsonb ->> 'operation_id'                                        as source_event_id,
           nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')             as order_id,
-          null::bigint                                                               as dim_product_id,
-          dw.id                                                                      as warehouse_id,
-          null::bigint                                                               as category_id,
           (r.payload::jsonb ->> 'operation_date')::timestamptz::date                 as operation_date,
           'SALE_COMMISSION'                                                          as commission_type,
           abs(nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric)           as amount,
           'RUB'                                                                      as currency
       from %s r
-      left join dim_warehouse dw
-        on dw.account_id            = r.account_id
-       and dw.source_platform       = :sourcePlatform
-       and dw.external_warehouse_id = nullif(r.payload::jsonb -> 'posting' ->> 'warehouse_id', '')
       where r.account_id = :accountId
         and r.request_id = :requestId
         and r.marketplace = 'OZON'
@@ -95,18 +79,11 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           :sourcePlatform                                                            as source_platform,
           r.payload::jsonb ->> 'rrd_id'                                              as source_event_id,
           r.payload::jsonb ->> 'srid'                                                as order_id,
-          null::bigint                                                               as dim_product_id,
-          dw.id                                                                      as warehouse_id,
-          null::bigint                                                               as category_id,
           (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as operation_date,
           'SALE_COMMISSION'                                                          as commission_type,
           abs(nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric)     as amount,
           coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
       from %1$s r
-      left join dim_warehouse dw
-        on dw.account_id            = :accountId
-       and dw.source_platform       = :sourcePlatform
-       and dw.external_warehouse_id = nullif(r.payload::jsonb ->> 'ppvz_office_id', '')
       where r.account_id = :accountId
         and r.request_id = :requestId
         and r.marketplace = 'WILDBERRIES'
@@ -120,18 +97,11 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           :sourcePlatform                                                            as source_platform,
           r.payload::jsonb ->> 'rrd_id'                                              as source_event_id,
           r.payload::jsonb ->> 'srid'                                                as order_id,
-          null::bigint                                                               as dim_product_id,
-          dw.id                                                                      as warehouse_id,
-          null::bigint                                                               as category_id,
           (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as operation_date,
           'ACQUIRING_FEE'                                                            as commission_type,
           abs(nullif(r.payload::jsonb ->> 'acquiring_fee', '')::numeric)             as amount,
           coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
       from %1$s r
-      left join dim_warehouse dw
-        on dw.account_id            = :accountId
-       and dw.source_platform       = :sourcePlatform
-       and dw.external_warehouse_id = nullif(r.payload::jsonb ->> 'ppvz_office_id', '')
       where r.account_id = :accountId
         and r.request_id = :requestId
         and r.marketplace = 'WILDBERRIES'
