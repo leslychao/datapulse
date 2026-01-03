@@ -9,4 +9,8 @@ public interface DimWarehouseRepository {
   void upsertWildberries(Long accountId, String requestId);
 
   void upsertOzonFromPostings(Long accountId, String requestId);
+
+  void upsertOzonFromTransactions(Long accountId, String requestId);
+
+  void upsertWildberriesFromReportDetails(Long accountId, String requestId);
 }

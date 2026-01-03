@@ -3,9 +3,11 @@ package io.datapulse.etl.repository.jdbc;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.LogisticsFactRepository;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -16,275 +18,296 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
       insert into fact_logistics_costs (
           account_id,
           source_platform,
-          operation_date,
-          warehouse_id,
+          source_event_id,
           order_id,
-          dim_product_id,
+          warehouse_id,
+          operation_date,
           logistics_type,
           amount,
           currency,
-          amount_raw,
-          amount_abs,
           created_at,
           updated_at
       )
       select
           account_id,
           source_platform,
-          operation_date,
-          warehouse_id,
+          source_event_id,
           order_id,
-          dim_product_id,
+          warehouse_id,
+          operation_date,
           logistics_type,
           amount,
           currency,
-          amount_raw,
-          amount_abs,
           now(),
           now()
       from (
           %s
       ) as source
-      on conflict (account_id, source_platform, operation_date, warehouse_id, logistics_type, order_id, dim_product_id)
+      on conflict (account_id, source_platform, source_event_id)
       do update
       set
-          amount     = excluded.amount,
-          currency   = excluded.currency,
-          amount_raw = excluded.amount_raw,
-          amount_abs = excluded.amount_abs,
-          updated_at = now();
+          order_id       = excluded.order_id,
+          warehouse_id   = excluded.warehouse_id,
+          operation_date = excluded.operation_date,
+          logistics_type = excluded.logistics_type,
+          amount         = excluded.amount,
+          currency       = excluded.currency,
+          updated_at     = now()
       """;
 
-  private final JdbcTemplate jdbcTemplate;
+  private static final String OZON_LOGISTICS_SELECT = """
+      select
+          :accountId                                                                 as account_id,
+          :sourcePlatform                                                            as source_platform,
+          r.payload::jsonb ->> 'operation_id'                                        as source_event_id,
+          nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')             as order_id,
+          dw.id                                                                      as warehouse_id,
+          (r.payload::jsonb ->> 'operation_date')::timestamptz::date                 as operation_date,
+          case
+            when r.payload::jsonb ->> 'operation_type' in (
+              'OperationAgentDeliveredToCustomer',
+              'OperationAgentDeliveredToCustomerCanceled',
+              'OperationAgentStornoDeliveredToCustomer',
+              'OperationMarketplaceCrossDockServiceWriteOff',
+              'MarketplaceServiceItemDirectFlowLogistic',
+              'MarketplaceServiceItemDeliveryKGT',
+              'MarketplaceServiceItemDirectFlowLogisticVDC',
+              'ItemAdvertisementForSupplierLogistic',
+              'ItemAdvertisementForSupplierLogisticSeller',
+              'MarketplaceServiceItemDropoffPPZ',
+              'MarketplaceServiceItemDropoffFF',
+              'MarketplaceServiceItemDropoffPVZ',
+              'MarketplaceServiceItemDropoffSC',
+              'MarketplaceServiceItemPickup',
+              'MarketplaceServiceItemFulfillment',
+              'MarketplaceServiceItemDelivToCustomer',
+              'MarketplaceServiceItemDirectFlowTrans'
+            ) then 'OUTBOUND'
+            when r.payload::jsonb ->> 'operation_type' in (
+              'OperationItemReturn',
+              'OperationReturnGoodsFBSofRMS',
+              'MarketplaceServiceItemReturnFlowLogistic',
+              'MarketplaceServiceItemReturnAfterDelivToCustomer',
+              'MarketplaceServiceItemReturnNotDelivToCustomer',
+              'MarketplaceServiceItemReturnPartGoodsCustomer',
+              'MarketplaceServiceItemReturnFlowTrans',
+              'MarketplaceReturnStorageServiceAtThePickupPointFbsItem',
+              'MarketplaceReturnStorageServiceInTheWarehouseFbsItem',
+              'MarketplaceServiceItemRedistributionReturnsPVZ'
+            ) then 'RETURN'
+            when r.payload::jsonb ->> 'operation_type' in (
+              'OperationMarketplaceServiceStorage'
+            ) then 'STORAGE'
+          end                                                                        as logistics_type,
+          abs(nullif(r.payload::jsonb ->> 'amount', '')::numeric)                    as amount,
+          'RUB'                                                                      as currency
+      from %s r
+      left join dim_warehouse dw
+        on dw.account_id            = r.account_id
+       and dw.source_platform       = :sourcePlatform
+       and dw.external_warehouse_id = nullif(r.payload::jsonb -> 'posting' ->> 'warehouse_id', '')
+      where r.account_id = :accountId
+        and r.request_id = :requestId
+        and r.marketplace = 'OZON'
+        and r.payload::jsonb ->> 'operation_type' in (
+          'OperationAgentDeliveredToCustomer',
+          'OperationAgentDeliveredToCustomerCanceled',
+          'OperationAgentStornoDeliveredToCustomer',
+          'OperationMarketplaceCrossDockServiceWriteOff',
+          'OperationItemReturn',
+          'OperationReturnGoodsFBSofRMS',
+          'OperationMarketplaceServiceStorage',
+          'MarketplaceReturnStorageServiceAtThePickupPointFbsItem',
+          'MarketplaceReturnStorageServiceInTheWarehouseFbsItem',
+          'MarketplaceServiceItemDirectFlowLogistic',
+          'MarketplaceServiceItemReturnFlowLogistic',
+          'MarketplaceServiceItemDeliveryKGT',
+          'MarketplaceServiceItemDirectFlowLogisticVDC',
+          'ItemAdvertisementForSupplierLogistic',
+          'ItemAdvertisementForSupplierLogisticSeller',
+          'MarketplaceServiceItemDropoffPPZ',
+          'MarketplaceServiceItemDropoffFF',
+          'MarketplaceServiceItemDropoffPVZ',
+          'MarketplaceServiceItemDropoffSC',
+          'MarketplaceServiceItemPickup',
+          'MarketplaceServiceItemFulfillment',
+          'MarketplaceServiceItemDelivToCustomer',
+          'MarketplaceServiceItemDirectFlowTrans',
+          'MarketplaceServiceItemReturnAfterDelivToCustomer',
+          'MarketplaceServiceItemReturnNotDelivToCustomer',
+          'MarketplaceServiceItemReturnPartGoodsCustomer',
+          'MarketplaceServiceItemReturnFlowTrans',
+          'MarketplaceServiceItemRedistributionReturnsPVZ'
+        )
+        and nullif(r.payload::jsonb ->> 'amount', '') is not null
+        and nullif(r.payload::jsonb ->> 'amount', '')::numeric < 0
+      """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
 
-  @Override
-  public void upsertWildberries(long accountId, String requestId) {
-    Objects.requireNonNull(requestId, "requestId обязателен.");
+  private static final String WILDBERRIES_LOGISTICS_SELECT = """
+      select
+          :accountId                                                                as account_id,
+          :sourcePlatform                                                           as source_platform,
+          concat(base.realizationreport_id, '-', base.rrd_id, '-', base.logistics_kind)
+                                                                                    as source_event_id,
+          base.srid                                                                 as order_id,
+          dw.id                                                                     as warehouse_id,
+          base.rr_dt_date                                                           as operation_date,
+          base.logistics_kind                                                       as logistics_type,
+          sum(base.amount)                                                          as amount,
+          'RUB'                                                                     as currency
+      from (
+          select
+              r.payload::jsonb ->> 'realizationreport_id'                           as realizationreport_id,
+              r.payload::jsonb ->> 'rrd_id'                                         as rrd_id,
+              r.payload::jsonb ->> 'srid'                                           as srid,
+              nullif(r.payload::jsonb ->> 'ppvz_office_id', '')::bigint            as ppvz_office_id,
+              (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                    as rr_dt_date,
+              'OUTBOUND'::text                                                     as logistics_kind,
+              (
+                coalesce(nullif(r.payload::jsonb ->> 'delivery_rub', '')::numeric, 0)
+                + coalesce(nullif(r.payload::jsonb ->> 'rebill_logistic_cost', '')::numeric, 0)
+                + coalesce(nullif(r.payload::jsonb ->> 'acceptance', '')::numeric, 0)
+                + coalesce(nullif(r.payload::jsonb ->> 'deduction', '')::numeric, 0)
+              )                                                                     as amount
+          from %1$s r
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'WILDBERRIES'
+            and (
+              coalesce(nullif(r.payload::jsonb ->> 'delivery_rub', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'rebill_logistic_cost', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'acceptance', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'deduction', '')::numeric, 0)
+            ) <> 0
+            and coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0) = 0
+            and coalesce(r.payload::jsonb ->> 'doc_type_name', '') <> 'Возврат'
+            and coalesce(nullif(r.payload::jsonb ->> 'quantity', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_price', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'ppvz_for_pay', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'penalty', '')::numeric, 0) = 0
 
-    String platform = MarketplaceType.WILDBERRIES.tag();
+          union all
 
-    String selectQuery = """
-        select
-            account_id,
-            source_platform,
-            operation_date,
-            warehouse_id,
-            order_id,
-            dim_product_id,
-            logistics_type,
-            amount,
-            currency,
-            amount_raw,
-            amount_abs
-        from (
-            select
-                s.account_id      as account_id,
-                s.source_platform as source_platform,
-                s.operation_date  as operation_date,
-                s.warehouse_id    as warehouse_id,
-                s.order_id        as order_id,
-                s.dim_product_id  as dim_product_id,
-                s.logistics_type  as logistics_type,
-                sum(s.amount)     as amount,
-                max(s.currency)   as currency,
-                sum(s.amount_raw) as amount_raw,
-                sum(s.amount_abs) as amount_abs
-            from (
-                select
-                    r.account_id                                      as account_id,
-                    '%1$s'                                            as source_platform,
-                    (r.payload::jsonb ->> 'rr_dt')::date             as operation_date,
-                    w.id                                             as warehouse_id,
-                    nullif(r.payload::jsonb ->> 'srid','')           as order_id,
-                    dp.id                                            as dim_product_id,
-                    l.logistics_type                                 as logistics_type,
-                    abs(l.amount)                                    as amount,
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'currency_name',''),
-                        'RUB'
-                    )                                                as currency,
-                    l.amount                                         as amount_raw,
-                    abs(l.amount)                                    as amount_abs
-                from %2$s r
-                left join dim_warehouse w
-                  on w.account_id = r.account_id
-                 and lower(w.source_platform) = lower('%1$s')
-                 and w.external_warehouse_id =
-                     nullif(r.payload::jsonb ->> 'ppvz_office_id','')
-                join dim_product dp
-                  on dp.account_id        = r.account_id
-                 and dp.source_platform   = '%1$s'
-                 and dp.source_product_id = nullif(r.payload::jsonb ->> 'nm_id','')
-                left join fact_returns fr
-                  on fr.account_id      = r.account_id
-                 and fr.source_platform = '%1$s'
-                 and fr.order_id        = nullif(r.payload::jsonb ->> 'srid','')
-                 and fr.dim_product_id  = dp.id
-                join lateral (
-                    values
-                      ('DELIVERY_TO_CUSTOMER',
-                       nullif(r.payload::jsonb ->> 'delivery_rub','')::numeric),
-                      ('RETURN_FROM_CUSTOMER',
-                       nullif(r.payload::jsonb ->> 'return_amount','')::numeric),
-                      ('INBOUND',
-                       nullif(r.payload::jsonb ->> 'rebill_logistic_cost','')::numeric),
-                      ('STORAGE',
-                       nullif(r.payload::jsonb ->> 'storage_fee','')::numeric),
-                      ('INBOUND',
-                       nullif(r.payload::jsonb ->> 'acceptance','')::numeric)
-                ) as l(logistics_type, amount)
-                  on l.amount is not null and l.amount <> 0
-                where r.account_id = ?
-                  and r.request_id = ?
-                  and nullif(r.payload::jsonb ->> 'rr_dt','') is not null
-                  and nullif(r.payload::jsonb ->> 'srid','')  is not null
-                  and dp.id is not null
-                  and (
-                    l.logistics_type <> 'RETURN_FROM_CUSTOMER'
-                    or fr.id is not null
-                  )
-            ) s
-            group by
-                s.account_id,
-                s.source_platform,
-                s.operation_date,
-                s.warehouse_id,
-                s.order_id,
-                s.dim_product_id,
-                s.logistics_type
-        ) t
-        """.formatted(platform, RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
+          select
+              r.payload::jsonb ->> 'realizationreport_id'                           as realizationreport_id,
+              r.payload::jsonb ->> 'rrd_id'                                         as rrd_id,
+              r.payload::jsonb ->> 'srid'                                           as srid,
+              nullif(r.payload::jsonb ->> 'ppvz_office_id', '')::bigint            as ppvz_office_id,
+              (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                    as rr_dt_date,
+              'RETURN'::text                                                       as logistics_kind,
+              (
+                coalesce(nullif(r.payload::jsonb ->> 'delivery_rub', '')::numeric, 0)
+                + coalesce(nullif(r.payload::jsonb ->> 'rebill_logistic_cost', '')::numeric, 0)
+                + coalesce(nullif(r.payload::jsonb ->> 'acceptance', '')::numeric, 0)
+                + coalesce(nullif(r.payload::jsonb ->> 'deduction', '')::numeric, 0)
+              )                                                                     as amount
+          from %1$s r
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'WILDBERRIES'
+            and (
+              coalesce(nullif(r.payload::jsonb ->> 'delivery_rub', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'rebill_logistic_cost', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'acceptance', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'deduction', '')::numeric, 0)
+            ) <> 0
+            and (
+              coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0) <> 0
+              or coalesce(r.payload::jsonb ->> 'doc_type_name', '') = 'Возврат'
+            )
+            and coalesce(nullif(r.payload::jsonb ->> 'quantity', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_price', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'ppvz_for_pay', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'penalty', '')::numeric, 0) = 0
 
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
-  }
+          union all
+
+          select
+              r.payload::jsonb ->> 'realizationreport_id'                           as realizationreport_id,
+              r.payload::jsonb ->> 'rrd_id'                                         as rrd_id,
+              r.payload::jsonb ->> 'srid'                                           as srid,
+              nullif(r.payload::jsonb ->> 'ppvz_office_id', '')::bigint            as ppvz_office_id,
+              (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                    as rr_dt_date,
+              'STORAGE'::text                                                      as logistics_kind,
+              coalesce(nullif(r.payload::jsonb ->> 'storage_fee', '')::numeric, 0) as amount
+          from %1$s r
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'WILDBERRIES'
+            and coalesce(nullif(r.payload::jsonb ->> 'storage_fee', '')::numeric, 0) <> 0
+            and coalesce(nullif(r.payload::jsonb ->> 'quantity', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_price', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'ppvz_for_pay', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric, 0) = 0
+            and coalesce(nullif(r.payload::jsonb ->> 'penalty', '')::numeric, 0) = 0
+      ) as base
+      left join dim_warehouse dw
+        on dw.account_id            = :accountId
+       and dw.source_platform       = :sourcePlatform
+       and dw.external_warehouse_id = base.ppvz_office_id::text
+      group by
+          base.realizationreport_id,
+          base.rrd_id,
+          base.logistics_kind,
+          base.srid,
+          dw.id,
+          base.rr_dt_date
+      """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
+
+  private final NamedParameterJdbcTemplate jdbcTemplate;
 
   @Override
   public void upsertOzon(long accountId, String requestId) {
-    Objects.requireNonNull(requestId, "requestId обязателен.");
+    List<String> selects = new ArrayList<>();
+    if (tableExists(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS)) {
+      selects.add(OZON_LOGISTICS_SELECT);
+    }
+    executeUpsert(selects, accountId, requestId, MarketplaceType.OZON.tag());
+  }
 
-    String platform = MarketplaceType.OZON.tag();
+  @Override
+  public void upsertWildberries(long accountId, String requestId) {
+    List<String> selects = new ArrayList<>();
+    if (tableExists(RawTableNames.RAW_WB_SALES_REPORT_DETAIL)) {
+      selects.add(WILDBERRIES_LOGISTICS_SELECT);
+    }
+    executeUpsert(selects, accountId, requestId, MarketplaceType.WILDBERRIES.tag());
+  }
 
-    String selectQuery = """
-        select
-            account_id,
-            source_platform,
-            operation_date,
-            warehouse_id,
-            order_id,
-            dim_product_id,
-            logistics_type,
-            amount,
-            currency,
-            amount_raw,
-            amount_abs
-        from (
-            select
-                s.account_id      as account_id,
-                s.source_platform as source_platform,
-                s.operation_date  as operation_date,
-                s.warehouse_id    as warehouse_id,
-                s.order_id        as order_id,
-                s.dim_product_id  as dim_product_id,
-                s.logistics_type  as logistics_type,
-                sum(s.amount)     as amount,
-                max(s.currency)   as currency,
-                sum(s.amount_raw) as amount_raw,
-                sum(s.amount_abs) as amount_abs
-            from (
-                select
-                    r.account_id                                     as account_id,
-                    '%1$s'                                           as source_platform,
-                    (r.payload::jsonb ->> 'operation_date')::timestamptz::date
-                                                                    as operation_date,
-                    w.id                                            as warehouse_id,
-                    nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
-                                                                    as order_id,
-                    dp.id                                           as dim_product_id,
-                    case
-                      when ot in (
-                          'OperationAgentDeliveredToCustomer',
-                          'OperationAgentDeliveredToCustomerCanceled',
-                          'OperationAgentStornoDeliveredToCustomer',
-                          'MarketplaceServiceItemDirectFlowLogistic',
-                          'MarketplaceServiceItemDirectFlowLogisticVDC',
-                          'MarketplaceServiceItemDeliveryKGT'
-                      ) then 'DELIVERY_TO_CUSTOMER'
-                      when ot in (
-                          'OperationReturnGoodsFBSofRMS',
-                          'OperationItemReturn',
-                          'MarketplaceServiceItemReturnFlowLogistic'
-                      ) then 'RETURN_FROM_CUSTOMER'
-                      when ot in (
-                          'OperationMarketplaceCrossDockServiceWriteOff',
-                          'MarketplaceServiceItemRedistributionReturnsPVZ',
-                          'MarketplaceServiceItemDropoffPPZ'
-                      ) then 'INBOUND'
-                      when ot in (
-                          'OperationMarketplaceServiceStorage',
-                          'MarketplaceReturnStorageServiceAtThePickupPointFbsItem',
-                          'MarketplaceReturnStorageServiceInTheWarehouseFbsItem'
-                      ) then 'STORAGE'
-                      else null
-                    end                                              as logistics_type,
-                    abs(nullif(r.payload::jsonb ->> 'amount','')::numeric)
-                                                                    as amount,
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'currency_code',''),
-                        'RUB'
-                    )                                               as currency,
-                    nullif(r.payload::jsonb ->> 'amount','')::numeric
-                                                                    as amount_raw,
-                    abs(nullif(r.payload::jsonb ->> 'amount','')::numeric)
-                                                                    as amount_abs
-                from %2$s r
-                join dim_warehouse w
-                  on w.account_id = r.account_id
-                 and lower(w.source_platform) = lower('%1$s')
-                 and w.external_warehouse_id =
-                     nullif(r.payload::jsonb -> 'posting' ->> 'warehouse_id','')
-                join lateral jsonb_array_elements(r.payload::jsonb -> 'items') item
-                  on true
-                left join dim_product dp
-                  on dp.account_id        = r.account_id
-                 and dp.source_platform   = '%1$s'
-                 and dp.source_product_id = nullif(item ->> 'sku','')
-                left join fact_returns fr
-                  on fr.account_id      = r.account_id
-                 and fr.source_platform = '%1$s'
-                 and fr.order_id        = nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
-                 and fr.dim_product_id  = dp.id
-                cross join lateral (
-                   values (r.payload::jsonb ->> 'operation_type')
-                ) ot(ot)
-                where r.account_id = ?
-                  and r.request_id = ?
-                  and nullif(r.payload::jsonb ->> 'operation_date','') is not null
-                  and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') is not null
-                  and nullif(r.payload::jsonb ->> 'amount','')         is not null
-                  and nullif(item ->> 'sku','')                         is not null
-                  and dp.id is not null
-                  and (
-                    ot not in (
-                        'OperationReturnGoodsFBSofRMS',
-                        'OperationItemReturn',
-                        'MarketplaceServiceItemReturnFlowLogistic'
-                    )
-                    or fr.id is not null
-                  )
-              ) s
-            where s.logistics_type is not null
-              and s.amount is not null
-            group by
-                s.account_id,
-                s.source_platform,
-                s.operation_date,
-                s.warehouse_id,
-                s.order_id,
-                s.dim_product_id,
-                s.logistics_type
-        ) t
-        """.formatted(platform, RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
+  private void executeUpsert(List<String> selects, long accountId, String requestId,
+      String sourcePlatform) {
+    if (selects.isEmpty()) {
+      return;
+    }
+    String unionSelect = String.join(" union all ", selects);
+    String sql = UPSERT_TEMPLATE.formatted(unionSelect);
+    MapSqlParameterSource parameters = new MapSqlParameterSource()
+        .addValue("accountId", accountId)
+        .addValue("requestId", requestId)
+        .addValue("sourcePlatform", sourcePlatform);
+    jdbcTemplate.update(sql, parameters);
+  }
 
-    jdbcTemplate.update(UPSERT_TEMPLATE.formatted(selectQuery), accountId, requestId);
+  private boolean tableExists(String tableName) {
+    String sql = """
+        select exists (
+          select 1
+          from information_schema.tables
+          where table_schema = current_schema()
+            and table_name = :tableName
+        )
+        """;
+    MapSqlParameterSource parameters = new MapSqlParameterSource()
+        .addValue("tableName", tableName);
+    Boolean exists = jdbcTemplate.queryForObject(sql, parameters, Boolean.class);
+    return Boolean.TRUE.equals(exists);
   }
 }

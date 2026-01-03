@@ -120,6 +120,48 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
         and t.payload::jsonb -> 'analytics_data' ->> 'warehouse_id' is not null
       """;
 
+  private static final String OZON_RETURNS_SELECT = """
+      select
+          t.account_id                                      as account_id,
+          '%s'::text                                        as source_platform,
+          ((t.payload::jsonb #>> '{place,id}')::bigint)     as external_warehouse_id,
+          (t.payload::jsonb #>> '{place,name}')::text       as warehouse_name,
+          'FBO'                                             as fulfillment_model,
+          true                                              as is_active,
+          12                                                as priority
+      from %s t
+      where t.account_id = ?
+        and t.request_id = ?
+        and t.payload::jsonb -> 'place' is not null
+      """;
+
+  private static final String OZON_FROM_TRANSACTIONS_SELECT = """
+      select
+          t.account_id as account_id,
+          '%s'::text as source_platform,
+          ((t.payload::jsonb -> 'posting' ->> 'warehouse_id')::bigint) as external_warehouse_id,
+          coalesce(
+            nullif(t.payload::jsonb -> 'posting' ->> 'warehouse', ''),
+            nullif(t.payload::jsonb -> 'posting' ->> 'warehouse_name', ''),
+            'UNKNOWN'
+          )::text as warehouse_name,
+          case t.payload::jsonb -> 'posting' ->> 'delivery_schema'
+            when 'FBO'        then 'FBO'
+            when 'FBOECONOMY' then 'FBO'
+            when 'FBS'        then 'FBS'
+            when 'FBSECONOMY' then 'FBS'
+            when 'RFBS'       then 'RFBS'
+            else 'UNKNOWN'
+          end as fulfillment_model,
+          true as is_active,
+          8 as priority
+      from %s t
+      where t.account_id = ?
+        and t.request_id = ?
+        and t.payload::jsonb -> 'posting' ->> 'warehouse_id' is not null
+        and t.payload::jsonb -> 'posting' ->> 'warehouse_id' <> ''
+      """;
+
   private static final String WB_FBW_SELECT = """
       select
           t.account_id as account_id,
@@ -159,19 +201,22 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
       where t.account_id = ? and t.request_id = ?
       """;
 
-  private static final String OZON_RETURNS_SELECT = """
+  private static final String WB_FROM_REPORT_DETAILS_SELECT = """
       select
-          t.account_id                                      as account_id,
-          '%s'::text                                        as source_platform,
-          ((t.payload::jsonb #>> '{place,id}')::bigint)     as external_warehouse_id,
-          (t.payload::jsonb #>> '{place,name}')::text       as warehouse_name,
-          'FBO'                                             as fulfillment_model,
-          true                                              as is_active,
-          12                                                as priority
+          t.account_id as account_id,
+          '%s'::text as source_platform,
+          ((t.payload::jsonb ->> 'ppvz_office_id')::bigint) as external_warehouse_id,
+          coalesce(
+            nullif(t.payload::jsonb ->> 'ppvz_office_name', ''),
+            'UNKNOWN'
+          )::text as warehouse_name,
+          'FBO' as fulfillment_model,
+          true as is_active,
+          8 as priority
       from %s t
       where t.account_id = ?
         and t.request_id = ?
-        and t.payload::jsonb -> 'place' is not null
+        and nullif(t.payload::jsonb ->> 'ppvz_office_id', '') is not null
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -187,7 +232,6 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
     }
     executeUpsert(selects, accountId, requestId);
   }
-
 
   @Override
   public void upsertOzon(Long accountId, String requestId) {
@@ -226,6 +270,18 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
   }
 
   @Override
+  public void upsertOzonFromTransactions(Long accountId, String requestId) {
+    List<String> selects = new ArrayList<>();
+    if (tableExists(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS)) {
+      selects.add(OZON_FROM_TRANSACTIONS_SELECT.formatted(
+          MarketplaceType.OZON.tag(),
+          RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS
+      ));
+    }
+    executeUpsert(selects, accountId, requestId);
+  }
+
+  @Override
   public void upsertWildberries(Long accountId, String requestId) {
     List<String> selects = new ArrayList<>();
     if (tableExists(RawTableNames.RAW_WB_WAREHOUSES_FBW)) {
@@ -244,6 +300,18 @@ public class DimWarehouseJdbcRepository implements DimWarehouseRepository {
       selects.add(WB_SELLER_SELECT.formatted(
           MarketplaceType.WILDBERRIES.tag(),
           RawTableNames.RAW_WB_WAREHOUSES_SELLER
+      ));
+    }
+    executeUpsert(selects, accountId, requestId);
+  }
+
+  @Override
+  public void upsertWildberriesFromReportDetails(Long accountId, String requestId) {
+    List<String> selects = new ArrayList<>();
+    if (tableExists(RawTableNames.RAW_WB_SALES_REPORT_DETAIL)) {
+      selects.add(WB_FROM_REPORT_DETAILS_SELECT.formatted(
+          MarketplaceType.WILDBERRIES.tag(),
+          RawTableNames.RAW_WB_SALES_REPORT_DETAIL
       ));
     }
     executeUpsert(selects, accountId, requestId);

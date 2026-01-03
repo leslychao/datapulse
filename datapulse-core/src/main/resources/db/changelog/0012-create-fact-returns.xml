@@ -6,7 +6,7 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
-  <changeSet id="0101-create-fact-returns" author="vitalii.kim" dbms="postgresql">
+  <changeSet id="0012-create-fact-returns" author="vitalii.kim" dbms="postgresql">
 
     <sql>
       create table if not exists fact_returns

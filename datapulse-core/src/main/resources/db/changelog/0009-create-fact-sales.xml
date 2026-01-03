@@ -6,7 +6,7 @@
         http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
-  <changeSet id="0100-create-fact-sales" author="vitalii.kim" dbms="postgresql">
+  <changeSet id="0009-create-fact-sales" author="vitalii.kim" dbms="postgresql">
 
     <sql>
       create table if not exists fact_sales
