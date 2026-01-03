@@ -17,11 +17,14 @@
         source_platform text        not null,
         source_event_id text        not null,
 
+        order_id        text        not null,
+
         dim_product_id  bigint      not null,
         warehouse_id    bigint,
         category_id     bigint,
 
         quantity        integer     not null,
+        sale_ts         timestamptz not null,
         sale_date       date        not null,
 
         created_at      timestamptz not null default now(),
