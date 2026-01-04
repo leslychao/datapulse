@@ -63,7 +63,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')             as order_id,
           (r.payload::jsonb ->> 'operation_date')::timestamptz::date                 as operation_date,
           'SALE_COMMISSION'                                                          as commission_type,
-          abs(nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric)           as amount,
+          - nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric              as amount,
           'RUB'                                                                      as currency
       from %s r
       where r.account_id = :accountId
@@ -81,7 +81,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           r.payload::jsonb ->> 'srid'                                                as order_id,
           (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as operation_date,
           'SALE_COMMISSION'                                                          as commission_type,
-          abs(nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric)     as amount,
+          nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric          as amount,
           coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
       from %1$s r
       where r.account_id = :accountId
@@ -99,7 +99,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           r.payload::jsonb ->> 'srid'                                                as order_id,
           (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as operation_date,
           'ACQUIRING_FEE'                                                            as commission_type,
-          abs(nullif(r.payload::jsonb ->> 'acquiring_fee', '')::numeric)             as amount,
+          nullif(r.payload::jsonb ->> 'acquiring_fee', '')::numeric                  as amount,
           coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
       from %1$s r
       where r.account_id = :accountId

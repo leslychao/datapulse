@@ -3,7 +3,10 @@ package io.datapulse.etl.repository.jdbc;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.RawTableNames;
 import io.datapulse.etl.repository.FinanceFactRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -12,427 +15,345 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class FinanceFactJdbcRepository implements FinanceFactRepository {
 
-  private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+  private static final Logger log = LoggerFactory.getLogger(FinanceFactJdbcRepository.class);
+
+  private static final String UPSERT_TEMPLATE = """
+      insert into fact_finance (
+          account_id,
+          source_platform,
+          order_id,
+          finance_date,
+          currency,
+          revenue_gross,
+          seller_discount_amount,
+          marketplace_commission_amount,
+          logistics_cost_amount,
+          penalties_amount,
+          marketing_cost_amount,
+          compensation_amount,
+          refund_amount,
+          net_payout,
+          is_closed,
+          created_at,
+          updated_at
+      )
+      select
+          account_id,
+          source_platform,
+          order_id,
+          finance_date,
+          currency,
+          revenue_gross,
+          seller_discount_amount,
+          marketplace_commission_amount,
+          logistics_cost_amount,
+          penalties_amount,
+          marketing_cost_amount,
+          compensation_amount,
+          refund_amount,
+          net_payout,
+          false as is_closed,
+          now(),
+          now()
+      from (
+          %s
+      ) as source
+      on conflict (account_id, source_platform, order_id, finance_date)
+      do update
+      set
+          currency                      = excluded.currency,
+          revenue_gross                 = excluded.revenue_gross,
+          seller_discount_amount        = excluded.seller_discount_amount,
+          marketplace_commission_amount = excluded.marketplace_commission_amount,
+          logistics_cost_amount         = excluded.logistics_cost_amount,
+          penalties_amount              = excluded.penalties_amount,
+          marketing_cost_amount         = excluded.marketing_cost_amount,
+          compensation_amount           = excluded.compensation_amount,
+          refund_amount                 = excluded.refund_amount,
+          net_payout                    = excluded.net_payout,
+          updated_at                    = now();
+      """;
+
+  private static final String WB_FINANCE_SELECT = """
+      with revenue as (
+        select
+            :accountId                                                                as account_id,
+            :sourcePlatform                                                           as source_platform,
+            r.payload::jsonb ->> 'srid'                                              as order_id,
+            (r.payload::jsonb ->> 'rr_dt')::date                                     as finance_date,
+            coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                    as currency,
+            sum(coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0)) as revenue_gross,
+            sum(
+              coalesce(nullif(r.payload::jsonb ->> 'product_discount_for_report', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'supplier_promo', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'seller_promo_discount', '')::numeric, 0)
+            )                                                                        as seller_discount_amount,
+            sum(coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0))
+                                                                                     as refund_amount,
+            sum(coalesce(nullif(r.payload::jsonb ->> 'additional_payment', '')::numeric, 0))
+                                                                                     as compensation_amount
+        from %1$s r
+        where r.account_id = :accountId
+          and r.request_id = :requestId
+          and r.marketplace = 'WILDBERRIES'
+        group by
+          r.payload::jsonb ->> 'srid',
+          (r.payload::jsonb ->> 'rr_dt')::date,
+          coalesce(r.payload::jsonb ->> 'currency_name', 'руб')
+      ),
+      commission as (
+        select
+            fc.account_id,
+            fc.source_platform,
+            fc.order_id,
+            sum(
+              case
+                when fc.commission_type in ('SALE_COMMISSION', 'ACQUIRING_FEE', 'SERVICE_FEE', 'MARKETING_COMMISSION')
+                  then fc.amount
+                else 0
+              end
+            ) as marketplace_commission_amount,
+            sum(
+              case
+                when fc.commission_type = 'MARKETING_COMMISSION'
+                  then fc.amount
+                else 0
+              end
+            ) as marketing_cost_amount
+        from fact_commission fc
+        where fc.account_id      = :accountId
+          and fc.source_platform = :sourcePlatform
+        group by
+          fc.account_id,
+          fc.source_platform,
+          fc.order_id
+      ),
+      logistics as (
+        select
+            fl.account_id,
+            fl.source_platform,
+            fl.order_id,
+            sum(fl.amount) as logistics_cost_amount
+        from fact_logistics_costs fl
+        where fl.account_id      = :accountId
+          and fl.source_platform = :sourcePlatform
+        group by
+          fl.account_id,
+          fl.source_platform,
+          fl.order_id
+      ),
+      penalties as (
+        select
+            fp.account_id,
+            fp.source_platform,
+            fp.order_id,
+            sum(fp.amount) as penalties_amount
+        from fact_penalties fp
+        where fp.account_id      = :accountId
+          and fp.source_platform = :sourcePlatform
+        group by
+          fp.account_id,
+          fp.source_platform,
+          fp.order_id
+      )
+      select
+          r.account_id,
+          r.source_platform,
+          r.order_id,
+          r.finance_date,
+          r.currency,
+          r.revenue_gross,
+          r.seller_discount_amount,
+          coalesce(c.marketplace_commission_amount, 0) as marketplace_commission_amount,
+          coalesce(l.logistics_cost_amount, 0)         as logistics_cost_amount,
+          coalesce(p.penalties_amount, 0)              as penalties_amount,
+          coalesce(c.marketing_cost_amount, 0)         as marketing_cost_amount,
+          r.compensation_amount,
+          r.refund_amount,
+          (
+            r.revenue_gross
+            - r.seller_discount_amount
+            - coalesce(c.marketplace_commission_amount, 0)
+            - coalesce(l.logistics_cost_amount, 0)
+            - coalesce(p.penalties_amount, 0)
+            - coalesce(c.marketing_cost_amount, 0)
+            + r.compensation_amount
+            - r.refund_amount
+          ) as net_payout
+      from revenue r
+      left join commission c
+        on c.account_id      = r.account_id
+       and c.source_platform = r.source_platform
+       and c.order_id        = r.order_id
+      left join logistics l
+        on l.account_id      = r.account_id
+       and l.source_platform = r.source_platform
+       and l.order_id        = r.order_id
+      left join penalties p
+        on p.account_id      = r.account_id
+       and p.source_platform = r.source_platform
+       and p.order_id        = r.order_id
+      """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
+
+  private static final String OZON_FINANCE_SELECT = """
+      with daily_finance as (
+        select
+            :accountId                                                                                 as account_id,
+            :sourcePlatform                                                                            as source_platform,
+            nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')                            as order_id,
+            (r.payload::jsonb ->> 'operation_date')::timestamptz::date                                as finance_date,
+            'RUB'                                                                                      as currency,
+
+            -- Выручка: только операции type = 'orders'
+            sum(
+              case
+                when r.payload::jsonb ->> 'type' = 'orders'
+                  then coalesce(nullif(r.payload::jsonb ->> 'accruals_for_sale', '')::numeric, 0)
+                else 0
+              end
+            )                                                                                          as revenue_gross,
+
+            -- Пока нет явного поля в API → 0, позже подтянем из postings.financial_data
+            0::numeric                                                                                 as seller_discount_amount,
+
+            -- Комиссия: продажа = +abs(sale_commission), возврат = -abs(sale_commission)
+            sum(
+              case
+                when r.payload::jsonb ->> 'type' = 'orders' then
+                  abs(coalesce(nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric, 0))
+                when r.payload::jsonb ->> 'type' = 'returns' then
+                  -abs(coalesce(nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric, 0))
+                else 0
+              end
+            )                                                                                          as marketplace_commission_amount,
+
+            -- Возврат покупателю: только «денежный» возврат
+            sum(
+              case
+                when r.payload::jsonb ->> 'type' = 'returns'
+                 and r.payload::jsonb ->> 'operation_type' = 'ClientReturnAgentOperation'
+                  then abs(coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0))
+                else 0
+              end
+            )                                                                                          as refund_amount,
+
+            -- Компенсации от Ozon (если есть)
+            sum(
+              case
+                when r.payload::jsonb ->> 'type' = 'compensation'
+                  then abs(coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0))
+                else 0
+              end
+            )                                                                                          as compensation_amount
+
+        from %1$s r
+        where r.account_id = :accountId
+          and r.request_id = :requestId
+          and r.marketplace = 'OZON'
+          and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '') is not null
+        group by
+          nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', ''),
+          (r.payload::jsonb ->> 'operation_date')::timestamptz::date
+      ),
+
+      logistics as (
+        select
+            fl.account_id,
+            fl.source_platform,
+            fl.order_id,
+            fl.operation_date                                                  as finance_date,
+            sum(fl.amount)                                                     as logistics_cost_amount
+        from fact_logistics_costs fl
+        where fl.account_id      = :accountId
+          and fl.source_platform = :sourcePlatform
+        group by
+          fl.account_id,
+          fl.source_platform,
+          fl.order_id,
+          fl.operation_date
+      ),
+
+      penalties as (
+        select
+            fp.account_id,
+            fp.source_platform,
+            fp.order_id,
+            fp.penalty_date                                                    as finance_date,
+            sum(fp.amount)                                                     as penalties_amount
+        from fact_penalties fp
+        where fp.account_id      = :accountId
+          and fp.source_platform = :sourcePlatform
+        group by
+          fp.account_id,
+          fp.source_platform,
+          fp.order_id,
+          fp.penalty_date
+      )
+
+      select
+          df.account_id,
+          df.source_platform,
+          df.order_id,
+          df.finance_date,
+          df.currency,
+
+          df.revenue_gross,
+          df.seller_discount_amount,
+          df.marketplace_commission_amount,
+          coalesce(l.logistics_cost_amount, 0) as logistics_cost_amount,
+          coalesce(p.penalties_amount, 0)      as penalties_amount,
+          0::numeric                           as marketing_cost_amount,
+          df.compensation_amount,
+          df.refund_amount,
+
+          (
+            df.revenue_gross
+            - df.seller_discount_amount
+            - df.marketplace_commission_amount
+            - coalesce(l.logistics_cost_amount, 0)
+            - coalesce(p.penalties_amount, 0)
+            - 0::numeric
+            + df.compensation_amount
+            - df.refund_amount
+          ) as net_payout
+
+      from daily_finance df
+      left join logistics l
+        on l.account_id      = df.account_id
+       and l.source_platform = df.source_platform
+       and l.order_id        = df.order_id
+       and l.finance_date    = df.finance_date
+      left join penalties p
+        on p.account_id      = df.account_id
+       and p.source_platform = df.source_platform
+       and p.order_id        = df.order_id
+       and p.finance_date    = df.finance_date
+      """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
+
+  private final NamedParameterJdbcTemplate jdbcTemplate;
 
   @Override
   public void upsertFromWildberries(long accountId, String requestId) {
-    String platform = MarketplaceType.WILDBERRIES.tag();
-
-    String query = """
-        with raw_sales as (
-            select
-                r.account_id                                         as account_id,
-                nullif(r.payload::jsonb ->> 'srid','')               as order_id,
-                nullif(r.payload::jsonb ->> 'nm_id','')              as source_product_id,
-                coalesce(
-                    nullif(r.payload::jsonb ->> 'retail_price_withdisc_rub','')::numeric,
-                    0
-                )                                                    as revenue_gross_amount,
-                coalesce(
-                    nullif(r.payload::jsonb ->> 'ppvz_for_pay','')::numeric,
-                    0
-                )                                                    as payout_from_marketplace_raw,
-                coalesce(
-                    nullif(r.payload::jsonb ->> 'currency_name',''),
-                    'RUB'
-                )                                                    as currency
-            from %2$s r
-            where r.account_id = :accountId
-              and nullif(r.payload::jsonb ->> 'srid','') is not null
-              and nullif(r.payload::jsonb ->> 'nm_id','') is not null
-              and (
-                nullif(r.payload::jsonb ->> 'doc_type_name','') is null
-                or nullif(r.payload::jsonb ->> 'doc_type_name','') not in ('Возврат', 'Сторно продажи')
-              )
-              and (
-                nullif(r.payload::jsonb ->> 'supplier_oper_name','') is null
-                or nullif(r.payload::jsonb ->> 'supplier_oper_name','') not in ('Возврат', 'Сторно продажи')
-              )
-        ),
-        source_sales as (
-            select distinct
-                fs.id              as fact_sales_id,
-                fs.account_id      as account_id,
-                fs.source_platform as source_platform,
-                fs.order_id        as order_id,
-                fs.dim_product_id  as dim_product_id,
-                fs.quantity        as quantity,
-                fs.sale_date       as sale_date,
-                fs.warehouse_id    as warehouse_id
-            from fact_sales fs
-            join dim_product dp
-              on dp.id = fs.dim_product_id
-            join raw_sales rs
-              on rs.account_id = fs.account_id
-             and rs.order_id = fs.order_id
-             and rs.source_product_id = dp.source_product_id
-            where fs.account_id = :accountId
-              and fs.source_platform = '%1$s'
-        ),
-        finance_raw as (
-            select
-                ss.fact_sales_id as fact_sales_id,
-                sum(rs.revenue_gross_amount)           as revenue_gross_amount,
-                sum(rs.payout_from_marketplace_raw)    as payout_from_marketplace_raw,
-                max(rs.currency)                       as currency
-            from source_sales ss
-            join dim_product dp
-              on dp.id = ss.dim_product_id
-            join raw_sales rs
-              on rs.account_id = ss.account_id
-             and rs.order_id = ss.order_id
-             and rs.source_product_id = dp.source_product_id
-            group by ss.fact_sales_id
-        ),
-        commission_costs as (
-            select
-                ss.fact_sales_id as fact_sales_id,
-                sum(fc.amount)   as total_commission
-            from source_sales ss
-            left join fact_commission fc
-              on fc.account_id      = ss.account_id
-             and fc.source_platform = ss.source_platform
-             and fc.order_id        = ss.order_id
-             and fc.dim_product_id  = ss.dim_product_id
-             and fc.commission_kind = 'SALES'
-            group by ss.fact_sales_id
-        ),
-        logistics_costs as (
-            select
-                ss.fact_sales_id as fact_sales_id,
-                sum(fl.amount)   as total_logistics
-            from source_sales ss
-            left join fact_logistics_costs fl
-              on fl.account_id      = ss.account_id
-             and fl.source_platform = ss.source_platform
-             and fl.order_id        = ss.order_id
-             and fl.dim_product_id  = ss.dim_product_id
-            group by ss.fact_sales_id
-        ),
-        product_costs as (
-            select
-                ss.fact_sales_id                  as fact_sales_id,
-                sum(fpc.cost_value * ss.quantity) as total_product_cost
-            from source_sales ss
-            left join fact_product_cost fpc
-              on fpc.account_id = ss.account_id
-             and fpc.product_id = ss.dim_product_id
-             and ss.sale_date >= fpc.valid_from
-             and (fpc.valid_to is null or ss.sale_date <= fpc.valid_to)
-            group by ss.fact_sales_id
-        ),
-        return_flags as (
-            select
-                ss.fact_sales_id           as fact_sales_id,
-                bool_or(fr.id is not null) as has_returns
-            from source_sales ss
-            left join fact_returns fr
-              on fr.account_id      = ss.account_id
-             and fr.source_platform = ss.source_platform
-             and fr.order_id        = ss.order_id
-             and fr.dim_product_id  = ss.dim_product_id
-            group by ss.fact_sales_id
-        ),
-        finalized as (
-            select
-                ss.fact_sales_id                                            as fact_sales_id,
-                coalesce(fr.revenue_gross_amount, 0)                         as revenue_gross_amount,
-                (coalesce(fr.revenue_gross_amount, 0)
-                    - coalesce(cc.total_commission, 0)
-                    - coalesce(lc.total_logistics, 0)
-                    - coalesce(pc.total_product_cost, 0)
-                )                                                            as revenue_net_amount,
-                coalesce(fr.payout_from_marketplace_raw, 0)                  as payout_from_marketplace,
-                (coalesce(fr.payout_from_marketplace_raw, 0)
-                    - coalesce(pc.total_product_cost, 0)
-                )                                                            as mp_based_net,
-                coalesce(fr.currency, 'RUB')                                 as currency,
-                coalesce(rf.has_returns, false)                              as is_refund
-            from source_sales ss
-            left join finance_raw fr      on fr.fact_sales_id = ss.fact_sales_id
-            left join commission_costs cc on cc.fact_sales_id = ss.fact_sales_id
-            left join logistics_costs lc  on lc.fact_sales_id = ss.fact_sales_id
-            left join product_costs pc    on pc.fact_sales_id = ss.fact_sales_id
-            left join return_flags rf     on rf.fact_sales_id = ss.fact_sales_id
-        )
-        insert into fact_finance (
-            fact_sales_id,
-            revenue_gross_amount,
-            revenue_net_amount,
-            payout_from_marketplace,
-            mp_based_net,
-            currency,
-            is_refund,
-            created_at,
-            updated_at
-        )
-        select
-            finalized.fact_sales_id,
-            finalized.revenue_gross_amount,
-            finalized.revenue_net_amount,
-            finalized.payout_from_marketplace,
-            finalized.mp_based_net,
-            finalized.currency,
-            finalized.is_refund,
-            now(),
-            now()
-        from finalized
-        on conflict (fact_sales_id) do update
-        set
-            revenue_gross_amount    = excluded.revenue_gross_amount,
-            revenue_net_amount      = excluded.revenue_net_amount,
-            payout_from_marketplace = excluded.payout_from_marketplace,
-            mp_based_net            = excluded.mp_based_net,
-            currency                = excluded.currency,
-            is_refund               = excluded.is_refund,
-            updated_at              = now()
-        """.formatted(platform, RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
-
-    MapSqlParameterSource params = new MapSqlParameterSource()
-        .addValue("accountId", accountId);
-
-    namedParameterJdbcTemplate.update(query, params);
+    Objects.requireNonNull(requestId, "requestId обязателен.");
+    String sourcePlatform = MarketplaceType.WILDBERRIES.tag();
+    String sql = UPSERT_TEMPLATE.formatted(WB_FINANCE_SELECT);
+    MapSqlParameterSource parameters = new MapSqlParameterSource().addValue("accountId", accountId)
+        .addValue("requestId", requestId).addValue("sourcePlatform", sourcePlatform);
+    int rows = jdbcTemplate.update(sql, parameters);
+    log.info("Finance facts upserted (WB): accountId={}, sourcePlatform={}, requestId={}, rows={}",
+        accountId, sourcePlatform, requestId, rows);
   }
 
   @Override
   public void upsertFromOzon(long accountId, String requestId) {
-    String platform = MarketplaceType.OZON.tag();
-
-    String query = """
-        with raw_postings as (
-            select
-                r.account_id                                   as account_id,
-                nullif(r.payload::jsonb ->> 'posting_number','')
-                                                              as order_id,
-                nullif(item ->> 'sku','')                      as source_product_id,
-                nullif(item ->> 'quantity','')::int            as quantity,
-                nullif(item ->> 'price','')::numeric           as price,
-                coalesce(nullif(item ->> 'currency_code',''), 'RUB')
-                                                              as currency
-            from %2$s r
-            join lateral jsonb_array_elements(r.payload::jsonb -> 'products') item on true
-            where r.account_id = :accountId
-            union all
-            select
-                r.account_id                                   as account_id,
-                nullif(r.payload::jsonb ->> 'posting_number','')
-                                                              as order_id,
-                nullif(item ->> 'sku','')                      as source_product_id,
-                nullif(item ->> 'quantity','')::int            as quantity,
-                nullif(item ->> 'price','')::numeric           as price,
-                coalesce(nullif(item ->> 'currency_code',''), 'RUB')
-                                                              as currency
-            from %3$s r
-            join lateral jsonb_array_elements(r.payload::jsonb -> 'products') item on true
-            where r.account_id = :accountId
-        ),
-        source_sales as (
-            select distinct
-                fs.id              as fact_sales_id,
-                fs.account_id      as account_id,
-                fs.source_platform as source_platform,
-                fs.order_id        as order_id,
-                fs.dim_product_id  as dim_product_id,
-                fs.quantity        as quantity,
-                fs.sale_date       as sale_date,
-                fs.warehouse_id    as warehouse_id,
-                rp.quantity        as posting_quantity,
-                rp.price           as posting_price,
-                rp.currency        as posting_currency
-            from fact_sales fs
-            join dim_product dp
-              on dp.id = fs.dim_product_id
-            join raw_postings rp
-              on rp.account_id        = fs.account_id
-             and rp.order_id          = fs.order_id
-             and rp.source_product_id = dp.source_product_id
-            where fs.account_id = :accountId
-              and fs.source_platform = '%1$s'
-        ),
-        posting_totals as (
-            select
-                account_id as account_id,
-                order_id   as order_id,
-                sum(coalesce(price, 0) * coalesce(quantity, 0))
-                           as total_posting_price
-            from raw_postings
-            group by account_id, order_id
-        ),
-        finance_raw as (
-            select
-                r.account_id                                     as account_id,
-                nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','')
-                                                                  as order_id,
-                sum(
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'accruals_for_sale','')::numeric,
-                        0
-                    )
-                )                                                 as gross_total,
-                sum(
-                    case
-                      when lower(
-                               coalesce(
-                                   nullif(r.payload::jsonb ->> 'type',''),
-                                   ''
-                               )
-                           ) in ('orders', 'returns', 'compensation')
-                        then coalesce(
-                                 nullif(r.payload::jsonb ->> 'amount','')::numeric,
-                                 0
-                             )
-                      else 0
-                    end
-                )                                                 as net_total,
-                max(
-                    coalesce(
-                        nullif(r.payload::jsonb ->> 'currency_code',''),
-                        'RUB'
-                    )
-                )                                                 as currency
-            from %4$s r
-            where r.account_id = :accountId
-              and nullif(r.payload::jsonb -> 'posting' ->> 'posting_number','') is not null
-            group by r.account_id, order_id
-        ),
-        sales_finance as (
-            select
-                ss.fact_sales_id as fact_sales_id,
-                coalesce(
-                    fr.gross_total
-                    * (coalesce(ss.posting_price, 0) * coalesce(ss.posting_quantity, 0))
-                    / nullif(pt.total_posting_price, 0),
-                    coalesce(ss.posting_price, 0) * coalesce(ss.posting_quantity, 0),
-                    0
-                )                               as revenue_gross_amount,
-                coalesce(
-                    fr.net_total
-                    * (coalesce(ss.posting_price, 0) * coalesce(ss.posting_quantity, 0))
-                    / nullif(pt.total_posting_price, 0),
-                    0
-                )                               as net_from_marketplace,
-                coalesce(fr.currency, ss.posting_currency, 'RUB')
-                                                 as currency
-            from source_sales ss
-            left join posting_totals pt
-              on pt.account_id = ss.account_id
-             and pt.order_id   = ss.order_id
-            left join finance_raw fr
-              on fr.account_id = ss.account_id
-             and fr.order_id   = ss.order_id
-        ),
-        commission_costs as (
-            select
-                ss.fact_sales_id as fact_sales_id,
-                sum(fc.amount)   as total_commission
-            from source_sales ss
-            left join fact_commission fc
-              on fc.account_id      = ss.account_id
-             and fc.source_platform = ss.source_platform
-             and fc.order_id        = ss.order_id
-             and fc.dim_product_id  = ss.dim_product_id
-             and fc.commission_kind = 'SALES'
-            group by ss.fact_sales_id
-        ),
-        logistics_costs as (
-            select
-                ss.fact_sales_id as fact_sales_id,
-                sum(fl.amount)   as total_logistics
-            from source_sales ss
-            left join fact_logistics_costs fl
-              on fl.account_id      = ss.account_id
-             and fl.source_platform = ss.source_platform
-             and fl.order_id        = ss.order_id
-             and fl.dim_product_id  = ss.dim_product_id
-            group by ss.fact_sales_id
-        ),
-        product_costs as (
-            select
-                ss.fact_sales_id                  as fact_sales_id,
-                sum(fpc.cost_value * ss.quantity) as total_product_cost
-            from source_sales ss
-            left join fact_product_cost fpc
-              on fpc.account_id = ss.account_id
-             and fpc.product_id = ss.dim_product_id
-             and ss.sale_date >= fpc.valid_from
-             and (fpc.valid_to is null or ss.sale_date <= fpc.valid_to)
-            group by ss.fact_sales_id
-        ),
-        return_flags as (
-            select
-                ss.fact_sales_id           as fact_sales_id,
-                bool_or(fr.id is not null) as has_returns
-            from source_sales ss
-            left join fact_returns fr
-              on fr.account_id      = ss.account_id
-             and fr.source_platform = ss.source_platform
-             and fr.order_id        = ss.order_id
-             and fr.dim_product_id  = ss.dim_product_id
-            group by ss.fact_sales_id
-        ),
-        finalized as (
-            select
-                ss.fact_sales_id                                            as fact_sales_id,
-                coalesce(sf.revenue_gross_amount, 0)                         as revenue_gross_amount,
-                (coalesce(sf.revenue_gross_amount, 0)
-                    - coalesce(cc.total_commission, 0)
-                    - coalesce(lc.total_logistics, 0)
-                    - coalesce(pc.total_product_cost, 0)
-                )                                                            as revenue_net_amount,
-                coalesce(sf.net_from_marketplace, 0)                         as payout_from_marketplace,
-                (coalesce(sf.net_from_marketplace, 0)
-                    - coalesce(pc.total_product_cost, 0)
-                )                                                            as mp_based_net,
-                coalesce(sf.currency, 'RUB')                                 as currency,
-                coalesce(rf.has_returns, false)                              as is_refund
-            from source_sales ss
-            left join sales_finance   sf on sf.fact_sales_id = ss.fact_sales_id
-            left join commission_costs cc on cc.fact_sales_id = ss.fact_sales_id
-            left join logistics_costs lc  on lc.fact_sales_id = ss.fact_sales_id
-            left join product_costs pc    on pc.fact_sales_id = ss.fact_sales_id
-            left join return_flags rf     on rf.fact_sales_id = ss.fact_sales_id
-        )
-        insert into fact_finance (
-            fact_sales_id,
-            revenue_gross_amount,
-            revenue_net_amount,
-            payout_from_marketplace,
-            mp_based_net,
-            currency,
-            is_refund,
-            created_at,
-            updated_at
-        )
-        select
-            finalized.fact_sales_id,
-            finalized.revenue_gross_amount,
-            finalized.revenue_net_amount,
-            finalized.payout_from_marketplace,
-            finalized.mp_based_net,
-            finalized.currency,
-            finalized.is_refund,
-            now(),
-            now()
-        from finalized
-        on conflict (fact_sales_id) do update
-        set
-            revenue_gross_amount    = excluded.revenue_gross_amount,
-            revenue_net_amount      = excluded.revenue_net_amount,
-            payout_from_marketplace = excluded.payout_from_marketplace,
-            mp_based_net            = excluded.mp_based_net,
-            currency                = excluded.currency,
-            is_refund               = excluded.is_refund,
-            updated_at              = now()
-        """.formatted(
-        platform,
-        RawTableNames.RAW_OZON_POSTINGS_FBS,
-        RawTableNames.RAW_OZON_POSTINGS_FBO,
-        RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS
-    );
-
-    MapSqlParameterSource params = new MapSqlParameterSource()
-        .addValue("accountId", accountId);
-
-    namedParameterJdbcTemplate.update(query, params);
+    Objects.requireNonNull(requestId, "requestId обязателен.");
+    String sourcePlatform = MarketplaceType.OZON.tag();
+    String sql = UPSERT_TEMPLATE.formatted(OZON_FINANCE_SELECT);
+    MapSqlParameterSource parameters = new MapSqlParameterSource().addValue("accountId", accountId)
+        .addValue("requestId", requestId).addValue("sourcePlatform", sourcePlatform);
+    int rows = jdbcTemplate.update(sql, parameters);
+    log.info(
+        "Finance facts upserted (Ozon): accountId={}, sourcePlatform={}, requestId={}, rows={}",
+        accountId, sourcePlatform, requestId, rows);
   }
 }
