@@ -99,7 +99,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               + coalesce(nullif(r.payload::jsonb ->> 'seller_promo_discount', '')::numeric, 0)
             )                                                                        as seller_discount_amount,
 
-            -- Денежный возврат покупателю
+            -- Денежный возврат покупателю (WB прямо даёт return_amount)
             sum(
               coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0)
             )                                                                        as refund_amount,
@@ -227,7 +227,8 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
       """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
   /**
-   * Ozon: дневной order-level P&L на основе finance/transaction.list + фактов логистики/штрафов.
+   * Ozon: дневной order-level P&L на основе finance/transaction.list + фактов
+   * логистики/штрафов/комиссий.
    */
   private static final String OZON_FINANCE_SELECT = """
       with daily_finance as (
@@ -250,18 +251,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             -- Пока нет явного поля в API → 0, позже подтянем из postings.financial_data
             0::numeric                                                                                 as seller_discount_amount,
 
-            -- Комиссия: продажа = +abs(sale_commission), возврат = -abs(sale_commission)
-            sum(
-              case
-                when r.payload::jsonb ->> 'type' = 'orders' then
-                  abs(coalesce(nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric, 0))
-                when r.payload::jsonb ->> 'type' = 'returns' then
-                  -abs(coalesce(nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric, 0))
-                else 0
-              end
-            )                                                                                          as marketplace_commission_amount,
-
-            -- Возврат покупателю: только «денежный» возврат
+            -- Денежный возврат покупателю: только «денежный» возврат
             sum(
               case
                 when r.payload::jsonb ->> 'type' = 'returns'
@@ -288,6 +278,36 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
         group by
           nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', ''),
           (r.payload::jsonb ->> 'operation_date')::timestamptz::date
+      ),
+
+      commission as (
+        select
+            fc.account_id,
+            fc.source_platform,
+            fc.order_id,
+            fc.operation_date                                                            as finance_date,
+            sum(
+              case
+                when fc.commission_type in ('SALE_COMMISSION', 'ACQUIRING_FEE', 'SERVICE_FEE', 'MARKETING_COMMISSION')
+                  then fc.amount
+                else 0
+              end
+            )                                                                            as marketplace_commission_amount,
+            sum(
+              case
+                when fc.commission_type = 'MARKETING_COMMISSION'
+                  then fc.amount
+                else 0
+              end
+            )                                                                            as marketing_cost_amount
+        from fact_commission fc
+        where fc.account_id      = :accountId
+          and fc.source_platform = :sourcePlatform
+        group by
+          fc.account_id,
+          fc.source_platform,
+          fc.order_id,
+          fc.operation_date
       ),
 
       logistics as (
@@ -333,25 +353,30 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
 
           df.revenue_gross,
           df.seller_discount_amount,
-          df.marketplace_commission_amount,
-          coalesce(l.logistics_cost_amount, 0) as logistics_cost_amount,
-          coalesce(p.penalties_amount, 0)      as penalties_amount,
-          0::numeric                           as marketing_cost_amount,
+          coalesce(c.marketplace_commission_amount, 0) as marketplace_commission_amount,
+          coalesce(l.logistics_cost_amount, 0)         as logistics_cost_amount,
+          coalesce(p.penalties_amount, 0)              as penalties_amount,
+          coalesce(c.marketing_cost_amount, 0)         as marketing_cost_amount,
           df.compensation_amount,
           df.refund_amount,
 
           (
             df.revenue_gross
             - df.seller_discount_amount
-            - df.marketplace_commission_amount
+            - coalesce(c.marketplace_commission_amount, 0)
             - coalesce(l.logistics_cost_amount, 0)
             - coalesce(p.penalties_amount, 0)
-            - 0::numeric
+            - coalesce(c.marketing_cost_amount, 0)
             + df.compensation_amount
             - df.refund_amount
           ) as net_payout
 
       from daily_finance df
+      left join commission c
+        on c.account_id      = df.account_id
+       and c.source_platform = df.source_platform
+       and c.order_id        = df.order_id
+       and c.finance_date    = df.finance_date
       left join logistics l
         on l.account_id      = df.account_id
        and l.source_platform = df.source_platform
