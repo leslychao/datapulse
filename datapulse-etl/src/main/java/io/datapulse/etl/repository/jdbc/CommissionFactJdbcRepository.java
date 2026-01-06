@@ -70,11 +70,11 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
               nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')     as order_id,
               (r.payload::jsonb ->> 'operation_date')::timestamptz::date         as operation_date,
               case
-                when sc.sale_commission_num > 0 then sc.sale_commission_num
+                when sc.sale_commission_num < 0 then -sc.sale_commission_num
                 else 0
               end                                                                as commission_charge_amount,
               case
-                when sc.sale_commission_num < 0 then -sc.sale_commission_num
+                when sc.sale_commission_num > 0 then sc.sale_commission_num
                 else 0
               end                                                                as commission_refund_amount,
               'RUB'                                                              as currency
@@ -97,8 +97,8 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           t.source_event_id,
           t.order_id,
           t.operation_date,
-          sum(t.commission_charge_amount)  as commission_charge_amount,
-          sum(t.commission_refund_amount)  as commission_refund_amount,
+          sum(t.commission_charge_amount) as commission_charge_amount,
+          sum(t.commission_refund_amount) as commission_refund_amount,
           t.currency
       from (
           select
