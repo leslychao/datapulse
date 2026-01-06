@@ -8,7 +8,7 @@
 
   <!-- =============================================================== -->
   <!-- FACT COMMISSION — комиссии маркетплейса по операциям/заказам    -->
-  <!-- grain: account + platform + source_event_id                     -->
+  <!-- grain: account + platform + source_event_id + commission_type   -->
   <!-- =============================================================== -->
 
   <changeSet id="0014-create-fact-commission" author="vitalii.kim" dbms="postgresql">
@@ -25,6 +25,8 @@
 
         operation_date           date           not null,
 
+        commission_type          text           not null,
+
         commission_charge_amount numeric(18, 2) not null,
         commission_refund_amount numeric(18, 2) not null,
         currency                 text           not null,
@@ -33,7 +35,7 @@
         updated_at               timestamptz    not null default now(),
 
         constraint uq_fact_commission_source
-          unique (account_id, source_platform, source_event_id)
+          unique (account_id, source_platform, source_event_id, commission_type)
       );
 
       create index if not exists idx_fact_commission_account_date

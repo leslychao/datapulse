@@ -60,12 +60,12 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
 
   private static final String OZON_LOGISTICS_SELECT = """
       select
-          :accountId                                                    as account_id,
-          :sourcePlatform                                               as source_platform,
-          r.payload::jsonb ->> 'operation_id'                           as source_event_id,
+          :accountId                                                     as account_id,
+          :sourcePlatform                                                as source_platform,
+          r.payload::jsonb ->> 'operation_id'                            as source_event_id,
           nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '') as order_id,
-          dw.id                                                         as warehouse_id,
-          (r.payload::jsonb ->> 'operation_date')::timestamptz::date    as operation_date,
+          dw.id                                                          as warehouse_id,
+          (r.payload::jsonb ->> 'operation_date')::timestamptz::date     as operation_date,
           case
             when r.payload::jsonb ->> 'operation_type' in (
               'OperationMarketplaceCrossDockServiceWriteOff',
@@ -98,16 +98,21 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
             when r.payload::jsonb ->> 'operation_type' in (
               'OperationMarketplaceServiceStorage'
             ) then 'STORAGE'
-          end                                                           as logistics_type,
+            when r.payload::jsonb ->> 'operation_type' in (
+              'MarketplaceSellerReexposureDeliveryReturnOperation',
+              'MarketplaceSellerShippingCompensationReturnOperation',
+              'ReturnAgentOperationRFBS'
+            ) then 'DELIVERY_ADJUSTMENT'
+          end                                                            as logistics_type,
           case
             when ln.amount_num < 0 then -ln.amount_num
             else 0
-          end                                                           as logistics_charge_amount,
+          end                                                            as logistics_charge_amount,
           case
             when ln.amount_num > 0 then ln.amount_num
             else 0
-          end                                                           as logistics_refund_amount,
-          'RUB'                                                         as currency
+          end                                                            as logistics_refund_amount,
+          'RUB'                                                          as currency
       from %s r
       cross join lateral (
           select nullif(r.payload::jsonb ->> 'amount', '')::numeric as amount_num
@@ -144,7 +149,10 @@ public class LogisticsFactJdbcRepository implements LogisticsFactRepository {
           'MarketplaceServiceItemReturnNotDelivToCustomer',
           'MarketplaceServiceItemReturnPartGoodsCustomer',
           'MarketplaceServiceItemReturnFlowTrans',
-          'MarketplaceServiceItemRedistributionReturnsPVZ'
+          'MarketplaceServiceItemRedistributionReturnsPVZ',
+          'MarketplaceSellerReexposureDeliveryReturnOperation',
+          'MarketplaceSellerShippingCompensationReturnOperation',
+          'ReturnAgentOperationRFBS'
         )
         and ln.amount_num is not null
         and ln.amount_num <> 0

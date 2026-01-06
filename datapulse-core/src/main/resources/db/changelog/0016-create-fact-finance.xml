@@ -28,6 +28,7 @@
         revenue_gross                 numeric(18, 2) not null default 0,
         seller_discount_amount        numeric(18, 2) not null default 0,
         marketplace_commission_amount numeric(18, 2) not null default 0,
+        acquiring_commission_amount   numeric(18, 2) not null default 0,
         logistics_cost_amount         numeric(18, 2) not null default 0,
         penalties_amount              numeric(18, 2) not null default 0,
         marketing_cost_amount         numeric(18, 2) not null default 0,

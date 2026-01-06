@@ -25,6 +25,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           revenue_gross,
           seller_discount_amount,
           marketplace_commission_amount,
+          acquiring_commission_amount,
           logistics_cost_amount,
           penalties_amount,
           marketing_cost_amount,
@@ -43,6 +44,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           revenue_gross,
           seller_discount_amount,
           marketplace_commission_amount,
+          acquiring_commission_amount,
           logistics_cost_amount,
           penalties_amount,
           marketing_cost_amount,
@@ -61,6 +63,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           revenue_gross                 = excluded.revenue_gross,
           seller_discount_amount        = excluded.seller_discount_amount,
           marketplace_commission_amount = excluded.marketplace_commission_amount,
+          acquiring_commission_amount   = excluded.acquiring_commission_amount,
           logistics_cost_amount         = excluded.logistics_cost_amount,
           penalties_amount              = excluded.penalties_amount,
           marketing_cost_amount         = excluded.marketing_cost_amount,
@@ -112,8 +115,20 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fc.source_platform,
             fc.order_id,
             fc.operation_date                                             as finance_date,
-            sum(fc.commission_charge_amount - fc.commission_refund_amount)
-                                                                         as marketplace_commission_amount
+            sum(
+              case
+                when fc.commission_type = 'SALE_COMMISSION'
+                  then fc.commission_charge_amount - fc.commission_refund_amount
+                else 0
+              end
+            )                                                             as marketplace_commission_amount,
+            sum(
+              case
+                when fc.commission_type = 'ACQUIRING_COMMISSION'
+                  then fc.commission_charge_amount - fc.commission_refund_amount
+                else 0
+              end
+            )                                                             as acquiring_commission_amount
         from fact_commission fc
         where fc.account_id      = :accountId
           and fc.source_platform = :sourcePlatform
@@ -184,6 +199,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           df.revenue_gross,
           df.seller_discount_amount,
           coalesce(c.marketplace_commission_amount, 0) as marketplace_commission_amount,
+          coalesce(c.acquiring_commission_amount, 0)   as acquiring_commission_amount,
           coalesce(l.logistics_cost_amount, 0)         as logistics_cost_amount,
           coalesce(p.penalties_amount, 0)              as penalties_amount,
           coalesce(m.marketing_cost_amount, 0)         as marketing_cost_amount,
@@ -236,7 +252,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
               case
                 when r.payload::jsonb ->> 'type' = 'returns'
                  and r.payload::jsonb ->> 'operation_type' = 'ClientReturnAgentOperation'
-                  then abs(coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0))
+                  then abs(coalesce(nullif(r.payload::jsonb ->> 'accruals_for_sale', '')::numeric, 0))
                 else 0
               end
             )                                                                    as refund_amount,
@@ -263,8 +279,20 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fc.source_platform,
             fc.order_id,
             fc.operation_date                                             as finance_date,
-            sum(fc.commission_charge_amount - fc.commission_refund_amount)
-                                                                         as marketplace_commission_amount
+            sum(
+              case
+                when fc.commission_type = 'SALE_COMMISSION'
+                  then fc.commission_charge_amount - fc.commission_refund_amount
+                else 0
+              end
+            )                                                             as marketplace_commission_amount,
+            sum(
+              case
+                when fc.commission_type = 'ACQUIRING_COMMISSION'
+                  then fc.commission_charge_amount - fc.commission_refund_amount
+                else 0
+              end
+            )                                                             as acquiring_commission_amount
         from fact_commission fc
         where fc.account_id      = :accountId
           and fc.source_platform = :sourcePlatform
@@ -335,6 +363,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           df.revenue_gross,
           df.seller_discount_amount,
           coalesce(c.marketplace_commission_amount, 0) as marketplace_commission_amount,
+          coalesce(c.acquiring_commission_amount, 0)   as acquiring_commission_amount,
           coalesce(l.logistics_cost_amount, 0)         as logistics_cost_amount,
           coalesce(p.penalties_amount, 0)              as penalties_amount,
           coalesce(m.marketing_cost_amount, 0)         as marketing_cost_amount,

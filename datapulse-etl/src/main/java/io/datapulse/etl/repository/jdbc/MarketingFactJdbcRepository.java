@@ -94,12 +94,15 @@ public class MarketingFactJdbcRepository implements MarketingFactRepository {
             and r.payload::jsonb ->> 'operation_type' in (
               'MarketplaceMarketingActionCostOperation',
               'MarketplaceSaleReviewsOperation',
-              'MarketplaceServicePremiumCashback',
+              'OperationMarketplaceServicePremiumCashback',
               'MarketplaceServicePremiumCashbackIndividualPoints',
               'MarketplaceServicePremiumPromotion',
               'OperationElectronicServicesPromotionInSearch',
               'ItemAgentServiceStarsMembership',
-              'MarketplaceServiceItemInstallment'
+              'MarketplaceServiceItemInstallment',
+              'OperationElectronicServiceStencil',
+              'OperationMarketplaceServiceItemElectronicServicesBrandShelf',
+              'OperationSubscriptionPremium'
             )
       ) as t
       """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);

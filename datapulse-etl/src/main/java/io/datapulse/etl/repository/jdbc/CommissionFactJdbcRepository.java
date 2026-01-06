@@ -23,6 +23,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           source_event_id,
           order_id,
           operation_date,
+          commission_type,
           commission_charge_amount,
           commission_refund_amount,
           currency,
@@ -35,6 +36,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           source_event_id,
           order_id,
           operation_date,
+          commission_type,
           commission_charge_amount,
           commission_refund_amount,
           currency,
@@ -43,24 +45,26 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
       from (
           %s
       ) as source
-      on conflict (account_id, source_platform, source_event_id)
+      on conflict (account_id, source_platform, source_event_id, commission_type)
       do update
       set
           order_id                 = excluded.order_id,
           operation_date           = excluded.operation_date,
+          commission_type          = excluded.commission_type,
           commission_charge_amount = excluded.commission_charge_amount,
           commission_refund_amount = excluded.commission_refund_amount,
           currency                 = excluded.currency,
           updated_at               = now()
       """;
 
-  private static final String OZON_COMMISSION_SELECT = """
+  private static final String OZON_SALE_COMMISSION_SELECT = """
       select
           :accountId      as account_id,
           :sourcePlatform as source_platform,
           t.source_event_id,
           t.order_id,
           t.operation_date,
+          t.commission_type,
           t.commission_charge_amount,
           t.commission_refund_amount,
           t.currency
@@ -69,6 +73,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
               r.payload::jsonb ->> 'operation_id'                                as source_event_id,
               nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')     as order_id,
               (r.payload::jsonb ->> 'operation_date')::timestamptz::date         as operation_date,
+              'SALE_COMMISSION'                                                  as commission_type,
               case
                 when sc.sale_commission_num < 0 then -sc.sale_commission_num
                 else 0
@@ -90,6 +95,46 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
       ) as t
       """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
 
+  private static final String OZON_ACQUIRING_COMMISSION_SELECT = """
+      select
+          :accountId      as account_id,
+          :sourcePlatform as source_platform,
+          t.source_event_id,
+          t.order_id,
+          t.operation_date,
+          t.commission_type,
+          t.commission_charge_amount,
+          t.commission_refund_amount,
+          t.currency
+      from (
+          select
+              r.payload::jsonb ->> 'operation_id'                                as source_event_id,
+              nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')     as order_id,
+              (r.payload::jsonb ->> 'operation_date')::timestamptz::date         as operation_date,
+              'ACQUIRING_COMMISSION'                                             as commission_type,
+              case
+                when amt.amount_num < 0 then -amt.amount_num
+                else 0
+              end                                                                as commission_charge_amount,
+              case
+                when amt.amount_num > 0 then amt.amount_num
+                else 0
+              end                                                                as commission_refund_amount,
+              'RUB'                                                              as currency
+          from %s r
+          cross join lateral (
+              select nullif(r.payload::jsonb ->> 'amount', '')::numeric as amount_num
+          ) amt
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'OZON'
+            and r.payload::jsonb ->> 'operation_type' =
+                'MarketplaceRedistributionOfAcquiringOperation'
+            and amt.amount_num is not null
+            and amt.amount_num <> 0
+      ) as t
+      """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
+
   private static final String WILDBERRIES_COMMISSION_SELECT = """
       select
           :accountId      as account_id,
@@ -97,14 +142,16 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           t.source_event_id,
           t.order_id,
           t.operation_date,
-          sum(t.commission_charge_amount) as commission_charge_amount,
-          sum(t.commission_refund_amount) as commission_refund_amount,
+          t.commission_type,
+          t.commission_charge_amount,
+          t.commission_refund_amount,
           t.currency
       from (
           select
               r.payload::jsonb ->> 'rrd_id'                                      as source_event_id,
               r.payload::jsonb ->> 'srid'                                        as order_id,
               (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                  as operation_date,
+              'SALE_COMMISSION'                                                  as commission_type,
               case
                 when sc.ppvz_sales_commission_num > 0 then sc.ppvz_sales_commission_num
                 else 0
@@ -131,6 +178,7 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
               r.payload::jsonb ->> 'rrd_id'                                      as source_event_id,
               r.payload::jsonb ->> 'srid'                                        as order_id,
               (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                  as operation_date,
+              'ACQUIRING_COMMISSION'                                             as commission_type,
               case
                 when af.acquiring_fee_num > 0 then af.acquiring_fee_num
                 else 0
@@ -150,11 +198,6 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
             and af.acquiring_fee_num is not null
             and af.acquiring_fee_num <> 0
       ) as t
-      group by
-          t.source_event_id,
-          t.order_id,
-          t.operation_date,
-          t.currency
       """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -163,7 +206,8 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
   public void upsertOzon(long accountId, String requestId) {
     List<String> selects = new ArrayList<>();
     if (tableExists(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS)) {
-      selects.add(OZON_COMMISSION_SELECT);
+      selects.add(OZON_SALE_COMMISSION_SELECT);
+      selects.add(OZON_ACQUIRING_COMMISSION_SELECT);
     }
     executeUpsert(selects, accountId, requestId, MarketplaceType.OZON.tag());
   }
