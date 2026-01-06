@@ -79,6 +79,9 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             (r.payload::jsonb ->> 'rr_dt')::timestamptz::date             as finance_date,
             coalesce(r.payload::jsonb ->> 'currency_name', 'руб')         as currency,
             sum(
+              coalesce(nullif(r.payload::jsonb ->> 'ppvz_for_pay', '')::numeric, 0)
+            )                                                             as cash_flow_amount,
+            sum(
               coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0)
             )                                                             as revenue_gross,
             sum(
@@ -153,6 +156,23 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           fp.source_platform,
           fp.order_id,
           fp.penalty_date
+      ),
+
+      marketing as (
+        select
+            fm.account_id,
+            fm.source_platform,
+            fm.order_id,
+            fm.operation_date                                             as finance_date,
+            sum(fm.marketing_charge_amount - fm.marketing_refund_amount)  as marketing_cost_amount
+        from fact_marketing_costs fm
+        where fm.account_id      = :accountId
+          and fm.source_platform = :sourcePlatform
+        group by
+          fm.account_id,
+          fm.source_platform,
+          fm.order_id,
+          fm.operation_date
       )
 
       select
@@ -166,18 +186,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           coalesce(c.marketplace_commission_amount, 0) as marketplace_commission_amount,
           coalesce(l.logistics_cost_amount, 0)         as logistics_cost_amount,
           coalesce(p.penalties_amount, 0)              as penalties_amount,
-          0::numeric                                   as marketing_cost_amount,
+          coalesce(m.marketing_cost_amount, 0)         as marketing_cost_amount,
           df.compensation_amount,
           df.refund_amount,
-          (
-            df.revenue_gross
-            - df.seller_discount_amount
-            - coalesce(c.marketplace_commission_amount, 0)
-            - coalesce(l.logistics_cost_amount, 0)
-            - coalesce(p.penalties_amount, 0)
-            + df.compensation_amount
-            - df.refund_amount
-          ) as net_payout
+          df.cash_flow_amount                          as net_payout
       from daily_finance df
       left join commission c
         on c.account_id      = df.account_id
@@ -194,6 +206,11 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
        and p.source_platform = df.source_platform
        and p.order_id        = df.order_id
        and p.finance_date    = df.finance_date
+      left join marketing m
+        on m.account_id      = df.account_id
+       and m.source_platform = df.source_platform
+       and m.order_id        = df.order_id
+       and m.finance_date    = df.finance_date
       """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
   private static final String OZON_FINANCE_SELECT = """
@@ -204,6 +221,9 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')      as order_id,
             (r.payload::jsonb ->> 'operation_date')::timestamptz::date          as finance_date,
             'RUB'                                                                as currency,
+            sum(
+              coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0)
+            )                                                                    as cash_flow_amount,
             sum(
               case
                 when r.payload::jsonb ->> 'type' = 'orders'
@@ -223,7 +243,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             sum(
               case
                 when r.payload::jsonb ->> 'type' = 'compensation'
-                  then abs(coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0))
+                  then coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0)
                 else 0
               end
             )                                                                    as compensation_amount
@@ -287,6 +307,23 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           fp.source_platform,
           fp.order_id,
           fp.penalty_date
+      ),
+
+      marketing as (
+        select
+            fm.account_id,
+            fm.source_platform,
+            fm.order_id,
+            fm.operation_date                                             as finance_date,
+            sum(fm.marketing_charge_amount - fm.marketing_refund_amount)  as marketing_cost_amount
+        from fact_marketing_costs fm
+        where fm.account_id      = :accountId
+          and fm.source_platform = :sourcePlatform
+        group by
+          fm.account_id,
+          fm.source_platform,
+          fm.order_id,
+          fm.operation_date
       )
 
       select
@@ -300,18 +337,10 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
           coalesce(c.marketplace_commission_amount, 0) as marketplace_commission_amount,
           coalesce(l.logistics_cost_amount, 0)         as logistics_cost_amount,
           coalesce(p.penalties_amount, 0)              as penalties_amount,
-          0::numeric                                   as marketing_cost_amount,
+          coalesce(m.marketing_cost_amount, 0)         as marketing_cost_amount,
           df.compensation_amount,
           df.refund_amount,
-          (
-            df.revenue_gross
-            - df.seller_discount_amount
-            - coalesce(c.marketplace_commission_amount, 0)
-            - coalesce(l.logistics_cost_amount, 0)
-            - coalesce(p.penalties_amount, 0)
-            + df.compensation_amount
-            - df.refund_amount
-          ) as net_payout
+          df.cash_flow_amount                          as net_payout
       from daily_finance df
       left join commission c
         on c.account_id      = df.account_id
@@ -328,6 +357,11 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
        and p.source_platform = df.source_platform
        and p.order_id        = df.order_id
        and p.finance_date    = df.finance_date
+      left join marketing m
+        on m.account_id      = df.account_id
+       and m.source_platform = df.source_platform
+       and m.order_id        = df.order_id
+       and m.finance_date    = df.finance_date
       """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
 
   private final NamedParameterJdbcTemplate jdbcTemplate;

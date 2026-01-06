@@ -5,6 +5,7 @@ import static io.datapulse.etl.MarketplaceEvent.FACT_FINANCE;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
 import io.datapulse.etl.repository.FinanceFactRepository;
+import io.datapulse.etl.repository.MarketingFactRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,8 @@ public final class FinanceFactMaterializationHandler implements MaterializationH
 
   private final FinanceFactRepository repository;
 
+  private final MarketingFactRepository marketingFactRepository;
+
   @Override
   public MarketplaceEvent supportedEvent() {
     return FACT_FINANCE;
@@ -25,8 +28,13 @@ public final class FinanceFactMaterializationHandler implements MaterializationH
   public void materialize(long accountId, String requestId) {
     log.info("Finance fact materialization started: requestId={}, accountId={}", requestId,
         accountId);
+
+    marketingFactRepository.upsertOzon(accountId, requestId);
+    marketingFactRepository.upsertWildberries(accountId, requestId);
+    
     repository.upsertFromOzon(accountId, requestId);
     repository.upsertFromWildberries(accountId, requestId);
+
     log.info("Finance fact materialization finished: requestId={}, accountId={}", requestId,
         accountId);
   }
