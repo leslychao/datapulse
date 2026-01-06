@@ -6,17 +6,15 @@ import io.datapulse.etl.repository.CommissionFactRepository;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class CommissionFactJdbcRepository implements CommissionFactRepository {
-
-  private static final Logger log = LoggerFactory.getLogger(CommissionFactJdbcRepository.class);
 
   private static final String UPSERT_TEMPLATE = """
       insert into fact_commission (
@@ -25,8 +23,8 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           source_event_id,
           order_id,
           operation_date,
-          commission_type,
-          amount,
+          commission_charge_amount,
+          commission_refund_amount,
           currency,
           created_at,
           updated_at
@@ -37,76 +35,126 @@ public class CommissionFactJdbcRepository implements CommissionFactRepository {
           source_event_id,
           order_id,
           operation_date,
-          commission_type,
-          amount,
+          commission_charge_amount,
+          commission_refund_amount,
           currency,
           now(),
           now()
       from (
           %s
       ) as source
-      on conflict (account_id, source_platform, source_event_id, commission_type)
+      on conflict (account_id, source_platform, source_event_id)
       do update
       set
-          order_id       = excluded.order_id,
-          operation_date = excluded.operation_date,
-          amount         = excluded.amount,
-          currency       = excluded.currency,
-          updated_at     = now()
+          order_id                 = excluded.order_id,
+          operation_date           = excluded.operation_date,
+          commission_charge_amount = excluded.commission_charge_amount,
+          commission_refund_amount = excluded.commission_refund_amount,
+          currency                 = excluded.currency,
+          updated_at               = now()
       """;
 
   private static final String OZON_COMMISSION_SELECT = """
       select
-          :accountId                                                                 as account_id,
-          :sourcePlatform                                                            as source_platform,
-          r.payload::jsonb ->> 'operation_id'                                        as source_event_id,
-          nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')             as order_id,
-          (r.payload::jsonb ->> 'operation_date')::timestamptz::date                 as operation_date,
-          'SALE_COMMISSION'                                                          as commission_type,
-          - nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric              as amount,
-          'RUB'                                                                      as currency
-      from %s r
-      where r.account_id = :accountId
-        and r.request_id = :requestId
-        and r.marketplace = 'OZON'
-        and nullif(r.payload::jsonb ->> 'sale_commission', '') is not null
-        and nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric <> 0
+          :accountId      as account_id,
+          :sourcePlatform as source_platform,
+          t.source_event_id,
+          t.order_id,
+          t.operation_date,
+          t.commission_charge_amount,
+          t.commission_refund_amount,
+          t.currency
+      from (
+          select
+              r.payload::jsonb ->> 'operation_id'                                as source_event_id,
+              nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')     as order_id,
+              (r.payload::jsonb ->> 'operation_date')::timestamptz::date         as operation_date,
+              case
+                when sc.sale_commission_num > 0 then sc.sale_commission_num
+                else 0
+              end                                                                as commission_charge_amount,
+              case
+                when sc.sale_commission_num < 0 then -sc.sale_commission_num
+                else 0
+              end                                                                as commission_refund_amount,
+              'RUB'                                                              as currency
+          from %s r
+          cross join lateral (
+              select nullif(r.payload::jsonb ->> 'sale_commission', '')::numeric as sale_commission_num
+          ) sc
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'OZON'
+            and sc.sale_commission_num is not null
+            and sc.sale_commission_num <> 0
+      ) as t
       """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
 
   private static final String WILDBERRIES_COMMISSION_SELECT = """
       select
-          :accountId                                                                 as account_id,
-          :sourcePlatform                                                            as source_platform,
-          r.payload::jsonb ->> 'rrd_id'                                              as source_event_id,
-          r.payload::jsonb ->> 'srid'                                                as order_id,
-          (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as operation_date,
-          'SALE_COMMISSION'                                                          as commission_type,
-          nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric          as amount,
-          coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
-      from %1$s r
-      where r.account_id = :accountId
-        and r.request_id = :requestId
-        and r.marketplace = 'WILDBERRIES'
-        and nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '') is not null
-        and nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric <> 0
+          :accountId      as account_id,
+          :sourcePlatform as source_platform,
+          t.source_event_id,
+          t.order_id,
+          t.operation_date,
+          sum(t.commission_charge_amount)  as commission_charge_amount,
+          sum(t.commission_refund_amount)  as commission_refund_amount,
+          t.currency
+      from (
+          select
+              r.payload::jsonb ->> 'rrd_id'                                      as source_event_id,
+              r.payload::jsonb ->> 'srid'                                        as order_id,
+              (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                  as operation_date,
+              case
+                when sc.ppvz_sales_commission_num > 0 then sc.ppvz_sales_commission_num
+                else 0
+              end                                                                as commission_charge_amount,
+              case
+                when sc.ppvz_sales_commission_num < 0 then -sc.ppvz_sales_commission_num
+                else 0
+              end                                                                as commission_refund_amount,
+              coalesce(r.payload::jsonb ->> 'currency_name', 'руб')              as currency
+          from %1$s r
+          cross join lateral (
+              select nullif(r.payload::jsonb ->> 'ppvz_sales_commission', '')::numeric
+                     as ppvz_sales_commission_num
+          ) sc
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'WILDBERRIES'
+            and sc.ppvz_sales_commission_num is not null
+            and sc.ppvz_sales_commission_num <> 0
 
-      union all
+          union all
 
-      select
-          :accountId                                                                 as account_id,
-          :sourcePlatform                                                            as source_platform,
-          r.payload::jsonb ->> 'rrd_id'                                              as source_event_id,
-          r.payload::jsonb ->> 'srid'                                                as order_id,
-          (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as operation_date,
-          'ACQUIRING_FEE'                                                            as commission_type,
-          nullif(r.payload::jsonb ->> 'acquiring_fee', '')::numeric                  as amount,
-          coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
-      from %1$s r
-      where r.account_id = :accountId
-        and r.request_id = :requestId
-        and r.marketplace = 'WILDBERRIES'
-        and nullif(r.payload::jsonb ->> 'acquiring_fee', '') is not null
-        and nullif(r.payload::jsonb ->> 'acquiring_fee', '')::numeric <> 0
+          select
+              r.payload::jsonb ->> 'rrd_id'                                      as source_event_id,
+              r.payload::jsonb ->> 'srid'                                        as order_id,
+              (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                  as operation_date,
+              case
+                when af.acquiring_fee_num > 0 then af.acquiring_fee_num
+                else 0
+              end                                                                as commission_charge_amount,
+              case
+                when af.acquiring_fee_num < 0 then -af.acquiring_fee_num
+                else 0
+              end                                                                as commission_refund_amount,
+              coalesce(r.payload::jsonb ->> 'currency_name', 'руб')              as currency
+          from %1$s r
+          cross join lateral (
+              select nullif(r.payload::jsonb ->> 'acquiring_fee', '')::numeric as acquiring_fee_num
+          ) af
+          where r.account_id = :accountId
+            and r.request_id = :requestId
+            and r.marketplace = 'WILDBERRIES'
+            and af.acquiring_fee_num is not null
+            and af.acquiring_fee_num <> 0
+      ) as t
+      group by
+          t.source_event_id,
+          t.order_id,
+          t.operation_date,
+          t.currency
       """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
