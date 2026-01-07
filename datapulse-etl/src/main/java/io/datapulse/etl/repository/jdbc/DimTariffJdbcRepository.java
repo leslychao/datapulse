@@ -12,23 +12,18 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class DimTariffJdbcRepository implements DimTariffRepository {
 
-  /**
-   * SCD2-апдейт тарифов Wildberries по справочнику dim_category.
-   * <p>
-   * Таблица назначения: dim_tariff_wb Grain: (source_platform, dim_category_id).
-   */
   private static final String UPSERT_WB_SCD2_TEMPLATE = """
       with source as (
           select
               '%1$s'                                                   as source_platform,
               c.id                                                     as dim_category_id,
 
-              (t.payload::jsonb ->> 'kgvpBooking')::numeric(10,4)          as kgvp_booking,
-              (t.payload::jsonb ->> 'kgvpMarketplace')::numeric(10,4)      as kgvp_marketplace,
-              (t.payload::jsonb ->> 'kgvpPickup')::numeric(10,4)           as kgvp_pickup,
-              (t.payload::jsonb ->> 'kgvpSupplier')::numeric(10,4)         as kgvp_supplier,
-              (t.payload::jsonb ->> 'kgvpSupplierExpress')::numeric(10,4)  as kgvp_supplier_express,
-              (t.payload::jsonb ->> 'paidStorageKgvp')::numeric(10,4)      as paid_storage_kgvp
+              (t.payload::jsonb ->> 'kgvpBooking')::numeric(10,4)         as kgvp_booking,
+              (t.payload::jsonb ->> 'kgvpMarketplace')::numeric(10,4)     as kgvp_marketplace,
+              (t.payload::jsonb ->> 'kgvpPickup')::numeric(10,4)          as kgvp_pickup,
+              (t.payload::jsonb ->> 'kgvpSupplier')::numeric(10,4)        as kgvp_supplier,
+              (t.payload::jsonb ->> 'kgvpSupplierExpress')::numeric(10,4) as kgvp_supplier_express,
+              (t.payload::jsonb ->> 'paidStorageKgvp')::numeric(10,4)     as paid_storage_kgvp
           from %2$s t
           join dim_category c
             on c.source_platform    = '%1$s'
@@ -112,26 +107,17 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
       );
       """;
 
-  /**
-   * SCD2-апдейт тарифов Ozon на уровне товара.
-   * <p>
-   * Таблица назначения: dim_tariff_ozon Grain: product_id.
-   * <p>
-   * Логика: 1) source: свежие тарифы из RAW_OZON_PRODUCT_INFO_PRICES (accountId + requestId). 2)
-   * closed: закрываем текущие записи (valid_to = current_date - 1), если поля изменились. 3)
-   * insert: создаём новую запись на current_date, если нет открытой с теми же значениями.
-   */
   private static final String UPSERT_OZON_SCD2_TEMPLATE = """
-      with source as (
+      with raw as (
           select
               (t.payload::jsonb ->> 'product_id')::bigint              as product_id,
               t.payload::jsonb ->> 'offer_id'                          as offer_id,
               (t.payload::jsonb ->> 'acquiring')::numeric(10,4)        as acquiring,
 
-              (t.payload::jsonb -> 'commissions' ->> 'sales_percent_fbo')::numeric(10,4) as sales_percent_fbo,
-              (t.payload::jsonb -> 'commissions' ->> 'sales_percent_fbs')::numeric(10,4) as sales_percent_fbs,
+              (t.payload::jsonb -> 'commissions' ->> 'sales_percent_fbo')::numeric(10,4)  as sales_percent_fbo,
+              (t.payload::jsonb -> 'commissions' ->> 'sales_percent_fbs')::numeric(10,4)  as sales_percent_fbs,
               (t.payload::jsonb -> 'commissions' ->> 'sales_percent_rfbs')::numeric(10,4) as sales_percent_rfbs,
-              (t.payload::jsonb -> 'commissions' ->> 'sales_percent_fbp')::numeric(10,4) as sales_percent_fbp,
+              (t.payload::jsonb -> 'commissions' ->> 'sales_percent_fbp')::numeric(10,4)  as sales_percent_fbp,
 
               (t.payload::jsonb -> 'commissions' ->> 'fbo_deliv_to_customer_amount')::numeric(10,4)     as fbo_deliv_to_customer_amount,
               (t.payload::jsonb -> 'commissions' ->> 'fbo_direct_flow_trans_min_amount')::numeric(10,4) as fbo_direct_flow_trans_min_amount,
@@ -143,11 +129,35 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
               (t.payload::jsonb -> 'commissions' ->> 'fbs_direct_flow_trans_max_amount')::numeric(10,4) as fbs_direct_flow_trans_max_amount,
               (t.payload::jsonb -> 'commissions' ->> 'fbs_first_mile_min_amount')::numeric(10,4)        as fbs_first_mile_min_amount,
               (t.payload::jsonb -> 'commissions' ->> 'fbs_first_mile_max_amount')::numeric(10,4)        as fbs_first_mile_max_amount,
-              (t.payload::jsonb -> 'commissions' ->> 'fbs_return_flow_amount')::numeric(10,4)           as fbs_return_flow_amount
+              (t.payload::jsonb -> 'commissions' ->> 'fbs_return_flow_amount')::numeric(10,4)           as fbs_return_flow_amount,
+
+              t.created_at                                            as created_at
           from %1$s t
           where t.account_id = ?
             and t.request_id = ?
             and (t.payload::jsonb ->> 'product_id') is not null
+      ),
+      source as (
+          select distinct on (product_id)
+              product_id,
+              offer_id,
+              acquiring,
+              sales_percent_fbo,
+              sales_percent_fbs,
+              sales_percent_rfbs,
+              sales_percent_fbp,
+              fbo_deliv_to_customer_amount,
+              fbo_direct_flow_trans_min_amount,
+              fbo_direct_flow_trans_max_amount,
+              fbo_return_flow_amount,
+              fbs_deliv_to_customer_amount,
+              fbs_direct_flow_trans_min_amount,
+              fbs_direct_flow_trans_max_amount,
+              fbs_first_mile_min_amount,
+              fbs_first_mile_max_amount,
+              fbs_return_flow_amount
+          from raw
+          order by product_id, created_at desc
       ),
       closed as (
           update dim_tariff_ozon d

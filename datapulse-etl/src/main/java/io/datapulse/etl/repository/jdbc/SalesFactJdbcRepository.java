@@ -46,7 +46,7 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
       on conflict (account_id, source_platform, source_event_id)
       do update
       set
-          order_id      = excluded.order_id,
+          order_id       = excluded.order_id,
           dim_product_id = excluded.dim_product_id,
           warehouse_id   = excluded.warehouse_id,
           category_id    = excluded.category_id,
@@ -61,13 +61,13 @@ public class SalesFactJdbcRepository implements SalesFactRepository {
           :accountId                                                               as account_id,
           :platform                                                                as source_platform,
           (r.payload::jsonb ->> 'srid') || ':' || (r.payload::jsonb ->> 'nmId')    as source_event_id,
-          (r.payload::jsonb ->> 'srid')                                           as order_id,
+          (r.payload::jsonb ->> 'srid')                                            as order_id,
           dp.id                                                                    as dim_product_id,
           dw.id                                                                    as warehouse_id,
           dc.id                                                                    as category_id,
-          count(*)                                                                 as quantity,
-          min((r.payload::jsonb ->> 'date')::timestamptz)                         as sale_ts,
-          min((r.payload::jsonb ->> 'date')::timestamptz)::date                   as sale_date
+          sum(coalesce((r.payload::jsonb ->> 'quantity')::int, 1))                 as quantity,
+          min((r.payload::jsonb ->> 'date')::timestamptz)                          as sale_ts,
+          min((r.payload::jsonb ->> 'date')::timestamptz)::date                    as sale_date
       from raw_wb_supplier_sales r
       join dim_product dp
         on dp.account_id        = r.account_id
