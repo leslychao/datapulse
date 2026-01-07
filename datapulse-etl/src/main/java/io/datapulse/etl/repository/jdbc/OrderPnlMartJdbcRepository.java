@@ -34,7 +34,6 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
                   sum(net_payout)                    as net_payout
               from datapulse.fact_finance
               where account_id = :accountId
-                and request_id = :requestId
               group by account_id, source_platform, order_id
           ),
 
@@ -47,11 +46,13 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
                   sum(case when quantity < 0 then -quantity else 0 end) as returned_from_sales
               from datapulse.fact_sales s
               where s.account_id = :accountId
-                and s.request_id = :requestId
-                and exists (select 1 from finance_by_order f
-                            where f.account_id = s.account_id
-                              and f.source_platform = s.source_platform
-                              and f.order_id = s.order_id)
+                and exists (
+                    select 1
+                    from finance_by_order f
+                    where f.account_id = s.account_id
+                      and f.source_platform = s.source_platform
+                      and f.order_id = s.order_id
+                )
               group by account_id, source_platform, order_id
           ),
 
@@ -63,11 +64,13 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
                   sum(quantity) as returned_items_count
               from datapulse.fact_returns r
               where r.account_id = :accountId
-                and r.request_id = :requestId
-                and exists (select 1 from finance_by_order f
-                            where f.account_id = r.account_id
-                              and f.source_platform = r.source_platform
-                              and f.order_id = r.order_id)
+                and exists (
+                    select 1
+                    from finance_by_order f
+                    where f.account_id = r.account_id
+                      and f.source_platform = r.source_platform
+                      and f.order_id = r.order_id
+                )
               group by account_id, source_platform, order_id
           ),
 
@@ -78,12 +81,12 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
                   coalesce(s.order_id, r.order_id)               as order_id,
                   coalesce(s.items_sold_count, 0)                as items_sold_count,
                   coalesce(s.returned_from_sales, 0)
-                    + coalesce(r.returned_items_count, 0)        as returned_items_count
+                      + coalesce(r.returned_items_count, 0)      as returned_items_count
               from sales_by_order s
-              full join returns_by_order r
-                on r.account_id = s.account_id
-               and r.source_platform = s.source_platform
-               and r.order_id = s.order_id
+                       full join returns_by_order r
+                                 on r.account_id = s.account_id
+                                 and r.source_platform = s.source_platform
+                                 and r.order_id = s.order_id
           )
 
       insert into datapulse.mart_order_pnl (
@@ -129,27 +132,27 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
           f.refund_amount,
           f.net_payout,
           (
-              f.revenue_gross
-            - f.seller_discount_amount
-            - f.marketplace_commission_amount
-            - f.acquiring_commission_amount
-            - f.logistics_cost_amount
-            - f.penalties_amount
-            - f.marketing_cost_amount
-            - f.refund_amount
-            + f.compensation_amount
-          ) as pnl_amount,
-          coalesce(q.items_sold_count, 0),
-          coalesce(q.returned_items_count, 0),
-          (coalesce(q.returned_items_count, 0) <> 0 or f.refund_amount <> 0),
-          (f.penalties_amount <> 0),
+                  f.revenue_gross
+                  - f.seller_discount_amount
+                  - f.marketplace_commission_amount
+                  - f.acquiring_commission_amount
+                  - f.logistics_cost_amount
+                  - f.penalties_amount
+                  - f.marketing_cost_amount
+                  - f.refund_amount
+                  + f.compensation_amount
+          )                                           as pnl_amount,
+          coalesce(q.items_sold_count, 0)             as items_sold_count,
+          coalesce(q.returned_items_count, 0)         as returned_items_count,
+          (coalesce(q.returned_items_count, 0) <> 0 or f.refund_amount <> 0) as is_returned,
+          (f.penalties_amount <> 0)                                         as has_penalties,
           now(),
           now()
       from finance_by_order f
-      left join qty_by_order q
-        on q.account_id = f.account_id
-       and q.source_platform = f.source_platform
-       and q.order_id = f.order_id
+               left join qty_by_order q
+                         on q.account_id = f.account_id
+                         and q.source_platform = f.source_platform
+                         and q.order_id = f.order_id
       on conflict (account_id, source_platform, order_id) do update
       set currency                      = excluded.currency,
           first_finance_date            = excluded.first_finance_date,
@@ -175,16 +178,16 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   @Override
-  public void refresh(long accountId, String requestId) {
+  public void refresh(long accountId) {
     var params = new MapSqlParameterSource()
-        .addValue("accountId", accountId)
-        .addValue("requestId", requestId);
+        .addValue("accountId", accountId);
 
     int affected = jdbcTemplate.update(UPSERT_SQL, params);
 
     log.info(
-        "Order PnL mart refreshed: accountId={}, requestId={}, affectedRows={}",
-        accountId, requestId, affected
+        "Order PnL mart refreshed (full account): accountId={}, affectedRows={}",
+        accountId,
+        affected
     );
   }
 }

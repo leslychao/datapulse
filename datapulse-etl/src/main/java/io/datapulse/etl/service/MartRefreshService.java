@@ -6,9 +6,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class MartRefreshService {
 
   private final OrderPnlMartRepository orderPnlMartRepository;
@@ -20,11 +20,13 @@ public class MartRefreshService {
   ) {
     if (isOrderPnlRelated(event)) {
       log.info(
-          "Refreshing order PnL mart: requestId={}, accountId={}, event={}",
-          requestId, accountId, event
+          "Refreshing order PnL mart (by account): requestId={}, accountId={}, event={}",
+          requestId,
+          accountId,
+          event
       );
 
-      orderPnlMartRepository.refresh(accountId, requestId);
+      orderPnlMartRepository.refresh(accountId);
     }
   }
 
