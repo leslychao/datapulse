@@ -21,4 +21,5 @@
   <include file="changelog/0016-create-fact-finance.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0017-create-fact-penalties.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0018-create-fact-marketing-costs.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0019-create-mart-order-pnl.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -1,5 +1,6 @@
 package io.datapulse.etl.flow.core;
 
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_MART_REFRESH_TRIGGER;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 
 import io.datapulse.core.service.EtlExecutionAuditService;
@@ -82,12 +83,13 @@ public class EtlAggregationResultFlowConfig {
             ExecutionAggregationResult.class,
             (aggregation, headers) -> {
               startMaterialization(aggregation);
-              return null;
+              return aggregation;
             },
             endpoint -> endpoint
-                .requiresReply(false)
+                .requiresReply(true)
                 .advice(etlMaterializationExecutionAdvice)
         )
+        .channel(CH_ETL_MART_REFRESH_TRIGGER)
         .get();
   }
 
