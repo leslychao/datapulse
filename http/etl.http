@@ -94,26 +94,6 @@ Content-Type: application/json
   });
 %}
 
-### Run ETL — FACT_LOGISTICS_COSTS
-POST {{host}}/api/etl/run
-Content-Type: application/json
-
-{
-  "accountId": 1,
-  "event": "FACT_LOGISTICS_COSTS",
-  "burst": 1,
-  "dateMode": "LAST_DAYS"
-}
-
-> {%
-  client.test("ETL FACT_LOGISTICS_COSTS — run", function () {
-    client.assert(
-        response.status === 200 || response.status === 202,
-        "expected 200 or 202, got " + response.status
-    );
-  });
-%}
-
 ### Run ETL — INVENTORY_FACT
 POST {{host}}/api/etl/run
 Content-Type: application/json
@@ -126,27 +106,7 @@ Content-Type: application/json
 }
 
 > {%
-  client.test("ETL SALES_FACT — run", function () {
-    client.assert(
-        response.status === 200 || response.status === 202,
-        "expected 200 or 202, got " + response.status
-    );
-  });
-%}
-
-### Run ETL — FACT_COMMISSION
-POST {{host}}/api/etl/run
-Content-Type: application/json
-
-{
-  "accountId": 1,
-  "event": "FACT_COMMISSION",
-  "burst": 1,
-  "dateMode": "LAST_DAYS"
-}
-
-> {%
-  client.test("ETL FACT_COMMISSION — run", function () {
+  client.test("ETL INVENTORY_FACT — run", function () {
     client.assert(
         response.status === 200 || response.status === 202,
         "expected 200 or 202, got " + response.status
@@ -174,19 +134,53 @@ Content-Type: application/json
   });
 %}
 
-### Run ETL — FACT_PENALTIES
-POST {{host}}/api/etl/run
+### Run ETL Scenario — ALL_EVENTS
+POST {{host}}/api/etl/scenario/run
 Content-Type: application/json
 
 {
   "accountId": 1,
-  "event": "FACT_PENALTIES",
-  "burst": 1,
-  "dateMode": "LAST_DAYS"
+  "events": [
+    {
+      "event": "WAREHOUSE_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 30
+    },
+    {
+      "event": "CATEGORY_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 30
+    },
+    {
+      "event": "TARIFF_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 30
+    },
+    {
+      "event": "PRODUCT_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    },
+    {
+      "event": "SALES_FACT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    },
+    {
+      "event": "INVENTORY_FACT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    },
+    {
+      "event": "FACT_FINANCE",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    }
+  ]
 }
 
 > {%
-  client.test("ETL FACT_PENALTIES — run", function () {
+  client.test("ETL SCENARIO — ALL_EVENTS run", function () {
     client.assert(
         response.status === 200 || response.status === 202,
         "expected 200 or 202, got " + response.status

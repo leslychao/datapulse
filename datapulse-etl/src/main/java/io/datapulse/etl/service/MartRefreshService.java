@@ -33,10 +33,7 @@ public class MartRefreshService {
   private boolean isOrderPnlRelated(MarketplaceEvent event) {
     return switch (event) {
       case SALES_FACT,
-          FACT_LOGISTICS_COSTS,
-          FACT_FINANCE,
-          FACT_PENALTIES,
-          FACT_COMMISSION -> true;
+          FACT_FINANCE -> true;
       default -> false;
     };
   }

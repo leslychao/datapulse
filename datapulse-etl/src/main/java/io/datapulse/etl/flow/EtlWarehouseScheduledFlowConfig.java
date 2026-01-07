@@ -27,11 +27,24 @@ public class EtlWarehouseScheduledFlowConfig {
   public IntegrationFlow etlWarehouseScheduledRunFlow() {
     return IntegrationFlow
         .fromSupplier(
-            () -> etlScheduledRunRequestFactory.buildDailyRunRequests(MarketplaceEvent.WAREHOUSE_DICT),
+            () -> etlScheduledRunRequestFactory.buildDailyRunRequests(
+                MarketplaceEvent.WAREHOUSE_DICT),
             spec -> spec.poller(Pollers.cron("0 0 * * * *"))
         )
         .split()
-        .transform(EtlRunRequest.class, orchestrationCommandFactory::toCommand)
+        .transform(
+            EtlRunRequest.class,
+            request -> orchestrationCommandFactory.toCommand(
+                null,
+                request.accountId(),
+                request.event(),
+                request.dateMode(),
+                request.dateFrom(),
+                request.dateTo(),
+                request.lastDays(),
+                request.sourceIds()
+            )
+        )
         .handle(
             Amqp.outboundAdapter(etlExecutionRabbitTemplate)
                 .exchangeName(EXCHANGE_EXECUTION)

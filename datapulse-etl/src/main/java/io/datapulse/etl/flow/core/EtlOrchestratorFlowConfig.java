@@ -101,7 +101,19 @@ public class EtlOrchestratorFlowConfig {
                 .requestPayloadType(EtlRunRequest.class)
                 .statusCodeFunction(message -> HttpStatus.ACCEPTED)
         )
-        .transform(EtlRunRequest.class, etlOrchestrationCommandFactory::toCommand)
+        .transform(
+            EtlRunRequest.class,
+            request -> etlOrchestrationCommandFactory.toCommand(
+                null,
+                request.accountId(),
+                request.event(),
+                request.dateMode(),
+                request.dateFrom(),
+                request.dateTo(),
+                request.lastDays(),
+                request.sourceIds()
+            )
+        )
         .wireTap(flow -> flow
             .handle(
                 Amqp.outboundAdapter(etlExecutionRabbitTemplate)

@@ -1,15 +1,14 @@
 package io.datapulse.etl.flow.core;
 
-import static io.datapulse.domain.MessageCodes.ETL_DATE_RANGE_INVALID;
 import static io.datapulse.domain.MessageCodes.ETL_EVENT_UNKNOWN;
 import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
-import static io.datapulse.domain.MessageCodes.REQUEST_REQUIRED;
 
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.dto.EtlDateMode;
-import io.datapulse.etl.dto.EtlRunRequest;
+import io.datapulse.etl.dto.EtlDateRange;
 import io.datapulse.etl.dto.OrchestrationCommand;
+import io.datapulse.etl.service.EtlDateRangeResolver;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -19,132 +18,73 @@ import org.springframework.stereotype.Component;
 @Component
 public class EtlOrchestrationCommandFactory {
 
-  private static final int DEFAULT_LAST_DAYS = 30;
-
-  private record RequiredField(
-      String name,
-      Object value
-  ) {
+  private record RequiredField(String name, Object value) {
 
   }
 
-  private record EffectiveDateRange(
+  private final EtlDateRangeResolver dateRangeResolver;
+
+  public EtlOrchestrationCommandFactory(EtlDateRangeResolver dateRangeResolver) {
+    this.dateRangeResolver = dateRangeResolver;
+  }
+
+  public OrchestrationCommand toCommand(
+      String requestId,
+      Long accountId,
+      String eventCode,
+      EtlDateMode dateMode,
       LocalDate dateFrom,
-      LocalDate dateTo
+      LocalDate dateTo,
+      Integer lastDays,
+      List<String> sourceIds
   ) {
+    validateRequiredFields(accountId, eventCode);
 
-  }
-
-  public OrchestrationCommand toCommand(EtlRunRequest request) {
-    validateRunRequest(request);
-
-    MarketplaceEvent event = MarketplaceEvent.fromString(request.event());
+    MarketplaceEvent event = MarketplaceEvent.fromString(eventCode);
     if (event == null) {
-      throw new AppException(
-          ETL_EVENT_UNKNOWN,
-          request.event()
-      );
+      throw new AppException(ETL_EVENT_UNKNOWN, eventCode);
     }
 
-    EffectiveDateRange range = resolveDateRange(event, request);
+    EtlDateRange range = dateRangeResolver.resolve(
+        event,
+        dateMode,
+        dateFrom,
+        dateTo,
+        lastDays
+    );
 
-    String requestId = UUID.randomUUID().toString();
+    String effectiveRequestId = resolveRequestId(requestId);
 
-    List<String> sourceIds = request.sourceIds() == null
-        ? List.of()
-        : List.copyOf(request.sourceIds());
+    List<String> safeSourceIds =
+        sourceIds == null ? List.of() : List.copyOf(sourceIds);
 
     return new OrchestrationCommand(
-        requestId,
-        request.accountId(),
+        effectiveRequestId,
+        accountId,
         event,
         range.dateFrom(),
         range.dateTo(),
-        sourceIds
+        safeSourceIds
     );
   }
 
-  private void validateRunRequest(EtlRunRequest request) {
-    if (request == null) {
-      throw new AppException(
-          REQUEST_REQUIRED,
-          "EtlRunRequest"
-      );
-    }
+  private String resolveRequestId(String requestId) {
+    return (requestId == null || requestId.isBlank())
+        ? UUID.randomUUID().toString()
+        : requestId;
+  }
 
-    List<String> missingFields = Stream.of(
-            new RequiredField("accountId", request.accountId()),
-            new RequiredField("event", request.event())
+  private void validateRequiredFields(Long accountId, String eventCode) {
+    List<String> missing = Stream.of(
+            new RequiredField("accountId", accountId),
+            new RequiredField("event", eventCode)
         )
-        .filter(field -> field.value() == null)
+        .filter(f -> f.value() == null)
         .map(RequiredField::name)
         .toList();
 
-    if (!missingFields.isEmpty()) {
-      throw new AppException(
-          ETL_REQUEST_INVALID,
-          String.join(", ", missingFields)
-      );
+    if (!missing.isEmpty()) {
+      throw new AppException(ETL_REQUEST_INVALID, String.join(", ", missing));
     }
-  }
-
-  private EffectiveDateRange resolveDateRange(
-      MarketplaceEvent event,
-      EtlRunRequest request
-  ) {
-    EtlDateMode mode = request.dateMode();
-    LocalDate dateFrom = request.dateFrom();
-    LocalDate dateTo = request.dateTo();
-
-    if (mode == null) {
-      if (dateFrom != null || dateTo != null) {
-        mode = EtlDateMode.RANGE;
-      } else {
-        mode = defaultDateMode(event);
-      }
-    }
-
-    return switch (mode) {
-      case NONE -> new EffectiveDateRange(null, null);
-
-      case RANGE -> {
-        if (dateFrom == null || dateTo == null) {
-          throw new AppException(
-              ETL_REQUEST_INVALID,
-              "dateFrom,dateTo"
-          );
-        }
-
-        if (dateFrom.isAfter(dateTo)) {
-          throw new AppException(
-              ETL_DATE_RANGE_INVALID,
-              dateFrom,
-              dateTo
-          );
-        }
-
-        yield new EffectiveDateRange(dateFrom, dateTo);
-      }
-
-      case LAST_DAYS -> {
-        int effectiveDays = resolveLastDays(request.lastDays());
-
-        LocalDate today = LocalDate.now();
-        LocalDate calculatedFrom = today.minusDays(effectiveDays);
-
-        yield new EffectiveDateRange(calculatedFrom, today);
-      }
-    };
-  }
-
-  private EtlDateMode defaultDateMode(MarketplaceEvent event) {
-    return EtlDateMode.NONE;
-  }
-
-  private int resolveLastDays(Integer requestedLastDays) {
-    if (requestedLastDays != null && requestedLastDays > 0) {
-      return requestedLastDays;
-    }
-    return DEFAULT_LAST_DAYS;
   }
 }

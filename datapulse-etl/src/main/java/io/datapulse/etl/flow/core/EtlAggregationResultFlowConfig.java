@@ -1,6 +1,6 @@
 package io.datapulse.etl.flow.core;
 
-import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_MART_REFRESH_TRIGGER;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_EVENT_COMPLETED;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_RESULT;
 
 import io.datapulse.core.service.EtlExecutionAuditService;
@@ -9,6 +9,7 @@ import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.etl.dto.ExecutionAggregationResult;
 import io.datapulse.etl.dto.ExecutionOutcome;
 import io.datapulse.etl.dto.IngestStatus;
+import io.datapulse.etl.dto.scenario.EtlEventCompletedEvent;
 import io.datapulse.etl.service.EtlMaterializationService;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.aop.Advice;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
@@ -31,9 +33,17 @@ public class EtlAggregationResultFlowConfig {
 
   private final EtlMaterializationService etlMaterializationService;
   private final EtlExecutionAuditService etlExecutionAuditService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Bean(name = CH_ETL_ORCHESTRATION_RESULT)
   public MessageChannel etlOrchestrationResultChannel(
+      @Qualifier("etlOrchestrateExecutor") TaskExecutor etlOrchestrateExecutor
+  ) {
+    return new PublishSubscribeChannel(etlOrchestrateExecutor);
+  }
+
+  @Bean(name = CH_ETL_EVENT_COMPLETED)
+  public MessageChannel etlEventCompletedChannel(
       @Qualifier("etlOrchestrateExecutor") TaskExecutor etlOrchestrateExecutor
   ) {
     return new PublishSubscribeChannel(etlOrchestrateExecutor);
@@ -89,7 +99,30 @@ public class EtlAggregationResultFlowConfig {
                 .requiresReply(true)
                 .advice(etlMaterializationExecutionAdvice)
         )
-        .channel(CH_ETL_MART_REFRESH_TRIGGER)
+        .channel(CH_ETL_EVENT_COMPLETED)
+        .get();
+  }
+
+  @Bean
+  public IntegrationFlow etlEventCompletedPublishFlow() {
+    return IntegrationFlow
+        .from(CH_ETL_EVENT_COMPLETED)
+        .transform(
+            ExecutionAggregationResult.class,
+            aggregation -> new EtlEventCompletedEvent(
+                aggregation.requestId(),
+                aggregation.accountId(),
+                aggregation.event()
+            )
+        )
+        .handle(
+            EtlEventCompletedEvent.class,
+            (event, headers) -> {
+              eventPublisher.publishEvent(event);
+              return null;
+            },
+            endpoint -> endpoint.requiresReply(false)
+        )
         .get();
   }
 
