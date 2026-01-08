@@ -15,7 +15,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -116,11 +115,11 @@ public abstract class AbstractCrudService<D extends LongBaseDto, E extends LongB
       @NotNull(message = ValidationKeys.ID_REQUIRED)
       Long id
   ) {
-    try {
-      repository().deleteById(id);
-    } catch (EmptyResultDataAccessException ex) {
+    if (!repository().existsById(id)) {
       throw new NotFoundException(MessageCodes.NOT_FOUND, id);
     }
+    repository().deleteById(id);
+    repository().flush();
   }
 
   protected abstract void validateOnUpdate(

@@ -7,16 +7,22 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <changeSet id="0001-init-datapulse-core" author="vitalii.kim" dbms="postgresql">
+
     <sql>
       CREATE TABLE account
       (
         id         BIGSERIAL PRIMARY KEY,
         name       TEXT        NOT NULL,
+        active     BOOLEAN     NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ
       );
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_account_name_ci
+
+      CREATE UNIQUE INDEX ux_account_name_ci
         ON account (LOWER(name));
+
+      CREATE INDEX idx_account_active
+        ON account (active);
 
       CREATE TABLE account_connection
       (
@@ -30,13 +36,19 @@
         updated_at       TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
       );
-      CREATE INDEX idx_acc_conn_account ON account_connection (account_id);
-      CREATE INDEX idx_acc_conn_marketplace ON account_connection (marketplace);
+
+      CREATE INDEX idx_acc_conn_account
+        ON account_connection (account_id);
+
+      CREATE INDEX idx_acc_conn_marketplace
+        ON account_connection (marketplace);
     </sql>
 
     <rollback>
       DROP TABLE IF EXISTS account_connection CASCADE;
       DROP TABLE IF EXISTS account CASCADE;
     </rollback>
+
   </changeSet>
+
 </databaseChangeLog>

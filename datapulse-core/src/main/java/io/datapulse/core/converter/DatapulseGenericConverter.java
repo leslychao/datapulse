@@ -4,26 +4,38 @@ import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 
 import io.datapulse.core.entity.AccountConnectionEntity;
 import io.datapulse.core.entity.AccountEntity;
+import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
+import io.datapulse.core.entity.UserProfileEntity;
 import io.datapulse.core.entity.inventory.FactInventorySnapshotEntity;
 import io.datapulse.core.entity.productcost.ProductCostEntity;
 import io.datapulse.core.mapper.AccountConnectionMapper;
 import io.datapulse.core.mapper.AccountMapper;
+import io.datapulse.core.mapper.AccountMemberMapper;
 import io.datapulse.core.mapper.EtlExecutionAuditMapper;
+import io.datapulse.core.mapper.UserProfileMapper;
 import io.datapulse.core.mapper.inventory.InventorySnapshotMapper;
 import io.datapulse.core.mapper.productcost.ProductCostMapper;
 import io.datapulse.domain.dto.AccountConnectionDto;
 import io.datapulse.domain.dto.AccountDto;
+import io.datapulse.domain.dto.AccountMemberDto;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
+import io.datapulse.domain.dto.UserProfileDto;
 import io.datapulse.domain.dto.inventory.InventorySnapshotDto;
 import io.datapulse.domain.dto.productcost.ProductCostDto;
 import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountConnectionUpdateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
+import io.datapulse.domain.dto.request.AccountMemberCreateRequest;
+import io.datapulse.domain.dto.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.dto.request.AccountUpdateRequest;
+import io.datapulse.domain.dto.request.UserProfileCreateRequest;
+import io.datapulse.domain.dto.request.UserProfileUpdateRequest;
 import io.datapulse.domain.dto.request.inventory.InventorySnapshotQueryRequest;
 import io.datapulse.domain.dto.response.AccountConnectionResponse;
+import io.datapulse.domain.dto.response.AccountMemberResponse;
 import io.datapulse.domain.dto.response.AccountResponse;
+import io.datapulse.domain.dto.response.UserProfileResponse;
 import io.datapulse.domain.dto.response.inventory.InventorySnapshotResponse;
 import io.datapulse.domain.exception.AppException;
 import jakarta.annotation.PostConstruct;
@@ -47,90 +59,66 @@ public final class DatapulseGenericConverter implements GenericConverter {
   private final InventorySnapshotMapper inventorySnapshotMapper;
   private final ProductCostMapper productCostMapper;
 
-  private final Map<ConvertiblePair, Function<Object, Object>> converters = new LinkedHashMap<>();
+  private final UserProfileMapper userProfileMapper;
+  private final AccountMemberMapper accountMemberMapper;
+
+  private final Map<ConvertiblePair, TypedConverter<?, ?>> converters = new LinkedHashMap<>();
 
   @PostConstruct
   void init() {
-    converters.put(
-        new ConvertiblePair(AccountCreateRequest.class, AccountDto.class),
-        src -> accountMapper.toDto((AccountCreateRequest) src)
-    );
+    // ===== Requests -> DTO =====
+    register(AccountCreateRequest.class, AccountDto.class, accountMapper::toDto);
+    register(AccountUpdateRequest.class, AccountDto.class, accountMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountUpdateRequest.class, AccountDto.class),
-        src -> accountMapper.toDto((AccountUpdateRequest) src)
-    );
+    register(AccountConnectionCreateRequest.class, AccountConnectionDto.class,
+        accountConnectionMapper::toDto);
+    register(AccountConnectionUpdateRequest.class, AccountConnectionDto.class,
+        accountConnectionMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountConnectionCreateRequest.class, AccountConnectionDto.class),
-        src -> accountConnectionMapper.toDto((AccountConnectionCreateRequest) src)
-    );
+    register(InventorySnapshotQueryRequest.class, InventorySnapshotDto.class,
+        inventorySnapshotMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountConnectionUpdateRequest.class, AccountConnectionDto.class),
-        src -> accountConnectionMapper.toDto((AccountConnectionUpdateRequest) src)
-    );
+    register(UserProfileCreateRequest.class, UserProfileDto.class, userProfileMapper::toDto);
+    register(UserProfileUpdateRequest.class, UserProfileDto.class, userProfileMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(InventorySnapshotQueryRequest.class, InventorySnapshotDto.class),
-        src -> inventorySnapshotMapper.toDto((InventorySnapshotQueryRequest) src)
-    );
+    register(AccountMemberCreateRequest.class, AccountMemberDto.class, accountMemberMapper::toDto);
+    register(AccountMemberUpdateRequest.class, AccountMemberDto.class, accountMemberMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountDto.class, AccountEntity.class),
-        src -> accountMapper.toEntity((AccountDto) src)
-    );
-    converters.put(
-        new ConvertiblePair(AccountEntity.class, AccountDto.class),
-        src -> accountMapper.toDto((AccountEntity) src)
-    );
+    // ===== DTO <-> Entity =====
+    register(AccountDto.class, AccountEntity.class, accountMapper::toEntity);
+    register(AccountEntity.class, AccountDto.class, accountMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountConnectionDto.class, AccountConnectionEntity.class),
-        src -> accountConnectionMapper.toEntity((AccountConnectionDto) src)
-    );
-    converters.put(
-        new ConvertiblePair(AccountConnectionEntity.class, AccountConnectionDto.class),
-        src -> accountConnectionMapper.toDto((AccountConnectionEntity) src)
-    );
+    register(AccountConnectionDto.class, AccountConnectionEntity.class,
+        accountConnectionMapper::toEntity);
+    register(AccountConnectionEntity.class, AccountConnectionDto.class,
+        accountConnectionMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(EtlExecutionAuditDto.class, EtlExecutionAuditEntity.class),
-        src -> etlSyncAuditMapper.toEntity((EtlExecutionAuditDto) src)
-    );
-    converters.put(
-        new ConvertiblePair(EtlExecutionAuditEntity.class, EtlExecutionAuditDto.class),
-        src -> etlSyncAuditMapper.toDto((EtlExecutionAuditEntity) src)
-    );
+    register(EtlExecutionAuditDto.class, EtlExecutionAuditEntity.class,
+        etlSyncAuditMapper::toEntity);
+    register(EtlExecutionAuditEntity.class, EtlExecutionAuditDto.class, etlSyncAuditMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(FactInventorySnapshotEntity.class, InventorySnapshotDto.class),
-        src -> inventorySnapshotMapper.toDto((FactInventorySnapshotEntity) src)
-    );
+    register(ProductCostDto.class, ProductCostEntity.class, productCostMapper::toEntity);
+    register(ProductCostEntity.class, ProductCostDto.class, productCostMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountDto.class, AccountResponse.class),
-        src -> accountMapper.toResponse((AccountDto) src)
-    );
+    register(UserProfileDto.class, UserProfileEntity.class, userProfileMapper::toEntity);
+    register(UserProfileEntity.class, UserProfileDto.class, userProfileMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(AccountConnectionDto.class, AccountConnectionResponse.class),
-        src -> accountConnectionMapper.toResponse((AccountConnectionDto) src)
-    );
+    register(AccountMemberDto.class, AccountMemberEntity.class, accountMemberMapper::toEntity);
+    register(AccountMemberEntity.class, AccountMemberDto.class, accountMemberMapper::toDto);
 
-    converters.put(
-        new ConvertiblePair(InventorySnapshotDto.class, InventorySnapshotResponse.class),
-        src -> inventorySnapshotMapper.toResponse((InventorySnapshotDto) src)
-    );
+    // ===== Entity/DTO -> Response =====
+    register(AccountDto.class, AccountResponse.class, accountMapper::toResponse);
+    register(AccountConnectionDto.class, AccountConnectionResponse.class,
+        accountConnectionMapper::toResponse);
+    register(InventorySnapshotDto.class, InventorySnapshotResponse.class,
+        inventorySnapshotMapper::toResponse);
 
-    converters.put(
-        new ConvertiblePair(ProductCostDto.class, ProductCostEntity.class),
-        src -> productCostMapper.toEntity((ProductCostDto) src)
-    );
-    converters.put(
-        new ConvertiblePair(ProductCostEntity.class, ProductCostDto.class),
-        src -> productCostMapper.toDto((ProductCostEntity) src)
-    );
+    register(UserProfileDto.class, UserProfileResponse.class, userProfileMapper::toResponse);
+    register(AccountMemberDto.class, AccountMemberResponse.class, accountMemberMapper::toResponse);
+
+    // ===== Other =====
+    register(FactInventorySnapshotEntity.class, InventorySnapshotDto.class,
+        inventorySnapshotMapper::toDto);
   }
 
   @Override
@@ -151,16 +139,14 @@ public final class DatapulseGenericConverter implements GenericConverter {
     Class<?> srcClass = sourceType.getType();
     Class<?> tgtClass = targetType.getType();
 
-    Function<Object, Object> converter =
-        converters.get(new ConvertiblePair(srcClass, tgtClass));
-    if (converter != null) {
-      return converter.apply(source);
+    TypedConverter<?, ?> direct = converters.get(new ConvertiblePair(srcClass, tgtClass));
+    if (direct != null) {
+      return direct.convert(source);
     }
 
-    Function<Object, Object> compatibleConverter =
-        findCompatibleConverter(srcClass, tgtClass);
-    if (compatibleConverter != null) {
-      return compatibleConverter.apply(source);
+    TypedConverter<?, ?> compatible = findCompatibleConverter(srcClass, tgtClass);
+    if (compatible != null) {
+      return compatible.convert(source);
     }
 
     throw new AppException(
@@ -170,11 +156,8 @@ public final class DatapulseGenericConverter implements GenericConverter {
     );
   }
 
-  private Function<Object, Object> findCompatibleConverter(
-      Class<?> sourceClass,
-      Class<?> targetClass
-  ) {
-    for (Map.Entry<ConvertiblePair, Function<Object, Object>> entry : converters.entrySet()) {
+  private TypedConverter<?, ?> findCompatibleConverter(Class<?> sourceClass, Class<?> targetClass) {
+    for (Map.Entry<ConvertiblePair, TypedConverter<?, ?>> entry : converters.entrySet()) {
       ConvertiblePair pair = entry.getKey();
       if (pair.getSourceType().isAssignableFrom(sourceClass)
           && pair.getTargetType().isAssignableFrom(targetClass)) {
@@ -182,5 +165,21 @@ public final class DatapulseGenericConverter implements GenericConverter {
       }
     }
     return null;
+  }
+
+  private <S, T> void register(
+      Class<S> sourceType,
+      Class<T> targetType,
+      Function<S, T> converter
+  ) {
+    converters.put(new ConvertiblePair(sourceType, targetType),
+        new TypedConverter<>(sourceType, converter));
+  }
+
+  private record TypedConverter<S, T>(Class<S> sourceType, Function<S, T> converter) {
+
+    private Object convert(Object source) {
+      return converter.apply(sourceType.cast(source));
+    }
   }
 }

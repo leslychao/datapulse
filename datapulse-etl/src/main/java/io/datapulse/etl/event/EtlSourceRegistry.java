@@ -1,7 +1,7 @@
 package io.datapulse.etl.event;
 
 import static io.datapulse.domain.MessageCodes.ETL_EVENT_REQUIRED;
-import static io.datapulse.domain.MessageCodes.ETL_EVENT_SOURCES_MISSING;
+import static io.datapulse.domain.ValidationKeys.ETL_EVENT_SOURCES_MISSING;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.exception.AppException;

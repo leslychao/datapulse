@@ -111,4 +111,20 @@ public final class MessageCodes {
   public static final String PRODUCT_COST_EXCEL_FIELD_NOT_INTEGER = "product.cost.excel.field.not-integer";
   public static final String PRODUCT_COST_EXCEL_FIELD_NOT_NUMBER = "product.cost.excel.field.not-number";
   public static final String PRODUCT_COST_EXCEL_FIELD_NOT_DATE = "product.cost.excel.field.not-date";
+
+  // ===== User-Profile =====
+  public static final String USER_PROFILE_KEYCLOAK_SUB_REQUIRED = "user-profile.keycloak-sub.required";
+  public static final String USER_PROFILE_EMAIL_REQUIRED = "user-profile.email.required";
+  public static final String USER_PROFILE_EMAIL_INVALID = "user-profile.email.invalid";
+  public static final String USER_PROFILE_BY_ID_NOT_FOUND = "user-profile.by-id.not-found";
+  public static final String USER_PROFILE_KEYCLOAK_SUB_ALREADY_EXISTS = "user-profile.keycloak-sub.already-exists";
+  public static final String USER_PROFILE_EMAIL_ALREADY_EXISTS = "user-profile.email.already-exists";
+
+  // ===== Account-Member =====
+  public static final String ACCOUNT_MEMBER_ACCOUNT_ID_REQUIRED = "account-member.account-id.required";
+  public static final String ACCOUNT_MEMBER_USER_ID_REQUIRED = "account-member.user-id.required";
+  public static final String ACCOUNT_MEMBER_ROLE_REQUIRED = "account-member.role.required";
+  public static final String ACCOUNT_MEMBER_ALREADY_EXISTS = "account-member.already-exists";
+  public static final String ACCOUNT_MEMBER_ACCOUNT_IMMUTABLE = "account-member.account.immutable";
+  public static final String ACCOUNT_MEMBER_USER_IMMUTABLE = "account-member.user.immutable";
 }
