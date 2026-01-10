@@ -7,7 +7,6 @@ import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountConnectionRepository;
 import io.datapulse.core.service.AbstractIngestApiService;
 import io.datapulse.core.service.vault.MarketplaceCredentialsVaultService;
-import io.datapulse.core.tx.TransactionCallbacks;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
@@ -64,23 +63,56 @@ public class AccountConnectionService extends AbstractIngestApiService<
   }
 
   @Override
+  @Transactional
   public AccountConnectionDto save(
       @Valid
       @NotNull(message = ValidationKeys.DTO_REQUIRED)
       AccountConnectionDto dto
   ) {
-    applyCredentialsToVault(dto);
-    return super.save(dto);
+    AccountConnectionDto saved = super.save(dto);
+    persistCredentialsIfPresent(saved);
+    return saved;
   }
 
   @Override
+  @Transactional
   public AccountConnectionDto update(
       @Valid
       @NotNull(message = ValidationKeys.DTO_REQUIRED)
       AccountConnectionDto dto
   ) {
-    applyCredentialsToVault(dto);
-    return super.update(dto);
+    AccountConnectionDto updated = super.update(dto);
+    persistCredentialsIfPresent(updated);
+    return updated;
+  }
+
+  private void persistCredentialsIfPresent(AccountConnectionDto dto) {
+    Long accountId = dto.getAccountId();
+    MarketplaceType marketplace = dto.getMarketplace();
+    MarketplaceCredentials credentials = dto.getCredentials();
+
+    if (accountId == null || marketplace == null || credentials == null) {
+      return;
+    }
+
+    vaultService.saveCredentials(accountId, marketplace, credentials);
+  }
+
+  @Override
+  @Transactional
+  public void delete(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
+    AccountConnectionEntity connection = repository.findById(id)
+        .orElseThrow(
+            () -> new NotFoundException(MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
+
+    AccountEntity account = connection.getAccount();
+    MarketplaceType marketplace = connection.getMarketplace();
+
+    repository.delete(connection);
+
+    if (account != null && marketplace != null) {
+      vaultService.deleteCredentials(account.getId(), marketplace);
+    }
   }
 
   @Override
@@ -164,13 +196,30 @@ public class AccountConnectionService extends AbstractIngestApiService<
     return entity;
   }
 
+  @Override
+  protected AccountConnectionEntity merge(
+      AccountConnectionEntity target,
+      AccountConnectionDto source
+  ) {
+    Long existingAccountId = Optional.ofNullable(target.getAccount())
+        .map(AccountEntity::getId)
+        .orElseThrow(() -> new AppException(MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING));
+
+    Long sourceAccountId = source.getAccountId();
+    if (sourceAccountId != null && !sourceAccountId.equals(existingAccountId)) {
+      throw new AppException(MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE);
+    }
+
+    accountConnectionApplier.applyUpdateFromDto(source, target);
+    return target;
+  }
+
   public void assertActiveConnectionExists(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
-      @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
+      @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)
+      MarketplaceType marketplaceType
   ) {
-    boolean exists = repository.existsByAccount_IdAndMarketplaceAndActiveTrue(accountId,
-        marketplaceType);
-    if (!exists) {
+    if (!repository.existsByAccount_IdAndMarketplaceAndActiveTrue(accountId, marketplaceType)) {
       throw new NotFoundException(
           MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
           accountId,
@@ -187,55 +236,6 @@ public class AccountConnectionService extends AbstractIngestApiService<
         .stream()
         .map(AccountConnectionEntity::getMarketplace)
         .collect(Collectors.toSet());
-  }
-
-  @Override
-  protected AccountConnectionEntity merge(AccountConnectionEntity target,
-      AccountConnectionDto source) {
-    Long existingAccountId = Optional.ofNullable(target.getAccount())
-        .map(AccountEntity::getId)
-        .orElseThrow(() -> new AppException(MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING));
-
-    Long sourceAccountId = source.getAccountId();
-    if (sourceAccountId != null && !sourceAccountId.equals(existingAccountId)) {
-      throw new AppException(MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE);
-    }
-
-    accountConnectionApplier.applyUpdateFromDto(source, target);
-    return target;
-  }
-
-  @Override
-  @Transactional
-  public void delete(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
-    AccountConnectionEntity connection = repository.findById(id)
-        .orElseThrow(
-            () -> new NotFoundException(MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
-
-    AccountEntity account = connection.getAccount();
-    MarketplaceType marketplace = connection.getMarketplace();
-
-    repository.delete(connection);
-
-    if (account != null && marketplace != null) {
-      long accountId = account.getId();
-      TransactionCallbacks.afterCommit(
-          () -> vaultService.deleteCredentials(accountId, marketplace));
-    }
-  }
-
-  private void applyCredentialsToVault(AccountConnectionDto dto) {
-    Long accountId = dto.getAccountId();
-    MarketplaceType marketplace = dto.getMarketplace();
-    MarketplaceCredentials credentials = dto.getCredentials();
-
-    if (accountId == null || marketplace == null || credentials == null) {
-      return;
-    }
-
-    vaultService.saveCredentials(accountId, marketplace, credentials);
-    TransactionCallbacks.afterRollback(
-        () -> vaultService.deleteCredentials(accountId, marketplace));
   }
 
   private void validateAccountExists(Long accountId) {
@@ -255,6 +255,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
     @Mapping(target = "updatedAt", ignore = true)
     void applyUpdateFromDto(
         AccountConnectionDto dto,
-        @MappingTarget AccountConnectionEntity entity);
+        @MappingTarget AccountConnectionEntity entity
+    );
   }
 }
