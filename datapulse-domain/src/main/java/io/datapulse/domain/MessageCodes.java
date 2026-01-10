@@ -125,6 +125,7 @@ public final class MessageCodes {
   public static final String ACCOUNT_MEMBER_ACCOUNT_ID_REQUIRED = "account-member.account-id.required";
   public static final String ACCOUNT_MEMBER_USER_ID_REQUIRED = "account-member.user-id.required";
   public static final String ACCOUNT_MEMBER_ROLE_REQUIRED = "account-member.role.required";
+  public static final String ACCOUNT_MEMBER_STATUS_REQUIRED = "account-member.status.required";
   public static final String ACCOUNT_MEMBER_ALREADY_EXISTS = "account-member.already-exists";
   public static final String ACCOUNT_MEMBER_ACCOUNT_IMMUTABLE = "account-member.account.immutable";
   public static final String ACCOUNT_MEMBER_USER_IMMUTABLE = "account-member.user.immutable";

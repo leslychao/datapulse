@@ -75,6 +75,9 @@ public class AccountMemberService extends AbstractIngestApiService<
     if (dto.getRole() == null) {
       throw new AppException(MessageCodes.ACCOUNT_MEMBER_ROLE_REQUIRED);
     }
+    if (dto.getStatus() == null) {
+      throw new AppException(MessageCodes.ACCOUNT_MEMBER_STATUS_REQUIRED);
+    }
     if (accountMemberRepository.existsByAccountIdAndUserId(dto.getAccountId(), dto.getUserId())) {
       throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_ALREADY_EXISTS, dto.getAccountId(),
           dto.getUserId());
@@ -91,6 +94,9 @@ public class AccountMemberService extends AbstractIngestApiService<
     }
     if (dto.getRole() == null) {
       throw new AppException(MessageCodes.ACCOUNT_MEMBER_ROLE_REQUIRED);
+    }
+    if (dto.getStatus() == null) {
+      throw new AppException(MessageCodes.ACCOUNT_MEMBER_STATUS_REQUIRED);
     }
   }
 
@@ -123,6 +129,7 @@ public class AccountMemberService extends AbstractIngestApiService<
       AccountMemberDto source
   ) {
     target.setRole(source.getRole());
+    target.setStatus(source.getStatus());
     return target;
   }
 

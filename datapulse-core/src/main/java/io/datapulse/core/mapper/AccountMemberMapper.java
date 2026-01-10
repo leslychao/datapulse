@@ -45,6 +45,7 @@ public interface AccountMemberMapper {
   // ===== DTO -> Response =====
 
   @Mapping(target = "role", expression = "java(dto.getRole() == null ? null : dto.getRole().name())")
+  @Mapping(target = "status", expression = "java(dto.getStatus() == null ? null : dto.getStatus().name())")
   AccountMemberResponse toResponse(AccountMemberDto dto);
 
   // ===== helpers: Long -> ref-entity =====

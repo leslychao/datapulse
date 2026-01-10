@@ -249,7 +249,8 @@ Content-Type: application/json
 {
   "accountId": {{accountIdMembers}},
   "userId": {{userId1}},
-  "role": "OWNER"
+  "role": "OWNER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -271,7 +272,8 @@ PUT {{host}}/api/account-members/{{accountMemberId1}}
 Content-Type: application/json
 
 {
-  "role": "ADMIN"
+  "role": "ADMIN",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -290,7 +292,8 @@ Content-Type: application/json
 
 {
   "userId": {{userId2}},
-  "role": "VIEWER"
+  "role": "VIEWER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -314,7 +317,8 @@ Content-Type: application/json
 
 {
   "accountId": {{accountIdMembers}},
-  "role": "VIEWER"
+  "role": "VIEWER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -338,7 +342,8 @@ Content-Type: application/json
 
 {
   "accountId": {{accountIdMembers}},
-  "userId": {{userId2}}
+  "userId": {{userId2}},
+  "status": "ACTIVE"
 }
 
 > {%
@@ -352,18 +357,44 @@ Content-Type: application/json
         (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
         "";
 
-    client.assert(/role|роль|обязател/i.test(msg), "no role required hint: " + msg);
+  client.assert(/role|роль|обязател/i.test(msg), "no role required hint: " + msg);
   });
 %}
 
-### 2.6 ACCOUNT-MEMBER — NEGATIVE: unknown accountId → 404
+### 2.6 ACCOUNT-MEMBER — NEGATIVE: missing status → 400
+POST {{host}}/api/account-members
+Content-Type: application/json
+
+{
+  "accountId": {{accountIdMembers}},
+  "userId": {{userId2}},
+  "role": "VIEWER"
+}
+
+> {%
+  client.test("AccountMember /create — missing status 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg =
+        (b && b.message) ||
+        (b && b.error) ||
+        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
+        "";
+
+    client.assert(/status|статус|обязател/i.test(msg), "no status required hint: " + msg);
+  });
+%}
+
+### 2.7 ACCOUNT-MEMBER — NEGATIVE: unknown accountId → 404
 POST {{host}}/api/account-members
 Content-Type: application/json
 
 {
   "accountId": 999999999,
   "userId": {{userId2}},
-  "role": "VIEWER"
+  "role": "VIEWER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -377,14 +408,15 @@ Content-Type: application/json
   });
 %}
 
-### 2.7 ACCOUNT-MEMBER — NEGATIVE: unknown userId → 404
+### 2.8 ACCOUNT-MEMBER — NEGATIVE: unknown userId → 404
 POST {{host}}/api/account-members
 Content-Type: application/json
 
 {
   "accountId": {{accountIdMembers}},
   "userId": 999999999,
-  "role": "VIEWER"
+  "role": "VIEWER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -398,14 +430,15 @@ Content-Type: application/json
   });
 %}
 
-### 2.8 ACCOUNT-MEMBER — NEGATIVE: duplicate membership → 400
+### 2.9 ACCOUNT-MEMBER — NEGATIVE: duplicate membership → 400
 POST {{host}}/api/account-members
 Content-Type: application/json
 
 {
   "accountId": {{accountIdMembers}},
   "userId": {{userId1}},
-  "role": "VIEWER"
+  "role": "VIEWER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -419,12 +452,13 @@ Content-Type: application/json
   });
 %}
 
-### 2.9 ACCOUNT-MEMBER — NEGATIVE: update not found → 404
+### 2.10 ACCOUNT-MEMBER — NEGATIVE: update not found → 404
 PUT {{host}}/api/account-members/9999999
 Content-Type: application/json
 
 {
-  "role": "VIEWER"
+  "role": "VIEWER",
+  "status": "ACTIVE"
 }
 
 > {%
@@ -442,7 +476,7 @@ Content-Type: application/json
   });
 %}
 
-### 2.10 ACCOUNT-MEMBER — NEGATIVE: delete not found → 404
+### 2.11 ACCOUNT-MEMBER — NEGATIVE: delete not found → 404
 DELETE {{host}}/api/account-members/9999999
 
 > {%

@@ -5,6 +5,7 @@ public record AccountMemberResponse(
     Long accountId,
     Long userId,
     String role,
+    String status,
     String createdAt,
     String updatedAt
 ) {
