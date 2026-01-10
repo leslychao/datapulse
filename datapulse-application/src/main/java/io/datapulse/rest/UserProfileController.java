@@ -1,6 +1,6 @@
 package io.datapulse.rest;
 
-import io.datapulse.core.service.UserProfileService;
+import io.datapulse.core.service.account.UserProfileService;
 import io.datapulse.domain.dto.request.UserProfileCreateRequest;
 import io.datapulse.domain.dto.request.UserProfileUpdateRequest;
 import io.datapulse.domain.dto.response.UserProfileResponse;

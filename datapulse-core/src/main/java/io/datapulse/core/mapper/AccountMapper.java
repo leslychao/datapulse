@@ -1,6 +1,6 @@
 package io.datapulse.core.mapper;
 
-import io.datapulse.core.entity.AccountEntity;
+import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.domain.dto.AccountDto;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.request.AccountUpdateRequest;

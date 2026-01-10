@@ -1,5 +1,7 @@
-package io.datapulse.core.entity;
+package io.datapulse.core.entity.account;
 
+import io.datapulse.core.entity.LongBaseEntity;
+import io.datapulse.core.entity.UserProfileEntity;
 import io.datapulse.domain.AccountMemberRole;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

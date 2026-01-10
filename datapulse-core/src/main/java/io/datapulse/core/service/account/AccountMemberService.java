@@ -1,12 +1,13 @@
-package io.datapulse.core.service;
+package io.datapulse.core.service.account;
 
-import io.datapulse.core.entity.AccountEntity;
-import io.datapulse.core.entity.AccountMemberEntity;
+import io.datapulse.core.entity.account.AccountEntity;
+import io.datapulse.core.entity.account.AccountMemberEntity;
 import io.datapulse.core.entity.UserProfileEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountMemberRepository;
 import io.datapulse.core.repository.AccountRepository;
 import io.datapulse.core.repository.UserProfileRepository;
+import io.datapulse.core.service.AbstractIngestApiService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.AccountMemberDto;

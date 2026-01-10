@@ -1,7 +1,8 @@
 package io.datapulse.core.repository;
 
-import io.datapulse.core.entity.AccountConnectionEntity;
+import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.domain.MarketplaceType;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -19,4 +20,8 @@ public interface AccountConnectionRepository extends JpaRepository<AccountConnec
       Long id);
 
   Set<AccountConnectionEntity> findAllByAccount_IdAndActiveTrue(Long accountId);
+
+  Optional<AccountConnectionEntity> findByAccount_IdAndMarketplace(
+      Long accountId,
+      MarketplaceType marketplace);
 }

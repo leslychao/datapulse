@@ -1,6 +1,6 @@
 package io.datapulse.core.service.account;
 
-import io.datapulse.core.entity.AccountEntity;
+import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountRepository;

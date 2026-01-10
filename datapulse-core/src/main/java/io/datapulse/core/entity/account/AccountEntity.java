@@ -1,5 +1,6 @@
-package io.datapulse.core.entity;
+package io.datapulse.core.entity.account;
 
+import io.datapulse.core.entity.LongBaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;

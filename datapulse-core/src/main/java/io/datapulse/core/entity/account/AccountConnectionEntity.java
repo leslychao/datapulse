@@ -1,5 +1,6 @@
-package io.datapulse.core.entity;
+package io.datapulse.core.entity.account;
 
+import io.datapulse.core.entity.LongBaseEntity;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.SyncStatus;
 import jakarta.persistence.Entity;

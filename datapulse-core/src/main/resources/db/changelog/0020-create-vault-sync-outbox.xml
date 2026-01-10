@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0020-create-vault-sync-outbox" author="vitalii.kim" dbms="postgresql">
+    <sql>
+
+      create table if not exists vault_sync_outbox
+      (
+        id               bigserial primary key,
+        account_id       bigint      not null,
+        marketplace      text        not null,
+        command_type     text        not null,
+        status           text        not null,
+        attempts         integer     not null default 0,
+        next_attempt_at  timestamptz,
+        created_at       timestamptz not null default now(),
+        updated_at       timestamptz not null default now(),
+
+        constraint uq_vault_sync_outbox_key
+          unique (account_id, marketplace, command_type)
+      );
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

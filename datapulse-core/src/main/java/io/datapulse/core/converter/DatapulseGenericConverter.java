@@ -2,9 +2,9 @@ package io.datapulse.core.converter;
 
 import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 
-import io.datapulse.core.entity.AccountConnectionEntity;
-import io.datapulse.core.entity.AccountEntity;
-import io.datapulse.core.entity.AccountMemberEntity;
+import io.datapulse.core.entity.account.AccountConnectionEntity;
+import io.datapulse.core.entity.account.AccountEntity;
+import io.datapulse.core.entity.account.AccountMemberEntity;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.entity.UserProfileEntity;
 import io.datapulse.core.entity.inventory.FactInventorySnapshotEntity;

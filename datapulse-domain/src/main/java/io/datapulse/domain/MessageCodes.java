@@ -15,6 +15,7 @@ public final class MessageCodes {
   public static final String ID_REQUIRED = "id.required";
   public static final String NOT_FOUND = "not-found";
   public static final String DATA_CORRUPTED_ACCOUNT_MISSING = "data.corrupted.account.missing";
+  public static final String DATA_CORRUPTED_MARKETPLACE_MISSING = "data.corrupted.marketplace.missing";
   public static final String ERROR_UNKNOWN = "error.unknown";
   public static final String ERROR_REASON = "error.reason";
 

@@ -1,6 +1,6 @@
 package io.datapulse.core.repository;
 
-import io.datapulse.core.entity.AccountMemberEntity;
+import io.datapulse.core.entity.account.AccountMemberEntity;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

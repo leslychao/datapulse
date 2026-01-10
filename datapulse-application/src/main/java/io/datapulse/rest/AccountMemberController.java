@@ -1,6 +1,6 @@
 package io.datapulse.rest;
 
-import io.datapulse.core.service.AccountMemberService;
+import io.datapulse.core.service.account.AccountMemberService;
 import io.datapulse.domain.dto.request.AccountMemberCreateRequest;
 import io.datapulse.domain.dto.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.dto.response.AccountMemberResponse;

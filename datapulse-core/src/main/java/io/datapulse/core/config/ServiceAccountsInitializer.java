@@ -2,6 +2,7 @@ package io.datapulse.core.config;
 
 import io.datapulse.core.service.account.AccountConnectionService;
 import io.datapulse.core.service.account.AccountService;
+import io.datapulse.core.service.vault.VaultSyncOutboxService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.dto.AccountDto;
@@ -11,7 +12,6 @@ import io.datapulse.domain.dto.request.AccountConnectionCreateRequest;
 import io.datapulse.domain.dto.request.AccountCreateRequest;
 import io.datapulse.domain.dto.response.AccountResponse;
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.domain.exception.NotFoundException;
 import java.util.Map;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +32,7 @@ public class ServiceAccountsInitializer {
 
   private final AccountService accountService;
   private final AccountConnectionService accountConnectionService;
+  private final VaultSyncOutboxService vaultSyncOutboxService;
 
   @EventListener(ApplicationReadyEvent.class)
   @Transactional
@@ -136,14 +137,21 @@ public class ServiceAccountsInitializer {
       String rawClientId,
       String rawApiKey
   ) {
-    if (connectionExists(accountId, marketplace)) {
-      return;
-    }
-
     AccountConnectionCreateRequest request = buildConnectionRequest(accountId, marketplace, rawToken, rawClientId, rawApiKey);
 
-    accountConnectionService.createFromRequest(request);
-    log.info("{} account connection created: accountId={}, marketplace={}", kind, accountId, marketplace);
+    accountConnectionService.getByAccountAndMarketplace(accountId, marketplace)
+        .ifPresentOrElse(
+            existing -> {
+              if (Boolean.TRUE.equals(existing.getActive())) {
+                return;
+              }
+              vaultSyncOutboxService.ensurePresent(accountId, marketplace, request.credentials());
+            },
+            () -> {
+              accountConnectionService.createFromRequest(request);
+              log.info("{} account connection created: accountId={}, marketplace={}", kind, accountId, marketplace);
+            }
+        );
   }
 
   private AccountConnectionCreateRequest buildConnectionRequest(
@@ -157,15 +165,6 @@ public class ServiceAccountsInitializer {
       case WILDBERRIES -> buildWbRequest(accountId, marketplace, rawToken);
       case OZON -> buildOzonRequest(accountId, marketplace, rawClientId, rawApiKey);
     };
-  }
-
-  private boolean connectionExists(Long accountId, MarketplaceType marketplace) {
-    try {
-      accountConnectionService.assertActiveConnectionExists(accountId, marketplace);
-      return true;
-    } catch (NotFoundException ex) {
-      return false;
-    }
   }
 
   private AccountConnectionCreateRequest buildWbRequest(
@@ -182,7 +181,7 @@ public class ServiceAccountsInitializer {
         accountId,
         marketplace,
         new WbCredentials(token),
-        Boolean.TRUE
+        Boolean.FALSE
     );
   }
 
@@ -203,7 +202,7 @@ public class ServiceAccountsInitializer {
         accountId,
         marketplace,
         new OzonCredentials(clientId, apiKey),
-        Boolean.TRUE
+        Boolean.FALSE
     );
   }
 }
