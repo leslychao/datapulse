@@ -3,6 +3,7 @@ package io.datapulse.core.entity.account;
 import io.datapulse.core.entity.LongBaseEntity;
 import io.datapulse.core.entity.UserProfileEntity;
 import io.datapulse.domain.AccountMemberRole;
+import io.datapulse.domain.AccountMemberStatus;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -29,6 +30,9 @@ public class AccountMemberEntity extends LongBaseEntity {
 
   @Enumerated(EnumType.STRING)
   private AccountMemberRole role;
+
+  @Enumerated(EnumType.STRING)
+  private AccountMemberStatus status = AccountMemberStatus.ACTIVE;
 
   private OffsetDateTime createdAt = OffsetDateTime.now();
   private OffsetDateTime updatedAt;
