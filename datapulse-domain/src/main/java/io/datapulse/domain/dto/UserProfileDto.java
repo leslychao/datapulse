@@ -12,6 +12,8 @@ public class UserProfileDto extends LongBaseDto {
 
   private String keycloakSub;
   private String email;
+  private String fullName;
+  private String username;
   private OffsetDateTime createdAt;
   private OffsetDateTime updatedAt;
 }

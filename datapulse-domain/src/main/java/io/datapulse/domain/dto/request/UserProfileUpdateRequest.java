@@ -9,7 +9,10 @@ import jakarta.validation.constraints.NotBlank;
 public record UserProfileUpdateRequest(
     @NotBlank(message = USER_PROFILE_EMAIL_REQUIRED)
     @Email(message = USER_PROFILE_EMAIL_INVALID)
-    String email
+    String email,
+
+    String fullName,
+    String username
 ) {
 
 }
