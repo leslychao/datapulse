@@ -10,7 +10,10 @@ public record UserProfileCreateRequest(
 
     @NotBlank(message = ValidationKeys.USER_PROFILE_EMAIL_REQUIRED)
     @Email(message = ValidationKeys.USER_PROFILE_EMAIL_INVALID)
-    String email
+    String email,
+
+    String fullName,
+    String username
 ) {
 
 }

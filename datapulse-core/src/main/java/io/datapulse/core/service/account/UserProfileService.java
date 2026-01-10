@@ -94,6 +94,12 @@ public class UserProfileService extends AbstractIngestApiService<
       UserProfileDto source
   ) {
     target.setEmail(source.getEmail());
+    if (source.getFullName() != null) {
+      target.setFullName(source.getFullName());
+    }
+    if (source.getUsername() != null) {
+      target.setUsername(source.getUsername());
+    }
     return target;
   }
 }

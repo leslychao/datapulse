@@ -14,6 +14,8 @@ public class UserProfileEntity extends LongBaseEntity {
 
   private String keycloakSub;
   private String email;
+  private String fullName;
+  private String username;
 
   private OffsetDateTime createdAt = OffsetDateTime.now();
   private OffsetDateTime updatedAt;

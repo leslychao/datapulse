@@ -40,6 +40,12 @@ public interface UserProfileMapper {
     if (dto.getEmail() != null) {
       dto.setEmail(StringUtils.trimToNull(dto.getEmail()));
     }
+    if (dto.getFullName() != null) {
+      dto.setFullName(StringUtils.trimToNull(dto.getFullName()));
+    }
+    if (dto.getUsername() != null) {
+      dto.setUsername(StringUtils.trimToNull(dto.getUsername()));
+    }
   }
 
   UserProfileResponse toResponse(UserProfileDto dto);
