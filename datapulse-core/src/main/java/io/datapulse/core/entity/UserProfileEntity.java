@@ -18,5 +18,5 @@ public class UserProfileEntity extends LongBaseEntity {
   private String username;
 
   private OffsetDateTime createdAt = OffsetDateTime.now();
-  private OffsetDateTime updatedAt;
+  private OffsetDateTime updatedAt = OffsetDateTime.now();
 }
