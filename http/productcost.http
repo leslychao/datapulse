@@ -1,0 +1,40 @@
+### ===========================================
+### PRODUCT-COST IMPORT — SUCCESS (200)
+### ===========================================
+POST {{host}}/api/accounts/{{accountId}}/product-costs/import
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+Accept: application/json
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="product_cost_from_dim_product.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ./product_cost_from_dim_product.xlsx
+--WebAppBoundary--
+
+> {%
+  client.test("ProductCost /import — success 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+  });
+%}
+
+### ===========================================
+### PRODUCT-COST IMPORT — NEGATIVE: WRONG FORMAT (4xx)
+### ===========================================
+POST {{host}}/api/accounts/{{accountId}}/product-costs/import
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+Accept: application/json
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="not_excel.txt"
+Content-Type: text/plain
+
+This is not an excel file
+--WebAppBoundary--
+
+> {%
+  client.test("ProductCost /import — wrong format 4xx", function () {
+    client.assert(String(response.status).startsWith("4"),
+        "expected 4xx, got " + response.status);
+  });
+%}

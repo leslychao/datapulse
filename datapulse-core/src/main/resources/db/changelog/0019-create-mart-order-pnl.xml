@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0019-create-mart-order-pnl" author="vitalii.kim" dbms="postgresql">
+    <sql>
+
+      create table if not exists mart_order_pnl
+      (
+        id                            bigserial primary key,
+
+        account_id                    bigint         not null,
+        source_platform               text           not null,
+        order_id                      text           not null,
+
+        currency                      text           not null,
+
+        first_finance_date            date           not null,
+        last_finance_date             date           not null,
+
+        revenue_gross                 numeric(18, 2) not null,
+        seller_discount_amount        numeric(18, 2) not null,
+        marketplace_commission_amount numeric(18, 2) not null,
+        acquiring_commission_amount   numeric(18, 2) not null,
+        logistics_cost_amount         numeric(18, 2) not null,
+        penalties_amount              numeric(18, 2) not null,
+        marketing_cost_amount         numeric(18, 2) not null,
+        compensation_amount           numeric(18, 2) not null,
+        refund_amount                 numeric(18, 2) not null,
+
+        net_payout                    numeric(18, 2) not null,
+        pnl_amount                    numeric(18, 2) not null default 0,
+
+        items_sold_count              integer        not null default 0,
+        returned_items_count          integer        not null default 0,
+        is_returned                   boolean        not null default false,
+        has_penalties                 boolean        not null default false,
+
+        created_at                    timestamptz    not null default now(),
+        updated_at                    timestamptz    not null default now(),
+
+        constraint uq_mart_order_pnl_business_key
+          unique (account_id, source_platform, order_id)
+      );
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

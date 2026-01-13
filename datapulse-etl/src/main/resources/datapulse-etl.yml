@@ -1,0 +1,14 @@
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: client
+    password: pasClient105
+    virtual-host: datapulse
+    template:
+      reply-timeout: 5000ms
+
+etl:
+  orchestrate:
+    core-pool-size: 4
+    max-pool-size: 8

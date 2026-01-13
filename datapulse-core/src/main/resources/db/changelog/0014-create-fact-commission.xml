@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- =============================================================== -->
+  <!-- FACT COMMISSION — комиссии маркетплейса по операциям/заказам    -->
+  <!-- grain: account + platform + source_event_id + commission_type   -->
+  <!-- =============================================================== -->
+
+  <changeSet id="0014-create-fact-commission" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      create table if not exists fact_commission
+      (
+        id                       bigserial primary key,
+
+        account_id               bigint         not null,
+        source_platform          text           not null,
+        source_event_id          text           not null,
+
+        order_id                 text,
+
+        operation_date           date           not null,
+
+        commission_type          text           not null,
+
+        commission_charge_amount numeric(18, 2) not null,
+        commission_refund_amount numeric(18, 2) not null,
+        currency                 text           not null,
+
+        created_at               timestamptz    not null default now(),
+        updated_at               timestamptz    not null default now(),
+
+        constraint uq_fact_commission_source
+          unique (account_id, source_platform, source_event_id, commission_type)
+      );
+
+      create index if not exists idx_fact_commission_account_date
+        on fact_commission (account_id, source_platform, operation_date);
+
+      create index if not exists idx_fact_commission_order
+        on fact_commission (account_id, source_platform, order_id);
+    </sql>
+
+    <rollback>
+      drop table if exists fact_commission cascade;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

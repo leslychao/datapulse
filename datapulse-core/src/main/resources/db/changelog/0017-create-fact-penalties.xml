@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- =============================================================== -->
+  <!-- FACT PENALTIES — штрафы и санкции                               -->
+  <!-- grain: account + platform + source_event + penalty_type         -->
+  <!-- =============================================================== -->
+
+  <changeSet id="0017-create-fact-penalties" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      create table if not exists fact_penalties
+      (
+        id              bigserial primary key,
+
+        account_id      bigint         not null,
+        source_platform text           not null,
+        source_event_id text           not null,
+
+        order_id        text,
+
+        penalty_type    text           not null,
+        penalty_ts      timestamptz    not null,
+        penalty_date    date           not null,
+
+        amount          numeric(18, 2) not null,
+        currency        text           not null,
+
+        created_at      timestamptz    not null default now(),
+        updated_at      timestamptz    not null default now(),
+
+        constraint uq_fact_penalties_source
+          unique (account_id, source_platform, source_event_id, penalty_type)
+      );
+    </sql>
+
+    <rollback>
+      drop table if exists fact_penalties cascade;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,189 @@
+### Run ETL — WAREHOUSE_DICT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "WAREHOUSE_DICT",
+  "burst": 1
+}
+
+> {%
+  client.test("ETL WAREHOUSE_DICT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — CATEGORY_DICT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "CATEGORY_DICT",
+  "burst": 1
+}
+
+> {%
+  client.test("ETL CATEGORY_DICT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — TARIFF_DICT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "TARIFF_DICT",
+  "burst": 1
+}
+
+> {%
+  client.test("ETL TARIFF_DICT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — PRODUCT_DICT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "PRODUCT_DICT",
+  "burst": 1
+}
+
+> {%
+  client.test("ETL PRODUCT_DICT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — SALES_FACT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "SALES_FACT",
+  "burst": 1,
+  "dateMode": "LAST_DAYS"
+}
+
+> {%
+  client.test("ETL SALES_FACT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — INVENTORY_FACT
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "INVENTORY_FACT",
+  "burst": 1,
+  "dateMode": "LAST_DAYS"
+}
+
+> {%
+  client.test("ETL INVENTORY_FACT — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL — FACT_FINANCE
+POST {{host}}/api/etl/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "event": "FACT_FINANCE",
+  "burst": 1,
+  "dateMode": "LAST_DAYS"
+}
+
+> {%
+  client.test("ETL FACT_FINANCE — run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}
+
+### Run ETL Scenario — ALL_EVENTS
+POST {{host}}/api/etl/scenario/run
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "events": [
+    {
+      "event": "WAREHOUSE_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 30
+    },
+    {
+      "event": "CATEGORY_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 30
+    },
+    {
+      "event": "TARIFF_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 30
+    },
+    {
+      "event": "PRODUCT_DICT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    },
+    {
+      "event": "SALES_FACT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    },
+    {
+      "event": "INVENTORY_FACT",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    },
+    {
+      "event": "FACT_FINANCE",
+      "dateMode": "LAST_DAYS",
+      "lastDays": 7
+    }
+  ]
+}
+
+> {%
+  client.test("ETL SCENARIO — ALL_EVENTS run", function () {
+    client.assert(
+        response.status === 200 || response.status === 202,
+        "expected 200 or 202, got " + response.status
+    );
+  });
+%}

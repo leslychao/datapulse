@@ -1,0 +1,78 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+marketplace:
+  providers:
+    WILDBERRIES:
+      endpoints:
+        DICT_WB_WAREHOUSES_FBW:
+          url: https://supplies-api-sandbox.wildberries.ru/api/v1/warehouses
+          authScope: SANDBOX_ACCOUNT
+
+        DICT_WB_OFFICES_FBS:
+          url: https://marketplace-api-sandbox.wildberries.ru/api/v3/offices
+          authScope: SANDBOX_ACCOUNT
+
+        DICT_WB_WAREHOUSES_SELLER:
+          url: https://marketplace-api-sandbox.wildberries.ru/api/v3/warehouses
+          authScope: SANDBOX_ACCOUNT
+
+        DICT_WB_CATEGORIES_PARENT:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/object/parent/all
+          authScope: SANDBOX_ACCOUNT
+
+        DICT_WB_SUBJECTS:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/object/all
+          authScope: SANDBOX_ACCOUNT
+
+        DICT_WB_TARIFFS_COMMISSION:
+          authScope: SYSTEM_ACCOUNT
+
+        DICT_WB_PRODUCTS:
+          url: https://content-api-sandbox.wildberries.ru/content/v2/get/cards/list
+          authScope: SANDBOX_ACCOUNT
+
+        FACT_WB_SALES_REPORT_DETAIL_BY_PERIOD:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v5/supplier/reportDetailByPeriod
+          authScope: SANDBOX_ACCOUNT
+
+        FACT_WB_SUPPLIER_SALES:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/sales
+          authScope: SANDBOX_ACCOUNT
+
+        FACT_WB_STOCKS:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/stocks
+          authScope: SANDBOX_ACCOUNT
+
+        FACT_WB_INCOMES:
+          url: https://statistics-api-sandbox.wildberries.ru/api/v1/supplier/incomes
+          authScope: SANDBOX_ACCOUNT
+
+    OZON:
+      endpoints:
+        DICT_OZON_WAREHOUSES_FBS:
+          authScope: SYSTEM_ACCOUNT
+        DICT_OZON_CLUSTERS:
+          authScope: SYSTEM_ACCOUNT
+        DICT_OZON_CATEGORY_TREE:
+          authScope: SYSTEM_ACCOUNT
+        DICT_OZON_PRODUCT_INFO_PRICES:
+          authScope: TARGET_ACCOUNT
+        DICT_OZON_PRODUCTS:
+          authScope: TARGET_ACCOUNT
+        DICT_OZON_PRODUCT_INFO_LIST:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_POSTING_FBS_LIST:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_POSTING_FBO_LIST:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_FINANCE_TRANSACTION_LIST:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_PRODUCT_INFO_STOCKS:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_ANALYTICS_STOCKS:
+          authScope: TARGET_ACCOUNT
+        FACT_OZON_RETURNS_LIST:
+          authScope: TARGET_ACCOUNT

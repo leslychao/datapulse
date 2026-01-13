@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0012-create-fact-returns" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      create table if not exists fact_returns
+      (
+        id              bigserial primary key,
+
+        account_id      bigint      not null,
+        source_platform text        not null,
+        source_event_id text        not null,
+
+        order_id        text        not null,
+
+        dim_product_id  bigint      not null,
+        warehouse_id    bigint,
+        category_id     bigint,
+
+        quantity        integer     not null,
+        return_ts       timestamptz not null,
+
+        created_at      timestamptz not null default now(),
+        updated_at      timestamptz not null default now(),
+
+        constraint uq_fact_returns_source
+          unique (account_id, source_platform, source_event_id),
+
+        constraint fk_fact_returns_dim_product
+          foreign key (dim_product_id) references dim_product (id)
+      );
+    </sql>
+
+    <rollback>
+      drop table if exists fact_returns cascade;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

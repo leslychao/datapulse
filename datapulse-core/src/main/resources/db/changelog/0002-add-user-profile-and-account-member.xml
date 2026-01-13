@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0002-add-user-profile-and-account-member" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      CREATE TABLE user_profile
+      (
+        id           BIGSERIAL PRIMARY KEY,
+        keycloak_sub TEXT        NOT NULL,
+        email        TEXT        NOT NULL,
+        full_name    TEXT,
+        username     TEXT,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_user_profile_keycloak_sub
+        ON user_profile (keycloak_sub);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_user_profile_email_ci
+        ON user_profile (LOWER(email));
+
+      CREATE TABLE account_member
+      (
+        id         BIGSERIAL PRIMARY KEY,
+        account_id BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        user_id    BIGINT      NOT NULL REFERENCES user_profile (id) ON DELETE CASCADE,
+        role       TEXT        NOT NULL,
+        status     TEXT        NOT NULL DEFAULT 'ACTIVE',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ,
+        CONSTRAINT uq_account_member UNIQUE (account_id, user_id)
+      );
+
+      CREATE INDEX idx_account_member_account
+        ON account_member (account_id);
+
+      CREATE INDEX idx_account_member_user
+        ON account_member (user_id);
+
+      CREATE INDEX idx_account_member_role
+        ON account_member (role);
+
+      CREATE INDEX idx_account_member_status
+        ON account_member (status);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS account_member CASCADE;
+      DROP TABLE IF EXISTS user_profile CASCADE;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <!-- ===================================================================== -->
+  <!-- DIM TARIFF :: OZON — PER PRODUCT (SCD2)                               -->
+  <!-- ===================================================================== -->
+
+  <changeSet id="0007-create-dim-tariff-ozon" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      create table if not exists dim_tariff_ozon
+      (
+        id                               bigserial primary key,
+
+        -- Зерно: один товар на Озоне
+        product_id                       bigint      not null,
+        offer_id                         text,
+
+        -- Комиссия за эквайринг
+        acquiring                        numeric(10, 4),
+
+        -- Комиссии за продажу
+        sales_percent_fbo                numeric(10, 4),
+        sales_percent_fbs                numeric(10, 4),
+        sales_percent_rfbs               numeric(10, 4),
+        sales_percent_fbp                numeric(10, 4),
+
+        -- Логистика FBO
+        fbo_deliv_to_customer_amount     numeric(10, 4),
+        fbo_direct_flow_trans_min_amount numeric(10, 4),
+        fbo_direct_flow_trans_max_amount numeric(10, 4),
+        fbo_return_flow_amount           numeric(10, 4),
+
+        -- Логистика FBS
+        fbs_deliv_to_customer_amount     numeric(10, 4),
+        fbs_direct_flow_trans_min_amount numeric(10, 4),
+        fbs_direct_flow_trans_max_amount numeric(10, 4),
+        fbs_first_mile_min_amount        numeric(10, 4),
+        fbs_first_mile_max_amount        numeric(10, 4),
+        fbs_return_flow_amount           numeric(10, 4),
+
+        valid_from                       date        not null,
+        valid_to                         date,
+
+        created_at                       timestamptz not null default now(),
+        updated_at                       timestamptz not null default now(),
+
+        constraint uq_dim_tariff_ozon_scd2
+          unique (product_id, valid_from)
+      );
+
+      create index if not exists idx_dim_tariff_ozon_current
+        on dim_tariff_ozon (product_id)
+        where valid_to is null;
+    </sql>
+
+    <rollback>
+      drop index if exists idx_dim_tariff_ozon_current;
+      drop table if exists dim_tariff_ozon cascade;
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

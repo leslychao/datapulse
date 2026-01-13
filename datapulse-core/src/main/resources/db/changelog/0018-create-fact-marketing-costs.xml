@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0018-create-fact-marketing-costs" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      create table if not exists fact_marketing_costs
+      (
+        id                      bigserial primary key,
+
+        account_id              bigint         not null,
+        source_platform         text           not null,
+        source_event_id         text           not null,
+
+        order_id                text           null,
+        operation_date          date           not null,
+        marketing_type          text           not null,
+
+        marketing_charge_amount numeric(18, 2) not null,
+        marketing_refund_amount numeric(18, 2) not null default 0,
+
+        currency                text           not null,
+
+        created_at              timestamptz    not null default now(),
+        updated_at              timestamptz    not null default now(),
+
+        constraint uq_fact_marketing_costs_source
+          unique (account_id, source_platform, source_event_id, marketing_type)
+      );
+    </sql>
+
+  </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <include file="changelog/0001-init-datapulse-core.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0002-add-user-profile-and-account-member.xml"
+    relativeToChangelogFile="true"/>
+  <include file="changelog/0003-create-etl-execution-audit.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0004-create-dim-warehouses.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0005-create-dim-category.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0006-create-dim-tariff-wb.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0007-create-dim-tariff-ozon.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0008-create-dim-product.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0009-create-fact-sales.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0010-create-dim-subject-wb.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0011-create-fact-inventory-snapshot.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0012-create-fact-returns.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0013-create-fact-logistics-costs.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0014-create-fact-commission.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0015-create-fact-product-cost.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0016-create-fact-finance.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0017-create-fact-penalties.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0018-create-fact-marketing-costs.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0019-create-mart-order-pnl.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0020-create-vault-sync-outbox.xml" relativeToChangelogFile="true"/>
+</databaseChangeLog>

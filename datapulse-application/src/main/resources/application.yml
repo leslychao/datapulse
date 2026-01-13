@@ -1,0 +1,18 @@
+server:
+  port: 8080
+  max-http-request-header-size: 128KB
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/datapulse
+  config:
+    import:
+      - classpath:datapulse-core.yml
+      - classpath:datapulse-marketplaces.yml
+      - classpath:datapulse-etl.yml
+
+logging:
+  level:
+    liquibase: INFO

@@ -1,0 +1,74 @@
+### ============================================================
+### Order PnL — list (minimal)
+### ============================================================
+GET {{host}}/api/accounts/{{accountId}}/order-pnl
+Accept: application/json
+
+> {%
+  client.test("Order PnL — list minimal", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    client.assert(Array.isArray(response.body.content), "expected page content array");
+  });
+%}
+
+### ============================================================
+### Order PnL — list by marketplace
+### ============================================================
+GET {{host}}/api/accounts/{{accountId}}/order-pnl?sourcePlatform=WILDBERRIES
+Accept: application/json
+
+> {%
+  client.test("Order PnL — filter by marketplace", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+  });
+%}
+
+### ============================================================
+### Order PnL — list by date range
+### ============================================================
+GET {{host}}/api/accounts/{{accountId}}/order-pnl?dateFrom=2025-01-01&dateTo=2025-01-31
+Accept: application/json
+
+> {%
+  client.test("Order PnL — filter by date range", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+  });
+%}
+
+### ============================================================
+### Order PnL — returned only
+### ============================================================
+GET {{host}}/api/accounts/{{accountId}}/order-pnl?isReturned=true
+Accept: application/json
+
+> {%
+  client.test("Order PnL — returned only", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+  });
+%}
+
+### ============================================================
+### Order PnL — with penalties only
+### ============================================================
+GET {{host}}/api/accounts/{{accountId}}/order-pnl?hasPenalties=true
+Accept: application/json
+
+> {%
+  client.test("Order PnL — with penalties only", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+  });
+%}
+
+### ============================================================
+### Order PnL — pageable (page 0, size 20)
+### ============================================================
+GET {{host}}/api/accounts/{{accountId}}/order-pnl?page=0&size=20
+Accept: application/json
+
+> {%
+  client.test("Order PnL — pageable", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+    client.assert(typeof response.body.totalElements === "number", "expected totalElements");
+    client.assert(Array.isArray(response.body.content), "expected page content array");
+  });
+%}

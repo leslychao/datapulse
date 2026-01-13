@@ -1,0 +1,97 @@
+DataPulse Commercial License
+Version 1.1
+
+Copyright © 2026 Vitalii Kim
+All rights reserved.
+
+1. Definitions
+
+“Software” means the DataPulse software, including all source code, object code,
+documentation, database schemas, configuration files, and any associated materials.
+
+“Licensor” means Vitalii Kim.
+
+“Licensee” means any individual or legal entity that accesses, installs, or uses the Software.
+
+“Commercial Use” means any use of the Software for commercial, business, or
+revenue-generating purposes, including but not limited to:
+- use by for-profit organizations;
+- internal business analytics;
+- offering the Software or its functionality as a service (SaaS, PaaS, managed service);
+- resale, sublicensing, or distribution;
+- inclusion in commercial products or services.
+
+“Evaluation Use” means non-commercial use of the Software solely for internal
+evaluation, technical review, architectural assessment, or proof-of-concept
+purposes, without deployment to production environments.
+
+2. License Grant
+
+The Software is proprietary and not open source.
+
+Subject to the terms of this License, the Licensor grants the Licensee a limited,
+non-exclusive, non-transferable, non-sublicensable license to use the Software
+solely for Evaluation Use.
+
+No other rights are granted.
+
+Any Commercial Use of the Software requires a separate written commercial license
+agreement with the Licensor.
+
+3. Prohibited Uses
+
+Unless expressly permitted in a written agreement signed by the Licensor, the
+Licensee must not:
+1. Use the Software for any Commercial Use;
+2. Deploy or operate the Software in production environments;
+3. Deploy or operate the Software as a hosted, cloud, or managed service;
+4. Distribute, sublicense, sell, rent, lease, or otherwise transfer the Software;
+5. Modify, adapt, translate, or create derivative works, except as strictly
+   necessary for Evaluation Use;
+6. Reverse engineer, decompile, or disassemble the Software, except where expressly
+   permitted by applicable law;
+7. Remove, alter, or obscure any copyright, license, or attribution notices.
+
+4. Commercial Licensing
+
+Any Commercial Use of the Software requires an explicit written license from the
+Licensor.
+
+Commercial licensing inquiries must be sent to:
+vitaliikim992@gmail.com
+
+5. Ownership
+
+The Software is licensed, not sold.
+
+All intellectual property rights, including but not limited to copyrights, remain
+the exclusive property of the Licensor.
+
+6. No Warranty
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+7. Limitation of Liability
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, CONSEQUENTIAL, OR BUSINESS DAMAGES ARISING OUT OF OR RELATED TO THE USE
+OR INABILITY TO USE THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+8. Termination
+
+This License is automatically terminated upon any violation of its terms.
+Upon termination, the Licensee must immediately cease all use of the Software and
+destroy all copies in its possession or control.
+
+9. Governing Law
+
+This License shall be governed by and construed in accordance with the laws of
+the Republic of Austria, without regard to conflict of law principles.
+
+10. Entire Agreement
+
+This License constitutes the entire agreement between the parties regarding the
+Software and supersedes all prior or contemporaneous understandings, whether
+written or oral.

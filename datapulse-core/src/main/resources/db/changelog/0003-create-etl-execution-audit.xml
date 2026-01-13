@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0003-create-etl-execution-audit" author="vitalii.kim" dbms="postgresql">
+
+    <sql>
+      -- ================================
+      -- ETL EXECUTION AUDIT (per source)
+      -- ================================
+      CREATE TABLE etl_execution_audit
+      (
+        id            BIGSERIAL PRIMARY KEY,
+
+        request_id    VARCHAR(64)  NOT NULL,
+        account_id    BIGINT       NOT NULL,
+        event         VARCHAR(64)  NOT NULL,
+        marketplace   VARCHAR(32)  NOT NULL,
+        source_id     VARCHAR(128) NOT NULL,
+        date_from     DATE,
+        date_to       DATE,
+
+        status        VARCHAR(32)  NOT NULL,
+
+        rows_count    BIGINT       NOT NULL DEFAULT 0,
+
+        error_message TEXT         NULL,
+
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_etl_execution_audit_req
+        ON etl_execution_audit (request_id);
+
+      CREATE INDEX IF NOT EXISTS idx_etl_execution_audit_acc_event_created
+        ON etl_execution_audit (account_id, event, created_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_etl_execution_audit_execution_key
+        ON etl_execution_audit (request_id, account_id, event, marketplace, source_id);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS etl_execution_audit CASCADE;
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>
