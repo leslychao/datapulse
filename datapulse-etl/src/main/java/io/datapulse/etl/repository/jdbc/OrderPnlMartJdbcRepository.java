@@ -126,19 +126,8 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
           f.last_finance_date,
           f.revenue_gross,
           f.seller_discount_amount,
-
-          case
-            when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
-              then 0
-            else f.marketplace_commission_amount
-          end                                                       as marketplace_commission_amount,
-
-          case
-            when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
-              then 0
-            else f.acquiring_commission_amount
-          end                                                       as acquiring_commission_amount,
-
+          f.marketplace_commission_amount,
+          f.acquiring_commission_amount,
           f.logistics_cost_amount,
           f.penalties_amount,
           f.marketing_cost_amount,
@@ -148,16 +137,8 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
 
           (
               f.revenue_gross
-              - case
-                  when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
-                    then 0
-                  else f.marketplace_commission_amount
-                end
-              - case
-                  when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
-                    then 0
-                  else f.acquiring_commission_amount
-                end
+              - f.marketplace_commission_amount
+              - f.acquiring_commission_amount
               - f.logistics_cost_amount
               - f.penalties_amount
               - f.marketing_cost_amount
