@@ -19,6 +19,13 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
 
   private static final Logger log = LoggerFactory.getLogger(PenaltiesFactJdbcRepository.class);
 
+  /**
+   * Upsert template for fact_penalties.
+   * <p>
+   * The fact_penalties table now stores separate columns for charges and refunds instead of a
+   * single absolute amount.  When we upsert we insert both components.  On conflict the new values
+   * overwrite the existing ones maintaining idempotency.
+   */
   private static final String UPSERT_TEMPLATE = """
       insert into fact_penalties (
           account_id,
@@ -28,7 +35,8 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
           penalty_type,
           penalty_ts,
           penalty_date,
-          amount,
+          penalty_charge_amount,
+          penalty_refund_amount,
           currency,
           created_at,
           updated_at
@@ -41,7 +49,8 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
           penalty_type,
           penalty_ts,
           penalty_date,
-          amount,
+          penalty_charge_amount,
+          penalty_refund_amount,
           currency,
           now(),
           now()
@@ -51,13 +60,14 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
       on conflict (account_id, source_platform, source_event_id, penalty_type)
       do update
       set
-          order_id     = excluded.order_id,
-          penalty_type = excluded.penalty_type,
-          penalty_ts   = excluded.penalty_ts,
-          penalty_date = excluded.penalty_date,
-          amount       = excluded.amount,
-          currency     = excluded.currency,
-          updated_at   = now()
+          order_id               = excluded.order_id,
+          penalty_type           = excluded.penalty_type,
+          penalty_ts             = excluded.penalty_ts,
+          penalty_date           = excluded.penalty_date,
+          penalty_charge_amount  = excluded.penalty_charge_amount,
+          penalty_refund_amount  = excluded.penalty_refund_amount,
+          currency               = excluded.currency,
+          updated_at             = now()
       """;
 
   private static final String OZON_PENALTIES_SELECT = """
@@ -75,9 +85,19 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
           end                                                                        as penalty_type,
           (r.payload::jsonb ->> 'operation_date')::timestamptz                       as penalty_ts,
           (r.payload::jsonb ->> 'operation_date')::timestamptz::date                 as penalty_date,
-          abs(nullif(r.payload::jsonb ->> 'amount', '')::numeric)                    as amount,
+          case
+            when amt.amount_num < 0 then -amt.amount_num
+            else 0
+          end                                                                        as penalty_charge_amount,
+          case
+            when amt.amount_num > 0 then amt.amount_num
+            else 0
+          end                                                                        as penalty_refund_amount,
           'RUB'                                                                      as currency
       from %s r
+      cross join lateral (
+          select nullif(r.payload::jsonb ->> 'amount', '')::numeric as amount_num
+      ) amt
       where r.account_id = :accountId
         and r.request_id = :requestId
         and r.marketplace = 'OZON'
@@ -85,8 +105,8 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
           'OperationMarketplaceWithHoldingForUndeliverableGoods',
           'OperationClaim'
         )
-        and nullif(r.payload::jsonb ->> 'amount', '') is not null
-        and nullif(r.payload::jsonb ->> 'amount', '')::numeric < 0
+        and amt.amount_num is not null
+        and amt.amount_num <> 0
       """.formatted(RawTableNames.RAW_OZON_FINANCE_TRANSACTIONS);
 
   private static final String WILDBERRIES_PENALTIES_SELECT = """
@@ -110,14 +130,24 @@ public class PenaltiesFactJdbcRepository implements PenaltiesFactRepository {
           end                                                                        as penalty_type,
           (r.payload::jsonb ->> 'rr_dt')::timestamptz                                as penalty_ts,
           (r.payload::jsonb ->> 'rr_dt')::timestamptz::date                          as penalty_date,
-          abs(nullif(r.payload::jsonb ->> 'penalty', '')::numeric)                   as amount,
+          case
+            when pn.penalty_num > 0 then pn.penalty_num
+            else 0
+          end                                                                        as penalty_charge_amount,
+          case
+            when pn.penalty_num < 0 then -pn.penalty_num
+            else 0
+          end                                                                        as penalty_refund_amount,
           coalesce(r.payload::jsonb ->> 'currency_name', 'руб')                      as currency
       from %s r
+      cross join lateral (
+          select nullif(r.payload::jsonb ->> 'penalty', '')::numeric as penalty_num
+      ) pn
       where r.account_id = :accountId
         and r.request_id = :requestId
         and r.marketplace = 'WILDBERRIES'
-        and nullif(r.payload::jsonb ->> 'penalty', '') is not null
-        and nullif(r.payload::jsonb ->> 'penalty', '')::numeric <> 0
+        and pn.penalty_num is not null
+        and pn.penalty_num <> 0
       """.formatted(RawTableNames.RAW_WB_SALES_REPORT_DETAIL);
 
   private final NamedParameterJdbcTemplate jdbcTemplate;

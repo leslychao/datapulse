@@ -7,8 +7,9 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <!-- =============================================================== -->
-  <!-- FACT PENALTIES — штрафы и санкции                               -->
+  <!-- FACT_PENALTIES — штрафы и санкции                               -->
   <!-- grain: account + platform + source_event + penalty_type         -->
+  <!-- sign normalization: charge / refund split                       -->
   <!-- =============================================================== -->
 
   <changeSet id="0017-create-fact-penalties" author="vitalii.kim" dbms="postgresql">
@@ -16,32 +17,55 @@
     <sql>
       create table if not exists fact_penalties
       (
-        id              bigserial primary key,
+        id                    bigserial primary key,
 
-        account_id      bigint         not null,
-        source_platform text           not null,
-        source_event_id text           not null,
+        account_id            bigint         not null,
+        source_platform       text           not null,
+        source_event_id       text           not null,
 
-        order_id        text,
+        order_id              text,
 
-        penalty_type    text           not null,
-        penalty_ts      timestamptz    not null,
-        penalty_date    date           not null,
+        penalty_type          text           not null,
 
-        amount          numeric(18, 2) not null,
-        currency        text           not null,
+        penalty_ts            timestamptz    not null,
+        penalty_date          date           not null,
 
-        created_at      timestamptz    not null default now(),
-        updated_at      timestamptz    not null default now(),
+        penalty_charge_amount numeric(18, 2) not null default 0,
+        penalty_refund_amount numeric(18, 2) not null default 0,
+
+        currency              text           not null,
+
+        created_at            timestamptz    not null default now(),
+        updated_at            timestamptz    not null default now(),
+
+        constraint chk_fact_penalties_non_negative
+          check (
+                penalty_charge_amount >= 0
+              and penalty_refund_amount >= 0
+            ),
 
         constraint uq_fact_penalties_source
-          unique (account_id, source_platform, source_event_id, penalty_type)
+          unique (
+                  account_id,
+                  source_platform,
+                  source_event_id,
+                  penalty_type
+            )
       );
+
+      create index if not exists idx_fact_penalties_finance_date
+        on fact_penalties (
+                           account_id,
+                           source_platform,
+                           order_id,
+                           penalty_date
+          );
     </sql>
 
     <rollback>
       drop table if exists fact_penalties cascade;
     </rollback>
+
   </changeSet>
 
 </databaseChangeLog>

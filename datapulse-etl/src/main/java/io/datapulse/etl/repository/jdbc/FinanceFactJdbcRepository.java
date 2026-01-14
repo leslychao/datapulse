@@ -185,12 +185,16 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
       ),
 
       penalties as (
+        -- Penalities aggregated by date.  The fact_penalties table stores
+        -- separate charge and refund components to preserve sign.  We
+        -- compute the net penalty amount here.  Positive values denote
+        -- costs, negative values denote refunds.
         select
             fp.account_id,
             fp.source_platform,
             fp.order_id,
             fp.penalty_date                                               as finance_date,
-            sum(fp.amount)                                                as penalties_amount
+            sum(fp.penalty_charge_amount - fp.penalty_refund_amount)      as penalties_amount
         from datapulse.fact_penalties fp
         where fp.account_id      = :accountId
           and fp.source_platform = :sourcePlatform
@@ -355,12 +359,15 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
       ),
 
       penalties as (
+        -- Penalities aggregated by date.  Positive values denote costs,
+        -- negative denote refunds.  We derive net amount from charge
+        -- minus refund components.
         select
             fp.account_id,
             fp.source_platform,
             fp.order_id,
             fp.penalty_date                                               as finance_date,
-            sum(fp.amount)                                                as penalties_amount
+            sum(fp.penalty_charge_amount - fp.penalty_refund_amount)      as penalties_amount
         from datapulse.fact_penalties fp
         where fp.account_id      = :accountId
           and fp.source_platform = :sourcePlatform
