@@ -41,4 +41,19 @@ public class SecurityException extends AppException {
         MessageCodes.SECURITY_USER_PROFILE_NOT_RESOLVED
     );
   }
+
+  public static SecurityException accessDenied() {
+    return new SecurityException(
+        HttpStatus.FORBIDDEN,
+        MessageCodes.SECURITY_ACCESS_DENIED
+    );
+  }
+
+  public static SecurityException accessDeniedForAccount(long accountId) {
+    return new SecurityException(
+        HttpStatus.FORBIDDEN,
+        MessageCodes.SECURITY_ACCOUNT_ACCESS_DENIED,
+        accountId
+    );
+  }
 }

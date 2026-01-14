@@ -21,6 +21,8 @@ import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.domain.dto.account.AccountConnectionDto;
 import io.datapulse.domain.dto.account.AccountDto;
 import io.datapulse.domain.dto.productcost.ProductCostDto;
+import io.datapulse.domain.dto.userprofile.UserProfileDto;
+import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.request.AccountMemberCreateRequest;
 import io.datapulse.domain.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.request.account.AccountConnectionCreateRequest;
@@ -34,8 +36,6 @@ import io.datapulse.domain.response.account.AccountConnectionResponse;
 import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.domain.response.inventory.InventorySnapshotResponse;
 import io.datapulse.domain.response.userprofile.UserProfileResponse;
-import io.datapulse.domain.dto.userprofile.UserProfileDto;
-import io.datapulse.domain.exception.AppException;
 import jakarta.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -102,7 +102,9 @@ public final class DatapulseGenericConverter implements GenericConverter {
     register(AccountMemberEntity.class, AccountMemberDto.class, accountMemberMapper::toDto);
 
     // ===== Entity/DTO -> Response =====
+    register(AccountEntity.class, AccountResponse.class, accountMapper::toResponse);
     register(AccountDto.class, AccountResponse.class, accountMapper::toResponse);
+
     register(AccountConnectionDto.class, AccountConnectionResponse.class,
         accountConnectionMapper::toResponse);
     register(FactInventorySnapshotEntity.class, InventorySnapshotResponse.class,

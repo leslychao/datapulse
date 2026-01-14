@@ -1,4 +1,4 @@
-package io.datapulse.security.identity;
+package io.datapulse.security;
 
 import io.datapulse.domain.exception.SecurityException;
 import io.datapulse.domain.identity.AuthenticatedUser;
@@ -12,7 +12,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Service;
 
 @Service
-public class CurrentUserProvider {
+public class SecurityHelper {
 
   public Optional<AuthenticatedUser> getCurrentUserIfAuthenticated() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

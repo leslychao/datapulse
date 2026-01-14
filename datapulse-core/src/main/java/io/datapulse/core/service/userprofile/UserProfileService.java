@@ -9,7 +9,6 @@ import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.userprofile.UserProfileDto;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
-import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.request.userprofile.UserProfileCreateRequest;
 import io.datapulse.domain.request.userprofile.UserProfileUpdateRequest;
 import io.datapulse.domain.response.userprofile.UserProfileResponse;
@@ -61,22 +60,19 @@ public class UserProfileService extends AbstractIngestApiService<
     return UserProfileResponse.class;
   }
 
-  @Transactional(readOnly = true)
-  public UserProfileResponse getByKeycloakSubRequired(
-      @NotNull(message = ValidationKeys.USER_PROFILE_KEYCLOAK_SUB_REQUIRED)
-      String keycloakSub
+  @Transactional
+  public long ensureUserProfileAndGetId(
+      @NotNull String keycloakSub,
+      @NotNull String email,
+      String fullName,
+      String username
   ) {
-    String normalized = normalizeKeycloakSubRequired(keycloakSub);
-
-    UserProfileEntity entity = userProfileRepository
-        .findByKeycloakSub(normalized)
-        .orElseThrow(() -> new NotFoundException(
-            MessageCodes.USER_PROFILE_BY_SUB_NOT_FOUND,
-            normalized
-        ));
-
-    UserProfileDto dto = mapperFacade.to(entity, UserProfileDto.class);
-    return toResponse(dto);
+    return userProfileRepository.upsertAndSyncIfChangedSafeEmailReturningId(
+        keycloakSub,
+        email,
+        fullName,
+        username
+    );
   }
 
   @Override
@@ -150,16 +146,5 @@ public class UserProfileService extends AbstractIngestApiService<
   ) {
     entity.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     return entity;
-  }
-
-  private static String normalizeKeycloakSubRequired(String keycloakSub) {
-    if (keycloakSub == null) {
-      throw new AppException(MessageCodes.USER_PROFILE_KEYCLOAK_SUB_REQUIRED);
-    }
-    String normalized = keycloakSub.trim();
-    if (normalized.isBlank()) {
-      throw new AppException(MessageCodes.USER_PROFILE_KEYCLOAK_SUB_REQUIRED);
-    }
-    return normalized;
   }
 }

@@ -1,6 +1,7 @@
 server:
   port: 8080
   max-http-request-header-size: 128KB
+
 spring:
   security:
     oauth2:
@@ -16,3 +17,9 @@ spring:
 logging:
   level:
     liquibase: INFO
+
+datapulse:
+  cache:
+    user-profile-id:
+      maximum-size: 100000
+      expire-after-access: 15m

@@ -1,13 +1,16 @@
-package io.datapulse.security.identity.filter;
+package io.datapulse.iam.filter;
 
+import io.datapulse.cache.UserProfileIdCache;
 import io.datapulse.core.service.iam.IamService;
-import io.datapulse.security.identity.CurrentUserProvider;
+import io.datapulse.iam.DomainUserContext;
+import io.datapulse.security.SecurityHelper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -15,8 +18,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class IamFilter extends OncePerRequestFilter {
 
-  private final CurrentUserProvider currentUserProvider;
+  private final SecurityHelper securityHelper;
   private final IamService iamService;
+  private final UserProfileIdCache userProfileIdCache;
+  private final ObjectProvider<DomainUserContext> domainUserContextProvider;
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -33,9 +38,15 @@ public class IamFilter extends OncePerRequestFilter {
       FilterChain filterChain
   ) throws ServletException, IOException {
 
-    currentUserProvider
+    securityHelper
         .getCurrentUserIfAuthenticated()
-        .ifPresent(iamService::ensureUserProfile);
+        .ifPresent(user -> {
+          long profileId = userProfileIdCache.getOrLoad(
+              user.userId(),
+              () -> iamService.ensureUserProfileAndGetId(user)
+          );
+          domainUserContextProvider.getObject().setProfileId(profileId);
+        });
 
     filterChain.doFilter(request, response);
   }

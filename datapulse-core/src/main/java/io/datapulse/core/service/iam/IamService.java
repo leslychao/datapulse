@@ -1,10 +1,10 @@
 package io.datapulse.core.service.iam;
 
-import io.datapulse.core.repository.userprofile.UserProfileRepository;
 import io.datapulse.core.service.userprofile.UserProfileService;
-import io.datapulse.domain.exception.SecurityException;
 import io.datapulse.domain.identity.AuthenticatedUser;
+import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.domain.response.userprofile.UserProfileResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,33 +13,26 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class IamService {
 
-  private final UserProfileRepository userProfileRepository;
   private final UserProfileService userProfileService;
+  private final AccessibleAccountsQueryService accessibleAccountsQueryService;
 
   @Transactional(readOnly = true)
-  public UserProfileResponse currentUserProfile(String keycloakSub) {
-    return userProfileService.getByKeycloakSubRequired(keycloakSub);
+  public UserProfileResponse getCurrentUserProfile(long profileId) {
+    return userProfileService.getResponseRequired(profileId);
   }
 
   @Transactional
-  public void ensureUserProfile(AuthenticatedUser user) {
-    String keycloakSub = requireText(user.userId(), "sub");
-    String email = requireText(user.email(), "email");
-
-    userProfileRepository.upsertAndSyncIfChangedSafeEmail(
-        keycloakSub,
-        email,
+  public long ensureUserProfileAndGetId(AuthenticatedUser user) {
+    return userProfileService.ensureUserProfileAndGetId(
+        user.userId(),
+        user.email(),
         user.fullName(),
         user.username()
     );
-
-    userProfileService.getByKeycloakSubRequired(keycloakSub);
   }
 
-  private static String requireText(String value, String claimName) {
-    if (value == null || value.isBlank()) {
-      throw SecurityException.jwtClaimMissing(claimName);
-    }
-    return value.trim();
+  @Transactional(readOnly = true)
+  public List<AccountResponse> getAccessibleActiveAccounts(long profileId) {
+    return accessibleAccountsQueryService.findAccessibleActiveAccounts(profileId);
   }
 }

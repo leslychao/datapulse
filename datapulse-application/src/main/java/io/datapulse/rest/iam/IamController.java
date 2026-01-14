@@ -1,8 +1,10 @@
 package io.datapulse.rest.iam;
 
 import io.datapulse.core.service.iam.IamService;
+import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.domain.response.userprofile.UserProfileResponse;
-import io.datapulse.security.identity.CurrentUserProvider;
+import io.datapulse.iam.DomainUserContext;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,10 +17,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class IamController {
 
   private final IamService iamService;
-  private final CurrentUserProvider currentUserProvider;
+  private final DomainUserContext domainUserContext;
 
   @GetMapping
   public UserProfileResponse currentUserProfile() {
-    return iamService.currentUserProfile(currentUserProvider.getCurrentKeycloakSub());
+    long profileId = domainUserContext.requireProfileId();
+    return iamService.getCurrentUserProfile(profileId);
+  }
+
+  @GetMapping("/accounts")
+  public List<AccountResponse> getAccessibleActiveAccounts() {
+    long profileId = domainUserContext.requireProfileId();
+    return iamService.getAccessibleActiveAccounts(profileId);
   }
 }

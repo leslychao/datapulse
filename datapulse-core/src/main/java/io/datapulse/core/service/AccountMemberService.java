@@ -1,4 +1,4 @@
-package io.datapulse.core.service.account;
+package io.datapulse.core.service;
 
 import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.core.entity.account.AccountMemberEntity;
@@ -7,16 +7,15 @@ import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountMemberRepository;
 import io.datapulse.core.repository.account.AccountRepository;
 import io.datapulse.core.repository.userprofile.UserProfileRepository;
-import io.datapulse.core.service.AbstractIngestApiService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.AccountMemberDto;
-import io.datapulse.domain.request.AccountMemberCreateRequest;
-import io.datapulse.domain.request.AccountMemberUpdateRequest;
-import io.datapulse.domain.response.AccountMemberResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
+import io.datapulse.domain.request.AccountMemberCreateRequest;
+import io.datapulse.domain.request.AccountMemberUpdateRequest;
+import io.datapulse.domain.response.AccountMemberResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -78,9 +77,12 @@ public class AccountMemberService extends AbstractIngestApiService<
     if (dto.getStatus() == null) {
       throw new AppException(MessageCodes.ACCOUNT_MEMBER_STATUS_REQUIRED);
     }
-    if (accountMemberRepository.existsByAccountIdAndUserId(dto.getAccountId(), dto.getUserId())) {
-      throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_ALREADY_EXISTS, dto.getAccountId(),
-          dto.getUserId());
+    if (accountMemberRepository.existsByAccount_IdAndUser_Id(dto.getAccountId(), dto.getUserId())) {
+      throw new BadRequestException(
+          MessageCodes.ACCOUNT_MEMBER_ALREADY_EXISTS,
+          dto.getAccountId(),
+          dto.getUserId()
+      );
     }
   }
 

@@ -131,4 +131,6 @@ public final class MessageCodes {
   public static final String SECURITY_JWT_NOT_AUTHENTICATED = "security.jwt.not-authenticated";
   public static final String SECURITY_JWT_CLAIM_REQUIRED = "security.jwt.claim.required";
   public static final String SECURITY_USER_PROFILE_NOT_RESOLVED = "security.user.profile.not.resolved";
+  public static final String SECURITY_ACCESS_DENIED = "security.access.denied";
+  public static final String SECURITY_ACCOUNT_ACCESS_DENIED = "security.account.access.denied";
 }

@@ -2,7 +2,7 @@ package io.datapulse.security.config;
 
 import static org.springframework.http.HttpMethod.OPTIONS;
 
-import io.datapulse.security.identity.filter.IamFilter;
+import io.datapulse.iam.filter.IamFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

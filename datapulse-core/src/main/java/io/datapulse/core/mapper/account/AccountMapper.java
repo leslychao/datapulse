@@ -41,4 +41,6 @@ public interface AccountMapper {
   }
 
   AccountResponse toResponse(AccountDto dto);
+
+  AccountResponse toResponse(AccountEntity entity);
 }
