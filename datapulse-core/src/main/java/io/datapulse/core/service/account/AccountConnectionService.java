@@ -13,12 +13,12 @@ import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.account.AccountConnectionDto;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
-import io.datapulse.domain.request.account.AccountConnectionCreateRequest;
-import io.datapulse.domain.request.account.AccountConnectionUpdateRequest;
-import io.datapulse.domain.response.account.AccountConnectionResponse;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
+import io.datapulse.domain.request.account.AccountConnectionCreateRequest;
+import io.datapulse.domain.request.account.AccountConnectionUpdateRequest;
+import io.datapulse.domain.response.account.AccountConnectionResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
@@ -72,6 +72,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
 
     MarketplaceCredentials credentials = dto.getCredentials();
     if (credentials != null) {
+      activateConnectionInSameTransaction(saved);
       ensureVaultOutboxPresent(saved, credentials);
     }
 
@@ -87,6 +88,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
 
     MarketplaceCredentials credentials = dto.getCredentials();
     if (credentials != null) {
+      activateConnectionInSameTransaction(updated);
       ensureVaultOutboxPresent(updated, credentials);
     }
 
@@ -235,8 +237,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
   ) {
-    if (!accountConnectionRepository.existsByAccount_IdAndMarketplaceAndActiveTrue(
-        accountId,
+    if (!accountConnectionRepository.existsByAccount_IdAndMarketplaceAndActiveTrue(accountId,
         marketplaceType)) {
       throw new NotFoundException(
           MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
@@ -267,11 +268,25 @@ public class AccountConnectionService extends AbstractIngestApiService<
     return mapperFacade.to(entity, AccountConnectionDto.class);
   }
 
-  private void ensureVaultOutboxPresent(
-      AccountConnectionDto dto,
+  private void ensureVaultOutboxPresent(AccountConnectionDto dto,
       MarketplaceCredentials credentials) {
     VaultSyncKey key = resolveVaultSyncKey(dto);
     vaultSyncOutboxService.ensurePresent(key.accountId(), key.marketplace(), credentials);
+  }
+
+  private void activateConnectionInSameTransaction(AccountConnectionDto dto) {
+    VaultSyncKey key = resolveVaultSyncKey(dto);
+
+    accountConnectionRepository.findByAccount_IdAndMarketplace(key.accountId(), key.marketplace())
+        .ifPresent(connection -> {
+          if (Boolean.TRUE.equals(connection.getActive())) {
+            return;
+          }
+          OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
+          connection.setActive(true);
+          connection.setUpdatedAt(now);
+          accountConnectionRepository.save(connection);
+        });
   }
 
   private VaultSyncKey resolveVaultSyncKey(AccountConnectionDto dto) {

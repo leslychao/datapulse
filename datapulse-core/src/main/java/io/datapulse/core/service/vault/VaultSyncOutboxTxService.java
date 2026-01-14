@@ -4,33 +4,30 @@ import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.VaultSyncCommandType;
 import io.datapulse.core.entity.account.VaultSyncOutboxEntity;
 import io.datapulse.core.entity.account.VaultSyncStatus;
-import io.datapulse.core.repository.account.AccountConnectionRepository;
 import io.datapulse.core.repository.VaultSyncOutboxRepository;
+import io.datapulse.core.repository.account.AccountConnectionRepository;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 class VaultSyncOutboxTxService {
 
   private final VaultSyncOutboxRepository outboxRepository;
   private final AccountConnectionRepository accountConnectionRepository;
 
-  VaultSyncOutboxTxService(
-      VaultSyncOutboxRepository outboxRepository,
-      AccountConnectionRepository accountConnectionRepository
-  ) {
-    this.outboxRepository = outboxRepository;
-    this.accountConnectionRepository = accountConnectionRepository;
-  }
-
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public VaultSyncOutboxEntity upsertPending(long accountId, MarketplaceType marketplace,
-      VaultSyncCommandType commandType) {
+  public VaultSyncOutboxEntity upsertPending(
+      long accountId,
+      MarketplaceType marketplace,
+      VaultSyncCommandType commandType
+  ) {
     OffsetDateTime now = now();
 
     Optional<VaultSyncOutboxEntity> existing =
@@ -91,7 +88,7 @@ class VaultSyncOutboxTxService {
     outboxRepository.save(outbox);
   }
 
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @Transactional
   public void activateAccountConnectionIfPresent(long accountId, MarketplaceType marketplace) {
     Optional<AccountConnectionEntity> existing =
         accountConnectionRepository.findByAccount_IdAndMarketplace(accountId, marketplace);

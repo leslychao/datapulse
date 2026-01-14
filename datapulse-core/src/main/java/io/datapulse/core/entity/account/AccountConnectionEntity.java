@@ -32,7 +32,7 @@ public class AccountConnectionEntity extends LongBaseEntity {
   @Enumerated(EnumType.STRING)
   private MarketplaceType marketplace;
 
-  private Boolean active = true;
+  private Boolean active;
 
   private OffsetDateTime lastSyncAt;
 
