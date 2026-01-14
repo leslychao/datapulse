@@ -31,6 +31,6 @@ public class OrderPnlController {
       OrderPnlQueryRequest request,
       Pageable pageable
   ) {
-    return service.find(accountId, request, pageable);
+    return service.searchOrderPnl(accountId, request, pageable);
   }
 }

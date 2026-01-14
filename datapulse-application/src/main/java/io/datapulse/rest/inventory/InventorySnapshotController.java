@@ -29,6 +29,6 @@ public class InventorySnapshotController {
       InventorySnapshotQueryRequest request,
       Pageable pageable
   ) {
-    return service.findSnapshots(accountId, request, pageable);
+    return service.searchInventorySnapshots(accountId, request, pageable);
   }
 }

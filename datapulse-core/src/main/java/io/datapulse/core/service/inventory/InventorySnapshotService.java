@@ -25,7 +25,7 @@ public class InventorySnapshotService {
   private final FactInventorySnapshotRepository repository;
   private final InventorySnapshotMapper mapper;
 
-  public Page<InventorySnapshotResponse> findSnapshots(
+  public Page<InventorySnapshotResponse> searchInventorySnapshots(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
       @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) InventorySnapshotQueryRequest request,
       @NotNull(message = ValidationKeys.PAGEABLE_REQUIRED) Pageable pageable

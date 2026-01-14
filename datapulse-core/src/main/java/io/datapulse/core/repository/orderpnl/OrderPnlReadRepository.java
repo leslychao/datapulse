@@ -7,7 +7,7 @@ import org.springframework.data.domain.Pageable;
 
 public interface OrderPnlReadRepository {
 
-  Page<OrderPnlResponse> find(
+  Page<OrderPnlResponse> searchOrderPnl(
       Long accountId,
       OrderPnlQueryRequest request,
       Pageable pageable

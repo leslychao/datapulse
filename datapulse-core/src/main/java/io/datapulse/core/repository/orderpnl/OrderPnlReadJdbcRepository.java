@@ -62,7 +62,7 @@ public class OrderPnlReadJdbcRepository implements OrderPnlReadRepository {
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   @Override
-  public Page<OrderPnlResponse> find(
+  public Page<OrderPnlResponse> searchOrderPnl(
       Long accountId,
       OrderPnlQueryRequest request,
       Pageable pageable

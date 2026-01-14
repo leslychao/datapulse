@@ -1,9 +1,12 @@
 package io.datapulse.domain.response.account;
 
+import java.time.OffsetDateTime;
+
 public record AccountResponse(
     Long id,
     String name,
-    String createdAt,
-    String updatedAt) {
-
+    boolean active,
+    OffsetDateTime createdAt,
+    OffsetDateTime updatedAt
+) {
 }

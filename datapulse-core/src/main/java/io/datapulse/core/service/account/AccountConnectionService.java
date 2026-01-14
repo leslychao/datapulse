@@ -22,6 +22,7 @@ import io.datapulse.domain.exception.NotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -135,6 +136,19 @@ public class AccountConnectionService extends AbstractIngestApiService<
   @Override
   protected Class<AccountConnectionResponse> responseType() {
     return AccountConnectionResponse.class;
+  }
+
+  @Transactional(readOnly = true)
+  public List<AccountConnectionResponse> getAllByAccountId(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId
+  ) {
+    validateAccountExists(accountId);
+
+    return accountConnectionRepository.findAllByAccount_Id(accountId)
+        .stream()
+        .map(this::toDto)
+        .map(this::toResponse)
+        .toList();
   }
 
   @Override

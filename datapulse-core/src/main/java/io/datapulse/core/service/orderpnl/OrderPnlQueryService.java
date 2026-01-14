@@ -19,11 +19,11 @@ public class OrderPnlQueryService {
 
   private final OrderPnlReadRepository repository;
 
-  public Page<OrderPnlResponse> find(
+  public Page<OrderPnlResponse> searchOrderPnl(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
       @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) OrderPnlQueryRequest request,
       @NotNull(message = ValidationKeys.PAGEABLE_REQUIRED) Pageable pageable
   ) {
-    return repository.find(accountId, request, pageable);
+    return repository.searchOrderPnl(accountId, request, pageable);
   }
 }
