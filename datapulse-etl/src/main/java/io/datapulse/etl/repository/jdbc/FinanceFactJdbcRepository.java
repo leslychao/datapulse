@@ -16,7 +16,7 @@ import org.springframework.stereotype.Repository;
 public class FinanceFactJdbcRepository implements FinanceFactRepository {
 
   private static final String UPSERT_TEMPLATE = """
-      insert into fact_finance (
+      insert into datapulse.fact_finance (
           account_id,
           source_platform,
           order_id,
@@ -80,33 +80,61 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             :sourcePlatform                                                as source_platform,
             r.payload::jsonb ->> 'srid'                                   as order_id,
             (r.payload::jsonb ->> 'rr_dt')::timestamptz::date             as finance_date,
-            coalesce(r.payload::jsonb ->> 'currency_name', 'руб')         as currency,
+            case
+              when lower(coalesce(nullif(r.payload::jsonb ->> 'currency_name', ''), 'rub')) in ('руб', 'rub', 'rur')
+                then 'RUB'
+              else upper(coalesce(nullif(r.payload::jsonb ->> 'currency_name', ''), 'RUB'))
+            end                                                           as currency,
+
             sum(
               coalesce(nullif(r.payload::jsonb ->> 'ppvz_for_pay', '')::numeric, 0)
             )                                                             as cash_flow_amount,
+
             sum(
-              coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0)
+              greatest(coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0), 0)
             )                                                             as revenue_gross,
+
             sum(
-              coalesce(nullif(r.payload::jsonb ->> 'product_discount_for_report', '')::numeric, 0)
-              + coalesce(nullif(r.payload::jsonb ->> 'supplier_promo', '')::numeric, 0)
-              + coalesce(nullif(r.payload::jsonb ->> 'seller_promo_discount', '')::numeric, 0)
+              abs(coalesce(nullif(r.payload::jsonb ->> 'product_discount_for_report', '')::numeric, 0))
+              + abs(coalesce(nullif(r.payload::jsonb ->> 'supplier_promo', '')::numeric, 0))
+              + abs(coalesce(nullif(r.payload::jsonb ->> 'seller_promo_discount', '')::numeric, 0))
             )                                                             as seller_discount_amount,
+
             sum(
-              coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0)
+              abs(coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0))
             )                                                             as refund_amount,
+
             sum(
-              coalesce(nullif(r.payload::jsonb ->> 'additional_payment', '')::numeric, 0)
-              + coalesce(nullif(r.payload::jsonb ->> 'installment_cofinancing_amount', '')::numeric, 0)
+              abs(coalesce(nullif(r.payload::jsonb ->> 'additional_payment', '')::numeric, 0))
+              + abs(coalesce(nullif(r.payload::jsonb ->> 'installment_cofinancing_amount', '')::numeric, 0))
             )                                                             as compensation_amount
+
         from %1$s r
         where r.account_id = :accountId
           and r.request_id = :requestId
           and r.marketplace = 'WILDBERRIES'
+          and nullif(r.payload::jsonb ->> 'srid', '') is not null
         group by
           r.payload::jsonb ->> 'srid',
           (r.payload::jsonb ->> 'rr_dt')::timestamptz::date,
-          coalesce(r.payload::jsonb ->> 'currency_name', 'руб')
+          case
+            when lower(coalesce(nullif(r.payload::jsonb ->> 'currency_name', ''), 'rub')) in ('руб', 'rub', 'rur')
+              then 'RUB'
+            else upper(coalesce(nullif(r.payload::jsonb ->> 'currency_name', ''), 'RUB'))
+          end
+        having
+          abs(sum(coalesce(nullif(r.payload::jsonb ->> 'ppvz_for_pay', '')::numeric, 0))) <> 0
+          or sum(greatest(coalesce(nullif(r.payload::jsonb ->> 'retail_amount', '')::numeric, 0), 0)) <> 0
+          or abs(sum(coalesce(nullif(r.payload::jsonb ->> 'return_amount', '')::numeric, 0))) <> 0
+          or abs(sum(
+                coalesce(nullif(r.payload::jsonb ->> 'product_discount_for_report', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'supplier_promo', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'seller_promo_discount', '')::numeric, 0)
+          )) <> 0
+          or abs(sum(
+                coalesce(nullif(r.payload::jsonb ->> 'additional_payment', '')::numeric, 0)
+              + coalesce(nullif(r.payload::jsonb ->> 'installment_cofinancing_amount', '')::numeric, 0)
+          )) <> 0
       ),
 
       commission as (
@@ -129,7 +157,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 else 0
               end
             )                                                             as acquiring_commission_amount
-        from fact_commission fc
+        from datapulse.fact_commission fc
         where fc.account_id      = :accountId
           and fc.source_platform = :sourcePlatform
         group by
@@ -146,7 +174,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fl.order_id,
             fl.operation_date                                             as finance_date,
             sum(fl.logistics_charge_amount - fl.logistics_refund_amount)  as logistics_cost_amount
-        from fact_logistics_costs fl
+        from datapulse.fact_logistics_costs fl
         where fl.account_id      = :accountId
           and fl.source_platform = :sourcePlatform
         group by
@@ -163,7 +191,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fp.order_id,
             fp.penalty_date                                               as finance_date,
             sum(fp.amount)                                                as penalties_amount
-        from fact_penalties fp
+        from datapulse.fact_penalties fp
         where fp.account_id      = :accountId
           and fp.source_platform = :sourcePlatform
         group by
@@ -180,7 +208,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fm.order_id,
             fm.operation_date                                             as finance_date,
             sum(fm.marketing_charge_amount - fm.marketing_refund_amount)  as marketing_cost_amount
-        from fact_marketing_costs fm
+        from datapulse.fact_marketing_costs fm
         where fm.account_id      = :accountId
           and fm.source_platform = :sourcePlatform
         group by
@@ -237,17 +265,21 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             nullif(r.payload::jsonb -> 'posting' ->> 'posting_number', '')      as order_id,
             (r.payload::jsonb ->> 'operation_date')::timestamptz::date          as finance_date,
             'RUB'                                                                as currency,
+
             sum(
               coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0)
             )                                                                    as cash_flow_amount,
+
             sum(
               case
                 when r.payload::jsonb ->> 'type' = 'orders'
-                  then coalesce(nullif(r.payload::jsonb ->> 'accruals_for_sale', '')::numeric, 0)
+                  then greatest(coalesce(nullif(r.payload::jsonb ->> 'accruals_for_sale', '')::numeric, 0), 0)
                 else 0
               end
             )                                                                    as revenue_gross,
+
             0::numeric                                                           as seller_discount_amount,
+
             sum(
               case
                 when r.payload::jsonb ->> 'type' = 'returns'
@@ -256,13 +288,15 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 else 0
               end
             )                                                                    as refund_amount,
+
             sum(
               case
                 when r.payload::jsonb ->> 'type' = 'compensation'
-                  then coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0)
+                  then abs(coalesce(nullif(r.payload::jsonb ->> 'amount', '')::numeric, 0))
                 else 0
               end
             )                                                                    as compensation_amount
+
         from %1$s r
         where r.account_id = :accountId
           and r.request_id = :requestId
@@ -293,7 +327,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
                 else 0
               end
             )                                                             as acquiring_commission_amount
-        from fact_commission fc
+        from datapulse.fact_commission fc
         where fc.account_id      = :accountId
           and fc.source_platform = :sourcePlatform
         group by
@@ -310,7 +344,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fl.order_id,
             fl.operation_date                                             as finance_date,
             sum(fl.logistics_charge_amount - fl.logistics_refund_amount)  as logistics_cost_amount
-        from fact_logistics_costs fl
+        from datapulse.fact_logistics_costs fl
         where fl.account_id      = :accountId
           and fl.source_platform = :sourcePlatform
         group by
@@ -327,7 +361,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fp.order_id,
             fp.penalty_date                                               as finance_date,
             sum(fp.amount)                                                as penalties_amount
-        from fact_penalties fp
+        from datapulse.fact_penalties fp
         where fp.account_id      = :accountId
           and fp.source_platform = :sourcePlatform
         group by
@@ -344,7 +378,7 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
             fm.order_id,
             fm.operation_date                                             as finance_date,
             sum(fm.marketing_charge_amount - fm.marketing_refund_amount)  as marketing_cost_amount
-        from fact_marketing_costs fm
+        from datapulse.fact_marketing_costs fm
         where fm.account_id      = :accountId
           and fm.source_platform = :sourcePlatform
         group by
@@ -400,11 +434,14 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
     Objects.requireNonNull(requestId, "requestId обязателен.");
     String sourcePlatform = MarketplaceType.WILDBERRIES.tag();
     String sql = UPSERT_TEMPLATE.formatted(WB_FINANCE_SELECT);
+
     MapSqlParameterSource parameters = new MapSqlParameterSource()
         .addValue("accountId", accountId)
         .addValue("requestId", requestId)
         .addValue("sourcePlatform", sourcePlatform);
+
     int rows = jdbcTemplate.update(sql, parameters);
+
     log.info(
         "Finance facts upserted (WB): accountId={}, sourcePlatform={}, requestId={}, rows={}",
         accountId,
@@ -419,11 +456,14 @@ public class FinanceFactJdbcRepository implements FinanceFactRepository {
     Objects.requireNonNull(requestId, "requestId обязателен.");
     String sourcePlatform = MarketplaceType.OZON.tag();
     String sql = UPSERT_TEMPLATE.formatted(OZON_FINANCE_SELECT);
+
     MapSqlParameterSource parameters = new MapSqlParameterSource()
         .addValue("accountId", accountId)
         .addValue("requestId", requestId)
         .addValue("sourcePlatform", sourcePlatform);
+
     int rows = jdbcTemplate.update(sql, parameters);
+
     log.info(
         "Finance facts upserted (Ozon): accountId={}, sourcePlatform={}, requestId={}, rows={}",
         accountId,

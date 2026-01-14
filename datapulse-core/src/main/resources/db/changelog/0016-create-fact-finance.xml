@@ -7,14 +7,14 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
 
   <!-- =============================================================== -->
-  <!-- FACT FINANCE — P&L по заказу                                   -->
-  <!-- grain: account + platform + order + finance_date               -->
+  <!-- FACT FINANCE — финансовые потоки по заказу                      -->
+  <!-- grain: account + platform + order + finance_date                -->
   <!-- =============================================================== -->
 
   <changeSet id="0014-create-fact-finance" author="vitalii.kim" dbms="postgresql">
 
     <sql>
-      create table if not exists fact_finance
+      create table if not exists datapulse.fact_finance
       (
         id                            bigserial primary key,
 
@@ -37,21 +37,21 @@
         net_payout                    numeric(18, 2) not null default 0,
 
         created_at                    timestamptz    not null default now(),
-        updated_at                    timestamptz    not null default now()
+        updated_at                    timestamptz    not null default now(),
+
+        constraint uq_fact_finance_business_key
+          unique (account_id, source_platform, order_id, finance_date)
       );
 
-      create unique index if not exists ux_fact_finance_order
-        on fact_finance (account_id, source_platform, order_id, finance_date);
-
       create index if not exists ix_fact_finance_account_platform_date
-        on fact_finance (account_id, source_platform, finance_date);
+        on datapulse.fact_finance (account_id, source_platform, finance_date);
 
       create index if not exists ix_fact_finance_order_id
-        on fact_finance (order_id);
+        on datapulse.fact_finance (order_id);
     </sql>
 
     <rollback>
-      drop table if exists fact_finance cascade;
+      drop table if exists datapulse.fact_finance cascade;
     </rollback>
   </changeSet>
 

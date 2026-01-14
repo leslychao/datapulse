@@ -19,7 +19,10 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
                   account_id,
                   source_platform,
                   order_id,
-                  max(currency)                      as currency,
+                  case
+                    when count(distinct currency) = 1 then min(currency)
+                    else 'MIXED'
+                  end                                as currency,
                   min(finance_date)                  as first_finance_date,
                   max(finance_date)                  as last_finance_date,
                   sum(revenue_gross)                 as revenue_gross,
@@ -123,29 +126,49 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
           f.last_finance_date,
           f.revenue_gross,
           f.seller_discount_amount,
-          f.marketplace_commission_amount,
-          f.acquiring_commission_amount,
+
+          case
+            when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
+              then 0
+            else f.marketplace_commission_amount
+          end                                                       as marketplace_commission_amount,
+
+          case
+            when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
+              then 0
+            else f.acquiring_commission_amount
+          end                                                       as acquiring_commission_amount,
+
           f.logistics_cost_amount,
           f.penalties_amount,
           f.marketing_cost_amount,
           f.compensation_amount,
           f.refund_amount,
           f.net_payout,
+
           (
-                  f.revenue_gross
-                  - f.seller_discount_amount
-                  - f.marketplace_commission_amount
-                  - f.acquiring_commission_amount
-                  - f.logistics_cost_amount
-                  - f.penalties_amount
-                  - f.marketing_cost_amount
-                  - f.refund_amount
-                  + f.compensation_amount
-          )                                           as pnl_amount,
-          coalesce(q.items_sold_count, 0)             as items_sold_count,
-          coalesce(q.returned_items_count, 0)         as returned_items_count,
+              f.revenue_gross
+              - case
+                  when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
+                    then 0
+                  else f.marketplace_commission_amount
+                end
+              - case
+                  when f.source_platform = 'ozon' and f.revenue_gross = f.refund_amount and f.revenue_gross <> 0
+                    then 0
+                  else f.acquiring_commission_amount
+                end
+              - f.logistics_cost_amount
+              - f.penalties_amount
+              - f.marketing_cost_amount
+              - f.refund_amount
+              + f.compensation_amount
+          )                                                         as pnl_amount,
+
+          coalesce(q.items_sold_count, 0)                           as items_sold_count,
+          coalesce(q.returned_items_count, 0)                       as returned_items_count,
           (coalesce(q.returned_items_count, 0) <> 0 or f.refund_amount <> 0) as is_returned,
-          (f.penalties_amount <> 0)                                         as has_penalties,
+          (f.penalties_amount <> 0)                                 as has_penalties,
           now(),
           now()
       from finance_by_order f
@@ -154,7 +177,8 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
                          and q.source_platform = f.source_platform
                          and q.order_id = f.order_id
       on conflict (account_id, source_platform, order_id) do update
-      set currency                      = excluded.currency,
+      set
+          currency                      = excluded.currency,
           first_finance_date            = excluded.first_finance_date,
           last_finance_date             = excluded.last_finance_date,
           revenue_gross                 = excluded.revenue_gross,
@@ -179,7 +203,7 @@ public class OrderPnlMartJdbcRepository implements OrderPnlMartRepository {
 
   @Override
   public void refresh(long accountId) {
-    var params = new MapSqlParameterSource()
+    MapSqlParameterSource params = new MapSqlParameterSource()
         .addValue("accountId", accountId);
 
     int affected = jdbcTemplate.update(UPSERT_SQL, params);

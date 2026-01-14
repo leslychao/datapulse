@@ -8,8 +8,7 @@
 
   <changeSet id="0019-create-mart-order-pnl" author="vitalii.kim" dbms="postgresql">
     <sql>
-
-      create table if not exists mart_order_pnl
+      create table if not exists datapulse.mart_order_pnl
       (
         id                            bigserial primary key,
 
@@ -22,17 +21,17 @@
         first_finance_date            date           not null,
         last_finance_date             date           not null,
 
-        revenue_gross                 numeric(18, 2) not null,
-        seller_discount_amount        numeric(18, 2) not null,
-        marketplace_commission_amount numeric(18, 2) not null,
-        acquiring_commission_amount   numeric(18, 2) not null,
-        logistics_cost_amount         numeric(18, 2) not null,
-        penalties_amount              numeric(18, 2) not null,
-        marketing_cost_amount         numeric(18, 2) not null,
-        compensation_amount           numeric(18, 2) not null,
-        refund_amount                 numeric(18, 2) not null,
+        revenue_gross                 numeric(18, 2) not null default 0,
+        seller_discount_amount        numeric(18, 2) not null default 0,
+        marketplace_commission_amount numeric(18, 2) not null default 0,
+        acquiring_commission_amount   numeric(18, 2) not null default 0,
+        logistics_cost_amount         numeric(18, 2) not null default 0,
+        penalties_amount              numeric(18, 2) not null default 0,
+        marketing_cost_amount         numeric(18, 2) not null default 0,
+        compensation_amount           numeric(18, 2) not null default 0,
+        refund_amount                 numeric(18, 2) not null default 0,
 
-        net_payout                    numeric(18, 2) not null,
+        net_payout                    numeric(18, 2) not null default 0,
         pnl_amount                    numeric(18, 2) not null default 0,
 
         items_sold_count              integer        not null default 0,
@@ -46,7 +45,18 @@
         constraint uq_mart_order_pnl_business_key
           unique (account_id, source_platform, order_id)
       );
+
+      create index if not exists ix_mart_order_pnl_account_platform_dates
+        on datapulse.mart_order_pnl (account_id, source_platform, first_finance_date,
+                                     last_finance_date);
+
+      create index if not exists ix_mart_order_pnl_order_id
+        on datapulse.mart_order_pnl (order_id);
     </sql>
+
+    <rollback>
+      drop table if exists datapulse.mart_order_pnl cascade;
+    </rollback>
   </changeSet>
 
 </databaseChangeLog>
