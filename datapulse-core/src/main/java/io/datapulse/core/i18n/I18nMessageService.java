@@ -27,22 +27,7 @@ public class I18nMessageService {
       return message(ERROR_UNKNOWN, targetLocale);
     }
 
-    String baseMessage = baseMessage(throwable, targetLocale);
-
-    if (throwable instanceof AppException appException) {
-      Throwable cause = ExceptionUtils.getRootCause(appException);
-      if (cause != null) {
-        String reason = message(
-            ERROR_REASON,
-            new Object[]{causeMessage(cause)},
-            targetLocale,
-            message(ERROR_REASON_FALLBACK, targetLocale)
-        );
-        return baseMessage + ", " + reason;
-      }
-    }
-
-    return baseMessage;
+    return baseMessage(throwable, targetLocale);
   }
 
   public String userMessage(Throwable throwable) {
@@ -56,6 +41,44 @@ public class I18nMessageService {
   public String userMessage(String code, Locale locale, Object... args) {
     Locale targetLocale = targetLocale(locale);
     return message(code, args, targetLocale, code);
+  }
+
+  public String logMessage(Throwable throwable, Locale locale) {
+    Locale targetLocale = targetLocale(locale);
+
+    if (throwable == null) {
+      return message(ERROR_UNKNOWN, targetLocale);
+    }
+
+    String baseMessage = baseMessage(throwable, targetLocale);
+
+    Throwable rootCause = rootCause(throwable);
+    if (rootCause == null) {
+      return baseMessage;
+    }
+
+    String reason = message(
+        ERROR_REASON,
+        new Object[]{causeMessage(rootCause)},
+        targetLocale,
+        message(ERROR_REASON_FALLBACK, targetLocale)
+    );
+
+    return baseMessage + ", " + reason;
+  }
+
+  public String logMessage(Throwable throwable) {
+    return logMessage(throwable, DEFAULT_LOCALE);
+  }
+
+  private Throwable rootCause(Throwable throwable) {
+    if (throwable instanceof AppException appException) {
+      Throwable root = ExceptionUtils.getRootCause(appException);
+      return root != null ? root : appException;
+    }
+
+    Throwable root = ExceptionUtils.getRootCause(throwable);
+    return root != null ? root : throwable;
   }
 
   private String baseMessage(Throwable throwable, Locale locale) {
