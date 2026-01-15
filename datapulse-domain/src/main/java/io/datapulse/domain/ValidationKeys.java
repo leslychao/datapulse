@@ -106,4 +106,7 @@ public final class ValidationKeys {
 
   public static final String ACCOUNT_MEMBER_STATUS_REQUIRED =
       "{" + MessageCodes.ACCOUNT_MEMBER_STATUS_REQUIRED + "}";
+
+  public static final String ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED =
+      "{" + MessageCodes.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED + "}";
 }

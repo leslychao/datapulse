@@ -34,6 +34,8 @@ public class AccountConnectionEntity extends LongBaseEntity {
 
   private Boolean active;
 
+  private String maskedCredentials;
+
   private OffsetDateTime lastSyncAt;
 
   @Enumerated(EnumType.STRING)

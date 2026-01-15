@@ -1,4 +1,4 @@
-package io.datapulse.rest;
+package io.datapulse.rest.account;
 
 import io.datapulse.core.service.account.AccountConnectionService;
 import io.datapulse.domain.request.account.AccountConnectionCreateRequest;

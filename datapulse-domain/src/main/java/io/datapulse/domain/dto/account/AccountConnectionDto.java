@@ -21,5 +21,6 @@ public class AccountConnectionDto extends LongBaseDto {
   private SyncStatus lastSyncStatus;
   private OffsetDateTime createdAt;
   private OffsetDateTime updatedAt;
+  private String maskedCredentials;
   private MarketplaceCredentials credentials;
 }

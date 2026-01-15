@@ -5,7 +5,7 @@ import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.AccountEntity;
-import io.datapulse.core.entity.account.AccountMemberEntity;
+import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.core.entity.inventory.FactInventorySnapshotEntity;
 import io.datapulse.core.entity.productcost.ProductCostEntity;
 import io.datapulse.core.entity.userprofile.UserProfileEntity;

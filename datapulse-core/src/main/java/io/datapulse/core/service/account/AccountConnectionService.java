@@ -1,5 +1,6 @@
 package io.datapulse.core.service.account;
 
+import io.datapulse.core.codec.CredentialsCodec;
 import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.core.mapper.BaseMapperConfig;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -36,6 +38,7 @@ import org.springframework.validation.annotation.Validated;
 
 @Service
 @Validated
+@RequiredArgsConstructor
 public class AccountConnectionService extends AbstractIngestApiService<
     AccountConnectionCreateRequest,
     AccountConnectionUpdateRequest,
@@ -48,26 +51,15 @@ public class AccountConnectionService extends AbstractIngestApiService<
   private final AccountService accountService;
   private final AccountConnectionApplier accountConnectionApplier;
   private final VaultSyncOutboxService vaultSyncOutboxService;
-
-  public AccountConnectionService(
-      MapperFacade mapperFacade,
-      AccountConnectionRepository accountConnectionRepository,
-      AccountService accountService,
-      AccountConnectionApplier accountConnectionApplier,
-      VaultSyncOutboxService vaultSyncOutboxService
-  ) {
-    this.mapperFacade = mapperFacade;
-    this.accountConnectionRepository = accountConnectionRepository;
-    this.accountService = accountService;
-    this.accountConnectionApplier = accountConnectionApplier;
-    this.vaultSyncOutboxService = vaultSyncOutboxService;
-  }
+  private final CredentialsCodec credentialsCodec;
 
   @Override
   @Transactional
   public AccountConnectionDto save(
       @Valid @NotNull(message = ValidationKeys.DTO_REQUIRED) AccountConnectionDto dto
   ) {
+    applyMaskedCredentialsIfPresent(dto);
+
     AccountConnectionDto saved = super.save(dto);
 
     MarketplaceCredentials credentials = dto.getCredentials();
@@ -76,7 +68,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
       ensureVaultOutboxPresent(saved, credentials);
     }
 
-    return saved;
+    return dto;
   }
 
   @Override
@@ -84,6 +76,8 @@ public class AccountConnectionService extends AbstractIngestApiService<
   public AccountConnectionDto update(
       @Valid @NotNull(message = ValidationKeys.DTO_REQUIRED) AccountConnectionDto dto
   ) {
+    applyMaskedCredentialsIfPresent(dto);
+
     AccountConnectionDto updated = super.update(dto);
 
     MarketplaceCredentials credentials = dto.getCredentials();
@@ -92,7 +86,7 @@ public class AccountConnectionService extends AbstractIngestApiService<
       ensureVaultOutboxPresent(updated, credentials);
     }
 
-    return updated;
+    return dto;
   }
 
   @Override
@@ -230,6 +224,12 @@ public class AccountConnectionService extends AbstractIngestApiService<
     }
 
     accountConnectionApplier.applyUpdateFromDto(source, target);
+
+    String maskedCredentials = source.getMaskedCredentials();
+    if (maskedCredentials != null) {
+      target.setMaskedCredentials(maskedCredentials);
+    }
+
     return target;
   }
 
@@ -329,6 +329,17 @@ public class AccountConnectionService extends AbstractIngestApiService<
     if (!accountService.exists(accountId)) {
       throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId);
     }
+  }
+
+  private void applyMaskedCredentialsIfPresent(AccountConnectionDto dto) {
+    MarketplaceType marketplace = dto.getMarketplace();
+    MarketplaceCredentials credentials = dto.getCredentials();
+
+    if (marketplace == null || credentials == null) {
+      return;
+    }
+
+    dto.setMaskedCredentials(credentialsCodec.mask(marketplace, credentials));
   }
 
   @Mapper(componentModel = "spring", config = BaseMapperConfig.class)

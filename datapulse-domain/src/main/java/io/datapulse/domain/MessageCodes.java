@@ -113,7 +113,6 @@ public final class MessageCodes {
   public static final String USER_PROFILE_EMAIL_REQUIRED = "user-profile.email.required";
   public static final String USER_PROFILE_EMAIL_INVALID = "user-profile.email.invalid";
   public static final String USER_PROFILE_BY_ID_NOT_FOUND = "user-profile.by-id.not-found";
-  public static final String USER_PROFILE_BY_SUB_NOT_FOUND = "user-profile.by-sub.not-found";
   public static final String USER_PROFILE_KEYCLOAK_SUB_ALREADY_EXISTS = "user-profile.keycloak-sub.already-exists";
   public static final String USER_PROFILE_EMAIL_ALREADY_EXISTS = "user-profile.email.already-exists";
 
@@ -122,10 +121,10 @@ public final class MessageCodes {
   public static final String ACCOUNT_MEMBER_ROLE_REQUIRED = "account-member.role.required";
   public static final String ACCOUNT_MEMBER_STATUS_REQUIRED = "account-member.status.required";
   public static final String ACCOUNT_MEMBER_ALREADY_EXISTS = "account-member.already-exists";
-  public static final String ACCOUNT_MEMBER_BY_ID_NOT_FOUND = "account-member.by-id.not-found";
   public static final String ACCOUNT_MEMBER_BY_ACCOUNT_USER_NOT_FOUND = "account-member.by-account-user.not-found";
   public static final String ACCOUNT_MEMBER_ACCOUNT_IMMUTABLE = "account-member.account.immutable";
   public static final String ACCOUNT_MEMBER_USER_IMMUTABLE = "account-member.user.immutable";
+  public static final String ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED = "account-member.current-user-id.required";
 
   public static final String SECURITY_JWT_AUTHENTICATION_REQUIRED = "security.jwt.authentication.required";
   public static final String SECURITY_JWT_NOT_AUTHENTICATED = "security.jwt.not-authenticated";

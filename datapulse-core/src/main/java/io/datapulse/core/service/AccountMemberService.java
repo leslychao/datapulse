@@ -1,12 +1,14 @@
 package io.datapulse.core.service;
 
+import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.core.entity.account.AccountEntity;
-import io.datapulse.core.entity.account.AccountMemberEntity;
 import io.datapulse.core.entity.userprofile.UserProfileEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountMemberRepository;
 import io.datapulse.core.repository.account.AccountRepository;
 import io.datapulse.core.repository.userprofile.UserProfileRepository;
+import io.datapulse.domain.AccountMemberRole;
+import io.datapulse.domain.AccountMemberStatus;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.AccountMemberDto;
@@ -19,8 +21,10 @@ import io.datapulse.domain.response.AccountMemberResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 @Service
@@ -61,6 +65,47 @@ public class AccountMemberService extends AbstractIngestApiService<
   @Override
   protected Class<AccountMemberResponse> responseType() {
     return AccountMemberResponse.class;
+  }
+
+  @Transactional
+  public void ensureOwnerMembership(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long userId
+  ) {
+    accountMemberRepository.findByAccount_IdAndUser_Id(accountId, userId)
+        .ifPresentOrElse(
+            existing -> updateToOwnerActive(existing.getId()),
+            () -> createOwnerActiveIdempotent(accountId, userId)
+        );
+  }
+
+  private void updateToOwnerActive(Long memberId) {
+    AccountMemberUpdateRequest updateRequest = new AccountMemberUpdateRequest(
+        AccountMemberRole.OWNER,
+        AccountMemberStatus.ACTIVE
+    );
+    updateFromRequest(memberId, updateRequest);
+  }
+
+  private void createOwnerActiveIdempotent(Long accountId, Long userId) {
+    try {
+      AccountMemberCreateRequest createRequest = new AccountMemberCreateRequest(
+          accountId,
+          userId,
+          AccountMemberRole.OWNER,
+          AccountMemberStatus.ACTIVE
+      );
+      createFromRequest(createRequest);
+    } catch (DataIntegrityViolationException race) {
+      AccountMemberEntity existing = accountMemberRepository
+          .findByAccount_IdAndUser_Id(accountId, userId)
+          .orElseThrow(() -> new NotFoundException(
+              MessageCodes.ACCOUNT_MEMBER_BY_ACCOUNT_USER_NOT_FOUND,
+              userId,
+              accountId
+          ));
+      updateToOwnerActive(existing.getId());
+    }
   }
 
   @Override

@@ -1,6 +1,6 @@
-package io.datapulse.core.entity.account;
+package io.datapulse.core.entity;
 
-import io.datapulse.core.entity.LongBaseEntity;
+import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.core.entity.userprofile.UserProfileEntity;
 import io.datapulse.domain.AccountMemberRole;
 import io.datapulse.domain.AccountMemberStatus;
@@ -35,5 +35,5 @@ public class AccountMemberEntity extends LongBaseEntity {
   private AccountMemberStatus status = AccountMemberStatus.ACTIVE;
 
   private OffsetDateTime createdAt = OffsetDateTime.now();
-  private OffsetDateTime updatedAt;
+  private OffsetDateTime updatedAt = OffsetDateTime.now();
 }

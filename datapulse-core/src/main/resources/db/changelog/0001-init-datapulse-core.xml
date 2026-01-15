@@ -26,14 +26,15 @@
 
       CREATE TABLE account_connection
       (
-        id               BIGSERIAL PRIMARY KEY,
-        account_id       BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        marketplace      TEXT        NOT NULL,
-        active           BOOLEAN     NOT NULL DEFAULT TRUE,
-        last_sync_at     TIMESTAMPTZ,
-        last_sync_status TEXT,
-        created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at       TIMESTAMPTZ,
+        id                 BIGSERIAL PRIMARY KEY,
+        account_id         BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        marketplace        TEXT        NOT NULL,
+        active             BOOLEAN     NOT NULL DEFAULT TRUE,
+        masked_credentials TEXT,
+        last_sync_at       TIMESTAMPTZ,
+        last_sync_status   TEXT,
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at         TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)
       );
 

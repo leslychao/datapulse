@@ -1,6 +1,6 @@
 package io.datapulse.iam.authorization;
 
-import io.datapulse.core.entity.account.AccountMemberEntity;
+import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.core.repository.AccountMemberRepository;
 import io.datapulse.domain.AccountMemberStatus;
 import io.datapulse.domain.exception.SecurityException;

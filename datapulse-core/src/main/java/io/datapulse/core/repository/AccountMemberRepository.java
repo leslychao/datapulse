@@ -1,6 +1,6 @@
 package io.datapulse.core.repository;
 
-import io.datapulse.core.entity.account.AccountMemberEntity;
+import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.domain.AccountMemberStatus;
 import java.util.List;
 import java.util.Optional;
