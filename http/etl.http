@@ -139,7 +139,7 @@ POST {{host}}/api/etl/scenario/run
 Content-Type: application/json
 
 {
-  "accountId": 1,
+  "accountId": 6,
   "events": [
     {
       "event": "WAREHOUSE_DICT",

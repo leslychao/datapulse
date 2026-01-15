@@ -1,0 +1,38 @@
+package io.datapulse.etl.materialization.dim.product;
+
+import io.datapulse.domain.MarketplaceType;
+import io.datapulse.etl.MarketplaceEvent;
+import io.datapulse.etl.materialization.MaterializationHandler;
+import io.datapulse.etl.repository.DimProductRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public final class ProductOzonMaterializationHandler implements MaterializationHandler {
+
+  private final DimProductRepository repository;
+
+  @Override
+  public MarketplaceEvent supportedEvent() {
+    return MarketplaceEvent.PRODUCT_DICT;
+  }
+
+  @Override
+  public MarketplaceType marketplace() {
+    return MarketplaceType.OZON;
+  }
+
+  @Override
+  public void materialize(long accountId, String requestId) {
+    log.info("Product materialization started: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
+
+    repository.upsertOzon(accountId, requestId);
+
+    log.info("Product materialization finished: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
+  }
+}

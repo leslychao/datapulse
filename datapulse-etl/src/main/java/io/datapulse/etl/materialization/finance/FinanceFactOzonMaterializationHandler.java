@@ -2,6 +2,7 @@ package io.datapulse.etl.materialization.finance;
 
 import static io.datapulse.etl.MarketplaceEvent.FACT_FINANCE;
 
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
 import io.datapulse.etl.repository.CommissionFactRepository;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public final class FinanceFactMaterializationHandler implements MaterializationHandler {
+public final class FinanceFactOzonMaterializationHandler implements MaterializationHandler {
 
   private final LogisticsFactRepository logisticsFactRepository;
   private final DimWarehouseRepository dimWarehouseRepository;
@@ -35,29 +36,28 @@ public final class FinanceFactMaterializationHandler implements MaterializationH
   }
 
   @Override
+  public MarketplaceType marketplace() {
+    return MarketplaceType.OZON;
+  }
+
+  @Override
   public void materialize(long accountId, String requestId) {
-    log.info("Finance fact materialization started: requestId={}, accountId={}", requestId,
-        accountId);
+    log.info("Finance fact materialization started: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
 
     dimWarehouseRepository.upsertOzonFromTransactions(accountId, requestId);
-    dimWarehouseRepository.upsertWildberriesFromReportDetails(accountId, requestId);
 
     logisticsFactRepository.upsertOzon(accountId, requestId);
-    logisticsFactRepository.upsertWildberries(accountId, requestId);
 
     commissionFactRepository.upsertOzon(accountId, requestId);
-    commissionFactRepository.upsertWildberries(accountId, requestId);
 
     marketingFactRepository.upsertOzon(accountId, requestId);
-    marketingFactRepository.upsertWildberries(accountId, requestId);
 
     penaltiesFactRepository.upsertOzon(accountId, requestId);
-    penaltiesFactRepository.upsertWildberries(accountId, requestId);
 
     financeFactRepository.upsertFromOzon(accountId, requestId);
-    financeFactRepository.upsertFromWildberries(accountId, requestId);
 
-    log.info("Finance fact materialization finished: requestId={}, accountId={}", requestId,
-        accountId);
+    log.info("Finance fact materialization finished: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
   }
 }

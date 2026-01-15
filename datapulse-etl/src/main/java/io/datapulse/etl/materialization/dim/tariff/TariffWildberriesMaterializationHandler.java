@@ -1,5 +1,6 @@
 package io.datapulse.etl.materialization.dim.tariff;
 
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
 import io.datapulse.etl.repository.DimTariffRepository;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public final class TariffMaterializationHandler implements MaterializationHandler {
+public final class TariffWildberriesMaterializationHandler implements MaterializationHandler {
 
   private final DimTariffRepository dimTariffRepository;
 
@@ -20,14 +21,18 @@ public final class TariffMaterializationHandler implements MaterializationHandle
   }
 
   @Override
+  public MarketplaceType marketplace() {
+    return MarketplaceType.WILDBERRIES;
+  }
+
+  @Override
   public void materialize(long accountId, String requestId) {
-    log.info("Tariff/commission materialization started: requestId={}, accountId={}", requestId,
-        accountId);
+    log.info("Tariff/commission materialization started: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
 
     dimTariffRepository.upsertWildberries(accountId, requestId);
-    dimTariffRepository.upsertOzon(accountId, requestId);
 
-    log.info("Tariff/commission materialization finished: requestId={}, accountId={}", requestId,
-        accountId);
+    log.info("Tariff/commission materialization finished: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
   }
 }

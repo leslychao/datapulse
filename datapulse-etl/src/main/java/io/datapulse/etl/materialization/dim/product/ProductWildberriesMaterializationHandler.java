@@ -1,5 +1,6 @@
 package io.datapulse.etl.materialization.dim.product;
 
+import io.datapulse.domain.MarketplaceType;
 import io.datapulse.etl.MarketplaceEvent;
 import io.datapulse.etl.materialization.MaterializationHandler;
 import io.datapulse.etl.repository.DimProductRepository;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public final class ProductMaterializationHandler implements MaterializationHandler {
+public final class ProductWildberriesMaterializationHandler implements MaterializationHandler {
 
   private final DimProductRepository repository;
 
@@ -20,12 +21,18 @@ public final class ProductMaterializationHandler implements MaterializationHandl
   }
 
   @Override
-  public void materialize(long accountId, String requestId) {
-    log.info("Product materialization started: requestId={}, accountId={}", requestId, accountId);
+  public MarketplaceType marketplace() {
+    return MarketplaceType.WILDBERRIES;
+  }
 
-    repository.upsertOzon(accountId, requestId);
+  @Override
+  public void materialize(long accountId, String requestId) {
+    log.info("Product materialization started: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
+
     repository.upsertWildberries(accountId, requestId);
 
-    log.info("Product materialization finished: requestId={}, accountId={}", requestId, accountId);
+    log.info("Product materialization finished: requestId={}, accountId={}, marketplace={}",
+        requestId, accountId, marketplace());
   }
 }
