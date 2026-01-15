@@ -26,12 +26,14 @@ public class FileStreamingService {
 
     try {
       DataBufferUtils.write(
-          source,
-          tmp,
-          StandardOpenOption.CREATE,
-          StandardOpenOption.TRUNCATE_EXISTING,
-          StandardOpenOption.WRITE
-      ).block();
+              source,
+              tmp,
+              StandardOpenOption.CREATE,
+              StandardOpenOption.TRUNCATE_EXISTING,
+              StandardOpenOption.WRITE
+          )
+          .then()
+          .block();
 
       moveAtomicallyOrReplace(tmp, targetFile);
       return targetFile;
@@ -82,7 +84,7 @@ public class FileStreamingService {
       } catch (IOException ex) {
         throw new AppException(
             MessageCodes.DOWNLOAD_MOVE_FAILED,
-            new Object[]{ tmp, target, ExceptionUtils.getRootCause(ex) },
+            new Object[]{tmp, target, ExceptionUtils.getRootCause(ex)},
             ex
         );
       }

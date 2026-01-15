@@ -18,6 +18,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -35,11 +37,9 @@ public abstract class AbstractMarketplaceAdapter {
   private final MarketplaceProperties properties;
   private final AuthAccountIdResolver authAccountIdResolver;
 
-  protected final <R> Snapshot<R> doGet(
-      long accountId,
-      EndpointKey key,
-      Class<R> elementType
-  ) {
+  private final SnapshotLockRegistry lockRegistry = new SnapshotLockRegistry();
+
+  protected final <R> Snapshot<R> doGet(long accountId, EndpointKey key, Class<R> elementType) {
     return execute(accountId, key, null, HttpMethod.GET, null, null, elementType);
   }
 
@@ -52,12 +52,8 @@ public abstract class AbstractMarketplaceAdapter {
     return execute(accountId, key, null, HttpMethod.GET, queryParams, null, elementType);
   }
 
-  protected final <R> Snapshot<R> doPost(
-      long accountId,
-      EndpointKey key,
-      Map<String, ?> body,
-      Class<R> elementType
-  ) {
+  protected final <R> Snapshot<R> doPost(long accountId, EndpointKey key, Map<String, ?> body,
+      Class<R> elementType) {
     return execute(accountId, key, null, HttpMethod.POST, null, body, elementType);
   }
 
@@ -71,11 +67,7 @@ public abstract class AbstractMarketplaceAdapter {
     return execute(accountId, key, partitionKey, HttpMethod.POST, null, body, elementType);
   }
 
-  private EndpointRef resolveEndpoint(
-      EndpointKey key,
-      HttpMethod method,
-      Map<String, ?> params
-  ) {
+  private EndpointRef resolveEndpoint(EndpointKey key, HttpMethod method, Map<String, ?> params) {
     if (method == HttpMethod.GET && params != null) {
       return resolver.resolve(marketplaceType, key, params);
     }
@@ -101,44 +93,50 @@ public abstract class AbstractMarketplaceAdapter {
     try {
       EndpointRef ref = resolveEndpoint(endpointKey, method, queryParams);
       URI uri = ref.uri();
-
       HttpHeaders headers = headerProvider.build(marketplaceType, authAccountId);
-      Path target = planPath(authAccountId, endpointKey, partitionKey);
 
-      if (Files.exists(target)) {
-        long size = Files.size(target);
+      Path target = planPath(targetAccountId, endpointKey, partitionKey);
+
+      ReentrantLock lock = lockRegistry.lockFor(target);
+      lock.lock();
+      try {
+        if (Files.exists(target)) {
+          long size = Files.size(target);
+          log.info(
+              "Snapshot reused from local cache: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, path={}, sizeBytes={}",
+              marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, target, size
+          );
+          return new Snapshot<>(elementType, target);
+        }
+
         log.info(
-            "Snapshot reused from local cache: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, path={}, sizeBytes={}",
-            marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, target, size
+            "Starting snapshot download: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, method={}, uri={}",
+            marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, method, uri
         );
-        return new Snapshot<>(elementType, target);
+
+        Files.createDirectories(target.getParent());
+
+        Path resultPath = downloader.download(
+            marketplaceType,
+            endpointKey,
+            authAccountId,
+            method,
+            uri,
+            headers,
+            safe(body),
+            target
+        );
+
+        long size = Files.size(resultPath);
+        log.info(
+            "Snapshot download completed: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, path={}, sizeBytes={}",
+            marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, resultPath, size
+        );
+
+        return new Snapshot<>(elementType, resultPath);
+      } finally {
+        lock.unlock();
       }
-
-      log.info(
-          "Starting snapshot download: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, method={}, uri={}",
-          marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, method, uri
-      );
-
-      Path resultPath = downloader.download(
-          marketplaceType,
-          endpointKey,
-          authAccountId,
-          method,
-          uri,
-          headers,
-          safe(body),
-          target
-      );
-
-      long size = Files.size(resultPath);
-
-      log.info(
-          "Snapshot download completed: marketplace={}, targetAccountId={}, authAccountId={}, endpoint={}, partitionKey={}, path={}, sizeBytes={}",
-          marketplaceType, targetAccountId, authAccountId, endpointKey, partitionKey, resultPath,
-          size
-      );
-
-      return new Snapshot<>(elementType, resultPath);
 
     } catch (IOException ex) {
       log.error(
@@ -149,7 +147,7 @@ public abstract class AbstractMarketplaceAdapter {
     }
   }
 
-  private Path planPath(long authAccountId, EndpointKey endpoint, String partitionKey) {
+  private Path planPath(long targetAccountId, EndpointKey endpoint, String partitionKey) {
     String endpointTag = sanitize(endpoint.tag());
     String marketplace = sanitize(marketplaceType.name().toLowerCase());
 
@@ -159,16 +157,30 @@ public abstract class AbstractMarketplaceAdapter {
 
     return baseDir()
         .resolve(marketplace)
-        .resolve(Long.toString(authAccountId))
+        .resolve(Long.toString(targetAccountId))
         .resolve(endpointTag)
         .resolve(fileName);
   }
 
   private String sanitize(String value) {
-    return value == null ? "unknown" : value.trim().toLowerCase().replaceAll("[^a-z0-9._-]", "_");
+    return value == null
+        ? "unknown"
+        : value.trim().toLowerCase().replaceAll("[^a-z0-9._-]", "_");
   }
 
   private Path baseDir() {
     return properties.getStorage().getBaseDir();
+  }
+
+  private static final class SnapshotLockRegistry {
+
+    private final ConcurrentHashMap<String, ReentrantLock> locksByPath = new ConcurrentHashMap<>();
+
+    ReentrantLock lockFor(Path target) {
+      return locksByPath.computeIfAbsent(
+          target.toAbsolutePath().normalize().toString(),
+          ignored -> new ReentrantLock()
+      );
+    }
   }
 }
