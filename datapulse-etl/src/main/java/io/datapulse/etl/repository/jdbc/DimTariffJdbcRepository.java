@@ -13,17 +13,19 @@ import org.springframework.stereotype.Repository;
 public class DimTariffJdbcRepository implements DimTariffRepository {
 
   private static final String UPSERT_WB_SCD2_TEMPLATE = """
-      with source as (
+      with raw as (
           select
-              '%1$s'                                                   as source_platform,
-              c.id                                                     as dim_category_id,
+              '%1$s'                                                     as source_platform,
+              c.id                                                       as dim_category_id,
 
               (t.payload::jsonb ->> 'kgvpBooking')::numeric(10,4)         as kgvp_booking,
               (t.payload::jsonb ->> 'kgvpMarketplace')::numeric(10,4)     as kgvp_marketplace,
               (t.payload::jsonb ->> 'kgvpPickup')::numeric(10,4)          as kgvp_pickup,
               (t.payload::jsonb ->> 'kgvpSupplier')::numeric(10,4)        as kgvp_supplier,
               (t.payload::jsonb ->> 'kgvpSupplierExpress')::numeric(10,4) as kgvp_supplier_express,
-              (t.payload::jsonb ->> 'paidStorageKgvp')::numeric(10,4)     as paid_storage_kgvp
+              (t.payload::jsonb ->> 'paidStorageKgvp')::numeric(10,4)     as paid_storage_kgvp,
+
+              t.created_at                                               as created_at
           from %2$s t
           join dim_category c
             on c.source_platform    = '%1$s'
@@ -31,14 +33,29 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
           where t.account_id = ?
             and t.request_id = ?
       ),
+      source as (
+          select distinct on (source_platform, dim_category_id)
+              source_platform,
+              dim_category_id,
+              kgvp_booking,
+              kgvp_marketplace,
+              kgvp_pickup,
+              kgvp_supplier,
+              kgvp_supplier_express,
+              paid_storage_kgvp,
+              created_at as valid_from_ts
+          from raw
+          order by source_platform, dim_category_id, created_at desc
+      ),
       closed as (
           update dim_tariff_wb d
-          set valid_to  = current_date - 1,
+          set valid_to   = s.valid_from_ts - interval '1 microsecond',
               updated_at = now()
           from source s
-          where d.source_platform  = s.source_platform
-            and d.dim_category_id  = s.dim_category_id
+          where d.source_platform = s.source_platform
+            and d.dim_category_id = s.dim_category_id
             and d.valid_to is null
+            and d.valid_from < s.valid_from_ts
             and (
               (d.kgvp_booking,
                d.kgvp_marketplace,
@@ -54,6 +71,7 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
                s.kgvp_supplier_express,
                s.paid_storage_kgvp)
             )
+          returning d.source_platform, d.dim_category_id
       )
       insert into dim_tariff_wb (
           source_platform,
@@ -78,16 +96,30 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
           s.kgvp_supplier,
           s.kgvp_supplier_express,
           s.paid_storage_kgvp,
-          current_date as valid_from,
-          null::date   as valid_to,
+          s.valid_from_ts as valid_from,
+          null::timestamptz as valid_to,
           now(),
           now()
       from source s
-      where not exists (
+      left join closed c
+        on c.source_platform = s.source_platform
+       and c.dim_category_id = s.dim_category_id
+      where
+        (
+          not exists (
+              select 1
+              from dim_tariff_wb cur
+              where cur.source_platform = s.source_platform
+                and cur.dim_category_id = s.dim_category_id
+                and cur.valid_to is null
+          )
+          or c.dim_category_id is not null
+        )
+        and not exists (
           select 1
           from dim_tariff_wb d
-          where d.source_platform  = s.source_platform
-            and d.dim_category_id  = s.dim_category_id
+          where d.source_platform = s.source_platform
+            and d.dim_category_id = s.dim_category_id
             and d.valid_to is null
             and (
               (d.kgvp_booking,
@@ -104,7 +136,8 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
                s.kgvp_supplier_express,
                s.paid_storage_kgvp)
             )
-      );
+        )
+      on conflict (source_platform, dim_category_id, valid_from) do nothing;
       """;
 
   private static final String UPSERT_OZON_SCD2_TEMPLATE = """
@@ -155,17 +188,19 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
               fbs_direct_flow_trans_max_amount,
               fbs_first_mile_min_amount,
               fbs_first_mile_max_amount,
-              fbs_return_flow_amount
+              fbs_return_flow_amount,
+              created_at as valid_from_ts
           from raw
           order by product_id, created_at desc
       ),
       closed as (
           update dim_tariff_ozon d
-          set valid_to  = current_date - 1,
+          set valid_to   = s.valid_from_ts - interval '1 microsecond',
               updated_at = now()
           from source s
           where d.product_id = s.product_id
             and d.valid_to is null
+            and d.valid_from < s.valid_from_ts
             and (
               (d.acquiring,
                d.sales_percent_fbo,
@@ -199,6 +234,7 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
                s.fbs_first_mile_max_amount,
                s.fbs_return_flow_amount)
             )
+          returning d.product_id
       )
       insert into dim_tariff_ozon (
           product_id,
@@ -241,12 +277,24 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
           s.fbs_first_mile_min_amount,
           s.fbs_first_mile_max_amount,
           s.fbs_return_flow_amount,
-          current_date as valid_from,
-          null::date   as valid_to,
+          s.valid_from_ts as valid_from,
+          null::timestamptz as valid_to,
           now(),
           now()
       from source s
-      where not exists (
+      left join closed c
+        on c.product_id = s.product_id
+      where
+        (
+          not exists (
+              select 1
+              from dim_tariff_ozon cur
+              where cur.product_id = s.product_id
+                and cur.valid_to is null
+          )
+          or c.product_id is not null
+        )
+        and not exists (
           select 1
           from dim_tariff_ozon d
           where d.product_id = s.product_id
@@ -284,7 +332,8 @@ public class DimTariffJdbcRepository implements DimTariffRepository {
                s.fbs_first_mile_max_amount,
                s.fbs_return_flow_amount)
             )
-      );
+        )
+      on conflict (product_id, valid_from) do nothing;
       """;
 
   private final JdbcTemplate jdbcTemplate;
