@@ -28,6 +28,7 @@ public final class MessageCodes {
   public static final String DATE_RANGE_INVALID = "date.range.invalid";
 
   public static final String ACCOUNT_ID_REQUIRED = "account.id.required";
+  public static final String ACCOUNT_NAME_CONFIG_REQUIRED = "account.name.config.required";
   public static final String ACCOUNT_NAME_REQUIRED = "account.name.required";
   public static final String ACCOUNT_NAME_MAX_LENGTH = "account.name.max-length";
   public static final String ACCOUNT_ALREADY_EXISTS = "account.already-exists";
@@ -125,6 +126,9 @@ public final class MessageCodes {
   public static final String ACCOUNT_MEMBER_ACCOUNT_IMMUTABLE = "account-member.account.immutable";
   public static final String ACCOUNT_MEMBER_USER_IMMUTABLE = "account-member.user.immutable";
   public static final String ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED = "account-member.current-user-id.required";
+  public static final String ACCOUNT_MEMBER_NOT_FOUND = "account-member.not-found";
+  public static final String ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN = "account-member.last-owner.forbidden";
+  public static final String ACCOUNT_MEMBER_SINGLE_OWNER_ONLY = "account-member.single-owner-only";
 
   public static final String SECURITY_JWT_AUTHENTICATION_REQUIRED = "security.jwt.authentication.required";
   public static final String SECURITY_JWT_NOT_AUTHENTICATED = "security.jwt.not-authenticated";

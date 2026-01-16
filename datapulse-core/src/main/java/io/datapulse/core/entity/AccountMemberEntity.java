@@ -10,7 +10,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -33,7 +32,4 @@ public class AccountMemberEntity extends LongBaseEntity {
 
   @Enumerated(EnumType.STRING)
   private AccountMemberStatus status = AccountMemberStatus.ACTIVE;
-
-  private OffsetDateTime createdAt = OffsetDateTime.now();
-  private OffsetDateTime updatedAt = OffsetDateTime.now();
 }

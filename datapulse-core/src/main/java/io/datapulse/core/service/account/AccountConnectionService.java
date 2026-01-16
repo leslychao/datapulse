@@ -3,16 +3,13 @@ package io.datapulse.core.service.account;
 import io.datapulse.core.codec.CredentialsCodec;
 import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.AccountEntity;
-import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.account.AccountConnectionRepository;
-import io.datapulse.core.service.AbstractIngestApiService;
+import io.datapulse.core.repository.account.AccountRepository;
 import io.datapulse.core.service.vault.VaultSyncOutboxService;
-import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
-import io.datapulse.domain.dto.account.AccountConnectionDto;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
@@ -20,18 +17,14 @@ import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.request.account.AccountConnectionCreateRequest;
 import io.datapulse.domain.request.account.AccountConnectionUpdateRequest;
 import io.datapulse.domain.response.account.AccountConnectionResponse;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -39,122 +32,51 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 @RequiredArgsConstructor
-public class AccountConnectionService extends AbstractIngestApiService<
-    AccountConnectionCreateRequest,
-    AccountConnectionUpdateRequest,
-    AccountConnectionResponse,
-    AccountConnectionDto,
-    AccountConnectionEntity> {
+public class AccountConnectionService {
 
   private final MapperFacade mapperFacade;
   private final AccountConnectionRepository accountConnectionRepository;
-  private final AccountService accountService;
-  private final AccountConnectionApplier accountConnectionApplier;
+  private final AccountRepository accountRepository;
   private final VaultSyncOutboxService vaultSyncOutboxService;
   private final CredentialsCodec credentialsCodec;
-
-  @Override
-  @Transactional
-  public AccountConnectionDto save(
-      @Valid @NotNull(message = ValidationKeys.DTO_REQUIRED) AccountConnectionDto dto
-  ) {
-    applyMaskedCredentialsIfPresent(dto);
-
-    AccountConnectionDto saved = super.save(dto);
-
-    MarketplaceCredentials credentials = dto.getCredentials();
-    if (credentials != null) {
-      activateConnectionInSameTransaction(saved);
-      ensureVaultOutboxPresent(saved, credentials);
-    }
-
-    return dto;
-  }
-
-  @Override
-  @Transactional
-  public AccountConnectionDto update(
-      @Valid @NotNull(message = ValidationKeys.DTO_REQUIRED) AccountConnectionDto dto
-  ) {
-    applyMaskedCredentialsIfPresent(dto);
-
-    AccountConnectionDto updated = super.update(dto);
-
-    MarketplaceCredentials credentials = dto.getCredentials();
-    if (credentials != null) {
-      activateConnectionInSameTransaction(updated);
-      ensureVaultOutboxPresent(updated, credentials);
-    }
-
-    return dto;
-  }
-
-  @Override
-  @Transactional
-  public void delete(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
-    AccountConnectionEntity existing = accountConnectionRepository.findById(id)
-        .orElseThrow(
-            () -> new NotFoundException(MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND, id));
-
-    accountConnectionRepository.delete(existing);
-
-    Long accountId = Optional.ofNullable(existing.getAccount())
-        .map(AccountEntity::getId)
-        .orElse(null);
-
-    MarketplaceType marketplace = existing.getMarketplace();
-
-    if (accountId != null && marketplace != null) {
-      vaultSyncOutboxService.ensureAbsent(accountId, marketplace);
-    }
-  }
-
-  @Override
-  protected MapperFacade mapper() {
-    return mapperFacade;
-  }
-
-  @Override
-  protected JpaRepository<AccountConnectionEntity, Long> repository() {
-    return accountConnectionRepository;
-  }
-
-  @Override
-  protected Class<AccountConnectionDto> dtoType() {
-    return AccountConnectionDto.class;
-  }
-
-  @Override
-  protected Class<AccountConnectionEntity> entityType() {
-    return AccountConnectionEntity.class;
-  }
-
-  @Override
-  protected Class<AccountConnectionResponse> responseType() {
-    return AccountConnectionResponse.class;
-  }
 
   @Transactional(readOnly = true)
   public List<AccountConnectionResponse> getAllByAccountId(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId
   ) {
-    validateAccountExists(accountId);
-
     return accountConnectionRepository.findAllByAccount_Id(accountId)
         .stream()
-        .map(this::toDto)
         .map(this::toResponse)
         .toList();
   }
 
-  @Override
-  protected void validateOnCreate(AccountConnectionDto dto) {
-    Long accountId = dto.getAccountId();
-    validateAccountExists(accountId);
+  @Transactional(readOnly = true)
+  public Optional<AccountConnectionResponse> getByAccountAndMarketplace(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
+  ) {
+    return accountConnectionRepository.findByAccount_IdAndMarketplace(accountId, marketplaceType)
+        .map(this::toResponse);
+  }
 
-    MarketplaceType marketplace = dto.getMarketplace();
+  @Transactional
+  public AccountConnectionResponse create(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountConnectionCreateRequest request
+  ) {
+    AccountEntity account = requireAccountEntity(accountId);
+
+    MarketplaceType marketplace = request.marketplace();
     if (marketplace == null) {
       throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED);
+    }
+
+    MarketplaceCredentials credentials = request.credentials();
+    if (credentials == null) {
+      throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED);
+    }
+    if (!marketplace.supports(credentials)) {
+      throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH);
     }
 
     if (accountConnectionRepository.existsByAccount_IdAndMarketplace(accountId, marketplace)) {
@@ -164,79 +86,84 @@ public class AccountConnectionService extends AbstractIngestApiService<
           marketplace
       );
     }
-  }
 
-  @Override
-  protected void validateOnUpdate(
-      Long id,
-      AccountConnectionDto dto,
-      AccountConnectionEntity existing
-  ) {
-    MarketplaceType requestedMarketplace = dto.getMarketplace();
-    MarketplaceType currentMarketplace = existing.getMarketplace();
+    AccountConnectionEntity entity = new AccountConnectionEntity();
+    entity.setAccount(account);
+    entity.setMarketplace(marketplace);
+    entity.setActive(true);
+    entity.setMaskedCredentials(credentialsCodec.mask(marketplace, credentials));
 
-    if (requestedMarketplace == null || requestedMarketplace == currentMarketplace) {
-      return;
-    }
-
-    AccountEntity account = existing.getAccount();
-    if (account == null || account.getId() == null) {
-      throw new AppException(MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING);
-    }
-
-    Long accountId = account.getId();
-
-    if (accountConnectionRepository.existsByAccount_IdAndMarketplaceAndIdNot(
-        accountId, requestedMarketplace, id
-    )) {
+    AccountConnectionEntity saved;
+    try {
+      saved = accountConnectionRepository.save(entity);
+    } catch (DataIntegrityViolationException violation) {
       throw new BadRequestException(
           MessageCodes.ACCOUNT_CONNECTION_ALREADY_EXISTS,
           accountId,
-          requestedMarketplace
+          marketplace
       );
     }
+
+    vaultSyncOutboxService.ensurePresent(accountId, marketplace, credentials);
+
+    return mapperFacade.to(saved, AccountConnectionResponse.class);
   }
 
-  @Override
-  protected AccountConnectionEntity beforeSave(AccountConnectionEntity entity) {
-    OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
-    entity.setCreatedAt(now);
-    entity.setUpdatedAt(now);
-    return entity;
-  }
+  @Transactional
+  public AccountConnectionResponse update(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long connectionId,
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountConnectionUpdateRequest request
+  ) {
+    AccountConnectionEntity existing = requireConnectionEntity(accountId, connectionId);
 
-  @Override
-  protected AccountConnectionEntity beforeUpdate(AccountConnectionEntity entity) {
-    entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
-    return entity;
-  }
+    MarketplaceType marketplace = existing.getMarketplace();
 
-  @Override
-  protected AccountConnectionEntity merge(AccountConnectionEntity target,
-      AccountConnectionDto source) {
-    Long existingAccountId = Optional.ofNullable(target.getAccount())
-        .map(AccountEntity::getId)
-        .orElseThrow(() -> new AppException(MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING));
+    MarketplaceCredentials credentials = request.credentials();
+    Boolean requestedActive = request.active();
 
-    Long requestedAccountId = source.getAccountId();
-    if (requestedAccountId != null && !requestedAccountId.equals(existingAccountId)) {
-      throw new AppException(MessageCodes.ACCOUNT_CONNECTION_ACCOUNT_IMMUTABLE);
+    if (Boolean.TRUE.equals(requestedActive) && credentials == null) {
+      throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED);
     }
 
-    accountConnectionApplier.applyUpdateFromDto(source, target);
-
-    String maskedCredentials = source.getMaskedCredentials();
-    if (maskedCredentials != null) {
-      target.setMaskedCredentials(maskedCredentials);
+    if (credentials != null) {
+      if (!marketplace.supports(credentials)) {
+        throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH);
+      }
+      existing.setMaskedCredentials(credentialsCodec.mask(marketplace, credentials));
+      existing.setActive(true);
+      vaultSyncOutboxService.ensurePresent(accountId, marketplace, credentials);
+    } else if (requestedActive != null) {
+      existing.setActive(requestedActive);
+      if (!requestedActive) {
+        vaultSyncOutboxService.ensureAbsent(accountId, marketplace);
+      }
     }
 
-    return target;
+    AccountConnectionEntity saved = accountConnectionRepository.save(existing);
+    return mapperFacade.to(saved, AccountConnectionResponse.class);
   }
 
+  @Transactional
+  public void delete(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long connectionId
+  ) {
+    AccountConnectionEntity existing = requireConnectionEntity(accountId, connectionId);
+
+    MarketplaceType marketplace = existing.getMarketplace();
+
+    accountConnectionRepository.delete(existing);
+    vaultSyncOutboxService.ensureAbsent(accountId, marketplace);
+  }
+
+  @Transactional(readOnly = true)
   public void assertActiveConnectionExists(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
   ) {
+    requireAccountEntity(accountId);
+
     if (!accountConnectionRepository.existsByAccount_IdAndMarketplaceAndActiveTrue(accountId,
         marketplaceType)) {
       throw new NotFoundException(
@@ -247,110 +174,40 @@ public class AccountConnectionService extends AbstractIngestApiService<
     }
   }
 
+  @Transactional(readOnly = true)
   public Set<MarketplaceType> getActiveMarketplacesByAccountId(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId
   ) {
+    requireAccountEntity(accountId);
+
     return accountConnectionRepository.findAllByAccount_IdAndActiveTrue(accountId)
         .stream()
         .map(AccountConnectionEntity::getMarketplace)
+        .filter(Objects::nonNull)
         .collect(Collectors.toSet());
   }
 
-  public Optional<AccountConnectionDto> getByAccountAndMarketplace(
-      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
-      @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED) MarketplaceType marketplaceType
-  ) {
-    return accountConnectionRepository.findByAccount_IdAndMarketplace(accountId, marketplaceType)
-        .map(this::toDto);
+  private AccountConnectionResponse toResponse(AccountConnectionEntity entity) {
+    return mapperFacade.to(entity, AccountConnectionResponse.class);
   }
 
-  private AccountConnectionDto toDto(AccountConnectionEntity entity) {
-    return mapperFacade.to(entity, AccountConnectionDto.class);
+  private AccountEntity requireAccountEntity(Long accountId) {
+    return accountRepository.findById(accountId)
+        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
   }
 
-  private void ensureVaultOutboxPresent(AccountConnectionDto dto,
-      MarketplaceCredentials credentials) {
-    VaultSyncKey key = resolveVaultSyncKey(dto);
-    vaultSyncOutboxService.ensurePresent(key.accountId(), key.marketplace(), credentials);
-  }
+  private AccountConnectionEntity requireConnectionEntity(Long accountId, Long connectionId) {
+    AccountConnectionEntity existing = accountConnectionRepository
+        .findByIdAndAccount_Id(connectionId, accountId)
+        .orElseThrow(() -> new NotFoundException(
+            MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND,
+            connectionId
+        ));
 
-  private void activateConnectionInSameTransaction(AccountConnectionDto dto) {
-    VaultSyncKey key = resolveVaultSyncKey(dto);
-
-    accountConnectionRepository.findByAccount_IdAndMarketplace(key.accountId(), key.marketplace())
-        .ifPresent(connection -> {
-          if (Boolean.TRUE.equals(connection.getActive())) {
-            return;
-          }
-          OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
-          connection.setActive(true);
-          connection.setUpdatedAt(now);
-          accountConnectionRepository.save(connection);
-        });
-  }
-
-  private VaultSyncKey resolveVaultSyncKey(AccountConnectionDto dto) {
-    Long accountId = dto.getAccountId();
-    MarketplaceType marketplace = dto.getMarketplace();
-
-    if (accountId != null && marketplace != null) {
-      return new VaultSyncKey(accountId, marketplace);
-    }
-
-    Long connectionId = dto.getId();
-    if (connectionId == null) {
-      throw new BadRequestException(MessageCodes.ID_REQUIRED);
-    }
-
-    AccountConnectionEntity existing = accountConnectionRepository.findById(connectionId)
-        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_CONNECTION_BY_ID_NOT_FOUND,
-            connectionId));
-
-    Long resolvedAccountId = Optional.ofNullable(existing.getAccount())
-        .map(AccountEntity::getId)
-        .orElseThrow(() -> new AppException(MessageCodes.DATA_CORRUPTED_ACCOUNT_MISSING));
-
-    MarketplaceType resolvedMarketplace = existing.getMarketplace();
-    if (resolvedMarketplace == null) {
+    if (existing.getMarketplace() == null) {
       throw new AppException(MessageCodes.DATA_CORRUPTED_MARKETPLACE_MISSING);
     }
 
-    return new VaultSyncKey(resolvedAccountId, resolvedMarketplace);
-  }
-
-  private record VaultSyncKey(long accountId, MarketplaceType marketplace) {
-
-  }
-
-  private void validateAccountExists(Long accountId) {
-    if (accountId == null) {
-      throw new BadRequestException(MessageCodes.ACCOUNT_ID_REQUIRED);
-    }
-    if (!accountService.exists(accountId)) {
-      throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId);
-    }
-  }
-
-  private void applyMaskedCredentialsIfPresent(AccountConnectionDto dto) {
-    MarketplaceType marketplace = dto.getMarketplace();
-    MarketplaceCredentials credentials = dto.getCredentials();
-
-    if (marketplace == null || credentials == null) {
-      return;
-    }
-
-    dto.setMaskedCredentials(credentialsCodec.mask(marketplace, credentials));
-  }
-
-  @Mapper(componentModel = "spring", config = BaseMapperConfig.class)
-  public interface AccountConnectionApplier {
-
-    @Mapping(target = "account", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    void applyUpdateFromDto(
-        AccountConnectionDto dto,
-        @MappingTarget AccountConnectionEntity entity
-    );
+    return existing;
   }
 }

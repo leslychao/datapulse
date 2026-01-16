@@ -4,8 +4,8 @@ import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.VaultSyncCommandType;
 import io.datapulse.core.entity.account.VaultSyncOutboxEntity;
 import io.datapulse.core.entity.account.VaultSyncStatus;
-import io.datapulse.core.repository.account.AccountConnectionRepository;
 import io.datapulse.core.repository.VaultSyncOutboxRepository;
+import io.datapulse.core.repository.account.AccountConnectionRepository;
 import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
@@ -162,7 +162,7 @@ public class VaultSyncOutboxProcessor {
     }
 
     AccountConnectionEntity entity = connection.get();
-    if (Boolean.TRUE.equals(entity.getActive())) {
+    if (entity.isActive()) {
       return;
     }
 

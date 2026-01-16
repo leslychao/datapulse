@@ -1,154 +1,114 @@
 package io.datapulse.core.service.account;
 
 import io.datapulse.core.entity.account.AccountEntity;
-import io.datapulse.core.mapper.BaseMapperConfig;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.account.AccountRepository;
-import io.datapulse.core.service.AbstractIngestApiService;
-import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
-import io.datapulse.domain.dto.account.AccountDto;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.request.account.AccountCreateRequest;
 import io.datapulse.domain.request.account.AccountUpdateRequest;
 import io.datapulse.domain.response.account.AccountResponse;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 @Service
 @Validated
-public class AccountService extends AbstractIngestApiService<
-    AccountCreateRequest,
-    AccountUpdateRequest,
-    AccountResponse,
-    AccountDto,
-    AccountEntity> {
+@RequiredArgsConstructor
+public class AccountService {
 
   private final AccountRepository repository;
   private final MapperFacade mapperFacade;
-  private final AccountApplier accountApplier;
 
-  public AccountService(
-      MapperFacade mapperFacade,
-      AccountRepository repository,
-      AccountApplier accountApplier
+  @Transactional(readOnly = true)
+  public Long findActiveAccountIdByNameIgnoreCase(String accountName) {
+    String name = normalizeAccountName(accountName);
+    if (name == null) {
+      return null;
+    }
+
+    return repository.findByActiveIsTrueAndNameIgnoreCase(name)
+        .map(AccountEntity::getId)
+        .orElse(null);
+  }
+
+  @Transactional
+  public AccountResponse createFromRequest(
+      @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountCreateRequest request
   ) {
-    this.repository = repository;
-    this.mapperFacade = mapperFacade;
-    this.accountApplier = accountApplier;
-  }
-
-  @Override
-  protected MapperFacade mapper() {
-    return mapperFacade;
-  }
-
-  @Override
-  protected JpaRepository<AccountEntity, Long> repository() {
-    return repository;
-  }
-
-  @Override
-  protected Class<AccountDto> dtoType() {
-    return AccountDto.class;
-  }
-
-  @Override
-  protected Class<AccountEntity> entityType() {
-    return AccountEntity.class;
-  }
-
-  @Override
-  protected Class<AccountResponse> responseType() {
-    return AccountResponse.class;
-  }
-
-  @Override
-  protected void validateOnCreate(AccountDto draft) {
-    String name = StringUtils.trimToNull(draft.getName());
+    String name = normalizeAccountName(request.name());
     if (name == null) {
       throw new BadRequestException(MessageCodes.ACCOUNT_NAME_REQUIRED);
     }
     if (repository.existsByNameIgnoreCase(name)) {
       throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, name);
     }
+
+    AccountEntity entity = new AccountEntity();
+    entity.setName(name);
+    entity.setActive(request.active() == null || request.active());
+
+    AccountEntity saved = repository.save(entity);
+    return mapperFacade.to(saved, AccountResponse.class);
   }
 
-  @Override
-  protected void validateOnUpdate(Long id, AccountDto dto, AccountEntity existing) {
-    String newName = StringUtils.trimToNull(dto.getName());
+  @Transactional
+  public AccountResponse updateFromRequest(
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long id,
+      @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountUpdateRequest request
+  ) {
+    AccountEntity existing = repository.findById(id)
+        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id));
+
+    String newName = normalizeAccountName(request.name());
     if (newName == null) {
       throw new BadRequestException(MessageCodes.ACCOUNT_NAME_REQUIRED);
     }
 
-    String oldName = StringUtils.trimToNull(existing.getName());
+    String oldName = normalizeAccountName(existing.getName());
     if (!StringUtils.equalsIgnoreCase(newName, oldName)
         && repository.existsByNameIgnoreCaseAndIdNot(newName, id)) {
       throw new BadRequestException(MessageCodes.ACCOUNT_ALREADY_EXISTS, newName);
     }
+
+    existing.setName(newName);
+
+    if (request.active() != null) {
+      existing.setActive(request.active());
+    }
+
+    AccountEntity saved = repository.save(existing);
+    return mapperFacade.to(saved, AccountResponse.class);
   }
 
-  @Override
-  protected AccountEntity beforeSave(AccountEntity entity) {
-    OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
-    entity.setCreatedAt(now);
-    entity.setUpdatedAt(now);
-    entity.setActive(true);
-    return entity;
-  }
-
-  @Override
-  protected AccountEntity beforeUpdate(AccountEntity entity) {
-    entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
-    return entity;
-  }
-
-  @Override
-  protected AccountEntity merge(AccountEntity target, AccountDto source) {
-    accountApplier.applyUpdateFromDto(source, target);
-    return target;
-  }
-
-  @Override
   @Transactional
   public void delete(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
-    if (!repository.existsById(id)) {
-      throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id);
-    }
-    repository.deleteById(id);
+    AccountEntity existing = repository.findById(id)
+        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, id));
+    repository.delete(existing);
   }
 
+  @Transactional(readOnly = true)
   public boolean exists(@NotNull(message = ValidationKeys.ID_REQUIRED) Long id) {
     return repository.existsById(id);
   }
 
-  public List<AccountDto> getActive() {
-    return streamActive().toList();
-  }
-
-  public Stream<AccountDto> streamActive() {
+  @Transactional(readOnly = true)
+  public List<AccountResponse> getActive() {
     return repository.findAllByActiveIsTrue()
         .stream()
-        .map(entity -> mapperFacade.to(entity, AccountDto.class));
+        .map(entity -> mapperFacade.to(entity, AccountResponse.class))
+        .toList();
   }
 
-  @Mapper(componentModel = "spring", config = BaseMapperConfig.class)
-  public interface AccountApplier {
-
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    void applyUpdateFromDto(AccountDto dto, @MappingTarget AccountEntity entity);
+  private static String normalizeAccountName(String name) {
+    return StringUtils.trimToNull(name);
   }
 }

@@ -8,8 +8,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.NamedAttributeNode;
-import jakarta.persistence.NamedEntityGraph;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import lombok.Getter;
@@ -17,22 +15,18 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "account_connection")
-@NamedEntityGraph(
-    name = "AccountConnection.withAccount",
-    attributeNodes = @NamedAttributeNode("account")
-)
 @Getter
 @Setter
 public class AccountConnectionEntity extends LongBaseEntity {
 
   @ManyToOne
-  @JoinColumn(name = "account_id")
+  @JoinColumn(name = "account_id", nullable = false)
   private AccountEntity account;
 
   @Enumerated(EnumType.STRING)
   private MarketplaceType marketplace;
 
-  private Boolean active;
+  private boolean active;
 
   private String maskedCredentials;
 
@@ -40,8 +34,4 @@ public class AccountConnectionEntity extends LongBaseEntity {
 
   @Enumerated(EnumType.STRING)
   private SyncStatus lastSyncStatus = SyncStatus.NEW;
-
-  private OffsetDateTime createdAt = OffsetDateTime.now();
-
-  private OffsetDateTime updatedAt;
 }

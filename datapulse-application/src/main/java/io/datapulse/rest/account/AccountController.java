@@ -8,6 +8,7 @@ import io.datapulse.facade.AccountOnboardingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,21 +26,24 @@ public class AccountController {
   private final AccountService accountService;
   private final AccountOnboardingService onboardingService;
 
-  @PostMapping
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
   public AccountResponse create(@RequestBody AccountCreateRequest request) {
     return onboardingService.createAccount(request);
   }
 
-  @PutMapping(path = "/{id}", consumes = "application/json")
+  @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("@accountAccessService.canWrite(#id)")
   public AccountResponse update(
       @PathVariable Long id,
-      @RequestBody AccountUpdateRequest request) {
+      @RequestBody AccountUpdateRequest request
+  ) {
     return accountService.updateFromRequest(id, request);
   }
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("@accountAccessService.canDeleteAccount(#id)")
   public void delete(@PathVariable Long id) {
     accountService.delete(id);
   }

@@ -39,7 +39,6 @@ class VaultSyncOutboxTxService {
       outbox.setStatus(VaultSyncStatus.PENDING);
       outbox.setAttempts(0);
       outbox.setNextAttemptAt(now);
-      outbox.setUpdatedAt(now);
       return outboxRepository.save(outbox);
     }
 
@@ -50,8 +49,6 @@ class VaultSyncOutboxTxService {
     outbox.setStatus(VaultSyncStatus.PENDING);
     outbox.setAttempts(0);
     outbox.setNextAttemptAt(now);
-    outbox.setCreatedAt(now);
-    outbox.setUpdatedAt(now);
     return outboxRepository.save(outbox);
   }
 
@@ -65,11 +62,9 @@ class VaultSyncOutboxTxService {
       return;
     }
 
-    OffsetDateTime now = now();
     outbox.setStatus(VaultSyncStatus.COMPLETED);
     outbox.setAttempts(0);
     outbox.setNextAttemptAt(null);
-    outbox.setUpdatedAt(now);
     outboxRepository.save(outbox);
   }
 
@@ -84,7 +79,6 @@ class VaultSyncOutboxTxService {
     outbox.setAttempts(outbox.getAttempts() + 1);
     outbox.setStatus(VaultSyncStatus.RETRY);
     outbox.setNextAttemptAt(now);
-    outbox.setUpdatedAt(now);
     outboxRepository.save(outbox);
   }
 
@@ -98,13 +92,11 @@ class VaultSyncOutboxTxService {
     }
 
     AccountConnectionEntity connection = existing.get();
-    if (Boolean.TRUE.equals(connection.getActive())) {
+    if (connection.isActive()) {
       return;
     }
 
-    OffsetDateTime now = now();
     connection.setActive(true);
-    connection.setUpdatedAt(now);
     accountConnectionRepository.save(connection);
   }
 

@@ -1,4 +1,4 @@
-package io.datapulse.iam.filter;
+package io.datapulse.security.filter;
 
 import io.datapulse.cache.UserProfileIdCache;
 import io.datapulse.core.service.iam.IamService;

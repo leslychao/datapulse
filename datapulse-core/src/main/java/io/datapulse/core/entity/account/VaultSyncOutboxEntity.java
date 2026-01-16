@@ -32,8 +32,4 @@ public class VaultSyncOutboxEntity extends LongBaseEntity {
   private int attempts;
 
   private OffsetDateTime nextAttemptAt;
-
-  private OffsetDateTime createdAt = OffsetDateTime.now();
-
-  private OffsetDateTime updatedAt = OffsetDateTime.now();
 }

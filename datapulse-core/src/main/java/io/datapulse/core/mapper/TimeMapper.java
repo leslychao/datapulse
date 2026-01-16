@@ -20,20 +20,28 @@ public interface TimeMapper {
     if (value == null || value.isBlank()) {
       return null;
     }
+
     try {
       return OffsetDateTime.parse(value);
     } catch (DateTimeParseException ignored) {
     }
+
     try {
-      LocalDate d = LocalDate.parse(value);
-      return d.atStartOfDay().atZone(ZoneId.systemDefault()).toOffsetDateTime();
+      LocalDate date = LocalDate.parse(value);
+      return date.atStartOfDay()
+          .atZone(ZoneId.systemDefault())
+          .toOffsetDateTime();
     } catch (DateTimeParseException ignored) {
     }
+
     try {
-      LocalDateTime dt = LocalDateTime.parse(value);
-      return dt.atZone(ZoneId.systemDefault()).toOffsetDateTime();
+      LocalDateTime dateTime = LocalDateTime.parse(value);
+      return dateTime
+          .atZone(ZoneId.systemDefault())
+          .toOffsetDateTime();
     } catch (DateTimeParseException ignored) {
     }
+
     return null;
   }
 
@@ -41,18 +49,22 @@ public interface TimeMapper {
     if (value == null || value.isBlank()) {
       return null;
     }
+
     try {
       return LocalDate.parse(value, DATE_ONLY);
     } catch (DateTimeParseException ignored) {
     }
+
     try {
       return LocalDateTime.parse(value, DATE_TIME_LOCAL).toLocalDate();
     } catch (DateTimeParseException ignored) {
     }
+
     try {
       return OffsetDateTime.parse(value).toLocalDate();
     } catch (DateTimeParseException ignored) {
     }
+
     return null;
   }
 
@@ -60,20 +72,24 @@ public interface TimeMapper {
     if (value == null || value.isBlank()) {
       return null;
     }
+
     try {
       return LocalDateTime.parse(value, DATE_TIME_LOCAL);
     } catch (DateTimeParseException ignored) {
     }
+
     try {
       return OffsetDateTime.parse(value)
           .atZoneSameInstant(ZoneId.systemDefault())
           .toLocalDateTime();
     } catch (DateTimeParseException ignored) {
     }
+
     try {
       return LocalDate.parse(value).atStartOfDay();
     } catch (DateTimeParseException ignored) {
     }
+
     return null;
   }
 
@@ -89,6 +105,8 @@ public interface TimeMapper {
     if (value == null) {
       return null;
     }
-    return value.withOffsetSameInstant(ZoneOffset.UTC).format(HUMAN_READABLE);
+    return value
+        .withOffsetSameInstant(ZoneOffset.UTC)
+        .format(HUMAN_READABLE);
   }
 }

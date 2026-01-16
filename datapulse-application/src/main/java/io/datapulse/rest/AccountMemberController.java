@@ -4,10 +4,13 @@ import io.datapulse.core.service.AccountMemberService;
 import io.datapulse.domain.request.AccountMemberCreateRequest;
 import io.datapulse.domain.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.response.AccountMemberResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -17,29 +20,45 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/account-members", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/accounts/{accountId}/members", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class AccountMemberController {
 
   private final AccountMemberService accountMemberService;
 
-  @PostMapping(consumes = "application/json")
-  @ResponseStatus(HttpStatus.CREATED)
-  public AccountMemberResponse create(@RequestBody AccountMemberCreateRequest request) {
-    return accountMemberService.createFromRequest(request);
+  @GetMapping
+  @PreAuthorize("@accountAccessService.canManageMembers(#accountId)")
+  public List<AccountMemberResponse> getAll(@PathVariable long accountId) {
+    return accountMemberService.getAllByAccountId(accountId);
   }
 
-  @PutMapping(path = "/{id}", consumes = "application/json")
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("@accountAccessService.canManageMembers(#accountId)")
+  public AccountMemberResponse create(
+      @PathVariable long accountId,
+      @RequestBody AccountMemberCreateRequest request
+  ) {
+    return accountMemberService.createMember(accountId, request);
+  }
+
+  @PutMapping(path = "/{memberId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("@accountAccessService.canManageMembers(#accountId)")
   public AccountMemberResponse update(
-      @PathVariable Long id,
+      @PathVariable long accountId,
+      @PathVariable long memberId,
       @RequestBody AccountMemberUpdateRequest request
   ) {
-    return accountMemberService.updateFromRequest(id, request);
+    return accountMemberService.updateMember(accountId, memberId, request);
   }
 
-  @DeleteMapping("/{id}")
+  @DeleteMapping("/{memberId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable Long id) {
-    accountMemberService.delete(id);
+  @PreAuthorize("@accountAccessService.canManageMembers(#accountId)")
+  public void delete(
+      @PathVariable long accountId,
+      @PathVariable long memberId
+  ) {
+    accountMemberService.deleteMember(accountId, memberId);
   }
 }

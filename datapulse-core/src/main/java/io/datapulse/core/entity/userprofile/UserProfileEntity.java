@@ -3,7 +3,6 @@ package io.datapulse.core.entity.userprofile;
 import io.datapulse.core.entity.LongBaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,7 +16,4 @@ public class UserProfileEntity extends LongBaseEntity {
   private String email;
   private String fullName;
   private String username;
-
-  private OffsetDateTime createdAt = OffsetDateTime.now();
-  private OffsetDateTime updatedAt = OffsetDateTime.now();
 }

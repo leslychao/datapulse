@@ -5,7 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,7 +22,4 @@ public class ProductCostEntity extends LongBaseEntity {
 
   private LocalDate validFrom;
   private LocalDate validTo;
-
-  private OffsetDateTime createdAt;
-  private OffsetDateTime updatedAt;
 }

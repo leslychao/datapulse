@@ -5,10 +5,10 @@ import io.datapulse.domain.AccountMemberStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface AccountMemberRepository extends JpaRepository<AccountMemberEntity, Long> {
-
-  boolean existsByAccount_IdAndUser_Id(Long accountId, Long userId);
 
   Optional<AccountMemberEntity> findByAccount_IdAndUser_Id(Long accountId, Long userId);
 
@@ -20,5 +20,25 @@ public interface AccountMemberRepository extends JpaRepository<AccountMemberEnti
 
   List<AccountMemberEntity> findAllByAccount_Id(Long accountId);
 
+  List<AccountMemberEntity> findAllByAccount_IdOrderByIdAsc(Long accountId);
+
   List<AccountMemberEntity> findAllByUser_Id(Long userId);
+
+  Optional<AccountMemberEntity> findByIdAndAccount_Id(Long memberId, Long accountId);
+
+  @Query(
+      value = """
+          select am
+          from AccountMemberEntity am
+          where am.account.id = :accountId
+            and am.role = :role
+            and am.status = :status
+          order by am.id asc
+          """
+  )
+  List<AccountMemberEntity> findActiveOwners(
+      @Param("accountId") Long accountId,
+      @Param("role") String role,
+      @Param("status") String status
+  );
 }

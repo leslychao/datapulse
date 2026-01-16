@@ -12,13 +12,12 @@ import static io.datapulse.domain.MessageCodes.PRODUCT_COST_PRODUCT_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.PRODUCT_COST_VALID_FROM_REQUIRED;
 import static io.datapulse.domain.MessageCodes.PRODUCT_COST_VALUE_REQUIRED;
 import static io.datapulse.domain.MessageCodes.PRODUCT_ID_REQUIRED;
+import static io.datapulse.domain.MessageCodes.RESOURCE_NOT_FOUND;
 
 import io.datapulse.core.entity.productcost.ProductCostEntity;
 import io.datapulse.core.excel.ExcelStreamingReader;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.productcost.ProductCostRepository;
-import io.datapulse.core.service.AbstractCrudService;
-import io.datapulse.domain.CommonConstants;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.productcost.ProductCostDto;
 import io.datapulse.domain.exception.BadRequestException;
@@ -28,11 +27,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -41,7 +38,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @Validated
 @RequiredArgsConstructor
-public class ProductCostService extends AbstractCrudService<ProductCostDto, ProductCostEntity> {
+public class ProductCostService {
 
   private static final int SHEET_INDEX = 0;
   private static final int BATCH_SIZE = 100;
@@ -64,103 +61,58 @@ public class ProductCostService extends AbstractCrudService<ProductCostDto, Prod
   private final ProductCostRepository productCostRepository;
   private final ProductIdentifierResolver productIdentifierResolver;
 
-  @Override
-  protected MapperFacade mapper() {
-    return mapperFacade;
+  @Transactional(readOnly = true)
+  public ProductCostDto get(
+      @NotNull(message = ValidationKeys.ID_REQUIRED)
+      Long id
+  ) {
+    ProductCostEntity entity = productCostRepository.findById(id)
+        .orElseThrow(() -> new BadRequestException(RESOURCE_NOT_FOUND, id));
+    return mapperFacade.to(entity, ProductCostDto.class);
   }
 
-  @Override
-  protected JpaRepository<ProductCostEntity, Long> repository() {
-    return productCostRepository;
-  }
-
-  @Override
-  protected Class<ProductCostDto> dtoType() {
-    return ProductCostDto.class;
-  }
-
-  @Override
-  protected Class<ProductCostEntity> entityType() {
-    return ProductCostEntity.class;
-  }
-
-  @Override
-  protected void validateOnCreate(
+  @Transactional
+  public ProductCostDto create(
       @Valid
       @NotNull(message = ValidationKeys.DTO_REQUIRED)
       ProductCostDto dto
   ) {
-    if (dto.getAccountId() == null) {
-      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
-    }
-    if (dto.getProductId() == null) {
-      throw new BadRequestException(PRODUCT_ID_REQUIRED);
-    }
-    if (dto.getCostValue() == null) {
-      throw new BadRequestException(PRODUCT_COST_VALUE_REQUIRED);
-    }
-    if (dto.getValidFrom() == null) {
-      throw new BadRequestException(PRODUCT_COST_VALID_FROM_REQUIRED);
-    }
+    validateOnCreate(dto);
+
+    ProductCostEntity created = mapperFacade.to(dto, ProductCostEntity.class);
+    ProductCostEntity saved = productCostRepository.save(created);
+
+    return mapperFacade.to(saved, ProductCostDto.class);
   }
 
-  @Override
-  protected void validateOnUpdate(
+  @Transactional
+  public ProductCostDto update(
       @NotNull(message = ValidationKeys.ID_REQUIRED)
       Long id,
       @Valid
       @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto dto,
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      ProductCostEntity existing
+      ProductCostDto dto
   ) {
-    Long existingAccountId = existing.getAccountId();
-    Long existingProductId = existing.getProductId();
+    ProductCostEntity existing = productCostRepository.findById(id)
+        .orElseThrow(() -> new BadRequestException(RESOURCE_NOT_FOUND, id));
 
-    Long dtoAccountId = dto.getAccountId();
-    Long dtoProductId = dto.getProductId();
+    validateOnUpdate(dto, existing);
 
-    if (dtoAccountId != null && !dtoAccountId.equals(existingAccountId)) {
-      throw new BadRequestException(PRODUCT_COST_ACCOUNT_IMMUTABLE);
-    }
-    if (dtoProductId != null && !dtoProductId.equals(existingProductId)) {
-      throw new BadRequestException(PRODUCT_COST_PRODUCT_IMMUTABLE);
-    }
+    ProductCostEntity merged = merge(existing, dto);
+    ProductCostEntity saved = productCostRepository.save(merged);
+
+    return mapperFacade.to(saved, ProductCostDto.class);
   }
 
-  @Override
-  protected ProductCostEntity merge(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      ProductCostEntity target,
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto source
+  @Transactional
+  public void delete(
+      @NotNull(message = ValidationKeys.ID_REQUIRED)
+      Long id
   ) {
-    if (source.getCostValue() != null) {
-      target.setCostValue(source.getCostValue());
+    if (!productCostRepository.existsById(id)) {
+      throw new BadRequestException(RESOURCE_NOT_FOUND, id);
     }
-    if (source.getCurrency() != null) {
-      target.setCurrency(source.getCurrency());
-    }
-    if (source.getValidFrom() != null) {
-      target.setValidFrom(source.getValidFrom());
-    }
-    target.setValidTo(source.getValidTo());
-    return target;
-  }
-
-  @Override
-  protected ProductCostEntity beforeSave(ProductCostEntity entity) {
-    OffsetDateTime now = OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT);
-    entity.setCreatedAt(now);
-    entity.setUpdatedAt(now);
-    return entity;
-  }
-
-  @Override
-  protected ProductCostEntity beforeUpdate(ProductCostEntity entity) {
-    entity.setUpdatedAt(OffsetDateTime.now(CommonConstants.ZONE_ID_DEFAULT));
-    return entity;
+    productCostRepository.deleteById(id);
   }
 
   @Transactional
@@ -205,6 +157,66 @@ public class ProductCostService extends AbstractCrudService<ProductCostDto, Prod
     } catch (Exception ex) {
       throw new BadRequestException(PRODUCT_COST_EXCEL_READ_FAILED, "unexpected-error");
     }
+  }
+
+  private void validateOnCreate(
+      @Valid
+      @NotNull(message = ValidationKeys.DTO_REQUIRED)
+      ProductCostDto dto
+  ) {
+    if (dto.getAccountId() == null) {
+      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
+    }
+    if (dto.getProductId() == null) {
+      throw new BadRequestException(PRODUCT_ID_REQUIRED);
+    }
+    if (dto.getCostValue() == null) {
+      throw new BadRequestException(PRODUCT_COST_VALUE_REQUIRED);
+    }
+    if (dto.getValidFrom() == null) {
+      throw new BadRequestException(PRODUCT_COST_VALID_FROM_REQUIRED);
+    }
+  }
+
+  private void validateOnUpdate(
+      @Valid
+      @NotNull(message = ValidationKeys.DTO_REQUIRED)
+      ProductCostDto dto,
+      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
+      ProductCostEntity existing
+  ) {
+    Long existingAccountId = existing.getAccountId();
+    Long existingProductId = existing.getProductId();
+
+    Long dtoAccountId = dto.getAccountId();
+    Long dtoProductId = dto.getProductId();
+
+    if (dtoAccountId != null && !dtoAccountId.equals(existingAccountId)) {
+      throw new BadRequestException(PRODUCT_COST_ACCOUNT_IMMUTABLE);
+    }
+    if (dtoProductId != null && !dtoProductId.equals(existingProductId)) {
+      throw new BadRequestException(PRODUCT_COST_PRODUCT_IMMUTABLE);
+    }
+  }
+
+  private ProductCostEntity merge(
+      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
+      ProductCostEntity target,
+      @Valid
+      @NotNull(message = ValidationKeys.DTO_REQUIRED)
+      ProductCostDto source
+  ) {
+    if (source.getCostValue() != null) {
+      target.setCostValue(source.getCostValue());
+    }
+    if (source.getCurrency() != null) {
+      target.setCurrency(source.getCurrency());
+    }
+    if (source.getValidFrom() != null) {
+      target.setValidFrom(source.getValidFrom());
+    }
+    target.setValidTo(source.getValidTo());
+    return target;
   }
 
   private void validateHeaderRow(List<String> row) {
@@ -278,12 +290,10 @@ public class ProductCostService extends AbstractCrudService<ProductCostDto, Prod
           )
           .ifPresentOrElse(existing -> {
             ProductCostEntity merged = merge(existing, dto);
-            ProductCostEntity updated = beforeUpdate(merged);
-            entitiesToSave.add(updated);
+            entitiesToSave.add(merged);
           }, () -> {
-            ProductCostEntity created = mapper().to(dto, ProductCostEntity.class);
-            ProductCostEntity withAudit = beforeSave(created);
-            entitiesToSave.add(withAudit);
+            ProductCostEntity created = mapperFacade.to(dto, ProductCostEntity.class);
+            entitiesToSave.add(created);
           });
     }
 

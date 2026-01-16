@@ -7,6 +7,7 @@ import io.datapulse.iam.DomainUserContext;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,12 +21,14 @@ public class IamController {
   private final DomainUserContext domainUserContext;
 
   @GetMapping
+  @PreAuthorize("isAuthenticated()")
   public UserProfileResponse currentUserProfile() {
     long profileId = domainUserContext.requireProfileId();
     return iamService.getCurrentUserProfile(profileId);
   }
 
   @GetMapping("/accounts")
+  @PreAuthorize("isAuthenticated()")
   public List<AccountResponse> getAccessibleActiveAccounts() {
     long profileId = domainUserContext.requireProfileId();
     return iamService.getAccessibleActiveAccounts(profileId);

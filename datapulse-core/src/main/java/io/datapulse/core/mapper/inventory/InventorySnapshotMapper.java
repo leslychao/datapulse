@@ -13,5 +13,5 @@ import org.mapstruct.Mapper;
 )
 public interface InventorySnapshotMapper {
 
-  InventorySnapshotResponse toResponse(FactInventorySnapshotEntity dto);
+  InventorySnapshotResponse toResponse(FactInventorySnapshotEntity entity);
 }

@@ -40,6 +40,13 @@ public class AccountAccessService {
   }
 
   @Transactional(readOnly = true)
+  public boolean canDeleteAccount(long accountId) {
+    return findActiveMember(accountId)
+        .map(member -> AccountRoleCapabilities.canDeleteAccount(member.getRole()))
+        .orElse(false);
+  }
+
+  @Transactional(readOnly = true)
   public void requireRead(long accountId) {
     AccountMemberEntity member = requireActiveMember(accountId);
     if (!AccountRoleCapabilities.canRead(member.getRole())) {

@@ -11,8 +11,6 @@ import io.datapulse.domain.AccountMemberRole;
 import io.datapulse.domain.AccountMemberStatus;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
-import io.datapulse.domain.dto.AccountMemberDto;
-import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.request.AccountMemberCreateRequest;
@@ -20,52 +18,20 @@ import io.datapulse.domain.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.response.AccountMemberResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.annotation.Validated;
 
 @Service
-@Validated
 @RequiredArgsConstructor
-public class AccountMemberService extends AbstractIngestApiService<
-    AccountMemberCreateRequest,
-    AccountMemberUpdateRequest,
-    AccountMemberResponse,
-    AccountMemberDto,
-    AccountMemberEntity> {
+public class AccountMemberService {
 
   private final AccountMemberRepository accountMemberRepository;
   private final AccountRepository accountRepository;
   private final UserProfileRepository userProfileRepository;
   private final MapperFacade mapperFacade;
-
-  @Override
-  protected MapperFacade mapper() {
-    return mapperFacade;
-  }
-
-  @Override
-  protected JpaRepository<AccountMemberEntity, Long> repository() {
-    return accountMemberRepository;
-  }
-
-  @Override
-  protected Class<AccountMemberDto> dtoType() {
-    return AccountMemberDto.class;
-  }
-
-  @Override
-  protected Class<AccountMemberEntity> entityType() {
-    return AccountMemberEntity.class;
-  }
-
-  @Override
-  protected Class<AccountMemberResponse> responseType() {
-    return AccountMemberResponse.class;
-  }
 
   @Transactional
   public void ensureOwnerMembership(
@@ -74,28 +40,35 @@ public class AccountMemberService extends AbstractIngestApiService<
   ) {
     accountMemberRepository.findByAccount_IdAndUser_Id(accountId, userId)
         .ifPresentOrElse(
-            existing -> updateToOwnerActive(existing.getId()),
-            () -> createOwnerActiveIdempotent(accountId, userId)
+            this::promoteToActiveOwner,
+            () -> createOwnerMembershipIdempotent(accountId, userId)
         );
   }
 
-  private void updateToOwnerActive(Long memberId) {
-    AccountMemberUpdateRequest updateRequest = new AccountMemberUpdateRequest(
-        AccountMemberRole.OWNER,
-        AccountMemberStatus.ACTIVE
-    );
-    updateFromRequest(memberId, updateRequest);
+  private void promoteToActiveOwner(AccountMemberEntity existing) {
+    existing.setRole(AccountMemberRole.OWNER);
+    existing.setStatus(AccountMemberStatus.ACTIVE);
+    accountMemberRepository.save(existing);
   }
 
-  private void createOwnerActiveIdempotent(Long accountId, Long userId) {
+  private void createOwnerMembershipIdempotent(Long accountId, Long userId) {
     try {
-      AccountMemberCreateRequest createRequest = new AccountMemberCreateRequest(
-          accountId,
-          userId,
-          AccountMemberRole.OWNER,
-          AccountMemberStatus.ACTIVE
-      );
-      createFromRequest(createRequest);
+      AccountEntity account = accountRepository.findById(accountId)
+          .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
+
+      UserProfileEntity user = userProfileRepository.findById(userId)
+          .orElseThrow(() -> new NotFoundException(
+              MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND,
+              userId
+          ));
+
+      AccountMemberEntity entity = new AccountMemberEntity();
+      entity.setAccount(account);
+      entity.setUser(user);
+      entity.setRole(AccountMemberRole.OWNER);
+      entity.setStatus(AccountMemberStatus.ACTIVE);
+
+      accountMemberRepository.save(entity);
     } catch (DataIntegrityViolationException race) {
       AccountMemberEntity existing = accountMemberRepository
           .findByAccount_IdAndUser_Id(accountId, userId)
@@ -104,93 +77,156 @@ public class AccountMemberService extends AbstractIngestApiService<
               userId,
               accountId
           ));
-      updateToOwnerActive(existing.getId());
+
+      promoteToActiveOwner(existing);
     }
   }
 
-  @Override
-  protected void validateOnCreate(AccountMemberDto dto) {
-    if (dto.getAccountId() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_ACCOUNT_ID_REQUIRED);
-    }
-    if (dto.getUserId() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_USER_ID_REQUIRED);
-    }
-    if (dto.getRole() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_ROLE_REQUIRED);
-    }
-    if (dto.getStatus() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_STATUS_REQUIRED);
-    }
-    if (accountMemberRepository.existsByAccount_IdAndUser_Id(dto.getAccountId(), dto.getUserId())) {
+  @Transactional(readOnly = true)
+  public List<AccountMemberResponse> getAllByAccountId(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId
+  ) {
+    requireAccountExists(accountId);
+
+    return accountMemberRepository.findAllByAccount_IdOrderByIdAsc(accountId).stream()
+        .map(this::toResponse)
+        .toList();
+  }
+
+  @Transactional
+  public AccountMemberResponse createMember(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountMemberCreateRequest request
+  ) {
+    AccountEntity account = requireAccount(accountId);
+    UserProfileEntity user = requireUser(request.userId());
+
+    AccountMemberEntity entity = new AccountMemberEntity();
+    entity.setAccount(account);
+    entity.setUser(user);
+    entity.setRole(request.role());
+    entity.setStatus(request.status());
+
+    try {
+      return toResponse(accountMemberRepository.save(entity));
+    } catch (DataIntegrityViolationException ex) {
+      if (isActiveOwner(request.role(), request.status())) {
+        throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_SINGLE_OWNER_ONLY, accountId);
+      }
       throw new BadRequestException(
           MessageCodes.ACCOUNT_MEMBER_ALREADY_EXISTS,
-          dto.getAccountId(),
-          dto.getUserId()
+          accountId,
+          request.userId()
       );
     }
   }
 
-  @Override
-  protected void validateOnUpdate(Long id, AccountMemberDto dto, AccountMemberEntity existing) {
-    if (dto.getAccountId() != null && !dto.getAccountId().equals(existing.getAccount().getId())) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_ACCOUNT_IMMUTABLE);
-    }
-    if (dto.getUserId() != null && !dto.getUserId().equals(existing.getUser().getId())) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_USER_IMMUTABLE);
-    }
-    if (dto.getRole() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_ROLE_REQUIRED);
-    }
-    if (dto.getStatus() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_STATUS_REQUIRED);
-    }
-  }
-
-  @Override
-  protected AccountMemberEntity beforeSave(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      AccountMemberEntity entity
+  @Transactional
+  public AccountMemberResponse updateMember(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long memberId,
+      @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountMemberUpdateRequest request
   ) {
-    Long accountId = extractAccountId(entity);
-    Long userId = extractUserId(entity);
+    AccountMemberEntity existing = requireMember(accountId, memberId);
 
-    AccountEntity account = accountRepository.findById(accountId)
-        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
+    assertNotLastActiveOwnerRemoval(accountId, existing, request.role(), request.status());
 
-    UserProfileEntity user = userProfileRepository.findById(userId)
-        .orElseThrow(
-            () -> new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, userId));
+    existing.setRole(request.role());
+    existing.setStatus(request.status());
 
-    entity.setAccount(account);
-    entity.setUser(user);
-    return entity;
+    try {
+      return toResponse(accountMemberRepository.save(existing));
+    } catch (DataIntegrityViolationException ex) {
+      if (isActiveOwner(request.role(), request.status())) {
+        throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_SINGLE_OWNER_ONLY, accountId);
+      }
+      throw ex;
+    }
   }
 
-  @Override
-  protected AccountMemberEntity merge(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      AccountMemberEntity target,
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      AccountMemberDto source
+  private static boolean isActiveOwner(AccountMemberRole role, AccountMemberStatus status) {
+    return role == AccountMemberRole.OWNER && status == AccountMemberStatus.ACTIVE;
+  }
+
+  @Transactional
+  public void deleteMember(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long memberId
   ) {
-    target.setRole(source.getRole());
-    target.setStatus(source.getStatus());
-    return target;
+    AccountMemberEntity existing = requireMember(accountId, memberId);
+
+    assertNotLastActiveOwnerRemoval(accountId, existing, null, null);
+
+    accountMemberRepository.delete(existing);
   }
 
-  private static Long extractAccountId(AccountMemberEntity entity) {
-    if (entity.getAccount() == null || entity.getAccount().getId() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_ACCOUNT_ID_REQUIRED);
+  private void assertNotLastActiveOwnerRemoval(
+      Long accountId,
+      AccountMemberEntity existing,
+      AccountMemberRole newRole,
+      AccountMemberStatus newStatus
+  ) {
+    if (!isRemovingActiveOwner(existing, newRole, newStatus)) {
+      return;
     }
-    return entity.getAccount().getId();
+
+    List<AccountMemberEntity> owners =
+        accountMemberRepository.findActiveOwners(
+            accountId,
+            AccountMemberRole.OWNER.name(),
+            AccountMemberStatus.ACTIVE.name()
+        );
+
+    if (owners.size() <= 1) {
+      throw new BadRequestException(
+          MessageCodes.ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN,
+          accountId
+      );
+    }
   }
 
-  private static Long extractUserId(AccountMemberEntity entity) {
-    if (entity.getUser() == null || entity.getUser().getId() == null) {
-      throw new AppException(MessageCodes.ACCOUNT_MEMBER_USER_ID_REQUIRED);
+  private static boolean isRemovingActiveOwner(
+      AccountMemberEntity existing,
+      AccountMemberRole newRole,
+      AccountMemberStatus newStatus
+  ) {
+    if (!isActiveOwner(existing.getRole(), existing.getStatus())) {
+      return false;
     }
-    return entity.getUser().getId();
+
+    boolean roleDowngraded = newRole != null && newRole != AccountMemberRole.OWNER;
+    boolean statusDeactivated = newStatus != null && newStatus != AccountMemberStatus.ACTIVE;
+
+    return roleDowngraded || statusDeactivated;
+  }
+
+  private AccountMemberEntity requireMember(Long accountId, Long memberId) {
+    requireAccountExists(accountId);
+
+    return accountMemberRepository.findByIdAndAccount_Id(memberId, accountId)
+        .orElseThrow(() ->
+            new NotFoundException(MessageCodes.ACCOUNT_MEMBER_NOT_FOUND, memberId));
+  }
+
+  private AccountEntity requireAccount(Long accountId) {
+    return accountRepository.findById(accountId)
+        .orElseThrow(() ->
+            new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
+  }
+
+  private void requireAccountExists(Long accountId) {
+    if (!accountRepository.existsById(accountId)) {
+      throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId);
+    }
+  }
+
+  private UserProfileEntity requireUser(Long userId) {
+    return userProfileRepository.findById(userId)
+        .orElseThrow(() ->
+            new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, userId));
+  }
+
+  private AccountMemberResponse toResponse(AccountMemberEntity entity) {
+    return mapperFacade.to(entity, AccountMemberResponse.class);
   }
 }

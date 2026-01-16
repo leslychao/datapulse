@@ -3,21 +3,16 @@ package io.datapulse.core.service.userprofile;
 import io.datapulse.core.entity.userprofile.UserProfileEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.userprofile.UserProfileRepository;
-import io.datapulse.core.service.AbstractIngestApiService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
-import io.datapulse.domain.dto.userprofile.UserProfileDto;
-import io.datapulse.domain.exception.AppException;
 import io.datapulse.domain.exception.BadRequestException;
-import io.datapulse.domain.request.userprofile.UserProfileCreateRequest;
+import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.request.userprofile.UserProfileUpdateRequest;
 import io.datapulse.domain.response.userprofile.UserProfileResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -25,126 +20,75 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 @RequiredArgsConstructor
-public class UserProfileService extends AbstractIngestApiService<
-    UserProfileCreateRequest,
-    UserProfileUpdateRequest,
-    UserProfileResponse,
-    UserProfileDto,
-    UserProfileEntity> {
+public class UserProfileService {
 
   private final UserProfileRepository userProfileRepository;
   private final MapperFacade mapperFacade;
 
-  @Override
-  protected MapperFacade mapper() {
-    return mapperFacade;
-  }
-
-  @Override
-  protected JpaRepository<UserProfileEntity, Long> repository() {
-    return userProfileRepository;
-  }
-
-  @Override
-  protected Class<UserProfileDto> dtoType() {
-    return UserProfileDto.class;
-  }
-
-  @Override
-  protected Class<UserProfileEntity> entityType() {
-    return UserProfileEntity.class;
-  }
-
-  @Override
-  protected Class<UserProfileResponse> responseType() {
-    return UserProfileResponse.class;
-  }
-
   @Transactional
   public long ensureUserProfileAndGetId(
-      @NotNull String keycloakSub,
-      @NotNull String email,
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED) String keycloakSub,
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED) String email,
       String fullName,
       String username
   ) {
+    String normalizedKeycloakSub = StringUtils.trimToNull(keycloakSub);
+    if (normalizedKeycloakSub == null) {
+      throw new BadRequestException(MessageCodes.USER_PROFILE_KEYCLOAK_SUB_REQUIRED);
+    }
+
+    String normalizedEmail = StringUtils.trimToNull(email);
+    if (normalizedEmail == null) {
+      throw new BadRequestException(MessageCodes.USER_PROFILE_EMAIL_REQUIRED);
+    }
+
     return userProfileRepository.upsertAndSyncIfChangedSafeEmailReturningId(
-        keycloakSub,
-        email,
-        fullName,
-        username
+        normalizedKeycloakSub,
+        normalizedEmail,
+        StringUtils.trimToNull(fullName),
+        StringUtils.trimToNull(username)
     );
   }
 
-  @Override
-  protected void validateOnCreate(UserProfileDto dto) {
-    if (dto.getKeycloakSub() == null || dto.getKeycloakSub().isBlank()) {
-      throw new AppException(MessageCodes.USER_PROFILE_KEYCLOAK_SUB_REQUIRED);
-    }
-    if (dto.getEmail() == null || dto.getEmail().isBlank()) {
-      throw new AppException(MessageCodes.USER_PROFILE_EMAIL_REQUIRED);
-    }
-
-    if (userProfileRepository.existsByKeycloakSub(dto.getKeycloakSub())) {
-      throw new BadRequestException(
-          MessageCodes.USER_PROFILE_KEYCLOAK_SUB_ALREADY_EXISTS,
-          dto.getKeycloakSub()
-      );
-    }
-    if (userProfileRepository.existsByEmailIgnoreCase(dto.getEmail())) {
-      throw new BadRequestException(
-          MessageCodes.USER_PROFILE_EMAIL_ALREADY_EXISTS,
-          dto.getEmail()
-      );
-    }
-  }
-
-  @Override
-  protected void validateOnUpdate(Long id, UserProfileDto dto, UserProfileEntity existing) {
-    if (dto.getEmail() == null || dto.getEmail().isBlank()) {
-      throw new AppException(MessageCodes.USER_PROFILE_EMAIL_REQUIRED);
-    }
-    if (userProfileRepository.existsByEmailIgnoreCaseAndIdNot(dto.getEmail(), id)) {
-      throw new AppException(MessageCodes.USER_PROFILE_EMAIL_ALREADY_EXISTS, dto.getEmail());
-    }
-  }
-
-  @Override
-  protected UserProfileEntity merge(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      UserProfileEntity target,
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      UserProfileDto source
+  @Transactional(readOnly = true)
+  public UserProfileResponse getResponseRequired(
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long id
   ) {
-    target.setEmail(source.getEmail());
-    if (source.getFullName() != null) {
-      target.setFullName(source.getFullName());
-    }
-    if (source.getUsername() != null) {
-      target.setUsername(source.getUsername());
-    }
-    return target;
+    UserProfileEntity entity = userProfileRepository.findById(id)
+        .orElseThrow(() -> new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, id));
+
+    return mapperFacade.to(entity, UserProfileResponse.class);
   }
 
-  @Override
-  protected UserProfileEntity beforeSave(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      UserProfileEntity entity
+  @Transactional
+  public UserProfileResponse updateFromRequest(
+      @NotNull(message = ValidationKeys.ID_REQUIRED) Long id,
+      @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) UserProfileUpdateRequest request
   ) {
-    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+    UserProfileEntity existing = userProfileRepository.findById(id)
+        .orElseThrow(() -> new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, id));
 
-    entity.setCreatedAt(now);
-    entity.setUpdatedAt(now);
+    String email = StringUtils.trimToNull(request.email());
+    if (email == null) {
+      throw new BadRequestException(MessageCodes.USER_PROFILE_EMAIL_REQUIRED);
+    }
+    if (userProfileRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
+      throw new BadRequestException(MessageCodes.USER_PROFILE_EMAIL_ALREADY_EXISTS, email);
+    }
 
-    return entity;
-  }
+    existing.setEmail(email);
 
-  @Override
-  protected UserProfileEntity beforeUpdate(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      UserProfileEntity entity
-  ) {
-    entity.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-    return entity;
+    String fullName = StringUtils.trimToNull(request.fullName());
+    if (fullName != null) {
+      existing.setFullName(fullName);
+    }
+
+    String username = StringUtils.trimToNull(request.username());
+    if (username != null) {
+      existing.setUsername(username);
+    }
+
+    UserProfileEntity saved = userProfileRepository.save(existing);
+    return mapperFacade.to(saved, UserProfileResponse.class);
   }
 }

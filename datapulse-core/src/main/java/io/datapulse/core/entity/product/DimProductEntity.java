@@ -3,7 +3,6 @@ package io.datapulse.core.entity.product;
 import io.datapulse.core.entity.LongBaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,7 +20,4 @@ public class DimProductEntity extends LongBaseEntity {
   private String offerId;
 
   private Long externalCategoryId;
-
-  private Instant createdAt;
-  private Instant updatedAt;
 }

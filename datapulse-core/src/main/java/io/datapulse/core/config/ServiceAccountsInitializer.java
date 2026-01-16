@@ -2,16 +2,17 @@ package io.datapulse.core.config;
 
 import io.datapulse.core.service.account.AccountConnectionService;
 import io.datapulse.core.service.account.AccountService;
-import io.datapulse.core.service.vault.VaultSyncOutboxService;
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.MessageCodes;
-import io.datapulse.domain.dto.account.AccountDto;
+import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import io.datapulse.domain.dto.credentials.OzonCredentials;
 import io.datapulse.domain.dto.credentials.WbCredentials;
-import io.datapulse.domain.request.account.AccountConnectionCreateRequest;
-import io.datapulse.domain.request.account.AccountCreateRequest;
-import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.domain.request.account.AccountConnectionCreateRequest;
+import io.datapulse.domain.request.account.AccountConnectionUpdateRequest;
+import io.datapulse.domain.request.account.AccountCreateRequest;
+import io.datapulse.domain.response.account.AccountConnectionResponse;
+import io.datapulse.domain.response.account.AccountResponse;
 import java.util.Map;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,6 @@ public class ServiceAccountsInitializer {
 
   private final AccountService accountService;
   private final AccountConnectionService accountConnectionService;
-  private final VaultSyncOutboxService vaultSyncOutboxService;
 
   @EventListener(ApplicationReadyEvent.class)
   @Transactional
@@ -98,7 +98,7 @@ public class ServiceAccountsInitializer {
         continue;
       }
 
-      createConnectionIfMissing(
+      ensureConnection(
           kind,
           accountId,
           marketplace,
@@ -110,15 +110,15 @@ public class ServiceAccountsInitializer {
   }
 
   private Long resolveAccountId(String kind, String accountName) {
-    AccountDto existing = accountService.getActive()
+    AccountResponse existing = accountService.getActive()
         .stream()
-        .filter(a -> StringUtils.equalsIgnoreCase(a.getName(), accountName))
+        .filter(a -> StringUtils.equalsIgnoreCase(a.name(), accountName))
         .findFirst()
         .orElse(null);
 
     if (existing != null) {
-      log.info("{} account already exists: id={}, name={}", kind, existing.getId(), existing.getName());
-      return existing.getId();
+      log.info("{} account already exists: id={}, name={}", kind, existing.id(), existing.name());
+      return existing.id();
     }
 
     AccountResponse created = accountService.createFromRequest(
@@ -129,7 +129,7 @@ public class ServiceAccountsInitializer {
     return created.id();
   }
 
-  private void createConnectionIfMissing(
+  private void ensureConnection(
       String kind,
       Long accountId,
       MarketplaceType marketplace,
@@ -137,72 +137,77 @@ public class ServiceAccountsInitializer {
       String rawClientId,
       String rawApiKey
   ) {
-    AccountConnectionCreateRequest request = buildConnectionRequest(accountId, marketplace, rawToken, rawClientId, rawApiKey);
+    MarketplaceCredentials credentials =
+        buildCredentials(marketplace, rawToken, rawClientId, rawApiKey);
 
     accountConnectionService.getByAccountAndMarketplace(accountId, marketplace)
         .ifPresentOrElse(
-            existing -> {
-              if (Boolean.TRUE.equals(existing.getActive())) {
-                return;
-              }
-              vaultSyncOutboxService.ensurePresent(accountId, marketplace, request.credentials());
-            },
-            () -> {
-              accountConnectionService.createFromRequest(request);
-              log.info("{} account connection created: accountId={}, marketplace={}", kind, accountId, marketplace);
-            }
+            existing -> activateIfNeeded(kind, accountId, existing, credentials),
+            () -> createConnection(kind, accountId, marketplace, credentials)
         );
   }
 
-  private AccountConnectionCreateRequest buildConnectionRequest(
+  private void activateIfNeeded(
+      String kind,
       Long accountId,
+      AccountConnectionResponse existing,
+      MarketplaceCredentials credentials
+  ) {
+    Boolean active = existing.active();
+    if (Boolean.TRUE.equals(active)) {
+      return;
+    }
+
+    AccountConnectionUpdateRequest request = new AccountConnectionUpdateRequest(
+        credentials,
+        Boolean.TRUE);
+    accountConnectionService.update(accountId, existing.id(), request);
+
+    log.info("{} account connection activated: accountId={}, marketplace={}, connectionId={}",
+        kind, accountId, existing.marketplace(), existing.id());
+  }
+
+  private void createConnection(
+      String kind,
+      Long accountId,
+      MarketplaceType marketplace,
+      MarketplaceCredentials credentials
+  ) {
+    AccountConnectionCreateRequest request = new AccountConnectionCreateRequest(marketplace,
+        credentials);
+    accountConnectionService.create(accountId, request);
+
+    log.info("{} account connection created: accountId={}, marketplace={}", kind, accountId,
+        marketplace);
+  }
+
+  private MarketplaceCredentials buildCredentials(
       MarketplaceType marketplace,
       String rawToken,
       String rawClientId,
       String rawApiKey
   ) {
     return switch (marketplace) {
-      case WILDBERRIES -> buildWbRequest(accountId, marketplace, rawToken);
-      case OZON -> buildOzonRequest(accountId, marketplace, rawClientId, rawApiKey);
+      case WILDBERRIES -> buildWbCredentials(rawToken);
+      case OZON -> buildOzonCredentials(rawClientId, rawApiKey);
     };
   }
 
-  private AccountConnectionCreateRequest buildWbRequest(
-      Long accountId,
-      MarketplaceType marketplace,
-      String rawToken
-  ) {
+  private WbCredentials buildWbCredentials(String rawToken) {
     String token = StringUtils.trimToNull(rawToken);
     if (token == null) {
       throw new AppException(MessageCodes.WB_MISSING_TOKEN);
     }
-
-    return new AccountConnectionCreateRequest(
-        accountId,
-        marketplace,
-        new WbCredentials(token),
-        Boolean.FALSE
-    );
+    return new WbCredentials(token);
   }
 
-  private AccountConnectionCreateRequest buildOzonRequest(
-      Long accountId,
-      MarketplaceType marketplace,
-      String rawClientId,
-      String rawApiKey
-  ) {
+  private OzonCredentials buildOzonCredentials(String rawClientId, String rawApiKey) {
     String clientId = StringUtils.trimToNull(rawClientId);
     String apiKey = StringUtils.trimToNull(rawApiKey);
 
     if (clientId == null || apiKey == null) {
       throw new AppException(MessageCodes.OZON_MISSING_CREDENTIALS);
     }
-
-    return new AccountConnectionCreateRequest(
-        accountId,
-        marketplace,
-        new OzonCredentials(clientId, apiKey),
-        Boolean.FALSE
-    );
+    return new OzonCredentials(clientId, apiKey);
   }
 }

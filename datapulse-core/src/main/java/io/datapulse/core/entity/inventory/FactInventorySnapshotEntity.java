@@ -3,7 +3,6 @@ package io.datapulse.core.entity.inventory;
 import io.datapulse.core.entity.LongBaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,7 +29,4 @@ public class FactInventorySnapshotEntity extends LongBaseEntity {
   private Integer quantityInWayFromClient;
   private Integer quantityReturnToSeller;
   private Integer quantityReturnFromCustomer;
-
-  private Instant createdAt;
-  private Instant updatedAt;
 }
