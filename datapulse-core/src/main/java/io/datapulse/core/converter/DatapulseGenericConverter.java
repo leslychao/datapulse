@@ -2,11 +2,13 @@ package io.datapulse.core.converter;
 
 import static io.datapulse.domain.MessageCodes.CONVERSION_MAPPING_NOT_FOUND;
 
+import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.core.entity.EtlExecutionAuditEntity;
 import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.core.entity.inventory.FactInventorySnapshotEntity;
 import io.datapulse.core.entity.productcost.ProductCostEntity;
+import io.datapulse.core.entity.userprofile.UserProfileEntity;
 import io.datapulse.core.mapper.AccountMemberMapper;
 import io.datapulse.core.mapper.EtlExecutionAuditMapper;
 import io.datapulse.core.mapper.account.AccountConnectionMapper;
@@ -16,8 +18,8 @@ import io.datapulse.core.mapper.productcost.ProductCostMapper;
 import io.datapulse.core.mapper.userprofile.UserProfileMapper;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.domain.dto.productcost.ProductCostDto;
-import io.datapulse.domain.dto.userprofile.UserProfileDto;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.domain.response.AccountMemberResponse;
 import io.datapulse.domain.response.account.AccountConnectionResponse;
 import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.domain.response.inventory.InventorySnapshotResponse;
@@ -53,7 +55,8 @@ public final class DatapulseGenericConverter implements GenericConverter {
     register(AccountConnectionEntity.class, AccountConnectionResponse.class,
         accountConnectionMapper::toResponse);
 
-    register(EtlExecutionAuditDto.class, EtlExecutionAuditEntity.class, etlSyncAuditMapper::toEntity);
+    register(EtlExecutionAuditDto.class, EtlExecutionAuditEntity.class,
+        etlSyncAuditMapper::toEntity);
     register(EtlExecutionAuditEntity.class, EtlExecutionAuditDto.class, etlSyncAuditMapper::toDto);
 
     register(ProductCostDto.class, ProductCostEntity.class, productCostMapper::toEntity);
@@ -64,7 +67,10 @@ public final class DatapulseGenericConverter implements GenericConverter {
     register(FactInventorySnapshotEntity.class, InventorySnapshotResponse.class,
         inventorySnapshotMapper::toResponse);
 
-    register(UserProfileDto.class, UserProfileResponse.class, userProfileMapper::toResponse);
+    register(UserProfileEntity.class, UserProfileResponse.class, userProfileMapper::toResponse);
+
+    register(AccountMemberEntity.class, AccountMemberResponse.class,
+        accountMemberMapper::toResponse);
   }
 
   @Override

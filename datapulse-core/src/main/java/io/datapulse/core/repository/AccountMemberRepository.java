@@ -1,6 +1,7 @@
 package io.datapulse.core.repository;
 
 import io.datapulse.core.entity.AccountMemberEntity;
+import io.datapulse.domain.AccountMemberRole;
 import io.datapulse.domain.AccountMemberStatus;
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +39,7 @@ public interface AccountMemberRepository extends JpaRepository<AccountMemberEnti
   )
   List<AccountMemberEntity> findActiveOwners(
       @Param("accountId") Long accountId,
-      @Param("role") String role,
-      @Param("status") String status
+      @Param("role") AccountMemberRole role,
+      @Param("status") AccountMemberStatus status
   );
 }

@@ -129,7 +129,7 @@ public class AccountMemberService {
   ) {
     AccountMemberEntity existing = requireMember(accountId, memberId);
 
-    assertNotLastActiveOwnerRemoval(accountId, existing, request.role(), request.status());
+    assertNotDemotingLastActiveOwner(accountId, existing, request.role(), request.status());
 
     existing.setRole(request.role());
     existing.setStatus(request.status());
@@ -155,12 +155,33 @@ public class AccountMemberService {
   ) {
     AccountMemberEntity existing = requireMember(accountId, memberId);
 
-    assertNotLastActiveOwnerRemoval(accountId, existing, null, null);
+    assertNotLastActiveOwnerDelete(accountId, existing);
 
     accountMemberRepository.delete(existing);
   }
 
-  private void assertNotLastActiveOwnerRemoval(
+  private void assertNotLastActiveOwnerDelete(Long accountId, AccountMemberEntity existing) {
+    if (!isActiveOwner(existing.getRole(), existing.getStatus())) {
+      return;
+    }
+
+    List<AccountMemberEntity> owners =
+        accountMemberRepository.findActiveOwners(
+            accountId,
+            AccountMemberRole.OWNER,
+            AccountMemberStatus.ACTIVE
+        );
+
+    if (owners.size() <= 1) {
+      throw new BadRequestException(
+          MessageCodes.ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN,
+          accountId
+      );
+    }
+  }
+
+
+  private void assertNotDemotingLastActiveOwner(
       Long accountId,
       AccountMemberEntity existing,
       AccountMemberRole newRole,
@@ -173,8 +194,8 @@ public class AccountMemberService {
     List<AccountMemberEntity> owners =
         accountMemberRepository.findActiveOwners(
             accountId,
-            AccountMemberRole.OWNER.name(),
-            AccountMemberStatus.ACTIVE.name()
+            AccountMemberRole.OWNER,
+            AccountMemberStatus.ACTIVE
         );
 
     if (owners.size() <= 1) {

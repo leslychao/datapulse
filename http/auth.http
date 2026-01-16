@@ -1,17 +1,37 @@
 ### =========================================================
-### 0. PREPARE — создаём базовые сущности для сценариев
+### AUTH — Keycloak password grant (access_token)
+### =========================================================
+POST {{keycloakBaseUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{keycloakClientId}}&client_secret={{keycloakClientSecret}}&username={{keycloakUsername}}&password={{keycloakPassword}}
+
+> {%
+  client.test("Auth — got access_token", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
+
+    const b = response.body || {};
+    client.assert(!!b.access_token, "missing access_token in response");
+
+    client.global.set("access_token", b.access_token);
+  });
+%}
+
+### =========================================================
+### PREPARE — create account + resolve current user + resolve owner memberId
 ### =========================================================
 
 ### 0.1 ACCOUNT — CREATE (201)
 POST {{host}}/api/accounts
 Content-Type: application/json
+Authorization: Bearer {{access_token}}
 
 {
   "name": "Test Account — Members"
 }
 
 > {%
-  client.test("Prepare /account — create 201", function () {
+  client.test("Prepare /api/accounts — create 201", function () {
     client.assert(response.status === 201, "expected 201, got " + response.status);
 
     var b = response.body || {};
@@ -21,255 +41,77 @@ Content-Type: application/json
   });
 %}
 
-### 0.2 USER-PROFILE — CREATE (201) primary
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": "sub-test-001",
-  "email": "user1@datapulse.local"
-}
+### 0.2 IAM — GET current user profile (200) -> currentUserId
+GET {{host}}/api/iam
+Authorization: Bearer {{access_token}}
 
 > {%
-  client.test("Prepare /user-profile — create user1 201", function () {
-    client.assert(response.status === 201, "expected 201, got " + response.status);
-
-    var b = response.body || {};
-    client.assert(b.id !== undefined, "missing id in response");
-
-    client.global.set("userId1", String(b.id || ""));
-  });
-%}
-
-### 0.3 USER-PROFILE — CREATE (201) secondary
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": "sub-test-002",
-  "email": "user2@datapulse.local"
-}
-
-> {%
-  client.test("Prepare /user-profile — create user2 201", function () {
-    client.assert(response.status === 201, "expected 201, got " + response.status);
-
-    var b = response.body || {};
-    client.assert(b.id !== undefined, "missing id in response");
-
-    client.global.set("userId2", String(b.id || ""));
-  });
-%}
-
-
-### =========================================================
-### 1. USER-PROFILE API — базовый жизненный цикл и валидации
-### =========================================================
-
-### 1.1 USER-PROFILE — UPDATE (200)
-PUT {{host}}/api/user-profiles/{{userId1}}
-Content-Type: application/json
-
-{
-  "email": "user1.updated@datapulse.local"
-}
-
-> {%
-  client.test("UserProfile /update — success 200", function () {
+  client.test("Prepare /api/iam — get current user 200", function () {
     client.assert(response.status === 200, "expected 200, got " + response.status);
 
     var b = response.body || {};
-    client.assert(String(b.id) === String(client.global.get("userId1")), "id mismatch after update");
-    client.assert(/updated/i.test(b.email || ""), "email was not updated");
+    client.assert(b.id !== undefined, "missing id in response");
+
+    client.global.set("currentUserId", String(b.id || ""));
   });
 %}
 
-### 1.2 USER-PROFILE — NEGATIVE: blank email → 400
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": "sub-test-blank-email",
-  "email": " "
-}
+### 0.3 MEMBERS — LIST (200) -> resolve currentAccountMemberId (owner)
+GET {{host}}/api/accounts/{{accountIdMembers}}/members
+Authorization: Bearer {{access_token}}
 
 > {%
-  client.test("UserProfile /create — blank email 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
+  client.test("Prepare /members — resolve current user's memberId 200", function () {
+    client.assert(response.status === 200, "expected 200, got " + response.status);
 
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
+    var b = response.body;
+    client.assert(Array.isArray(b), "expected array response");
 
-    client.assert(/email|обязател|пуст/i.test(msg), "no validation hint for blank email: " + msg);
+    var currentUserId = String(client.global.get("currentUserId"));
+    var found = null;
+
+    for (var i = 0; i < b.length; i++) {
+      var m = b[i] || {};
+      if (String(m.userId) === currentUserId) {
+        found = m;
+        break;
+      }
+    }
+
+    client.assert(found && found.id !== undefined, "current user's member not found in list");
+    client.global.set("currentAccountMemberId", String(found.id || ""));
   });
 %}
-
-### 1.3 USER-PROFILE — NEGATIVE: invalid email → 400
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": "sub-test-invalid-email",
-  "email": "not-an-email"
-}
-
-> {%
-  client.test("UserProfile /create — invalid email 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/email|формат|некоррект/i.test(msg), "no invalid-email hint: " + msg);
-  });
-%}
-
-### 1.4 USER-PROFILE — NEGATIVE: blank keycloakSub → 400
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": " ",
-  "email": "user3@datapulse.local"
-}
-
-> {%
-  client.test("UserProfile /create — blank keycloakSub 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/keycloak|sub|обязател|пуст/i.test(msg), "no keycloakSub validation hint: " + msg);
-  });
-%}
-
-### 1.5 USER-PROFILE — NEGATIVE: duplicate keycloakSub → 400
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": "sub-test-001",
-  "email": "dup-sub@datapulse.local"
-}
-
-> {%
-  client.test("UserProfile /create — duplicate keycloakSub 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) || "";
-
-    client.assert(/уже|существует|exists/i.test(msg), "no duplicate-sub hint: " + msg);
-  });
-%}
-
-### 1.6 USER-PROFILE — NEGATIVE: duplicate email (case-insensitive) → 400
-POST {{host}}/api/user-profiles
-Content-Type: application/json
-
-{
-  "keycloakSub": "sub-test-dup-email",
-  "email": "USER1.UPDATED@datapulse.local"
-}
-
-> {%
-  client.test("UserProfile /create — duplicate email (ci) 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) || "";
-
-    client.assert(/email|уже|существует|exists/i.test(msg), "no duplicate-email hint: " + msg);
-  });
-%}
-
-### 1.7 USER-PROFILE — NEGATIVE: update not found → 404
-PUT {{host}}/api/user-profiles/9999999
-Content-Type: application/json
-
-{
-  "email": "notfound@datapulse.local"
-}
-
-> {%
-  client.test("UserProfile /update — not found 404", function () {
-    client.assert(response.status === 404, "expected 404, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
-  });
-%}
-
-### 1.8 USER-PROFILE — NEGATIVE: delete not found → 404
-DELETE {{host}}/api/user-profiles/9999999
-
-> {%
-  client.test("UserProfile /delete — not found 404", function () {
-    client.assert(response.status === 404, "expected 404, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint on delete: " + msg);
-  });
-%}
-
 
 ### =========================================================
-### 2. ACCOUNT-MEMBER API — базовый жизненный цикл и валидации
+### TESTS — AccountMemberController /api/accounts/{accountId}/members
 ### =========================================================
 
-### 2.1 ACCOUNT-MEMBER — CREATE (201)
-POST {{host}}/api/account-members
+### 1.1 CREATE (NEGATIVE): duplicate (accountId,userId) -> 400
+POST {{host}}/api/accounts/{{accountIdMembers}}/members
 Content-Type: application/json
+Authorization: Bearer {{access_token}}
 
 {
-  "accountId": {{accountIdMembers}},
-  "userId": {{userId1}},
-  "role": "OWNER",
+  "userId": {{currentUserId}},
+  "role": "ADMIN",
   "status": "ACTIVE"
 }
 
 > {%
-  client.test("AccountMember /create — success 201", function () {
-    client.assert(response.status === 201, "expected 201, got " + response.status);
+  client.test("AccountMember /create — duplicate member 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
 
-    var b = response.body || {};
-    client.assert(b.id !== undefined, "missing id in response");
-    client.assert(String(b.accountId) === String(client.global.get("accountIdMembers")), "accountId mismatch");
-    client.assert(String(b.userId) === String(client.global.get("userId1")), "userId mismatch");
-    client.assert(String(b.role || "").length > 0, "missing role");
-
-    client.global.set("accountMemberId1", String(b.id || ""));
+    var msg = (response.body && response.body.message) || "";
+    client.assert(/уже\s+является\s+участником\s+аккаунта/i.test(msg),
+        "unexpected message: " + msg);
   });
 %}
 
-### 2.2 ACCOUNT-MEMBER — UPDATE (200) role change
-PUT {{host}}/api/account-members/{{accountMemberId1}}
+### 1.2 UPDATE (NEGATIVE): forbid downgrade last ACTIVE OWNER -> 400 ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN
+PUT {{host}}/api/accounts/{{accountIdMembers}}/members/{{currentAccountMemberId}}
 Content-Type: application/json
+Authorization: Bearer {{access_token}}
 
 {
   "role": "ADMIN",
@@ -277,184 +119,56 @@ Content-Type: application/json
 }
 
 > {%
-  client.test("AccountMember /update — role change 200", function () {
-    client.assert(response.status === 200, "expected 200, got " + response.status);
-
-    var b = response.body || {};
-    client.assert(String(b.id) === String(client.global.get("accountMemberId1")), "id mismatch after update");
-    client.assert(String(b.role) === "ADMIN", "role was not updated");
-  });
-%}
-
-### 2.3 ACCOUNT-MEMBER — NEGATIVE: missing accountId → 400
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "userId": {{userId2}},
-  "role": "VIEWER",
-  "status": "ACTIVE"
-}
-
-> {%
-  client.test("AccountMember /create — missing accountId 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/accountId|аккаунт|обязател/i.test(msg), "no accountId required hint: " + msg);
-  });
-%}
-
-### 2.4 ACCOUNT-MEMBER — NEGATIVE: missing userId → 400
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "accountId": {{accountIdMembers}},
-  "role": "VIEWER",
-  "status": "ACTIVE"
-}
-
-> {%
-  client.test("AccountMember /create — missing userId 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/userId|пользоват|обязател/i.test(msg), "no userId required hint: " + msg);
-  });
-%}
-
-### 2.5 ACCOUNT-MEMBER — NEGATIVE: missing role → 400
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "accountId": {{accountIdMembers}},
-  "userId": {{userId2}},
-  "status": "ACTIVE"
-}
-
-> {%
-  client.test("AccountMember /create — missing role 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-  client.assert(/role|роль|обязател/i.test(msg), "no role required hint: " + msg);
-  });
-%}
-
-### 2.6 ACCOUNT-MEMBER — NEGATIVE: missing status → 400
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "accountId": {{accountIdMembers}},
-  "userId": {{userId2}},
-  "role": "VIEWER"
-}
-
-> {%
-  client.test("AccountMember /create — missing status 400", function () {
-    client.assert(response.status === 400, "expected 400, got " + response.status);
-
-    var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/status|статус|обязател/i.test(msg), "no status required hint: " + msg);
-  });
-%}
-
-### 2.7 ACCOUNT-MEMBER — NEGATIVE: unknown accountId → 404
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "accountId": 999999999,
-  "userId": {{userId2}},
-  "role": "VIEWER",
-  "status": "ACTIVE"
-}
-
-> {%
-  client.test("AccountMember /create — unknown accountId 404", function () {
-    client.assert(response.status === 404, "expected 404, got " + response.status);
-
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) || "";
-
-    client.assert(/аккаунт|account|не\sнайден/i.test(msg), "no account-not-found hint: " + msg);
-  });
-%}
-
-### 2.8 ACCOUNT-MEMBER — NEGATIVE: unknown userId → 404
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "accountId": {{accountIdMembers}},
-  "userId": 999999999,
-  "role": "VIEWER",
-  "status": "ACTIVE"
-}
-
-> {%
-  client.test("AccountMember /create — unknown userId 404", function () {
-    client.assert(response.status === 404, "expected 404, got " + response.status);
-
-    var b = response.body || {};
-    var msg = (b && b.message) || (b && b.error) || "";
-
-    client.assert(/профил|пользоват|user|не\sнайден/i.test(msg), "no user-not-found hint: " + msg);
-  });
-%}
-
-### 2.9 ACCOUNT-MEMBER — NEGATIVE: duplicate membership → 400
-POST {{host}}/api/account-members
-Content-Type: application/json
-
-{
-  "accountId": {{accountIdMembers}},
-  "userId": {{userId1}},
-  "role": "VIEWER",
-  "status": "ACTIVE"
-}
-
-> {%
-  client.test("AccountMember /create — duplicate membership 400", function () {
+  client.test("AccountMember /update — forbid downgrade last ACTIVE OWNER 400", function () {
     client.assert(response.status === 400, "expected 400, got " + response.status);
 
     var b = response.body || {};
     var msg = (b && b.message) || (b && b.error) || "";
-
-    client.assert(/уже|существует|member|участник|exists/i.test(msg), "no duplicate-membership hint: " + msg);
+    client.assert(/last\s+owner|последн.*владел|ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN/i.test(msg),
+        "no last-owner-forbidden hint: " + msg);
   });
 %}
 
-### 2.10 ACCOUNT-MEMBER — NEGATIVE: update not found → 404
-PUT {{host}}/api/account-members/9999999
+### 1.3 UPDATE (NEGATIVE): forbid deactivate last ACTIVE OWNER -> 400 ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN
+PUT {{host}}/api/accounts/{{accountIdMembers}}/members/{{currentAccountMemberId}}
 Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "role": "OWNER",
+  "status": "INACTIVE"
+}
+
+> {%
+  client.test("AccountMember /update — forbid deactivate last ACTIVE OWNER 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/last\s+owner|последн.*владел|ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN/i.test(msg),
+        "no last-owner-forbidden hint: " + msg);
+  });
+%}
+
+### 1.4 DELETE (NEGATIVE): forbid delete last ACTIVE OWNER -> 400 ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN
+DELETE {{host}}/api/accounts/{{accountIdMembers}}/members/{{currentAccountMemberId}}
+Authorization: Bearer {{access_token}}
+
+> {%
+  client.test("AccountMember /delete — forbid delete last ACTIVE OWNER 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/last\s+owner|последн.*владел|ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN/i.test(msg),
+        "no last-owner-forbidden hint: " + msg);
+  });
+%}
+
+### 1.5 UPDATE (NEGATIVE): not found -> 404
+PUT {{host}}/api/accounts/{{accountIdMembers}}/members/9999999
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
 
 {
   "role": "VIEWER",
@@ -466,68 +180,32 @@ Content-Type: application/json
     client.assert(response.status === 404, "expected 404, got " + response.status);
 
     var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/не\s*найден|not\s*found/i.test(msg), "no 'not found' hint: " + msg);
   });
 %}
 
-### 2.11 ACCOUNT-MEMBER — NEGATIVE: delete not found → 404
-DELETE {{host}}/api/account-members/9999999
+### 1.6 DELETE (NEGATIVE): not found -> 404
+DELETE {{host}}/api/accounts/{{accountIdMembers}}/members/9999999
+Authorization: Bearer {{access_token}}
 
 > {%
   client.test("AccountMember /delete — not found 404", function () {
     client.assert(response.status === 404, "expected 404, got " + response.status);
 
     var b = response.body || {};
-    var msg =
-        (b && b.message) ||
-        (b && b.error) ||
-        (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
-        "";
-
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint on delete: " + msg);
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(/не\s*найден|not\s*found/i.test(msg), "no 'not found' hint: " + msg);
   });
 %}
-
 
 ### =========================================================
-### 3. CLEANUP — удаляем всё созданное в тестах
+### CLEANUP — delete account (CASCADE deletes members)
 ### =========================================================
 
-### 3.1 CLEANUP — DELETE ACCOUNT-MEMBER
-DELETE {{host}}/api/account-members/{{accountMemberId1}}
-
-> {%
-  client.test("Cleanup — delete account-member 204", function () {
-    client.assert(response.status === 204, "expected 204, got " + response.status);
-  });
-%}
-
-### 3.2 CLEANUP — DELETE USER-PROFILE user1
-DELETE {{host}}/api/user-profiles/{{userId1}}
-
-> {%
-  client.test("Cleanup — delete user-profile user1 204", function () {
-    client.assert(response.status === 204, "expected 204, got " + response.status);
-  });
-%}
-
-### 3.3 CLEANUP — DELETE USER-PROFILE user2
-DELETE {{host}}/api/user-profiles/{{userId2}}
-
-> {%
-  client.test("Cleanup — delete user-profile user2 204", function () {
-    client.assert(response.status === 204, "expected 204, got " + response.status);
-  });
-%}
-
-### 3.4 CLEANUP — DELETE ACCOUNT
+### 2.1 DELETE ACCOUNT (204)
 DELETE {{host}}/api/accounts/{{accountIdMembers}}
+Authorization: Bearer {{access_token}}
 
 > {%
   client.test("Cleanup — delete account 204", function () {
