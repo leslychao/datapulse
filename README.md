@@ -132,9 +132,10 @@ docker compose up -d
 
 ## License
 
-Datapulse is **proprietary commercial software**.
+DataPulse is a proprietary, single-vendor commercial software product.
 
-Evaluation use is permitted for internal review and proof-of-concept purposes.
-Any commercial or production use requires a separate written license agreement.
+This repository is provided for limited evaluation and review purposes only.
+No commercial, production, or internal business use is permitted without a
+separate written agreement.
 
-See the `LICENSE` file for full terms.
+See the LICENSE file for full terms.

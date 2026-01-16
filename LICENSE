@@ -1,97 +1,119 @@
-DataPulse Commercial License
-Version 1.1
+DataPulse Single-Vendor Proprietary License
+Version 1.2
 
 Copyright © 2026 Vitalii Kim
 All rights reserved.
 
 1. Definitions
 
-“Software” means the DataPulse software, including all source code, object code,
-documentation, database schemas, configuration files, and any associated materials.
+“Software” means the DataPulse software, including but not limited to all source code,
+object code, binaries, documentation, database schemas, data models, configuration files,
+APIs, algorithms, and any associated materials.
 
 “Licensor” means Vitalii Kim.
 
-“Licensee” means any individual or legal entity that accesses, installs, or uses the Software.
+“Licensee” means any individual or legal entity that accesses, downloads, installs,
+copies, views, or otherwise uses the Software.
 
-“Commercial Use” means any use of the Software for commercial, business, or
-revenue-generating purposes, including but not limited to:
-- use by for-profit organizations;
-- internal business analytics;
-- offering the Software or its functionality as a service (SaaS, PaaS, managed service);
-- resale, sublicensing, or distribution;
-- inclusion in commercial products or services.
+“Commercial Use” means any use of the Software or any part thereof, directly or indirectly,
+for commercial, business, professional, or revenue-generating purposes, including but not
+limited to:
+- internal business operations or analytics;
+- provision of services to third parties;
+- offering the Software or its functionality as a service (SaaS, PaaS, IaaS, managed service);
+- use in production, staging, pilot, or pre-production environments;
+- resale, sublicensing, distribution, or embedding;
+- development, testing, or validation of commercial products or services;
+- competitive analysis or development of competing solutions.
 
-“Evaluation Use” means non-commercial use of the Software solely for internal
-evaluation, technical review, architectural assessment, or proof-of-concept
-purposes, without deployment to production environments.
+“Evaluation Use” means temporary, non-commercial review of the Software solely for the
+purpose of assessing its technical characteristics, without deployment, execution, or use
+in any operational, business, or production context.
 
-2. License Grant
+2. License Nature
 
-The Software is proprietary and not open source.
-
-Subject to the terms of this License, the Licensor grants the Licensee a limited,
-non-exclusive, non-transferable, non-sublicensable license to use the Software
-solely for Evaluation Use.
-
-No other rights are granted.
-
-Any Commercial Use of the Software requires a separate written commercial license
-agreement with the Licensor.
-
-3. Prohibited Uses
-
-Unless expressly permitted in a written agreement signed by the Licensor, the
-Licensee must not:
-1. Use the Software for any Commercial Use;
-2. Deploy or operate the Software in production environments;
-3. Deploy or operate the Software as a hosted, cloud, or managed service;
-4. Distribute, sublicense, sell, rent, lease, or otherwise transfer the Software;
-5. Modify, adapt, translate, or create derivative works, except as strictly
-   necessary for Evaluation Use;
-6. Reverse engineer, decompile, or disassemble the Software, except where expressly
-   permitted by applicable law;
-7. Remove, alter, or obscure any copyright, license, or attribution notices.
-
-4. Commercial Licensing
-
-Any Commercial Use of the Software requires an explicit written license from the
-Licensor.
-
-Commercial licensing inquiries must be sent to:
-vitaliikim992@gmail.com
-
-5. Ownership
-
+The Software is proprietary and confidential.
+The Software is not open source.
 The Software is licensed, not sold.
 
-All intellectual property rights, including but not limited to copyrights, remain
-the exclusive property of the Licensor.
+No rights are granted except those expressly stated in this License.
 
-6. No Warranty
+3. License Grant
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+Subject to strict compliance with this License, the Licensor grants the Licensee a limited,
+non-exclusive, non-transferable, non-sublicensable, revocable license solely to access and
+review the Software for Evaluation Use only.
 
-7. Limitation of Liability
+No right is granted to run, deploy, operate, compile, modify, integrate, distribute, or
+commercially exploit the Software or any part thereof.
 
-IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, CONSEQUENTIAL, OR BUSINESS DAMAGES ARISING OUT OF OR RELATED TO THE USE
-OR INABILITY TO USE THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+4. Absolute Prohibition of Commercial Use
 
-8. Termination
+The Licensee must not engage in any Commercial Use of the Software.
 
-This License is automatically terminated upon any violation of its terms.
-Upon termination, the Licensee must immediately cease all use of the Software and
-destroy all copies in its possession or control.
+Commercial Use is prohibited even if:
+- the Software is used internally only;
+- no fees are charged to third parties;
+- the use does not directly generate revenue;
+- the Software is used for testing, benchmarking, or analytics;
+- the Software is modified or partially reimplemented;
+- the Software is used alongside other systems.
 
-9. Governing Law
+Only the Licensor is permitted to commercially use, operate, and monetize the Software.
 
-This License shall be governed by and construed in accordance with the laws of
-the Republic of Austria, without regard to conflict of law principles.
+5. Prohibited Activities
 
-10. Entire Agreement
+Unless explicitly authorized in a separate written agreement signed by the Licensor, the
+Licensee must not:
+1. Deploy or operate the Software in any environment;
+2. Use the Software in production, staging, pilot, or demonstration systems;
+3. Offer the Software or its functionality as a hosted, cloud, or managed service;
+4. Modify, adapt, translate, or create derivative works;
+5. Reverse engineer, decompile, or disassemble the Software;
+6. Use the Software to develop or assist in developing competing or similar products;
+7. Copy, distribute, sublicense, sell, rent, lease, or transfer the Software;
+8. Remove or alter copyright, license, or attribution notices.
 
-This License constitutes the entire agreement between the parties regarding the
-Software and supersedes all prior or contemporaneous understandings, whether
-written or oral.
+6. No Patent or IP License
+
+This License does not grant any express or implied license to patents, patent applications,
+trade secrets, trademarks, or other intellectual property rights of the Licensor.
+All such rights are expressly reserved.
+
+7. Ownership
+
+All right, title, and interest in and to the Software remain exclusively with the Licensor.
+Nothing in this License shall be construed as transferring any ownership rights.
+
+8. No Warranty
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED.
+
+9. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL NOT BE LIABLE FOR ANY
+DAMAGES ARISING OUT OF OR RELATED TO THE SOFTWARE.
+
+10. Termination
+
+This License is automatically terminated upon any violation.
+Upon termination, the Licensee must immediately cease all use of the Software and destroy
+all copies.
+
+Sections relating to ownership, restrictions, liability, and governing law shall survive
+termination.
+
+11. Injunctive Relief
+
+Unauthorized use of the Software may cause irreparable harm.
+The Licensor is entitled to injunctive relief without the requirement to prove damages.
+
+12. Governing Law and Jurisdiction
+
+This License shall be governed by and construed in accordance with the laws of the Republic
+of Austria.
+The courts of Austria shall have exclusive jurisdiction.
+
+13. Entire Agreement
+
+This License constitutes the entire agreement regarding the Software.
