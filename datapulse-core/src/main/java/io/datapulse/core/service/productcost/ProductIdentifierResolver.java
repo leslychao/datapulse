@@ -1,6 +1,8 @@
 package io.datapulse.core.service.productcost;
 
+import java.util.Optional;
+
 public interface ProductIdentifierResolver {
 
-  Long resolveProductId(Long accountId, String sourceProductId);
+  Optional<Long> resolveProductId(Long accountId, String sourceProductId);
 }

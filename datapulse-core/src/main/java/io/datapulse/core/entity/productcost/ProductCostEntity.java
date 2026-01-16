@@ -4,7 +4,7 @@ import io.datapulse.core.entity.LongBaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,6 +20,6 @@ public class ProductCostEntity extends LongBaseEntity {
   private BigDecimal costValue;
   private String currency;
 
-  private LocalDate validFrom;
-  private LocalDate validTo;
+  private Instant validFrom;
+  private Instant validTo;
 }

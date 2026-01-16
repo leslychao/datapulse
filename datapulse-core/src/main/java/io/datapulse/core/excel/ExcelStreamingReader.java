@@ -2,6 +2,7 @@ package io.datapulse.core.excel;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -23,7 +24,9 @@ public final class ExcelStreamingReader {
   private ExcelStreamingReader() {
   }
 
-  public static void readSheet(InputStream inputStream, int sheetIndex,
+  public static void readSheet(
+      InputStream inputStream,
+      int sheetIndex,
       Consumer<List<String>> rowConsumer) throws IOException {
     try (Workbook workbook = WorkbookFactory.create(inputStream)) {
       Sheet sheet = workbook.getSheetAt(sheetIndex);
@@ -62,13 +65,16 @@ public final class ExcelStreamingReader {
     if (cell == null) {
       return "";
     }
+
     CellType cellType = cell.getCellType();
     if (cellType == CellType.FORMULA) {
       cellType = cell.getCachedFormulaResultType();
     }
+
     if (cellType == CellType.STRING) {
       return cell.getStringCellValue();
     }
+
     if (cellType == CellType.NUMERIC) {
       if (DateUtil.isCellDateFormatted(cell)) {
         return cell.getLocalDateTimeCellValue()
@@ -76,14 +82,21 @@ public final class ExcelStreamingReader {
             .toLocalDate()
             .format(DATE_FORMATTER);
       }
-      return Double.toString(cell.getNumericCellValue());
+
+      double value = cell.getNumericCellValue();
+      long asLong = (long) value;
+
+      if (Double.compare(value, (double) asLong) == 0) {
+        return Long.toString(asLong);
+      }
+
+      return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
+
     if (cellType == CellType.BOOLEAN) {
       return Boolean.toString(cell.getBooleanCellValue());
     }
-    if (cellType == CellType.BLANK) {
-      return "";
-    }
+
     return "";
   }
 }

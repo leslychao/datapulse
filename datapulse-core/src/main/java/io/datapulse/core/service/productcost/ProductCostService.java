@@ -1,34 +1,26 @@
 package io.datapulse.core.service.productcost;
 
-import static io.datapulse.domain.MessageCodes.ACCOUNT_ID_REQUIRED;
-import static io.datapulse.domain.MessageCodes.PRODUCT_COST_ACCOUNT_IMMUTABLE;
 import static io.datapulse.domain.MessageCodes.PRODUCT_COST_EXCEL_FIELD_EMPTY;
-import static io.datapulse.domain.MessageCodes.PRODUCT_COST_EXCEL_FIELD_NOT_DATE;
 import static io.datapulse.domain.MessageCodes.PRODUCT_COST_EXCEL_FIELD_NOT_NUMBER;
 import static io.datapulse.domain.MessageCodes.PRODUCT_COST_EXCEL_HEADER_INVALID;
 import static io.datapulse.domain.MessageCodes.PRODUCT_COST_EXCEL_READ_FAILED;
-import static io.datapulse.domain.MessageCodes.PRODUCT_COST_PRODUCT_BY_SOURCE_ID_NOT_FOUND;
-import static io.datapulse.domain.MessageCodes.PRODUCT_COST_PRODUCT_IMMUTABLE;
-import static io.datapulse.domain.MessageCodes.PRODUCT_COST_VALID_FROM_REQUIRED;
-import static io.datapulse.domain.MessageCodes.PRODUCT_COST_VALUE_REQUIRED;
-import static io.datapulse.domain.MessageCodes.PRODUCT_ID_REQUIRED;
-import static io.datapulse.domain.MessageCodes.RESOURCE_NOT_FOUND;
 
-import io.datapulse.core.entity.productcost.ProductCostEntity;
 import io.datapulse.core.excel.ExcelStreamingReader;
-import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.productcost.ProductCostRepository;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.dto.productcost.ProductCostDto;
 import io.datapulse.domain.exception.BadRequestException;
-import jakarta.validation.Valid;
+import io.datapulse.domain.response.productcost.ProductCostImportResponse;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,82 +38,28 @@ public class ProductCostService {
   private static final String COL_SOURCE_PRODUCT_ID = "source_product_id";
   private static final String COL_COST_VALUE = "cost_value";
   private static final String COL_CURRENCY = "currency";
-  private static final String COL_VALID_FROM = "valid_from";
-  private static final String COL_VALID_TO = "valid_to";
 
   private static final List<String> EXPECTED_HEADER = List.of(
       COL_SOURCE_PRODUCT_ID,
       COL_COST_VALUE,
-      COL_CURRENCY,
-      COL_VALID_FROM,
-      COL_VALID_TO
+      COL_CURRENCY
   );
 
-  private final MapperFacade mapperFacade;
-  private final ProductCostRepository productCostRepository;
   private final ProductIdentifierResolver productIdentifierResolver;
-
-  @Transactional(readOnly = true)
-  public ProductCostDto get(
-      @NotNull(message = ValidationKeys.ID_REQUIRED)
-      Long id
-  ) {
-    ProductCostEntity entity = productCostRepository.findById(id)
-        .orElseThrow(() -> new BadRequestException(RESOURCE_NOT_FOUND, id));
-    return mapperFacade.to(entity, ProductCostDto.class);
-  }
+  private final ProductCostRepository productCostRepository;
 
   @Transactional
-  public ProductCostDto create(
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto dto
-  ) {
-    validateOnCreate(dto);
-
-    ProductCostEntity created = mapperFacade.to(dto, ProductCostEntity.class);
-    ProductCostEntity saved = productCostRepository.save(created);
-
-    return mapperFacade.to(saved, ProductCostDto.class);
-  }
-
-  @Transactional
-  public ProductCostDto update(
-      @NotNull(message = ValidationKeys.ID_REQUIRED)
-      Long id,
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto dto
-  ) {
-    ProductCostEntity existing = productCostRepository.findById(id)
-        .orElseThrow(() -> new BadRequestException(RESOURCE_NOT_FOUND, id));
-
-    validateOnUpdate(dto, existing);
-
-    ProductCostEntity merged = merge(existing, dto);
-    ProductCostEntity saved = productCostRepository.save(merged);
-
-    return mapperFacade.to(saved, ProductCostDto.class);
-  }
-
-  @Transactional
-  public void delete(
-      @NotNull(message = ValidationKeys.ID_REQUIRED)
-      Long id
-  ) {
-    if (!productCostRepository.existsById(id)) {
-      throw new BadRequestException(RESOURCE_NOT_FOUND, id);
-    }
-    productCostRepository.deleteById(id);
-  }
-
-  @Transactional
-  public void importFromExcel(
+  public ProductCostImportResponse importFromExcel(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED)
       Long accountId,
       @NotNull(message = ValidationKeys.REQUEST_REQUIRED)
       MultipartFile file
   ) {
+    Instant importTimestamp = Instant.now();
+
+    List<ProductCostImportResponse.ProductCostNotFoundRow> notFound = new ArrayList<>();
+    long[] importedRows = {0};
+
     try (InputStream inputStream = file.getInputStream()) {
       List<ProductCostDto> batch = new ArrayList<>(BATCH_SIZE);
       int[] rowIndex = {0};
@@ -138,18 +76,32 @@ public class ProductCostService {
           return;
         }
 
-        ProductCostDto dto = mapRowToDto(accountId, row, currentRowNumber);
-        batch.add(dto);
+        Optional<ProductCostDto> dto = parseRow(
+            accountId,
+            row,
+            currentRowNumber,
+            notFound);
+        if (dto.isEmpty()) {
+          return;
+        }
+
+        batch.add(dto.get());
 
         if (batch.size() >= BATCH_SIZE) {
-          processBatch(batch);
+          importedRows[0] += upsertBatchDeduplicated(accountId, batch, importTimestamp);
           batch.clear();
         }
       });
 
       if (!batch.isEmpty()) {
-        processBatch(batch);
+        importedRows[0] += upsertBatchDeduplicated(accountId, batch, importTimestamp);
       }
+
+      return new ProductCostImportResponse(
+          importedRows[0],
+          notFound.size(),
+          List.copyOf(notFound)
+      );
     } catch (BadRequestException ex) {
       throw ex;
     } catch (IOException ex) {
@@ -159,64 +111,59 @@ public class ProductCostService {
     }
   }
 
-  private void validateOnCreate(
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto dto
-  ) {
-    if (dto.getAccountId() == null) {
-      throw new BadRequestException(ACCOUNT_ID_REQUIRED);
+  private long upsertBatchDeduplicated(
+      Long accountId,
+      List<ProductCostDto> batch,
+      Instant importTimestamp) {
+    Map<Long, ProductCostDto> lastByProductId = new LinkedHashMap<>(batch.size());
+    for (ProductCostDto dto : batch) {
+      lastByProductId.put(dto.getProductId(), dto);
     }
-    if (dto.getProductId() == null) {
-      throw new BadRequestException(PRODUCT_ID_REQUIRED);
-    }
-    if (dto.getCostValue() == null) {
-      throw new BadRequestException(PRODUCT_COST_VALUE_REQUIRED);
-    }
-    if (dto.getValidFrom() == null) {
-      throw new BadRequestException(PRODUCT_COST_VALID_FROM_REQUIRED);
-    }
+    productCostRepository.upsertBatchFromDtos(
+        accountId,
+        new ArrayList<>(lastByProductId.values()),
+        importTimestamp
+    );
+    return lastByProductId.size();
   }
 
-  private void validateOnUpdate(
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto dto,
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      ProductCostEntity existing
+  private Optional<ProductCostDto> parseRow(
+      Long accountId,
+      List<String> row,
+      int rowNumber,
+      List<ProductCostImportResponse.ProductCostNotFoundRow> notFound
   ) {
-    Long existingAccountId = existing.getAccountId();
-    Long existingProductId = existing.getProductId();
+    String sourceProductIdRaw = getCell(row, 0);
+    String costValueRaw = getCell(row, 1);
+    String currencyRaw = getCell(row, 2);
 
-    Long dtoAccountId = dto.getAccountId();
-    Long dtoProductId = dto.getProductId();
+    String sourceProductId = parseRequiredText(
+        sourceProductIdRaw,
+        rowNumber,
+        COL_SOURCE_PRODUCT_ID);
 
-    if (dtoAccountId != null && !dtoAccountId.equals(existingAccountId)) {
-      throw new BadRequestException(PRODUCT_COST_ACCOUNT_IMMUTABLE);
-    }
-    if (dtoProductId != null && !dtoProductId.equals(existingProductId)) {
-      throw new BadRequestException(PRODUCT_COST_PRODUCT_IMMUTABLE);
-    }
-  }
+    Optional<Long> productId = productIdentifierResolver.resolveProductId(
+        accountId,
+        sourceProductId);
 
-  private ProductCostEntity merge(
-      @NotNull(message = ValidationKeys.ENTITY_REQUIRED)
-      ProductCostEntity target,
-      @Valid
-      @NotNull(message = ValidationKeys.DTO_REQUIRED)
-      ProductCostDto source
-  ) {
-    if (source.getCostValue() != null) {
-      target.setCostValue(source.getCostValue());
+    if (productId.isEmpty()) {
+      notFound.add(
+          new ProductCostImportResponse.ProductCostNotFoundRow(rowNumber, sourceProductId));
+      return Optional.empty();
     }
-    if (source.getCurrency() != null) {
-      target.setCurrency(source.getCurrency());
-    }
-    if (source.getValidFrom() != null) {
-      target.setValidFrom(source.getValidFrom());
-    }
-    target.setValidTo(source.getValidTo());
-    return target;
+
+    BigDecimal costValue = parseBigDecimal(costValueRaw, rowNumber, COL_COST_VALUE);
+
+    String currency = currencyRaw.isBlank()
+        ? "RUB"
+        : currencyRaw.trim();
+
+    ProductCostDto dto = new ProductCostDto();
+    dto.setAccountId(accountId);
+    dto.setProductId(productId.get());
+    dto.setCostValue(costValue);
+    dto.setCurrency(currency);
+    return Optional.of(dto);
   }
 
   private void validateHeaderRow(List<String> row) {
@@ -249,59 +196,6 @@ public class ProductCostService {
     return row == null || row.stream().allMatch(value -> value == null || value.isBlank());
   }
 
-  private ProductCostDto mapRowToDto(Long accountId, List<String> row, int rowNumber) {
-    String sourceProductIdRaw = getCell(row, 0);
-    String costValueRaw = getCell(row, 1);
-    String currencyRaw = getCell(row, 2);
-    String validFromRaw = getCell(row, 3);
-    String validToRaw = getCell(row, 4);
-
-    String sourceProductId = parseRequiredText(sourceProductIdRaw, rowNumber,
-        COL_SOURCE_PRODUCT_ID);
-    Long productId = resolveProductId(accountId, sourceProductId);
-
-    BigDecimal costValue = parseBigDecimal(costValueRaw, rowNumber, COL_COST_VALUE);
-    String currency = currencyRaw.isBlank() ? "RUB" : currencyRaw.trim();
-
-    LocalDate validFrom = parseDate(validFromRaw, rowNumber, COL_VALID_FROM);
-    LocalDate validTo =
-        validToRaw.isBlank() ? null : parseDate(validToRaw, rowNumber, COL_VALID_TO);
-
-    ProductCostDto dto = new ProductCostDto();
-    dto.setAccountId(accountId);
-    dto.setProductId(productId);
-    dto.setCostValue(costValue);
-    dto.setCurrency(currency);
-    dto.setValidFrom(validFrom);
-    dto.setValidTo(validTo);
-    return dto;
-  }
-
-  private void processBatch(List<ProductCostDto> batch) {
-    List<ProductCostEntity> entitiesToSave = new ArrayList<>(batch.size());
-
-    for (ProductCostDto dto : batch) {
-      validateOnCreate(dto);
-
-      productCostRepository.findByAccountIdAndProductIdAndValidFrom(
-              dto.getAccountId(),
-              dto.getProductId(),
-              dto.getValidFrom()
-          )
-          .ifPresentOrElse(existing -> {
-            ProductCostEntity merged = merge(existing, dto);
-            entitiesToSave.add(merged);
-          }, () -> {
-            ProductCostEntity created = mapperFacade.to(dto, ProductCostEntity.class);
-            entitiesToSave.add(created);
-          });
-    }
-
-    if (!entitiesToSave.isEmpty()) {
-      productCostRepository.saveAll(entitiesToSave);
-    }
-  }
-
   private String getCell(List<String> row, int index) {
     if (row == null || index >= row.size()) {
       return "";
@@ -321,15 +215,6 @@ public class ProductCostService {
     return raw.trim();
   }
 
-  private Long resolveProductId(Long accountId, String sourceProductId) {
-    Long productId = productIdentifierResolver.resolveProductId(accountId, sourceProductId);
-    if (productId == null) {
-      throw new BadRequestException(PRODUCT_COST_PRODUCT_BY_SOURCE_ID_NOT_FOUND, accountId,
-          sourceProductId);
-    }
-    return productId;
-  }
-
   private BigDecimal parseBigDecimal(String raw, int rowNumber, String columnName) {
     if (raw == null || raw.isBlank()) {
       throw new BadRequestException(PRODUCT_COST_EXCEL_FIELD_EMPTY, rowNumber, columnName);
@@ -339,17 +224,6 @@ public class ProductCostService {
     } catch (NumberFormatException ex) {
       throw new BadRequestException(PRODUCT_COST_EXCEL_FIELD_NOT_NUMBER, rowNumber, columnName,
           raw);
-    }
-  }
-
-  private LocalDate parseDate(String raw, int rowNumber, String columnName) {
-    if (raw == null || raw.isBlank()) {
-      throw new BadRequestException(PRODUCT_COST_EXCEL_FIELD_EMPTY, rowNumber, columnName);
-    }
-    try {
-      return LocalDate.parse(raw.trim());
-    } catch (Exception ex) {
-      throw new BadRequestException(PRODUCT_COST_EXCEL_FIELD_NOT_DATE, rowNumber, columnName, raw);
     }
   }
 }

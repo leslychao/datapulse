@@ -1,7 +1,7 @@
 ### ===========================================
 ### PRODUCT-COST IMPORT — SUCCESS (200)
 ### ===========================================
-POST {{host}}/api/accounts/{{accountId}}/product-costs/import
+POST {{host}}/api/accounts/{{productCostAccountId}}/product-costs/import
 Content-Type: multipart/form-data; boundary=WebAppBoundary
 Accept: application/json
 
@@ -21,7 +21,7 @@ Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 ### ===========================================
 ### PRODUCT-COST IMPORT — NEGATIVE: WRONG FORMAT (4xx)
 ### ===========================================
-POST {{host}}/api/accounts/{{accountId}}/product-costs/import
+POST {{host}}/api/accounts/{{productCostAccountId}}/product-costs/import
 Content-Type: multipart/form-data; boundary=WebAppBoundary
 Accept: application/json
 

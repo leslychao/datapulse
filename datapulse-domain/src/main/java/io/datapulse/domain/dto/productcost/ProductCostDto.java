@@ -2,8 +2,7 @@ package io.datapulse.domain.dto.productcost;
 
 import io.datapulse.domain.dto.LongBaseDto;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,8 +18,8 @@ public class ProductCostDto extends LongBaseDto {
   private BigDecimal costValue;
   private String currency;
 
-  private LocalDate validFrom;
-  private LocalDate validTo;
+  private Instant validFrom;
+  private Instant validTo;
 
-  private OffsetDateTime createdAt;
+  private Instant createdAt;
 }

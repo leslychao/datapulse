@@ -2,6 +2,7 @@ package io.datapulse.domain.response.account;
 
 import io.datapulse.domain.MarketplaceType;
 import io.datapulse.domain.SyncStatus;
+import java.time.OffsetDateTime;
 
 public record AccountConnectionResponse(
     Long id,
@@ -10,8 +11,8 @@ public record AccountConnectionResponse(
     Boolean active,
     String lastSyncAt,
     SyncStatus lastSyncStatus,
-    String createdAt,
-    String updatedAt,
+    OffsetDateTime createdAt,
+    OffsetDateTime updatedAt,
     String maskedCredentials
 ) {
 
