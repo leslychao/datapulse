@@ -1,12 +1,12 @@
 spring:
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: client
-    password: pasClient105
-    virtual-host: datapulse
+    host: ${RABBIT_HOST:127.0.0.1}
+    port: ${RABBIT_PORT:5672}
+    username: ${RABBIT_USERNAME:client}
+    password: ${RABBIT_PASSWORD:pasClient105}
+    virtual-host: ${RABBIT_VHOST:datapulse}
     template:
-      reply-timeout: 5000ms
+      reply-timeout: 5s
 
 etl:
   orchestrate:
