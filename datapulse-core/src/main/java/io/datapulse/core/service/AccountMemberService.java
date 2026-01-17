@@ -36,12 +36,12 @@ public class AccountMemberService {
   @Transactional
   public void ensureOwnerMembership(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
-      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long userId
+      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long currentUserId
   ) {
-    accountMemberRepository.findByAccount_IdAndUser_Id(accountId, userId)
+    accountMemberRepository.findByAccount_IdAndUser_Id(accountId, currentUserId)
         .ifPresentOrElse(
             this::promoteToActiveOwner,
-            () -> createOwnerMembershipIdempotent(accountId, userId)
+            () -> createOwnerMembershipIdempotent(accountId, currentUserId)
         );
   }
 
@@ -51,16 +51,10 @@ public class AccountMemberService {
     accountMemberRepository.save(existing);
   }
 
-  private void createOwnerMembershipIdempotent(Long accountId, Long userId) {
+  private void createOwnerMembershipIdempotent(Long accountId, Long currentUserId) {
     try {
-      AccountEntity account = accountRepository.findById(accountId)
-          .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
-
-      UserProfileEntity user = userProfileRepository.findById(userId)
-          .orElseThrow(() -> new NotFoundException(
-              MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND,
-              userId
-          ));
+      AccountEntity account = requireAccount(accountId);
+      UserProfileEntity user = requireUser(currentUserId);
 
       AccountMemberEntity entity = new AccountMemberEntity();
       entity.setAccount(account);
@@ -71,10 +65,10 @@ public class AccountMemberService {
       accountMemberRepository.save(entity);
     } catch (DataIntegrityViolationException race) {
       AccountMemberEntity existing = accountMemberRepository
-          .findByAccount_IdAndUser_Id(accountId, userId)
+          .findByAccount_IdAndUser_Id(accountId, currentUserId)
           .orElseThrow(() -> new NotFoundException(
               MessageCodes.ACCOUNT_MEMBER_BY_ACCOUNT_USER_NOT_FOUND,
-              userId,
+              currentUserId,
               accountId
           ));
 
@@ -96,10 +90,11 @@ public class AccountMemberService {
   @Transactional
   public AccountMemberResponse createMember(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long currentUserId,
       @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountMemberCreateRequest request
   ) {
     AccountEntity account = requireAccount(accountId);
-    UserProfileEntity user = requireUser(request.userId());
+    UserProfileEntity user = requireUser(currentUserId);
 
     AccountMemberEntity entity = new AccountMemberEntity();
     entity.setAccount(account);
@@ -116,7 +111,7 @@ public class AccountMemberService {
       throw new BadRequestException(
           MessageCodes.ACCOUNT_MEMBER_ALREADY_EXISTS,
           accountId,
-          request.userId()
+          currentUserId
       );
     }
   }
@@ -180,7 +175,6 @@ public class AccountMemberService {
     }
   }
 
-
   private void assertNotDemotingLastActiveOwner(
       Long accountId,
       AccountMemberEntity existing,
@@ -242,6 +236,10 @@ public class AccountMemberService {
   }
 
   private UserProfileEntity requireUser(Long userId) {
+    if (userId == null) {
+      throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED);
+    }
+
     return userProfileRepository.findById(userId)
         .orElseThrow(() ->
             new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, userId));

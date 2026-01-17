@@ -4,6 +4,8 @@ import io.datapulse.core.service.AccountMemberService;
 import io.datapulse.domain.request.AccountMemberCreateRequest;
 import io.datapulse.domain.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.response.AccountMemberResponse;
+import io.datapulse.iam.DomainUserContext;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AccountMemberController {
 
   private final AccountMemberService accountMemberService;
+  private final DomainUserContext domainUserContext;
 
   @GetMapping
   @PreAuthorize("@accountAccessService.canManageMembers(#accountId)")
@@ -37,9 +40,10 @@ public class AccountMemberController {
   @PreAuthorize("@accountAccessService.canManageMembers(#accountId)")
   public AccountMemberResponse create(
       @PathVariable long accountId,
-      @RequestBody AccountMemberCreateRequest request
+      @NotNull @RequestBody AccountMemberCreateRequest request
   ) {
-    return accountMemberService.createMember(accountId, request);
+    long currentUserId = domainUserContext.requireProfileId();
+    return accountMemberService.createMember(accountId, currentUserId, request);
   }
 
   @PutMapping(path = "/{memberId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -47,7 +51,7 @@ public class AccountMemberController {
   public AccountMemberResponse update(
       @PathVariable long accountId,
       @PathVariable long memberId,
-      @RequestBody AccountMemberUpdateRequest request
+      @NotNull @RequestBody AccountMemberUpdateRequest request
   ) {
     return accountMemberService.updateMember(accountId, memberId, request);
   }

@@ -87,23 +87,49 @@ Authorization: Bearer {{access_token}}
 ### TESTS — AccountMemberController /api/accounts/{accountId}/members
 ### =========================================================
 
-### 1.1 CREATE (NEGATIVE): duplicate (accountId,userId) -> 400
+### 1.0 CREATE (NEGATIVE): second ACTIVE OWNER forbidden -> 400 ACCOUNT_MEMBER_SINGLE_OWNER_ONLY
 POST {{host}}/api/accounts/{{accountIdMembers}}/members
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
-  "userId": {{currentUserId}},
+  "role": "OWNER",
+  "status": "ACTIVE"
+}
+
+> {%
+  client.test("AccountMember /create — second ACTIVE OWNER forbidden 400", function () {
+    client.assert(response.status === 400, "expected 400, got " + response.status);
+
+    var b = response.body || {};
+    var msg = (b && b.message) || (b && b.error) || "";
+    client.assert(
+        /(single\s+owner|единственн.*владел|втор(ого|ой)\s+активн(ого|ый)\s+владел|second\s+active\s+owner|ACCOUNT_MEMBER_SINGLE_OWNER_ONLY)/i
+        .test(msg),
+        "no single-owner-only hint: " + msg
+    );
+  });
+%}
+
+### 1.1 CREATE (NEGATIVE): duplicate (accountId,currentUserId) -> 400
+POST {{host}}/api/accounts/{{accountIdMembers}}/members
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
   "role": "ADMIN",
   "status": "ACTIVE"
 }
 
 > {%
-  client.test("AccountMember /create — duplicate member 400", function () {
+  client.test("AccountMember /create — duplicate current user 400", function () {
     client.assert(response.status === 400, "expected 400, got " + response.status);
 
-    var msg = (response.body && response.body.message) || "";
-    client.assert(/уже\s+является\s+участником\s+аккаунта/i.test(msg),
+    var msg = (response.body && response.body.message) || (response.body && response.body.error)
+        || "";
+    client.assert(
+        /уже\s+является\s+участником\s+аккаунта|already\s+exists|ACCOUNT_MEMBER_ALREADY_EXISTS/i.test(
+            msg),
         "unexpected message: " + msg);
   });
 %}
