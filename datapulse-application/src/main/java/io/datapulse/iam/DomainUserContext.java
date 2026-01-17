@@ -1,6 +1,7 @@
 package io.datapulse.iam;
 
 import io.datapulse.domain.exception.SecurityException;
+import java.util.Optional;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
@@ -24,5 +25,9 @@ public class DomainUserContext {
       throw SecurityException.userProfileNotResolved();
     }
     return profileId;
+  }
+
+  public Optional<Long> getProfileId() {
+    return Optional.ofNullable(profileId);
   }
 }

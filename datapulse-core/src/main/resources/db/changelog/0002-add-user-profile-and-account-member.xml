@@ -10,20 +10,24 @@
     <sql>
       CREATE TABLE user_profile
       (
-        id           BIGSERIAL PRIMARY KEY,
-        keycloak_sub TEXT        NOT NULL,
-        email        TEXT        NOT NULL,
-        full_name    TEXT,
-        username     TEXT,
-        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at   TIMESTAMPTZ
+        id               BIGSERIAL PRIMARY KEY,
+        keycloak_sub     TEXT        NOT NULL,
+        email            TEXT        NOT NULL,
+        full_name        TEXT,
+        username         TEXT,
+        last_activity_at TIMESTAMPTZ,
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at       TIMESTAMPTZ
       );
 
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_user_profile_keycloak_sub
+      CREATE UNIQUE INDEX ux_user_profile_keycloak_sub
         ON user_profile (keycloak_sub);
 
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_user_profile_email_ci
+      CREATE UNIQUE INDEX ux_user_profile_email_ci
         ON user_profile (LOWER(email));
+
+      CREATE INDEX idx_user_profile_last_activity_at
+        ON user_profile (last_activity_at);
 
       CREATE TABLE account_member
       (
@@ -49,7 +53,7 @@
       CREATE INDEX idx_account_member_status
         ON account_member (status);
 
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_account_member_single_active_owner
+      CREATE UNIQUE INDEX ux_account_member_single_active_owner
         ON account_member (account_id)
         WHERE role = 'OWNER' AND status = 'ACTIVE';
     </sql>

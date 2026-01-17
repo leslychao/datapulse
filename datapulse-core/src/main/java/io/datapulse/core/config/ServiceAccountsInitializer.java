@@ -1,5 +1,7 @@
 package io.datapulse.core.config;
 
+import io.datapulse.core.properties.SandboxAccountProperties;
+import io.datapulse.core.properties.SystemAccountProperties;
 import io.datapulse.core.service.account.AccountConnectionService;
 import io.datapulse.core.service.account.AccountService;
 import io.datapulse.domain.MarketplaceType;

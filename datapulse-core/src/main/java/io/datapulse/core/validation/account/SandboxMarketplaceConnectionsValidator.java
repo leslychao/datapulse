@@ -1,6 +1,6 @@
 package io.datapulse.core.validation.account;
 
-import io.datapulse.core.config.SandboxAccountProperties;
+import io.datapulse.core.properties.SandboxAccountProperties;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

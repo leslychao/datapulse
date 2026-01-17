@@ -1,6 +1,6 @@
 package io.datapulse.core.service.account;
 
-import io.datapulse.core.config.SandboxAccountProperties;
+import io.datapulse.core.properties.SandboxAccountProperties;
 import org.springframework.stereotype.Component;
 
 @Component

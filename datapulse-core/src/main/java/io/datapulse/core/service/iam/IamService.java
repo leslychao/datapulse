@@ -18,7 +18,7 @@ public class IamService {
 
   @Transactional(readOnly = true)
   public UserProfileResponse getCurrentUserProfile(long profileId) {
-    return userProfileService.getResponseRequired(profileId);
+    return userProfileService.getUserProfileRequired(profileId);
   }
 
   @Transactional

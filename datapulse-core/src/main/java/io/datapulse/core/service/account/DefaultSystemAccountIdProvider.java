@@ -1,6 +1,6 @@
 package io.datapulse.core.service.account;
 
-import io.datapulse.core.config.SystemAccountProperties;
+import io.datapulse.core.properties.SystemAccountProperties;
 import org.springframework.stereotype.Component;
 
 @Component

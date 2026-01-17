@@ -3,6 +3,7 @@ package io.datapulse.core.service.userprofile;
 import io.datapulse.core.entity.userprofile.UserProfileEntity;
 import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.userprofile.UserProfileRepository;
+import io.datapulse.core.service.useractivity.UserActivityService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.exception.BadRequestException;
@@ -22,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 @RequiredArgsConstructor
 public class UserProfileService {
 
+  private final UserActivityService userActivityService;
   private final UserProfileRepository userProfileRepository;
   private final MapperFacade mapperFacade;
 
@@ -51,13 +53,24 @@ public class UserProfileService {
   }
 
   @Transactional(readOnly = true)
-  public UserProfileResponse getResponseRequired(
+  public UserProfileResponse getUserProfileRequired(
       @NotNull(message = ValidationKeys.ID_REQUIRED) Long id
   ) {
     UserProfileEntity entity = userProfileRepository.findById(id)
         .orElseThrow(() -> new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, id));
 
-    return mapperFacade.to(entity, UserProfileResponse.class);
+    boolean recentlyActive = userActivityService.isRecentlyActive(entity.getId());
+    return new UserProfileResponse(
+        entity.getId(),
+        entity.getKeycloakSub(),
+        entity.getEmail(),
+        entity.getFullName(),
+        entity.getUsername(),
+        entity.getCreatedAt(),
+        entity.getUpdatedAt(),
+        recentlyActive,
+        recentlyActive ? null : entity.getLastActivityAt()
+    );
   }
 
   @Transactional

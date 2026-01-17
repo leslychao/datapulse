@@ -9,7 +9,9 @@ public record UserProfileResponse(
     String fullName,
     String username,
     OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    OffsetDateTime updatedAt,
+    boolean recentlyActive,
+    OffsetDateTime lastActivityAt
 ) {
 
 }

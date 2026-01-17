@@ -1,6 +1,6 @@
 package io.datapulse.core.validation.account;
 
-import io.datapulse.core.config.SystemAccountProperties;
+import io.datapulse.core.properties.SystemAccountProperties;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

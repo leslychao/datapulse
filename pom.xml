@@ -37,6 +37,7 @@
     <caffeine.version>3.1.8</caffeine.version>
     <spring-vault.version>3.1.2</spring-vault.version>
     <poi.version>5.3.0</poi.version>
+    <gson.version>2.11.0</gson.version>
   </properties>
 
   <dependencyManagement>
@@ -87,7 +88,7 @@
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.11.0</version>
+        <version>${gson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.springframework.vault</groupId>

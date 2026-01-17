@@ -1,4 +1,4 @@
-package io.datapulse.core.config;
+package io.datapulse.core.properties;
 
 import io.datapulse.core.validation.account.ValidMarketplaceConnections;
 import io.datapulse.domain.MarketplaceType;
@@ -18,8 +18,8 @@ import org.springframework.validation.annotation.Validated;
 @Configuration
 @Validated
 @ValidMarketplaceConnections
-@ConfigurationProperties(prefix = "sandbox-account")
-public class SandboxAccountProperties {
+@ConfigurationProperties(prefix = "system-account")
+public class SystemAccountProperties {
 
   private boolean enabled;
 
