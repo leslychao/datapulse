@@ -19,17 +19,48 @@ public class EtlMartRefreshListener {
   public void onEventCompleted(EtlEventCompletedEvent event) {
     MarketplaceEvent marketplaceEvent = event.event();
 
+    long startedAt = System.currentTimeMillis();
+
     log.info(
-        "Starting mart refresh after ETL materialization: requestId={}, accountId={}, event={}",
+        "ETL mart refresh START: requestId={}, accountId={}, event={}",
         event.requestId(),
         event.accountId(),
         marketplaceEvent
     );
 
-    martRefreshService.refreshAfterEvent(
-        event.accountId(),
-        marketplaceEvent,
-        event.requestId()
-    );
+    try {
+      martRefreshService.refreshAfterEvent(
+          event.accountId(),
+          marketplaceEvent,
+          event.requestId()
+      );
+
+      log.info(
+          "ETL mart refresh SUCCESS: requestId={}, accountId={}, event={}",
+          event.requestId(),
+          event.accountId(),
+          marketplaceEvent
+      );
+
+    } catch (Exception ex) {
+      log.error(
+          "ETL mart refresh ERROR: requestId={}, accountId={}, event={}",
+          event.requestId(),
+          event.accountId(),
+          marketplaceEvent,
+          ex
+      );
+      throw ex;
+    } finally {
+      long durationMs = System.currentTimeMillis() - startedAt;
+
+      log.info(
+          "ETL mart refresh FINISHED: requestId={}, accountId={}, event={}, durationMs={}",
+          event.requestId(),
+          event.accountId(),
+          marketplaceEvent,
+          durationMs
+      );
+    }
   }
 }
