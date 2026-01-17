@@ -53,8 +53,10 @@ vault:
   uri: http://localhost:8300
   token: ${VAULT_TOKEN:}
 
-datapulse:
+app:
   user-activity:
-    expire-after-write: PT5M
-    max-size: 200000
-    flush-batch-size: 1000
+    activity-window: PT5M
+    max-size: 100_000
+    cleanup-fixed-delay: PT1M
+    flush-fixed-delay: PT1S
+    flush-batch-size: 500

@@ -14,11 +14,12 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class JdbcUserActivityRepository implements UserActivityRepository {
 
-  private static final String SQL_UPDATE_LAST_ACTIVITY_AT = """
-      update user_profile
-         set last_activity_at = :lastSeen
-       where id = :profileId
-         and (last_activity_at is null or last_activity_at < :lastSeen)
+  private static final String SQL_TEMPLATE = """
+      update user_profile up
+         set last_activity_at = v.last_seen
+        from (values %s) as v(profile_id, last_seen)
+       where up.id = v.profile_id
+         and (up.last_activity_at is null or up.last_activity_at < v.last_seen)
       """;
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -29,22 +30,30 @@ public class JdbcUserActivityRepository implements UserActivityRepository {
       return;
     }
 
-    MapSqlParameterSource[] batch = new MapSqlParameterSource[lastSeenByProfileId.size()];
-    int index = 0;
+    StringBuilder valuesSql = new StringBuilder();
+    MapSqlParameterSource params = new MapSqlParameterSource();
 
+    int index = 0;
     for (Map.Entry<Long, Instant> entry : lastSeenByProfileId.entrySet()) {
       Long profileId = entry.getKey();
       Instant lastSeen = entry.getValue();
-
       if (profileId == null || lastSeen == null) {
         continue;
       }
 
+      if (index > 0) {
+        valuesSql.append(", ");
+      }
+
+      String idParam = "profileId" + index;
+      String tsParam = "lastSeen" + index;
+
+      valuesSql.append("(:").append(idParam).append(", :").append(tsParam).append(")");
+
       OffsetDateTime lastSeenTs = OffsetDateTime.ofInstant(lastSeen, ZoneOffset.UTC);
 
-      batch[index] = new MapSqlParameterSource()
-          .addValue("profileId", profileId)
-          .addValue("lastSeen", lastSeenTs, Types.TIMESTAMP_WITH_TIMEZONE);
+      params.addValue(idParam, profileId);
+      params.addValue(tsParam, lastSeenTs, Types.TIMESTAMP_WITH_TIMEZONE);
 
       index++;
     }
@@ -53,12 +62,7 @@ public class JdbcUserActivityRepository implements UserActivityRepository {
       return;
     }
 
-    MapSqlParameterSource[] effectiveBatch = batch;
-    if (index != batch.length) {
-      effectiveBatch = new MapSqlParameterSource[index];
-      System.arraycopy(batch, 0, effectiveBatch, 0, index);
-    }
-
-    jdbcTemplate.batchUpdate(SQL_UPDATE_LAST_ACTIVITY_AT, effectiveBatch);
+    String sql = SQL_TEMPLATE.formatted(valuesSql);
+    jdbcTemplate.update(sql, params);
   }
 }

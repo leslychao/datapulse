@@ -4,11 +4,9 @@ import io.datapulse.core.properties.UserActivityProperties;
 import io.datapulse.core.repository.useractivity.UserActivityRepository;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,36 +18,44 @@ public class UserActivityWriteBehindStore {
   private final UserActivityRepository userActivityRepository;
   private final UserActivityProperties props;
 
-  private final BlockingQueue<FlushItem> queue = new LinkedBlockingQueue<>();
+  private final ConcurrentHashMap<Long, Instant> pendingLastSeen = new ConcurrentHashMap<>();
 
-  public void enqueue(long profileId, Instant lastSeen) {
-    queue.add(new FlushItem(profileId, lastSeen));
+  public void enqueue(long profileId, Instant lastSeenAt) {
+    pendingLastSeen.merge(
+        profileId,
+        lastSeenAt,
+        (a, b) -> a.isAfter(b) ? a : b
+    );
   }
 
-  @Scheduled(fixedDelayString = "PT1S")
+  @Scheduled(fixedDelayString = "${app.user-activity.flush-fixed-delay}")
   public void flushBatch() {
-    int batchSize = props.flushBatchSize();
-
-    List<FlushItem> drained = new ArrayList<>(batchSize);
-    queue.drainTo(drained, batchSize);
-
-    if (drained.isEmpty()) {
+    if (pendingLastSeen.isEmpty()) {
       return;
     }
 
-    Map<Long, Instant> lastSeenByProfileId = new HashMap<>(drained.size());
-    for (FlushItem item : drained) {
-      lastSeenByProfileId.merge(
-          item.profileId(),
-          item.lastSeen(),
-          (a, b) -> a.isAfter(b) ? a : b
-      );
+    int batchSize = props.flushBatchSize();
+    List<Map.Entry<Long, Instant>> batch = new ArrayList<>(batchSize);
+
+    for (Map.Entry<Long, Instant> entry : pendingLastSeen.entrySet()) {
+      batch.add(entry);
+      if (batch.size() >= batchSize) {
+        break;
+      }
     }
 
-    userActivityRepository.updateLastActivityAtIfGreater(lastSeenByProfileId);
-  }
+    Map<Long, Instant> toFlush = new ConcurrentHashMap<>(batch.size());
+    for (Map.Entry<Long, Instant> entry : batch) {
+      Long profileId = entry.getKey();
+      Instant lastSeenAt = entry.getValue();
+      boolean removed = pendingLastSeen.remove(profileId, lastSeenAt);
+      if (removed) {
+        toFlush.put(profileId, lastSeenAt);
+      }
+    }
 
-  public record FlushItem(long profileId, Instant lastSeen) {
-
+    if (!toFlush.isEmpty()) {
+      userActivityRepository.updateLastActivityAtIfGreater(toFlush);
+    }
   }
 }

@@ -18,17 +18,18 @@ public class UserActivityCacheConfig {
 
   @Bean
   public Cache<Long, Instant> userActivityCache(
-      UserActivityWriteBehindStore writeBehind,
-      UserActivityProperties props) {
+      UserActivityWriteBehindStore writeBehindStore,
+      UserActivityProperties props
+  ) {
     return Caffeine.newBuilder()
         .maximumSize(props.maxSize())
-        .expireAfterWrite(props.expireAfterWrite())
-        .removalListener((Long profileId, Instant lastSeen, RemovalCause cause) -> {
-          if (profileId == null || lastSeen == null) {
+        .expireAfterWrite(props.activityWindow())
+        .removalListener((Long profileId, Instant lastSeenAt, RemovalCause cause) -> {
+          if (profileId == null || lastSeenAt == null) {
             return;
           }
           if (cause == RemovalCause.EXPIRED) {
-            writeBehind.enqueue(profileId, lastSeen);
+            writeBehindStore.enqueue(profileId, lastSeenAt);
           }
         })
         .build();
