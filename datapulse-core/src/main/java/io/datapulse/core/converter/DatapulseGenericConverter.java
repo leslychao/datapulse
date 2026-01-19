@@ -8,7 +8,6 @@ import io.datapulse.core.entity.account.AccountConnectionEntity;
 import io.datapulse.core.entity.account.AccountEntity;
 import io.datapulse.core.entity.inventory.FactInventorySnapshotEntity;
 import io.datapulse.core.entity.productcost.ProductCostEntity;
-import io.datapulse.core.entity.userprofile.UserProfileEntity;
 import io.datapulse.core.mapper.AccountMemberMapper;
 import io.datapulse.core.mapper.EtlExecutionAuditMapper;
 import io.datapulse.core.mapper.account.AccountConnectionMapper;
@@ -23,7 +22,6 @@ import io.datapulse.domain.response.AccountMemberResponse;
 import io.datapulse.domain.response.account.AccountConnectionResponse;
 import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.domain.response.inventory.InventorySnapshotResponse;
-import io.datapulse.domain.response.userprofile.UserProfileResponse;
 import jakarta.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -66,8 +64,6 @@ public final class DatapulseGenericConverter implements GenericConverter {
 
     register(FactInventorySnapshotEntity.class, InventorySnapshotResponse.class,
         inventorySnapshotMapper::toResponse);
-
-    register(UserProfileEntity.class, UserProfileResponse.class, userProfileMapper::toResponse);
 
     register(AccountMemberEntity.class, AccountMemberResponse.class,
         accountMemberMapper::toResponse);

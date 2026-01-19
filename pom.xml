@@ -38,10 +38,16 @@
     <spring-vault.version>3.1.2</spring-vault.version>
     <poi.version>5.3.0</poi.version>
     <gson.version>2.11.0</gson.version>
+    <springdoc.version>2.8.15</springdoc.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
