@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0021-create-account-invite" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      CREATE TABLE account_invite
+      (
+        id                    BIGSERIAL PRIMARY KEY,
+        email                 TEXT        NOT NULL,
+        token_hash            TEXT        NOT NULL,
+        status                TEXT        NOT NULL,
+        expires_at            TIMESTAMPTZ NOT NULL,
+        created_by_profile_id BIGINT      NOT NULL,
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE UNIQUE INDEX ux_account_invite_token_hash
+        ON account_invite (token_hash);
+
+      CREATE INDEX ix_account_invite_email
+        ON account_invite (email);
+
+      CREATE INDEX ix_account_invite_created_by_profile_id
+        ON account_invite (created_by_profile_id);
+
+      CREATE INDEX ix_account_invite_status_expires_at
+        ON account_invite (status, expires_at);
+
+      ALTER TABLE account_invite
+        ADD CONSTRAINT ck_account_invite_status
+          CHECK (status IN ('PENDING', 'CANCELLED', 'EXPIRED', 'ACCEPTED'));
+
+      CREATE TABLE account_invite_target
+      (
+        id           BIGSERIAL PRIMARY KEY,
+        invite_id    BIGINT NOT NULL,
+        account_id   BIGINT NOT NULL,
+        initial_role TEXT   NOT NULL,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      ALTER TABLE account_invite_target
+        ADD CONSTRAINT fk_account_invite_target_invite
+          FOREIGN KEY (invite_id) REFERENCES account_invite (id);
+
+      CREATE UNIQUE INDEX ux_account_invite_target_invite_account
+        ON account_invite_target (invite_id, account_id);
+
+      ALTER TABLE account_invite_target
+        ADD CONSTRAINT ck_account_invite_target_initial_role
+          CHECK (initial_role IN ('ADMIN', 'OPERATOR', 'VIEWER'));
+
+      CREATE TABLE account_invite_acceptance
+      (
+        id                  BIGSERIAL PRIMARY KEY,
+        invite_id           BIGINT      NOT NULL,
+        accepted_profile_id BIGINT      NOT NULL,
+        accepted_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      ALTER TABLE account_invite_acceptance
+        ADD CONSTRAINT fk_account_invite_acceptance_invite
+          FOREIGN KEY (invite_id) REFERENCES account_invite (id);
+
+      CREATE UNIQUE INDEX ux_account_invite_acceptance_invite_id
+        ON account_invite_acceptance (invite_id);
+
+      CREATE INDEX ix_account_invite_acceptance_accepted_profile_id
+        ON account_invite_acceptance (accepted_profile_id);
+
+    </sql>
+  </changeSet>
+
+</databaseChangeLog>

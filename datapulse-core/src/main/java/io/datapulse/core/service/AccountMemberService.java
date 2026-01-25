@@ -34,6 +34,57 @@ public class AccountMemberService {
   private final MapperFacade mapperFacade;
 
   @Transactional
+  public void grantAccountMembership(
+      @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
+      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long userId,
+      @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountMemberRole role
+  ) {
+    accountMemberRepository.findByAccount_IdAndUser_Id(accountId, userId)
+        .ifPresentOrElse(
+            existing -> activateMembership(existing, role),
+            () -> createMembershipIdempotent(accountId, userId, role)
+        );
+  }
+
+  private void activateMembership(AccountMemberEntity existing, AccountMemberRole role) {
+    if (existing.getStatus() != AccountMemberStatus.ACTIVE) {
+      existing.setStatus(AccountMemberStatus.ACTIVE);
+    }
+    if (role != null && existing.getRole() != role) {
+      existing.setRole(role);
+    }
+    accountMemberRepository.save(existing);
+  }
+
+  private void createMembershipIdempotent(
+      Long accountId,
+      Long userId,
+      AccountMemberRole role
+  ) {
+    try {
+      AccountEntity account = requireAccount(accountId);
+      UserProfileEntity user = requireUser(userId);
+
+      AccountMemberEntity entity = new AccountMemberEntity();
+      entity.setAccount(account);
+      entity.setUser(user);
+      entity.setRole(role);
+      entity.setStatus(AccountMemberStatus.ACTIVE);
+
+      accountMemberRepository.save(entity);
+    } catch (DataIntegrityViolationException race) {
+      AccountMemberEntity existing = accountMemberRepository
+          .findByAccount_IdAndUser_Id(accountId, userId)
+          .orElseThrow(() -> new NotFoundException(
+              MessageCodes.ACCOUNT_MEMBER_BY_ACCOUNT_USER_NOT_FOUND,
+              userId,
+              accountId
+          ));
+      activateMembership(existing, role);
+    }
+  }
+
+  @Transactional
   public void ensureOwnerMembership(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long currentUserId

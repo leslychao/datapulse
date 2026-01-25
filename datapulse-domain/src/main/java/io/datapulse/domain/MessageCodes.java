@@ -136,4 +136,11 @@ public final class MessageCodes {
   public static final String SECURITY_USER_PROFILE_NOT_RESOLVED = "security.user.profile.not.resolved";
   public static final String SECURITY_ACCESS_DENIED = "security.access.denied";
   public static final String SECURITY_ACCOUNT_ACCESS_DENIED = "security.account.access.denied";
+
+  public static final String INVITE_EMAIL_SUBJECT = "invite.email.subject";
+  public static final String INVITE_EMAIL_TITLE = "invite.email.title";
+  public static final String INVITE_EMAIL_LEAD = "invite.email.lead";
+  public static final String INVITE_EMAIL_CTA = "invite.email.cta";
+  public static final String INVITE_EMAIL_COPY_LINK = "invite.email.copy-link";
+  public static final String INVITE_EMAIL_FOOTER = "invite.email.footer";
 }
