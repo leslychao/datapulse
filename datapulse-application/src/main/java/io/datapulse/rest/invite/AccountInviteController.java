@@ -36,11 +36,7 @@ public class AccountInviteController {
   public AccountInviteResponse create(@RequestBody @Valid AccountInviteCreateRequest request) {
     long currentProfileId = domainUserContext.requireProfileId();
 
-    String currentEmail = securityHelper.getCurrentUserIfAuthenticated()
-        .map(AuthenticatedUser::email)
-        .orElseThrow(SecurityException::userProfileNotResolved);
-
-    return accountInviteService.createInvite(currentProfileId, currentEmail, request);
+    return accountInviteService.createInvite(currentProfileId, request);
   }
 
   @GetMapping("/resolve")
@@ -55,7 +51,8 @@ public class AccountInviteController {
   }
 
   @PostMapping(path = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
-  public AccountInviteAcceptResponse accept(@RequestBody @Valid AccountInviteAcceptRequest request) {
+  public AccountInviteAcceptResponse accept(
+      @RequestBody @Valid AccountInviteAcceptRequest request) {
     long currentProfileId = domainUserContext.requireProfileId();
 
     String currentEmail = securityHelper.getCurrentUserIfAuthenticated()
