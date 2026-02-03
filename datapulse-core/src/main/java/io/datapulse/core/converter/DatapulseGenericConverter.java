@@ -14,7 +14,6 @@ import io.datapulse.core.mapper.account.AccountConnectionMapper;
 import io.datapulse.core.mapper.account.AccountMapper;
 import io.datapulse.core.mapper.inventory.InventorySnapshotMapper;
 import io.datapulse.core.mapper.productcost.ProductCostMapper;
-import io.datapulse.core.mapper.userprofile.UserProfileMapper;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
 import io.datapulse.domain.dto.productcost.ProductCostDto;
 import io.datapulse.domain.exception.AppException;
@@ -42,8 +41,6 @@ public final class DatapulseGenericConverter implements GenericConverter {
   private final EtlExecutionAuditMapper etlSyncAuditMapper;
   private final InventorySnapshotMapper inventorySnapshotMapper;
   private final ProductCostMapper productCostMapper;
-
-  private final UserProfileMapper userProfileMapper;
   private final AccountMemberMapper accountMemberMapper;
 
   private final Map<ConvertiblePair, TypedConverter<?, ?>> converters = new LinkedHashMap<>();
