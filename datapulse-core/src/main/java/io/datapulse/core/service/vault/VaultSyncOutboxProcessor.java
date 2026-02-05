@@ -15,17 +15,17 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class VaultSyncOutboxProcessor {
-
-  private static final Logger log = LoggerFactory.getLogger(VaultSyncOutboxProcessor.class);
 
   private static final int MAX_ATTEMPTS = 10;
   private static final int BATCH_SIZE = 50;
@@ -34,16 +34,6 @@ public class VaultSyncOutboxProcessor {
   private final VaultSyncOutboxRepository repository;
   private final MarketplaceCredentialsVaultService vaultService;
   private final AccountConnectionRepository accountConnectionRepository;
-
-  public VaultSyncOutboxProcessor(
-      VaultSyncOutboxRepository repository,
-      MarketplaceCredentialsVaultService vaultService,
-      AccountConnectionRepository accountConnectionRepository
-  ) {
-    this.repository = repository;
-    this.vaultService = vaultService;
-    this.accountConnectionRepository = accountConnectionRepository;
-  }
 
   @Scheduled(fixedDelayString = "60000", initialDelayString = "60000")
   @Transactional
@@ -56,9 +46,7 @@ public class VaultSyncOutboxProcessor {
         PageRequest.of(0, BATCH_SIZE)
     );
 
-    for (VaultSyncOutboxEntity outbox : batch) {
-      processOutbox(outbox, now);
-    }
+    batch.forEach(vaultSyncOutboxEntity -> processOutbox(vaultSyncOutboxEntity, now));
   }
 
   private void processOutbox(VaultSyncOutboxEntity outbox, OffsetDateTime now) {
@@ -77,8 +65,12 @@ public class VaultSyncOutboxProcessor {
       }
     } catch (Exception e) {
       success = false;
-      log.warn("Vault sync attempt failed for account {} marketplace {} command {}", accountId,
-          marketplace, commandType, e);
+      log.warn(
+          "Vault sync attempt failed for account {} marketplace {} command {}",
+          accountId,
+          marketplace,
+          commandType,
+          e);
     }
 
     if (success) {
@@ -136,7 +128,9 @@ public class VaultSyncOutboxProcessor {
         .findByAccount_IdAndMarketplace(accountId, marketplace);
 
     if (connection.isEmpty()) {
-      log.warn("Account connection not found for account {} marketplace {}", accountId,
+      log.warn(
+          "Account connection not found for account {} marketplace {}",
+          accountId,
           marketplace);
       return;
     }
@@ -156,7 +150,9 @@ public class VaultSyncOutboxProcessor {
         .findByAccount_IdAndMarketplace(accountId, marketplace);
 
     if (connection.isEmpty()) {
-      log.warn("Account connection not found for account {} marketplace {}", accountId,
+      log.warn(
+          "Account connection not found for account {} marketplace {}",
+          accountId,
           marketplace);
       return;
     }

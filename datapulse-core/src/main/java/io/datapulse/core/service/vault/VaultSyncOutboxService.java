@@ -8,6 +8,7 @@ import io.datapulse.domain.dto.credentials.MarketplaceCredentials;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -15,18 +16,11 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 @Slf4j
+@RequiredArgsConstructor
 public class VaultSyncOutboxService {
 
   private final MarketplaceCredentialsVaultService vaultService;
   private final VaultSyncOutboxTxService txService;
-
-  public VaultSyncOutboxService(
-      MarketplaceCredentialsVaultService vaultService,
-      VaultSyncOutboxTxService txService
-  ) {
-    this.vaultService = vaultService;
-    this.txService = txService;
-  }
 
   public void ensurePresent(
       @Min(value = 1L, message = ValidationKeys.ACCOUNT_ID_REQUIRED)
