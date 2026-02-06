@@ -38,4 +38,12 @@ public interface MarketplaceCredentialsVaultService {
       @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)
       MarketplaceType marketplace
   );
+
+  boolean credentialsExist(
+      @Min(value = 1L, message = ValidationKeys.ACCOUNT_ID_REQUIRED)
+      long accountId,
+
+      @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)
+      MarketplaceType marketplace
+  );
 }

@@ -83,4 +83,13 @@ public class VaultSyncOutboxService {
       );
     }
   }
+
+  public boolean isPresent(
+      @Min(value = 1L, message = ValidationKeys.ACCOUNT_ID_REQUIRED)
+      long accountId,
+      @NotNull(message = ValidationKeys.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED)
+      MarketplaceType marketplace
+  ) {
+    return vaultService.credentialsExist(accountId, marketplace);
+  }
 }

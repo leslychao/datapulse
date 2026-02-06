@@ -122,10 +122,6 @@ public class AccountConnectionService {
     MarketplaceCredentials credentials = request.credentials();
     Boolean requestedActive = request.active();
 
-    if (Boolean.TRUE.equals(requestedActive) && credentials == null) {
-      throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED);
-    }
-
     if (credentials != null) {
       if (!marketplace.supports(credentials)) {
         throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH);
@@ -134,10 +130,12 @@ public class AccountConnectionService {
       existing.setActive(true);
       vaultSyncOutboxService.ensurePresent(accountId, marketplace, credentials);
     } else if (requestedActive != null) {
-      existing.setActive(requestedActive);
-      if (!requestedActive) {
-        vaultSyncOutboxService.ensureAbsent(accountId, marketplace);
+      if (requestedActive) {
+        if (!vaultSyncOutboxService.isPresent(accountId, marketplace)) {
+          throw new BadRequestException(MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED);
+        }
       }
+      existing.setActive(requestedActive);
     }
 
     AccountConnectionEntity saved = accountConnectionRepository.save(existing);
@@ -164,8 +162,10 @@ public class AccountConnectionService {
   ) {
     requireAccountEntity(accountId);
 
-    if (!accountConnectionRepository.existsByAccount_IdAndMarketplaceAndActiveTrue(accountId,
-        marketplaceType)) {
+    if (!accountConnectionRepository.existsByAccount_IdAndMarketplaceAndActiveTrue(
+        accountId,
+        marketplaceType
+    )) {
       throw new NotFoundException(
           MessageCodes.ACCOUNT_CONNECTION_BY_ACCOUNT_MARKETPLACE_NOT_FOUND,
           accountId,

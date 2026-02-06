@@ -9,8 +9,7 @@ import org.springframework.vault.support.VaultResponseSupport;
 
 @Service
 @Validated
-public class MarketplaceCredentialsVaultServiceImpl implements
-    MarketplaceCredentialsVaultService {
+public class MarketplaceCredentialsVaultServiceImpl implements MarketplaceCredentialsVaultService {
 
   private static final String ROOT_PATH = "datapulse/accounts";
 
@@ -50,6 +49,16 @@ public class MarketplaceCredentialsVaultServiceImpl implements
   ) {
     String path = buildPath(accountId, marketplace);
     kv.delete(path);
+  }
+
+  @Override
+  public boolean credentialsExist(
+      long accountId,
+      MarketplaceType marketplace
+  ) {
+    String path = buildPath(accountId, marketplace);
+    VaultResponseSupport<Object> resp = kv.get(path, Object.class);
+    return resp != null && resp.getData() != null;
   }
 
   private String buildPath(long accountId, MarketplaceType marketplace) {
