@@ -7,7 +7,8 @@ import io.datapulse.etl.dto.scenario.EtlScenarioRunRequest;
 import io.datapulse.etl.dto.scenario.EtlScenarioStep;
 import io.datapulse.etl.service.EtlDateRangeResolver;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,11 +42,12 @@ public class EtlScenarioPlanner {
               throw new IllegalArgumentException(
                   "Duplicate event in scenario: " + left.event()
               );
-            }
+            },
+            LinkedHashMap::new
         ));
 
-    List<MarketplaceEvent> orderedEvents =
-        topologicallySortWithDependencies(new HashSet<>(configByEvent.keySet()));
+    Set<MarketplaceEvent> orderedRoots = new LinkedHashSet<>(configByEvent.keySet());
+    List<MarketplaceEvent> orderedEvents = topologicallySortWithDependencies(orderedRoots);
 
     return orderedEvents.stream()
         .map(event -> toScenarioStep(request, requestId, event, configByEvent))
@@ -86,8 +88,8 @@ public class EtlScenarioPlanner {
       Set<MarketplaceEvent> roots
   ) {
     List<MarketplaceEvent> result = new ArrayList<>();
-    Set<MarketplaceEvent> visited = new HashSet<>();
-    Set<MarketplaceEvent> visiting = new HashSet<>();
+    Set<MarketplaceEvent> visited = new LinkedHashSet<>();
+    Set<MarketplaceEvent> visiting = new LinkedHashSet<>();
 
     for (MarketplaceEvent root : roots) {
       dfs(root, visited, visiting, result);
