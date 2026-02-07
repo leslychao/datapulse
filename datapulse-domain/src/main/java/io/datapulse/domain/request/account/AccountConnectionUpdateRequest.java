@@ -9,7 +9,9 @@ import io.datapulse.domain.dto.credentials.WbCredentials;
 public record AccountConnectionUpdateRequest(
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
-        property = "type"
+        include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
+        property = "marketplace",
+        visible = true
     )
     @JsonSubTypes({
         @JsonSubTypes.Type(value = WbCredentials.class, name = "WILDBERRIES"),
