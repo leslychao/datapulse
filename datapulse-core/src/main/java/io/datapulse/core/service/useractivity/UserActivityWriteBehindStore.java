@@ -1,4 +1,4 @@
-package io.datapulse.core.useractivity;
+package io.datapulse.core.service.useractivity;
 
 import io.datapulse.core.properties.UserActivityProperties;
 import io.datapulse.core.repository.useractivity.UserActivityRepository;
