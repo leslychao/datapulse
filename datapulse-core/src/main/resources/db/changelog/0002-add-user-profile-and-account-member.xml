@@ -52,10 +52,6 @@
 
       CREATE INDEX idx_account_member_status
         ON account_member (status);
-
-      CREATE UNIQUE INDEX ux_account_member_single_active_owner
-        ON account_member (account_id)
-        WHERE role = 'OWNER' AND status = 'ACTIVE';
     </sql>
 
     <rollback>
