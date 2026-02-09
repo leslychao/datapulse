@@ -16,8 +16,7 @@ public interface AccountRepository extends JpaRepository<AccountEntity, Long> {
       from AccountEntity a
         join AccountMemberEntity am on am.account.id = a.id
       where
-        a.active = true
-        and am.user.id = :profileId
+        am.user.id = :profileId
         and am.status = io.datapulse.domain.AccountMemberStatus.ACTIVE
       """)
   List<AccountEntity> findAccessibleActiveAccountsForProfileId(@Param("profileId") long profileId);

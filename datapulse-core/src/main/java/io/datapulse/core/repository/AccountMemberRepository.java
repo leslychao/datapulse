@@ -23,6 +23,16 @@ public interface AccountMemberRepository extends JpaRepository<AccountMemberEnti
 
   List<AccountMemberEntity> findAllByAccount_IdOrderByIdAsc(Long accountId);
 
+  @Query("""
+      select am
+      from AccountMemberEntity am
+      join fetch am.user u
+      where am.account.id = :accountId
+      order by am.id asc
+      """)
+  List<AccountMemberEntity> findAllByAccountIdWithUserOrderByIdAsc(
+      @Param("accountId") Long accountId);
+
   List<AccountMemberEntity> findAllByUser_Id(Long userId);
 
   Optional<AccountMemberEntity> findByIdAndAccount_Id(Long memberId, Long accountId);

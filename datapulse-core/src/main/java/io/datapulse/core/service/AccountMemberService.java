@@ -82,7 +82,7 @@ public class AccountMemberService {
   ) {
     requireAccountExists(accountId);
 
-    return accountMemberRepository.findAllByAccount_IdOrderByIdAsc(accountId).stream()
+    return accountMemberRepository.findAllByAccountIdWithUserOrderByIdAsc(accountId).stream()
         .map(this::toResponse)
         .toList();
   }
