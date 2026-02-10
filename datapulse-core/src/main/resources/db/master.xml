@@ -24,4 +24,6 @@
   <include file="changelog/0018-create-fact-marketing-costs.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0019-create-mart-order-pnl.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0020-create-vault-sync-outbox.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0021-create-account-invite.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0022-create-etl-event-audit.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

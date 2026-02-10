@@ -31,8 +31,6 @@
         marketplace        TEXT        NOT NULL,
         active             BOOLEAN     NOT NULL DEFAULT TRUE,
         masked_credentials TEXT,
-        last_sync_at       TIMESTAMPTZ,
-        last_sync_status   TEXT,
         created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at         TIMESTAMPTZ,
         CONSTRAINT uq_account_marketplace UNIQUE (account_id, marketplace)

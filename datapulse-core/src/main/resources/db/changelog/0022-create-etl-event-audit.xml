@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0022-create-etl-event-audit" author="vitalii.kim" dbms="postgresql">
+    <sql>
+      -- ======================================
+      -- ETL EVENT AUDIT (aggregated per event)
+      -- ======================================
+      CREATE TABLE etl_event_audit
+      (
+        id            BIGSERIAL PRIMARY KEY,
+
+        request_id    VARCHAR(64) NOT NULL,
+        account_id    BIGINT      NOT NULL,
+        marketplace   VARCHAR(32) NOT NULL,
+        event         VARCHAR(64) NOT NULL,
+
+        date_from     DATE,
+        date_to       DATE,
+
+        status        VARCHAR(32) NOT NULL,
+
+        started_at    TIMESTAMPTZ NOT NULL,
+        finished_at   TIMESTAMPTZ,
+
+        error_message TEXT        NULL,
+
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE UNIQUE INDEX ux_etl_event_audit_key
+        ON etl_event_audit (request_id, account_id, marketplace, event);
+
+      CREATE INDEX idx_etl_event_audit_req
+        ON etl_event_audit (request_id);
+
+      CREATE INDEX idx_etl_event_audit_acc_event_created
+        ON etl_event_audit (account_id, event, created_at DESC);
+
+      CREATE INDEX idx_etl_event_audit_acc_market_event_created
+        ON etl_event_audit (account_id, marketplace, event, created_at DESC);
+    </sql>
+
+    <rollback>
+      DROP TABLE IF EXISTS etl_event_audit CASCADE;
+    </rollback>
+  </changeSet>
+</databaseChangeLog>
