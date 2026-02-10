@@ -1,16 +1,5 @@
 # Datapulse — Marketplace Analytics Platform
 
-**PROPRIETARY SOFTWARE — NO USAGE RIGHTS**
-
-Datapulse is proprietary software owned exclusively by **Vitalii Kim**.
-This repository is provided for **read-only review** purposes only.
-Any use is prohibited, including running, compiling, deploying, modifying, integrating,
-or using it in any business or operational context.
-
-See [LICENSE](./LICENSE).
-
----
-
 **Datapulse** is a proprietary analytical platform for marketplace sellers (Wildberries and Ozon).
 It consolidates fragmented operational and financial data into a single, consistent analytical
 system and formalizes end-to-end data ingestion, normalization, and profit calculation.
