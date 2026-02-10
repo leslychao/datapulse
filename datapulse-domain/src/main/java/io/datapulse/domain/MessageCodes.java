@@ -140,6 +140,11 @@ public final class MessageCodes {
   public static final String SECURITY_ACCOUNT_SELF_OWNER_PROMOTION_FORBIDDEN = "security.account.self-promotion.forbidden";
 
   public static final String INVITE_EMAIL_REQUIRED = "invite.email.required";
+  public static final String INVITE_EMAIL_INVALID = "invite.email.invalid";
+  public static final String INVITE_TOKEN_REQUIRED = "invite.token.required";
+  public static final String INVITE_INITIAL_ROLE_REQUIRED = "invite.initial-role.required";
+  public static final String INVITE_ACCOUNT_ID_REQUIRED = "invite.account-id.required";
+
   public static final String INVITE_OWNER_ROLE_FORBIDDEN = "invite.owner-role.forbidden";
   public static final String INVITE_ACCOUNTS_REQUIRED = "invite.accounts.required";
   public static final String INVITE_NOT_FOUND_OR_INVALID = "invite.not-found-or-invalid";
@@ -155,4 +160,9 @@ public final class MessageCodes {
   public static final String INVITE_EMAIL_COPY_LINK = "invite.email.copy-link";
   public static final String INVITE_EMAIL_FOOTER = "invite.email.footer";
   public static final String INVITE_TOKEN_HASHING_FAILED = "invite.token.hashingFailed";
+  public static final String INVITE_EMAIL_DELIVERY_FAILED = "invite.email.delivery.failed";
+  public static final String INVITE_EMAIL_SENT = "invite.email.sent";
+  public static final String INVITE_EMAIL_SEND_FAILED = "invite.email.send.failed";
+
+  public static final String TEMPLATE_RENDER_FAILED = "template.render.failed";
 }

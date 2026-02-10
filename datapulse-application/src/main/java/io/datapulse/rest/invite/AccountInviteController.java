@@ -1,13 +1,12 @@
 package io.datapulse.rest.invite;
 
-import io.datapulse.core.service.account.invite.AccountInviteService;
+import io.datapulse.core.service.invite.AccountInviteService;
 import io.datapulse.domain.request.account.invite.AccountInviteAcceptRequest;
 import io.datapulse.domain.request.account.invite.AccountInviteCreateRequest;
 import io.datapulse.domain.response.account.invite.AccountInviteAcceptResponse;
 import io.datapulse.domain.response.account.invite.AccountInviteResolveResponse;
 import io.datapulse.domain.response.account.invite.AccountInviteResponse;
 import io.datapulse.iam.DomainUserContext;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,8 +29,8 @@ public class AccountInviteController {
 
   @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("isAuthenticated()")
-  public AccountInviteResponse create(@RequestBody @Valid AccountInviteCreateRequest request) {
+  @PreAuthorize("isAuthenticated() and @inviteAuthorizationService.canCreateInvite(#request)")
+  public AccountInviteResponse create(@RequestBody AccountInviteCreateRequest request) {
     long currentProfileId = domainUserContext.requireProfileId();
     return accountInviteService.createInvite(currentProfileId, request);
   }
@@ -49,11 +48,9 @@ public class AccountInviteController {
 
   @PostMapping(path = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("isAuthenticated()")
-  public AccountInviteAcceptResponse accept(
-      @RequestBody @Valid AccountInviteAcceptRequest request) {
+  public AccountInviteAcceptResponse accept(@RequestBody AccountInviteAcceptRequest request) {
     long currentProfileId = domainUserContext.requireProfileId();
     String currentEmail = domainUserContext.requireCurrentEmail();
-
     return accountInviteService.accept(currentProfileId, currentEmail, request);
   }
 }

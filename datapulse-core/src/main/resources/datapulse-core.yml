@@ -73,8 +73,7 @@ app:
     flush-fixed-delay: PT1S
     flush-batch-size: 500
 
-datapulse:
-  invite:
-    public-base-url: ${DATAPULSE_INVITE_PUBLIC_BASE_URL:http://localhost:4200}
+  invitation:
+    public-base-url: ${APP_INVITATION_PUBLIC_BASE_URL:http://localhost:4200}
     email:
-      from: ${DATAPULSE_INVITE_EMAIL_FROM:no-reply@datapulse.local}
+      from: ${APP_INVITATION_EMAIL_FROM:no-reply@datapulse.local}

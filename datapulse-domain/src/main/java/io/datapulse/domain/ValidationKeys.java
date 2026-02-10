@@ -5,7 +5,6 @@ public final class ValidationKeys {
   private ValidationKeys() {
   }
 
-  // ===== Common validation =====
   public static final String DTO_REQUIRED = "{" + MessageCodes.DTO_REQUIRED + "}";
   public static final String ENTITY_REQUIRED = "{" + MessageCodes.ENTITY_REQUIRED + "}";
   public static final String REQUEST_REQUIRED = "{" + MessageCodes.REQUEST_REQUIRED + "}";
@@ -14,14 +13,10 @@ public final class ValidationKeys {
   public static final String ID_REQUIRED = "{" + MessageCodes.ID_REQUIRED + "}";
   public static final String DATE_RANGE_INVALID = "{" + MessageCodes.DATE_RANGE_INVALID + "}";
 
-
-  // ===== Account =====
   public static final String ACCOUNT_ID_REQUIRED = "{" + MessageCodes.ACCOUNT_ID_REQUIRED + "}";
   public static final String ACCOUNT_NAME_REQUIRED = "{" + MessageCodes.ACCOUNT_NAME_REQUIRED + "}";
-  public static final String ACCOUNT_NAME_MAX_LENGTH =
-      "{" + MessageCodes.ACCOUNT_NAME_MAX_LENGTH + "}";
+  public static final String ACCOUNT_NAME_MAX_LENGTH = "{" + MessageCodes.ACCOUNT_NAME_MAX_LENGTH + "}";
 
-  // ===== Account-Connection =====
   public static final String ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED =
       "{" + MessageCodes.ACCOUNT_CONNECTION_MARKETPLACE_REQUIRED + "}";
   public static final String ACCOUNT_CONNECTION_CREDENTIALS_REQUIRED =
@@ -29,7 +24,6 @@ public final class ValidationKeys {
   public static final String ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH =
       "{" + MessageCodes.ACCOUNT_CONNECTION_CREDENTIALS_TYPE_MISMATCH + "}";
 
-  // ===== Credentials =====
   public static final String CREDENTIALS_WB_TOKEN_NOT_BLANK =
       "{" + MessageCodes.CREDENTIALS_WB_TOKEN_NOT_BLANK + "}";
   public static final String CREDENTIALS_OZON_CLIENT_ID_NOT_BLANK =
@@ -37,13 +31,11 @@ public final class ValidationKeys {
   public static final String CREDENTIALS_OZON_API_KEY_NOT_BLANK =
       "{" + MessageCodes.CREDENTIALS_OZON_API_KEY_NOT_BLANK + "}";
 
-  // ===== Marketplace / Config =====
   public static final String MARKETPLACE_BASE_URL_MISSING =
       "{" + MessageCodes.MARKETPLACE_BASE_URL_MISSING + "}";
   public static final String MARKETPLACE_ENDPOINT_AUTH_SCOPE_REQUIRED =
       "{" + MessageCodes.MARKETPLACE_ENDPOINT_AUTH_SCOPE_REQUIRED + "}";
 
-  // ===== Marketplace / Config binding (Bean Validation) =====
   public static final String MARKETPLACE_PROVIDERS_REQUIRED =
       "{" + MessageCodes.MARKETPLACE_PROVIDERS_REQUIRED + "}";
   public static final String MARKETPLACE_ENDPOINTS_REQUIRED =
@@ -78,12 +70,10 @@ public final class ValidationKeys {
   public static final String MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN =
       "{" + MessageCodes.MARKETPLACE_STORAGE_CLEANUP_INTERVAL_MIN + "}";
 
-  // ===== ETL / Events =====
   public static final String ETL_EVENT_REQUIRED = "{" + MessageCodes.ETL_EVENT_REQUIRED + "}";
   public static final String ETL_EVENT_SOURCES_MISSING =
       "{" + MessageCodes.ETL_EVENT_SOURCES_MISSING + "}";
 
-  // ===== User-Profile =====
   public static final String USER_PROFILE_KEYCLOAK_SUB_REQUIRED =
       "{" + MessageCodes.USER_PROFILE_KEYCLOAK_SUB_REQUIRED + "}";
 
@@ -93,8 +83,6 @@ public final class ValidationKeys {
   public static final String USER_PROFILE_EMAIL_INVALID =
       "{" + MessageCodes.USER_PROFILE_EMAIL_INVALID + "}";
 
-
-  // ===== Account-Member =====
   public static final String ACCOUNT_MEMBER_ACCOUNT_ID_REQUIRED =
       "{" + MessageCodes.ACCOUNT_MEMBER_ACCOUNT_ID_REQUIRED + "}";
 
@@ -112,4 +100,13 @@ public final class ValidationKeys {
 
   public static final String ACCOUNT_MEMBER_TARGET_PROFILE_ID_REQUIRED =
       "{" + MessageCodes.ACCOUNT_MEMBER_TARGET_PROFILE_ID_REQUIRED + "}";
+
+  public static final String INVITE_EMAIL_REQUIRED = "{" + MessageCodes.INVITE_EMAIL_REQUIRED + "}";
+  public static final String INVITE_EMAIL_INVALID = "{" + MessageCodes.INVITE_EMAIL_INVALID + "}";
+  public static final String INVITE_TOKEN_REQUIRED = "{" + MessageCodes.INVITE_TOKEN_REQUIRED + "}";
+  public static final String INVITE_INITIAL_ROLE_REQUIRED =
+      "{" + MessageCodes.INVITE_INITIAL_ROLE_REQUIRED + "}";
+  public static final String INVITE_ACCOUNT_ID_REQUIRED =
+      "{" + MessageCodes.INVITE_ACCOUNT_ID_REQUIRED + "}";
+  public static final String INVITE_ACCOUNTS_REQUIRED = "{" + MessageCodes.INVITE_ACCOUNTS_REQUIRED + "}";
 }

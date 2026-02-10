@@ -1,6 +1,6 @@
-package io.datapulse.core.service.account.invite.sender;
+package io.datapulse.core.service.invite.sender;
 
-import io.datapulse.core.service.account.invite.AccountInviteCreatedEvent;
+import io.datapulse.core.service.invite.AccountInviteCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

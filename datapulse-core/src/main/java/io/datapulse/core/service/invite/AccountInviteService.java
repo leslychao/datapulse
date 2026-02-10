@@ -1,4 +1,4 @@
-package io.datapulse.core.service.account.invite;
+package io.datapulse.core.service.invite;
 
 import io.datapulse.core.entity.account.invite.AccountInviteAcceptanceEntity;
 import io.datapulse.core.entity.account.invite.AccountInviteEntity;
@@ -22,6 +22,7 @@ import io.datapulse.domain.response.account.invite.AccountInviteAcceptResponse;
 import io.datapulse.domain.response.account.invite.AccountInviteResolveResponse;
 import io.datapulse.domain.response.account.invite.AccountInviteResolveResponse.ResolveState;
 import io.datapulse.domain.response.account.invite.AccountInviteResponse;
+import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -34,8 +35,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 public class AccountInviteService {
 
@@ -52,20 +55,23 @@ public class AccountInviteService {
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
-  public AccountInviteResponse createInvite(
-      long createdByProfileId,
-      AccountInviteCreateRequest request
-  ) {
+  public AccountInviteResponse createInvite(long createdByProfileId,
+      @Valid AccountInviteCreateRequest request) {
+    AccountMemberRole initialRole = request.initialRole();
+    if (initialRole == AccountMemberRole.OWNER) {
+      throw new BadRequestException(MessageCodes.INVITE_OWNER_ROLE_FORBIDDEN);
+    }
+
     String normalizedEmail = normalizeEmail(request.email());
     if (normalizedEmail == null) {
       throw new BadRequestException(MessageCodes.INVITE_EMAIL_REQUIRED);
     }
 
-    if (request.initialRole() == AccountMemberRole.OWNER) {
-      throw new BadRequestException(MessageCodes.INVITE_OWNER_ROLE_FORBIDDEN);
-    }
+    List<Long> distinctAccountIds = request.accountIds().stream()
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
 
-    List<Long> distinctAccountIds = request.accountIds().stream().distinct().toList();
     if (distinctAccountIds.isEmpty()) {
       throw new BadRequestException(MessageCodes.INVITE_ACCOUNTS_REQUIRED);
     }
@@ -90,7 +96,7 @@ public class AccountInviteService {
           AccountInviteTargetEntity target = new AccountInviteTargetEntity();
           target.setInviteId(savedInvite.getId());
           target.setAccountId(accountId);
-          target.setInitialRole(request.initialRole());
+          target.setInitialRole(initialRole);
           return target;
         })
         .toList();
@@ -103,7 +109,11 @@ public class AccountInviteService {
 
   @Transactional(readOnly = true)
   public AccountInviteResolveResponse resolve(String token) {
-    return resolveInternal(hashToken(token), ResolveContext.anonymous());
+    String normalizedToken = normalizeToken(token);
+    if (normalizedToken == null) {
+      return accountInviteMapper.toResolveResponse(ResolveState.INVALID, null, List.of());
+    }
+    return resolveInternal(hashToken(normalizedToken), ResolveContext.anonymous());
   }
 
   @Transactional(readOnly = true)
@@ -112,8 +122,13 @@ public class AccountInviteService {
       String currentEmail,
       String token
   ) {
+    String normalizedToken = normalizeToken(token);
+    if (normalizedToken == null) {
+      return accountInviteMapper.toResolveResponse(ResolveState.INVALID, null, List.of());
+    }
+
     return resolveInternal(
-        hashToken(token),
+        hashToken(normalizedToken),
         ResolveContext.authenticated(currentProfileId, normalizeEmail(currentEmail))
     );
   }
@@ -122,14 +137,19 @@ public class AccountInviteService {
   public AccountInviteAcceptResponse accept(
       long currentProfileId,
       String currentEmail,
-      AccountInviteAcceptRequest request
+      @Valid AccountInviteAcceptRequest request
   ) {
     String normalizedCurrentEmail = normalizeEmail(currentEmail);
     if (normalizedCurrentEmail == null) {
       throw new BadRequestException(MessageCodes.INVITE_CURRENT_EMAIL_NOT_DEFINED);
     }
 
-    String tokenHash = hashToken(request.token());
+    String normalizedToken = normalizeToken(request.token());
+    if (normalizedToken == null) {
+      throw new BadRequestException(MessageCodes.INVITE_TOKEN_REQUIRED);
+    }
+
+    String tokenHash = hashToken(normalizedToken);
 
     AccountInviteEntity invite = accountInviteRepository.findByTokenHashForUpdate(tokenHash)
         .orElseThrow(() -> new NotFoundException(MessageCodes.INVITE_NOT_FOUND_OR_INVALID));
@@ -214,6 +234,14 @@ public class AccountInviteService {
     return normalized.isBlank() ? null : normalized;
   }
 
+  private static String normalizeToken(String token) {
+    if (token == null) {
+      return null;
+    }
+    String normalized = token.trim();
+    return normalized.isBlank() ? null : normalized;
+  }
+
   private AccountInviteResolveResponse resolveInternal(String tokenHash, ResolveContext context) {
     AccountInviteEntity invite = accountInviteRepository.findByTokenHash(tokenHash).orElse(null);
     if (invite == null) {
@@ -231,8 +259,7 @@ public class AccountInviteService {
     }
 
     List<AccountInviteTargetEntity> targets = accountInviteTargetRepository.findAllByInviteId(
-        invite.getId()
-    );
+        invite.getId());
 
     if (currentStatus == AccountInviteStatus.ACCEPTED) {
       return accountInviteMapper.toResolveResponse(ResolveState.ALREADY_ACCEPTED, invite, targets);
