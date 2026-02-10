@@ -1,4 +1,16 @@
 spring:
+  mail:
+    host: ${mail.smtp.host:smtp.gmail.com}
+    port: ${mail.smtp.port:587}
+    username: ${mail.username:}
+    password: ${mail.password:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   datasource:
     url: "jdbc:postgresql://127.0.0.1:5434/datapulse?reWriteBatchedInserts=true"
     username: "datapulse"
@@ -60,3 +72,9 @@ app:
     cleanup-fixed-delay: PT1M
     flush-fixed-delay: PT1S
     flush-batch-size: 500
+
+datapulse:
+  invite:
+    public-base-url: ${DATAPULSE_INVITE_PUBLIC_BASE_URL:http://localhost:4200}
+    email:
+      from: ${DATAPULSE_INVITE_EMAIL_FROM:no-reply@datapulse.local}

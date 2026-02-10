@@ -77,7 +77,7 @@ public class InviteEmailSenderImpl implements InviteEmailSender {
       helper.setFrom(fromEmail);
       helper.setTo(email);
       helper.setSubject(subject);
-      helper.setText(html, true); // HTML ONLY
+      helper.setText(html, true);
 
       javaMailSender.send(mimeMessage);
     } catch (MessagingException ex) {
