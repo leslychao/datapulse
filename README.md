@@ -1,6 +1,6 @@
 # Datapulse — Marketplace Analytics Platform
 
-⚠️ **PROPRIETARY SOFTWARE — NO USAGE RIGHTS**
+**PROPRIETARY SOFTWARE — NO USAGE RIGHTS**
 
 Datapulse is proprietary software owned exclusively by **Vitalii Kim**.
 This repository is provided for **read-only review** purposes only.
