@@ -2,10 +2,9 @@ package io.datapulse.domain.identity;
 
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Optional;
 
 public record AuthenticatedUser(
-    String userId,
+    String keycloakSub,
     String username,
     String email,
     String fullName,

@@ -31,13 +31,14 @@
 
       CREATE TABLE account_member
       (
-        id         BIGSERIAL PRIMARY KEY,
-        account_id BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-        user_id    BIGINT      NOT NULL REFERENCES user_profile (id) ON DELETE CASCADE,
-        role       TEXT        NOT NULL,
-        status     TEXT        NOT NULL DEFAULT 'ACTIVE',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ,
+        id                 BIGSERIAL PRIMARY KEY,
+        account_id         BIGINT      NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        user_id            BIGINT      NOT NULL REFERENCES user_profile (id) ON DELETE CASCADE,
+        created_by_user_id BIGINT      NOT NULL REFERENCES user_profile (id) ON DELETE RESTRICT,
+        role               TEXT        NOT NULL,
+        status             TEXT        NOT NULL DEFAULT 'ACTIVE',
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at         TIMESTAMPTZ,
         CONSTRAINT uq_account_member UNIQUE (account_id, user_id)
       );
 
@@ -46,6 +47,9 @@
 
       CREATE INDEX idx_account_member_user
         ON account_member (user_id);
+
+      CREATE INDEX idx_account_member_created_by_user
+        ON account_member (created_by_user_id);
 
       CREATE INDEX idx_account_member_role
         ON account_member (role);

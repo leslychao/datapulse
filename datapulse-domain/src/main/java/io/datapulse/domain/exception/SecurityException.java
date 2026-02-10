@@ -56,4 +56,12 @@ public class SecurityException extends AppException {
         accountId
     );
   }
+
+  public static SecurityException selfPromotionForbidden(long accountId) {
+    return new SecurityException(
+        HttpStatus.FORBIDDEN,
+        MessageCodes.SECURITY_ACCOUNT_SELF_OWNER_PROMOTION_FORBIDDEN,
+        accountId
+    );
+  }
 }

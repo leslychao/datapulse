@@ -6,12 +6,14 @@ import io.datapulse.domain.ValidationKeys;
 import jakarta.validation.constraints.NotNull;
 
 public record AccountMemberCreateRequest(
+    @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_TARGET_PROFILE_ID_REQUIRED)
+    Long targetProfileId,
+
     @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_ROLE_REQUIRED)
     AccountMemberRole role,
 
     @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_STATUS_REQUIRED)
     AccountMemberStatus status
-
 ) {
 
 }

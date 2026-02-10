@@ -42,8 +42,8 @@ public class AccountMemberController {
       @PathVariable long accountId,
       @NotNull @RequestBody AccountMemberCreateRequest request
   ) {
-    long currentUserId = domainUserContext.requireProfileId();
-    return accountMemberService.createMember(accountId, currentUserId, request);
+    long actorProfileId = domainUserContext.requireProfileId();
+    return accountMemberService.createMember(accountId, actorProfileId, request);
   }
 
   @PutMapping(path = "/{memberId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -53,7 +53,8 @@ public class AccountMemberController {
       @PathVariable long memberId,
       @NotNull @RequestBody AccountMemberUpdateRequest request
   ) {
-    return accountMemberService.updateMember(accountId, memberId, request);
+    long actorProfileId = domainUserContext.requireProfileId();
+    return accountMemberService.updateMember(accountId, memberId, actorProfileId, request);
   }
 
   @DeleteMapping("/{memberId}")

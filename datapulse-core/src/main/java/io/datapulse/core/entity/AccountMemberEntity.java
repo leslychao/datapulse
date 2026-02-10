@@ -28,6 +28,10 @@ public class AccountMemberEntity extends LongBaseEntity {
   @JoinColumn(name = "user_id", nullable = false)
   private UserProfileEntity user;
 
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "created_by_user_id", nullable = false)
+  private UserProfileEntity createdBy;
+
   @Enumerated(EnumType.STRING)
   private AccountMemberRole role;
 

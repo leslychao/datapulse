@@ -24,7 +24,7 @@ public class IamService {
   @Transactional
   public long ensureUserProfileAndGetId(AuthenticatedUser user) {
     return userProfileService.ensureUserProfileAndGetId(
-        user.userId(),
+        user.keycloakSub(),
         user.email(),
         user.fullName(),
         user.username()

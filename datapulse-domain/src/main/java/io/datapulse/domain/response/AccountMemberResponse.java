@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 
 public record AccountMemberResponse(
     Long id,
+    String keycloakSub,
     Long accountId,
     Long userId,
 

@@ -1,19 +1,17 @@
 package io.datapulse.rest.invite;
 
 import io.datapulse.core.service.account.invite.AccountInviteService;
-import io.datapulse.domain.exception.SecurityException;
-import io.datapulse.domain.identity.AuthenticatedUser;
 import io.datapulse.domain.request.account.invite.AccountInviteAcceptRequest;
 import io.datapulse.domain.request.account.invite.AccountInviteCreateRequest;
 import io.datapulse.domain.response.account.invite.AccountInviteAcceptResponse;
 import io.datapulse.domain.response.account.invite.AccountInviteResolveResponse;
 import io.datapulse.domain.response.account.invite.AccountInviteResponse;
 import io.datapulse.iam.DomainUserContext;
-import io.datapulse.security.SecurityHelper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,35 +27,32 @@ public class AccountInviteController {
 
   private final AccountInviteService accountInviteService;
   private final DomainUserContext domainUserContext;
-  private final SecurityHelper securityHelper;
 
   @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("isAuthenticated()")
   public AccountInviteResponse create(@RequestBody @Valid AccountInviteCreateRequest request) {
     long currentProfileId = domainUserContext.requireProfileId();
-
     return accountInviteService.createInvite(currentProfileId, request);
   }
 
   @GetMapping("/resolve")
   public AccountInviteResolveResponse resolve(@RequestParam("token") String token) {
-    return securityHelper.getCurrentUserIfAuthenticated()
-        .map(user -> accountInviteService.resolveForAuthenticatedUser(
-            domainUserContext.requireProfileId(),
-            user.email(),
+    return domainUserContext.getProfileId()
+        .map(profileId -> accountInviteService.resolveForAuthenticatedUser(
+            profileId,
+            domainUserContext.requireCurrentEmail(),
             token
         ))
         .orElseGet(() -> accountInviteService.resolve(token));
   }
 
   @PostMapping(path = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
   public AccountInviteAcceptResponse accept(
       @RequestBody @Valid AccountInviteAcceptRequest request) {
     long currentProfileId = domainUserContext.requireProfileId();
-
-    String currentEmail = securityHelper.getCurrentUserIfAuthenticated()
-        .map(AuthenticatedUser::email)
-        .orElseThrow(SecurityException::userProfileNotResolved);
+    String currentEmail = domainUserContext.requireCurrentEmail();
 
     return accountInviteService.accept(currentProfileId, currentEmail, request);
   }

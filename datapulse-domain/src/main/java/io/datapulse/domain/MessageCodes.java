@@ -129,6 +129,7 @@ public final class MessageCodes {
   public static final String ACCOUNT_MEMBER_NOT_FOUND = "account-member.not-found";
   public static final String ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN = "account-member.last-owner.forbidden";
   public static final String ACCOUNT_MEMBER_SINGLE_OWNER_ONLY = "account-member.single-owner-only";
+  public static final String ACCOUNT_MEMBER_TARGET_PROFILE_ID_REQUIRED = "account-member.target-profile-id.required";
 
   public static final String SECURITY_JWT_AUTHENTICATION_REQUIRED = "security.jwt.authentication.required";
   public static final String SECURITY_JWT_NOT_AUTHENTICATED = "security.jwt.not-authenticated";
@@ -136,6 +137,7 @@ public final class MessageCodes {
   public static final String SECURITY_USER_PROFILE_NOT_RESOLVED = "security.user.profile.not.resolved";
   public static final String SECURITY_ACCESS_DENIED = "security.access.denied";
   public static final String SECURITY_ACCOUNT_ACCESS_DENIED = "security.account.access.denied";
+  public static final String SECURITY_ACCOUNT_SELF_OWNER_PROMOTION_FORBIDDEN = "security.account.self-promotion.forbidden";
 
   public static final String INVITE_EMAIL_SUBJECT = "invite.email.subject";
   public static final String INVITE_EMAIL_TITLE = "invite.email.title";

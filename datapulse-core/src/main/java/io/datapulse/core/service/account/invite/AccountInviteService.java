@@ -286,6 +286,4 @@ public class AccountInviteService {
           ex);
     }
   }
-
-
 }

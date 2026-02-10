@@ -7,17 +7,20 @@ import io.datapulse.core.mapper.MapperFacade;
 import io.datapulse.core.repository.AccountMemberRepository;
 import io.datapulse.core.repository.account.AccountRepository;
 import io.datapulse.core.repository.userprofile.UserProfileRepository;
+import io.datapulse.core.service.useractivity.UserActivityService;
 import io.datapulse.domain.AccountMemberRole;
 import io.datapulse.domain.AccountMemberStatus;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.ValidationKeys;
 import io.datapulse.domain.exception.BadRequestException;
 import io.datapulse.domain.exception.NotFoundException;
+import io.datapulse.domain.exception.SecurityException;
 import io.datapulse.domain.request.AccountMemberCreateRequest;
 import io.datapulse.domain.request.AccountMemberUpdateRequest;
 import io.datapulse.domain.response.AccountMemberResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,6 +35,7 @@ public class AccountMemberService {
   private final AccountRepository accountRepository;
   private final UserProfileRepository userProfileRepository;
   private final MapperFacade mapperFacade;
+  private final UserActivityService userActivityService;
 
   @Transactional
   public void grantAccountMembership(
@@ -68,6 +72,7 @@ public class AccountMemberService {
       AccountMemberEntity entity = new AccountMemberEntity();
       entity.setAccount(account);
       entity.setUser(user);
+      entity.setCreatedBy(user);
       entity.setRole(role);
       entity.setStatus(AccountMemberStatus.ACTIVE);
 
@@ -110,6 +115,7 @@ public class AccountMemberService {
       AccountMemberEntity entity = new AccountMemberEntity();
       entity.setAccount(account);
       entity.setUser(user);
+      entity.setCreatedBy(user);
       entity.setRole(AccountMemberRole.OWNER);
       entity.setStatus(AccountMemberStatus.ACTIVE);
 
@@ -141,15 +147,25 @@ public class AccountMemberService {
   @Transactional
   public AccountMemberResponse createMember(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
-      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long currentUserId,
+      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long actorProfileId,
       @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountMemberCreateRequest request
   ) {
     AccountEntity account = requireAccount(accountId);
-    UserProfileEntity user = requireUser(currentUserId);
+
+    UserProfileEntity targetUser = requireUser(request.targetProfileId());
+    UserProfileEntity actorUser = requireUser(actorProfileId);
+
+    if (actorProfileId.equals(request.targetProfileId())) {
+      accountMemberRepository.findByAccount_IdAndUser_Id(accountId, actorProfileId)
+          .ifPresent(existing ->
+              assertSelfNotPromotingRole(accountId, existing, actorProfileId, request.role())
+          );
+    }
 
     AccountMemberEntity entity = new AccountMemberEntity();
     entity.setAccount(account);
-    entity.setUser(user);
+    entity.setUser(targetUser);
+    entity.setCreatedBy(actorUser);
     entity.setRole(request.role());
     entity.setStatus(request.status());
 
@@ -162,7 +178,7 @@ public class AccountMemberService {
       throw new BadRequestException(
           MessageCodes.ACCOUNT_MEMBER_ALREADY_EXISTS,
           accountId,
-          currentUserId
+          request.targetProfileId()
       );
     }
   }
@@ -171,9 +187,12 @@ public class AccountMemberService {
   public AccountMemberResponse updateMember(
       @NotNull(message = ValidationKeys.ACCOUNT_ID_REQUIRED) Long accountId,
       @NotNull(message = ValidationKeys.ID_REQUIRED) Long memberId,
+      @NotNull(message = ValidationKeys.ACCOUNT_MEMBER_CURRENT_USER_ID_REQUIRED) Long actorProfileId,
       @Valid @NotNull(message = ValidationKeys.REQUEST_REQUIRED) AccountMemberUpdateRequest request
   ) {
     AccountMemberEntity existing = requireMember(accountId, memberId);
+
+    assertSelfNotPromotingRole(accountId, existing, actorProfileId, request.role());
 
     assertNotDemotingLastActiveOwner(accountId, existing, request.role(), request.status());
 
@@ -188,6 +207,46 @@ public class AccountMemberService {
       }
       throw ex;
     }
+  }
+
+  private static void assertSelfNotPromotingRole(
+      Long accountId,
+      AccountMemberEntity existing,
+      Long actorProfileId,
+      AccountMemberRole newRole
+  ) {
+    if (newRole == null) {
+      return;
+    }
+
+    UserProfileEntity targetUser = existing.getUser();
+    if (targetUser == null || targetUser.getId() == null) {
+      return;
+    }
+
+    if (!targetUser.getId().equals(actorProfileId)) {
+      return;
+    }
+
+    AccountMemberRole currentRole = existing.getRole();
+    if (currentRole == null) {
+      return;
+    }
+
+    if (roleRank(newRole) <= roleRank(currentRole)) {
+      return;
+    }
+
+    throw SecurityException.selfPromotionForbidden(accountId);
+  }
+
+  private static int roleRank(AccountMemberRole role) {
+    return switch (role) {
+      case VIEWER -> 10;
+      case OPERATOR -> 20;
+      case ADMIN -> 30;
+      case OWNER -> 40;
+    };
   }
 
   private static boolean isActiveOwner(AccountMemberRole role, AccountMemberStatus status) {
@@ -219,10 +278,7 @@ public class AccountMemberService {
         );
 
     if (owners.size() <= 1) {
-      throw new BadRequestException(
-          MessageCodes.ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN,
-          accountId
-      );
+      throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN, accountId);
     }
   }
 
@@ -244,10 +300,7 @@ public class AccountMemberService {
         );
 
     if (owners.size() <= 1) {
-      throw new BadRequestException(
-          MessageCodes.ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN,
-          accountId
-      );
+      throw new BadRequestException(MessageCodes.ACCOUNT_MEMBER_LAST_OWNER_FORBIDDEN, accountId);
     }
   }
 
@@ -270,14 +323,12 @@ public class AccountMemberService {
     requireAccountExists(accountId);
 
     return accountMemberRepository.findByIdAndAccount_Id(memberId, accountId)
-        .orElseThrow(() ->
-            new NotFoundException(MessageCodes.ACCOUNT_MEMBER_NOT_FOUND, memberId));
+        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_MEMBER_NOT_FOUND, memberId));
   }
 
   private AccountEntity requireAccount(Long accountId) {
     return accountRepository.findById(accountId)
-        .orElseThrow(() ->
-            new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
+        .orElseThrow(() -> new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId));
   }
 
   private void requireAccountExists(Long accountId) {
@@ -292,11 +343,31 @@ public class AccountMemberService {
     }
 
     return userProfileRepository.findById(userId)
-        .orElseThrow(() ->
-            new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, userId));
+        .orElseThrow(
+            () -> new NotFoundException(MessageCodes.USER_PROFILE_BY_ID_NOT_FOUND, userId));
   }
 
   private AccountMemberResponse toResponse(AccountMemberEntity entity) {
-    return mapperFacade.to(entity, AccountMemberResponse.class);
+    AccountMemberResponse base = mapperFacade.to(entity, AccountMemberResponse.class);
+
+    Long profileId = entity.getUser().getId();
+    boolean recentlyActive = userActivityService.isRecentlyActive(profileId);
+    OffsetDateTime lastActivityAt = recentlyActive ? null : entity.getUser().getLastActivityAt();
+
+    return new AccountMemberResponse(
+        base.id(),
+        base.keycloakSub(),
+        base.accountId(),
+        base.userId(),
+        base.email(),
+        base.username(),
+        base.fullName(),
+        recentlyActive,
+        lastActivityAt,
+        base.role(),
+        base.status(),
+        base.createdAt(),
+        base.updatedAt()
+    );
   }
 }
