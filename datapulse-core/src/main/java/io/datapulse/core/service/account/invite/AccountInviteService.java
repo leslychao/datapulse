@@ -9,11 +9,12 @@ import io.datapulse.core.repository.account.invite.AccountInviteAcceptanceReposi
 import io.datapulse.core.repository.account.invite.AccountInviteRepository;
 import io.datapulse.core.repository.account.invite.AccountInviteTargetRepository;
 import io.datapulse.core.service.AccountMemberService;
-import io.datapulse.core.service.account.invite.sender.InviteEmailSender;
 import io.datapulse.domain.AccountInviteStatus;
 import io.datapulse.domain.AccountMemberRole;
 import io.datapulse.domain.AccountMemberStatus;
+import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.BadRequestException;
+import io.datapulse.domain.exception.InternalServerErrorException;
 import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.request.account.invite.AccountInviteAcceptRequest;
 import io.datapulse.domain.request.account.invite.AccountInviteCreateRequest;
@@ -30,6 +31,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,8 +48,8 @@ public class AccountInviteService {
   private final AccountMemberService accountMemberService;
   private final AccountMemberRepository accountMemberRepository;
 
-  private final InviteEmailSender inviteEmailSender;
   private final AccountInviteMapper accountInviteMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public AccountInviteResponse createInvite(
@@ -56,16 +58,16 @@ public class AccountInviteService {
   ) {
     String normalizedEmail = normalizeEmail(request.email());
     if (normalizedEmail == null) {
-      throw new BadRequestException("E-mail обязателен для приглашения.");
+      throw new BadRequestException(MessageCodes.INVITE_EMAIL_REQUIRED);
     }
 
     if (request.initialRole() == AccountMemberRole.OWNER) {
-      throw new BadRequestException("Роль OWNER нельзя выдавать через приглашение.");
+      throw new BadRequestException(MessageCodes.INVITE_OWNER_ROLE_FORBIDDEN);
     }
 
     List<Long> distinctAccountIds = request.accountIds().stream().distinct().toList();
     if (distinctAccountIds.isEmpty()) {
-      throw new BadRequestException("Список кабинетов для приглашения не должен быть пустым.");
+      throw new BadRequestException(MessageCodes.INVITE_ACCOUNTS_REQUIRED);
     }
 
     String rawToken = generateRawToken();
@@ -94,38 +96,14 @@ public class AccountInviteService {
         .toList();
 
     accountInviteTargetRepository.saveAll(targets);
-    inviteEmailSender.sendInvite(normalizedEmail, rawToken);
+    eventPublisher.publishEvent(new AccountInviteCreatedEvent(normalizedEmail, rawToken));
 
     return accountInviteMapper.toResponse(savedInvite, targets);
   }
 
   @Transactional(readOnly = true)
   public AccountInviteResolveResponse resolve(String token) {
-    String tokenHash = hashToken(token);
-
-    AccountInviteEntity invite = accountInviteRepository.findByTokenHash(tokenHash).orElse(null);
-    if (invite == null) {
-      return accountInviteMapper.toResolveResponse(ResolveState.INVALID, null, List.of());
-    }
-
-    AccountInviteStatus currentStatus = invite.getStatus();
-
-    if (currentStatus == AccountInviteStatus.CANCELLED) {
-      return accountInviteMapper.toResolveResponse(ResolveState.CANCELLED, invite, List.of());
-    }
-
-    if (isExpired(invite)) {
-      return accountInviteMapper.toResolveResponse(ResolveState.EXPIRED, invite, List.of());
-    }
-
-    if (currentStatus == AccountInviteStatus.ACCEPTED) {
-      return accountInviteMapper.toResolveResponse(ResolveState.ALREADY_ACCEPTED, invite,
-          List.of());
-    }
-
-    List<AccountInviteTargetEntity> targets = accountInviteTargetRepository.findAllByInviteId(
-        invite.getId());
-    return accountInviteMapper.toResolveResponse(ResolveState.PENDING, invite, targets);
+    return resolveInternal(hashToken(token), ResolveContext.anonymous());
   }
 
   @Transactional(readOnly = true)
@@ -134,44 +112,10 @@ public class AccountInviteService {
       String currentEmail,
       String token
   ) {
-    String tokenHash = hashToken(token);
-
-    AccountInviteEntity invite = accountInviteRepository.findByTokenHash(tokenHash).orElse(null);
-    if (invite == null) {
-      return accountInviteMapper.toResolveResponse(ResolveState.INVALID, null, List.of());
-    }
-
-    AccountInviteStatus currentStatus = invite.getStatus();
-
-    if (currentStatus == AccountInviteStatus.CANCELLED) {
-      return accountInviteMapper.toResolveResponse(ResolveState.CANCELLED, invite, List.of());
-    }
-
-    if (isExpired(invite)) {
-      return accountInviteMapper.toResolveResponse(ResolveState.EXPIRED, invite, List.of());
-    }
-
-    List<AccountInviteTargetEntity> targets = accountInviteTargetRepository.findAllByInviteId(
-        invite.getId());
-
-    if (currentStatus == AccountInviteStatus.ACCEPTED) {
-      return accountInviteMapper.toResolveResponse(ResolveState.ALREADY_ACCEPTED, invite, targets);
-    }
-
-    String normalizedCurrentEmail = normalizeEmail(currentEmail);
-    if (!Objects.equals(normalizedCurrentEmail, invite.getEmail())) {
-      return accountInviteMapper.toResolveResponse(ResolveState.AUTHENTICATED_EMAIL_MISMATCH,
-          invite, targets);
-    }
-
-    boolean alreadyMember = isMemberOfAnyActive(currentProfileId, targets);
-    if (alreadyMember) {
-      return accountInviteMapper.toResolveResponse(ResolveState.AUTHENTICATED_ALREADY_MEMBER,
-          invite, targets);
-    }
-
-    return accountInviteMapper.toResolveResponse(ResolveState.AUTHENTICATED_CAN_ACCEPT, invite,
-        targets);
+    return resolveInternal(
+        hashToken(token),
+        ResolveContext.authenticated(currentProfileId, normalizeEmail(currentEmail))
+    );
   }
 
   @Transactional
@@ -182,24 +126,22 @@ public class AccountInviteService {
   ) {
     String normalizedCurrentEmail = normalizeEmail(currentEmail);
     if (normalizedCurrentEmail == null) {
-      throw new BadRequestException("E-mail текущего пользователя не определён.");
+      throw new BadRequestException(MessageCodes.INVITE_CURRENT_EMAIL_NOT_DEFINED);
     }
 
     String tokenHash = hashToken(request.token());
 
-    AccountInviteEntity invite = accountInviteRepository.findByTokenHash(tokenHash)
-        .orElseThrow(() -> new NotFoundException("Приглашение не найдено или недействительно."));
+    AccountInviteEntity invite = accountInviteRepository.findByTokenHashForUpdate(tokenHash)
+        .orElseThrow(() -> new NotFoundException(MessageCodes.INVITE_NOT_FOUND_OR_INVALID));
 
     AccountInviteStatus currentStatus = invite.getStatus();
 
     if (currentStatus == AccountInviteStatus.CANCELLED) {
-      throw new BadRequestException("Приглашение отменено.");
+      throw new BadRequestException(MessageCodes.INVITE_CANCELLED);
     }
 
     if (!Objects.equals(normalizedCurrentEmail, invite.getEmail())) {
-      throw new BadRequestException(
-          "Текущий пользователь вошёл под другим e-mail. Войдите под e-mail, на который выдано приглашение."
-      );
+      throw new BadRequestException(MessageCodes.INVITE_AUTHENTICATED_EMAIL_MISMATCH);
     }
 
     List<AccountInviteTargetEntity> targets = accountInviteTargetRepository.findAllByInviteId(
@@ -215,7 +157,7 @@ public class AccountInviteService {
     if (isExpired(invite)) {
       invite.setStatus(AccountInviteStatus.EXPIRED);
       accountInviteRepository.save(invite);
-      throw new BadRequestException("Срок действия приглашения истёк.");
+      throw new BadRequestException(MessageCodes.INVITE_EXPIRED);
     }
 
     List<Long> grantedAccountIds = grantMemberships(currentProfileId, targets);
@@ -234,11 +176,12 @@ public class AccountInviteService {
 
   private boolean isMemberOfAnyActive(long profileId, List<AccountInviteTargetEntity> targets) {
     for (AccountInviteTargetEntity target : targets) {
-      boolean isActiveMember = accountMemberRepository
-          .findByAccount_IdAndUser_IdAndStatus(target.getAccountId(), profileId,
-              AccountMemberStatus.ACTIVE)
-          .isPresent();
-      if (isActiveMember) {
+      boolean exists = accountMemberRepository.existsByAccount_IdAndUser_IdAndStatus(
+          target.getAccountId(),
+          profileId,
+          AccountMemberStatus.ACTIVE
+      );
+      if (exists) {
         return true;
       }
     }
@@ -267,7 +210,68 @@ public class AccountInviteService {
     if (email == null) {
       return null;
     }
-    return email.trim().toLowerCase();
+    String normalized = email.trim().toLowerCase();
+    return normalized.isBlank() ? null : normalized;
+  }
+
+  private AccountInviteResolveResponse resolveInternal(String tokenHash, ResolveContext context) {
+    AccountInviteEntity invite = accountInviteRepository.findByTokenHash(tokenHash).orElse(null);
+    if (invite == null) {
+      return accountInviteMapper.toResolveResponse(ResolveState.INVALID, null, List.of());
+    }
+
+    AccountInviteStatus currentStatus = invite.getStatus();
+
+    if (currentStatus == AccountInviteStatus.CANCELLED) {
+      return accountInviteMapper.toResolveResponse(ResolveState.CANCELLED, invite, List.of());
+    }
+
+    if (isExpired(invite)) {
+      return accountInviteMapper.toResolveResponse(ResolveState.EXPIRED, invite, List.of());
+    }
+
+    List<AccountInviteTargetEntity> targets = accountInviteTargetRepository.findAllByInviteId(
+        invite.getId()
+    );
+
+    if (currentStatus == AccountInviteStatus.ACCEPTED) {
+      return accountInviteMapper.toResolveResponse(ResolveState.ALREADY_ACCEPTED, invite, targets);
+    }
+
+    if (context.isAnonymous()) {
+      return accountInviteMapper.toResolveResponse(ResolveState.PENDING, invite, targets);
+    }
+
+    if (!Objects.equals(context.normalizedEmail(), invite.getEmail())) {
+      return accountInviteMapper.toResolveResponse(
+          ResolveState.AUTHENTICATED_EMAIL_MISMATCH,
+          invite,
+          targets
+      );
+    }
+
+    boolean alreadyMember = isMemberOfAnyActive(context.profileId(), targets);
+    if (alreadyMember) {
+      return accountInviteMapper.toResolveResponse(
+          ResolveState.AUTHENTICATED_ALREADY_MEMBER,
+          invite,
+          targets
+      );
+    }
+
+    return accountInviteMapper.toResolveResponse(ResolveState.AUTHENTICATED_CAN_ACCEPT, invite,
+        targets);
+  }
+
+  private record ResolveContext(boolean isAnonymous, long profileId, String normalizedEmail) {
+
+    static ResolveContext anonymous() {
+      return new ResolveContext(true, 0L, null);
+    }
+
+    static ResolveContext authenticated(long profileId, String normalizedEmail) {
+      return new ResolveContext(false, profileId, normalizedEmail);
+    }
   }
 
   private static String generateRawToken() {
@@ -282,8 +286,7 @@ public class AccountInviteService {
       byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
       return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
     } catch (Exception ex) {
-      throw new IllegalStateException("Ошибка криптографического хеширования токена приглашения.",
-          ex);
+      throw InternalServerErrorException.inviteTokenHashingFailed(ex);
     }
   }
 }

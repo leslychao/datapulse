@@ -19,6 +19,12 @@ public interface AccountMemberRepository extends JpaRepository<AccountMemberEnti
       AccountMemberStatus status
   );
 
+  boolean existsByAccount_IdAndUser_IdAndStatus(
+      Long accountId,
+      Long userId,
+      AccountMemberStatus status
+  );
+
   List<AccountMemberEntity> findAllByAccount_Id(Long accountId);
 
   List<AccountMemberEntity> findAllByAccount_IdOrderByIdAsc(Long accountId);

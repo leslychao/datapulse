@@ -139,10 +139,20 @@ public final class MessageCodes {
   public static final String SECURITY_ACCOUNT_ACCESS_DENIED = "security.account.access.denied";
   public static final String SECURITY_ACCOUNT_SELF_OWNER_PROMOTION_FORBIDDEN = "security.account.self-promotion.forbidden";
 
+  public static final String INVITE_EMAIL_REQUIRED = "invite.email.required";
+  public static final String INVITE_OWNER_ROLE_FORBIDDEN = "invite.owner-role.forbidden";
+  public static final String INVITE_ACCOUNTS_REQUIRED = "invite.accounts.required";
+  public static final String INVITE_NOT_FOUND_OR_INVALID = "invite.not-found-or-invalid";
+  public static final String INVITE_CANCELLED = "invite.cancelled";
+  public static final String INVITE_EXPIRED = "invite.expired";
+  public static final String INVITE_CURRENT_EMAIL_NOT_DEFINED = "invite.current-email.not-defined";
+  public static final String INVITE_AUTHENTICATED_EMAIL_MISMATCH = "invite.authenticated.email.mismatch";
+
   public static final String INVITE_EMAIL_SUBJECT = "invite.email.subject";
   public static final String INVITE_EMAIL_TITLE = "invite.email.title";
   public static final String INVITE_EMAIL_LEAD = "invite.email.lead";
   public static final String INVITE_EMAIL_CTA = "invite.email.cta";
   public static final String INVITE_EMAIL_COPY_LINK = "invite.email.copy-link";
   public static final String INVITE_EMAIL_FOOTER = "invite.email.footer";
+  public static final String INVITE_TOKEN_HASHING_FAILED = "invite.token.hashingFailed";
 }
