@@ -3,6 +3,7 @@ package io.datapulse.rest.advice;
 import io.datapulse.core.i18n.I18nMessageService;
 import io.datapulse.domain.MessageCodes;
 import io.datapulse.domain.exception.AppException;
+import io.datapulse.domain.exception.SecurityException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Locale;
@@ -13,6 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -31,6 +35,18 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 public class GenericControllerAdvice {
 
   private final I18nMessageService i18nMessageService;
+
+  @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
+  public ResponseEntity<ErrorResponse> handleAccessDenied(Throwable ex, Locale locale) {
+    return handleException(SecurityException.accessDenied(), locale);
+  }
+
+  @ExceptionHandler(AuthenticationException.class)
+  public ResponseEntity<ErrorResponse> handleAuthentication(
+      AuthenticationException ex,
+      Locale locale) {
+    return handleException(SecurityException.unauthenticatedJwtNotFound(), locale);
+  }
 
   @ExceptionHandler({
       MethodArgumentNotValidException.class,

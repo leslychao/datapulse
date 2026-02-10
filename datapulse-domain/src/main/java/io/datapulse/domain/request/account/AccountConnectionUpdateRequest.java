@@ -7,7 +7,6 @@ import io.datapulse.domain.dto.credentials.OzonCredentials;
 import io.datapulse.domain.dto.credentials.WbCredentials;
 
 public record AccountConnectionUpdateRequest(
-
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
@@ -19,7 +18,6 @@ public record AccountConnectionUpdateRequest(
         @JsonSubTypes.Type(value = OzonCredentials.class, name = "OZON")
     })
     MarketplaceCredentials credentials,
-
     Boolean active
 ) {
 

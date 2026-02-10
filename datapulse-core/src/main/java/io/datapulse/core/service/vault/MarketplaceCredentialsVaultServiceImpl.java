@@ -11,12 +11,11 @@ import org.springframework.vault.support.VaultResponseSupport;
 @Service
 @Validated
 @RequiredArgsConstructor
-public class MarketplaceCredentialsVaultServiceImpl implements
-    MarketplaceCredentialsVaultService {
+public class MarketplaceCredentialsVaultServiceImpl implements MarketplaceCredentialsVaultService {
 
   private static final String ROOT_PATH = "datapulse/accounts";
 
-  private final VaultKeyValueOperations kv;
+  private final VaultKeyValueOperations keyValueOperations;
 
   @Override
   public void saveCredentials(
@@ -25,7 +24,7 @@ public class MarketplaceCredentialsVaultServiceImpl implements
       MarketplaceCredentials credentials
   ) {
     String path = buildPath(accountId, marketplace);
-    kv.put(path, credentials);
+    keyValueOperations.put(path, credentials);
   }
 
   @Override
@@ -37,7 +36,8 @@ public class MarketplaceCredentialsVaultServiceImpl implements
 
     Class<? extends MarketplaceCredentials> type = marketplace.credentialsType();
 
-    VaultResponseSupport<? extends MarketplaceCredentials> resp = kv.get(path, type);
+    VaultResponseSupport<? extends MarketplaceCredentials> resp = keyValueOperations.get(path,
+        type);
     return resp != null ? resp.getData() : null;
   }
 
@@ -47,7 +47,17 @@ public class MarketplaceCredentialsVaultServiceImpl implements
       MarketplaceType marketplace
   ) {
     String path = buildPath(accountId, marketplace);
-    kv.delete(path);
+    keyValueOperations.delete(path);
+  }
+
+  @Override
+  public boolean credentialsExist(
+      long accountId,
+      MarketplaceType marketplace
+  ) {
+    String path = buildPath(accountId, marketplace);
+    VaultResponseSupport<Object> resp = keyValueOperations.get(path, Object.class);
+    return resp != null && resp.getData() != null;
   }
 
   private String buildPath(long accountId, MarketplaceType marketplace) {

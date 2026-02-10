@@ -4,7 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import io.datapulse.core.properties.UserActivityProperties;
-import io.datapulse.core.useractivity.UserActivityWriteBehindStore;
+import io.datapulse.core.service.useractivity.UserActivityWriteBehindStore;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

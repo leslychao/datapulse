@@ -8,8 +8,17 @@ public record AccountMemberResponse(
     Long id,
     Long accountId,
     Long userId,
+
+    String email,
+    String username,
+    String fullName,
+
+    boolean recentlyActive,
+    OffsetDateTime lastActivityAt,
+
     AccountMemberRole role,
     AccountMemberStatus status,
+
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {
