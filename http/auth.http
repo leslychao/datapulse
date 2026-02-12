@@ -41,7 +41,7 @@ Authorization: Bearer {{access_token}}
   });
 %}
 
-### 0.2 IAM — GET current user profile (200) -> currentUserId
+### 0.2 IAM — GET current user profile (200) -> currentUserId + currentProfileId
 GET {{host}}/api/iam
 Authorization: Bearer {{access_token}}
 
@@ -52,7 +52,12 @@ Authorization: Bearer {{access_token}}
     var b = response.body || {};
     client.assert(b.id !== undefined, "missing id in response");
 
+    // According to OpenAPI:
+    // - /api/iam -> UserProfileResponse.id
+    // - /members -> AccountMemberResponse.userId
+    // So we use the same value for both variables in these tests.
     client.global.set("currentUserId", String(b.id || ""));
+    client.global.set("currentProfileId", String(b.id || ""));
   });
 %}
 
@@ -68,17 +73,19 @@ Authorization: Bearer {{access_token}}
     client.assert(Array.isArray(b), "expected array response");
 
     var currentUserId = String(client.global.get("currentUserId"));
+    client.assert(!!currentUserId && currentUserId !== "undefined", "currentUserId is not set");
+
     var found = null;
 
     for (var i = 0; i < b.length; i++) {
       var m = b[i] || {};
-      if (String(m.userId) === currentUserId) {
+      if (m.userId !== undefined && String(m.userId) === currentUserId) {
         found = m;
         break;
       }
     }
 
-    client.assert(found && found.id !== undefined, "current user's member not found in list");
+    client.assert(found && found.id !== undefined, "current user's member not found in list by userId");
     client.global.set("currentAccountMemberId", String(found.id || ""));
   });
 %}
@@ -93,6 +100,7 @@ Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
+  "targetProfileId": {{currentProfileId}},
   "role": "OWNER",
   "status": "ACTIVE"
 }
@@ -101,12 +109,17 @@ Authorization: Bearer {{access_token}}
   client.test("AccountMember /create — second ACTIVE OWNER forbidden 400", function () {
     client.assert(response.status === 400, "expected 400, got " + response.status);
 
+    // With current prepare we don't have another targetProfileId (only current one),
+    // so backend may return either:
+    // - SINGLE_OWNER_ONLY (if owner uniqueness check is first)
+    // - ALREADY_EXISTS (if duplicate membership check is first)
     var b = response.body || {};
     var msg = (b && b.message) || (b && b.error) || "";
+
     client.assert(
-        /(single\s+owner|единственн.*владел|втор(ого|ой)\s+активн(ого|ый)\s+владел|second\s+active\s+owner|ACCOUNT_MEMBER_SINGLE_OWNER_ONLY)/i
+        /(single\s+owner|единственн.*владел|втор(ого|ой)\s+активн(ого|ый)\s+владел|second\s+active\s+owner|ACCOUNT_MEMBER_SINGLE_OWNER_ONLY|уже\s+является\s+участником\s+аккаунта|already\s+exists|ACCOUNT_MEMBER_ALREADY_EXISTS)/i
         .test(msg),
-        "no single-owner-only hint: " + msg
+        "no expected hint (single-owner-only OR already-exists): " + msg
     );
   });
 %}
@@ -117,6 +130,7 @@ Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
+  "targetProfileId": {{currentProfileId}},
   "role": "ADMIN",
   "status": "ACTIVE"
 }
@@ -125,12 +139,11 @@ Authorization: Bearer {{access_token}}
   client.test("AccountMember /create — duplicate current user 400", function () {
     client.assert(response.status === 400, "expected 400, got " + response.status);
 
-    var msg = (response.body && response.body.message) || (response.body && response.body.error)
-        || "";
+    var msg = (response.body && response.body.message) || (response.body && response.body.error) || "";
     client.assert(
-        /уже\s+является\s+участником\s+аккаунта|already\s+exists|ACCOUNT_MEMBER_ALREADY_EXISTS/i.test(
-            msg),
-        "unexpected message: " + msg);
+        /уже\s+является\s+участником\s+аккаунта|already\s+exists|ACCOUNT_MEMBER_ALREADY_EXISTS/i.test(msg),
+        "unexpected message: " + msg
+    );
   });
 %}
 

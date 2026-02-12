@@ -33,9 +33,9 @@ public class AccountController {
   }
 
   @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("@accountAccessService.canWrite(#id)")
+  @PreAuthorize("@accountAccessService.requireWrite(#id)")
   public AccountResponse update(
-      @PathVariable Long id,
+      @PathVariable long id,
       @RequestBody AccountUpdateRequest request
   ) {
     return accountService.updateFromRequest(id, request);
@@ -43,8 +43,8 @@ public class AccountController {
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize("@accountAccessService.canDeleteAccount(#id)")
-  public void delete(@PathVariable Long id) {
+  @PreAuthorize("@accountAccessService.requireDeleteAccount(#id)")
+  public void delete(@PathVariable long id) {
     accountService.delete(id);
   }
 }

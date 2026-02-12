@@ -2,7 +2,10 @@ package io.datapulse.iam.authorization;
 
 import io.datapulse.core.entity.AccountMemberEntity;
 import io.datapulse.core.repository.AccountMemberRepository;
+import io.datapulse.core.repository.account.AccountRepository;
 import io.datapulse.domain.AccountMemberStatus;
+import io.datapulse.domain.MessageCodes;
+import io.datapulse.domain.exception.NotFoundException;
 import io.datapulse.domain.exception.SecurityException;
 import io.datapulse.iam.DomainUserContext;
 import java.util.List;
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountAccessService {
 
   private final DomainUserContext domainUserContext;
+  private final AccountRepository accountRepository;
   private final AccountMemberRepository accountMemberRepository;
 
   @Transactional(readOnly = true)
@@ -47,27 +51,62 @@ public class AccountAccessService {
   }
 
   @Transactional(readOnly = true)
-  public void requireRead(long accountId) {
-    AccountMemberEntity member = requireActiveMember(accountId);
+  public boolean requireRead(long accountId) {
+    AccountMemberEntity member = requireExistingAccountAndMember(accountId);
+
+    if (member.getStatus() != AccountMemberStatus.ACTIVE) {
+      throw SecurityException.accessDeniedForAccount(accountId);
+    }
+
     if (!AccountRoleCapabilities.canRead(member.getRole())) {
       throw SecurityException.accessDeniedForAccount(accountId);
     }
+
+    return true;
   }
 
   @Transactional(readOnly = true)
-  public void requireWrite(long accountId) {
-    AccountMemberEntity member = requireActiveMember(accountId);
+  public boolean requireWrite(long accountId) {
+    AccountMemberEntity member = requireExistingAccountAndMember(accountId);
+
+    if (member.getStatus() != AccountMemberStatus.ACTIVE) {
+      throw SecurityException.accessDeniedForAccount(accountId);
+    }
+
     if (!AccountRoleCapabilities.canWrite(member.getRole())) {
       throw SecurityException.accessDeniedForAccount(accountId);
     }
+
+    return true;
   }
 
   @Transactional(readOnly = true)
   public void requireManageMembers(long accountId) {
-    AccountMemberEntity member = requireActiveMember(accountId);
+    AccountMemberEntity member = requireExistingAccountAndMember(accountId);
+
+    if (member.getStatus() != AccountMemberStatus.ACTIVE) {
+      throw SecurityException.accessDeniedForAccount(accountId);
+    }
+
     if (!AccountRoleCapabilities.canManageMembers(member.getRole())) {
       throw SecurityException.accessDeniedForAccount(accountId);
     }
+
+  }
+
+  @Transactional(readOnly = true)
+  public boolean requireDeleteAccount(long accountId) {
+    AccountMemberEntity member = requireExistingAccountAndMember(accountId);
+
+    if (member.getStatus() != AccountMemberStatus.ACTIVE) {
+      throw SecurityException.accessDeniedForAccount(accountId);
+    }
+
+    if (!AccountRoleCapabilities.canDeleteAccount(member.getRole())) {
+      throw SecurityException.accessDeniedForAccount(accountId);
+    }
+
+    return true;
   }
 
   @Transactional(readOnly = true)
@@ -81,12 +120,6 @@ public class AccountAccessService {
   }
 
   @Transactional(readOnly = true)
-  public AccountMemberEntity requireActiveMember(long accountId) {
-    return findActiveMember(accountId)
-        .orElseThrow(() -> SecurityException.accessDeniedForAccount(accountId));
-  }
-
-  @Transactional(readOnly = true)
   public List<AccountMemberEntity> findAllMembersByAccount(long accountId) {
     requireManageMembers(accountId);
     return accountMemberRepository.findAllByAccount_Id(accountId);
@@ -96,5 +129,22 @@ public class AccountAccessService {
   public List<AccountMemberEntity> findAllMembershipsByCurrentProfile() {
     long profileId = domainUserContext.requireProfileId();
     return accountMemberRepository.findAllByUser_Id(profileId);
+  }
+
+  private AccountMemberEntity requireExistingAccountAndMember(long accountId) {
+    long profileId = domainUserContext.requireProfileId();
+
+    Optional<AccountMemberEntity> memberOpt =
+        accountMemberRepository.findByAccount_IdAndUser_Id(accountId, profileId);
+
+    if (memberOpt.isPresent()) {
+      return memberOpt.get();
+    }
+
+    if (!accountRepository.existsById(accountId)) {
+      throw new NotFoundException(MessageCodes.ACCOUNT_NOT_FOUND, accountId);
+    }
+
+    throw SecurityException.accessDeniedForAccount(accountId);
   }
 }

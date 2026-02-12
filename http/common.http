@@ -80,6 +80,7 @@ Authorization: Bearer {{access_token}}
     client.assert(response.status === 200, "expected 200, got " + response.status);
 
     var b = response.body || {};
+    client.assert(typeof b.name === "string" && b.name.length > 0, "invalid name in response");
     client.assert(/UPDATED/i.test(b.name), "name with different case was not applied");
   });
 %}
@@ -158,13 +159,14 @@ Authorization: Bearer {{access_token}}
         (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
         "";
 
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint: " + msg);
+    client.assert(/не\s*найден|not\s*found/i.test(msg), "no 'not found' hint: " + msg);
   });
 %}
 
 ### 1.7 ACCOUNT — NEGATIVE: path id ≠ body id → 4xx
 # Scenario: защита от рассинхрона id между URL и телом запроса — должен быть
-#           любой 4xx (обычно 400).
+#           любой 4xx (обычно 400). Контроллер может игнорировать id из body,
+#           поэтому допускаем ЛЮБОЙ 4xx.
 PUT {{host}}/api/accounts/123456
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -197,7 +199,7 @@ Authorization: Bearer {{access_token}}
         (Array.isArray(b.errors) && b.errors[0] && (b.errors[0].message || b.errors[0])) ||
         "";
 
-    client.assert(/не\sнайден/i.test(msg), "no 'not found' hint on delete: " + msg);
+    client.assert(/не\s*найден|not\s*found/i.test(msg), "no 'not found' hint on delete: " + msg);
   });
 %}
 
@@ -217,14 +219,15 @@ Authorization: Bearer {{access_token}}
 %}
 
 ### 2.1 ACCOUNT-CONNECTION — CREATE (WB) → 201
+# NOTE: According to OpenAPI, body contains: { marketplace, credentials }.
+# 'active' is not part of AccountConnectionCreateRequest in schema, so we don't send it.
 POST {{host}}/api/accounts/{{accountId}}/connections
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
   "marketplace": "WILDBERRIES",
-  "credentials": { "token": "xxx" },
-  "active": true
+  "credentials": { "token": "xxx" }
 }
 
 > {%
@@ -232,11 +235,11 @@ Authorization: Bearer {{access_token}}
     client.assert(response.status === 201, "expected 201, got " + response.status);
 
     var b = response.body || {};
-    client.assert(!!b.id, "missing id in response");
+    client.assert(b.id !== undefined, "missing id in response");
 
     client.global.set("connectionIdWb", String(b.id || ""));
     client.assert(b.marketplace === "WILDBERRIES", "wrong marketplace in response");
-    client.assert(b.active === true, "active flag is not true");
+    client.assert(typeof b.active === "boolean", "missing active flag in response");
   });
 %}
 
@@ -250,8 +253,7 @@ Authorization: Bearer {{access_token}}
   "credentials": {
     "clientId": "xxx",
     "apiKey": "yyy"
-  },
-  "active": true
+  }
 }
 
 > {%
@@ -259,11 +261,11 @@ Authorization: Bearer {{access_token}}
     client.assert(response.status === 201, "expected 201, got " + response.status);
 
     var b = response.body || {};
-    client.assert(!!b.id, "missing id in response");
+    client.assert(b.id !== undefined, "missing id in response");
 
     client.global.set("connectionIdOzon", String(b.id || ""));
     client.assert(b.marketplace === "OZON", "wrong marketplace in response");
-    client.assert(b.active === true, "active flag is not true");
+    client.assert(typeof b.active === "boolean", "missing active flag in response");
   });
 %}
 
@@ -274,8 +276,7 @@ Authorization: Bearer {{access_token}}
 
 {
   "marketplace": "OZON",
-  "credentials": { "clientId": "dup", "apiKey": "dup" },
-  "active": true
+  "credentials": { "clientId": "dup", "apiKey": "dup" }
 }
 
 > {%
@@ -295,8 +296,7 @@ Authorization: Bearer {{access_token}}
 
 {
   "marketplace": "WILDBERRIES",
-  "credentials": { "token": "dup" },
-  "active": true
+  "credentials": { "token": "dup" }
 }
 
 > {%
@@ -310,6 +310,7 @@ Authorization: Bearer {{access_token}}
 %}
 
 ### 2.5 ACCOUNT-CONNECTION — UPDATE (OZON) toggle active → 200
+# OpenAPI: update request body has { credentials?, active? }.
 PUT {{host}}/api/accounts/{{accountId}}/connections/{{connectionIdOzon}}
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -328,7 +329,7 @@ Authorization: Bearer {{access_token}}
   });
 %}
 
-### 2.6 ACCOUNT-CONNECTION — UPDATE (WB) change token → 200 (optional, but useful)
+### 2.6 ACCOUNT-CONNECTION — UPDATE (WB) change token → 200
 PUT {{host}}/api/accounts/{{accountId}}/connections/{{connectionIdWb}}
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -348,7 +349,6 @@ Authorization: Bearer {{access_token}}
     client.assert(b.active === true, "active flag is not true");
   });
 %}
-
 
 ### =========================================================
 ### 4. CLEANUP — удаляем всё созданное в тестах (PATH)
