@@ -14,6 +14,7 @@ import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATION_R
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_PREPARE_RAW_SCHEMA;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.CH_ETL_RUN_CORE;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXECUTION_GROUP_ID;
+import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_EXECUTION_KEYS;
 import static io.datapulse.etl.flow.core.EtlFlowConstants.HDR_ETL_EXPECTED_EXECUTIONS;
 
 import io.datapulse.core.service.account.AccountConnectionService;
@@ -34,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -166,6 +168,15 @@ public class EtlOrchestratorFlowConfig {
         .enrichHeaders(headers -> headers.headerFunction(
             HDR_ETL_EXPECTED_EXECUTIONS,
             (Message<OrchestrationPlan> message) -> message.getPayload().expectedExecutions()
+        ))
+        .enrichHeaders(headers -> headers.headerFunction(
+            HDR_ETL_EXPECTED_EXECUTION_KEYS,
+            (Message<OrchestrationPlan> message) -> message.getPayload()
+                .plans()
+                .stream()
+                .flatMap(plan -> plan.executions().stream())
+                .map(this::executionKey)
+                .collect(Collectors.toCollection(LinkedHashSet::new))
         ))
         .split(OrchestrationPlan.class, OrchestrationPlan::plans)
         .channel(channel -> channel.executor(etlOrchestrateExecutor))
@@ -306,20 +317,42 @@ public class EtlOrchestratorFlowConfig {
     }
 
     Message<?> sample = messages.iterator().next();
-    Integer expected = sample.getHeaders().get(HDR_ETL_EXPECTED_EXECUTIONS, Integer.class);
-    if (expected == null) {
-      throw new AppException(ETL_REQUEST_INVALID, HDR_ETL_EXPECTED_EXECUTIONS);
-    }
+    Set<String> expectedKeys = extractExpectedExecutionKeys(sample);
 
-    long distinctSources = group.streamMessages()
+    Set<String> finalizedKeys = group.streamMessages()
         .map(Message::getPayload)
         .filter(ExecutionOutcome.class::isInstance)
         .map(ExecutionOutcome.class::cast)
-        .map(ExecutionOutcome::sourceId)
-        .distinct()
-        .count();
+        .map(this::executionKey)
+        .collect(Collectors.toSet());
 
-    return distinctSources >= expected;
+    return finalizedKeys.containsAll(expectedKeys);
+  }
+
+  private Set<String> extractExpectedExecutionKeys(Message<?> sample) {
+    @SuppressWarnings("unchecked")
+    Set<String> expectedKeys = sample.getHeaders().get(HDR_ETL_EXPECTED_EXECUTION_KEYS, Set.class);
+    if (expectedKeys == null || expectedKeys.isEmpty()) {
+      Integer expected = sample.getHeaders().get(HDR_ETL_EXPECTED_EXECUTIONS, Integer.class);
+      if (expected == null) {
+        throw new AppException(ETL_REQUEST_INVALID, HDR_ETL_EXPECTED_EXECUTION_KEYS);
+      }
+
+      throw new AppException(
+          ETL_REQUEST_INVALID,
+          "%s must be populated for expected=%d".formatted(HDR_ETL_EXPECTED_EXECUTION_KEYS, expected)
+      );
+    }
+
+    return expectedKeys.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+  }
+
+  private String executionKey(EtlSourceExecution execution) {
+    return execution.marketplace().name() + ":" + execution.sourceId();
+  }
+
+  private String executionKey(ExecutionOutcome outcome) {
+    return outcome.marketplace().name() + ":" + outcome.sourceId();
   }
 
   private ExecutionAggregationResult buildExecutionAggregationResult(MessageGroup group) {

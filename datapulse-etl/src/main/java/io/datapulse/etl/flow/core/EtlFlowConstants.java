@@ -16,4 +16,5 @@ public final class EtlFlowConstants {
   public static final String HDR_ETL_SCENARIO_REQUEST_ID = "ETL_SCENARIO_REQUEST_ID";
   public static final String HDR_ETL_EXECUTION_GROUP_ID = "ETL_EXECUTION_GROUP_ID";
   public static final String HDR_ETL_EXPECTED_EXECUTIONS = "ETL_EXPECTED_EXECUTIONS";
+  public static final String HDR_ETL_EXPECTED_EXECUTION_KEYS = "ETL_EXPECTED_EXECUTION_KEYS";
 }
