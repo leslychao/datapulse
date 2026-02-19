@@ -1,7 +1,7 @@
 package io.datapulse.etl.v1.listener;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.scenario.EtlEventCompletedEvent;
+import io.datapulse.etl.v1.dto.scenario.EtlEventCompletedEvent;
 import io.datapulse.etl.service.MartRefreshService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

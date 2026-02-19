@@ -1,6 +1,6 @@
 package io.datapulse.etl.v1.listener;
 
-import io.datapulse.etl.dto.scenario.EtlEventCompletedEvent;
+import io.datapulse.etl.v1.dto.scenario.EtlEventCompletedEvent;
 import io.datapulse.etl.v1.cache.EtlEventCompletionCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;

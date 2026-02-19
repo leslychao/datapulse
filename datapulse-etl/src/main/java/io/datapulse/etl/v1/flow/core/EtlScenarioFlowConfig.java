@@ -4,11 +4,11 @@ import static io.datapulse.etl.v1.flow.core.EtlFlowConstants.CH_ETL_SCENARIO_RUN
 import static io.datapulse.etl.v1.flow.core.EtlFlowConstants.CH_ETL_SCENARIO_STEPS;
 import static io.datapulse.etl.v1.flow.core.EtlFlowConstants.HDR_ETL_SCENARIO_REQUEST_ID;
 
-import io.datapulse.etl.dto.scenario.EtlScenarioRunRequest;
-import io.datapulse.etl.dto.scenario.EtlScenarioRunResponse;
-import io.datapulse.etl.dto.scenario.EtlScenarioStep;
-import io.datapulse.etl.service.scenario.EtlScenarioPlanner;
-import io.datapulse.etl.service.scenario.EtlScenarioStepExecutor;
+import io.datapulse.etl.v1.dto.scenario.EtlScenarioRunRequest;
+import io.datapulse.etl.v1.dto.scenario.EtlScenarioRunResponse;
+import io.datapulse.etl.v1.dto.scenario.EtlScenarioStep;
+import io.datapulse.etl.v1.flow.scenario.EtlScenarioPlanner;
+import io.datapulse.etl.v1.flow.scenario.EtlScenarioStepExecutor;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;

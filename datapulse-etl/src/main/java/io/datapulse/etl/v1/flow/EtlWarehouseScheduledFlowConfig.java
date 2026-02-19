@@ -1,7 +1,7 @@
 package io.datapulse.etl.v1.flow;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.EtlRunRequest;
+import io.datapulse.etl.v1.dto.EtlRunRequest;
 import io.datapulse.etl.v1.flow.core.EtlOrchestrationCommandFactory;
 import io.datapulse.etl.v1.flow.core.EtlScheduledRunRequestFactory;
 import io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants;

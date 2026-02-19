@@ -1,6 +1,6 @@
 package io.datapulse.etl.v1.flow.advice;
 
-import io.datapulse.etl.dto.ExecutionAggregationResult;
+import io.datapulse.etl.v1.dto.ExecutionAggregationResult;
 import io.datapulse.etl.v1.flow.core.handler.EtlMartRefreshErrorHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

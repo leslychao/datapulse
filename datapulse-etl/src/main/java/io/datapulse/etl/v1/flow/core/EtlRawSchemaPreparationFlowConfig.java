@@ -2,8 +2,8 @@ package io.datapulse.etl.v1.flow.core;
 
 import static io.datapulse.etl.v1.flow.core.EtlFlowConstants.CH_ETL_PREPARE_RAW_SCHEMA;
 
-import io.datapulse.etl.dto.EtlSourceExecution;
-import io.datapulse.etl.dto.OrchestrationPlan;
+import io.datapulse.etl.v1.dto.EtlSourceExecution;
+import io.datapulse.etl.v1.dto.OrchestrationPlan;
 import io.datapulse.etl.repository.jdbc.RawTableSchemaJdbcRepository;
 import java.util.LinkedHashSet;
 import java.util.Set;

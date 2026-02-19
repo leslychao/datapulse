@@ -1,16 +1,14 @@
-package io.datapulse.etl.dto;
+package io.datapulse.etl.v1.dto.scenario;
 
 import io.datapulse.etl.MarketplaceEvent;
 import java.time.LocalDate;
-import java.util.List;
 
-public record ExecutionAggregationResult(
+public record EtlScenarioStep(
     String requestId,
     long accountId,
     MarketplaceEvent event,
     LocalDate dateFrom,
-    LocalDate dateTo,
-    List<ExecutionOutcome> outcomes
+    LocalDate dateTo
 ) {
 
 }

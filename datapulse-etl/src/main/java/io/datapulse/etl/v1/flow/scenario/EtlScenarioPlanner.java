@@ -1,10 +1,10 @@
-package io.datapulse.etl.service.scenario;
+package io.datapulse.etl.v1.flow.scenario;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.EtlDateRange;
-import io.datapulse.etl.dto.scenario.EtlScenarioEventConfig;
-import io.datapulse.etl.dto.scenario.EtlScenarioRunRequest;
-import io.datapulse.etl.dto.scenario.EtlScenarioStep;
+import io.datapulse.etl.v1.dto.EtlDateRange;
+import io.datapulse.etl.v1.dto.scenario.EtlScenarioEventConfig;
+import io.datapulse.etl.v1.dto.scenario.EtlScenarioRunRequest;
+import io.datapulse.etl.v1.dto.scenario.EtlScenarioStep;
 import io.datapulse.etl.service.EtlDateRangeResolver;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

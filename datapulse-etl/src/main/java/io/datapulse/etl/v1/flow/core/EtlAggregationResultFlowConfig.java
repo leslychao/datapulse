@@ -6,10 +6,10 @@ import static io.datapulse.etl.v1.flow.core.EtlFlowConstants.CH_ETL_ORCHESTRATIO
 import io.datapulse.core.service.EtlExecutionAuditService;
 import io.datapulse.domain.SyncStatus;
 import io.datapulse.domain.dto.EtlExecutionAuditDto;
-import io.datapulse.etl.dto.ExecutionAggregationResult;
-import io.datapulse.etl.dto.ExecutionOutcome;
-import io.datapulse.etl.dto.IngestStatus;
-import io.datapulse.etl.dto.scenario.EtlEventCompletedEvent;
+import io.datapulse.etl.v1.dto.ExecutionAggregationResult;
+import io.datapulse.etl.v1.dto.ExecutionOutcome;
+import io.datapulse.etl.v1.dto.IngestStatus;
+import io.datapulse.etl.v1.dto.scenario.EtlEventCompletedEvent;
 import io.datapulse.etl.service.EtlMaterializationService;
 import java.util.List;
 import java.util.Map;

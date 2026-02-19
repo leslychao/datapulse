@@ -1,4 +1,4 @@
-package io.datapulse.etl.dto.scenario;
+package io.datapulse.etl.v1.dto.scenario;
 
 import java.util.List;
 

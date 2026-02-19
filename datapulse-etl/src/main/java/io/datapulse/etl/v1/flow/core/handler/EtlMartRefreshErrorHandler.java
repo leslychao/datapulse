@@ -1,7 +1,7 @@
 package io.datapulse.etl.v1.flow.core.handler;
 
 import io.datapulse.core.i18n.I18nMessageService;
-import io.datapulse.etl.dto.ExecutionAggregationResult;
+import io.datapulse.etl.v1.dto.ExecutionAggregationResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

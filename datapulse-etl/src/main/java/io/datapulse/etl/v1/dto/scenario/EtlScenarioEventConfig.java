@@ -1,7 +1,7 @@
-package io.datapulse.etl.dto.scenario;
+package io.datapulse.etl.v1.dto.scenario;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.EtlDateMode;
+import io.datapulse.etl.v1.dto.EtlDateMode;
 import java.time.LocalDate;
 
 public record EtlScenarioEventConfig(

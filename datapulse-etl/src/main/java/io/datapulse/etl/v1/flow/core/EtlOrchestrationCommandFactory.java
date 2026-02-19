@@ -5,9 +5,9 @@ import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
 
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.EtlDateMode;
-import io.datapulse.etl.dto.EtlDateRange;
-import io.datapulse.etl.dto.OrchestrationCommand;
+import io.datapulse.etl.v1.dto.EtlDateMode;
+import io.datapulse.etl.v1.dto.EtlDateRange;
+import io.datapulse.etl.v1.dto.OrchestrationCommand;
 import io.datapulse.etl.service.EtlDateRangeResolver;
 import java.time.LocalDate;
 import java.util.List;

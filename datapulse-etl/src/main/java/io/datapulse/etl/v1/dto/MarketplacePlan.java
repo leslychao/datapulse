@@ -1,4 +1,4 @@
-package io.datapulse.etl.dto;
+package io.datapulse.etl.v1.dto;
 
 import io.datapulse.domain.MarketplaceType;
 import java.util.List;

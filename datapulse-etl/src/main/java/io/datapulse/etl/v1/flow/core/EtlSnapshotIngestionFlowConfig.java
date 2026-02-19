@@ -7,7 +7,7 @@ import static io.datapulse.domain.MessageCodes.ETL_INGEST_SNAPSHOT_REQUIRED;
 import static io.datapulse.etl.v1.flow.core.EtlFlowConstants.CH_ETL_INGEST;
 
 import io.datapulse.domain.exception.AppException;
-import io.datapulse.etl.dto.EtlSourceExecution;
+import io.datapulse.etl.v1.dto.EtlSourceExecution;
 import io.datapulse.etl.v1.file.IngestItemIterator;
 import io.datapulse.etl.v1.file.SnapshotIteratorFactory;
 import io.datapulse.etl.v1.file.locator.JsonArrayLocator;

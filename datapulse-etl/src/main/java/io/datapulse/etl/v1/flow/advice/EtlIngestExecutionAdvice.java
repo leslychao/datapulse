@@ -1,8 +1,8 @@
 package io.datapulse.etl.v1.flow.advice;
 
-import io.datapulse.etl.dto.EtlSourceExecution;
-import io.datapulse.etl.dto.ExecutionOutcome;
-import io.datapulse.etl.dto.IngestStatus;
+import io.datapulse.etl.v1.dto.EtlSourceExecution;
+import io.datapulse.etl.v1.dto.ExecutionOutcome;
+import io.datapulse.etl.v1.dto.IngestStatus;
 import io.datapulse.etl.v1.flow.core.handler.EtlIngestErrorHandler;
 import io.datapulse.etl.repository.jdbc.RawBatchInsertJdbcRepository;
 import lombok.RequiredArgsConstructor;

@@ -3,7 +3,7 @@ package io.datapulse.etl.v1.flow.core;
 import io.datapulse.core.service.account.AccountService;
 import io.datapulse.domain.response.account.AccountResponse;
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.dto.EtlRunRequest;
+import io.datapulse.etl.v1.dto.EtlRunRequest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
