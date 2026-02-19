@@ -1,11 +1,11 @@
 package io.datapulse.etl.config;
 
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION_WAIT;
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION_DLX;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.QUEUE_EXECUTION_WAIT;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION_WAIT;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;

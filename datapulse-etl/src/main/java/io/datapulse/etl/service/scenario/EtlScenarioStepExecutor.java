@@ -1,14 +1,14 @@
 package io.datapulse.etl.service.scenario;
 
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
-import static io.datapulse.etl.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.EXCHANGE_EXECUTION;
+import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_EXECUTION;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.cache.EtlEventCompletionCache;
+import io.datapulse.etl.v1.cache.EtlEventCompletionCache;
 import io.datapulse.etl.dto.EtlDateMode;
 import io.datapulse.etl.dto.OrchestrationCommand;
 import io.datapulse.etl.dto.scenario.EtlScenarioStep;
-import io.datapulse.etl.flow.core.EtlOrchestrationCommandFactory;
+import io.datapulse.etl.v1.flow.core.EtlOrchestrationCommandFactory;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
