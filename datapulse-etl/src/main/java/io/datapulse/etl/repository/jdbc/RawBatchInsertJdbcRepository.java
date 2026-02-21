@@ -52,6 +52,13 @@ public class RawBatchInsertJdbcRepository {
     );
   }
 
+
+
+  public void deleteByRequestId(String tableName, String requestId) {
+    rawTableSchemaJdbcRepository.ensureTableExists(tableName);
+    String sql = "delete from %s where request_id = ?".formatted(tableName);
+    jdbcTemplate.update(sql, requestId);
+  }
   public long countByRequestId(String tableName, String requestId) {
     rawTableSchemaJdbcRepository.ensureTableExists(tableName);
     String sql = "select count(*) from %s where request_id = ?".formatted(tableName);

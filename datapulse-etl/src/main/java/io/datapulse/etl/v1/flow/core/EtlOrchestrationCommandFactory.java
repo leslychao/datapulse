@@ -5,22 +5,16 @@ import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
 
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.v1.dto.EtlDateMode;
 import io.datapulse.etl.v1.dto.EtlDateRange;
-import io.datapulse.etl.v1.dto.OrchestrationCommand;
+import io.datapulse.etl.v1.dto.EtlRunRequest;
+import io.datapulse.etl.v1.dto.RunTask;
 import io.datapulse.etl.service.EtlDateRangeResolver;
-import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
-import java.util.stream.Stream;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 
 @Component
 public class EtlOrchestrationCommandFactory {
-
-  private record RequiredField(String name, Object value) {
-
-  }
 
   private final EtlDateRangeResolver dateRangeResolver;
 
@@ -28,63 +22,18 @@ public class EtlOrchestrationCommandFactory {
     this.dateRangeResolver = dateRangeResolver;
   }
 
-  public OrchestrationCommand toCommand(
-      String requestId,
-      Long accountId,
-      String eventCode,
-      EtlDateMode dateMode,
-      LocalDate dateFrom,
-      LocalDate dateTo,
-      Integer lastDays,
-      List<String> sourceIds
-  ) {
-    validateRequiredFields(accountId, eventCode);
-
-    MarketplaceEvent event = MarketplaceEvent.fromString(eventCode);
+  public List<RunTask> toRunTasks(EtlRunRequest request) {
+    if (request.accountId() == null || request.event() == null) {
+      throw new AppException(ETL_REQUEST_INVALID, "accountId,event");
+    }
+    MarketplaceEvent event = MarketplaceEvent.fromString(request.event());
     if (event == null) {
-      throw new AppException(ETL_EVENT_UNKNOWN, eventCode);
+      throw new AppException(ETL_EVENT_UNKNOWN, request.event());
     }
-
-    EtlDateRange range = dateRangeResolver.resolve(
-        event,
-        dateMode,
-        dateFrom,
-        dateTo,
-        lastDays
-    );
-
-    String effectiveRequestId = resolveRequestId(requestId);
-
-    List<String> safeSourceIds =
-        sourceIds == null ? List.of() : List.copyOf(sourceIds);
-
-    return new OrchestrationCommand(
-        effectiveRequestId,
-        accountId,
-        event,
-        range.dateFrom(),
-        range.dateTo(),
-        safeSourceIds
-    );
-  }
-
-  private String resolveRequestId(String requestId) {
-    return (requestId == null || requestId.isBlank())
-        ? UUID.randomUUID().toString()
-        : requestId;
-  }
-
-  private void validateRequiredFields(Long accountId, String eventCode) {
-    List<String> missing = Stream.of(
-            new RequiredField("accountId", accountId),
-            new RequiredField("event", eventCode)
-        )
-        .filter(f -> f.value() == null)
-        .map(RequiredField::name)
+    EtlDateRange range = dateRangeResolver.resolve(event, request.dateMode(), request.dateFrom(), request.dateTo(), request.lastDays());
+    int burst = request.burst() == null || request.burst() < 1 ? 1 : request.burst();
+    return IntStream.range(0, burst)
+        .mapToObj(index -> new RunTask(request.accountId(), event, range.dateFrom(), range.dateTo()))
         .toList();
-
-    if (!missing.isEmpty()) {
-      throw new AppException(ETL_REQUEST_INVALID, String.join(", ", missing));
-    }
   }
 }

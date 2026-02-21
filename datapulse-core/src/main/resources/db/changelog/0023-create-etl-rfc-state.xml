@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+  <changeSet id="0023-create-etl-rfc-state" author="codex">
+    <sql>
+      create table if not exists etl_execution (
+        request_id varchar(64) primary key,
+        account_id bigint not null,
+        event varchar(64) not null,
+        date_from date not null,
+        date_to date not null,
+        status varchar(32) not null,
+        started_at timestamp not null,
+        ended_at timestamp,
+        total_sources integer not null,
+        completed_sources integer not null,
+        failed_sources integer not null
+      );
+
+      create table if not exists etl_source_state (
+        request_id varchar(64) not null,
+        event varchar(64) not null,
+        source_id varchar(128) not null,
+        status varchar(32) not null,
+        attempt integer not null,
+        max_attempts integer not null,
+        next_attempt_at timestamp,
+        last_error_code varchar(128),
+        last_error_message text,
+        last_error_at timestamp,
+        primary key (request_id, event, source_id)
+      );
+
+      create table if not exists etl_outbox (
+        id bigserial primary key,
+        type varchar(64) not null,
+        aggregate_key varchar(255) not null,
+        payload_json jsonb not null,
+        ttl_millis bigint not null,
+        status varchar(32) not null
+      );
+
+      create index if not exists ix_etl_outbox_status on etl_outbox(status);
+    </sql>
+  </changeSet>
+</databaseChangeLog>
