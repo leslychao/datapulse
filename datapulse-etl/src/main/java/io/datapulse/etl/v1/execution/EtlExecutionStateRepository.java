@@ -1,7 +1,6 @@
 package io.datapulse.etl.v1.execution;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.v1.dto.EtlSourceExecution;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
