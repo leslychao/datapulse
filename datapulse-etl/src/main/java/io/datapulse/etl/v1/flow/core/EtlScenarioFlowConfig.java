@@ -3,11 +3,9 @@ package io.datapulse.etl.v1.flow.core;
 import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.EXCHANGE_TASKS;
 import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_TASKS;
 
-import io.datapulse.etl.v1.dto.RunTask;
 import io.datapulse.etl.v1.dto.scenario.EtlScenarioRunRequest;
 import io.datapulse.etl.v1.dto.scenario.EtlScenarioRunResponse;
 import io.datapulse.etl.v1.flow.scenario.EtlScenarioPlanner;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.annotation.Bean;
