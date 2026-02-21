@@ -26,4 +26,5 @@
   <include file="changelog/0020-create-vault-sync-outbox.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0021-create-account-invite.xml" relativeToChangelogFile="true"/>
   <include file="changelog/0022-create-etl-event-audit.xml" relativeToChangelogFile="true"/>
+  <include file="changelog/0023-create-etl-rfc-state.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

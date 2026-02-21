@@ -1,21 +1,14 @@
 package io.datapulse.etl.v1.dto;
 
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.domain.MarketplaceType;
-import io.datapulse.etl.event.EventSource;
 import java.time.LocalDate;
 
 public record EtlSourceExecution(
     String requestId,
-    String sourceId,
-    MarketplaceEvent event,
-    MarketplaceType marketplace,
     Long accountId,
+    MarketplaceEvent event,
+    String sourceId,
     LocalDate dateFrom,
-    LocalDate dateTo,
-    int order,
-    EventSource source,
-    String rawTable
+    LocalDate dateTo
 ) {
-
 }
