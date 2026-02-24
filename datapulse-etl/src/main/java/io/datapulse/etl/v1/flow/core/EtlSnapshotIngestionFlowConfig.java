@@ -17,9 +17,12 @@ import io.datapulse.marketplaces.dto.Snapshot;
 import java.nio.file.Path;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.integration.endpoint.MessageProducerSupport;
 import org.springframework.integration.splitter.DefaultMessageSplitter;
 import org.springframework.integration.util.CloseableIterator;
 import org.springframework.util.CollectionUtils;
@@ -35,9 +38,9 @@ public class EtlSnapshotIngestionFlowConfig {
   private final RawBatchInsertJdbcRepository repository;
 
   @Bean
-  public IntegrationFlow etlIngestFlow() {
+  public IntegrationFlow etlIngestFlow(EtlIngestRequestedProducer etlIngestRequestedProducer) {
     return IntegrationFlow
-        .from(EtlIngestGateway.class)
+        .from(etlIngestRequestedProducer)
         .transform(IngestCommand.class, this::fetchSnapshotsAndBuildContexts)
         .split(new DefaultMessageSplitter())
         .split(IngestContext.class, this::toIngestItemIterator)
@@ -106,11 +109,21 @@ public class EtlSnapshotIngestionFlowConfig {
     repository.saveBatch(batch.rows(), source.rawTable(), execution.requestId(), execution.accountId(), source.marketplace());
   }
 
-  public record IngestCommand(EtlSourceExecution execution, RegisteredSource registeredSource) {}
+  public static final class IngestRequested extends ApplicationEvent {
+    private final IngestCommand command;
 
-  public interface EtlIngestGateway {
-    void ingest(IngestCommand command);
+    public IngestRequested(Object source, IngestCommand command) {
+      super(source);
+      this.command = command;
+    }
+
+    public IngestCommand command() {
+      return command;
+    }
   }
+
+
+  public record IngestCommand(EtlSourceExecution execution, RegisteredSource registeredSource) {}
 
   public record IngestContext(EtlSourceExecution execution, RegisteredSource registeredSource,
                               Path snapshotFile, Class<?> elementType) {
@@ -122,4 +135,19 @@ public class EtlSnapshotIngestionFlowConfig {
   public record IngestItem<T>(IngestContext context, T row, boolean last) {}
 
   public record IngestBatch<T>(IngestContext context, List<T> rows) {}
+
+  @org.springframework.stereotype.Component
+  public static class EtlIngestRequestedProducer extends MessageProducerSupport
+      implements ApplicationListener<IngestRequested> {
+
+    @Override
+    public void onApplicationEvent(IngestRequested event) {
+      sendMessage(getMessageBuilderFactory().withPayload(event.command()).build());
+    }
+
+    @Override
+    public String getComponentType() {
+      return "etl:ingest-requested-producer";
+    }
+  }
 }
