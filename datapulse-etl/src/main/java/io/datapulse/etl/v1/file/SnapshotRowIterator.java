@@ -1,23 +1,23 @@
 package io.datapulse.etl.v1.file;
 
-import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.IngestContext;
-import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.IngestItem;
+import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.SnapshotIngestContext;
+import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.SnapshotRow;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.integration.util.CloseableIterator;
 
 @Slf4j
-public final class IngestItemIterator implements CloseableIterator<IngestItem<?>> {
+public final class SnapshotRowIterator implements CloseableIterator<SnapshotRow<?>> {
 
   private final CloseableIterator<?> delegate;
-  private final IngestContext context;
+  private final SnapshotIngestContext context;
 
   private Object nextRow;
   private boolean hasNextLoaded;
 
-  public IngestItemIterator(
+  public SnapshotRowIterator(
       CloseableIterator<?> delegate,
-      IngestContext context
+      SnapshotIngestContext context
   ) {
     this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
     this.context = Objects.requireNonNull(context, "context must not be null");
@@ -43,11 +43,11 @@ public final class IngestItemIterator implements CloseableIterator<IngestItem<?>
   }
 
   @Override
-  public IngestItem<?> next() {
+  public SnapshotRow<?> next() {
     Object current = nextRow;
     advance();
     boolean last = !hasNextLoaded;
-    return new IngestItem<>(context, current, last);
+    return new SnapshotRow<>(context, current, last);
   }
 
   @Override
@@ -55,7 +55,7 @@ public final class IngestItemIterator implements CloseableIterator<IngestItem<?>
     try {
       delegate.close();
     } finally {
-      log.debug("Snapshot file retained: {}", context.snapshotFile());
+      log.debug("Snapshot file released: {}", context.snapshotFile());
     }
   }
 }

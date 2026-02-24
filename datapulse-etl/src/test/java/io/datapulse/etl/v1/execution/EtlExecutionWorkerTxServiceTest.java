@@ -11,7 +11,6 @@ import io.datapulse.etl.v1.dto.EtlSourceExecution;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import io.datapulse.etl.v1.flow.core.EtlIngestFlowFacade;
 
 class EtlExecutionWorkerTxServiceTest {
 

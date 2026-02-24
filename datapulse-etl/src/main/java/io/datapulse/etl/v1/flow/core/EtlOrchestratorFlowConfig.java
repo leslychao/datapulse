@@ -5,12 +5,12 @@ import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.QUEUE_EXEC
 import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.QUEUE_TASKS;
 import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_TASKS;
 
+import io.datapulse.etl.v1.dto.EtlIngestExecutionContext;
 import io.datapulse.etl.v1.dto.EtlRunRequest;
 import io.datapulse.etl.v1.dto.RunTask;
 import io.datapulse.etl.v1.execution.EtlExecutionPayloadCodec;
 import io.datapulse.etl.v1.execution.EtlExecutionWorkerTxService;
 import io.datapulse.etl.v1.execution.EtlTaskOrchestratorTxService;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -35,6 +35,9 @@ public class EtlOrchestratorFlowConfig {
   private final EtlTaskOrchestratorTxService orchestratorTxService;
   private final EtlExecutionWorkerTxService workerTxService;
 
+  // ingest subflow (без фасадов/каналов) — внедряем как bean
+  private final EtlSnapshotIngestionFlowConfig ingestFlowConfig;
+
   @Bean(name = EtlFlowConstants.CH_ETL_TASKS)
   public MessageChannel etlTasksChannel() {
     return new DirectChannel();
@@ -51,11 +54,11 @@ public class EtlOrchestratorFlowConfig {
         .from(Http.inboundGateway("/api/etl/run")
             .requestPayloadType(EtlRunRequest.class)
             .statusCodeFunction(message -> HttpStatus.ACCEPTED))
-        .transform(EtlRunRequest.class, request -> commandFactory.toRunTasks(request))
+        .transform(EtlRunRequest.class, commandFactory::toRunTasks)
         .split()
         .handle(Amqp.outboundAdapter(rabbitTemplate).exchangeName(EXCHANGE_TASKS).routingKey(ROUTING_KEY_TASKS),
             endpoint -> endpoint.requiresReply(false))
-        .handle(payload -> Map.of("status", "accepted"))
+        .handle(payload -> java.util.Map.of("status", "accepted"))
         .get();
   }
 
@@ -100,10 +103,20 @@ public class EtlOrchestratorFlowConfig {
           return valid;
         })
         .transform(byte[].class, payload -> codec.parseExecution(payload).orElseThrow())
-        .handle(io.datapulse.etl.v1.dto.EtlSourceExecution.class, (execution, headers) -> {
-          workerTxService.process(execution);
+
+        // 1) prepare TX: mark in-progress + delete raw + build ctx
+        .handle(workerTxService, "prepareIngest")
+        .filter(p -> p != null)
+
+        // 2) ingest subflow (request–reply): returns SAME EtlIngestExecutionContext on completion
+        .gateway(ingestFlowConfig.ingestSubflow())
+
+        // 3) finalize TX: mark completed + resolve execution
+        .handle(EtlIngestExecutionContext.class, (ctx, headers) -> {
+          workerTxService.finalizeIngest(ctx);
           return null;
         }, endpoint -> endpoint.requiresReply(false))
+
         .get();
   }
 }

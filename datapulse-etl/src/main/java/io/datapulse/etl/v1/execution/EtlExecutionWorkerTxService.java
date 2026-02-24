@@ -3,9 +3,8 @@ package io.datapulse.etl.v1.execution;
 import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.repository.jdbc.RawBatchInsertJdbcRepository;
+import io.datapulse.etl.v1.dto.EtlIngestExecutionContext;
 import io.datapulse.etl.v1.dto.EtlSourceExecution;
-import io.datapulse.etl.v1.flow.core.EtlIngestFlowFacade;
-import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.IngestCommand;
 import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
@@ -21,24 +20,34 @@ public class EtlExecutionWorkerTxService {
   private final EtlExecutionStateRepository stateRepository;
   private final EtlSourceRegistry sourceRegistry;
   private final RawBatchInsertJdbcRepository rawBatchRepository;
-  private final EtlIngestFlowFacade ingestFlowFacade;
   private final EtlExecutionOutboxRepository outboxRepository;
   private final EtlExecutionPayloadCodec payloadCodec;
 
+  /**
+   * TX-bound подготовка execution к ingest:
+   * - проверка, что execution/source не terminal
+   * - mark IN_PROGRESS (CAS)
+   * - delete raw by requestId (как у тебя сейчас)
+   * - построение EtlIngestExecutionContext (execution + registeredSource)
+   *
+   * Возвращает null, если делать нечего (terminal/не удалось CAS).
+   */
   @Transactional
-  public void process(EtlSourceExecution execution) {
+  public EtlIngestExecutionContext prepareIngest(EtlSourceExecution execution) {
     var executionRow = stateRepository.findExecution(execution.requestId()).orElse(null);
     if (executionRow == null || executionRow.isTerminal()) {
-      return;
+      return null;
     }
 
-    var sourceState = stateRepository.findSourceState(execution.requestId(), execution.event(), execution.sourceId()).orElse(null);
+    var sourceState = stateRepository
+        .findSourceState(execution.requestId(), execution.event(), execution.sourceId())
+        .orElse(null);
     if (sourceState == null || sourceState.status().isTerminal()) {
-      return;
+      return null;
     }
 
     if (!stateRepository.markSourceInProgress(execution.requestId(), execution.event(), execution.sourceId())) {
-      return;
+      return null;
     }
 
     RegisteredSource source = sourceRegistry.getSources(execution.event()).stream()
@@ -46,27 +55,50 @@ public class EtlExecutionWorkerTxService {
         .findFirst()
         .orElseThrow();
 
-    try {
-      rawBatchRepository.deleteByRequestId(source.rawTable(), execution.requestId());
-      ingestFlowFacade.ingest(new IngestCommand(execution, source));
-      stateRepository.markSourceCompleted(execution.requestId(), execution.event(), execution.sourceId());
-      stateRepository.resolveExecutionStatus(execution.requestId());
-    } catch (Throwable ex) {
-      handleException(execution, ex);
-    }
+    // твоя текущая семантика: delete-before-insert
+    rawBatchRepository.deleteByRequestId(source.rawTable(), execution.requestId());
+
+    return new EtlIngestExecutionContext(execution, source);
   }
 
-  private void handleException(EtlSourceExecution execution, Throwable error) {
+  /**
+   * Финализация ПОСЛЕ завершения ingest.
+   */
+  @Transactional
+  public void finalizeIngest(EtlIngestExecutionContext ctx) {
+    EtlSourceExecution execution = ctx.execution();
+    stateRepository.markSourceCompleted(execution.requestId(), execution.event(), execution.sourceId());
+    stateRepository.resolveExecutionStatus(execution.requestId());
+  }
+
+  /**
+   * Унифицированный обработчик ошибок ingest в TX-контексте.
+   * Его можно дергать из error-flow / advice (см. комментарий в конфиге).
+   */
+  @Transactional
+  public void handleIngestFailure(EtlIngestExecutionContext ctx, Throwable error) {
+    EtlSourceExecution execution = ctx.execution();
+
     if (error instanceof TooManyRequestsBackoffRequiredException remote) {
-      scheduleRetry(execution, "REMOTE_429", Math.max(0, remote.getRetryAfterSeconds()) * 1000L, error.getMessage());
+      scheduleRetry(execution, "REMOTE_429",
+          Math.max(0, remote.getRetryAfterSeconds()) * 1000L,
+          error.getMessage());
       return;
     }
     if (error instanceof LocalRateLimitBackoffRequiredException local) {
-      scheduleRetry(execution, "LOCAL_RATE_LIMIT", local.getRetryAfterMillis(), error.getMessage());
+      scheduleRetry(execution, "LOCAL_RATE_LIMIT",
+          local.getRetryAfterMillis(),
+          error.getMessage());
       return;
     }
+
     stateRepository.markSourceFailedTerminal(
-        execution.requestId(), execution.event(), execution.sourceId(), error.getClass().getSimpleName(), error.getMessage());
+        execution.requestId(),
+        execution.event(),
+        execution.sourceId(),
+        error.getClass().getSimpleName(),
+        error.getMessage()
+    );
     stateRepository.resolveExecutionStatus(execution.requestId());
   }
 
