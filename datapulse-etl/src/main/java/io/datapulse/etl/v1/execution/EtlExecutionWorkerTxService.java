@@ -4,7 +4,7 @@ import io.datapulse.etl.event.EtlSourceRegistry;
 import io.datapulse.etl.event.EtlSourceRegistry.RegisteredSource;
 import io.datapulse.etl.repository.jdbc.RawBatchInsertJdbcRepository;
 import io.datapulse.etl.v1.dto.EtlSourceExecution;
-import io.datapulse.etl.v1.flow.core.EtlIngestFlowFacade;
+import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.EtlIngestGateway;
 import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.IngestCommand;
 import io.datapulse.marketplaces.resilience.TooManyRequestsBackoffRequiredException;
 import java.time.OffsetDateTime;
@@ -21,7 +21,7 @@ public class EtlExecutionWorkerTxService {
   private final EtlExecutionStateRepository stateRepository;
   private final EtlSourceRegistry sourceRegistry;
   private final RawBatchInsertJdbcRepository rawBatchRepository;
-  private final EtlIngestFlowFacade ingestFlowFacade;
+  private final EtlIngestGateway ingestGateway;
   private final EtlExecutionOutboxRepository outboxRepository;
   private final EtlExecutionPayloadCodec payloadCodec;
 
@@ -48,7 +48,7 @@ public class EtlExecutionWorkerTxService {
 
     try {
       rawBatchRepository.deleteByRequestId(source.rawTable(), execution.requestId());
-      ingestFlowFacade.ingest(new IngestCommand(execution, source));
+      ingestGateway.ingest(new IngestCommand(execution, source));
       stateRepository.markSourceCompleted(execution.requestId(), execution.event(), execution.sourceId());
       stateRepository.resolveExecutionStatus(execution.requestId());
     } catch (Throwable ex) {

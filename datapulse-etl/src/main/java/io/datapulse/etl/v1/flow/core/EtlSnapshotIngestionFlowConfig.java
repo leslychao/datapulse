@@ -37,7 +37,7 @@ public class EtlSnapshotIngestionFlowConfig {
   @Bean
   public IntegrationFlow etlIngestFlow() {
     return IntegrationFlow
-        .from(EtlFlowConstants.CH_ETL_INGEST)
+        .from(EtlIngestGateway.class)
         .transform(IngestCommand.class, this::fetchSnapshotsAndBuildContexts)
         .split(new DefaultMessageSplitter())
         .split(IngestContext.class, this::toIngestItemIterator)
@@ -107,6 +107,10 @@ public class EtlSnapshotIngestionFlowConfig {
   }
 
   public record IngestCommand(EtlSourceExecution execution, RegisteredSource registeredSource) {}
+
+  public interface EtlIngestGateway {
+    void ingest(IngestCommand command);
+  }
 
   public record IngestContext(EtlSourceExecution execution, RegisteredSource registeredSource,
                               Path snapshotFile, Class<?> elementType) {
