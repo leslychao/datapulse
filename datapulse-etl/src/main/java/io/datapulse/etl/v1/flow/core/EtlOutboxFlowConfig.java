@@ -6,6 +6,7 @@ import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KE
 import io.datapulse.etl.v1.execution.EtlExecutionOutboxRepository;
 import io.datapulse.etl.v1.execution.EtlExecutionOutboxRepository.OutboxRow;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -49,7 +50,8 @@ public class EtlOutboxFlowConfig {
                     .errorChannel(CH_ETL_OUTBOX_ERROR)
             )
         )
-        .filter(List.class, rows -> !rows.isEmpty())
+        .handle(List.class, (rows, headers) -> rows.isEmpty() ? null : rows)
+        .filter(Objects::nonNull)
         .split(List.class, List::stream)
         .enrichHeaders(headers -> headers
             .headerFunction(HDR_OUTBOX_ID, message -> ((OutboxRow) message.getPayload()).id())

@@ -17,10 +17,10 @@ import io.datapulse.etl.v1.file.locator.SnapshotJsonLayoutRegistry;
 import io.datapulse.marketplaces.dto.Snapshot;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.integration.aggregator.CorrelationStrategy;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.splitter.DefaultMessageSplitter;
 import org.springframework.integration.util.CloseableIterator;
@@ -39,32 +39,16 @@ public class EtlSnapshotIngestionFlowConfig {
   private final SnapshotIteratorFactory snapshotIteratorFactory;
   private final RawBatchInsertJdbcRepository repository;
 
-  /**
-   * Subflow, который можно вызывать как .gateway(ingestSubflow()). ВАЖНО: он возвращает тот же
-   * EtlIngestExecutionContext, который пришёл на вход, но ТОЛЬКО после того как обработаны все
-   * snapshots.
-   */
   @Bean
   public IntegrationFlow ingestSubflow() {
     return f -> f
-        // вход: EtlIngestExecutionContext
-
-        // fetch snapshots -> List<SnapshotIngestContext>
         .transform(EtlIngestExecutionContext.class, this::fetchSnapshotsAndBuildSnapshotContexts)
-
-        // сохраним "сколько snapshots всего" + оригинальный execution-context в headers
         .enrichHeaders(h -> h
             .headerFunction(HDR_TOTAL_SNAPSHOTS, m -> ((List<?>) m.getPayload()).size())
             .headerFunction(HDR_EXEC_CTX, m -> m.getHeaders().get(HDR_EXEC_CTX))
         )
-
-        // split snapshots
         .split(new DefaultMessageSplitter())
-
-        // 1 snapshot -> iterator rows (SnapshotRow)
         .split(SnapshotIngestContext.class, this::toSnapshotRowIterator)
-
-        // rows -> batches (RawInsertBatch)
         .aggregate(aggregator -> aggregator
             .correlationStrategy(message -> ((SnapshotRow<?>) message.getPayload()).context().key())
             .releaseStrategy(group ->
@@ -87,27 +71,39 @@ public class EtlSnapshotIngestionFlowConfig {
             })
             .expireGroupsUponCompletion(true)
         )
-
-        // save batch; если это lastBatch для snapshot -> вернуть SnapshotIngestContext как "snapshot-completed signal"
         .handle(RawInsertBatch.class, (batch, headers) -> {
           saveBatch(batch);
           return batch.lastBatch() ? batch.context() : null;
         })
-        .filter(p -> p != null)
-
-        // fan-in: собрать "snapshot completed" по execution/source в 1 reply (original EtlIngestExecutionContext)
+        .filter(Objects::nonNull)
         .aggregate(aggregator -> aggregator
-            .correlationStrategy((CorrelationStrategy) message -> {
-              SnapshotIngestContext sctx = (SnapshotIngestContext) message.getPayload();
-              EtlSourceExecution ex = sctx.execCtx().execution();
-              return ex.requestId() + ":" + ex.sourceId();
+            .correlationStrategy(message -> {
+              Object p = message.getPayload();
+              if (!(p instanceof SnapshotRow<?>)) {
+                throw new IllegalStateException("Expected SnapshotRow but got: " + (p == null ? "null" : p.getClass()));
+              }
+              return ((SnapshotRow<?>) p).context().key();
             })
-            .releaseStrategy(group -> {
-              Integer total = (Integer) group.getOne().getHeaders().get(HDR_TOTAL_SNAPSHOTS);
-              return total != null && group.size() >= total;
+            .outputProcessor(group -> {
+              if (group.size() == 0 || group.getOne() == null) {
+                throw new IllegalStateException("EMPTY GROUP! groupId=" + group.getGroupId());
+              }
+              SnapshotRow<?> sample = (SnapshotRow<?>) group.getOne().getPayload();
+              if (sample == null) {
+                throw new IllegalStateException("Group sample payload is null! groupId=" + group.getGroupId());
+              }
+
+              boolean lastBatch = group.getMessages().stream()
+                  .map(m -> (SnapshotRow<?>) m.getPayload())
+                  .anyMatch(SnapshotRow::last);
+
+              List<?> rows = group.getMessages().stream()
+                  .map(m -> ((SnapshotRow<?>) m.getPayload()).row())
+                  .filter(Objects::nonNull)
+                  .toList();
+
+              return new RawInsertBatch<>(sample.context(), rows, lastBatch);
             })
-            .outputProcessor(
-                group -> (EtlIngestExecutionContext) group.getOne().getHeaders().get(HDR_EXEC_CTX))
             .expireGroupsUponCompletion(true)
         );
   }
@@ -144,8 +140,7 @@ public class EtlSnapshotIngestionFlowConfig {
     }).toList();
   }
 
-  private CloseableIterator<SnapshotRow<?>> toSnapshotRowIterator(
-      SnapshotIngestContext snapshotCtx) {
+  private CloseableIterator<SnapshotRow<?>> toSnapshotRowIterator(SnapshotIngestContext snapshotCtx) {
     JsonArrayLocator locator = snapshotJsonLayoutRegistry.resolve(snapshotCtx.elementType());
     if (locator == null) {
       throw new AppException(ETL_INGEST_JSON_LAYOUT_NOT_FOUND, snapshotCtx.elementType());
@@ -157,8 +152,6 @@ public class EtlSnapshotIngestionFlowConfig {
         locator
     );
 
-    // ВАЖНО: IngestItemIterator у тебя уже существует.
-    // Он возвращает (row, last) + context — мы просто используем наши типы.
     return new SnapshotRowIterator(delegate, snapshotCtx);
   }
 
@@ -178,13 +171,6 @@ public class EtlSnapshotIngestionFlowConfig {
     );
   }
 
-  /**
-   * Execution-level context уже отдельным DTO: EtlIngestExecutionContext
-   */
-
-  /**
-   * Snapshot-level unit of work.
-   */
   public record SnapshotIngestContext(
       EtlIngestExecutionContext execCtx,
       Path snapshotFile,
@@ -197,16 +183,10 @@ public class EtlSnapshotIngestionFlowConfig {
     }
   }
 
-  /**
-   * Row-level element (one parsed object from snapshot).
-   */
   public record SnapshotRow<T>(SnapshotIngestContext context, T row, boolean last) {
 
   }
 
-  /**
-   * Batch for JDBC insert.
-   */
   public record RawInsertBatch<T>(SnapshotIngestContext context, List<T> rows, boolean lastBatch) {
 
   }

@@ -21,17 +21,8 @@ public class EtlExecutionWorkerTxService {
   private final EtlSourceRegistry sourceRegistry;
   private final RawBatchInsertJdbcRepository rawBatchRepository;
   private final EtlExecutionOutboxRepository outboxRepository;
-  private final EtlExecutionPayloadCodec payloadCodec;
+  private final EtlJsonCodec jsonCodec;
 
-  /**
-   * TX-bound подготовка execution к ingest:
-   * - проверка, что execution/source не terminal
-   * - mark IN_PROGRESS (CAS)
-   * - delete raw by requestId (как у тебя сейчас)
-   * - построение EtlIngestExecutionContext (execution + registeredSource)
-   *
-   * Возвращает null, если делать нечего (terminal/не удалось CAS).
-   */
   @Transactional
   public EtlIngestExecutionContext prepareIngest(EtlSourceExecution execution) {
     var executionRow = stateRepository.findExecution(execution.requestId()).orElse(null);
@@ -55,15 +46,11 @@ public class EtlExecutionWorkerTxService {
         .findFirst()
         .orElseThrow();
 
-    // твоя текущая семантика: delete-before-insert
     rawBatchRepository.deleteByRequestId(source.rawTable(), execution.requestId());
 
     return new EtlIngestExecutionContext(execution, source);
   }
 
-  /**
-   * Финализация ПОСЛЕ завершения ingest.
-   */
   @Transactional
   public void finalizeIngest(EtlIngestExecutionContext ctx) {
     EtlSourceExecution execution = ctx.execution();
@@ -71,24 +58,26 @@ public class EtlExecutionWorkerTxService {
     stateRepository.resolveExecutionStatus(execution.requestId());
   }
 
-  /**
-   * Унифицированный обработчик ошибок ingest в TX-контексте.
-   * Его можно дергать из error-flow / advice (см. комментарий в конфиге).
-   */
   @Transactional
   public void handleIngestFailure(EtlIngestExecutionContext ctx, Throwable error) {
     EtlSourceExecution execution = ctx.execution();
 
     if (error instanceof TooManyRequestsBackoffRequiredException remote) {
-      scheduleRetry(execution, "REMOTE_429",
+      scheduleRetry(
+          execution,
+          "REMOTE_429",
           Math.max(0, remote.getRetryAfterSeconds()) * 1000L,
-          error.getMessage());
+          error.getMessage()
+      );
       return;
     }
     if (error instanceof LocalRateLimitBackoffRequiredException local) {
-      scheduleRetry(execution, "LOCAL_RATE_LIMIT",
+      scheduleRetry(
+          execution,
+          "LOCAL_RATE_LIMIT",
           local.getRetryAfterMillis(),
-          error.getMessage());
+          error.getMessage()
+      );
       return;
     }
 
@@ -104,8 +93,16 @@ public class EtlExecutionWorkerTxService {
 
   private void scheduleRetry(EtlSourceExecution execution, String code, long ttlMillis, String message) {
     OffsetDateTime nextAttemptAt = OffsetDateTime.now().plusNanos(ttlMillis * 1_000_000L);
-    if (stateRepository.scheduleRetry(execution.requestId(), execution.event(), execution.sourceId(), code, message, nextAttemptAt)) {
-      outboxRepository.enqueueWait(execution, payloadCodec.toJson(execution), ttlMillis);
+
+    if (stateRepository.scheduleRetry(
+        execution.requestId(),
+        execution.event(),
+        execution.sourceId(),
+        code,
+        message,
+        nextAttemptAt
+    )) {
+      outboxRepository.enqueueWait(execution, jsonCodec.toJson(execution), ttlMillis);
     } else {
       stateRepository.markSourceFailedTerminal(execution.requestId(), execution.event(), execution.sourceId(), code, message);
       stateRepository.resolveExecutionStatus(execution.requestId());

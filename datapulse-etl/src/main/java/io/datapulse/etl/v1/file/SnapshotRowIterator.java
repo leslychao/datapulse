@@ -2,60 +2,63 @@ package io.datapulse.etl.v1.file;
 
 import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.SnapshotIngestContext;
 import io.datapulse.etl.v1.flow.core.EtlSnapshotIngestionFlowConfig.SnapshotRow;
+import java.util.NoSuchElementException;
 import java.util.Objects;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.integration.util.CloseableIterator;
 
-@Slf4j
+
 public final class SnapshotRowIterator implements CloseableIterator<SnapshotRow<?>> {
 
   private final CloseableIterator<?> delegate;
-  private final SnapshotIngestContext context;
+  private final SnapshotIngestContext ctx;
 
-  private Object nextRow;
-  private boolean hasNextLoaded;
+  private boolean buffered;
+  private Object bufferedValue;
 
-  public SnapshotRowIterator(
-      CloseableIterator<?> delegate,
-      SnapshotIngestContext context
-  ) {
+  private boolean emptyLastEmitted;
+
+  public SnapshotRowIterator(CloseableIterator<?> delegate, SnapshotIngestContext ctx) {
     this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
-    this.context = Objects.requireNonNull(context, "context must not be null");
-    advance();
-    if (!hasNextLoaded) {
-      close();
-    }
-  }
-
-  private void advance() {
-    if (delegate.hasNext()) {
-      nextRow = delegate.next();
-      hasNextLoaded = true;
-    } else {
-      nextRow = null;
-      hasNextLoaded = false;
-    }
+    this.ctx = Objects.requireNonNull(ctx, "ctx must not be null");
   }
 
   @Override
   public boolean hasNext() {
-    return hasNextLoaded;
+    if (emptyLastEmitted) {
+      return false;
+    }
+    if (buffered) {
+      return true;
+    }
+    if (delegate.hasNext()) {
+      bufferedValue = delegate.next();
+      buffered = true;
+      return true;
+    }
+    return true;
   }
 
   @Override
   public SnapshotRow<?> next() {
-    Object current = nextRow;
-    advance();
-    boolean last = !hasNextLoaded;
-    return new SnapshotRow<>(context, current, last);
+    if (!hasNext()) {
+      throw new NoSuchElementException("No more snapshot rows for " + ctx.snapshotFile());
+    }
+
+    if (!buffered && !delegate.hasNext()) {
+      emptyLastEmitted = true;
+      return new SnapshotRow<>(ctx, null, true);
+    }
+
+    Object row = buffered ? bufferedValue : delegate.next();
+    buffered = false;
+    bufferedValue = null;
+
+    boolean last = !delegate.hasNext();
+    return new SnapshotRow<>(ctx, row, last);
   }
 
   @Override
   public void close() {
-    try {
-      delegate.close();
-    } finally {
-      log.debug("Snapshot file released: {}", context.snapshotFile());
-    }
+    delegate.close();
   }
 }

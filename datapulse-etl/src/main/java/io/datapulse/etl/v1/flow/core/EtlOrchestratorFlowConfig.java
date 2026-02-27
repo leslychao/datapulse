@@ -5,16 +5,21 @@ import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.QUEUE_EXEC
 import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.QUEUE_TASKS;
 import static io.datapulse.etl.v1.flow.core.EtlExecutionAmqpConstants.ROUTING_KEY_TASKS;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.etl.v1.dto.EtlIngestExecutionContext;
 import io.datapulse.etl.v1.dto.EtlRunRequest;
+import io.datapulse.etl.v1.dto.EtlSourceExecution;
 import io.datapulse.etl.v1.dto.RunTask;
-import io.datapulse.etl.v1.execution.EtlExecutionPayloadCodec;
 import io.datapulse.etl.v1.execution.EtlExecutionWorkerTxService;
 import io.datapulse.etl.v1.execution.EtlTaskOrchestratorTxService;
+import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -30,12 +35,12 @@ import org.springframework.messaging.MessageChannel;
 public class EtlOrchestratorFlowConfig {
 
   private final RabbitTemplate rabbitTemplate;
+  private final MessageConverter messageConverter;
+  private final ObjectMapper objectMapper;
+
   private final EtlOrchestrationCommandFactory commandFactory;
-  private final EtlExecutionPayloadCodec codec;
   private final EtlTaskOrchestratorTxService orchestratorTxService;
   private final EtlExecutionWorkerTxService workerTxService;
-
-  // ingest subflow (без фасадов/каналов) — внедряем как bean
   private final EtlSnapshotIngestionFlowConfig ingestFlowConfig;
 
   @Bean(name = EtlFlowConstants.CH_ETL_TASKS)
@@ -55,17 +60,26 @@ public class EtlOrchestratorFlowConfig {
             .requestPayloadType(EtlRunRequest.class)
             .statusCodeFunction(message -> HttpStatus.ACCEPTED))
         .transform(EtlRunRequest.class, commandFactory::toRunTasks)
-        .split()
-        .handle(Amqp.outboundAdapter(rabbitTemplate).exchangeName(EXCHANGE_TASKS).routingKey(ROUTING_KEY_TASKS),
-            endpoint -> endpoint.requiresReply(false))
-        .handle(payload -> java.util.Map.of("status", "accepted"))
+        .publishSubscribeChannel(s -> s
+            .subscribe(f -> f
+                .split()
+                .handle(Amqp.outboundAdapter(rabbitTemplate)
+                        .exchangeName(EXCHANGE_TASKS)
+                        .routingKey(ROUTING_KEY_TASKS),
+                    e -> e.requiresReply(false))
+            )
+        )
+        .transform(p -> Map.of("status", "accepted"))
         .get();
   }
 
   @Bean
   public IntegrationFlow etlTasksInboundFlow(ConnectionFactory connectionFactory) {
     return IntegrationFlow
-        .from(Amqp.inboundAdapter(connectionFactory, QUEUE_TASKS))
+        .from(
+            Amqp.inboundAdapter(connectionFactory, QUEUE_TASKS)
+                .messageConverter(messageConverter)
+        )
         .channel(EtlFlowConstants.CH_ETL_TASKS)
         .get();
   }
@@ -74,19 +88,34 @@ public class EtlOrchestratorFlowConfig {
   public IntegrationFlow etlTasksFlow() {
     return IntegrationFlow
         .from(EtlFlowConstants.CH_ETL_TASKS)
-        .filter(byte[].class, payload -> codec.parseRunTask(payload).isPresent())
-        .transform(byte[].class, payload -> codec.parseRunTask(payload).orElseThrow())
+        .transform(payload -> {
+          if (payload instanceof RunTask rt) return rt;
+          return objectMapper.convertValue(payload, RunTask.class);
+        })
         .handle(RunTask.class, (task, headers) -> {
-          orchestratorTxService.orchestrate(task);
-          return null;
-        }, endpoint -> endpoint.requiresReply(false))
+          try {
+            orchestratorTxService.orchestrate(task);
+            return null;
+          } catch (io.datapulse.domain.exception.NotFoundException e) {
+            // важно: лог + контекст
+            log.warn("Non-retryable ETL task rejected (account not found). task={}", task, e);
+
+            // ключевое: НЕ REQUEUE
+            throw new AmqpRejectAndDontRequeueException(
+                "Account not found for task; rejecting without requeue", e
+            );
+          }
+        }, e -> e.requiresReply(false))
         .get();
   }
 
   @Bean
   public IntegrationFlow etlExecutionInboundFlow(ConnectionFactory connectionFactory) {
     return IntegrationFlow
-        .from(Amqp.inboundAdapter(connectionFactory, QUEUE_EXECUTION))
+        .from(
+            Amqp.inboundAdapter(connectionFactory, QUEUE_EXECUTION)
+                .messageConverter(messageConverter)
+        )
         .channel(EtlFlowConstants.CH_ETL_EXECUTION)
         .get();
   }
@@ -95,28 +124,19 @@ public class EtlOrchestratorFlowConfig {
   public IntegrationFlow etlExecutionFlow() {
     return IntegrationFlow
         .from(EtlFlowConstants.CH_ETL_EXECUTION)
-        .filter(byte[].class, payload -> {
-          boolean valid = codec.parseExecution(payload).isPresent();
-          if (!valid) {
-            log.warn("Invalid execution payload received; dropping message");
+        .transform(payload -> {
+          if (payload instanceof EtlSourceExecution ex) {
+            return ex;
           }
-          return valid;
+          return objectMapper.convertValue(payload, EtlSourceExecution.class);
         })
-        .transform(byte[].class, payload -> codec.parseExecution(payload).orElseThrow())
-
-        // 1) prepare TX: mark in-progress + delete raw + build ctx
         .handle(workerTxService, "prepareIngest")
-        .filter(p -> p != null)
-
-        // 2) ingest subflow (request–reply): returns SAME EtlIngestExecutionContext on completion
+        .filter(Objects::nonNull)
         .gateway(ingestFlowConfig.ingestSubflow())
-
-        // 3) finalize TX: mark completed + resolve execution
         .handle(EtlIngestExecutionContext.class, (ctx, headers) -> {
           workerTxService.finalizeIngest(ctx);
           return null;
-        }, endpoint -> endpoint.requiresReply(false))
-
+        }, e -> e.requiresReply(false))
         .get();
   }
 }
