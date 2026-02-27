@@ -1,4 +1,4 @@
-package io.datapulse.etl.v1.file;
+package io.datapulse.etl.file.iterator;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

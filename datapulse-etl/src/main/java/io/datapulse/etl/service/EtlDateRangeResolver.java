@@ -5,8 +5,8 @@ import static io.datapulse.domain.MessageCodes.ETL_REQUEST_INVALID;
 
 import io.datapulse.domain.exception.AppException;
 import io.datapulse.etl.MarketplaceEvent;
-import io.datapulse.etl.v1.dto.EtlDateMode;
-import io.datapulse.etl.v1.dto.EtlDateRange;
+import io.datapulse.etl.dto.DateMode;
+import io.datapulse.etl.dto.DateRange;
 import java.time.LocalDate;
 import org.springframework.stereotype.Component;
 
@@ -15,25 +15,25 @@ public class EtlDateRangeResolver {
 
   private static final int DEFAULT_LAST_DAYS = 30;
 
-  public EtlDateRange resolve(
+  public DateRange resolve(
       MarketplaceEvent event,
-      EtlDateMode mode,
+      DateMode mode,
       LocalDate dateFrom,
       LocalDate dateTo,
       Integer lastDays
   ) {
-    EtlDateMode effectiveMode = resolveMode(event, mode, dateFrom, dateTo);
+    DateMode effectiveMode = resolveMode(event, mode, dateFrom, dateTo);
 
     return switch (effectiveMode) {
-      case NONE -> new EtlDateRange(null, null);
+      case NONE -> new DateRange(null, null);
       case RANGE -> resolveRange(dateFrom, dateTo);
       case LAST_DAYS -> resolveLastDaysRange(lastDays);
     };
   }
 
-  private EtlDateMode resolveMode(
+  private DateMode resolveMode(
       MarketplaceEvent event,
-      EtlDateMode mode,
+      DateMode mode,
       LocalDate dateFrom,
       LocalDate dateTo
   ) {
@@ -41,12 +41,12 @@ public class EtlDateRangeResolver {
       return mode;
     }
     if (dateFrom != null || dateTo != null) {
-      return EtlDateMode.RANGE;
+      return DateMode.RANGE;
     }
     return defaultDateMode(event);
   }
 
-  private EtlDateRange resolveRange(
+  private DateRange resolveRange(
       LocalDate dateFrom,
       LocalDate dateTo
   ) {
@@ -63,18 +63,18 @@ public class EtlDateRangeResolver {
           dateTo
       );
     }
-    return new EtlDateRange(dateFrom, dateTo);
+    return new DateRange(dateFrom, dateTo);
   }
 
-  private EtlDateRange resolveLastDaysRange(Integer requestedLastDays) {
+  private DateRange resolveLastDaysRange(Integer requestedLastDays) {
     int effectiveDays = resolveLastDays(requestedLastDays);
     LocalDate today = LocalDate.now();
     LocalDate calculatedFrom = today.minusDays(effectiveDays);
-    return new EtlDateRange(calculatedFrom, today);
+    return new DateRange(calculatedFrom, today);
   }
 
-  private EtlDateMode defaultDateMode(MarketplaceEvent event) {
-    return EtlDateMode.NONE;
+  private DateMode defaultDateMode(MarketplaceEvent event) {
+    return DateMode.NONE;
   }
 
   private int resolveLastDays(Integer requestedLastDays) {

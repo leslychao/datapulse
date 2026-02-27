@@ -1,7 +1,8 @@
-package io.datapulse.etl.v1.file;
+package io.datapulse.etl.file;
 
 import com.google.gson.stream.JsonReader;
-import io.datapulse.etl.v1.file.locator.JsonArrayLocator;
+import io.datapulse.etl.file.iterator.SnapshotGsonIterator;
+import io.datapulse.etl.file.locator.JsonArrayLocator;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

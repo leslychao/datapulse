@@ -1,8 +1,8 @@
-package io.datapulse.etl.v1.dto;
+package io.datapulse.etl.dto;
 
 import java.time.LocalDate;
 
-public record EtlDateRange(
+public record DateRange(
     LocalDate dateFrom,
     LocalDate dateTo
 ) {

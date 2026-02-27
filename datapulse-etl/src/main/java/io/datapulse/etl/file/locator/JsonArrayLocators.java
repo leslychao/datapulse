@@ -1,4 +1,4 @@
-package io.datapulse.etl.v1.file.locator;
+package io.datapulse.etl.file.locator;
 
 import java.util.Arrays;
 
