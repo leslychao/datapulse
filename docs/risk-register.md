@@ -145,16 +145,16 @@
 | Detection   | CI build failure при нарушении boundary                                                        |
 
 
-### R-13: P&L без рекламных расходов (Phase A/B/C)
+### R-13: P&L без рекламных расходов (Phase B core)
 
 
 | Параметр    | Значение                                                                                                                                                             |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Риск        | P&L завышает прибыль на сумму рекламных расходов. Для крупных рекламодателей (>10% от revenue) — значимая погрешность                                                |
-| Вероятность | Подтверждён (Phase G scope)                                                                                                                                          |
+| Вероятность | Подтверждён (до подключения Phase B extended)                                                                                                                        |
 | Влияние     | Среднее — P&L структурно корректен, но неполный по содержанию                                                                                                        |
-| Митигация   | advertising_cost в формуле = 0 (explicit). UI предупреждение "Рекламные расходы не подключены". Phase G добавит ads ingestion. Ретроактивный пересчёт marts возможен |
-| Detection   | N/A — known gap, не runtime failure                                                                                                                                  |
+| Митигация   | advertising_cost = 0 (explicit fallback). UI предупреждение per marketplace. Phase B extended добавляет ads ingestion: WB — после adapter migration, Ozon — после OAuth2 setup. Ретроактивный пересчёт marts при подключении |
+| Detection   | N/A до подключения; после — stale ad data alert                                                                                                                     |
 
 
 ### R-14: WB Incomes API deprecation (June 2026)
@@ -195,6 +195,42 @@
 | Not blocking | Phase A-C; Ozon Execution                                                                                   |
 
 
+### R-17: Массовое повреждение цен через широкую policy (blast radius)
+
+
+| Параметр    | Значение                                                                                                                                                                                             |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Риск        | Ошибка в конфигурации `price_policy` с `scope_type = CONNECTION` массово меняет цены по всему ассортименту подключения                                                                              |
+| Вероятность | Средняя (человеческая ошибка: неверный `target_margin_pct`, забытый constraint)                                                                                                                     |
+| Влияние     | Высокое — массовая потеря маржи, штрафы маркетплейса за некорректные цены, репутационный ущерб                                                                                                      |
+| Митигация   | 1) `SEMI_AUTO` default — все actions через approval; 2) `max_price_change_pct` ограничивает разовое изменение; 3) Safety gate для `FULL_AUTO` (минимум 7 дней в SEMI_AUTO, 0 FAILED actions); 4) Validation constraints на strategy_params при создании policy; 5) **Impact preview** (Phase E): dry-run pipeline показывает масштаб и направление изменений до активации policy (см. [Pricing → Impact preview](modules/pricing.md#impact-preview-phase-e)) |
+| Detection   | Резкий рост CHANGE decisions в pricing run; аномальный `avg_price_change_pct`; alert при > N% offers с change > threshold за один run                                                               |
+
+
+### R-18: Ozon Performance OAuth2 задерживает advertising ingestion
+
+
+| Параметр    | Значение                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Риск        | OAuth2 credentials для Ozon Performance API не получены или token exchange нестабилен                           |
+| Вероятность | Средняя (отдельная регистрация, 30-мин TTL, async report flow)                                                 |
+| Влияние     | Среднее — Ozon advertising data не загружается; P&L для Ozon остаётся без рекламных расходов                   |
+| Митигация   | WB advertising работает независимо (отдельный auth). Token caching с buffer. Retry при token failure. Graceful degradation: P&L без Ozon ads = допустимо |
+| Detection   | Token exchange failure rate; empty advertising data for Ozon connections                                        |
+
+
+### R-19: WB Advertising API дальнейшие breaking changes
+
+
+| Параметр    | Значение                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Риск        | WB повторно мигрирует advertising endpoints (как v1→v2, v2→v3)                                                |
+| Вероятность | Средняя (прецедент: два breaking change за 2025)                                                               |
+| Влияние     | Среднее — advertising ingestion ломается; P&L возвращается к fallback (advertising_cost = 0)                   |
+| Митигация   | `@JsonIgnoreProperties(ignoreUnknown = true)`. Мониторинг HTTP 404/410. Version pinning в adapter config. Graceful degradation при adapter failure |
+| Detection   | HTTP 404/410 от advert-api; рост ошибок в integration_call_log                                                 |
+
+
 ## Сводка рисков
 
 
@@ -212,10 +248,13 @@
 | R-10 Форматы timestamps                        | Подтверждён | Среднее | Средний         |
 | R-11 Simulated mode загрязняет truth           | Низкая      | Высокое | Средний         |
 | R-12 Расползание логики в common               | Средняя     | Среднее | Средний         |
-| R-13 P&L без рекламных расходов                | Подтверждён | Среднее | Средний         |
+| R-13 P&L без рекламных расходов (B core)        | Подтверждён | Среднее | Средний         |
 | R-14 WB Incomes API deprecation (June 2026)    | Высокая     | Низкое  | Низкий          |
 | R-15 Standalone operations allocation accuracy | Средняя     | Низкое  | Низкий          |
 | R-16 WB Price Write недоступен                 | Подтверждён | Высокое | Высокий         |
+| R-17 Blast radius широкой policy               | Средняя     | Высокое | Высокий         |
+| R-18 Ozon OAuth2 задерживает ads ingestion     | Средняя     | Среднее | Средний         |
+| R-19 WB Advertising API breaking changes       | Средняя     | Среднее | Средний         |
 
 
 ## Связанные документы

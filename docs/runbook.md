@@ -121,7 +121,7 @@
 
 ### FM-9: ClickHouse materialization failure
 
-**Симптомы:** Stale data alert. Canonical data в PostgreSQL свежая (`canonical_price_snapshot.captured_at` < threshold), но ClickHouse facts не обновлены. `job_execution` в статусе FAILED или IN_PROGRESS дольше ожидаемого.
+**Симптомы:** Stale data alert. Canonical data в PostgreSQL свежая (`canonical_price_current.updated_at` < threshold), но ClickHouse facts не обновлены. `job_execution` в статусе FAILED или IN_PROGRESS дольше ожидаемого.
 
 **Диагностика:**
 1. `SELECT status, error_details FROM job_execution WHERE status IN ('FAILED', 'IN_PROGRESS') ORDER BY started_at DESC LIMIT 10`
@@ -148,6 +148,7 @@
 | `datapulse.etl.retry.min-backoff` | 5с | Минимальный backoff |
 | `datapulse.etl.retry.max-backoff` | 5мин | Максимальный backoff |
 | `datapulse.etl.raw-retention.keep-count` | 3 | Количество хранимых raw-снапшотов |
+| `datapulse.etl.stale-job-threshold` | 1h | Порог для перевода IN_PROGRESS → STALE |
 
 ### RabbitMQ topology
 
@@ -162,7 +163,7 @@ Queues:
   etl.execution       — ingest worker слушает
   etl.execution.wait  — TTL expiration → DLX → etl.execution
 
-Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=true
+Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 ```
 
 #### Action execution
@@ -212,6 +213,8 @@ Queues:
 | Очистка кеша | Configurable | Вытеснение устаревших кешей |
 | Очистка инвайтов | Configurable | Удаление просроченных инвайтов |
 | Сверка алертов | Configurable | Переоценка условий алертов |
+| Stale job detector | Каждые 15 мин | Перевод зависших `job_execution` (IN_PROGRESS > 1h) в STALE |
+| Raw retention cleanup | Ежедневно | Удаление S3 objects по retention policy, обновление `job_item.status` → EXPIRED |
 
 ## Чеклист production readiness
 
@@ -241,6 +244,46 @@ Queues:
 - [ ] Инфраструктурные алерты (Grafana Alerting)
 - [ ] Стратегия бэкапов и восстановления PostgreSQL (RPO/RTO)
 - [ ] SLA/SLO
+
+## Advertising Failure Scenarios
+
+### Scenario: WB Advertising API returns 404
+
+**Симптомы:** `ADVERTISING_FACT` pipeline fails, integration_call_log показывает HTTP 404 для advert-api endpoints.
+
+**Причина:** WB deprecation/migration of advertising endpoints (прецедент: v1→v2, v2→v3).
+
+**Действия:**
+1. Проверить WB developer changelog (https://dev.wildberries.ru/release-notes)
+2. Найти новый endpoint path
+3. Обновить YAML config (`endpoint-key` → new URL)
+4. При изменении HTTP method (как POST→GET) или response structure — обновить adapter code
+5. **P&L impact:** advertising_cost fallback = 0 до fix. UI показывает "Рекламные расходы не подключены"
+
+### Scenario: Ozon Performance OAuth2 token failure
+
+**Симптомы:** Ozon `ADVERTISING_FACT` pipeline fails, token exchange возвращает 401/403.
+
+**Причина:** Невалидные client_id/client_secret, expired credentials, Ozon service outage.
+
+**Действия:**
+1. Проверить `secret_reference` для `OZON_PERFORMANCE_OAUTH2` — credentials актуальны?
+2. Попробовать token exchange вручную: `curl -X POST https://api-performance.ozon.ru/api/client/token -d '{"client_id":"...","client_secret":"...","grant_type":"client_credentials"}'`
+3. Если credentials expired — обновить в Vault, затем в `secret_reference`
+4. Если Ozon outage — дождаться восстановления (no action needed, graceful degradation)
+5. **P&L impact:** Ozon advertising_cost = 0 до fix. WB advertising продолжает работать независимо
+
+### Scenario: Advertising data stale (no updates > 48h)
+
+**Симптомы:** `fact_advertising.materialized_at` для connection отстаёт > 48h от now().
+
+**Причина:** Pipeline scheduler failure, rate limit exhaustion, adapter error.
+
+**Действия:**
+1. Проверить `job_execution` для `ADVERTISING_FACT` pipeline — есть ли failed jobs?
+2. Проверить rate limit counters для `WB_ADVERT` (5 req/60s)
+3. Если scheduler пропускает — рестартовать ETL worker
+4. **P&L impact:** Advertising data в marts устаревает, но не обнуляется. P&L использует последние доступные данные
 
 ## Связанные документы
 

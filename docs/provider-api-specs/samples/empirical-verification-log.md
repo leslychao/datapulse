@@ -678,3 +678,156 @@ Cross-verification выявила 2 важных расхождения:
 2. **Optional v5 fields** — нужен `@JsonIgnoreProperties(ignoreUnknown = true)` (DD-10)
 
 Sign convention DD-7 дополнительно подтверждена: `delivery_rub=20`, `rebill_logistic_cost=1.349`.
+
+---
+
+## Session 5: 2026-03-31 (P&L verification — Ozon production, WB production)
+
+### Goal
+
+Верификация 5 архитектурных гипотез: end-to-end P&L walkthrough, standalone ops ratio, WB v5 optional fields, Ozon timezone, partial return scenario.
+
+### 5.1 Ozon end-to-end walkthrough — posting `87621408-0010-1`
+
+**Запрос:** filter by posting_number="87621408-0010-1", Jan 2025
+
+**Операции по posting_number (3 ops):**
+
+| operation_type | amount | accruals_for_sale | sale_commission | services |
+|----------------|--------|-------------------|-----------------|----------|
+| OperationAgentDeliveredToCustomer | 49.60 | 157.00 | -35.95 | DelivToCustomer=-8.45, DirectFlowLogistic=-63.00 |
+| MarketplaceServiceBrandCommission | -0.79 | 0 | 0 | BrandCommission=-0.79 |
+| StarsMembership | -0.79 | 0 | 0 | StarsMembership=-0.79 |
+
+**Acquiring по order_number "87621408-0010" (1 op):**
+
+| operation_type | amount |
+|----------------|--------|
+| MarketplaceRedistributionOfAcquiringOperation | -2.16 |
+
+**P&L decompose:**
+- revenue=157, commission=36.74, acquiring=2.16, logistics=71.45, stars=0.79
+- net_payout = 49.60 + (-0.79) + (-0.79) + (-2.16) = 45.86
+- residual = 45.86 − (157 − 36.74 − 2.16 − 71.45 − 0.79) = **0.00** ✓
+
+### 5.2 Standalone operations reconciliation — Ozon Jan 2025
+
+**Запрос:** all operations for Jan 2025, page-by-page aggregation (7590 ops total)
+
+| Category | Ops | Credits | Debits | Net |
+|----------|-----|---------|--------|-----|
+| Order-linked | 7426 | +94,272.56 | -22,151.24 | +72,121.32 |
+| Standalone | 164 | +617.85 | -31,640.22 | -31,022.37 |
+| TOTAL | 7590 | +94,890.41 | -53,791.46 | +41,098.95 |
+
+**Standalone breakdown:**
+
+| operation_type | count | sum (RUB) |
+|---------------|-------|-----------|
+| OperationElectronicServiceStencil | 134 | -29,282.70 |
+| MarketplaceSaleReviewsOperation | 5 | -1,872.00 |
+| OperationMarketplaceServiceStorage | 22 | -485.52 |
+| MarketplaceSellerCompensationOperation | 1 | +241.97 |
+| AccrualWithoutDocs | 1 | +241.97 |
+| AccrualInternalClaim | 1 | +133.91 |
+
+**Key metrics:**
+- |standalone_net| / |order_net| = **43.01%**
+- |standalone_abs| / |all_abs| = **21.70%**
+- Dominant: OperationElectronicServiceStencil = 94% of standalone debits
+
+**Finding:** `OperationElectronicServiceStencil` operations have populated `items[].sku` field despite empty `posting_number`. SKU-level attribution is possible.
+
+### 5.3 WB v5 optional fields — production check
+
+**Запрос:** `GET /api/v5/supplier/reportDetailByPeriod?dateFrom=2025-12-01&dateTo=2026-01-01&limit=3`
+**Token:** real-account (acc:3)
+**Результат:** Empty string (аккаунт без финансовых данных за период)
+
+**Вывод:** Production verification невозможна без аккаунта с реальными продажами.
+Official docs sample confirms `seller_promo_discount=3` (non-zero). Other fields = 0 in sample.
+
+### 5.4 Ozon finance timezone — EMPIRICAL CONFIRMATION (DD-17)
+
+**Метод:** Cross-reference `posting.created_at` (UTC ISO 8601, from FBO list API) vs `finance.posting.order_date` (no-tz, from finance API).
+
+**Delivered postings Jan 4, 2025:**
+
+| posting_number | created_at (UTC ISO) | finance.order_date | Delta |
+|----------------|---------------------|--------------------|-------|
+| 0120282816-0009-1 | 2025-01-04T**01:25:58**Z | 2025-01-04 **04:25:58** | **+3h** |
+| 78354499-0042-1 | 2025-01-04T**01:32:31**Z | 2025-01-04 **04:32:31** | **+3h** |
+| 30173635-0399-1 | 2025-01-04T**01:43:21**Z | 2025-01-04 **04:43:21** | **+3h** |
+| 48651423-0289-2 | 2025-01-04T**03:10:38**Z | 2025-01-04 **06:10:38** | **+3h** |
+| 40777246-0378-2 | 2025-01-04T**04:18:03**Z | 2025-01-04 **07:18:03** | **+3h** |
+
+**Cross-check near midnight UTC (Jan 1):**
+
+| posting_number | created_at (UTC ISO) | finance.order_date | Delta |
+|----------------|---------------------|--------------------|-------|
+| 47721757-0306-1 | 2025-01-01T**17:06:39**Z | 2025-01-01 **20:06:39** | **+3h** |
+| 0125499819-0100-1 | 2025-01-01T**17:11:53**Z | 2025-01-01 **20:11:52** | **+3h** (1s trunc) |
+| 88434374-0047-1 | 2025-01-01T**17:11:50**Z | 2025-01-01 **20:11:50** | **+3h** |
+| 28717514-0219-2 | 2025-01-01T**17:09:33**Z | 2025-01-01 **20:09:33** | **+3h** |
+| 58347216-0441-1 | 2025-01-01T**17:23:02**Z | 2025-01-01 **20:23:02** | **+3h** |
+
+**Conclusion:** Constant +3h offset across all 10 data points = **Moscow timezone (UTC+3) confirmed**.
+Sub-second rounding (1s in one case) due to millisecond truncation.
+
+### 5.5 Partial return — posting `0108601676-0168-1`
+
+**Запрос:** all operations for posting 0108601676-0168-1 (Dec-Feb window)
+
+**Timeline (6 ops by posting_number + 2 by order_number):**
+
+| Date | Operation | amount | accruals | commission | services |
+|------|-----------|--------|----------|------------|----------|
+| Dec 31 | OperationAgentDeliveredToCustomer | +89.16 | +211 | -48.32 | DelivToCustomer=-10.52, DirectFlow=-63.00 |
+| Dec 31 | MarketplaceServiceBrandCommission | -1.06 | 0 | 0 | Brand=-1.06 |
+| Dec 31 | StarsMembership | -1.06 | 0 | 0 | Stars=-1.06 |
+| Jan 2 | ClientReturnAgentOperation | -162.68 | **-211** | **+48.32** | — |
+| Jan 2 | OperationAgentStornoDeliveredToCustomer | +9.40 | 0 | 0 | DelivToCustomer=**+9.40** |
+| Jan 3 | OperationItemReturn | -78.00 | 0 | 0 | ReturnAfterDeliv=0, ReturnFlow=-63, RedistPVZ=-15 |
+
+**Acquiring (order_number 0108601676-0168):**
+- Charge: MarketplaceRedistributionOfAcquiringOperation = -2.63
+- Reversal: MarketplaceRedistributionOfAcquiringOperation = **+2.63**
+
+**P&L validation:**
+- Sum of all amounts: 89.16 - 1.06 - 1.06 - 162.68 + 9.40 - 78.00 - 2.63 + 2.63 = **-144.24**
+- P&L components: 211 - 211 - 1.06 - 0 - 142.12 - 1.06 = **-144.24**
+- Residual = **0.00** ✓
+
+**Key observations:**
+1. Return = full reversal of `accruals_for_sale` (-211) and `sale_commission` (+48.32)
+2. `OperationAgentStornoDeliveredToCustomer` = partial logistics credit (+9.40 = DelivToCustomer refund)
+3. `OperationItemReturn` = NEW return logistics cost (-78 total: ReturnFlow + RedistPVZ)
+4. Acquiring: charge reversed on return (net = 0)
+5. Multi-day spread: sale Dec 31, return Jan 2, return logistics Jan 3
+
+### 5.6 Second return — posting `0186178620-0017-1`
+
+Same pattern confirmed:
+
+| Date | Operation | amount |
+|------|-----------|--------|
+| Jan 2 | Sale | +7.58 |
+| Jan 2 | Stars | -0.50 |
+| Jan 2 | Brand | -0.50 |
+| Jan 2 | Return (ClientReturn) | -76.33 |
+| Jan 2 | Storno | +4.85 |
+| Jan 7 | Return logistics | -78.00 |
+| (order) | Acquiring charge | -1.36 |
+| (order) | Acquiring reversal | +1.36 |
+
+Sum: 7.58 - 0.50 - 0.50 - 76.33 + 4.85 - 78.00 - 1.36 + 1.36 = **-142.90**
+
+### Summary of Session 5
+
+| Verification | Result | Impact |
+|-------------|--------|--------|
+| End-to-end Ozon P&L | ✅ Residual=0 | Model correct |
+| Standalone ops ratio | ⚠️ 43% of net | BLOCKER: needs SKU-attribution, UI visibility |
+| WB v5 optional fields | ⏳ No production data | Deferred, monitor on first ingestion |
+| Ozon timezone | ✅ Moscow (UTC+3) confirmed | DD-17 created in mapping-spec |
+| Partial return | ✅ Residual=0, rules documented | Return measures rules added to analytics-pnl K-3 |

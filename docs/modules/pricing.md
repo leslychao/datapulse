@@ -25,7 +25,7 @@ Eligibility → Signal Assembly → Strategy Evaluation → Constraint Resolutio
 | **Guard Pipeline** | clamped price + context | pass / block (reason) | Да |
 | **Decision** | всё выше | CHANGE / SKIP / HOLD | Terminal |
 | **Explanation** | decision + все inputs | explanation record | Нет |
-| **Action Scheduling** | decision = CHANGE | `price_action` (PENDING_APPROVAL) | Нет |
+| **Action Scheduling** | decision = CHANGE | `price_action` (PENDING_APPROVAL) | Да (active action exists) |
 
 ## Стратегии ценообразования
 
@@ -101,9 +101,45 @@ if current_price > max_price → target_price = max_price
 else → target_price = current_price (no change)
 ```
 
-### Стратегии Phase G (будущее)
+### Стратегии Phase G+ (будущее)
 
-VELOCITY_ADAPTIVE, STOCK_BALANCING, COMPOSITE — требуют накопленных исторических данных.
+Все будущие стратегии расширяют тот же pipeline (eligibility → signal assembly → strategy evaluation → constraint resolution → guard pipeline → decision → explanation). Новые стратегии добавляются как значения `strategy_type` enum. Constraint resolution и guard pipeline — shared для всех стратегий.
+
+| Стратегия | Фаза | Требования | Описание |
+|-----------|------|------------|----------|
+| `VELOCITY_ADAPTIVE` | G | Historical sales velocity (fact_sales, ≥ 30 дней) | Цена адаптируется к скорости продаж: замедление → снижение, ускорение → повышение |
+| `STOCK_BALANCING` | G | Inventory intelligence (fact_inventory_snapshot, lead time) | Цена балансирует остатки: overstock → снижение, near-stockout → повышение |
+| `COMPETITOR_ANCHOR` | G+ | Competitor data source, matching subsystem, trust scoring | Цена привязана к конкурентному ориентиру с margin floor |
+| `COMPOSITE` | G+ | Несколько signal sources | Взвешенная комбинация нескольких стратегий |
+
+#### COMPETITOR_ANCHOR — архитектурные prerequisites
+
+Для реализации необходимы компоненты, которых нет в текущей архитектуре:
+
+1. **Competitor data source** — внешний поставщик конкурентных цен (SaaS API, scraping service, manual upload). Не является частью Datapulse core. Интеграция через adapter boundary (аналогично marketplace adapters).
+
+2. **Canonical competitor model** — новые PostgreSQL-таблицы:
+
+| Таблица | Назначение |
+|---------|------------|
+| `competitor_observation` | Наблюдение: marketplace_offer_id, competitor_source, competitor_price, confidence_score, observed_at, freshness_status |
+| `competitor_match` | Матчинг: marketplace_offer_id, competitor_listing_id, match_method (AUTO/MANUAL), trust_level (TRUSTED/CANDIDATE/REJECTED) |
+
+3. **Signal assembly extension** — новые signals: `competitor_price`, `competitor_match_trust`, `competitor_freshness`.
+
+4. **Competitor-specific guards** — `competitor_freshness_guard`, `competitor_trust_guard`, `competitor_match_missing_guard`.
+
+5. **Strategy formula (примерная):**
+
+```
+anchor_price = competitor_price × position_factor
+target_price = MAX(anchor_price, margin_floor_price)
+margin_floor_price = COGS / (1 − min_margin_pct − effective_cost_rate)
+```
+
+`position_factor` — configurable: 1.0 = match, 0.95 = на 5% дешевле, 1.05 = на 5% дороже.
+
+**Design decision: отложить до подтверждённой потребности.** COMPETITOR_ANCHOR не включается в scope без: подтверждённого бизнес-кейса, надёжного источника данных о конкурентах, бюджета на competitor data integration. Текущая архитектура (signal assembly + strategy extensibility + constraint/guard pipeline) **не блокирует** добавление в будущем.
 
 ## Модель price_policy
 
@@ -123,12 +159,25 @@ price_policy:
   execution_mode            ENUM (RECOMMENDATION, SEMI_AUTO, FULL_AUTO)
   approval_timeout_hours    INT DEFAULT 72
   priority                  INT DEFAULT 0
+  version                   INT NOT NULL DEFAULT 1
   created_by                BIGINT FK → app_user
   created_at                TIMESTAMPTZ
   updated_at                TIMESTAMPTZ
 ```
 
 Key constraints — колонки (SQL-фильтрация). Guard config, strategy params — JSONB (расширяемость).
+
+### Policy versioning
+
+`version` инкрементируется атомарно при UPDATE полей, влияющих на pricing logic: `strategy_type`, `strategy_params`, `min_margin_pct`, `max_price_change_pct`, `min_price`, `max_price`, `guard_config`, `execution_mode`.
+
+```sql
+UPDATE price_policy
+SET strategy_params = :params, ..., version = version + 1, updated_at = NOW()
+WHERE id = :id
+```
+
+Изменения `name`, `status`, `priority` **не** инкрементируют version — это метаданные, не pricing logic. Полная версионная история policy прослеживается через `policy_snapshot` в `price_decision` (см. §Decision и Explanation).
 
 ## Назначение политик на товары
 
@@ -141,6 +190,32 @@ price_policy_assignment:
   category_id               BIGINT (nullable)
   marketplace_offer_id      BIGINT (nullable, FK → marketplace_offer)
 ```
+
+## Manual price lock
+
+Оператор может зафиксировать цену конкретного товара, исключив его из автоматического ценообразования. Lock → товар не проходит eligibility check → pricing pipeline пропускает его.
+
+```
+manual_price_lock:
+  id                        BIGSERIAL PK
+  workspace_id              BIGINT FK → workspace                    NOT NULL
+  marketplace_offer_id      BIGINT FK → marketplace_offer            NOT NULL
+  locked_price              DECIMAL NOT NULL                         -- зафиксированная цена
+  reason                    TEXT                                     -- причина фиксации (nullable)
+  locked_by                 BIGINT FK → app_user                     NOT NULL
+  locked_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+  expires_at                TIMESTAMPTZ                              -- auto-unlock (nullable — бессрочно)
+  unlocked_at               TIMESTAMPTZ                              -- manual unlock (nullable)
+  unlocked_by               BIGINT FK → app_user                     (nullable)
+
+  UNIQUE (marketplace_offer_id) WHERE unlocked_at IS NULL           -- один active lock per offer
+```
+
+**Eligibility check:** `SELECT EXISTS(SELECT 1 FROM manual_price_lock WHERE marketplace_offer_id = ? AND unlocked_at IS NULL AND (expires_at IS NULL OR expires_at > now()))`. Если TRUE → decision = SKIP, reason = `MANUAL_LOCK`.
+
+**Expiration:** scheduled job (hourly) проверяет `WHERE expires_at < now() AND unlocked_at IS NULL` → UPDATE `unlocked_at = now()`, `unlocked_by = NULL` (system unlock).
+
+**Audit:** создание/удаление lock записывается в `audit_log` (action_type = `lock.create`, `lock.remove`).
 
 ### Разрешение конфликтов: специфичность + приоритет
 
@@ -159,18 +234,44 @@ Signal assembler — единственная точка, через котор�
 
 | Signal | Источник | Store | Используется |
 |--------|----------|-------|-------------|
-| `current_price` | `canonical_price_snapshot` | PostgreSQL | Все стратегии |
+| `current_price` | `canonical_price_current` | PostgreSQL | Все стратегии |
 | `cogs` | `cost_profile` (SCD2) | PostgreSQL | TARGET_MARGIN |
 | `product_status` | `marketplace_offer` | PostgreSQL | Eligibility |
-| `available_stock` | `canonical_stock_snapshot` | PostgreSQL | Guard |
+| `available_stock` | `canonical_stock_current` | PostgreSQL | Guard |
 | `manual_lock` | `manual_price_lock` | PostgreSQL | Eligibility |
 | `avg_commission_pct` | fact_finance | ClickHouse | TARGET_MARGIN |
 | `avg_logistics_per_unit` | fact_finance | ClickHouse | TARGET_MARGIN |
 | `return_rate_pct` | fact_returns / fact_sales | ClickHouse | TARGET_MARGIN |
-| `ad_cost_ratio` | fact_advertising_costs / revenue | ClickHouse | TARGET_MARGIN |
+| `ad_cost_ratio` | fact_advertising.spend / fact_finance.revenue (30-day rolling, per product) | ClickHouse | TARGET_MARGIN |
 | `last_price_change_at` | `price_decision` | PostgreSQL | Frequency guard |
 | `price_change_history` | `price_decision` | PostgreSQL | Volatility guard |
 | `data_freshness` | `marketplace_sync_state` | PostgreSQL | Stale data guard |
+
+### Signal: `ad_cost_ratio` — specification
+
+Доля рекламных расходов в выручке по продукту. Используется в формуле TARGET_MARGIN: `effective_cost_rate = commission_pct + logistics_pct + return_adjustment_pct + ad_cost_pct`.
+
+```
+ad_cost_ratio = SUM(fact_advertising.spend) / NULLIF(SUM(fact_finance.revenue_amount), 0)
+  WHERE fact_advertising.marketplace_sku = offer.marketplace_sku
+    AND fact_advertising.ad_date >= today() - 30
+    AND fact_finance.finance_date >= today() - 30
+    AND fact_finance.attribution_level = 'POSTING'
+```
+
+| Параметр | Значение |
+|----------|----------|
+| Time window | 30 дней (rolling) |
+| Grain | Per `seller_sku_id` (агрегируется across campaigns) |
+| Revenue source | `fact_finance.revenue_amount` WHERE `attribution_level = 'POSTING'` |
+| Spend source | `fact_advertising.spend` (joined через `marketplace_sku`) |
+| Fallback (no advertising data) | `ad_cost_ratio = 0` |
+| Fallback (no revenue) | `ad_cost_ratio = NULL` → signal INSUFFICIENT_DATA |
+
+**Interaction with `include_ad_cost`:**
+- `include_ad_cost = false` (default) → `ad_cost_pct = 0` в формуле, signal не участвует
+- `include_ad_cost = true` → `ad_cost_pct = ad_cost_ratio`
+- Рекомендация: переключать на `true` после подтверждения что advertising data стабильно загружается ≥ 14 дней
 
 ## Constraints (ограничения)
 
@@ -196,11 +297,31 @@ Signal assembler — единственная точка, через котор�
 | **Frequency guard** | Изменение < N часов назад | 24 часа | Да |
 | **Volatility guard** | > N разворотов за период | 3 / 7 дней | Да |
 | **Stale data guard** | Данные старше N часов | 24 часа | Нет (safety) |
-| **Promo guard** | Товар в активном промо | Включён | Да |
+| **Promo guard** | Товар в активном промо ([Promotions](promotions.md) — source of truth) | Включён | Да |
 | **Manual lock guard** | Ручная блокировка | Включён | Нет |
 | **Stock-out guard** | Остатки = 0 | Включён | Да |
 
 Порядок оптимизирован по стоимости (дешёвые первыми). Short-circuit: первый сработавший → SKIP.
+
+### guard_config JSONB structure
+
+```json
+{
+  "margin_guard_enabled": true,
+  "frequency_guard_enabled": true,
+  "frequency_guard_hours": 24,
+  "volatility_guard_enabled": true,
+  "volatility_guard_reversals": 3,
+  "volatility_guard_period_days": 7,
+  "promo_guard_enabled": true,
+  "stock_out_guard_enabled": true,
+  "stale_data_guard_hours": 24
+}
+```
+
+Все поля optional — при отсутствии используются defaults. `stale_data_guard` и `manual_lock_guard` не имеют `_enabled` флага — всегда активны (safety).
+
+**Примечание:** помимо per-SKU stale data guard, analytics automation blocker ([Analytics & P&L](analytics-pnl.md#automation-blocker)) может заблокировать весь pricing run для account/marketplace при stale finance data (> 24h) или residual anomaly.
 
 ## Eligibility (критерии допуска)
 
@@ -216,20 +337,57 @@ Signal assembler — единственная точка, через котор�
 
 ### Модель decision
 
-```
+```sql
 price_decision:
-  id, workspace_id, marketplace_offer_id, price_policy_id
-  decision_type             ENUM (CHANGE, SKIP, HOLD)
-  current_price, target_price, price_change_amount, price_change_pct
-  strategy_type, strategy_raw_price
-  signal_snapshot           JSONB
-  constraints_applied       JSONB
-  guards_evaluated          JSONB
-  skip_reason               VARCHAR
-  explanation_summary       TEXT
-  execution_mode            ENUM
-  created_at                TIMESTAMPTZ
+  id                        BIGSERIAL PK
+  workspace_id              BIGINT FK → workspace              NOT NULL
+  pricing_run_id            BIGINT FK → pricing_run            NOT NULL
+  marketplace_offer_id      BIGINT FK → marketplace_offer      NOT NULL
+  price_policy_id           BIGINT FK → price_policy           NOT NULL
+  policy_version            INT NOT NULL                       -- snapshot price_policy.version
+  policy_snapshot           JSONB NOT NULL                     -- full policy config at decision time
+  decision_type             VARCHAR(20) NOT NULL               -- CHANGE, SKIP, HOLD
+  current_price             DECIMAL                            -- marketplace price at decision time
+  target_price              DECIMAL                            -- computed target (nullable — null for SKIP/HOLD)
+  price_change_amount       DECIMAL                            -- target - current (nullable)
+  price_change_pct          DECIMAL                            -- (target - current) / current × 100 (nullable)
+  strategy_type             VARCHAR(30) NOT NULL               -- TARGET_MARGIN, PRICE_CORRIDOR (redundant with snapshot for SQL filtering)
+  strategy_raw_price        DECIMAL                            -- raw price before constraints (nullable)
+  signal_snapshot           JSONB                              -- all assembled signals at decision time
+  constraints_applied       JSONB                              -- ordered list: [{ name, from_price, to_price }]
+  guards_evaluated          JSONB                              -- ordered list: [{ name, passed: bool, details }]
+  skip_reason               VARCHAR(255)                       -- human-readable skip reason (nullable — only for SKIP/HOLD)
+  explanation_summary       TEXT                               -- structured explanation (see §Explanation summary format)
+  execution_mode            VARCHAR(20) NOT NULL               -- LIVE, SIMULATED (from policy context)
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  INDEX idx_pd_workspace_created (workspace_id, created_at DESC)
+  INDEX idx_pd_offer_latest (marketplace_offer_id, created_at DESC)
+  INDEX idx_pd_run (pricing_run_id)
+  INDEX idx_pd_policy_version (price_policy_id, policy_version)
 ```
+
+`policy_version` — snapshot `price_policy.version` на момент решения. Indexed INT для аналитических запросов ("distribution of decisions by policy version").
+
+`policy_snapshot` — полный слепок policy config на момент решения:
+
+```json
+{
+  "policy_id": 42,
+  "version": 3,
+  "name": "Маржа 25% WB",
+  "strategy_type": "TARGET_MARGIN",
+  "strategy_params": { "target_margin_pct": 0.25, "commission_source": "AUTO_WITH_MANUAL_FALLBACK", "rounding_step": 10 },
+  "min_margin_pct": 0.15,
+  "max_price_change_pct": 0.10,
+  "min_price": null,
+  "max_price": null,
+  "guard_config": { "frequency_guard_hours": 24, "volatility_guard_reversals": 3 },
+  "execution_mode": "SEMI_AUTO"
+}
+```
+
+`strategy_type` и `execution_mode` redundant с `policy_snapshot`, но сохраняются top-level для SQL-фильтрации и индексирования (JSONB-фильтрация дороже). Controlled redundancy: snapshot для audit, top-level поля для operational queries.
 
 ### Decision → Action
 
@@ -238,6 +396,18 @@ price_decision:
 - CHANGE + RECOMMENDATION → НЕ создаёт action; рекомендация в UI
 - SKIP → сохраняется для аудита
 - HOLD → недостаточность данных
+
+### Action scheduling — обработка конфликтов с active action
+
+При создании `price_action` возможен конфликт с partial unique index (active action уже существует для того же offer в том же `execution_mode`). Обработка per-offer, не per-batch:
+
+| Сценарий | Действие |
+|----------|----------|
+| Active action в pre-execution (PENDING_APPROVAL, APPROVED, ON_HOLD, SCHEDULED) | Immediate supersede → SUPERSEDED; новый action создаётся. В одной транзакции |
+| Active action в in-flight (EXECUTING, RETRY_SCHEDULED, RECONCILIATION_PENDING) | Создаётся `deferred_action` ([Execution](execution.md) §Deferred supersede). Decision сохраняется. Alert: «action creation deferred, in-flight action {id} in progress» |
+| Unique constraint violation (race condition) | Catch per-offer. Decision сохраняется со skip_reason «active action in progress». Оффер пропускается, batch продолжается. `log.warn` + alert |
+
+**Инвариант:** конфликт при создании action для одного оффера НЕ прерывает pricing run для остальных офферов в batch.
 
 ### Retention
 
@@ -248,6 +418,51 @@ price_decision:
 | SKIP | 30 дней |
 
 Партиционирование `price_decision` по `created_at` (monthly).
+
+### Explanation summary format
+
+`explanation_summary` — human-readable TEXT, генерируемый шагом Explanation по фиксированному шаблону. Состоит из секций, разделённых newline. Каждая секция начинается с label в квадратных скобках.
+
+**CHANGE:**
+
+```
+[Решение] CHANGE: 4 500 → 3 890 (−13.6%)
+[Политика] «Маржа 25% WB» (TARGET_MARGIN, v3)
+[Стратегия] target_margin=25.0%, effective_cost_rate=38.2% (commission=15.0%, logistics=8.2%, returns=5.0%, ads=10.0%) → raw=3 842
+[Ограничения] rounding FLOOR step=10: 3 842 → 3 840; min_price 3 890: 3 840 → 3 890
+[Guards] Все пройдены
+[Режим] SEMI_AUTO → action PENDING_APPROVAL
+```
+
+**SKIP:**
+
+```
+[Решение] SKIP
+[Причина] Данные старше 24 часов (last sync: 2026-03-30 08:15)
+[Guard] stale_data_guard: last_success_at=2026-03-30 08:15, threshold=24h
+```
+
+**HOLD:**
+
+```
+[Решение] HOLD
+[Причина] Себестоимость не задана
+[Политика] «Маржа 25% WB» (TARGET_MARGIN, v3) — requires COGS
+```
+
+**Секции:**
+
+| Секция | Когда присутствует | Содержание |
+|--------|-------------------|------------|
+| `[Решение]` | Всегда | `{decision_type}`: price change summary или skip/hold |
+| `[Политика]` | Всегда кроме eligibility SKIP | Имя, тип стратегии, version |
+| `[Стратегия]` | Только для CHANGE | Ключевые параметры формулы и raw result |
+| `[Ограничения]` | Только если constraints изменили цену | Каждое ограничение: name, from → to |
+| `[Guards]` | Всегда для eligible SKUs | «Все пройдены» или сработавший guard с деталями |
+| `[Причина]` | Только для SKIP/HOLD | Human-readable skip_reason |
+| `[Режим]` | Только для CHANGE | execution_mode и результирующий action status |
+
+**Правила формата:** числа без trailing zeros; разделитель тысяч (пробел) для цен ≥ 10 000; проценты — один знак после точки; знак изменения — `+` для повышения, `−` (минус) для понижения; policy version — `v{N}`.
 
 ## Execution mode и уровни автоматизации
 
@@ -279,14 +494,67 @@ Pricing pipeline работает с конечной ценой для поку
 
 ### Триггеры
 
-| Триггер | Частота |
-|---------|---------|
-| Post-sync | После успешного ETL sync (1-4 раза в день) |
-| Manual | По требованию |
-| Schedule | Configurable cron |
-| Policy change | При изменении/активации policy |
+| Триггер | Механизм | Частота |
+|---------|----------|---------|
+| Post-sync | RabbitMQ event `ETL_SYNC_COMPLETED` (outbox, [ETL Pipeline](etl-pipeline.md#post-sync-outbox-events)) | После успешного ETL sync (1-4 раза в день) |
+| Manual | REST API `POST /api/pricing/runs` → outbox → RabbitMQ | По требованию |
+| Schedule | Spring `@Scheduled` cron → outbox → RabbitMQ | Configurable cron |
+| Policy change | `@TransactionalEventListener(AFTER_COMMIT)` → outbox → RabbitMQ | При изменении/активации policy |
 
-**Инвариант:** pricing run для connection X не запускается, пока для того же connection X есть ETL `job_execution` в статусе `IN_PROGRESS`. Post-sync trigger создаёт pricing run только после успешного завершения ETL sync. Manual и scheduled триггеры проверяют отсутствие активного sync перед запуском. Если есть active ETL → pricing run отложен (запланирован after sync completion).
+#### Post-sync trigger flow
+
+```
+ETL ingest-worker: sync COMPLETED
+  → INSERT outbox_event (ETL_SYNC_COMPLETED, connection_id, completed_domains[])
+  → outbox poller → RabbitMQ exchange datapulse.etl.events
+
+pricing-worker queue receives ETL_SYNC_COMPLETED:
+  1. Check: FINANCE ∈ completed_domains? (no → skip pricing run)
+  2. Check: active policies exist for connection_id? (no → skip)
+  3. Check: no IN_PROGRESS pricing run for connection_id? (yes → skip, idempotent)
+  4. INSERT pricing_run (PENDING) → INSERT outbox_event (PRICING_RUN_EXECUTE)
+  5. pricing-worker picks up → executes batch processing
+```
+
+**Идемпотентность:** pricing worker хранит `source_job_execution_id` в `pricing_run`. При повторной доставке `ETL_SYNC_COMPLETED` проверяется `EXISTS pricing_run WHERE source_job_execution_id = ?` — дубликат игнорируется.
+
+**Инвариант:** pricing run для connection X не запускается, пока для того же connection X есть ETL `job_execution` в статусе `IN_PROGRESS`. Post-sync trigger гарантирует это by design (event приходит после completion). Manual и scheduled триггеры проверяют отсутствие активного sync перед запуском. Если есть active ETL → pricing run откладывается (ожидает `ETL_SYNC_COMPLETED`).
+
+### pricing_run model
+
+```sql
+pricing_run:
+  id                      BIGSERIAL PK
+  workspace_id            BIGINT FK → workspace              NOT NULL
+  connection_id           BIGINT FK → marketplace_connection  NOT NULL
+  trigger_type            VARCHAR(30) NOT NULL                -- POST_SYNC, MANUAL, SCHEDULED, POLICY_CHANGE
+  source_job_execution_id BIGINT FK → job_execution           (nullable — only for POST_SYNC)
+  status                  VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+  total_offers            INT
+  eligible_count          INT
+  change_count            INT
+  skip_count              INT
+  hold_count              INT
+  started_at              TIMESTAMPTZ
+  completed_at            TIMESTAMPTZ
+  error_details           JSONB
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+**Lifecycle:**
+
+```
+PENDING → IN_PROGRESS → COMPLETED
+                      → COMPLETED_WITH_ERRORS
+                      → FAILED
+```
+
+| Переход | Guard |
+|---------|-------|
+| PENDING → IN_PROGRESS | CAS: `WHERE id = ? AND status = 'PENDING'` |
+| IN_PROGRESS → COMPLETED | Все offers обработаны, 0 errors |
+| IN_PROGRESS → COMPLETED_WITH_ERRORS | Часть offers обработана с ошибками |
+| IN_PROGRESS → FAILED | Infrastructure error (DB, ClickHouse unavailable) |
 
 ### Batch processing
 
@@ -299,10 +567,99 @@ Pricing pipeline работает с конечной ценой для поку
 6. Batch create actions (for CHANGE decisions with SEMI_AUTO/FULL_AUTO)
 ```
 
+## Impact preview (Phase E)
+
+Перед активацией или изменением `price_policy` оператор может запросить preview: «что произойдёт, если эта policy будет применена?»
+
+### Механика
+
+```
+1. Resolve offers, попадающие под assignments policy
+2. Прогнать per-offer pricing pipeline (eligibility → signals → strategy → constraints → guards) в dry-run mode
+3. Не создавать decisions/actions — только preview-результат
+4. Вернуть aggregated summary + per-offer breakdown
+```
+
+### Preview result
+
+| Поле | Описание |
+|------|----------|
+| `total_offers` | Количество offers в scope policy |
+| `eligible_count` | Прошли eligibility |
+| `change_count` | Decision = CHANGE |
+| `skip_count` | Decision = SKIP (с breakdown по skip reasons) |
+| `hold_count` | Decision = HOLD |
+| `avg_price_change_pct` | Средний % изменения для CHANGE decisions |
+| `max_price_change_pct` | Максимальный % изменения |
+| `min_margin_after` | Минимальная margin после изменения (worst case) |
+| `offers_breakdown` | Per-offer detail (paginated): current_price, target_price, change %, decision_type, skip_reason |
+
+### Ограничения
+
+- Preview выполняется synchronously в рамках API request (не через outbox/worker).
+- Timeout: 30s. Для policies с scope > 10 000 offers — async preview через polling.
+- Preview НЕ является гарантией: между preview и реальным pricing run данные могут измениться.
+
+### Фаза: E (Seller Operations)
+
+Impact preview — часть операционного cockpit. UI интегрируется в policy creation/editing flow.
+
+## REST API
+
+### Policies
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/pricing/policies` | PRICING_MANAGER, ADMIN, OWNER | Создать policy. Body: `{ name, strategyType, strategyParams, minMarginPct, maxPriceChangePct, minPrice, maxPrice, guardConfig, executionMode, priority }`. Status = DRAFT. Response: `201` |
+| GET | `/api/pricing/policies` | Any role | Список policies workspace. Filters: `?status=ACTIVE&strategyType=...` |
+| GET | `/api/pricing/policies/{policyId}` | Any role | Детали policy |
+| PUT | `/api/pricing/policies/{policyId}` | PRICING_MANAGER, ADMIN, OWNER | Обновить policy (инкрементирует version). Body: все изменяемые поля |
+| POST | `/api/pricing/policies/{policyId}/activate` | PRICING_MANAGER, ADMIN, OWNER | DRAFT/PAUSED → ACTIVE |
+| POST | `/api/pricing/policies/{policyId}/pause` | PRICING_MANAGER, ADMIN, OWNER | ACTIVE → PAUSED |
+| POST | `/api/pricing/policies/{policyId}/archive` | PRICING_MANAGER, ADMIN, OWNER | → ARCHIVED |
+
+### Policy assignments
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| GET | `/api/pricing/policies/{policyId}/assignments` | Any role | Список assignments |
+| POST | `/api/pricing/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment. Body: `{ connectionId, scopeType, categoryId?, marketplaceOfferId? }` |
+| DELETE | `/api/pricing/policies/{policyId}/assignments/{assignmentId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить assignment |
+
+### Manual price lock
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/pricing/locks` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Создать lock. Body: `{ marketplaceOfferId, lockedPrice, reason, expiresAt? }` |
+| GET | `/api/pricing/locks` | Any role | Active locks. Filter: `?marketplaceOfferId=...` |
+| DELETE | `/api/pricing/locks/{lockId}` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Unlock (manual) |
+
+### Pricing runs
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run. Body: `{ connectionId }` |
+| GET | `/api/pricing/runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
+| GET | `/api/pricing/runs/{runId}` | Any role | Детали run: status, counts, timing |
+
+### Decisions
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| GET | `/api/pricing/decisions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&decisionType=...&pricingRunId=...&from=...&to=...` |
+| GET | `/api/pricing/decisions/{decisionId}` | Any role | Полные детали decision: signal_snapshot, constraints_applied, guards_evaluated, explanation_summary |
+
+### Impact preview
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/pricing/policies/{policyId}/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run preview. Response: aggregated summary + paginated per-offer breakdown |
+
 ## Связанные модули
 
 - [Analytics & P&L](analytics-pnl.md) — derived signals через signal assembler
 - [ETL Pipeline](etl-pipeline.md) — canonical state для decision-grade reads
 - [Execution](execution.md) — action lifecycle после decision
-- [Seller Operations](seller-operations.md) — price journal, recommendations UI
+- [Promotions](promotions.md) — Promo guard читает canonical participation_status; shared signal assembler
+- [Seller Operations](seller-operations.md) — price journal, recommendations UI, impact preview UI
 - Детальные write-контракты: [Write Contracts](../provider-api-specs/write-contracts.md)

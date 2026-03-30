@@ -36,7 +36,9 @@ alwaysApply: true
 | Analytics & P&L | `modules/analytics-pnl.md` | Star schema, P&L, inventory, returns, data quality |
 | Pricing | `modules/pricing.md` | Strategies, policies, signals, constraints, guards, decisions |
 | Execution | `modules/execution.md` | Action lifecycle, outbox, retry, reconciliation, simulation |
+| Promotions | `modules/promotions.md` | Promo evaluation, participation decisions, promo execution, promo analytics |
 | Seller Operations | `modules/seller-operations.md` | Grid, views, queues, journals |
+| Audit & Alerting | `modules/audit-alerting.md` | Audit log, business alerts, alert rules, notifications, automation blocker |
 
 ## Когда допустимо создать новый модуль
 

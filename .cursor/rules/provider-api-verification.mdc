@@ -1,0 +1,95 @@
+---
+description: Strict evidence chain for analyzing provider APIs (Wildberries, Ozon)
+alwaysApply: true
+---
+
+# Provider API Verification Protocol
+
+## Evidence Chain (строгий порядок)
+
+1. `docs/provider-api-specs` — локальные спецификации
+2. Официальная документация провайдера
+3. Реальные API-вызовы через официальные endpoints
+
+Никогда не переходи к реальным API-вызовам, если вопрос уже закрыт локальными спеками или официальной документацией.
+Никогда не выдумывай поля, гарантии, семантику, ID matching, значение timestamp-ов, nullability, поведение пагинации или пригодность для join-ов без верификации.
+
+## Разрешённые официальные источники
+
+- Wildberries API: https://openapi.wildberries.ru
+- Wildberries финансовые отчёты: https://openapi.wildberries.ru/#tag/Finansy
+- Wildberries sandbox
+- Ozon Seller API: https://docs.ozon.ru/api/seller/
+
+## Реальные API-вызовы
+
+Допускаются **только** для архитектурно-значимых вопросов и **только** если спеки + официальная документация недостаточны.
+
+Проверяй только то, что важно для текущего дизайна:
+- Фактические поля и nullability
+- Гранулярность данных
+- ID matching между endpoints
+- Семантика timestamp-ов
+- Знаковые соглашения (sign conventions)
+- Пагинация / фильтры / лимиты / retry / rate limits
+- Пригодность для canonical model, joins, reconciliation, P&L, provenance
+- Документированный контракт vs фактическое поведение
+
+## Структура ответа (для каждого вопроса)
+
+1. **Question / hypothesis**
+2. **What docs/provider-api-specs say**
+3. **What official docs say**
+4. **What real API showed**
+5. **Mismatches**
+6. **Architectural conclusion**
+7. **Blocker / risk / acceptable limitation**
+8. **Recommended minimal solution** (без overengineering)
+
+## Разделение фактов
+
+Всегда явно разделяй:
+- Что говорят локальные спеки
+- Что говорит официальная документация
+- Что подтвердил реальный API
+- Что остаётся неподтверждённым или неоднозначным
+- Архитектурный вывод
+
+## Mismatch protocol
+
+При расхождении между спеками, документацией и реальным API:
+- Заяви об этом явно
+- Отдели документированный контракт от наблюдаемого поведения
+- Наблюдаемое поведение — важное свидетельство, но не гарантированный контракт, пока документация не подтвердит
+
+## Final verdict (обязательно для каждой гипотезы)
+
+- **Safe to rely on now**
+- **Safe only with explicit limitation / guardrail**
+- **Not safe to rely on; design must change**
+
+Если не подтверждено — прямо пиши: **not confirmed on real data**.
+
+## Принципы
+
+- Не overengineer
+- Не расширяй scope без необходимости
+
+## Provider Connections
+
+### Real Account
+
+```yaml
+WILDBERRIES:
+  token: "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjMsImVudCI6MSwiZXhwIjoxNzg2MjI1MjM5LCJmb3IiOiJzZWxmIiwiaWQiOiIwMTljMzc3OS04ZjJjLTcwMmUtOWU3OC02MmI3OWFhZmE5NTQiLCJpaWQiOjEyNzE5ODQxMywib2lkIjoyNTAwNjA4NjMsInMiOjEwNzM4MjM0ODYsInNpZCI6ImUwYWVlMTNkLTk0NjItNDI5OS05Njk3LTRmOGI0Y2M0MzA2OSIsInQiOmZhbHNlLCJ1aWQiOjEyNzE5ODQxM30.8T_Ol3xGrTq3Qoo2z6Mo9P93NcXIz-kqIBfnt1XD50GAlITUtkJLvUq9X5DKXlSMyX_UUDeo553PNK0G4w9wGw"
+OZON:
+  client-id: "1943980"
+  api-key: "a9d31abc-6f09-4848-915e-d669fba8845a"
+```
+
+### Sandbox Account
+
+```yaml
+WILDBERRIES:
+  token: "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzc3MDU5Mzg0LCJpZCI6IjAxOWExNTI1LWI1ZmEtNzNiZi04ZWIwLTE3YjMwYjk1MGY2MCIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.eURulaP5UTqegdGH86XJqRX2qnBao0jnX5DFCa_wUKzku84MCJF-IWyO6cdSokf6oVn5LPqtQkn-zLONagFvcg"
+```

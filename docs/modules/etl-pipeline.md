@@ -22,7 +22,7 @@
 | Возвраты | Возвраты, невыкупы, причины |
 | Финансы | Транзакции, комиссии, логистика, компенсации, штрафы |
 | Промо | Акции маркетплейсов, участие товаров |
-| Реклама | Кампании, статистика (показы, клики, расход) |
+| Реклама | Кампании, статистика (показы, клики, расход). Phase B extended |
 
 ## Обязательные свойства
 
@@ -72,7 +72,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | Хранилище | PostgreSQL (авторитетный) |
 | Мутабельность | UPSERT с `IS DISTINCT FROM` (no-churn on unchanged rows) |
 | Decision-grade | Current state — из canonical (PostgreSQL). Derived signals — из analytics (ClickHouse) через signal assembler |
-| Provenance | Каждая запись прослеживаема до raw source |
+| Provenance | Каждая запись содержит `job_execution_id` (FK) → drill-down до raw source через `job_item` |
 
 #### Canonical State vs Canonical Flow
 
@@ -94,13 +94,13 @@ Temp file выбран вместо streaming напрямую в S3 (`putObject
 #### S3 key structure
 
 ```
-s3://{bucket}/raw/{account_id}/{event}/{source_id}/{request_id}/page-{N}.json
+s3://{bucket}/raw/{connection_id}/{event}/{source_id}/{request_id}/page-{N}.json
 ```
 
 | Компонент | Назначение |
 |-----------|------------|
 | `raw/` | Prefix для raw layer |
-| `{account_id}` | Tenant isolation + partition для retention |
+| `{connection_id}` | `marketplace_connection.id` — isolation per marketplace cabinet |
 | `{event}` | Тип ETL event |
 | `{source_id}` | Конкретный source (класс адаптера) |
 | `{request_id}` | UUID конкретного ETL run |
@@ -154,8 +154,25 @@ Post-write extraction (Вариант B) — единый write path для вс
 | `record_count` | INT | Записей на странице |
 | `content_sha256` | VARCHAR(64) | SHA-256 для дедупликации |
 | `byte_size` | BIGINT | Размер payload |
-| `status` | VARCHAR(32) | CAPTURED → PROCESSED → ARCHIVED |
+| `status` | VARCHAR(32) | Lifecycle status (см. ниже) |
 | `captured_at` | TIMESTAMPTZ | Время захвата |
+| `processed_at` | TIMESTAMPTZ | Время завершения normalization (nullable) |
+
+### job_item status lifecycle
+
+```
+CAPTURED → PROCESSED → EXPIRED
+         → FAILED
+```
+
+| Переход | Условие | Guard |
+|---------|---------|-------|
+| → CAPTURED | S3 putObject успешен | INSERT (initial status) |
+| CAPTURED → PROCESSED | Normalization + canonical UPSERT завершены | `UPDATE ... WHERE id = ? AND status = 'CAPTURED'` |
+| CAPTURED → FAILED | Normalization failed (parsing error, validation error) | `UPDATE ... WHERE id = ? AND status = 'CAPTURED'` |
+| PROCESSED → EXPIRED | Retention cleanup: S3 object удалён | Scheduled job: `WHERE status = 'PROCESSED' AND captured_at < retention_threshold` |
+
+**FAILED items:** не блокируют processing остальных items в `job_execution`. При наличии FAILED items → `job_execution` завершается как `COMPLETED_WITH_ERRORS`. FAILED items логируются с `error_details` для forensic investigation. Recovery: re-run sync (новый job_execution) перезагрузит данные.
 
 ### Риски raw layer
 
@@ -175,10 +192,198 @@ Post-write extraction (Вариант B) — единый write path для вс
 | `CanonicalOffer` | State | Товарное предложение | sellerSku, marketplaceSku, name, brand, category, status |
 | `CanonicalPriceSnapshot` | State | Снимок цены | price, discountPrice, currency, capturedAt |
 | `CanonicalStockSnapshot` | State | Снимок остатков | available, reserved, warehouseId |
+| `Category` | Dict | Категория маркетплейса | name, parentCategoryId, externalCategoryId |
+| `Warehouse` | Dict | Склад | name, warehouseType (FBO/FBS/SELLER), externalWarehouseId |
 | `CanonicalOrder` | Flow | Заказ/отправление | externalOrderId, quantity, pricePerUnit, status |
 | `CanonicalSale` | Flow | Продажа | saleAmount, commission |
 | `CanonicalReturn` | Flow | Возврат | returnAmount, returnReason, returnDate |
-| `CanonicalFinanceEntry` | Flow | Финансовая операция | entryType, amount (нормализованный знак), entryDate |
+| `CanonicalFinanceEntry` | Flow | Финансовая операция | id (PK), connection_id (FK marketplace_connection), source_platform, posting_id, order_id, seller_sku_id, entryType, amount (нормализованный знак), entryDate, job_execution_id (FK) |
+
+### Canonical DDL
+
+```sql
+product_master:
+  id                      BIGSERIAL PK
+  workspace_id            BIGINT FK → workspace              NOT NULL
+  external_code           VARCHAR(120) NOT NULL               -- cross-marketplace product code (seller's internal code)
+  name                    VARCHAR(500)
+  brand                   VARCHAR(255)
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (workspace_id, external_code)
+
+seller_sku:
+  id                      BIGSERIAL PK
+  product_master_id       BIGINT FK → product_master          NOT NULL
+  sku_code                VARCHAR(120) NOT NULL               -- seller's article (vendorCode WB, offer_id Ozon)
+  barcode                 VARCHAR(120)
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (product_master_id, sku_code)
+
+marketplace_offer:
+  id                          BIGSERIAL PK
+  seller_sku_id               BIGINT FK → seller_sku             NOT NULL
+  marketplace_connection_id   BIGINT FK → marketplace_connection NOT NULL
+  marketplace_sku             VARCHAR(120) NOT NULL              -- marketplace-specific ID (nmID WB, product_id Ozon)
+  marketplace_sku_alt         VARCHAR(120)                       -- secondary ID (sku Ozon, imtID WB)
+  name                        VARCHAR(500)
+  category_id                 BIGINT FK → category               (nullable)
+  status                      VARCHAR(30) NOT NULL DEFAULT 'ACTIVE'  -- ACTIVE, ARCHIVED, BLOCKED
+  url                         VARCHAR(1000)
+  image_url                   VARCHAR(1000)
+  job_execution_id            BIGINT FK → job_execution          NOT NULL
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (seller_sku_id, marketplace_connection_id, marketplace_sku)
+
+canonical_price_current:
+  id                      BIGSERIAL PK
+  marketplace_offer_id    BIGINT FK → marketplace_offer       NOT NULL UNIQUE
+  price                   DECIMAL NOT NULL                    -- base price (before discount)
+  discount_price          DECIMAL                             -- final price after discount (nullable — no discount)
+  discount_pct            DECIMAL                             -- discount percentage (nullable)
+  currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
+  min_price               DECIMAL                             -- marketplace min price constraint (nullable)
+  max_price               DECIMAL                             -- marketplace max price constraint (nullable)
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  captured_at             TIMESTAMPTZ NOT NULL                -- when price was fetched from marketplace
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+canonical_stock_current:
+  id                          BIGSERIAL PK
+  marketplace_offer_id        BIGINT FK → marketplace_offer   NOT NULL
+  warehouse_id                BIGINT FK → warehouse           NOT NULL
+  available                   INT NOT NULL DEFAULT 0
+  reserved                    INT NOT NULL DEFAULT 0
+  job_execution_id            BIGINT FK → job_execution       NOT NULL
+  captured_at                 TIMESTAMPTZ NOT NULL
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (marketplace_offer_id, warehouse_id)
+
+canonical_order:
+  id                      BIGSERIAL PK
+  connection_id           BIGINT FK → marketplace_connection  NOT NULL
+  source_platform         VARCHAR(10) NOT NULL                -- 'ozon' / 'wb'
+  external_order_id       VARCHAR(120) NOT NULL
+  marketplace_offer_id    BIGINT FK → marketplace_offer       (nullable — SKU lookup miss)
+  order_date              TIMESTAMPTZ NOT NULL
+  quantity                INT NOT NULL
+  price_per_unit          DECIMAL NOT NULL
+  total_amount            DECIMAL                             -- quantity × price_per_unit (computed at normalization)
+  currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
+  status                  VARCHAR(30) NOT NULL                -- PENDING, DELIVERED, CANCELLED, RETURNED
+  fulfillment_type        VARCHAR(10)                         -- FBO, FBS
+  region                  VARCHAR(255)
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (connection_id, external_order_id)
+
+canonical_sale:
+  id                      BIGSERIAL PK
+  connection_id           BIGINT FK → marketplace_connection  NOT NULL
+  source_platform         VARCHAR(10) NOT NULL                -- 'ozon' / 'wb'
+  external_sale_id        VARCHAR(120) NOT NULL
+  canonical_order_id      BIGINT FK → canonical_order         (nullable)
+  marketplace_offer_id    BIGINT FK → marketplace_offer       (nullable)
+  posting_id              VARCHAR(120)                        -- posting_number (Ozon) / srid (WB); join key к fact_finance
+  seller_sku_id           BIGINT FK → seller_sku              (nullable — SKU lookup miss)
+  sale_date               TIMESTAMPTZ NOT NULL
+  sale_amount             DECIMAL NOT NULL
+  commission              DECIMAL
+  quantity                INT NOT NULL DEFAULT 1
+  currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (connection_id, external_sale_id)
+
+canonical_return:
+  id                      BIGSERIAL PK
+  connection_id           BIGINT FK → marketplace_connection  NOT NULL
+  source_platform         VARCHAR(10) NOT NULL                -- 'ozon' / 'wb'
+  external_return_id      VARCHAR(120) NOT NULL
+  canonical_order_id      BIGINT FK → canonical_order         (nullable)
+  marketplace_offer_id    BIGINT FK → marketplace_offer       (nullable)
+  seller_sku_id           BIGINT FK → seller_sku              (nullable — SKU lookup miss)
+  return_date             TIMESTAMPTZ NOT NULL
+  return_amount           DECIMAL NOT NULL
+  return_reason           VARCHAR(255)                        -- provider-specific reason (nullable — WB no reason)
+  quantity                INT NOT NULL DEFAULT 1
+  status                  VARCHAR(30)                         -- PENDING, COMPLETED (nullable)
+  currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (connection_id, external_return_id)
+
+canonical_finance_entry:
+  id                      BIGSERIAL PK
+  connection_id           BIGINT FK → marketplace_connection  NOT NULL
+  source_platform         VARCHAR(10) NOT NULL                -- 'ozon' / 'wb'
+  external_entry_id       VARCHAR(120) NOT NULL               -- rrd_id (WB), operation_id (Ozon)
+  entry_type              VARCHAR(60) NOT NULL                -- SALE, RETURN, COMMISSION, LOGISTICS, PENALTY, STORAGE, etc.
+  posting_id              VARCHAR(120)                        -- posting_number / srid (nullable — standalone ops)
+  order_id                VARCHAR(120)                        -- order group ID (nullable)
+  seller_sku_id           BIGINT FK → seller_sku              (nullable — SKU lookup miss)
+  warehouse_id            BIGINT FK → warehouse               (nullable — populated from WB ppvz_office_id; NULL for Ozon and non-warehouse ops)
+  amount                  DECIMAL NOT NULL                    -- normalized sign: positive = credit, negative = debit
+  net_payout              DECIMAL                             -- seller payout (ppvz_for_pay WB, operation.amount Ozon)
+  currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
+  entry_date              TIMESTAMPTZ NOT NULL                -- operation date from provider
+  attribution_level       VARCHAR(10) NOT NULL                -- POSTING, PRODUCT, ACCOUNT (computed at materialization)
+  job_execution_id        BIGINT FK → job_execution           NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (connection_id, source_platform, external_entry_id)
+
+cost_profile:
+  id                      BIGSERIAL PK
+  seller_sku_id           BIGINT FK → seller_sku              NOT NULL
+  cost_price              DECIMAL NOT NULL                    -- per-unit cost
+  currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
+  valid_from              DATE NOT NULL
+  valid_to                DATE                                -- NULL = current version
+  updated_by_user_id      BIGINT FK → app_user               NOT NULL
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (seller_sku_id, valid_from)
+```
+
+### Canonical UPSERT keys
+
+Каждая каноническая сущность использует UPSERT с `IS DISTINCT FROM` (no-churn). Ниже — уникальные бизнес-ключи для `ON CONFLICT`.
+
+| Сущность | UPSERT business key | Стратегия |
+|----------|---------------------|-----------|
+| `category` | `(marketplace_connection_id, external_category_id)` | UPSERT |
+| `warehouse` | `(marketplace_connection_id, external_warehouse_id)` | UPSERT |
+| `product_master` | `(workspace_id, external_code)` | UPSERT |
+| `seller_sku` | `(product_master_id, sku_code)` | UPSERT |
+| `marketplace_offer` | `(seller_sku_id, marketplace_connection_id, marketplace_sku)` | UPSERT |
+| `canonical_price_current` | `(marketplace_offer_id)` | UPSERT (latest state) |
+| `canonical_stock_current` | `(marketplace_offer_id, warehouse_id)` | UPSERT (latest state) |
+| `canonical_order` | `(connection_id, external_order_id)` | UPSERT |
+| `canonical_sale` | `(connection_id, external_sale_id)` | UPSERT |
+| `canonical_return` | `(connection_id, external_return_id)` | UPSERT |
+| `canonical_finance_entry` | `(connection_id, source_platform, external_entry_id)` | UPSERT |
+| `canonical_promo_campaign` | `(connection_id, external_promo_id)` | UPSERT |
+| `canonical_promo_product` | `(canonical_promo_campaign_id, marketplace_offer_id)` | UPSERT |
+| `cost_profile` | `(seller_sku_id, valid_from)` | SCD2 |
+
+`external_*_id` — provider-specific идентификатор, уникальный в рамках connection. Для WB finance: `rrd_id`; для Ozon finance: `operation_id`.
 
 ### Связи каталожных сущностей
 
@@ -196,6 +401,43 @@ product_master (внутренний товар селлера, cross-marketplac
 | `seller_sku` | Артикул продавца | product_master_id (FK) | vendorCode (WB), offer_id (Ozon) |
 | `marketplace_offer` | Предложение на маркетплейсе | seller_sku_id (FK), marketplace_connection_id (FK) | nmID (WB), product_id (Ozon), sku (Ozon) |
 | `cost_profile` | Себестоимость (SCD2) | seller_sku_id (FK) | — |
+
+### Dictionary tables: category, warehouse
+
+```
+category:
+  id                          BIGSERIAL PK
+  marketplace_connection_id   BIGINT FK → marketplace_connection     NOT NULL
+  external_category_id        VARCHAR(120) NOT NULL                  -- provider-specific ID
+  name                        VARCHAR(500) NOT NULL
+  parent_category_id          BIGINT FK → category                  (nullable — root categories)
+  marketplace_type            VARCHAR(10) NOT NULL                   -- 'ozon' / 'wb'
+  job_execution_id            BIGINT FK → job_execution              NOT NULL
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (marketplace_connection_id, external_category_id)
+```
+
+```
+warehouse:
+  id                          BIGSERIAL PK
+  marketplace_connection_id   BIGINT FK → marketplace_connection     NOT NULL
+  external_warehouse_id       VARCHAR(120) NOT NULL                  -- provider-specific ID
+  name                        VARCHAR(500) NOT NULL
+  warehouse_type              VARCHAR(20) NOT NULL                   -- FBO, FBS, SELLER
+  marketplace_type            VARCHAR(10) NOT NULL                   -- 'ozon' / 'wb'
+  job_execution_id            BIGINT FK → job_execution              NOT NULL
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (marketplace_connection_id, external_warehouse_id)
+```
+
+**Назначение в PostgreSQL:**
+- `category` — используется для pricing policy assignments (scope_type = CATEGORY), фильтрации в Seller Operations grid.
+- `warehouse` — FK для `canonical_stock_current.warehouse_id`, фильтрация остатков по типам складов.
+- Оба справочника — materialized в ClickHouse как `dim_category` / `dim_warehouse` для аналитики.
 
 ## Граф зависимостей ETL events
 
@@ -224,17 +466,27 @@ CATEGORY_DICT ───────────────────┘      
 
 | Domain | Event | Target tables (ClickHouse) | Target tables (PostgreSQL canonical) |
 |--------|-------|---------------------------|--------------------------------------|
-| Категории | `CATEGORY_DICT` | `dim_category` | — |
-| Склады | `WAREHOUSE_DICT` | `dim_warehouse` | — |
+| Категории | `CATEGORY_DICT` | `dim_category` | `category` |
+| Склады | `WAREHOUSE_DICT` | `dim_warehouse` | `warehouse` |
 | Товары | `PRODUCT_DICT` | `dim_product` | `product_master`, `seller_sku`, `marketplace_offer` |
-| Цены | `PRICE_SNAPSHOT` | `fact_price_snapshot` | `canonical_price_snapshot` |
+| Цены | `PRICE_SNAPSHOT` | `fact_price_snapshot` | `canonical_price_current` |
 | Продажи (Ozon) | `SALES_FACT` | `fact_orders`, `fact_sales`, `fact_returns`, dim backfill | `canonical_order`, `canonical_sale`, `canonical_return` |
 | Продажи (WB) | `SALES_FACT` | `fact_orders`, dim_product backfill | `canonical_order` |
-| Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_snapshot` |
+| Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_current` |
 | Финансы (Ozon) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
 | Финансы (WB) | `FACT_FINANCE` | `fact_sales`, `fact_returns`, `fact_finance` | `canonical_sale`, `canonical_return`, `canonical_finance_entry` |
-| Реклама | `ADVERTISING_FACT` | `fact_advertising_costs` | — |
-| Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | — |
+| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below) |
+| Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product` |
+
+### Pipeline invariant exception: Advertising (DD-AD-1)
+
+Advertising data (`ADVERTISING_FACT`) flows **Raw → ClickHouse** directly, без промежуточного canonical entity в PostgreSQL. Это единственное исключение из инварианта «Raw → Normalized → Canonical → Analytics».
+
+**Обоснование:** рекламные данные используются исключительно для аналитики (P&L allocation, pricing signal `ad_cost_ratio`). Ни один decision flow не читает advertising state из PostgreSQL. Ни один action lifecycle не зависит от advertising canonical truth.
+
+**Data provenance:** обеспечивается через `job_execution_id` в `fact_advertising` (ClickHouse column). Drill-down: `fact_advertising.job_execution_id` → `job_item.s3_key` → S3 raw payload.
+
+**Dedup:** ReplacingMergeTree с `ver` обеспечивает upsert-семантику при re-materialization. Dedup key: `(connection_id, source_platform, campaign_id, ad_date, marketplace_sku)`.
 
 ### Platform-specific правила
 
@@ -266,7 +518,7 @@ CATEGORY_DICT ───────────────────┘      
 
 | Провайдер | Формат | Особенности |
 |-----------|--------|-------------|
-| Ozon (финансы) | `yyyy-MM-dd HH:mm:ss` | Не ISO 8601; timezone — Moscow |
+| Ozon (финансы) | `yyyy-MM-dd HH:mm:ss` | Не ISO 8601; timezone — **Moscow (UTC+3), empirically confirmed 2026-03-31** |
 | WB (финансы) | Dual-format | date-only или ISO 8601; parser обязан поддерживать оба |
 | Ozon (прочие) | ISO 8601 | Стандартный формат |
 
@@ -319,33 +571,149 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 | **Ozon** | `SALES_FACT` | Ozon returns — часть sales-домена |
 | **WB** | `FACT_FINANCE` | WB returns извлекаются из строк финансового отчёта |
 
-## Ingestion flow (per ETL event)
+## Ingestion flow
+
+### Sync scheduling
+
+| Trigger | Описание | Scope |
+|---------|----------|-------|
+| Scheduled (cron) | Configurable per connection. Default: 4x/day для finance, 2x/day для catalog/prices/stocks | Per marketplace_connection |
+| Manual | Оператор запускает через UI / REST API | Per marketplace_connection |
+| System (after connection creation) | Первичная полная загрузка при создании подключения | Per marketplace_connection |
+
+**Scheduling model:** `marketplace_sync_state` хранит `next_scheduled_at` per connection. Spring `@Scheduled` job (1 min interval) сканирует `WHERE next_scheduled_at <= now() AND enabled = true` → INSERT `job_execution` → update `next_scheduled_at` по cron expression.
+
+**Sync scope per run:**
+
+| Sync type | `event_type` в job_execution | Domains included | Когда |
+|-----------|------------------------------|------------------|-------|
+| `FULL_SYNC` | `FULL_SYNC` | Все domains в dependency graph | Initial load, manual full sync, recovery after prolonged outage |
+| `INCREMENTAL` | `INCREMENTAL` | Зависит от domain (см. ниже) | Regular scheduled syncs |
+
+**Incremental strategy per domain:**
+
+| Domain | Incremental strategy | Cursor / pagination |
+|--------|---------------------|---------------------|
+| Каталог | Full scan (catalog small, no incremental API) | Offset-based pagination |
+| Цены | Full scan per connection (no incremental API) | Offset-based pagination |
+| Остатки | Full scan per connection (real-time state, no delta) | Offset-based pagination |
+| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination |
+| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination |
+| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination |
+| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination |
+| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) |
+| Промо | Full scan (promo list small per connection) | Offset-based pagination |
+| Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based |
+
+**`overlap_buffer`:** configurable per domain (default: 2 hours). Overlapping window гарантирует, что late-arriving records не потеряются. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке.
+
+**Deduplication:** SHA-256 hash per raw record. `ON CONFLICT DO NOTHING` при совпадении hash в `job_item`. Canonical UPSERT с `IS DISTINCT FROM` — no-churn для unchanged records.
+
+### Trigger и dispatch
+
+Один sync run = один `job_execution` = один outbox message = один RabbitMQ message. Worker получает message и выполняет dependency graph внутри одного процесса, последовательно.
 
 ```
-1. Scheduler / manual trigger → INSERT job_execution → INSERT outbox_event
-2. Outbox poller → RabbitMQ → ingest-worker
-3. Worker: fetch → HTTP → streaming write to temp file → S3 putObject → INSERT job_item
-4. Worker: normalize → S3 getObject → streaming JSON parse (batch=500) → UPSERT canonical
-5. Worker: materialize → canonical → ClickHouse (ReplacingMergeTree)
-6. Update job_execution status, marketplace_sync_state
+1. Scheduler / manual trigger → INSERT job_execution (PENDING) → INSERT outbox_event
+2. Outbox poller → RabbitMQ → ingest-worker picks up message
+3. Worker: CAS job_execution PENDING → IN_PROGRESS
 ```
+
+### Processing (per ETL event, inside worker)
+
+Worker обходит dependency graph (§Граф зависимостей) в топологическом порядке. Для каждого event:
+
+```
+4. Fetch: HTTP → streaming write to temp file → S3 putObject → INSERT job_item (CAPTURED)
+5. Normalize: S3 getObject → streaming JSON parse (batch=500) → UPSERT canonical (с job_execution_id)
+6. Materialize: canonical WHERE job_execution_id = current → ClickHouse (ReplacingMergeTree)
+7. Update job_item.status → PROCESSED
+```
+
+### Completion
+
+```
+8. CAS job_execution IN_PROGRESS → COMPLETED (или COMPLETED_WITH_ERRORS при partial failure)
+9. Update marketplace_sync_state.last_success_at
+10. INSERT outbox_event (ETL_SYNC_COMPLETED) → downstream consumers
+```
+
+### Post-sync outbox events
+
+После успешного завершения sync (step 8 → COMPLETED или COMPLETED_WITH_ERRORS) ETL pipeline публикует outbox event для downstream consumers:
+
+| Event type | Payload | Consumer | Действие |
+|------------|---------|----------|----------|
+| `ETL_SYNC_COMPLETED` | `{ connection_id, job_execution_id, sync_scope, completed_domains[], failed_domains[], completed_at }` | `datapulse-pricing-worker` | Запускает pricing run (если FINANCE ∈ completed_domains и есть active price_policies) |
+|| `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-pricing-worker` | Запускает promo evaluation (если PROMO ∈ completed_domains и есть active promo_policies). См. [Promotions](promotions.md) §Post-sync promo evaluation trigger |
+| `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-api` | Обновляет UI через WebSocket (sync status badge) |
+
+**sync_scope** — перечень data domains, включённых в sync run (CATALOG, PRICES, STOCKS, ORDERS, SALES, RETURNS, FINANCE, PROMO).
+
+**completed_domains** — домены, успешно обработанные. **failed_domains** — домены, завершившиеся ошибкой (при COMPLETED_WITH_ERRORS).
+
+**Routing:** outbox poller публикует event в RabbitMQ exchange `datapulse.etl.events` с routing key `etl.sync.completed.{connection_id}`. Pricing worker и API — отдельные queues с binding к этому exchange (fanout-like для ETL events).
+
+**Идемпотентность consumer:** pricing worker проверяет `job_execution_id` — если pricing run для данного `job_execution_id` уже создан, повторный event игнорируется.
+
+### Materialization scope
+
+Materializer обрабатывает **только записи текущего `job_execution_id`** (job-scoped materialization). Canonical → ClickHouse delta определяется по `job_execution_id`, не по timestamp diff. Full re-materialization (Phase B: daily) — отдельный scheduled job.
+
+### Consumer error handling
+
+ETL consumer config: `AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false`.
+
+При unhandled exception message отбрасывается (не requeue). Состояние зафиксировано в PostgreSQL (DB-first): `job_execution` содержит `error_details`, recovery возможен через новый sync run. Poison pill не блокирует consumer.
 
 ## Data provenance
 
 Каждая каноническая запись прослеживаема до raw source:
 
 1. Raw record хранится в S3; `job_item` — индекс raw layer в PostgreSQL.
-2. Materialization привязывает canonical record к `job_item_id` / `job_execution_id`.
-3. Fact/mart records содержат `account_id`, `source_platform`, привязку к canonical entities.
-4. Audit log фиксирует materialization events.
+2. Каждая canonical entity содержит `job_execution_id` (FK) → через `job_item` → `s3_key` → raw payload.
+3. Fact/mart records содержат `connection_id`, `source_platform`, `entry_id` (FK к canonical).
+4. Drill-down path: `fact_finance.entry_id` → `canonical_finance_entry` → `job_execution_id` → `job_item.s3_key` → S3.
 
 ## Модель данных: ETL-specific таблицы
 
 | Таблица | Назначение |
 |---------|------------|
-| `job_execution` | ETL run: connection, event type, status, timing |
+| `job_execution` | ETL run: connection, event type, status, timing, error_details |
 | `job_item` | Index raw payload в S3: s3_key, sha256, byte_size, status |
-| `outbox_event` (ETL part) | Outbox для ETL step dispatch: ETL_STEP_EXECUTE, ETL_STEP_RETRY |
+| `outbox_event` (shared) | Outbox для ETL step dispatch: `ETL_SYNC_EXECUTE`, `ETL_SYNC_COMPLETED`. Авторитетная DDL — [Data Model](../data-model.md) §outbox_event |
+
+### job_execution lifecycle
+
+```
+PENDING → IN_PROGRESS → COMPLETED
+                      → COMPLETED_WITH_ERRORS
+                      → FAILED
+         STALE (set by timeout job)
+```
+
+| Переход | Условие | Guard |
+|---------|---------|-------|
+| PENDING → IN_PROGRESS | Worker picks up message | CAS: `UPDATE ... WHERE id = ? AND status = 'PENDING'` |
+| IN_PROGRESS → COMPLETED | Все events обработаны | CAS: `WHERE status = 'IN_PROGRESS'` |
+| IN_PROGRESS → COMPLETED_WITH_ERRORS | Часть events failed, часть succeeded | CAS: `WHERE status = 'IN_PROGRESS'` |
+| IN_PROGRESS → FAILED | Critical failure (все events failed или infrastructure error) | CAS: `WHERE status = 'IN_PROGRESS'` |
+| IN_PROGRESS → STALE | `started_at < now() - stale_threshold` | Scheduled stale job detector |
+
+Все переходы защищены CAS (optimistic lock). Двойная обработка невозможна: если CAS PENDING→IN_PROGRESS не прошёл, worker отбрасывает message.
+
+#### job_execution fields
+
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| `id` | BIGSERIAL | PK |
+| `connection_id` | BIGINT FK | marketplace_connection |
+| `event_type` | VARCHAR(64) | Тип sync (FULL_SYNC, INCREMENTAL) |
+| `status` | VARCHAR(32) | PENDING / IN_PROGRESS / COMPLETED / COMPLETED_WITH_ERRORS / FAILED / STALE |
+| `started_at` | TIMESTAMPTZ | Время начала |
+| `completed_at` | TIMESTAMPTZ | Время завершения |
+| `error_details` | JSONB | Структурированные детали ошибок (nullable) |
+| `created_at` | TIMESTAMPTZ | Время создания записи |
 
 ## Design decisions
 
@@ -360,6 +728,54 @@ WB old incomes API `/api/v1/supplier/incomes` deprecated (June 2026). **Phase A/
 ### G-7: dim_warehouse для WB — RESOLVED
 
 Найден dedicated endpoint `GET /api/v3/offices` — полный список складов WB (Production: 225 offices). Join keys: finance `ppvz_office_id` → `offices.id`.
+
+### G-8: Retention cleanup for job_item — RESOLVED
+
+При удалении S3 objects по retention policy, `job_item.status` обновляется до `EXPIRED`. Cleanup job (scheduled) сканирует `job_item WHERE status = 'PROCESSED' AND captured_at < retention_threshold` и помечает записи. Provenance drill-down для expired записей возвращает "raw source expired".
+
+### G-9: Timezone conversion for ClickHouse materialization — RESOLVED
+
+Materializer конвертирует `canonical_finance_entry.entryDate` (TIMESTAMPTZ) → `fact_finance.finance_date` (Date) с использованием Moscow timezone (UTC+3) как business timezone. Обоснование: оба маркетплейса (WB, Ozon) оперируют в Moscow TZ для финансовой отчётности.
+
+### G-10: Stale job detection — RESOLVED
+
+Scheduled job (configurable interval, default: 15 min) сканирует `job_execution WHERE status = 'IN_PROGRESS' AND started_at < now() - interval '1 hour'` и переводит в STALE. Threshold настраивается через `datapulse.etl.stale-job-threshold`.
+
+### G-11: canonical_price/stock split — current vs history — RESOLVED
+
+**Проблема:** Исходный дизайн `canonical_price_snapshot` и `canonical_stock_snapshot` включал `captured_at` в UPSERT key. Каждый sync создавал новую строку вместо обновления → бесконечный рост PostgreSQL. Для таблиц, которые описывают **текущее состояние**, это неправильно.
+
+**Решение:** Split на два слоя:
+
+| Слой | Таблица | Хранилище | UPSERT key | Назначение |
+|------|---------|-----------|------------|------------|
+| Current state | `canonical_price_current` | PostgreSQL | `(marketplace_offer_id)` | Последняя известная цена. Используется pricing pipeline |
+| Current state | `canonical_stock_current` | PostgreSQL | `(marketplace_offer_id, warehouse_id)` | Последний известный остаток. Используется pricing pipeline |
+| History | `fact_price_snapshot` | ClickHouse | `(connection_id, product_id, captured_at)` | Ценовая история для аналитики |
+| History | `fact_inventory_snapshot` | ClickHouse | `(connection_id, product_id, warehouse_id, captured_at)` | Историческая динамика остатков |
+
+**Materializer flow:** каждый PRICE_SNAPSHOT sync → UPSERT `canonical_price_current` (PostgreSQL, latest state) + INSERT `fact_price_snapshot` (ClickHouse, append-only history). Аналогично для INVENTORY_FACT.
+
+**Pricing pipeline reads:** `canonical_price_current` (not ClickHouse) — decision-grade current price per offer. ClickHouse `fact_price_snapshot` используется signal assembler для исторических сигналов (trend, volatility).
+
+**Bounded growth:** PostgreSQL содержит максимум 1 строку per marketplace_offer (prices) и 1 строку per marketplace_offer × warehouse (stocks). Исторические снимки — только в ClickHouse.
+
+### G-12: workspace_id denormalization — RESOLVED
+
+**Вопрос:** Нужно ли денормализовать `workspace_id` в canonical entities (`canonical_finance_entry`, `canonical_order`, `canonical_price_current`, etc.), или достаточно `connection_id → marketplace_connection.workspace_id` JOIN?
+
+**Решение: НЕ денормализовать.**
+
+Обоснование:
+1. **`connection_id` — уже tenant-isolation key.** Все canonical queries фильтруются по `connection_id`, не по `workspace_id`. Workspace owns connections; connection owns canonical data.
+2. **JOIN стоимость минимальна.** `marketplace_connection` — маленькая таблица (десятки строк). JOIN по PK = index lookup.
+3. **Денормализация создаёт inconsistency risk.** При переносе connection между workspaces (Phase G, если потребуется) — все canonical records потребуют bulk UPDATE.
+4. **Pricing, Execution, Promotions** — уже используют `connection_id` как primary filter. `workspace_id` нужен только на верхнем уровне (UI routing, API authorization).
+
+**Исключения (workspace_id денормализован):**
+- `job_execution` — содержит `workspace_id` опосредованно через `connection_id`.
+- `price_policy`, `price_decision`, `price_action` — содержат `workspace_id` напрямую, потому что это бизнес-сущности уровня workspace (policy → workspace).
+- `audit_log`, `alert_rule`, `alert_event` — содержат `workspace_id` для прямого query без JOIN.
 
 ## Конфигурация MinIO
 
@@ -395,9 +811,215 @@ minio:
 | API | CRUD через datapulse-api: `POST /api/cost-profiles`, `PUT`, bulk import CSV. |
 | Permission | ADMIN, PRICING_MANAGER. |
 
+## Canonical finance resolution rules
+
+Normalizer разрешает provider-specific идентификаторы в каноничные поля `canonical_finance_entry`. Все provider-specific поля остаются в raw/normalized layer — за границу canonical они **не протекают**.
+
+### posting_id resolution
+
+| Provider | Source field | → canonical posting_id | Notes |
+|----------|-------------|------------------------|-------|
+| Ozon (order-linked) | `posting.posting_number` | As-is (с суффиксом -N) | e.g. "87621408-0010-1" |
+| Ozon (acquiring) | — | **NULL** | Acquiring привязывается через order_id |
+| Ozon (standalone) | `posting_number` = "" | **NULL** | Standalone operation |
+| WB | `srid` | As-is | Unique row identifier |
+
+### order_id resolution
+
+| Provider | Source field | → canonical order_id | Notes |
+|----------|-------------|----------------------|-------|
+| Ozon (order-linked) | `posting.posting_number` | Strip `-N` suffix (DD-15) | e.g. "87621408-0010-1" → "87621408-0010" |
+| Ozon (acquiring) | `posting.posting_number` | As-is (уже без -N) | e.g. "87621408-0010" |
+| Ozon (standalone) | — | **NULL** | Standalone operation |
+| WB | `gNumber` | As-is | Order group number |
+
+### seller_sku_id resolution
+
+| Provider | Source field | Resolution | Notes |
+|----------|-------------|------------|-------|
+| Ozon (order-linked) | `items[].sku` | Lookup: `sku → catalog sources[].sku → product_id → offer_id → seller_sku.id` | |
+| Ozon (standalone with items) | `items[].sku` | Same lookup | e.g. packaging/labeling operations |
+| Ozon (standalone without items) | — | **NULL** | e.g. storage, reviews |
+| WB | `sa_name` (= supplierArticle) | Lookup: `vendorCode → seller_sku.id` | |
+
+**SKU resolution fallback:** если lookup не находит соответствие (товар ещё не загружен через PRODUCT_DICT), `seller_sku_id = NULL`. Запись логируется как warning (`log.warn "SKU lookup miss: sku={}, connection_id={}"`). Attribution fallback: entry без `seller_sku_id` и без `posting_id`/`order_id` получает `ACCOUNT`. Entry с `posting_id` или `order_id`, но без `seller_sku_id` получает `POSTING` (allocation в mart).
+
+### net_payout per entry
+
+| Provider | Source | → canonical net_payout | Notes |
+|----------|--------|------------------------|-------|
+| Ozon | `operation.amount` | As-is (signed) | Net contribution per operation |
+| WB | `ppvz_for_pay` | As-is | Per-row seller payout |
+
+Posting-level net_payout (Σ across all operations) вычисляется в `mart_posting_pnl`, не в canonical layer.
+
+### attribution_level (computed at materialization)
+
+Materializer вычисляет `attribution_level` при записи в fact_finance:
+
+```
+IF posting_id IS NOT NULL OR order_id IS NOT NULL  → POSTING
+ELIF seller_sku_id IS NOT NULL                     → PRODUCT
+ELSE                                               → ACCOUNT
+```
+
+Acquiring operations (`posting_id IS NULL`, `order_id IS NOT NULL`): получают `POSTING` потому что привязаны к order (→ к posting через order_id join в mart, allocation pro-rata по revenue).
+
+**Acquiring SKU enrichment:** normalizer проставляет `seller_sku_id` если order содержит один SKU. Для multi-SKU orders `seller_sku_id = NULL`, allocation выполняется в mart pro-rata по revenue.
+
+## Promo canonical entities
+
+Промо-данные загружаются через `PROMO_SYNC` event и сохраняются в canonical layer (PostgreSQL) для operational use в модуле [Promotions](promotions.md), а также материализуются в ClickHouse для аналитики.
+
+### canonical_promo_campaign
+
+```
+canonical_promo_campaign:
+  id                       BIGSERIAL PK
+  connection_id            BIGINT FK → marketplace_connection       NOT NULL
+  external_promo_id        VARCHAR(120) NOT NULL                    -- provider-specific promo ID
+  source_platform          VARCHAR(10) NOT NULL                     -- 'ozon' / 'wb'
+  promo_name               VARCHAR(500) NOT NULL                    -- название акции
+  promo_type               VARCHAR(60) NOT NULL                     -- тип акции (provider-specific taxonomy)
+  status                   VARCHAR(30) NOT NULL                     -- UPCOMING, ACTIVE, FROZEN, ENDED, CANCELLED
+  date_from                TIMESTAMPTZ                              -- начало акции (nullable — если не объявлено)
+  date_to                  TIMESTAMPTZ                              -- конец акции (nullable — бессрочные)
+  freeze_at                TIMESTAMPTZ                              -- Ozon-specific: момент заморозки изменений участия (nullable)
+  participation_deadline   TIMESTAMPTZ                              -- дедлайн подачи заявки (nullable)
+  description              TEXT                                     -- описание условий (nullable)
+  mechanic                 VARCHAR(60)                              -- механика: DISCOUNT, SPP, CASHBACK, BUNDLE, etc.
+  is_participating         BOOLEAN                                  -- summary flag: есть ли participating products (обновляется sync + Datapulse actions)
+  raw_payload              JSONB                                    -- полный provider payload для forensics
+  job_execution_id         BIGINT FK → job_execution                NOT NULL
+  synced_at                TIMESTAMPTZ                              -- время последнего sync
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (connection_id, external_promo_id)
+```
+
+### canonical_promo_product
+
+```
+canonical_promo_product:
+  id                            BIGSERIAL PK
+  canonical_promo_campaign_id   BIGINT FK → canonical_promo_campaign  NOT NULL
+  marketplace_offer_id          BIGINT FK → marketplace_offer         NOT NULL
+  participation_status          VARCHAR(30) NOT NULL                   -- ELIGIBLE, PARTICIPATING, DECLINED, REMOVED, BANNED, AUTO_DECLINED
+  required_price                DECIMAL                                -- цена участия (Ozon: action_price; WB: actionPrice/planPrice; nullable)
+  current_price                 DECIMAL                                -- текущая regular цена товара на момент sync
+  max_promo_price               DECIMAL                                -- макс. допустимая цена участия (Ozon: max_action_price; nullable)
+  max_discount_pct              DECIMAL                                -- макс. скидка (nullable — не все акции задают)
+  min_stock_required            INT                                    -- мин. остаток для участия (Ozon: min_stock; nullable)
+  stock_available               INT                                    -- текущий остаток на момент sync (nullable)
+  add_mode                      VARCHAR(60)                            -- Ozon: способ добавления в акцию (nullable)
+  participation_decision_source VARCHAR(20)                            -- MANUAL, AUTO, SYSTEM (обновляется Promotions при decision)
+  job_execution_id              BIGINT FK → job_execution              NOT NULL
+  synced_at                     TIMESTAMPTZ                            -- время последнего sync
+  created_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
+
+  UNIQUE (canonical_promo_campaign_id, marketplace_offer_id)
+```
+
+**Маппинг из provider API:**
+- WB: `/api/v2/promo/adverts` → `canonical_promo_campaign`; `/api/v2/promo/adverts/{id}/products` → `canonical_promo_product`
+- Ozon: `/v1/actions` → `canonical_promo_campaign`; `/v1/actions/products` → `canonical_promo_product`
+
+Детальные маппинг-правила: [promo-advertising-contracts.md](../provider-api-specs/promo-advertising-contracts.md).
+
+## REST API (ETL monitoring)
+
+ETL jobs запускаются через Integration API (`POST /api/connections/{id}/sync`). Мониторинг — через ETL-specific endpoints.
+
+### Job executions
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| GET | `/api/connections/{connectionId}/jobs` | Any role | Paginated список job executions. Filters: `?status=...&from=...&to=...`. Sort: `created_at DESC` |
+| GET | `/api/jobs/{jobId}` | Any role | Детали job execution: status, timing, error_details, domains processed |
+| GET | `/api/jobs/{jobId}/items` | ADMIN, OWNER | Job items (raw layer index): `[{ sourceId, pageNumber, s3Key, status, recordCount, byteSize, capturedAt, processedAt }]` |
+| POST | `/api/jobs/{jobId}/retry` | ADMIN, OWNER | Retry failed job — создаёт новый job_execution с тем же scope. Только для FAILED/COMPLETED_WITH_ERRORS |
+
+### Cost profiles
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| GET | `/api/cost-profiles` | Any role | Список cost profiles (current versions). Filter: `?sellerSkuId=...&search=...`. Paginated |
+| POST | `/api/cost-profiles` | ADMIN, PRICING_MANAGER | Создать/обновить cost profile. Body: `{ sellerSkuId, costPrice, currency, validFrom }`. SCD2: закрывает предыдущую версию |
+| POST | `/api/cost-profiles/bulk-import` | ADMIN, PRICING_MANAGER | CSV import. Body: multipart file. Format: `sku_code,cost_price,currency,valid_from`. Response: `{ imported, skipped, errors[] }` |
+| GET | `/api/cost-profiles/{sellerSkuId}/history` | Any role | SCD2 history для SKU: все версии с valid_from/valid_to |
+
+## Error handling contract
+
+### Normalization errors
+
+При ошибке normalization конкретного record (parsing, type coercion, validation):
+
+1. Record пропускается (не блокирует остальные в batch)
+2. Error logged: `log.warn "Normalization failed: source={}, page={}, record={}, error={}", source_id, page, recordIndex, errorMessage`
+3. `job_item.status` → `FAILED` (если весь page не parseable) или остаётся `CAPTURED` с partial processing
+4. `job_execution.error_details` JSONB обновляется: `{ "normalization_errors": [{ "source", "page", "record_index", "field", "error" }] }`
+5. При наличии errors → `job_execution` завершается как `COMPLETED_WITH_ERRORS`
+
+### Error categories
+
+| Категория | Пример | Поведение |
+|-----------|--------|-----------|
+| Parse error | Невалидный JSON, unexpected structure | Skip page → `job_item` FAILED |
+| Type coercion error | String вместо number, invalid date format | Skip record, continue batch |
+| Validation error | Negative quantity, missing required field | Skip record, log warning |
+| SKU lookup miss | `seller_sku_id` not found for finance entry | Record saved with `seller_sku_id = NULL`, log warning |
+| Referential integrity | FK target not found (offer, order) | Record saved with nullable FK = NULL, log warning |
+
+### Alerting
+
+При `FAILED` job_execution или при `error_count > threshold` в `COMPLETED_WITH_ERRORS` → `ETL_JOB_ALERT` event → notification to workspace admins (WebSocket + alert_event record).
+
+## Bulk operations и массовые операции
+
+### Full sync (bulk ingestion)
+
+Full sync загружает весь каталог/ценовой snapshot/остатки целиком. Это самая тяжёлая операция по нагрузке.
+
+| Аспект | Поведение |
+|--------|-----------|
+| Триггер | Первичная синхронизация при создании connection. Ручной trigger через API. Scheduled full re-sync (configurable, default: weekly) |
+| Pagination | Adapter вычитывает все страницы последовательно (cursor-based для WB, offset/limit для Ozon). Каждая страница → отдельный `job_item` в raw layer |
+| Memory management | Streaming: page загружается → сохраняется в S3 → нормализуется → записывается в canonical → memory freed. Не держать весь dataset в памяти |
+| Canonical write | Batch UPSERT с `IS DISTINCT FROM` (no-churn). Batch size: configurable (default: 500 records per batch) |
+| Timeout | Per-page timeout (configurable). Общий job timeout = `max_pages × page_timeout + buffer`. Default job timeout: 2 часа |
+| Failure mid-sync | Processed pages сохранены (raw + canonical). Оставшиеся pages → `FAILED`. Job → `COMPLETED_WITH_ERRORS`. Следующий incremental sync подхватит пропущенное |
+| Concurrency | Один full sync per connection per domain одновременно. Enforced через `job_execution` status check при создании нового job |
+
+### Cost profile bulk import
+
+CSV import для cost profiles (COGS) — отдельный поток, не связанный с marketplace sync.
+
+| Аспект | Поведение |
+|--------|-----------|
+| Endpoint | `POST /api/cost-profiles/bulk-import` (multipart file) |
+| Validation | Row-level: пропустить невалидные строки, продолжить. Report: `{ imported, skipped, errors[] }` |
+| Atomicity | Всё или ничего не подходит (partial import полезнее). Каждая строка — отдельный UPSERT. SCD2: закрытие предыдущей версии в той же транзакции |
+| Limits | Max rows per file: 10 000. Max file size: 5 MB. Превышение → 400 Bad Request |
+| Duplicate handling | Повторный import с теми же данными → no-op (SCD2: `valid_from` совпадает, UPSERT не создаёт новую версию если данные не изменились) |
+
+### Materialization (ClickHouse bulk write)
+
+ETL materializer записывает данные из canonical layer (PostgreSQL) в ClickHouse.
+
+| Аспект | Поведение |
+|--------|-----------|
+| Механизм | Batch INSERT через JDBC ClickHouse driver. Batch size: configurable (default: 5000 rows) |
+| Idempotency | `ReplacingMergeTree` в ClickHouse обеспечивает upsert-семантику. Повторная materialization безопасна |
+| Partial failure | При ошибке INSERT одного batch → log error, continue с остальными. Job → `COMPLETED_WITH_ERRORS` |
+| Full re-materialization | Daily scheduled (ночной window). Перезаписывает все данные. Гарантирует eventual consistency CH ↔ PG |
+| Concurrent access | ClickHouse INSERT не блокирует SELECT. Читатели (seller-operations, analytics) видят consistent snapshot благодаря `FINAL` keyword в критических запросах |
+
 ## Связанные модули
 
 - [Integration](integration.md) — marketplace connections, credentials, rate limits
 - [Analytics & P&L](analytics-pnl.md) — materialization targets (facts, dims, marts)
-- [Pricing](pricing.md) — читает canonical state для decision-grade data
+- [Pricing](pricing.md) — читает canonical state для decision-grade data; post-sync trigger ([§Post-sync outbox events](#post-sync-outbox-events))
+- [Promotions](promotions.md) — `PROMO_SYNC` обеспечивает promo discovery; ETL materializer пишет в canonical `canonical_promo_campaign` / `canonical_promo_product` (PostgreSQL) и `dim_promo_campaign` / `fact_promo_product` (ClickHouse)
 - Детальные контракты: [Provider API Specs](../provider-api-specs/)

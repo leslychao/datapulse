@@ -63,9 +63,17 @@ v2/product/list, v2/product/info → 404 (deprecated).
 ### DD-6: Ozon Finance Timestamp Format
 
 **Решение:** `operation_date` и `posting.order_date` парсить как `"yyyy-MM-dd HH:mm:ss"`,
-НЕ как ISO 8601.
+НЕ как ISO 8601. **Timezone = Moscow (UTC+3) — empirically confirmed 2026-03-31.**
 
 **Обоснование:** Реальный ответ содержит "2025-01-02 00:00:00" (без T, без Z).
+
+**Timezone verification (2026-03-31):** Cross-reference `posting.created_at` (UTC ISO) vs `finance.posting.order_date`:
+- `created_at: 2025-01-04T01:25:58Z` → `order_date: 2025-01-04 04:25:58` (+3h)
+- `created_at: 2025-01-04T03:10:38Z` → `order_date: 2025-01-04 06:10:38` (+3h)
+- `created_at: 2025-01-01T17:06:39Z` → `order_date: 2025-01-01 20:06:39` (+3h)
+Constant +3h offset = Moscow timezone. Confirmed on 7 data points.
+
+**Реализация:** `OffsetDateTime.of(LocalDateTime.parse(value, formatter), ZoneOffset.ofHours(3))`
 
 ### DD-7: WB Finance Sign Convention
 
@@ -523,7 +531,7 @@ Must combine with `reportDetailByPeriod` for monetary values.
 | `sa_name` | `sellerSku` | C | Sandbox verified (sa_name = supplier article) |
 | per-field amounts (see below) | `amount` | C-docs | Which field depends on entryType |
 | (implicit) | `currency` | C-docs | "RUB" (`currency_name` = "руб" in docs) |
-| `rr_dt` or `sale_dt` | `entryDate` | C-docs | DD-9: parse both date-only and ISO 8601 |
+| `sale_dt` | `entryDate` | C-docs | DD-9: parse both date-only and ISO 8601. **`sale_dt` only** — `rr_dt` is report attribution metadata, not economic event date (T-1 invariant) |
 | `realizationreport_id` | `reportId` | C | Report grouping key |
 | `rrd_id` | `rowId` | C | Row-level unique ID, pagination cursor |
 
@@ -557,10 +565,9 @@ Field name determines credit/debit semantics. When normalizing to canonical:
 | Seller promo | `seller_promo_discount` | amount | C-docs | negate (debit), absent in sandbox |
 | Loyalty | `loyalty_discount` | amount | C-docs | negate (debit), absent in sandbox |
 
-**CRITICAL**: One WB `reportDetailByPeriod` row contains MULTIPLE financial
+**DD-8**: One WB `reportDetailByPeriod` row contains MULTIPLE financial
 dimensions simultaneously (commission + delivery + penalty in same row).
-The current NormalizedFinanceItem model (one entryType per record) requires
-splitting one WB row into multiple NormalizedFinanceItem records.
+**Composite row model**: одна WB row → одна `NormalizedFinanceItem` → одна `canonical_finance_entry` → одна `fact_finance` row. Все financial measures (commission, delivery, penalty и т.д.) хранятся как отдельные поля в одном record. Splitting не выполняется.
 
 **DD-9**: Timestamp fields `rr_dt`, `date_from`, `date_to`, `create_dt` require
 dual-format parser (date-only OR ISO 8601 datetime). See wb-read-contracts.md v5.
@@ -801,3 +808,46 @@ Write contracts documented in `write-contracts.md`. Key findings:
 | Write Poll | **BROKEN** (same host) | N/A | write-contracts.md §1.2 |
 | Reconciliation Read | READY | READY | write-contracts.md §1.3, §2.2 |
 | Reconciliation Logic | NOT IMPLEMENTED | NOT IMPLEMENTED | ADR-016 gap |
+
+### Advertising Contracts (Phase B extended)
+
+Advertising read contracts documented in `promo-advertising-contracts.md` §2 (WB) and §4 (Ozon).
+
+| Capability | WB | Ozon | Contract |
+|------------|----|------|----------|
+| Ad Campaigns (dim) | NEEDS WORK (v2 DTO expansion) | NEEDS WORK (OAuth2 + adapter) | promo-advertising-contracts.md §2.1, §4.2 |
+| Ad Stats (fact) | NEEDS WORK (v3 POST→GET migration) | NEEDS WORK (OAuth2 + async flow) | promo-advertising-contracts.md §2.2, §4.3 |
+
+**WB Advertising field mapping** (fullstats v3 → `fact_advertising`):
+
+| API field | ClickHouse column | Transform |
+|-----------|-------------------|-----------|
+| `advertId` | `campaign_id` | Direct |
+| `days[].date` | `ad_date` | Parse `YYYY-MM-DD` |
+| `days[].apps[].nms[].nmId` | `marketplace_sku` | Cast to String |
+| `days[].apps[].nms[].views` | `views` | Direct |
+| `days[].apps[].nms[].clicks` | `clicks` | Direct |
+| `days[].apps[].nms[].sum` | `spend` | Direct (RUB) |
+| `days[].apps[].nms[].orders` | `orders` | Direct |
+| `days[].apps[].nms[].shks` | `ordered_units` | Direct |
+| `days[].apps[].nms[].sum_price` | `ordered_revenue` | Direct (RUB) |
+| `days[].apps[].nms[].canceled` | `canceled` | Direct |
+| `days[].apps[].nms[].ctr` | `ctr` | Direct (%) |
+| `days[].apps[].nms[].cpc` | `cpc` | Direct (RUB) |
+| `days[].apps[].nms[].cr` | `cr` | Direct (%) |
+
+**Flatten rule:** Hierarchical response (campaign → days → apps → nms) flattened into one row per `(campaign_id, ad_date, marketplace_sku)`. `appType` collapsed (aggregated across apps within same day/product).
+
+**Ozon Advertising field mapping** (Performance report → `fact_advertising`):
+
+| API field | ClickHouse column | Transform |
+|-----------|-------------------|-----------|
+| campaign `id` | `campaign_id` | Direct |
+| report `date` | `ad_date` | Parse `YYYY-MM-DD` |
+| `views` | `views` | Direct |
+| `clicks` | `clicks` | Direct |
+| `moneySpent` | `spend` | Parse String → Decimal |
+| `orders` | `orders` | Direct (if available) |
+
+> Ozon `marketplace_sku` mapping requires cross-referencing campaign product list.
+> Full field inventory pending empirical verification (see promo-advertising-contracts.md §4.3).
