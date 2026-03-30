@@ -383,6 +383,18 @@ minio:
 
 Один bucket `datapulse-raw` с prefix-based isolation: `raw/`, `evidence/` (Phase C), `exports/` (Phase E).
 
+## cost_profile lifecycle
+
+| Аспект | Описание |
+|--------|----------|
+| Источник | Ручной ввод (Phase A/B). Bulk CSV import (Phase E). |
+| Grain | Per `seller_sku`. Не per `marketplace_offer`. |
+| Версионирование | SCD2: `valid_from`, `valid_to`. При обновлении: закрыть текущую запись, создать новую. |
+| При отсутствии | Pricing: eligibility SKIP («Себестоимость не задана»). P&L: COGS = 0 (explicit, помечено в UI). |
+| Validation | `cost_price > 0`, `currency = RUB`. |
+| API | CRUD через datapulse-api: `POST /api/cost-profiles`, `PUT`, bulk import CSV. |
+| Permission | ADMIN, PRICING_MANAGER. |
+
 ## Связанные модули
 
 - [Integration](integration.md) — marketplace connections, credentials, rate limits

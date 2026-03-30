@@ -213,9 +213,24 @@
 | Client-side pagination         | Загрузка полного dataset на клиент                          |
 
 
+### Target latency budget (Phase C)
+
+| Сегмент | Target | Обоснование |
+|---------|--------|-------------|
+| API sync → raw (S3) | 1-10 мин | Зависит от rate limits МП |
+| Raw → canonical | 1-5 мин | Batch 500, streaming parse |
+| Canonical → ClickHouse | 1-3 мин | Batch INSERT |
+| ClickHouse → pricing run | < 1 мин | Post-sync trigger |
+| Pricing run (1000 SKU) | < 30 сек | Batch signal assembly |
+| Action → execution | 1-7 сек | Outbox poll (1s) + provider call |
+| Execution → reconciliation | 30s-10 мин | Deferred reconciliation |
+| **Total: data change → confirmed price update** | **~15-30 мин** | При штатной работе |
+
+Это **не SLA** — это target для engineering decisions. SLA определяется позже на основе эмпирических данных после Phase A-B.
+
 ### Открытые вопросы
 
-- SLA/SLO: целевые показатели свежести данных, доступности API, latency для screens.
+- SLA/SLO: конкретные значения после эмпирических замеров (Phase A-B).
 - Data retention: политика по raw artifacts (S3), historical facts (ClickHouse), operational state (PostgreSQL).
 - Connection pool sizing: PostgreSQL, ClickHouse.
 

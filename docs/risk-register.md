@@ -62,16 +62,15 @@
 | Detection   | Рост sync duration; mart freshness degradation                                                                |
 
 
-### R-06: WB Returns endpoint заблокирован
+### R-06: WB Returns endpoint — RESOLVED (2026-03-30)
 
 
-| Параметр    | Значение                                                                       |
-| ----------- | ------------------------------------------------------------------------------ |
-| Риск        | Dedicated endpoint возвратов WB возвращает 400; требует Analytics-scoped токен |
-| Вероятность | Подтверждён (эмпирически)                                                      |
-| Влияние     | Низкое — возвраты WB извлекаются из sales endpoint и finance report            |
-| Митигация   | Альтернативные источники покрывают пробел                                      |
-| Detection   | — (известное ограничение, не runtime failure)                                  |
+| Параметр    | Значение                                                                                           |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| Статус      | **RESOLVED**                                                                                       |
+| Причина     | Root cause: формат даты `dateFrom`/`dateTo` — date-only (`YYYY-MM-DD`), не datetime               |
+| Дата        | 2026-03-30                                                                                         |
+| Влияние     | Нет — endpoint работает с корректными параметрами                                                  |
 
 
 ### R-07: Безопасность учётных данных
@@ -182,6 +181,20 @@
 | Detection   | Seller reports allocation не соответствует ожиданиям; UI feedback                                                                                  |
 
 
+### R-16: WB Price Write недоступен
+
+
+| Параметр    | Значение                                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| Риск        | WB Price Write endpoint недоступен: DNS migration (`discounts-api` → `discounts-prices-api`) + token scope   |
+| Вероятность | Подтверждён (2026-03-30)                                                                                     |
+| Влияние     | Высокое — Phase D Execution для WB невозможен                                                                |
+| Митигация   | F-1: обновить host на `discounts-prices-api.wildberries.ru`. F-2: получить production токен с write scope    |
+| Detection   | DNS resolution failure; HTTP 401 на write endpoint                                                           |
+| Blocking    | Phase D (Execution) для WB                                                                                   |
+| Not blocking | Phase A-C; Ozon Execution                                                                                   |
+
+
 ## Сводка рисков
 
 
@@ -192,7 +205,7 @@
 | R-03 Single-point-of-failure                   | Средняя     | Высокое | Высокий         |
 | R-04 Корректность финансовых расчётов          | Средняя     | Высокое | Высокий         |
 | R-05 Масштабируемость витрин                   | Средняя     | Среднее | Средний         |
-| R-06 WB Returns заблокирован                   | Подтверждён | Низкое  | Низкий          |
+| R-06 WB Returns ~~заблокирован~~ RESOLVED      | —           | —       | —               |
 | R-07 Безопасность credentials                  | Низкая      | Высокое | Средний         |
 | R-08 Ложный SUCCEEDED                          | Средняя     | Высокое | Высокий         |
 | R-09 Stale truth блокирует automation          | Средняя     | Среднее | Средний         |
@@ -202,6 +215,7 @@
 | R-13 P&L без рекламных расходов                | Подтверждён | Среднее | Средний         |
 | R-14 WB Incomes API deprecation (June 2026)    | Высокая     | Низкое  | Низкий          |
 | R-15 Standalone operations allocation accuracy | Средняя     | Низкое  | Низкий          |
+| R-16 WB Price Write недоступен                 | Подтверждён | Высокое | Высокий         |
 
 
 ## Связанные документы
