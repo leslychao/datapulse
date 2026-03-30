@@ -15,15 +15,15 @@ The user opens Datapulse and works in it all day — like a developer works in a
 ## Product purpose
 
 The UI must prioritize operational usability for data-heavy workflows:
-- Seller Operations Grid
-- Saved Views
-- Working Queues
-- Journals (Price, Promo)
-- Mismatch Monitor
-- Explanation panels
-- Pricing recommendations and decisions
-- P&L drill-down
-- Execution / reconciliation states
+- Dense data grids with filtering, sorting, and inline editing
+- Contextual detail panels with drill-down and explainability
+- Tabbed workspaces for parallel data views
+- Task-oriented queues and journals
+- Summary KPI strips with drill-down into underlying data
+- Status-driven action pipelines
+
+Specific screens and their content will be defined per module. This document
+describes the abstract visual language and interaction patterns that all screens share.
 
 The product should feel like a serious daily work tool, not a decorative dashboard.
 
@@ -87,9 +87,9 @@ Datapulse uses a Cursor-inspired shell with four persistent zones:
 | Zone | Cursor analogy | Datapulse purpose |
 |------|---------------|-------------------|
 | **Top Bar** | Title bar + menu | Workspace switcher, breadcrumbs, global search (Ctrl+K), user menu |
-| **Activity Bar** | Left icon bar | Module navigation: Operations, Analytics, Pricing, Execution, Settings |
+| **Activity Bar** | Left icon bar | Module navigation: one icon per top-level module |
 | **Main Area** | Editor area + tabs | Active view content — grid, tables, forms. Multiple tabs for open views |
-| **Detail Panel** | Side panel (right) | Contextual detail: SKU explanation, decision breakdown, P&L drill-down. Slide-in, resizable, closeable |
+| **Detail Panel** | Side panel (right) | Contextual detail for selected entity: breakdown, explanation, history. Slide-in, resizable, closeable |
 | **Bottom Panel** | Terminal / output | Bulk action bar, notification feed (collapsible) |
 | **Status Bar** | Status bar | Data freshness indicators, last sync times, active workspace/account, connection health |
 
@@ -109,16 +109,11 @@ Datapulse uses a Cursor-inspired shell with four persistent zones:
 ### Primary navigation: Activity Bar
 
 Vertical icon bar (left edge). Each icon = a top-level module.
+Exact module list will be defined when page structure is finalized.
 
-| Icon | Module | Primary screens |
-|------|--------|----------------|
-| Grid icon | **Operations** | Operational Grid, Saved Views, Working Queues |
-| Chart icon | **Analytics** | P&L overview, Inventory, Returns & Penalties |
-| Tag icon | **Pricing** | Policies, Decisions, Price Journal |
-| Play icon | **Execution** | Actions, Reconciliation, Failed queue |
-| Gear icon | **Settings** | Accounts, Connections, Team, Billing |
-
-Active module is highlighted with a vertical accent bar (left edge of icon).
+- Each module gets a distinct icon. 4–6 modules expected.
+- Active module is highlighted with a vertical accent bar (left edge of icon).
+- Settings/admin module always at the bottom of the bar, separated from operational modules.
 
 ### Secondary navigation: Tabs
 
@@ -127,27 +122,24 @@ Within a module, open views appear as tabs in the Main Area (like editor tabs in
 - "Pinned" tabs stick to the left.
 - Tab overflow → horizontal scroll with chevron arrows.
 - Double-click a tab to rename a custom view.
-
-Examples:
-- Operations module → tabs: "All SKUs", "Low margin", "Price review queue", "WB Ozon comparison"
-- Analytics module → tabs: "P&L March 2026", "Inventory overview", "Returns deep-dive"
+- Each module defines its own default and user-created tabs.
 
 ### Tertiary navigation: Breadcrumbs
 
 Displayed in Top Bar below workspace switcher. Shows current path:
-`Operations > Saved View: Low margin > SKU #28491`
+`Module > View > Entity`
 
-Breadcrumb segments are clickable.
+Breadcrumb segments are clickable. Depth: typically 2–3 levels.
 
 ### Quick access: Command Palette (Ctrl+K)
 
 Global search and action palette. Matches:
-- SKU by name, barcode, article
-- Saved views by name
-- Working queue items
-- Commands: "Run pricing", "Export view", "Switch workspace"
+- Domain entities by name, code, or identifier
+- Saved views and workspaces
+- System commands and actions
 
 Visually: centered floating input with dropdown results (identical to Cursor's Ctrl+K).
+Specific searchable entity types are defined per module.
 
 ---
 
@@ -163,26 +155,7 @@ Flow: user opens Datapulse → redirect to Keycloak login → authenticate → r
 
 After login, if the user has access to multiple workspaces, a **workspace selector** screen is shown before entering the shell.
 
-```
-┌─────────────────────────────────────────┐
-│              DataPulse                  │
-│                                         │
-│  Select workspace                       │
-│                                         │
-│  ┌─────────────────────────────────┐    │
-│  │ 🏢  My Brand (WB + Ozon)       │    │
-│  │     3 connections · 1,204 SKUs  │    │
-│  └─────────────────────────────────┘    │
-│  ┌─────────────────────────────────┐    │
-│  │ 🏢  Partner Store (Ozon)       │    │
-│  │     1 connection · 312 SKUs     │    │
-│  └─────────────────────────────────┘    │
-│                                         │
-│  [+ Create workspace]                   │
-└─────────────────────────────────────────┘
-```
-
-- Each workspace card: name, marketplace icons, connection count, SKU count.
+- Each workspace card: name, summary stats (connection count, entity count).
 - Single workspace → skip selector, go directly to shell.
 - Last used workspace remembered (localStorage) → pre-selected on next login.
 
@@ -192,28 +165,14 @@ Dropdown in Top Bar (left corner, next to logo). Shows current workspace name.
 Click → dropdown with workspace list + "Manage workspaces" link.
 Switching workspace = full context reload (clear tabs, reset filters, load new data).
 
-### First-run onboarding (SC-1)
+### First-run onboarding
 
-New workspace with no connections → guided setup instead of empty grid:
-
-```
-Step 1: "Connect your first marketplace"
-        [Wildberries]  [Ozon]
-
-Step 2: "Enter API credentials"
-        Token: [________________]  [Validate]
-        ✓ Connection successful · 1,204 products found
-
-Step 3: "Initial sync started"
-        Progress: ████████░░ 80% — catalog synced, prices syncing...
-        "This may take a few minutes. We'll notify you when ready."
-
-→ Redirect to Operations Grid when first sync completes.
-```
+New workspace with no data → guided setup flow instead of an empty workspace.
 
 - Steps are displayed in the Main Area (no modal wizard). Activity Bar is visible but grayed out until setup completes.
-- Validation happens inline (not on submit). Token validation → immediate feedback.
-- After first connection, user can skip remaining steps and add more connections later in Settings.
+- Validation happens inline (not on submit). Credential validation → immediate feedback.
+- After initial setup, user can skip remaining steps and complete configuration later in Settings.
+- Specific onboarding steps are defined per feature.
 
 ---
 
@@ -287,7 +246,7 @@ JetBrains Mono for tabular data, prices, quantities, percentages, codes, barcode
 | `--text-base` | 14px | 400 | Body text, form inputs, primary labels |
 | `--text-lg` | 16px | 600 | Section headings, tab labels |
 | `--text-xl` | 20px | 600 | Page titles, KPI values |
-| `--text-2xl` | 24px | 700 | Hero numbers (P&L total, only in summary cards) |
+| `--text-2xl` | 24px | 700 | Hero numbers (only in summary KPI cards) |
 
 Default body: 14px. Grid cells: 13px. This matches Cursor's density.
 
@@ -307,20 +266,20 @@ The operational grid is the central UI component — equivalent to the code edit
 - Rows: 32px default height (compact), 40px comfortable
 - Cells: left-aligned text, right-aligned numbers
 - Selection: checkbox column (first), shift+click for range, ctrl+click for toggle
-- Frozen columns: checkbox + SKU name always visible on horizontal scroll
+- Frozen columns: checkbox + primary identifier always visible on horizontal scroll
 
 **Row behavior:**
 - Hover: `--bg-tertiary` background
 - Selected: `--bg-active` background + left accent border (2px `--accent-primary`)
-- Click on row → opens Detail Panel (right) with full SKU context
-- Double-click on editable cell → inline edit (price override, COGS input)
+- Click on row → opens Detail Panel (right) with full entity context
+- Double-click on editable cell → inline edit
 
 **Column types:**
 - Text: product name, barcode, category (left-aligned)
 - Number: price, margin, stock, velocity (right-aligned, monospace, with sign coloring)
 - Status: badge with semantic color + short label ("Profitable", "Pending", "Failed")
 - Sparkline: 7-day trend mini-chart inline in cell (optional per column)
-- Action: icon button in cell (lock price, view explanation)
+- Action: icon button in cell (context-dependent actions)
 
 **Pagination:**
 - Server-side pagination. 50 / 100 / 200 rows per page selector.
@@ -332,7 +291,7 @@ The operational grid is the central UI component — equivalent to the code edit
 Horizontal bar above grid. Filters appear as compact pills:
 
 ```
-[Marketplace: WB ×] [Margin: < 10% ×] [Status: Active ×]  [+ Add filter]  [⊘ Clear all]
+[Field: Value ×] [Field: Operator Value ×] [Status: Active ×]  [+ Add filter]  [⊘ Clear all]
 ```
 
 - Each pill shows field name + operator + value. Click to edit inline dropdown.
@@ -346,7 +305,7 @@ Opens when user clicks a grid row or triggers "explain" / "detail" action.
 
 **Layout:**
 - Header: entity name + close button (×) + collapse button
-- Tab strip within panel: "Overview", "P&L", "Pricing", "History"
+- Tab strip within panel: context-dependent tabs (defined per entity type)
 - Content: dense key-value pairs, mini tables, explanation blocks
 
 **Sizing:**
@@ -395,9 +354,9 @@ Cards are used **only** for summary KPIs at the top of analytical views — not 
 
 ```
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│  Revenue     │  │  Profit      │  │  Margin      │  │  Active SKUs │
-│  ₽ 2,340,120 │  │  ₽ 312,450   │  │  13.4%       │  │  1,234       │
-│  ↑ 8.2%      │  │  ↓ 2.1%      │  │  → 0.0%      │  │  ↑ 12        │
+│  KPI Label   │  │  KPI Label   │  │  KPI Label   │  │  KPI Label   │
+│  Value       │  │  Value       │  │  Value       │  │  Value       │
+│  ↑ Δ trend   │  │  ↓ Δ trend   │  │  → Δ trend   │  │  ↑ Δ trend   │
 └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
@@ -406,8 +365,8 @@ Max 4-6 KPI cards in a row. Below them — immediately the table/grid. No card-b
 ### Modals (rare)
 
 Modals are used sparingly — only for:
-- Destructive confirmations ("Delete policy?")
-- Multi-step creation wizards (Create pricing policy)
+- Destructive confirmations
+- Multi-step creation wizards
 - Bulk action confirmations
 
 Everything else: inline editing, panels, dropdowns.
@@ -420,23 +379,19 @@ Grid toolbar has a "Columns" button (icon: vertical bars). Opens a dropdown pane
 ┌─ Columns ────────────────────┐
 │ 🔍 Search columns...         │
 │                               │
-│ ☑ SKU Name          (frozen) │
-│ ☑ Price                      │
-│ ☑ Margin                     │
-│ ☑ Stock                      │
-│ ☐ Velocity                   │
-│ ☐ Category                   │
+│ ☑ Primary column    (frozen) │
+│ ☑ Column A                   │
+│ ☑ Column B                   │
+│ ☐ Column C                   │
+│ ☐ Column D                   │
 │ ☑ Status                     │
-│ ☐ COGS                       │
-│ ☐ Days of cover              │
-│ ☐ Return rate                │
 │                               │
 │ [Reset to default]            │
 └───────────────────────────────┘
 ```
 
 - Checkbox toggles column visibility. Drag handle (left of checkbox) reorders columns.
-- "Frozen" label on columns that cannot be hidden (SKU Name).
+- "Frozen" label on columns that cannot be hidden (primary identifier column).
 - Search input at top for grids with many columns.
 - Column configuration is part of Saved View state — switching view restores column set.
 - "Reset to default" restores the module's default column set.
@@ -462,270 +417,6 @@ Large exports (>10,000 rows) → async: "Export is being prepared. You'll be not
 
 ---
 
-## Key screens
-
-### Operations → Operational Grid
-
-The default landing screen. Seller's daily workspace.
-
-```
-┌─ Top Bar ───────────────────────────────────────────────────┐
-│  [DataPulse]  Operations > All SKUs         🔍 Ctrl+K  [V] │
-├─ Activity Bar ──────────────────────────────────────────────┤
-│    │ Tab: [All SKUs] [Low margin*] [Price review] [+]       │
-│ □  │ Toolbar: [Marketplace ▾] [Category ▾] [+Filter] [⊘]  │
-│ □  │ ┌─Grid──────────────────────────────────────────┐      │
-│ ■  │ │ ☐ │ SKU Name      │ Price  │ Margin │ Stock │ │      │
-│ □  │ │ ☐ │ Widget A      │ 1,290₽ │ 18.3%  │   42  │ │      │
-│ □  │ │ ■ │ Widget B      │   890₽ │  4.1%  │  120  │→│ Detail│
-│    │ │ ☐ │ Widget C      │ 2,450₽ │ 22.7%  │    8  │ │ Panel │
-│    │ └───────────────────────────────────────────────┘      │
-│    │ Showing 1-50 of 1,234   [< Prev] [1] [2] ... [Next >] │
-├────┴────────────────────────────────────────────────────────┤
-│  Status: WB synced 12 min ago · Ozon synced 3 min ago      │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Analytics → P&L Overview
-
-Summary KPIs + drill-down table.
-
-```
-┌─ KPI Strip ─────────────────────────────────────────────────┐
-│ [Revenue ₽2.3M ↑8%] [Profit ₽312K ↓2%] [Margin 13.4%] ... │
-├─ Filter Bar ────────────────────────────────────────────────┤
-│ [Period: Mar 2026 ×] [Marketplace: All] [Category ▾]       │
-├─ P&L Table ─────────────────────────────────────────────────┤
-│ SKU       │ Revenue │ Comission │ Logistics │ COGS │ Profit │
-│ Widget A  │  45,200 │   -4,520  │   -2,100  │  -28K│ +10.5K │
-│ Widget B  │  12,800 │   -1,920  │     -890  │   -9K│   -990 │
-│ ...       │         │           │           │      │        │
-├─ clicked row ─────────────────────────────── Detail Panel ──┤
-│                                             │ P&L Breakdown │
-│                                             │ revenue  45200│
-│                                             │ - comm   4520 │
-│                                             │ - logi   2100 │
-│                                             │ - COGS  28000 │
-│                                             │ = profit 10580│
-│                                             │ residual   +22│
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Pricing → Decision Explanation
-
-When operator reviews a pricing decision, the Detail Panel shows full explainability:
-
-```
-Detail Panel (right)
-┌─────────────────────────────────────┐
-│ Pricing Decision #4821        [×]   │
-│ Widget A · WB · Mar 28, 2026        │
-├─────────────────────────────────────┤
-│ Decision: CHANGE  890₽ → 1,050₽    │
-│ Strategy: TARGET_MARGIN (25%)       │
-├─ Signals ───────────────────────────┤
-│ COGS              640₽              │
-│ Commission avg    12.3%             │
-│ Logistics avg     82₽               │
-│ Return rate       4.2%              │
-│ Ad cost ratio     3.1%              │
-├─ Constraints ───────────────────────┤
-│ ✓ min_margin      passed            │
-│ ✓ max_change      passed (18%)      │
-│ ✓ min_price       passed            │
-│ ⚡ rounding        1,047 → 1,050    │
-├─ Guards ────────────────────────────┤
-│ ✓ margin          25.1% ≥ 15%      │
-│ ✓ frequency       48h since last    │
-│ ✓ stale data      fresh (3h ago)    │
-│ ✓ stock           42 units          │
-├─────────────────────────────────────┤
-│ [Approve]  [Reject]  [Hold]        │
-└─────────────────────────────────────┘
-```
-
-### Operations → Working Queues
-
-Working queues are filtered, prioritized subsets of the operational grid — task-oriented views for daily routines.
-
-```
-┌─ Tab: [All SKUs] [Low margin] [▸ Price review queue ◂] [+]──┐
-│                                                               │
-│  Queue: Price review         12 items · 3 assigned to you     │
-│  [Auto-assign next]  [Mark all reviewed]                      │
-│                                                               │
-│  ┌─Grid────────────────────────────────────────────────────┐  │
-│  │ Priority │ SKU Name    │ Issue         │ Assigned │ Age  │  │
-│  │ !!!      │ Widget B    │ Margin < 5%   │ You      │ 2d   │  │
-│  │ !!       │ Widget F    │ Price stale   │ —        │ 1d   │  │
-│  │ !        │ Widget K    │ Needs COGS    │ Anna     │ 4h   │  │
-│  └─────────────────────────────────────────────────────────┘  │
-└───────────────────────────────────────────────────────────────┘
-```
-
-Visual differences from Saved Views:
-- Queue header shows item count and personal assignment count.
-- Priority column with urgency indicators (!, !!, !!!).
-- "Assigned" column — who is working on this item.
-- Age column — how long item has been in queue.
-- Queue-specific actions in toolbar: "Auto-assign next", "Mark all reviewed".
-
-Saved Views are passive filters. Working Queues are active task lists with assignment and completion tracking.
-
-### Operations → Price Journal
-
-Chronological log of all price changes — decisions, actions, and outcomes.
-
-```
-┌─ Tab: [All SKUs] [▸ Price Journal ◂] [+]────────────────────┐
-│                                                               │
-│  Filter: [Period: Last 7 days ×] [SKU ▾] [Status ▾]         │
-│                                                               │
-│  ┌─Table───────────────────────────────────────────────────┐  │
-│  │ Time         │ SKU       │ Was    │ Now    │ Δ     │ St │  │
-│  │ Mar 28 14:32 │ Widget A  │  890₽  │ 1,050₽ │ +18%  │ ✓  │  │
-│  │ Mar 28 14:32 │ Widget B  │ 1,290₽ │ 1,190₽ │  −8%  │ ✓  │  │
-│  │ Mar 27 09:15 │ Widget C  │ 2,450₽ │ 2,450₽ │   0%  │ ⊘  │  │
-│  │ Mar 26 11:00 │ Widget A  │  850₽  │   890₽ │  +5%  │ ✓  │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│                                                               │
-│  Detail Panel → decision explanation, action lifecycle, effect│
-└───────────────────────────────────────────────────────────────┘
-```
-
-- "Was / Now / Δ" — old price, new price, change percentage (colored).
-- Status column: ✓ SUCCEEDED, ⊘ SKIPPED, ● PENDING, ✕ FAILED.
-- Click row → Detail Panel shows full decision explanation + action attempt history.
-- Promo Journal follows the same pattern (promo name, dates, effect metrics instead of price deltas).
-
-### Operations → Mismatch Monitor
-
-Displays data quality issues — discrepancies between domains.
-
-```
-┌─ Tab: [All SKUs] [▸ Mismatch Monitor ◂] [+]─────────────────┐
-│                                                               │
-│  Summary: 5 active mismatches · 2 critical                    │
-│                                                               │
-│  ┌─Table───────────────────────────────────────────────────┐  │
-│  │ Sev  │ Type              │ SKU      │ Expected │ Actual │  │
-│  │ 🔴   │ Price mismatch    │ Widget B │  1,050₽  │  890₽  │  │
-│  │ 🔴   │ Stock mismatch    │ Widget F │     42   │    0   │  │
-│  │ 🟡   │ Stale finance     │ —        │ < 24h    │ 36h    │  │
-│  │ 🟡   │ Residual spike    │ Widget A │ < 3%     │ 8.2%   │  │
-│  │ ⚪   │ Missing COGS      │ Widget K │ set      │ empty  │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│                                                               │
-│  Detail Panel → evidence, source records, suggested action    │
-└───────────────────────────────────────────────────────────────┘
-```
-
-- Severity: critical (red), warning (yellow), info (gray).
-- Each mismatch row shows: what was expected vs what is actual.
-- Detail Panel shows evidence trail — source records from both sides of the mismatch.
-- Mismatches auto-resolve when underlying data is corrected (re-sync).
-
-### Execution → Action Queue
-
-Operator's view of the action lifecycle — all price actions across statuses.
-
-```
-┌─ Tab: [▸ Action Queue ◂] [Failed] [Reconciliation] [+]──────┐
-│                                                               │
-│  Filter: [Status: All ▾] [Marketplace ▾] [Period ▾]         │
-│                                                               │
-│  ┌─Table───────────────────────────────────────────────────┐  │
-│  │ ID    │ SKU       │ Target  │ Status           │ Age    │  │
-│  │ #4821 │ Widget A  │ 1,050₽  │ ● PENDING_APPR   │ 2h     │  │
-│  │ #4820 │ Widget B  │ 1,190₽  │ ✓ SUCCEEDED      │ 1d     │  │
-│  │ #4818 │ Widget F  │   990₽  │ ✕ FAILED (3/3)   │ 3d     │  │
-│  │ #4815 │ Widget C  │ 2,200₽  │ ↻ RETRY (2/3)    │ 6h     │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│                                                               │
-│  [Approve selected]  [Reject selected]                        │
-└───────────────────────────────────────────────────────────────┘
-```
-
-- Status column shows state + attempt count for retries/failures: "RETRY (2/3)", "FAILED (3/3)".
-- Tabs pre-filter by status group: "Failed" tab = only FAILED actions, "Reconciliation" = RECONCILIATION_PENDING.
-- Detail Panel for a row shows: full attempt history (timestamps, responses, errors), action timeline visualization.
-
-### Execution → Action Detail (Detail Panel)
-
-```
-Detail Panel (right)
-┌─────────────────────────────────────┐
-│ Action #4818                  [×]   │
-│ Widget F · Ozon · Target: 990₽     │
-├─ Timeline ──────────────────────────┤
-│ Mar 26 11:00  Created (pricing run) │
-│ Mar 26 11:02  Approved (auto)       │
-│ Mar 26 11:05  Attempt 1 → 429      │
-│ Mar 26 11:10  Attempt 2 → 503      │
-│ Mar 26 11:20  Attempt 3 → 503      │
-│ Mar 26 11:20  FAILED (max attempts) │
-├─ Last error ────────────────────────┤
-│ HTTP 503 Service Unavailable        │
-│ Ozon API returned maintenance page  │
-├─────────────────────────────────────┤
-│ [Retry]  [Cancel]                   │
-└─────────────────────────────────────┘
-```
-
-### Settings → Connections
-
-```
-┌─ Settings ──────────────────────────────────────────────────┐
-│  Sidebar          │  Content                                │
-│                   │                                         │
-│  Connections ■    │  Marketplace Connections                 │
-│  Team             │                                         │
-│  Workspace        │  ┌─────────────────────────────────┐    │
-│  Billing          │  │ WB Main    ● Connected          │    │
-│                   │  │ Last sync: 12 min ago            │    │
-│                   │  │ 842 SKUs · 3 endpoints active    │    │
-│                   │  │ [Edit] [Sync now] [Disconnect]   │    │
-│                   │  └─────────────────────────────────┘    │
-│                   │  ┌─────────────────────────────────┐    │
-│                   │  │ Ozon Store ● Connected          │    │
-│                   │  │ Last sync: 3 min ago             │    │
-│                   │  │ 362 SKUs · 5 endpoints active    │    │
-│                   │  │ [Edit] [Sync now] [Disconnect]   │    │
-│                   │  └─────────────────────────────────┘    │
-│                   │                                         │
-│                   │  [+ Add connection]                     │
-└───────────────────┴─────────────────────────────────────────┘
-```
-
-Settings uses a different layout than operational modules: left sidebar navigation (vertical text links) + content area. No tabs, no grid. This matches how Cursor's Settings screen differs from the editor.
-
-### Settings → Team
-
-```
-│  Team members (4)                                │
-│                                                   │
-│  ┌─Table──────────────────────────────────────┐  │
-│  │ Name       │ Email              │ Role     │  │
-│  │ Виталий К. │ v@example.com      │ Owner    │  │
-│  │ Анна С.    │ anna@example.com   │ Admin    │  │
-│  │ Иван П.    │ ivan@example.com   │ Operator │  │
-│  │ Мария Д.   │ maria@example.com  │ Analyst  │  │
-│  └────────────────────────────────────────────┘  │
-│                                                   │
-│  Pending invitations (1)                          │
-│  ┌────────────────────────────────────────────┐  │
-│  │ new@example.com │ Operator │ Exp: Apr 5 │ ×│  │
-│  └────────────────────────────────────────────┘  │
-│                                                   │
-│  [+ Invite member]                                │
-```
-
-- Role displayed as badge. Role change via inline dropdown (admin only).
-- Invite: email + role selector → sends invitation email.
-- Pending invitations shown separately with expiration date and cancel button.
-
----
-
 ## Interaction patterns
 
 ### Keyboard-first
@@ -743,12 +434,12 @@ Settings uses a different layout than operational modules: left sidebar navigati
 
 ### Inline editing
 
-Editable cells (COGS, manual price lock, notes) switch to edit mode on double-click.
+Editable cells switch to edit mode on double-click.
 No modal forms for single-field edits. Save on blur or Enter. Cancel on Escape.
 
 ### Context menu (right-click)
 
-On grid rows: Copy, Open in new tab, Lock price, Add to queue, Export selection.
+On grid rows: Copy, Open in new tab, Export selection, and context-dependent domain actions.
 
 ### Bulk actions
 
@@ -812,7 +503,7 @@ Tone: helpful, direct. No "Oops!" or playful copy.
 | Connection lost (WebSocket) | Persistent top banner (yellow) | "Connection lost. Reconnecting..." → auto-dismiss on reconnect |
 | Connection lost (no internet) | Persistent top banner (red) | "No internet connection. Changes will not be saved." |
 | Permission denied | Toast (error variant) | "You don't have permission to approve actions." |
-| Stale data blocking action | Inline message near action button | "Cannot run pricing: stock data is stale." |
+| Stale data blocking action | Inline message near action button | "Cannot proceed: source data is stale." |
 | 404 / not found | Full main area message | "Workspace not found." + [Go to workspace selector] |
 
 Rules:
@@ -823,17 +514,15 @@ Rules:
 
 ### Confirmation & feedback
 
-| Action | Feedback | Style |
-|--------|----------|-------|
-| Save (view, policy, COGS) | Toast: "View saved" | Success toast, auto-dismiss 3s |
-| Approve action | Toast: "Action #4821 approved" | Success toast, 3s |
-| Reject action | Toast: "Action #4821 rejected" | Neutral toast, 3s |
-| Bulk approve | Toast: "12 actions approved" | Success toast, 3s |
-| Delete (policy, connection) | Confirmation modal → Toast: "Policy deleted" | Danger modal → success toast |
-| Disconnect marketplace | Confirmation modal (explicit type-to-confirm) | Danger modal: "Type 'WB Main' to confirm" |
-| Invite sent | Toast: "Invitation sent to anna@example.com" | Success toast, 3s |
-| Sync triggered | Toast: "Sync started for WB Main" | Info toast, 3s |
-| Export started | Toast: "Exporting 1,234 rows..." → file download | Info toast → browser download |
+| Action type | Feedback | Style |
+|-------------|----------|-------|
+| Non-destructive save | Toast: "Saved" | Success toast, auto-dismiss 3s |
+| Approve / confirm | Toast: "Approved" | Success toast, 3s |
+| Reject / decline | Toast: "Rejected" | Neutral toast, 3s |
+| Bulk action | Toast: "N items processed" | Success toast, 3s |
+| Destructive action | Confirmation modal → Toast: "Deleted" | Danger modal → success toast |
+| High-impact destructive | Confirmation modal (type-to-confirm) | Danger modal: type entity name |
+| Async operation | Toast: "Started..." → completion notification | Info toast → browser download or notification |
 
 Rules:
 - Success toasts: 3 seconds, auto-dismiss, green left border.
@@ -852,7 +541,7 @@ Rules:
 Always visible at the bottom. Compact, one-line:
 
 ```
-● WB synced 12 min ago   ● Ozon synced 3 min ago   ● 2 stale endpoints
+● Source A synced 12 min ago   ● Source B synced 3 min ago   ● 2 stale endpoints
 ```
 
 - Green dot: synced within threshold (default 1h)
@@ -863,14 +552,14 @@ Always visible at the bottom. Compact, one-line:
 
 Column header shows freshness icon if source data is older than threshold:
 - ⚠ icon next to column header
-- Tooltip: "Stock data last updated 6 hours ago"
+- Tooltip: "Data last updated N hours ago"
 
 ### Automation blockers
 
-When data staleness blocks automation (pricing, execution), a non-dismissible banner appears above the grid:
+When data staleness blocks automation, a non-dismissible banner appears above the grid:
 
 ```
-⚠ Automated pricing paused: WB stock data is 8 hours stale. Manual actions are still available.
+⚠ Automation paused: [source] data is N hours stale. Manual actions are still available.
 ```
 
 Banner style: yellow background, `--text-primary` text, compact (32px height).
@@ -892,8 +581,8 @@ Each notification: icon + title + time + dismiss.
 
 ### WebSocket real-time updates
 
-- Grid rows update in place (no full reload) when sync completes.
-- New pricing decisions appear in working queue without page refresh.
+- Grid rows update in place (no full reload) when data changes.
+- New items appear in lists/queues without page refresh.
 - Status bar sync times update live.
 - Subtle flash animation (background color pulse once) on updated rows — only when row is visible.
 
