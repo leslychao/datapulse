@@ -139,6 +139,6 @@ Provider DTO и provider-specific response semantics остаются **внут
 
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — capability-based integration, anti-corruption layer
+- [Архитектура данных](data-architecture.md) — инварианты, anti-corruption boundary
 - [Матрица возможностей провайдеров](provider-capability-matrix.md) — покрытие, rate limits, auth
 - [Архитектура данных](data-architecture.md) — sign conventions, join keys

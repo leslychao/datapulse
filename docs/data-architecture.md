@@ -13,12 +13,32 @@ API маркетплейсов → Raw → Normalized → Canonical → Analytic
 | Свойство | Описание |
 |----------|----------|
 | Назначение | Immutable source-faithful хранилище; replay; forensic traceability |
-| Хранилище | S3-compatible |
+| Хранилище | S3-compatible (MinIO) |
 | Формат | Исходный JSON payload от API маркетплейса |
 | Мутабельность | Immutable — записи не обновляются и не удаляются (кроме retention cleanup) |
 | Идемпотентность | SHA-256 от serialized payload; `ON CONFLICT DO NOTHING` |
 | Dedup key | `(request_id, source_id, record_key)` |
-| Retention | Configurable; default: `keep_count = 3` последних снапшотов per (account, table) |
+| Гранулярность | Одна страница API = один S3 object |
+| Index | `job_item` в PostgreSQL (без payload) — связь raw → execution context |
+| Retention | Finance: 12 мес (audit); state: keep_count=3; flow: 6 мес |
+
+#### Write path
+
+HTTP response → temp file (disk, streaming 64 KB chunks) → SHA-256 digest → S3 putObject → INSERT job_item → delete temp file. Memory footprint записи: **64 KB** вне зависимости от размера response (WB finance до 300 MB).
+
+Temp file выбран вместо streaming напрямую в S3 (putObject требует Content-Length) и вместо multipart upload (сложнее, нельзя re-read при ошибке). Cursor extraction выполняется post-write из temp file — отдельная фаза, не смешивается с write path.
+
+#### Read path (primary ingestion)
+
+Write-then-read: сначала сохраняем в S3, потом читаем оттуда для нормализации. Соответствует принципу DB-first. При crash — retry из S3 без повторного API call. Streaming JSON parse через Jackson streaming API (batch=500 records, memory ~1.5 MB).
+
+#### S3 key structure
+
+```
+s3://{bucket}/raw/{account_id}/{event}/{source_id}/{request_id}/page-{N}.json
+```
+
+Детальная спецификация streaming capture, cursor extraction strategies (3 семейства), per-endpoint analysis, risk catalog — см. [S3 Raw Layer — implementation spec](s3-raw-layer-architecture.md).
 
 ### Normalized layer
 
@@ -136,7 +156,7 @@ product_master (внутренний товар селлера, cross-marketplac
 | `fact_promo_product` | Phase F | Promo ingestion pipeline не реализован |
 | `dim_promo_campaign` | Phase F | Promo ingestion pipeline не реализован |
 
-**Eliminated (sanitation 2026-03-30, pnl-architecture-sanitation.md §4):**
+**Eliminated (sanitation 2026-03-30, pnl-architecture-sanitation.md §3):**
 
 | Таблица | Причина удаления | Данные доступны в |
 |---------|-----------------|-------------------|
@@ -676,10 +696,124 @@ Tenant — организационный контейнер (юрлицо, би
 **Проблема:** Для Ozon posting price=103 vs accruals_for_sale=157 → разные значения.
 **Решение:** Эти значения для РАЗНЫХ товаров/количеств. Для ОДНОГО товара: `financial_data.products[].price` = `accruals_for_sale` при qty=1 (верифицировано: posting price=99, accruals_for_sale=99). При qty>1: `accruals_for_sale` = `price × quantity`. Discrepancy в примере была вызвана сравнением разных postings. `CanonicalSale.saleAmount` = `financial_data.products[].price` (из posting) для per-item, `accruals_for_sale` (из finance) для per-posting total.
 
+## Scope реализации по фазам
+
+### Phase A — Foundation
+
+**Цель:** tenancy, интеграция, canonical truth.
+
+| Deliverable | Что создаётся |
+|-------------|---------------|
+| Tenancy tables | `tenant`, `workspace`, `app_user`, `workspace_member`, `workspace_invitation` |
+| Integration tables | `marketplace_connection`, `secret_reference`, `marketplace_sync_state`, `integration_call_log` |
+| Execution tables | `job_execution`, `job_item`, `outbox_event` |
+| Raw layer | S3 bucket + streaming write/read, `job_item` as index |
+| Catalog canonical | `product_master`, `seller_sku`, `marketplace_offer` |
+| Cost canonical | `cost_profile` (SCD2) |
+| State canonical | `canonical_price_snapshot`, `canonical_stock_snapshot` |
+| Flow canonical | `canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry` |
+| Dimensions | `dim_product`, `dim_category`, `dim_warehouse` |
+| ETL pipeline | 7 events: WAREHOUSE_DICT, CATEGORY_DICT, PRODUCT_DICT, PRICE_SNAPSHOT, SALES_FACT, INVENTORY_FACT, FACT_FINANCE |
+| Adapters | WB adapter (catalog, prices, orders, sales, finance, offices), Ozon adapter (catalog, prices, stocks, orders, postings, returns, finance, categories) |
+
+### Phase B — Trust Analytics
+
+**Цель:** правдивая аналитика.
+
+| Deliverable | Что создаётся |
+|-------------|---------------|
+| fact_finance | ReplacingMergeTree, sorting key: (account_id, source_platform, operation_id, finance_date) |
+| fact_sales, fact_orders, fact_returns | Из canonical_sale, canonical_order, canonical_return |
+| fact_product_cost | Из cost_profile (SCD2) |
+| fact_price_snapshot, fact_inventory_snapshot | Из canonical snapshots |
+| mart_posting_pnl | fact_finance + fact_sales (qty) + fact_product_cost (COGS) |
+| mart_product_pnl | mart_posting_pnl + fact_finance (standalone ops) |
+| mart_inventory_analysis, mart_returns_analysis | Inventory/returns facts |
+| Materializers | Per-domain: canonical → ClickHouse |
+| Anomaly controls | Stale data detection, missing sync, residual tracking |
+
+### Что НЕ входит в Phase A/B
+
+| Что | Phase | Причина |
+|-----|-------|---------|
+| fact_advertising_costs | G | Ads API не подключены |
+| fact_supply (WB incomes) | G | Нет потребителей; API deprecated June 2026 |
+| dim_promo_campaign, fact_promo_product | F | Promo pipeline не реализован |
+| Pricing pipeline | C | Требует confirmed P&L truth |
+| Execution lifecycle | D | Требует manual approval flow |
+| Seller Operations UI | E | Требует working analytics |
+| Simulated execution | F | Требует parity tests |
+
+## Runtime entrypoints
+
+| Entrypoint | Phase | Ответственность |
+|------------|-------|-----------------|
+| `datapulse-api` | A | REST API: tenancy CRUD, connection management, sync triggers, canonical reads, analytics reads |
+| `datapulse-ingest-worker` | A | Data pipeline: fetch → raw → normalize → canonicalize → materialize |
+| `datapulse-pricing-worker` | C | Eligibility, signals, constraints, decisions, explanation, action scheduling |
+| `datapulse-executor-worker` | D | Action execution, attempts, retries, reconciliation |
+
+### Ingestion flow (per ETL event)
+
+```
+1. Scheduler / manual trigger → INSERT job_execution → INSERT outbox_event
+2. Outbox poller → RabbitMQ → ingest-worker
+3. Worker: fetch → HTTP → streaming write to temp file → S3 putObject → INSERT job_item
+4. Worker: normalize → S3 getObject → streaming JSON parse (batch=500) → UPSERT canonical
+5. Worker: materialize → canonical → ClickHouse (ReplacingMergeTree)
+6. Update job_execution status, marketplace_sync_state
+```
+
+## Архитектурные инварианты
+
+| # | Инвариант |
+|---|-----------|
+| 1 | Pipeline строго последовательный: Raw → Normalized → Canonical → Analytics. Пропуск стадий запрещён |
+| 2 | Бизнес-логика работает только с canonical и analytics. Прямой доступ к raw/normalized — запрещён |
+| 3 | PostgreSQL — единственный source of truth для business state |
+| 4 | ClickHouse — read-only для бизнес-логики; не хранит action lifecycle, retries, reconciliation |
+| 5 | Provider DTO не протекают за границу adapter. Canonical layer = marketplace-agnostic |
+| 6 | Каждая каноническая запись прослеживаема до raw source через job_item.s3_key |
+| 7 | fact_finance материализуется напрямую из canonical_finance_entry, без промежуточных facts |
+| 8 | UPSERT с `IS DISTINCT FROM` — no-churn при неизменённых данных |
+
+### Data quality controls (Phase B)
+
+| Control | Что проверяет | Реакция |
+|---------|---------------|---------|
+| Stale data | `marketplace_sync_state.last_success_at` > threshold | Alert + block automation |
+| Missing sync | Ожидаемый sync не произошёл по расписанию | Alert |
+| Residual spike | `reconciliation_residual` > threshold | Alert + investigation |
+| Spike detection | Аномальные всплески в финансовых метриках | Alert |
+
+### Phasing rules
+
+| Правило | Обоснование |
+|---------|-------------|
+| Phase B не начинается без confirmed canonical truth (Phase A) | Mart на некорректных данных — хуже, чем отсутствие mart |
+| Phase C не начинается без confirmed P&L truth (Phase B) | Pricing на неверных сигналах — хуже, чем отсутствие pricing |
+| Phase D не начинается без manual approval flow (Phase C) | Auto-execution без approval — опасно |
+| fact_advertising_costs = 0 до Phase G | P&L корректен структурно, но неполон. UI предупреждение |
+
+## Provider contract readiness (Phase A/B)
+
+| Capability | WB | Ozon | Blocker |
+|------------|-----|------|---------|
+| Catalog | READY | READY | — |
+| Prices | READY | READY | — |
+| Stocks | PARTIAL | READY | WB: verify on production |
+| Orders | READY | READY | — |
+| Sales | READY | READY | — |
+| Returns | READY | READY | — |
+| Finance | READY | READY | — |
+| Warehouses | READY | READY | — |
+| Categories | — | READY | — |
+
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — store responsibilities, architecture principles
 - [Функциональные возможности](functional-capabilities.md) — P&L, inventory intelligence
 - [Матрица возможностей провайдеров](provider-capability-matrix.md) — покрытие по data domains
 - [Исполнение и сверка](execution-and-reconciliation.md) — action state в модели данных
 - [Архитектура ценообразования](pricing-architecture-analysis.md) — pricing pipeline, strategies, policy model
+- [S3 Raw Layer — implementation spec](s3-raw-layer-architecture.md) — streaming write/read, cursor extraction, memory footprint
+- [Санация P&L](pnl-architecture-sanitation.md) — rationale за удаление component facts и spine pattern

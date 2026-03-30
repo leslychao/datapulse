@@ -174,7 +174,7 @@
 
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — architecture principles, boundaries
+- [Архитектура данных](data-architecture.md) — инварианты, scope Phase A/B
 - [Исполнение и сверка](execution-and-reconciliation.md) — action lifecycle, SUCCEEDED criteria
 - [Матрица возможностей провайдеров](provider-capability-matrix.md) — provider blockers, rate limits
 - [Нефункциональная архитектура](non-functional-architecture.md) — resilience, security measures

@@ -111,6 +111,6 @@
 
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — capability-based integration
+- [Архитектура данных](data-architecture.md) — scope Phase A/B, readiness, полная модель данных
 - [Архитектура данных](data-architecture.md) — pipeline layers, sign conventions, join keys
 - [Политика работы с API маркетплейсов](marketplace-api-policy.md) — обязательные правила адаптеров

@@ -216,7 +216,7 @@ Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=true
 
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — runtime entrypoints, store responsibilities
+- [Архитектура данных](data-architecture.md) — runtime entrypoints, scope Phase A/B
 - [Исполнение и сверка](execution-and-reconciliation.md) — outbox, retry, RabbitMQ topology
 - [Нефункциональная архитектура](non-functional-architecture.md) — health, observability requirements
 - [Реестр рисков](risk-register.md) — failure scenarios, mitigations

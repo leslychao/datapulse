@@ -260,7 +260,7 @@ Validation errors (`400`) содержат `fieldErrors[]`: `field`, `messageKey
 
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — store responsibilities, principles
+- [Архитектура данных](data-architecture.md) — scope Phase A/B, инварианты, полная модель данных
 - [Исполнение и сверка](execution-and-reconciliation.md) — retry, outbox, CAS details
 - [Архитектура данных](data-architecture.md) — pipeline integrity, financial data
 - [Матрица возможностей провайдеров](provider-capability-matrix.md) — rate limits, provider constraints

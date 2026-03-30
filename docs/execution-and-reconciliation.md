@@ -286,7 +286,7 @@ Decision → Explanation → Action Scheduling → Simulated Gateway
 
 ## Связанные документы
 
-- [Целевая архитектура](target-architecture.md) — ownership split (Pricing vs Execution), async flow
+- [Архитектура данных](data-architecture.md) — scope Phase A/B, runtime entrypoints
 - [Функциональные возможности](functional-capabilities.md) — pricing pipeline, controlled execution
 - [Нефункциональная архитектура](non-functional-architecture.md) — resilience requirements
 - [Архитектура данных](data-architecture.md) — action state в модели данных

@@ -250,7 +250,7 @@ Price Journal → что изменено → применилось ли → к
 ## Связанные документы
 
 - [Видение и границы](project-vision-and-scope.md) — фазы поставки, scope
-- [Целевая архитектура](target-architecture.md) — bounded contexts, module structure
+- [Архитектура данных](data-architecture.md) — scope Phase A/B, инварианты, полная модель данных
 - [Архитектура данных](data-architecture.md) — P&L formula, data layers
 - [Исполнение и сверка](execution-and-reconciliation.md) — action lifecycle
 - [Нефункциональная архитектура](non-functional-architecture.md) — performance, resilience для capabilities

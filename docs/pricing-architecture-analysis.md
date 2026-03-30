@@ -13,7 +13,7 @@
 | Аспект | Где описано | Что зафиксировано |
 |--------|------------|-------------------|
 | Pipeline шаги | `functional-capabilities.md` §5 | Eligibility → Signal Assembly → Strategy Evaluation → Constraint Resolution → Guard Pipeline → Decision → Explanation → Action Scheduling |
-| Bounded context | `target-architecture.md` | Pricing владеет policies, strategies, constraints, decisions, explanations, action intents |
+| Bounded context | `data-architecture.md` | Pricing владеет policies, strategies, constraints, decisions, explanations, action intents |
 | Execution lifecycle | `execution-and-reconciliation.md` | PENDING_APPROVAL → ... → SUCCEEDED/FAILED; CAS guards, retry, reconciliation |
 | Write contracts | `write-contracts.md` | WB async (upload task + poll), Ozon sync; reconciliation NOT implemented |
 | Таблицы PostgreSQL | `data-architecture.md` | `price_policy` (strategy config как JSONB), `price_decision`, `price_action`, `manual_price_lock` |
@@ -728,8 +728,7 @@ Pricing Run:
 ## Связанные документы
 
 - [Функциональные возможности](functional-capabilities.md) — pipeline, обязательные свойства
-- [Целевая архитектура](target-architecture.md) — bounded contexts, pricing kernel
-- [Архитектура данных](data-architecture.md) — canonical model, signal sources
+- [Архитектура данных](data-architecture.md) — canonical model, signal sources, scope Phase A/B, инварианты
 - [Исполнение и сверка](execution-and-reconciliation.md) — action lifecycle после decision
 - [Write contracts](provider-contracts/write-contracts.md) — WB/Ozon price write API
 - [Нефункциональная архитектура](non-functional-architecture.md) — permissions, audit

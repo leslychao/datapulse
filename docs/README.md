@@ -11,12 +11,19 @@
 | Document | Contents | Audience |
 |---|---|---|
 | [Project Vision & Scope](project-vision-and-scope.md) | Назначение системы, mandatory capabilities, delivery phases, out of scope, open design decisions | All |
-| [Target Architecture](target-architecture.md) | Bounded contexts, module structure, runtime model, data flows, store responsibilities, forbidden approaches | Backend, architecture |
+| [Data Architecture](data-architecture.md) | Data pipeline layers, canonical entities, star schema, P&L formula, sign conventions, join keys, Phase A/B scope, invariants, runtime entrypoints | Backend, data engineering |
 | [Functional Capabilities](functional-capabilities.md) | Capability groups, user flows, pipeline definitions, acceptance criteria | Product, backend, QA |
 | [Non-Functional Architecture](non-functional-architecture.md) | Security, audit, observability, resilience, consistency, performance, operability | Backend, DevOps, QA |
-| [Data Architecture](data-architecture.md) | Data pipeline layers, canonical entities, star schema, P&L formula, sign conventions, join keys, source-of-truth rules | Backend, data engineering |
 | [Provider Capability Matrix](provider-capability-matrix.md) | Provider contracts coverage, blockers, validation gaps, rate limits, authentication, pagination patterns | Backend, integration |
 | [Execution & Reconciliation](execution-and-reconciliation.md) | Action lifecycle, outbox pattern, retry semantics, reconciliation rules, CAS guards, idempotency, simulation | Backend |
+| [Pricing Architecture](pricing-architecture-analysis.md) | Pricing pipeline, strategies, policy model, signal assembly, constraints, guards, execution modes | Backend |
+
+### Implementation Specs
+
+| Document | Contents |
+|---|---|
+| [S3 Raw Layer — Implementation Spec](s3-raw-layer-architecture.md) | Streaming capture, cursor extraction, write/read path, memory footprint, per-endpoint analysis, risk catalog |
+| [P&L Sanitation Rationale](pnl-architecture-sanitation.md) | Rationale за удаление component facts и spine pattern, resolved P&L design questions |
 
 ### Operational & Policy Documents
 
@@ -37,6 +44,12 @@
 | [Promo & Advertising Contracts](provider-contracts/promo-advertising-contracts.md) | Promo and advertising API contracts, migration notes |
 | [Empirical Verification Log](provider-contracts/samples/empirical-verification-log.md) | API verification log |
 
+### Frontend
+
+| Document | Contents |
+|---|---|
+| [Frontend Design Direction](frontend/frontend-design-direction.md) | Design language, UX principles, anti-goals |
+
 ### Reference Material (folder `_archive/`)
 
 Archived documents from analysis phase. Useful as reference for validated lessons, design rationale, and anti-patterns discovered during analysis. Not normative for new implementation.
@@ -51,12 +64,17 @@ Detailed implementation descriptions. Use as source of validated patterns and do
 Normative (how the system MUST work)
 ──────────────────────────────────────
 project-vision-and-scope.md      ← Entry point: what and why
-target-architecture.md           ← How: structure, boundaries, principles
+data-architecture.md             ← How: data model, pipeline, P&L, phasing, invariants
 functional-capabilities.md      ← What: capability groups, user flows
 non-functional-architecture.md  ← How well: quality attributes
-data-architecture.md             ← Data: layers, truth, formulas
 provider-capability-matrix.md   ← External: provider coverage, limits
 execution-and-reconciliation.md ← Actions: lifecycle, reliability
+pricing-architecture-analysis.md ← Pricing: strategies, policies, guards
+
+Implementation Specs
+──────────────────────────────────────
+s3-raw-layer-architecture.md     ← Deep-dive: streaming capture, cursor extraction
+pnl-architecture-sanitation.md   ← Rationale: P&L model cleanup decisions
 
 Policy
 ──────────────────────────────────────
