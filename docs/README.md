@@ -2,89 +2,96 @@
 
 ## How to Read
 
-Документы организованы как **нормативный комплект** для greenfield-реализации. Каждый документ отвечает на вопрос "как обязана быть устроена система", а не "что мы когда-то наблюдали в коде".
+Документы организованы в три слоя:
+
+1. **Shared архитектурные документы** — vision, общая модель данных, NFR. Читать первыми.
+2. **Модульные документы** (`modules/`) — по одному на каждый модуль системы. Самодостаточные, содержат всё о модуле: назначение, модель данных, алгоритмы, design decisions.
+3. **Business features** (`features/`) — описания бизнес-фич от идеи до плана реализации (TBD).
 
 ## Document Map
 
-### Core Architecture Documents
+### Shared Architecture Documents
 
 | Document | Contents | Audience |
-|---|---|---|
-| [Project Vision & Scope](project-vision-and-scope.md) | Назначение системы, mandatory capabilities, delivery phases, out of scope, open design decisions | All |
-| [Data Architecture](data-architecture.md) | Data pipeline layers, canonical entities, star schema, P&L formula, sign conventions, join keys, Phase A/B scope, invariants, runtime entrypoints | Backend, data engineering |
-| [Functional Capabilities](functional-capabilities.md) | Capability groups, user flows, pipeline definitions, acceptance criteria | Product, backend, QA |
-| [Non-Functional Architecture](non-functional-architecture.md) | Security, audit, observability, resilience, consistency, performance, operability | Backend, DevOps, QA |
-| [Provider Capability Matrix](provider-capability-matrix.md) | Provider contracts coverage, blockers, validation gaps, rate limits, authentication, pagination patterns | Backend, integration |
-| [Execution & Reconciliation](execution-and-reconciliation.md) | Action lifecycle, outbox pattern, retry semantics, reconciliation rules, CAS guards, idempotency, simulation | Backend |
-| [Pricing Architecture](pricing-architecture-analysis.md) | Pricing pipeline, strategies, policy model, signal assembly, constraints, guards, execution modes | Backend |
+|----------|----------|----------|
+| [Project Vision & Scope](project-vision-and-scope.md) | Назначение системы, mandatory capabilities, delivery phases, out of scope, tech stack, constraints | All |
+| [Data Model](data-model.md) | Pipeline layers, канонические сущности (обзор), star schema (обзор), таблицы по модулям, источники истины, инварианты, runtime entrypoints | All |
+| [Non-Functional Architecture](non-functional-architecture.md) | Security (общее), observability stack, resilience patterns, performance, operability, notifications | Backend, DevOps, QA |
 
-### Implementation Specs
+### Module Documents (`modules/`)
+
+| Module | Phase | Contents |
+|--------|-------|----------|
+| [Tenancy & IAM](modules/tenancy-iam.md) | A | Multi-tenant модель, workspace isolation, пользователи, роли, permission matrix, приглашения, Keycloak/OAuth2 |
+| [Integration](modules/integration.md) | A | Marketplace connections, credential management (Vault), API policy, provider capability matrix, rate limits, retry, lane isolation |
+| [ETL Pipeline](modules/etl-pipeline.md) | A | Raw → Normalized → Canonical pipeline, S3 raw layer (streaming capture, cursor extraction), adapters, ETL event graph, sign conventions, join keys, canonical entities |
+| [Analytics & P&L](modules/analytics-pnl.md) | B | Star schema (facts/dims/marts), P&L formula, fact_finance, inventory intelligence, returns & penalties, data quality controls, sanitation rationale |
+| [Pricing](modules/pricing.md) | C | Strategies (TARGET_MARGIN, PRICE_CORRIDOR), policies, signal assembly, constraints, guards, eligibility, decisions, explanations, execution modes |
+| [Execution](modules/execution.md) | D+F | Action lifecycle, outbox pattern, retry, CAS guards, reconciliation, simulation mode, shadow-state |
+| [Seller Operations](modules/seller-operations.md) | E | Operational grid, saved views, working queues, price/promo journals, mismatch monitor |
+
+### Business Features (`features/`)
 
 | Document | Contents |
-|---|---|
-| [S3 Raw Layer — Implementation Spec](s3-raw-layer-architecture.md) | Streaming capture, cursor extraction, write/read path, memory footprint, per-endpoint analysis, risk catalog |
-| [P&L Sanitation Rationale](pnl-architecture-sanitation.md) | Rationale за удаление component facts и spine pattern, resolved P&L design questions |
+|----------|----------|
+| [README](features/README.md) | Workflow: DRAFT → DESIGNING → ARCH_UPDATED → TBD_READY → IMPLEMENTING → DONE |
+| [_TEMPLATE](features/_TEMPLATE.md) | Шаблон для новой бизнес-фичи |
 
 ### Operational & Policy Documents
 
 | Document | Contents |
-|---|---|
-| [Marketplace API Policy](marketplace-api-policy.md) | Mandatory rules for marketplace adapter implementation |
+|----------|----------|
 | [Risk Register](risk-register.md) | Architectural, integration, contractual, operational risks |
 | [Runbook](runbook.md) | Operations, failure scenarios, recovery procedures |
 
-### Provider Contracts (folder `provider-contracts/`)
+### Provider Contracts (`provider-api-specs/`)
 
 | Document | Contents |
-|---|---|
-| [WB Read Contracts](provider-contracts/wb-read-contracts.md) | WB API read contracts: 7 capabilities, field-level semantics, rate limits |
-| [Ozon Read Contracts](provider-contracts/ozon-read-contracts.md) | Ozon API read contracts: 7 capabilities, field-level semantics, sign conventions |
-| [Write Contracts](provider-contracts/write-contracts.md) | Price write contracts for WB and Ozon |
-| [Mapping Spec](provider-contracts/mapping-spec.md) | Provider → Normalized → Canonical mapping: design decisions, readiness matrix |
-| [Promo & Advertising Contracts](provider-contracts/promo-advertising-contracts.md) | Promo and advertising API contracts, migration notes |
-| [Empirical Verification Log](provider-contracts/samples/empirical-verification-log.md) | API verification log |
+|----------|----------|
+| [WB Read Contracts](provider-api-specs/wb-read-contracts.md) | WB API read contracts: capabilities, field-level semantics, rate limits |
+| [Ozon Read Contracts](provider-api-specs/ozon-read-contracts.md) | Ozon API read contracts: capabilities, field-level semantics |
+| [Write Contracts](provider-api-specs/write-contracts.md) | Price write contracts for WB and Ozon |
+| [Mapping Spec](provider-api-specs/mapping-spec.md) | Provider → Normalized → Canonical mapping |
+| [Promo & Advertising Contracts](provider-api-specs/promo-advertising-contracts.md) | Promo and advertising API contracts |
+| [Empirical Verification Log](provider-api-specs/samples/empirical-verification-log.md) | API verification log |
 
 ### Frontend
 
 | Document | Contents |
-|---|---|
+|----------|----------|
 | [Frontend Design Direction](frontend/frontend-design-direction.md) | Design language, UX principles, anti-goals |
-
-### Reference Material (folder `_archive/`)
-
-Archived documents from analysis phase. Useful as reference for validated lessons, design rationale, and anti-patterns discovered during analysis. Not normative for new implementation.
-
-### Implementation Details (folder `implementations_for_improve/`)
-
-Detailed implementation descriptions. Use as source of validated patterns and domain-specific solutions, not as prescriptive spec.
 
 ## Document Hierarchy
 
 ```
-Normative (how the system MUST work)
+Shared Architecture (how the system MUST work)
 ──────────────────────────────────────
 project-vision-and-scope.md      ← Entry point: what and why
-data-architecture.md             ← How: data model, pipeline, P&L, phasing, invariants
-functional-capabilities.md      ← What: capability groups, user flows
-non-functional-architecture.md  ← How well: quality attributes
-provider-capability-matrix.md   ← External: provider coverage, limits
-execution-and-reconciliation.md ← Actions: lifecycle, reliability
-pricing-architecture-analysis.md ← Pricing: strategies, policies, guards
+data-model.md                    ← Shared: entities, pipeline, invariants
+non-functional-architecture.md   ← Cross-cutting: security, observability, resilience
 
-Implementation Specs
+Module Documents (self-contained per module)
 ──────────────────────────────────────
-s3-raw-layer-architecture.md     ← Deep-dive: streaming capture, cursor extraction
-pnl-architecture-sanitation.md   ← Rationale: P&L model cleanup decisions
+modules/tenancy-iam.md           ← Phase A: multi-tenancy, IAM
+modules/integration.md           ← Phase A: marketplace connections, API policy
+modules/etl-pipeline.md          ← Phase A: data pipeline, raw layer, adapters
+modules/analytics-pnl.md         ← Phase B: star schema, P&L, inventory, returns
+modules/pricing.md               ← Phase C: strategies, policies, signals, decisions
+modules/execution.md             ← Phase D+F: actions, retry, reconciliation, simulation
+modules/seller-operations.md     ← Phase E: grid, views, queues, journals
 
-Policy
+Business Features (idea → architecture → TBD → implementation)
 ──────────────────────────────────────
-marketplace-api-policy.md        ← Rules for marketplace adapters
+features/                        ← Feature specs with TBD
+
+Operational
+──────────────────────────────────────
 risk-register.md                 ← Known risks and mitigations
 runbook.md                       ← Operational procedures
 
 Contracts (input dependency for adapters)
 ──────────────────────────────────────
-provider-contracts/              ← Detailed field-level contracts
+provider-api-specs/              ← Detailed field-level contracts
 ```
 
 ## Language

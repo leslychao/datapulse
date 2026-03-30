@@ -132,7 +132,7 @@
 | Reconciliation safety                 | Uncertain outcomes → RECONCILIATION_PENDING, не SUCCEEDED                                                |
 
 
-Детали реализации (state machine, outbox schema, CAS SQL, retry flow) — [Исполнение и сверка](execution-and-reconciliation.md).
+Детали реализации (state machine, outbox schema, CAS SQL, retry flow) — [Execution](modules/execution.md).
 
 ### Открытые вопросы
 
@@ -260,8 +260,8 @@ Validation errors (`400`) содержат `fieldErrors[]`: `field`, `messageKey
 
 ## Связанные документы
 
-- [Архитектура данных](data-architecture.md) — scope Phase A/B, инварианты, полная модель данных
-- [Исполнение и сверка](execution-and-reconciliation.md) — retry, outbox, CAS details
-- [Архитектура данных](data-architecture.md) — pipeline integrity, financial data
-- [Матрица возможностей провайдеров](provider-capability-matrix.md) — rate limits, provider constraints
+- [Data Model](data-model.md) — shared data model overview, инварианты
+- [Execution](modules/execution.md) — retry, outbox, CAS details
+- [Integration](modules/integration.md) — rate limits, provider constraints
+- [ETL Pipeline](modules/etl-pipeline.md) — pipeline integrity
 

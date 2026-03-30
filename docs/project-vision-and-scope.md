@@ -145,11 +145,8 @@ Datapulse реализуется как **explainable marketplace operating syst
 
 ## Related Documents
 
-- [Data Architecture](data-architecture.md) — data model, pipeline, P&L, Phase A/B scope, invariants, runtime entrypoints
-- [Functional Capabilities](functional-capabilities.md) — capability groups, user flows
+- [Data Model](data-model.md) — shared data model overview, pipeline, invariants, runtime entrypoints
 - [Non-Functional Architecture](non-functional-architecture.md) — security, consistency, audit, resilience, observability
-- [Provider Capability Matrix](provider-capability-matrix.md) — provider contracts coverage
-- [Execution & Reconciliation](execution-and-reconciliation.md) — action lifecycle, outbox, retry, idempotency
-- [Marketplace API Policy](marketplace-api-policy.md) — mandatory rules for marketplace adapters
-- [Provider Contracts](provider-contracts/) — detailed read/write contracts per provider
+- [Module Documents](modules/) — self-contained documentation per system module
+- [Provider API Specs](provider-api-specs/) — detailed read/write API specs per provider
 

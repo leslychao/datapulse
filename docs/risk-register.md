@@ -174,8 +174,8 @@
 
 ## Связанные документы
 
-- [Архитектура данных](data-architecture.md) — инварианты, scope Phase A/B
-- [Исполнение и сверка](execution-and-reconciliation.md) — action lifecycle, SUCCEEDED criteria
-- [Матрица возможностей провайдеров](provider-capability-matrix.md) — provider blockers, rate limits
-- [Нефункциональная архитектура](non-functional-architecture.md) — resilience, security measures
-- [Архитектурная санация P&L](pnl-architecture-sanitation.md) — Q1-Q7, sanitation decisions
+- [Data Model](data-model.md) — инварианты, scope
+- [Execution](modules/execution.md) — action lifecycle, SUCCEEDED criteria
+- [Integration](modules/integration.md) — provider blockers, rate limits
+- [Non-Functional Architecture](non-functional-architecture.md) — resilience, security measures
+- [Analytics & P&L](modules/analytics-pnl.md) — P&L sanitation decisions
