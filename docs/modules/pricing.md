@@ -68,6 +68,31 @@ target_price = COGS / (1 − target_margin_pct − effective_cost_rate)
 
 MARKUP как отдельная стратегия не включается. TARGET_MARGIN покрывает MARKUP как частный случай при cost rates = 0.
 
+### Validation contract для strategy_params
+
+`strategy_params` десериализуется в typed record с Jakarta Validation constraints при создании/обновлении `price_policy`. Невалидные params → 400 Bad Request.
+
+#### TARGET_MARGIN constraints
+
+| Параметр | Constraint | Обоснование |
+|----------|-----------|-------------|
+| `target_margin_pct` | [0.01, 0.80] | > 0.80 при любых cost rates → отрицательный знаменатель |
+| `commission_manual_pct` | [0.01, 0.50] | Комиссия МП не превышает 50% |
+| `commission_lookback_days` | [7, 365] | < 7 — недостаточно данных; > 365 — irrelevant |
+| `commission_min_transactions` | [1, 100] | Минимальная выборка для статистической значимости |
+| `rounding_step` | [1, 100] | Шаг округления в рублях |
+
+#### PRICE_CORRIDOR constraints
+
+| Параметр | Constraint | Обоснование |
+|----------|-----------|-------------|
+| `min_price` | > 0, nullable | Абсолютный floor |
+| `max_price` | > min_price, nullable | Абсолютный ceiling |
+
+#### Runtime safety guard
+
+Pricing strategy evaluator проверяет `denominator > 0` перед делением. При `denominator ≤ 0` → `decision = SKIP` с reason «target margin + effective cost rate ≥ 100%». Это defense-in-depth: validation ловит при создании policy, runtime guard — при execution (на случай если cost rates изменились после создания policy).
+
 ### PRICE_CORRIDOR — ценовой коридор (ограничительная)
 
 ```
@@ -260,6 +285,8 @@ Pricing pipeline работает с конечной ценой для поку
 | Manual | По требованию |
 | Schedule | Configurable cron |
 | Policy change | При изменении/активации policy |
+
+**Инвариант:** pricing run для connection X не запускается, пока для того же connection X есть ETL `job_execution` в статусе `IN_PROGRESS`. Post-sync trigger создаёт pricing run только после успешного завершения ETL sync. Manual и scheduled триггеры проверяют отсутствие активного sync перед запуском. Если есть active ETL → pricing run отложен (запланирован after sync completion).
 
 ### Batch processing
 

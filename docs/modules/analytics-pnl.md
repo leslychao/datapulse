@@ -270,6 +270,12 @@ SPP — скидка WB для покупателя, оплачиваемая WB
 
 Ядро модели концептуально здорово. Основные искажения — accumulation, не corruption. Очистка выполнена без redesign. Модель масштабируема: новый маркетплейс = новый adapter, без изменения star schema.
 
+## Schema evolution
+
+ClickHouse schema управляется numbered SQL migration scripts (`clickhouse/migrations/V001__*.sql`). При старте `datapulse-ingest-worker` проверяется таблица `schema_version` в ClickHouse, непримёнённые миграции применяются автоматически.
+
+При несовместимых изменениях (sorting key): `CREATE TABLE new` → `INSERT INTO new SELECT ... FROM old` → `RENAME TABLE`. Rollback: re-materialization из canonical layer (PostgreSQL → ClickHouse) — всегда возможна, canonical = source of truth.
+
 ## Связанные модули
 
 - [ETL Pipeline](etl-pipeline.md) — canonical data sources для materialization

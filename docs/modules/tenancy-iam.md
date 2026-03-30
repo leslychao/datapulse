@@ -121,6 +121,14 @@ PENDING → ACCEPTED → (workspace_member created)
 
 Audit records immutable: update и delete запрещены. Retention: не менее 12 месяцев.
 
+## Workspace isolation enforcement
+
+1. `WorkspaceContext` — request-scoped бин, устанавливается из JWT claims в security filter.
+2. Все repository queries обязаны фильтровать по `workspace_id` из `WorkspaceContext`.
+3. Worker'ы (без HTTP request): `WorkspaceContext` устанавливается из `job_execution.workspace_id` перед обработкой.
+4. CI: ArchUnit тест проверяет, что все public repository methods принимают `workspaceId` или используют `WorkspaceContext`.
+5. RLS — не используется (может быть добавлен позже без архитектурных изменений).
+
 ## Связанные модули
 
 - [Integration](integration.md) — marketplace connections привязаны к workspace

@@ -119,6 +119,22 @@
 
 **Действие:** `SELECT * FROM price_action WHERE status = 'RECONCILIATION_PENDING' AND updated_at < now() - interval '30 minutes'`.
 
+### FM-9: ClickHouse materialization failure
+
+**Симптомы:** Stale data alert. Canonical data в PostgreSQL свежая (`canonical_price_snapshot.captured_at` < threshold), но ClickHouse facts не обновлены. `job_execution` в статусе FAILED или IN_PROGRESS дольше ожидаемого.
+
+**Диагностика:**
+1. `SELECT status, error_details FROM job_execution WHERE status IN ('FAILED', 'IN_PROGRESS') ORDER BY started_at DESC LIMIT 10`
+2. Проверить доступность ClickHouse: `SELECT 1 FROM system.one`
+3. Проверить логи ingest-worker на ClickHouse connection errors
+
+**Восстановление:**
+1. Восстановить доступность ClickHouse
+2. ETL автоматически retry через outbox
+3. При завершении sync — `marketplace_sync_state` обновится → stale data guard снимется
+
+**Влияние:** Canonical truth (PostgreSQL) не пострадала. Pricing заблокирован stale data guard (correct behavior). Analytics screens показывают устаревшие данные.
+
 ## Конфигурация
 
 ### Ключевые параметры
@@ -160,7 +176,19 @@ Queues:
   action.execution       — executor worker слушает
   action.execution.wait  — TTL expiration → DLX → action.execution
 
-Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=true
+Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
+```
+
+#### Reconciliation
+
+```
+Exchanges (direct):
+  action.reconciliation       — deferred reconciliation dispatch
+  action.reconciliation.wait  — delayed reconciliation (DLX)
+
+Queues:
+  action.reconciliation       — reconciliation consumer
+  action.reconciliation.wait  — TTL → DLX → action.reconciliation
 ```
 
 ## Базовые действия при сбоях
