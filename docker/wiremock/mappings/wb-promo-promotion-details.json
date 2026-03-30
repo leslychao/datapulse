@@ -1,0 +1,14 @@
+{
+  "name": "WB Promo — Promotion Details (dp-calendar-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v1/calendar/promotions/details"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-promo-promotion-details.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

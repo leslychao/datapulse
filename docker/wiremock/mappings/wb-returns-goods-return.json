@@ -1,0 +1,18 @@
+{
+  "name": "WB Returns (seller-analytics-api goods-return)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v1/analytics/goods-return",
+    "queryParameters": {
+      "dateFrom": { "matches": "\\d{4}-\\d{2}-\\d{2}" },
+      "dateTo": { "matches": "\\d{4}-\\d{2}-\\d{2}" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-returns-goods-return.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

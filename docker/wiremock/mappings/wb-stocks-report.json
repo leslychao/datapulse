@@ -1,0 +1,14 @@
+{
+  "name": "WB Stocks Report (seller-analytics-api)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/analytics/v1/stocks-report/wb-warehouses"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-stocks-report.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

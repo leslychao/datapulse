@@ -1,0 +1,14 @@
+{
+  "name": "WB Price Write — Upload Task (discounts-prices-api)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/v2/upload/task"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-price-upload-task.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

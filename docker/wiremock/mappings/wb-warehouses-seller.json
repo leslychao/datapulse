@@ -1,0 +1,14 @@
+{
+  "name": "WB Warehouses Seller (marketplace-api, sandbox returns empty)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v3/warehouses"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-warehouses-seller.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "data": {
+    "nomenclatures": [
+      {
+        "nmID": 274849,
+        "vendorCode": "ART-001-BLK",
+        "actionPrice": 3500.0,
+        "price": 5000.0,
+        "inAction": true
+      },
+      {
+        "nmID": 275100,
+        "vendorCode": "ART-002-WHT",
+        "actionPrice": 1800.0,
+        "price": 2500.0,
+        "inAction": true
+      },
+      {
+        "nmID": 275200,
+        "vendorCode": "ART-003-RED",
+        "actionPrice": 0.0,
+        "price": 3200.0,
+        "inAction": false
+      }
+    ]
+  }
+}

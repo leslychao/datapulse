@@ -1,0 +1,59 @@
+{
+  "data": {
+    "promotions": [
+      {
+        "id": 2235,
+        "name": "Весенняя распродажа: товары-герои",
+        "startDateTime": "2026-03-15T21:00:00Z",
+        "endDateTime": "2026-04-15T20:59:59Z",
+        "type": "regular",
+        "description": "Акция на весь ассортимент одежды с повышенным cashback",
+        "inAction": true,
+        "participationPercentage": 75,
+        "advantages": [
+          "Повышенная видимость в каталоге",
+          "Участие в рассылке покупателям",
+          "Бейджик акции на карточке товара"
+        ],
+        "conditions": [
+          "Скидка от 20%",
+          "Товар в наличии на складе WB"
+        ]
+      },
+      {
+        "id": 2301,
+        "name": "Гаджеты: технораспродажа",
+        "startDateTime": "2026-04-01T21:00:00Z",
+        "endDateTime": "2026-04-10T20:59:59Z",
+        "type": "regular",
+        "description": "Специальные цены на электронику",
+        "inAction": false,
+        "participationPercentage": 0,
+        "advantages": [
+          "Топ-позиция в поиске",
+          "Баннер на главной странице"
+        ],
+        "conditions": [
+          "Скидка от 30%",
+          "Минимум 10 единиц на складе"
+        ]
+      },
+      {
+        "id": 2400,
+        "name": "Лето близко: купальники и аксессуары",
+        "startDateTime": "2026-05-01T21:00:00Z",
+        "endDateTime": "2026-06-01T20:59:59Z",
+        "type": "auto",
+        "description": "Автоматическая акция на летний ассортимент",
+        "inAction": true,
+        "participationPercentage": 90,
+        "advantages": [
+          "Автоподключение товаров"
+        ],
+        "conditions": [
+          "Скидка от 15%"
+        ]
+      }
+    ]
+  }
+}

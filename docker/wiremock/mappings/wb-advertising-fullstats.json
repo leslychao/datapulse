@@ -1,0 +1,14 @@
+{
+  "name": "WB Advertising — Full Stats v3 (advert-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/adv/v3/fullstats"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-advertising-fullstats.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

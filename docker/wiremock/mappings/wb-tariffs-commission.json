@@ -1,0 +1,14 @@
+{
+  "name": "WB Tariffs Commission (common-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v1/tariffs/commission"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-tariffs-commission.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

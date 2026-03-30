@@ -1,0 +1,14 @@
+{
+  "name": "WB Advertising — List Campaigns v2 (advert-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/advert/v2/adverts"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-advertising-campaigns.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

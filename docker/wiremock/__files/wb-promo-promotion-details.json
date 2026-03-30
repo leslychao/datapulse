@@ -1,0 +1,21 @@
+{
+  "data": {
+    "id": 2235,
+    "name": "Весенняя распродажа: товары-герои",
+    "startDateTime": "2026-03-15T21:00:00Z",
+    "endDateTime": "2026-04-15T20:59:59Z",
+    "type": "regular",
+    "description": "Акция на весь ассортимент одежды с повышенным cashback. Участвуйте для увеличения продаж.",
+    "inAction": true,
+    "ranging": [
+      {
+        "type": "priority",
+        "value": 1
+      },
+      {
+        "type": "discount_threshold",
+        "value": 20
+      }
+    ]
+  }
+}

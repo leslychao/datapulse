@@ -1,0 +1,149 @@
+[
+  {
+    "advertId": 100001,
+    "type": 6,
+    "status": 9,
+    "dates": [
+      {
+        "date": "2026-03-28",
+        "views": 1520,
+        "clicks": 85,
+        "ctr": 5.59,
+        "cpc": 12.35,
+        "sum": 1049.75,
+        "atbs": 14,
+        "orders": 8,
+        "cr": 9.41,
+        "shks": 8,
+        "sum_price": 40000,
+        "canceled": 1,
+        "apps": [
+          {
+            "appType": 1,
+            "nm": [
+              {
+                "nmId": 274849,
+                "views": 980,
+                "clicks": 55,
+                "ctr": 5.61,
+                "cpc": 11.80,
+                "sum": 649.00,
+                "atbs": 9,
+                "orders": 5,
+                "cr": 9.09,
+                "shks": 5,
+                "sum_price": 25000,
+                "canceled": 0
+              },
+              {
+                "nmId": 275100,
+                "views": 540,
+                "clicks": 30,
+                "ctr": 5.56,
+                "cpc": 13.36,
+                "sum": 400.75,
+                "atbs": 5,
+                "orders": 3,
+                "cr": 10.00,
+                "shks": 3,
+                "sum_price": 15000,
+                "canceled": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "date": "2026-03-29",
+        "views": 1800,
+        "clicks": 102,
+        "ctr": 5.67,
+        "cpc": 11.50,
+        "sum": 1173.00,
+        "atbs": 18,
+        "orders": 10,
+        "cr": 9.80,
+        "shks": 10,
+        "sum_price": 50000,
+        "canceled": 0,
+        "apps": [
+          {
+            "appType": 1,
+            "nm": [
+              {
+                "nmId": 274849,
+                "views": 1100,
+                "clicks": 65,
+                "ctr": 5.91,
+                "cpc": 10.80,
+                "sum": 702.00,
+                "atbs": 12,
+                "orders": 7,
+                "cr": 10.77,
+                "shks": 7,
+                "sum_price": 35000,
+                "canceled": 0
+              },
+              {
+                "nmId": 275100,
+                "views": 700,
+                "clicks": 37,
+                "ctr": 5.29,
+                "cpc": 12.73,
+                "sum": 471.00,
+                "atbs": 6,
+                "orders": 3,
+                "cr": 8.11,
+                "shks": 3,
+                "sum_price": 15000,
+                "canceled": 0
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "advertId": 100002,
+    "type": 8,
+    "status": 11,
+    "dates": [
+      {
+        "date": "2026-03-15",
+        "views": 600,
+        "clicks": 25,
+        "ctr": 4.17,
+        "cpc": 8.50,
+        "sum": 212.50,
+        "atbs": 4,
+        "orders": 2,
+        "cr": 8.00,
+        "shks": 2,
+        "sum_price": 5000,
+        "canceled": 0,
+        "apps": [
+          {
+            "appType": 1,
+            "nm": [
+              {
+                "nmId": 275100,
+                "views": 600,
+                "clicks": 25,
+                "ctr": 4.17,
+                "cpc": 8.50,
+                "sum": 212.50,
+                "atbs": 4,
+                "orders": 2,
+                "cr": 8.00,
+                "shks": 2,
+                "sum_price": 5000,
+                "canceled": 0
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

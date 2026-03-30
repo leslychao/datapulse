@@ -1,0 +1,432 @@
+---
+description: Спецификация стиля написания Java / Spring Boot кода — паттерны, идиомы, конвенции. Обязательна к соблюдению при генерации любого Java-кода.
+alwaysApply: true
+---
+
+# Java / Spring Boot — Стиль написания кода
+
+## 1. Dependency Injection
+
+- **Только constructor injection** через Lombok `@RequiredArgsConstructor`.
+- Все зависимости — `private final` поля.
+- `@Autowired`, field injection, setter injection — **запрещены**.
+- Если класс не имеет зависимостей (чистый калькулятор), `@RequiredArgsConstructor` не нужен.
+
+```java
+// ✅
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+  private final PaymentRepository repository;
+  private final NotificationSender sender;
+}
+
+// ❌
+@Service
+public class PaymentService {
+  @Autowired private PaymentRepository repository;
+}
+```
+
+## 2. Аннотации классов — порядок и комбинации
+
+### REST-контроллеры
+
+```
+@RestController
+@RequestMapping(value = "/api/...", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
+```
+
+`@PreAuthorize("isAuthenticated()")` на уровне класса — только если **все** методы требуют одинаковой проверки. Ставится после `@RequiredArgsConstructor`.
+
+### Сервисы (бизнес-логика)
+
+```
+@Service
+[@Validated]              — если методы принимают @Valid параметры
+@RequiredArgsConstructor
+[@Slf4j]                  — только если класс реально логирует
+```
+
+### Инфраструктурные компоненты / worker-ы
+
+`@Slf4j` ставится первой, т.к. логирование — основная обязанность инфраструктурного кода.
+
+```
+@Slf4j
+@Service                  — или @Component
+@RequiredArgsConstructor
+```
+
+### Event listeners
+
+```
+@Component
+@RequiredArgsConstructor
+[@Slf4j]
+```
+
+### Repositories (JDBC)
+
+```
+@Repository
+@RequiredArgsConstructor
+[@Slf4j]
+```
+
+### @Configuration
+
+```
+@Configuration
+@RequiredArgsConstructor
+```
+
+### @ConfigurationProperties
+
+Два основных стиля:
+- **Immutable class**: `@Validated @Getter @RequiredArgsConstructor @ConfigurationProperties(prefix = "...")` с `final` полями и Jakarta Validation.
+- **Record**: `@ConfigurationProperties(prefix = "...")` для простых плоских конфигов.
+- **Mutable POJO**: `@Data @Validated @ConfigurationProperties(prefix = "...")` с вложенными `static class` и дефолтами — допускается для сложных вложенных конфигов.
+
+## 3. REST-контроллеры — стиль endpoint-ов
+
+### Возвращаемые типы
+
+- **По умолчанию**: возвращай DTO/record напрямую, **без** `ResponseEntity`.
+- **`ResponseEntity` используется ТОЛЬКО когда:**
+  - Нужен статус, отличный от 200 (например `ResponseEntity.status(CREATED).body(...)`)
+  - Ресурс может отсутствовать → `Optional.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build())`
+  - Нужны кастомные заголовки (например `Content-Disposition` для файлового экспорта)
+
+### HTTP-статусы
+
+- **DELETE → void**: `@ResponseStatus(HttpStatus.NO_CONTENT)` + `public void`
+- **POST create с телом**: `@ResponseStatus(HttpStatus.CREATED)` + возврат DTO напрямую, **или** `ResponseEntity.status(CREATED).body(...)` когда тело формируется динамически
+- **POST side-effect без возврата**: `public void` (дефолтный 200)
+- **PUT update**: возврат обновлённого DTO
+
+### Параметры методов
+
+- `@PathVariable("name")` — с явным именем в строке
+- `@RequestParam` — для фильтров и токенов
+- `@RequestBody` — для create/update payloads
+- **Query-object** (без аннотации) — для сложных фильтров (Spring bind из query string)
+- `Pageable` — без аннотации, Spring резолвит автоматически
+
+### Validation
+
+- `@Valid` на `@RequestBody` где есть Jakarta Validation constraints
+- `@NotNull` перед `@RequestBody` допускается
+
+### Пагинация
+
+- `Page<T>` (Spring Data) — по умолчанию. Кастомный wrapper — только если нужен summary рядом с данными.
+- JDBC: `new PageImpl<>(content, pageable, total)`.
+
+### Security
+
+- Метод-уровневый `@PreAuthorize` с SpEL-выражением на access-checking бины — основной паттерн.
+- `#paramName` ссылается на `@PathVariable` или `@RequestParam`.
+- Получение текущего пользователя в сервисах: через request-scoped context-бин. Прямой доступ к `SecurityContextHolder` — **только** в инфраструктурном коде (фильтры, handshake handlers).
+- Авторизация multi-tenant: `@PreAuthorize("@accessService.canRead(#accountId)")` / `canWrite` — SpEL на access-checking бин.
+
+### HTTP-методы
+
+- GET — чтение, списки, экспорт
+- POST — создание, действия (accept, resend, simulate, mark read)
+- PUT — полное обновление
+- DELETE — удаление
+- **PATCH не используется**
+
+## 4. Records vs Classes
+
+### Records (`public record`)
+
+Используй для:
+- **Request-объектов** (все без исключений)
+- **Response-объектов** (кроме случаев, когда нужна мутабельность для маппинга)
+- **Доменных событий** (Spring `ApplicationEvent` payloads)
+- **Immutable value objects** (credentials, context-ы, snapshot-ы)
+- **Простых ConfigurationProperties**
+
+Вложенные records допускаются для составных body:
+```java
+public record SimulationRequest(
+    @NotEmpty @Valid List<SimulationItem> items,
+    BigDecimal upliftFactor
+) {
+    public record SimulationItem(
+        long productId,
+        BigDecimal discountPercent
+    ) {}
+}
+```
+
+### Classes
+
+Используй для:
+- **JPA-сущностей** (всегда class, `@Getter @Setter`)
+- **Mutable DTO с наследованием** (для MapStruct маппинга)
+- **Исключений** (`extends RuntimeException`)
+- **Utility-классов** (`final class` + `private` конструктор)
+
+## 5. Lombok на разных типах
+
+| Тип | Аннотации |
+|-----|-----------|
+| JPA Entity | `@Getter`, `@Setter`. **Без** `@Data`, `@EqualsAndHashCode`, `@Builder` |
+| Mutable DTO | `@Getter`, `@Setter`, `@EqualsAndHashCode(callSuper = true)` при наследовании |
+| Exception | `@Getter` |
+| Record | **Без Lombok** — встроенные accessor-ы |
+| JDBC POJO (не JPA, persistence через `JdbcTemplate`) | `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor` |
+| Service / Controller | `@RequiredArgsConstructor` |
+| ConfigProperties (class) | `@Getter @RequiredArgsConstructor` с `final` полями, или `@Data` для mutable |
+
+## 6. JPA-сущности
+
+- Наследуют общую `BaseEntity` (или стоят отдельно для составных ключей).
+- `@Getter @Setter` на классе. **Без** `@Data`, `@Builder`, `@EqualsAndHashCode`.
+- **equals/hashCode**: дефолтный identity из `Object` (JPA managed entities).
+- `@ManyToOne(fetch = FetchType.LAZY, optional = false)` + `@JoinColumn(name = "...", nullable = false)`.
+- Скалярные FK допускаются как альтернатива ассоциациям (`private long accountId`).
+- `@Column(name = "...")` — только когда имя отличается от дефолтного snake_case.
+- Timestamps через `@PrePersist` / `@PreUpdate` в базовой сущности.
+
+## 7. Enum-ы
+
+- **Простые** (без полей): только константы, без конструктора.
+- **С поведением**: `@JsonCreator` для десериализации, helper-методы типа `isTerminal()` допускаются.
+- **`EnumSet`-based helpers** для группировки: `writeRoles()`, `readRoles()`.
+
+## 8. Репозитории
+
+### JPA (Spring Data)
+
+- `interface XRepository extends JpaRepository<Entity, Long>`
+- Derive query methods: `findByAccount_IdAndUser_Id`, `existsBy...`, `countBy...`
+- `@Query` с **JPQL** (не native) в text blocks `"""..."""`. `@Param("name")` для именованных параметров.
+- `@Modifying` + `@Query` для bulk UPDATE/DELETE.
+- `@NamedQuery`, `nativeQuery = true` — **не используются**.
+
+### JDBC
+
+- `@Repository @RequiredArgsConstructor`, инжектируй `JdbcTemplate` или `NamedParameterJdbcTemplate`.
+- SQL хранится в `private static final String` (text blocks `"""..."""`).
+- Именованные параметры (`:paramName`) в read-repos, позиционные `?` в batch write.
+- RowMapper как лямбда `(rs, rowNum) -> new Dto(...)` или `private` метод `mapRow`.
+- Пагинация: `count query` + `main query` с `limit :limit offset :offset` → `new PageImpl<>(content, pageable, total)`.
+- Динамическая сортировка: whitelist `Map<String, String>` (DTO field → SQL column) + `buildOrderByClause(Sort)` с `nulls last`. Предотвращает SQL injection.
+- Batch: `jdbcTemplate.batchUpdate(sql, list, list.size(), (ps, item) -> { ps.set... })`.
+
+## 9. Транзакции
+
+- `@Transactional` — **только на уровне методов**, не на классе.
+- `@Transactional(readOnly = true)` — на read-only методах.
+- `@Transactional(propagation = Propagation.REQUIRES_NEW)` — на event listener-ах для изоляции.
+- `TransactionTemplate` — для явных программных границ внутри worker-ов и pipeline-ов.
+
+## 10. Обработка ошибок
+
+- **Иерархия**: базовый `AppException(messageKey, args..., HttpStatus)` → `@ControllerAdvice` → `ErrorResponse`.
+- **Конкретные подклассы**: `BadRequestException`, `NotFoundException` — фиксируют HTTP status в конструкторе.
+- **Static factory** на exception-ах с `private` конструктором для читаемости: `SecurityException.tokenExpired()`.
+- **Коды ошибок**: `MessageCodes` — `public final class` с `private` конструктором, `public static final String` dot-separated ключи для i18n.
+- **Infrastructure "should not happen"**: `IllegalStateException` с описательным сообщением.
+- **Non-fatal ошибки**: catch + `log.error/warn`, без rethrow.
+
+## 11. MapStruct маппинг
+
+- `@Mapper(componentModel = "spring", config = BaseMapperConfig.class)`.
+- `BaseMapperConfig`: `unmappedTargetPolicy = ERROR`, `nullValuePropertyMappingStrategy = IGNORE`.
+- Основной метод: `toResponse(Entity)`.
+- Сложные маппинги: `@Mapping`, `@Named` + `qualifiedByName`, `default` методы для ручной сборки.
+- Вспомогательные маппeры подключаются через `uses = HelperMapper.class`.
+
+## 12. Логирование
+
+- **`@Slf4j`** (Lombok) — единственный способ. `LoggerFactory.getLogger()` **не используется**.
+- `log.info` — start/end операций, ключевые бизнес-события.
+- `log.debug` — guard skips, пропуск дублирующей работы.
+- `log.warn` — retry exhaustion, backoff, skip-сценарии.
+- `log.error` — терминальные ошибки, с exception в аргументе.
+- Формат сообщений: **key=value** стиль: `"Operation started: userId={}, action={}, status={}"`.
+
+## 13. Null-safety
+
+- Нормализация строк через `StringUtils.trimToNull` / helper-методы.
+- Guard clauses: `if (x == null) return` или `throw BadRequestException`.
+- `Objects.equals` для safe equality.
+- `Optional` из репозиториев: `.orElseThrow()`, `.ifPresent()`, `.map().orElse()`.
+- Nullable wrapper types (`Long`, `Boolean`) для optional query parameters.
+- `@Nullable` аннотации **не используются**.
+
+## 14. Коллекции
+
+- **`List`** — основной тип для API и бизнес-логики.
+- **`Set`** — только для enum-группировок и уникальных наборов.
+- **Streams**: маппинг, фильтрация, grouping, `Collectors.toSet/toList`.
+- **For-loop**: когда есть side effects, batching, или итерация с мутабельным состоянием.
+- Deep immutability не форсируется.
+
+## 15. Предпочтение библиотечных утилит
+
+**Принцип:** максимально использовать проверенные библиотечные решения вместо написания собственных утилит, хелперов и велосипедов.
+
+### Приоритет использования
+
+1. **Apache Commons** (уже в зависимостях):
+   - `StringUtils` — `isBlank`, `trimToNull`, `defaultIfBlank`, `abbreviate`, `substringBefore/After`
+   - `CollectionUtils` — `isEmpty`, `isNotEmpty`, `emptyIfNull`
+   - `ObjectUtils` — `defaultIfNull`, `firstNonNull`
+   - `NumberUtils` — `isParsable`, `toInt`, `toLong`
+   - `BooleanUtils` — `isTrue`, `toBoolean`
+
+2. **Spring Framework утилиты:**
+   - `StringUtils` (Spring) — `hasText`, `commaDelimitedListToSet`, `cleanPath`
+   - `CollectionUtils` (Spring) — `isEmpty`, `firstElement`
+   - `Assert` — precondition checks в infrastructure-коде
+   - `StreamUtils`, `FileCopyUtils` — IO-операции
+   - `ReflectionUtils`, `AopUtils` — рефлексия
+
+3. **Java стандартная библиотека (java.util, java.time, java.nio, java.security):**
+   - `Objects.requireNonNull`, `Objects.equals`, `Objects.hash`
+   - `Collections.unmodifiableList/Map`, `List.of`, `Map.of`, `Set.of`
+   - `Optional` — цепочки `.map().filter().orElse()`
+   - `HexFormat` — hex encoding/decoding
+   - `MessageDigest` — SHA-256 и другие хеши
+   - `Base64` — encoding/decoding
+   - `Duration`, `Instant`, `LocalDate`, `OffsetDateTime` — работа с датами/временем
+   - `EnumSet`, `EnumMap` — коллекции для enum-ов
+
+4. **Jackson (`ObjectMapper`):** сериализация/десериализация JSON — не писать парсинг вручную.
+
+### Запрещено
+
+- **Не писать** собственные `StringUtils`, `CollectionUtils`, `DateUtils`, `JsonUtils` и подобные utility-классы, если эквивалент есть в Apache Commons, Spring или JDK.
+- **Не реализовывать** вручную: retry-логику (использовать reactor `Retry` или Spring Retry), rate limiting (использовать готовые алгоритмы), hash computation (использовать `MessageDigest`), Base64/Hex encoding (использовать JDK).
+- **Не копировать** код из StackOverflow для задач, решаемых одной строкой через библиотеку.
+
+### Допускается собственный код
+
+- **Доменная бизнес-логика**, которой нет в библиотеках (финансовые формулы, allocation, domain-specific validation).
+- **Thin wrappers** над библиотеками для адаптации к доменной модели (пример: обёртка token-bucket алгоритма с доменной семантикой per-tenant/per-endpoint).
+- **Композиция** нескольких библиотечных вызовов в один domain-specific метод.
+
+## 16. Константы
+
+- `private static final` / `public static final` в `SCREAMING_SNAKE_CASE`.
+- Utility / constants классы: `public final class` + `private` конструктор.
+- SQL-запросы: `private static final String` text blocks в repository-классе.
+- Dynamic SQL: `String.formatted(...)` для шаблонов с подстановкой имён таблиц.
+
+## 17. Интерфейсы
+
+- **Используй**, когда есть несколько реализаций или нужна подменяемость (infrastructure boundaries, strategy pattern, repository seams).
+- **Не используй** для single-implementation сервисов: конкретный `@Service` класс достаточен.
+- Registry-классы (коллекция strategy/handler бинов) — конкретные `final` классы без интерфейса.
+
+## 18. Jackson / Сериализация
+
+- Records — дефолтный Jackson binding по именам компонентов (camelCase). `@JsonProperty` не нужен.
+- `@JsonCreator` — на enum-ах для кастомной десериализации из строки.
+- `@JsonTypeInfo` + `@JsonSubTypes` — для полиморфных типов (`EXTERNAL_PROPERTY`).
+- `@JsonIgnoreProperties(ignoreUnknown = true)` — на DTO для внешних API.
+
+## 19. Event / Listener паттерны
+
+- `@TransactionalEventListener(phase = AFTER_COMMIT)` — когда действие должно выполниться только после коммита (email, push).
+- `@EventListener` — для доменных событий без привязки к коммиту.
+- `@Async` — на listener-ах для неблокирующей обработки (email, внешние вызовы).
+- `@Transactional(REQUIRES_NEW)` — на listener-ах, которым нужна своя транзакция.
+- `@Async` + `@Transactional` на одном методе: допускается — `@Async` создаёт новый поток, `@Transactional` открывает в нём транзакцию. Оба применяются через прокси, порядок корректен при вызове через Spring-бин.
+- Naming методов: `on<EventName>` — `onOrderCreated`, `onPaymentCompleted`.
+
+## 20. Видимость методов
+
+- `public` — API-facing, вызывается из других Spring-бинов.
+- `private` — helper-методы, внутренняя логика.
+- `package-private` (без модификатора) — координация внутри одного пакета (редко, но допускается).
+- `protected` — persistence helpers при наследовании.
+
+## 21. Naming conventions
+
+| Элемент | Паттерн |
+|---------|---------|
+| CRUD-методы | `create*`, `update*`, `delete`, `list*`, `get*` |
+| Query-методы | `find*`, `search*`, `summary*`, `trend*` |
+| Guard/ensure | `ensure*`, `can*`, `require*` |
+| Event handlers | `on*` (`onOrderCreated`, `onPaymentCompleted`) |
+| Pipeline steps | `process`, `execute`, `handle`, `advance*` |
+| CAS-операции | `cas*` (`casStart`, `casComplete`, `casFail`) |
+| Boolean queries | `is*`, `has*`, `exists*` |
+| Builder helpers | `build*` (`buildOrderByClause`, `buildFilterParams`) |
+
+## 22. Java 17 — разрешённые языковые возможности
+
+- **Text blocks** (`"""..."""`) — для SQL, JSON-шаблонов, multi-line строк.
+- **Switch expressions** (`return switch (x) { case A -> ...; }`) — предпочтительно вместо if-else цепочек по enum.
+- **Pattern matching для instanceof** (`if (obj instanceof Type var)`) — предпочтительно вместо явного cast.
+- **Sealed interfaces/classes** (`sealed interface X permits A, B`) — для закрытых иерархий (credentials, strategy variants).
+- **Records** — уже описаны в секции 4.
+
+**Запрещено**: API и конструкции из Java 18+ (`List.getFirst()`, `List.getLast()`, record patterns `case Foo(var x)`, string templates и т.д.).
+
+## 23. BigDecimal (денежные значения)
+
+- **Тип по умолчанию** для денег и процентов: `BigDecimal`. `double`/`float` для финансовых данных — **запрещены**.
+- **Сравнение**: `a.compareTo(b) == 0`, не `a.equals(b)` (`equals` проверяет scale: `new BigDecimal("1.0").equals(new BigDecimal("1.00"))` → `false`).
+- **Создание**: `BigDecimal.valueOf(long)` или `new BigDecimal("0.01")`. **Не** `new BigDecimal(0.1)` (потеря точности из-за IEEE 754).
+- **Константы**: `BigDecimal.ZERO`, `BigDecimal.ONE`.
+- **Деление**: всегда с явным `scale` и `RoundingMode` — `a.divide(b, 2, RoundingMode.HALF_UP)`. Без scale деление может выбросить `ArithmeticException`.
+- **Null-safety**: nullable `BigDecimal` → `Objects.requireNonNullElse(value, BigDecimal.ZERO)` или guard clause.
+
+## 24. Дата и время — выбор типа
+
+| Тип | Когда использовать |
+|-----|-------------------|
+| `LocalDate` | Бизнес-даты, периоды обработки, диапазоны "от-до" в фильтрах |
+| `Instant` | Machine timestamps: worker timing, файловые операции, технические метки |
+| `OffsetDateTime` | Доменные timestamps с offset: аудит, пользовательские события, токены |
+| `ZonedDateTime` | Только парсинг внешних дат (RFC 1123 в HTTP retry headers). Не хранить в БД |
+
+- В PostgreSQL: `LocalDate` → `date`, `Instant` / `OffsetDateTime` → `timestamptz`.
+- `ZonedDateTime` в полях сущностей и DTO — **не используется**.
+
+## 25. HTTP-клиент
+
+- **`WebClient`** (Spring WebFlux) — единственный HTTP-клиент. `RestTemplate` и `RestClient` **не используются**.
+- Конфигурация: централизованная через `@Configuration` бин `WebClient.Builder` / `WebClient`.
+- Стриминг: `DataBuffer` flux → disk для потоковой загрузки больших ответов.
+- Ошибки: обработка через `WebClientResponseException` в retry-политиках.
+
+## 26. Spring Profiles
+
+- `@Profile("local")` — stub/mock реализации для локальной разработки (заглушки внешних адаптеров, упрощённый security).
+- `@Profile("!local")` — production реализации (реальные адаптеры, полный security chain).
+- Выбор профиля — через environment variable или CLI (`--spring.profiles.active=local`), **не** через `application.yml`.
+
+## 27. Тестирование
+
+### Unit-тесты
+
+- `@ExtendWith(MockitoExtension.class)` + `@Mock` + `@InjectMocks`.
+- Naming: `*Test` suffix.
+- Группировка: `@Nested` + `@DisplayName` для логических блоков внутри теста.
+
+### Integration-тесты
+
+- `@SpringJUnitConfig` + `@Testcontainers` + `@DynamicPropertySource` для PostgreSQL.
+- Naming: `*IntegrationTest` или `*Test` с Testcontainers-инфраструктурой.
+- `@TestConfiguration` — локальная конфигурация внутри тестового класса (не shared base class).
+
+### Assertions
+
+- **AssertJ** — основная библиотека: `assertThat(...)`, `assertThatThrownBy(...)`, `assertThatCode(...)`.
+- JUnit `assertEquals` / `assertTrue` — **не используются**.
+- Mockito `verify` / `when` — для проверки поведения (вызовы методов, порядок).
+
+### Запрещено
+
+- Shared abstract test base classes — композиция через аннотации.
+- Hamcrest matchers — заменены AssertJ.

@@ -1,0 +1,40 @@
+{
+  "report": [
+    {
+      "kgvpBooking": 12.0,
+      "kgvpMarketplace": 15.5,
+      "kgvpPickup": 10.0,
+      "kgvpSupplier": 14.0,
+      "kgvpSupplierExpress": 16.5,
+      "paidStorageKgvp": 5.0,
+      "parentID": 306,
+      "parentName": "Одежда",
+      "subjectID": 105,
+      "subjectName": "Купальники"
+    },
+    {
+      "kgvpBooking": 10.0,
+      "kgvpMarketplace": 13.0,
+      "kgvpPickup": 8.5,
+      "kgvpSupplier": 12.0,
+      "kgvpSupplierExpress": 14.0,
+      "paidStorageKgvp": 4.5,
+      "parentID": 306,
+      "parentName": "Одежда",
+      "subjectID": 1201,
+      "subjectName": "Футболки"
+    },
+    {
+      "kgvpBooking": 14.0,
+      "kgvpMarketplace": 18.0,
+      "kgvpPickup": 12.0,
+      "kgvpSupplier": 16.0,
+      "kgvpSupplierExpress": 19.0,
+      "paidStorageKgvp": 6.5,
+      "parentID": 115,
+      "parentName": "Электроника",
+      "subjectID": 2050,
+      "subjectName": "Наушники"
+    }
+  ]
+}
