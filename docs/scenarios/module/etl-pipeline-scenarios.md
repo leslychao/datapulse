@@ -73,15 +73,15 @@ ETL Pipeline отвечает за движение данных от марке
 
 - **Назначение:** После sync генерировать events для downstream consumers (Pricing, Analytics, Alerting).
 - **Trigger:** job_execution completion (COMPLETED или COMPLETED_WITH_ERRORS).
-- **Main path:** INSERT outbox events в той же транзакции с финальным update job_execution. Events: CATALOG_SYNC_COMPLETED, PRICES_SYNC_COMPLETED, STOCKS_SYNC_COMPLETED, FINANCE_SYNC_COMPLETED, PROMO_SYNC_COMPLETED.
+- **Main path:** INSERT single `ETL_SYNC_COMPLETED` outbox event в той же транзакции с финальным update job_execution. Event payload: `{ connection_id, job_execution_id, sync_scope, completed_domains[], failed_domains[], completed_at }`. Downstream consumers проверяют `completed_domains[]` чтобы определить свою релевантность (например, Pricing реагирует если `PRICES` ∈ `completed_domains[]`, Analytics — если `FINANCE` ∈ `completed_domains[]`).
 - **Dependencies:** Outbox table. RabbitMQ (eventual delivery).
-- **Failure risks:** Outbox publisher lag → downstream stale. Selective domain events → subscriber must handle partial data.
-- **Uniqueness:** Fan-out point: один sync → несколько downstream consumers. Разные event types для разных domains.
+- **Failure risks:** Outbox publisher lag → downstream stale. Consumer must check `completed_domains[]` — если нужный domain отсутствует или в `failed_domains[]`, consumer пропускает обработку.
+- **Uniqueness:** Fan-out point: один sync → один `ETL_SYNC_COMPLETED` event с domain list. Downstream consumers фильтруют по `completed_domains[]` вместо подписки на отдельные event types.
 
 ### ETL-09: ClickHouse materialization (happy path)
 
 - **Назначение:** Перенос данных из canonical (PostgreSQL) в analytics (ClickHouse).
-- **Trigger:** Post-sync event (domain-specific) или daily full re-materialization.
+- **Trigger:** Post-sync `ETL_SYNC_COMPLETED` event или daily full re-materialization.
 - **Main path:** Read canonical data (batch) → INSERT into ClickHouse (facts, dims) → update materialization state.
 - **Dependencies:** ClickHouse available. Canonical data consistent.
 - **Failure risks:** ClickHouse down → COMPLETED_WITH_ERRORS. Data volume → batch sizing.
@@ -149,3 +149,21 @@ ETL Pipeline отвечает за движение данных от марке
 - **Dependencies:** Original job в FAILED или COMPLETED_WITH_ERRORS.
 - **Failure risks:** Same failure repeats → investigation needed. Cost: full re-processing of scope.
 - **Uniqueness:** User-initiated retry (не automatic). Новый job, не продолжение старого.
+
+### ETL-17: Stale job detection (IN_PROGRESS → STALE)
+
+- **Назначение:** Обнаружение зависших ETL jobs.
+- **Trigger:** Scheduled job (every 15 min).
+- **Main path:** Scan `job_execution WHERE status = 'IN_PROGRESS' AND started_at < now() - interval '1 hour'` → CAS UPDATE → STALE.
+- **Dependencies:** `datapulse.etl.stale-job-threshold` configuration.
+- **Failure risks:** Legitimately long sync classified as stale. Mitigation: configurable threshold (default: 1 hour).
+- **Uniqueness:** Safety net для worker crash, pod eviction, или зависших provider calls.
+
+### ETL-18: Advertising pipeline exception (Raw → ClickHouse)
+
+- **Назначение:** Рекламные данные загружаются напрямую в ClickHouse, минуя canonical PostgreSQL.
+- **Trigger:** `ADVERTISING_FACT` ETL event.
+- **Main path:** Raw (S3) → Normalized → INSERT `fact_advertising` + `dim_advertising_campaign` (ClickHouse). Нет canonical entity в PostgreSQL. Data provenance через `job_execution_id` в `fact_advertising`.
+- **Dependencies:** ClickHouse available. Campaign → product mapping для allocation.
+- **Failure risks:** ClickHouse down → advertising data lost until next re-materialization. No canonical fallback.
+- **Uniqueness:** Единственное исключение из pipeline invariant (Raw → Normalized → Canonical → Analytics). Обоснование: advertising data используется только для аналитики (P&L allocation, pricing signal `ad_cost_ratio`), ни один decision flow не читает advertising state из PostgreSQL.

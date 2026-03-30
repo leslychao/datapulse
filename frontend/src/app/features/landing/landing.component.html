@@ -1,0 +1,29 @@
+<div class="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-secondary)]">
+  <div class="w-full max-w-md rounded-lg bg-[var(--bg-primary)] p-8 shadow-[var(--shadow-md)]">
+    <div class="mb-8 text-center">
+      <h1 class="text-2xl font-bold text-[var(--text-primary)]">Datapulse</h1>
+      <p class="mt-2 text-[var(--text-secondary)]">
+        Управление маркетплейсами WB и Ozon
+      </p>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <button
+        (click)="login()"
+        class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-medium text-white transition-colors duration-[var(--transition-fast)] hover:bg-[var(--accent-primary-hover)]"
+      >
+        Войти
+      </button>
+      <button
+        (click)="register()"
+        class="w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors duration-[var(--transition-fast)] hover:bg-[var(--bg-tertiary)]"
+      >
+        Зарегистрироваться
+      </button>
+    </div>
+  </div>
+
+  <p class="mt-6 text-xs text-[var(--text-tertiary)]">
+    &copy; 2025 Datapulse. Все права защищены.
+  </p>
+</div>

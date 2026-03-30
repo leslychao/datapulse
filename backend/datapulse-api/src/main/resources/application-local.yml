@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/datapulse
+    username: datapulse
+    password: changeme
+  jpa:
+    show-sql: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/datapulse
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: vitaliikim992@gmail.com
+    password: "jqpb lgsb qywx eqvt"
+
+logging:
+  level:
+    io.datapulse: DEBUG
+    org.springframework.security: DEBUG

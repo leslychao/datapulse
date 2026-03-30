@@ -1,0 +1,49 @@
+<div class="flex h-screen w-screen overflow-hidden bg-[var(--bg-primary)]">
+  <!-- Activity Bar (left) -->
+  <aside
+    class="flex w-12 flex-col items-center gap-2 border-r border-[var(--border-default)] bg-[var(--bg-secondary)] py-3"
+  >
+    <a
+      routerLink="/app/dashboard"
+      routerLinkActive="bg-[var(--bg-active)] text-[var(--accent-primary)]"
+      class="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition-colors duration-[var(--transition-fast)] hover:bg-[var(--bg-tertiary)]"
+      title="Дашборд"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+    </a>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="flex flex-1 flex-col overflow-hidden">
+    <!-- Top Bar -->
+    <header
+      class="flex h-10 shrink-0 items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4"
+    >
+      <span class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase">
+        Datapulse
+      </span>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-[var(--text-secondary)]">{{ userName }}</span>
+        <button
+          (click)="logout()"
+          class="cursor-pointer rounded-[var(--radius-sm)] px-2 py-1 text-xs text-[var(--text-secondary)] transition-colors duration-[var(--transition-fast)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        >
+          Выйти
+        </button>
+      </div>
+    </header>
+
+    <!-- Router content -->
+    <main class="flex-1 overflow-auto bg-[var(--bg-primary)]">
+      <router-outlet />
+    </main>
+
+    <!-- Status Bar -->
+    <footer
+      class="flex h-6 shrink-0 items-center justify-between border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-3"
+    >
+      <span class="text-[11px] text-[var(--text-tertiary)]">Datapulse v0.1.0</span>
+      <span class="text-[11px] text-[var(--text-tertiary)]">Синхронизировано</span>
+    </footer>
+  </div>
+</div>

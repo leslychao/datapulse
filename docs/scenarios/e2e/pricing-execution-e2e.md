@@ -11,7 +11,7 @@
 - **Business goal:** Полностью автоматическое ценообразование: новые данные → решение → исполнение → подтверждение.
 - **Участвующие модули:** ETL → Pricing → Execution → Integration → Audit & Alerting.
 - **Основной поток:**
-  1. **ETL:** `PRICES_SYNC_COMPLETED` → outbox event.
+  1. **ETL:** `ETL_SYNC_COMPLETED (FINANCE ∈ completed_domains)` → outbox event.
   2. **Pricing:** Event consumed → pricing run → eligibility (policy assigned, COGS available) → signal assembly (canonical + CH) → TARGET_MARGIN strategy → constraints → guards (all pass) → decision → action created (`execution_mode=FULL_AUTO`, `status=APPROVED`).
   3. **Execution:** Action picked up → `SCHEDULED` → `EXECUTING` → call provider write API via Integration → HTTP 200 → `RECONCILIATION_PENDING` → immediate reconciliation (read current price) → price matches → `SUCCEEDED`.
   4. **Audit:** Decision logged. Action attempts logged. Price change recorded in price journal.

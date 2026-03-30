@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Сценарный реестр Datapulse содержит **118 module-level сценариев** и **20 e2e сценариев**, организованных в **10 сценарных семейств**.
+Сценарный реестр Datapulse содержит **137 module-level сценариев** и **20 e2e сценариев**, организованных в **10 сценарных семейств**.
 
 ## Структура документов
 
@@ -10,15 +10,15 @@
 docs/scenarios/
 ├── coverage-matrix.md          ← этот документ
 ├── module/
-│   ├── execution-scenarios.md       (18 сценариев) — MUST
-│   ├── etl-pipeline-scenarios.md    (16 сценариев) — MUST
-│   ├── analytics-pnl-scenarios.md   (12 сценариев) — MUST
-│   ├── pricing-scenarios.md         (16 сценариев) — MUST
-│   ├── integration-scenarios.md     (14 сценариев) — MUST
-│   ├── tenancy-iam-scenarios.md     (10 сценариев) — SHOULD
-│   ├── promotions-scenarios.md      (12 сценариев) — MUST
+│   ├── execution-scenarios.md       (22 сценария) — MUST
+│   ├── etl-pipeline-scenarios.md    (18 сценариев) — MUST
+│   ├── analytics-pnl-scenarios.md   (14 сценариев) — MUST
+│   ├── pricing-scenarios.md         (21 сценарий) — MUST
+│   ├── integration-scenarios.md     (15 сценариев) — MUST
+│   ├── tenancy-iam-scenarios.md     (12 сценариев) — SHOULD
+│   ├── promotions-scenarios.md      (13 сценариев) — MUST
 │   ├── seller-operations-scenarios.md (10 сценариев) — SHOULD
-│   └── audit-alerting-scenarios.md  (10 сценариев) — SHOULD
+│   └── audit-alerting-scenarios.md  (12 сценариев) — SHOULD
 └── e2e/
     ├── pricing-execution-e2e.md     (5 сценариев)  — MUST
     ├── data-pipeline-e2e.md         (5 сценариев)  — MUST
@@ -46,14 +46,14 @@ docs/scenarios/
 
 | # | Семейство | Модули | Кол-во сценариев |
 |---|-----------|--------|------------------|
-| 1 | Data Ingestion & Pipeline | Integration, ETL, Analytics | 30 |
-| 2 | Pricing Decision | Pricing, Analytics | 16 |
-| 3 | Action Execution | Execution, Integration | 18 |
-| 4 | Reconciliation & Data Quality | Execution, Analytics, Audit | 12 |
-| 5 | Promotions Lifecycle | Promotions, Pricing, Execution | 12 |
+| 1 | Data Ingestion & Pipeline | Integration, ETL, Analytics | 33 |
+| 2 | Pricing Decision | Pricing, Analytics | 21 |
+| 3 | Action Execution | Execution, Integration | 22 |
+| 4 | Reconciliation & Data Quality | Execution, Analytics, Audit | 14 |
+| 5 | Promotions Lifecycle | Promotions, Pricing, Execution | 13 |
 | 6 | Seller Operations & UX | Seller Ops, Analytics, Pricing | 10 |
-| 7 | Tenancy & Access Control | Tenancy & IAM | 10 |
-| 8 | Audit & Alerting | Audit & Alerting | 10 |
+| 7 | Tenancy & Access Control | Tenancy & IAM | 12 |
+| 8 | Audit & Alerting | Audit & Alerting | 12 |
 | 9 | E2E: Cross-Module Flows | All | 20 |
 | 10 | Infrastructure Resilience | Cross-cutting | (covered within module scenarios) |
 
@@ -108,6 +108,26 @@ docs/scenarios/
 | Circuit breaker для transient degradation | `integration.md` §Circuit breaker | ✅ Closed |
 | Vault unavailability fallback | `integration.md` §Vault unavailability | ✅ Closed |
 | Bulk operations behavior | `etl-pipeline.md` §Bulk operations | ✅ Closed |
+
+### Ревизия сценариев (2026-03-31)
+
+| Категория | Что исправлено | Scope |
+|-----------|---------------|-------|
+| CRITICAL: EXE-02 REJECTED state | `REJECTED` → `CANCELLED` с `cancel_reason` | execution-scenarios |
+| CRITICAL: EXE-18 DLX retry | Rewrite → DB-first outbox retry, poison pill handling | execution-scenarios |
+| CRITICAL: EXE-10 deferred reconciliation | `deferred_action` table → `outbox_event (RECONCILIATION_CHECK)` с TTL | execution-scenarios |
+| CRITICAL: ETL-08 domain events | 5 domain-specific events → единый `ETL_SYNC_COMPLETED` с `completed_domains[]` | etl, pricing, promotions, e2e |
+| CRITICAL: ANA-01 P&L formula | Некорректные компоненты → 13-component formula | analytics-pnl-scenarios |
+| CRITICAL: INT-11 credential caching | «No caching» → Caffeine cache, TTL 1h | integration-scenarios |
+| IMPORTANT: Event naming | `PRICES_SYNC_COMPLETED`, `PROMO_SYNC_COMPLETED` и др. → `ETL_SYNC_COMPLETED` | all e2e, pricing, promotions |
+| IMPORTANT: Table naming | `canonical_price_snapshot` → `canonical_price_current`, `dim_sku` → `dim_product` | analytics, seller-ops, e2e |
+| IMPORTANT: PRC-06 guard | Несуществующий `active_action_guard` → Action Scheduling conflict | pricing-scenarios |
+| IMPORTANT: PRC-10 lock model | Флаг на `canonical_offer` → `manual_price_lock` table | pricing-scenarios |
+| IMPORTANT: IAM-01 API path | `POST /api/workspaces` → `POST /api/tenants/{tenantId}/workspaces` | tenancy-iam-scenarios |
+| IMPORTANT: PRO-06 lifecycle | Missing APPROVED state | promotions-scenarios |
+| IMPORTANT: AUD-04 interval | 30 min → 5 min | audit-alerting-scenarios |
+| IMPORTANT: AUD-05 mechanism | Outbox → Spring ApplicationEvent | audit-alerting-scenarios |
+| ADDED: 19 new scenarios | EXE-19..22, ETL-17..18, ANA-13..14, PRC-17..21, INT-15, IAM-11..12, PRO-13, AUD-11..12 | across 9 module files |
 
 ## Оставшиеся известные ограничения
 

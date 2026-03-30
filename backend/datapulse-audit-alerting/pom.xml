@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.datapulse</groupId>
+        <artifactId>datapulse-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>datapulse-audit-alerting</artifactId>
+    <name>Datapulse Audit &amp; Alerting</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.datapulse</groupId>
+            <artifactId>datapulse-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.datapulse</groupId>
+            <artifactId>datapulse-platform</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>

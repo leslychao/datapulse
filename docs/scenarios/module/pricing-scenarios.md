@@ -15,7 +15,7 @@ Pricing отвечает за принятие ценовых решений: 8-
 ### PRC-01: Pricing run — happy path (TARGET_MARGIN)
 
 - **Назначение:** Стандартный расчёт рекомендованной цены на основе целевой маржи.
-- **Trigger:** `PRICES_SYNC_COMPLETED` или `STOCKS_SYNC_COMPLETED` outbox event → pricing run per connection.
+- **Trigger:** `ETL_SYNC_COMPLETED` outbox event → pricing worker проверяет FINANCE ∈ completed_domains → pricing run per connection.
 - **Main path:** Eligibility check → assemble signals (COGS, current price, commission, logistics from CH) → evaluate TARGET_MARGIN strategy → apply constraints (min/max) → guard pipeline (all pass) → create decision → generate explanation → schedule action.
 - **Dependencies:** Canonical data fresh. ClickHouse signals available. `price_policy` assigned to offer. COGS (`cost_profile`) exists.
 - **Failure risks:** Missing COGS → ineligible. Stale CH data → guard blocks.
@@ -57,14 +57,14 @@ Pricing отвечает за принятие ценовых решений: 8-
 - **Failure risks:** Overly aggressive threshold → false positives (blocking too often). Too lenient → pricing on stale data.
 - **Uniqueness:** Guard-specific block — другой failure reason, другой recovery (wait for fresh sync).
 
-### PRC-06: Guard hit — active action exists
+### PRC-06: Action Scheduling: active action conflict
 
-- **Назначение:** Уже есть active (non-terminal) price action для этого offer.
-- **Trigger:** Guard pipeline: `active_action_guard` checks `price_action`.
-- **Main path:** Active action found → guard blocks → no new decision → explanation: `active_action_exists`.
-- **Dependencies:** `price_action` partial unique index.
-- **Failure risks:** Stuck action → permanently blocks new pricing. Mitigation: stuck-state detector (EXE-15).
-- **Uniqueness:** Cross-module guard (Pricing checks Execution state). Другая recovery: resolve existing action.
+- **Назначение:** Уже есть active (non-terminal) price action для этого offer — конфликт обнаруживается на стадии Action Scheduling.
+- **Trigger:** Action Scheduling stage: конфликт с partial unique index (active action уже существует для этого offer).
+- **Main path:** Active action found for same offer → if pre-execution (PENDING_APPROVAL, APPROVED, ON_HOLD, SCHEDULED): immediate supersede → SUPERSEDED, new action created. If in-flight (EXECUTING, RETRY_SCHEDULED, RECONCILIATION_PENDING): `deferred_action` created, decision saved. Unique constraint race condition → decision saved with skip_reason «active action in progress».
+- **Dependencies:** `price_action` partial unique index. Supersede policy.
+- **Failure risks:** Unique constraint race condition → per-offer catch, batch continues. In-flight action stuck → stuck-state detector eventually resolves.
+- **Uniqueness:** Handled at Action Scheduling (not Guard Pipeline). Per-offer conflict resolution, не batch interruption.
 
 ### PRC-07: Guard hit — promo active
 
@@ -78,9 +78,9 @@ Pricing отвечает за принятие ценовых решений: 8-
 ### PRC-08: Guard hit — stock guard (low inventory)
 
 - **Назначение:** Запас товара слишком низкий для автоматического ценообразования.
-- **Trigger:** Guard pipeline: `stock_guard` checks `canonical_stock_snapshot`.
+- **Trigger:** Guard pipeline: `stock_guard` checks `canonical_stock_current`.
 - **Main path:** Stock < threshold → guard blocks → explanation: `low_stock, available=X, threshold=Y`.
-- **Dependencies:** `canonical_stock_snapshot`. Threshold in `price_policy`.
+- **Dependencies:** `canonical_stock_current`. Threshold in `price_policy`.
 - **Failure risks:** Stock data stale → false block/allow.
 - **Uniqueness:** Другой signal source (stocks), другой threshold logic.
 
@@ -96,11 +96,11 @@ Pricing отвечает за принятие ценовых решений: 8-
 ### PRC-10: Manual price lock
 
 - **Назначение:** Оператор вручную фиксирует цену — pricing pipeline пропускает offer.
-- **Trigger:** POST manual price lock (Operator/Pricing Manager). Lock stored in `canonical_offer`.
+- **Trigger:** POST manual price lock (Operator/Pricing Manager). Lock stored in dedicated `manual_price_lock` table (не флаг на canonical_offer). Lock has own lifecycle: creation, optional expiration (`expires_at`), manual unlock.
 - **Main path:** Pricing run: eligibility check → locked offer → skip → no decision.
-- **Dependencies:** `canonical_offer.price_locked` flag. Lock expiry (optional).
+- **Dependencies:** `manual_price_lock` table. Lock expiry scheduled job (hourly). Lock expiry (optional).
 - **Failure risks:** Lock forgotten (no expiry) → offer never repriced. Mitigation: lock duration alert.
-- **Uniqueness:** User-initiated override — другой actor, другой persistence (lock flag, не policy).
+- **Uniqueness:** User-initiated override — другой actor, другой persistence (dedicated lock table, не policy).
 
 ### PRC-11: Price policy versioning
 
@@ -115,8 +115,8 @@ Pricing отвечает за принятие ценовых решений: 8-
 
 - **Назначение:** Назначение policy на группу offers (by filter criteria).
 - **Trigger:** `POST /api/policy-assignments` (PRICING_MANAGER/ADMIN).
-- **Main path:** Evaluate filter → UPSERT `policy_assignment` for matching offers → trigger pricing run.
-- **Dependencies:** Canonical offers. Filter criteria (brand, category, price range, etc.).
+- **Main path:** UPSERT `price_policy_assignment` with `scope_type` (CONNECTION, CATEGORY, или SKU) → trigger pricing run.
+- **Dependencies:** Canonical offers. `scope_type` ENUM (CONNECTION, CATEGORY, SKU). `category_id` или `marketplace_offer_id` в зависимости от scope.
 - **Failure risks:** Large filter → many assignments → large pricing run → performance.
 - **Uniqueness:** Bulk write с dynamic filter — другой input (filter, не individual offer).
 
@@ -156,6 +156,51 @@ Pricing отвечает за принятие ценовых решений: 8-
 - **Failure risks:** Simulation results diverge from reality (different state, timing).
 - **Uniqueness:** Другой execution mode. Результаты не влияют на реальные цены.
 
+### PRC-17: Guard hit — frequency (too recent price change)
+
+- **Назначение:** Частота ценовых изменений ограничена.
+- **Trigger:** Guard pipeline: `frequency_guard` проверяет `price_decision` history.
+- **Main path:** Последнее изменение цены < N часов назад (default: 24h) → guard blocks → explanation: `frequency_guard, last_change=X hours ago, threshold=Y hours`.
+- **Dependencies:** `price_decision` history. `guard_config.frequency_guard_hours`.
+- **Failure risks:** Aggressive threshold → задержка реакции на рыночные изменения. Configurable per policy.
+- **Uniqueness:** Temporal guard — ограничивает частоту, не абсолютное значение.
+
+### PRC-18: Guard hit — volatility (too many reversals)
+
+- **Назначение:** Предотвращение осциллирующих ценовых изменений.
+- **Trigger:** Guard pipeline: `volatility_guard` проверяет direction reversals.
+- **Main path:** > N разворотов направления цены за период (default: 3 reversals / 7 days) → guard blocks → explanation: `volatility_guard, reversals=X, threshold=Y per Z days`.
+- **Dependencies:** `price_decision` direction history. `guard_config.volatility_guard_reversals`, `volatility_guard_period_days`.
+- **Failure risks:** Legitimate volatile market → unnecessary block. Mitigation: configurable, disableable.
+- **Uniqueness:** Pattern-based guard (direction history), не point-in-time check.
+
+### PRC-19: Guard hit — margin floor
+
+- **Назначение:** Вычисленная цена даёт маржу ниже минимального порога.
+- **Trigger:** Guard pipeline: `margin_guard` проверяет expected margin.
+- **Main path:** Computed margin at target_price < `min_margin_pct` → guard blocks → explanation: `margin_guard, expected_margin=X%, min_margin=Y%`.
+- **Dependencies:** COGS, effective_cost_rate, target_price. `price_policy.min_margin_pct`.
+- **Failure risks:** Incorrect COGS → false block. Missing COGS → handled earlier at eligibility (PRC-04).
+- **Uniqueness:** Post-strategy guard (проверяет result стратегии), не pre-strategy eligibility.
+
+### PRC-20: Impact preview (dry-run)
+
+- **Назначение:** Предпросмотр эффекта pricing policy перед активацией.
+- **Trigger:** `POST /api/pricing/policies/{policyId}/preview` (PRICING_MANAGER/ADMIN/OWNER).
+- **Main path:** Resolve offers в scope policy → dry-run pricing pipeline (eligibility → signals → strategy → constraints → guards) → НЕ создавать decisions/actions → return aggregated summary + per-offer breakdown (total_offers, eligible_count, change_count, skip_count, avg_price_change_pct, max_price_change_pct).
+- **Dependencies:** Same as pricing run, но synchronous execution (не через outbox/worker). Timeout: 30s. Scope > 10 000 offers → async preview via polling.
+- **Failure risks:** Data changed between preview и реальный pricing run → preview ≠ reality. Preview ≠ гарантия.
+- **Uniqueness:** Read-only (никаких side effects). Synchronous API (не outbox). Другой execution path.
+
+### PRC-21: Safety gate для FULL_AUTO
+
+- **Назначение:** Проверка условий перед переключением policy на FULL_AUTO.
+- **Trigger:** PUT policy `execution_mode = FULL_AUTO`.
+- **Main path:** Система проверяет 5 условий: (1) Policy была в SEMI_AUTO минимум N дней (default: 7), (2) Не было FAILED actions за последние N дней, (3) Stale data guard НЕ отключён, (4) Manual lock guard НЕ отключён, (5) Pricing manager явно подтверждает (UI confirmation).
+- **Dependencies:** price_action history. price_policy history. guard_config.
+- **Failure risks:** Conditions met but underlying data quality poor → false confidence. Safety gate — necessary but not sufficient.
+- **Uniqueness:** Meta-check на policy transition, не на individual pricing decision.
+
 ## Индекс сценариев
 
 | ID | Кратко |
@@ -165,7 +210,7 @@ Pricing отвечает за принятие ценовых решений: 8-
 | PRC-03 | Eligibility: no policy |
 | PRC-04 | Eligibility: missing COGS |
 | PRC-05 | Guard: stale data |
-| PRC-06 | Guard: active action |
+| PRC-06 | Action Scheduling: active action conflict |
 | PRC-07 | Guard: promo active |
 | PRC-08 | Guard: low stock |
 | PRC-09 | Marketplace constraints |
@@ -176,6 +221,11 @@ Pricing отвечает за принятие ценовых решений: 8-
 | PRC-14 | FULL_AUTO mode |
 | PRC-15 | Stale / partial CH analytics |
 | PRC-16 | SIMULATED run |
+| PRC-17 | Guard: frequency (too recent change) |
+| PRC-18 | Guard: volatility (reversals) |
+| PRC-19 | Guard: margin floor |
+| PRC-20 | Impact preview (dry-run) |
+| PRC-21 | Safety gate для FULL_AUTO |
 
 ## Связанные документы
 

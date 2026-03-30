@@ -64,9 +64,9 @@ Seller Operations предоставляет операционный интер
 
 - **Назначение:** Обнаружение расхождений между expected price (наше решение) и actual price (маркетплейс).
 - **Trigger:** Scheduled comparison или on-demand.
-- **Main path:** Compare last successful `price_action.target_price` vs current `canonical_price_snapshot.current_price` → if `|diff| > threshold` → mismatch record.
+- **Main path:** Compare last successful `price_action.target_price` vs current `canonical_price_current.price` → if `|diff| > threshold` → mismatch record.
 - **Dependencies:** Recent price sync. Successful price actions. Threshold configuration.
-- **Failure risks:** Stale price snapshot → false mismatch. Marketplace processing delay → temporary mismatch.
+- **Failure risks:** Stale `canonical_price_current` → false mismatch. Marketplace processing delay → temporary mismatch.
 - **Uniqueness:** Cross-data-source comparison — уникальный detection pattern (decision vs reality).
 
 ### SEL-08: Grid filtering and sorting

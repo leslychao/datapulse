@@ -46,8 +46,8 @@
 - **Business goal:** Расхождение между expected price (наше решение) и actual price (маркетплейс) обнаружено и исправлено.
 - **Участвующие модули:** ETL (price sync) → Seller Ops (mismatch monitor) → Audit & Alerting → Execution (optional re-action).
 - **Основной поток:**
-  1. **ETL:** PRICES_SYNC → canonical_price_snapshot updated with current marketplace price.
-  2. **Seller Ops:** Mismatch monitor compares last successful price_action.target_price vs canonical_price_snapshot.current_price → |diff| > threshold → mismatch record.
+  1. **ETL:** PRICES_SYNC → canonical_price_current updated with current marketplace price.
+  2. **Seller Ops:** Mismatch monitor compares last successful price_action.target_price vs canonical_price_current.price → |diff| > threshold → mismatch record.
   3. **Audit & Alerting:** MISMATCH_DETECTED alert → WebSocket notification.
   4. **Seller Ops:** Operator reviews mismatch → three options:
      - a. Accept (marketplace price is correct, our data was stale).

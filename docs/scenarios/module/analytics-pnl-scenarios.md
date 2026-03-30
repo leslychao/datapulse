@@ -10,8 +10,8 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 
 - **Назначение:** Расчёт P&L на уровне SKU/day/connection.
 - **Trigger:** Materialization после `FINANCE_SYNC_COMPLETED`.
-- **Main path:** `fact_finance` (CH) + `dim_sku` + `cost_profile` (SCD2 COGS) → compute 13 P&L components: revenue, returns, commission, logistics, storage, penalties, advertising, last_mile, acquiring, COGS, other_deductions, promo_discount → net_profit.
-- **Dependencies:** Finance entries materialized. COGS available (`cost_profile`). `dim_sku` linked.
+- **Main path:** `fact_finance` (CH) + `dim_product` + `cost_profile` (SCD2 COGS) → compute 13 P&L components: revenue_amount, marketplace_commission, acquiring_commission, logistics_cost, storage_cost, penalties, acceptance_cost, marketing_cost, other_marketplace_charges, advertising_cost (pro-rata allocation), refund_amount, compensation (+), COGS (SCD2) → net_profit. Примечание: `last_mile` — подкатегория `logistics_cost`, не отдельный P&L component. `promo_discount` не существует как P&L component (скидки уже отражены в `revenue_amount`).
+- **Dependencies:** Finance entries materialized. COGS available (`cost_profile`). `dim_product` linked.
 - **Failure risks:** Missing COGS → P&L incomplete (COGS=0, margin inflated). Missing finance entries → undercount.
 - **Uniqueness:** Core business output. 13-компонентная формула — уникальная бизнес-логика.
 
@@ -98,10 +98,10 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 
 ### ANA-11: Incomplete dimension linkage
 
-- **Назначение:** Факт (finance, order) не может быть привязан к dimension (SKU, brand, category).
+- **Назначение:** Факт (finance, order) не может быть привязан к dimension (product, brand, category).
 - **Trigger:** Materialization: fact row references dimension key that doesn't exist in dim table.
-- **Main path:** Fact row saved с dim key = `UNKNOWN` placeholder. Aggregations work but drill-down incomplete.
-- **Dependencies:** Dimension tables populated before facts (dependency ordering).
+- **Main path:** Fact row saved с dim key = `UNKNOWN` placeholder in `dim_product`. Aggregations work but drill-down incomplete.
+- **Dependencies:** `dim_product` populated before facts (dependency ordering).
 - **Failure risks:** Systematic missing dims → aggregation accuracy questionable.
 - **Uniqueness:** Star schema integrity issue — другая persistence semantics (placeholder vs reject).
 
@@ -113,3 +113,22 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 - **Dependencies:** `job_execution_id` propagated through pipeline. S3 raw preserved (retention policy).
 - **Failure risks:** Raw expired (retention) → trace ends at canonical. `job_execution_id` missing → broken link.
 - **Uniqueness:** Observability/audit scenario — не data flow, а investigation flow. Read-only.
+
+### ANA-13: COGS revenue-ratio netting (T-4 invariant)
+
+- **Назначение:** Нетирование COGS пропорционально возвращённой выручке.
+- **Trigger:** P&L materialization (mart computation).
+- **Main path:** `gross_cogs = fact_sales.quantity × fact_product_cost.cost_price`. `refund_ratio = SUM(refund_amount) / NULLIF(SUM(revenue_amount), 0)`. `net_cogs = gross_cogs × GREATEST(0, 1 − COALESCE(refund_ratio, 0))`. Инвариант: если posting полностью возвращён → refund_ratio = 1 → net_cogs = 0.
+- **Dependencies:** fact_sales (quantity). fact_product_cost (SCD2). fact_finance (refund_amount, revenue_amount).
+- **Failure risks:** Missing fact_sales → COGS = 0, cogs_status = NO_SALES. Missing cost_profile → COGS = 0, cogs_status = NO_COST_PROFILE.
+- **Uniqueness:** Revenue-ratio netting вместо quantity-based (Ozon fact_returns не содержит posting_number для join). Единая формула для обоих маркетплейсов.
+
+### ANA-14: Attribution taxonomy (POSTING / PRODUCT / ACCOUNT)
+
+- **Назначение:** Классификация каждой строки fact_finance по уровню attribution.
+- **Trigger:** Materialization canonical_finance_entry → fact_finance.
+- **Main path:** Materializer вычисляет: IF posting_id IS NOT NULL OR order_id IS NOT NULL → POSTING. ELIF seller_sku_id IS NOT NULL → PRODUCT. ELSE → ACCOUNT. Exhaustive classification — каждая строка ровно в одной категории.
+- **Dependencies:** canonical_finance_entry fields: posting_id, order_id, seller_sku_id.
+- **Failure risks:** Новый тип операции МП с неожиданной комбинацией fields → неверная attribution. Mitigation: exhaustive enum, unrecognized → ACCOUNT + log.warn.
+- **Uniqueness:** Определяет, в какой mart попадает строка (mart_posting_pnl vs mart_product_pnl).
+

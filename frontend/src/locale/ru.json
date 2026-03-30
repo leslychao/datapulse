@@ -1,0 +1,12 @@
+{
+  "landing.title": "Datapulse",
+  "landing.subtitle": "Управление маркетплейсами WB и Ozon",
+  "landing.login": "Войти",
+  "landing.register": "Зарегистрироваться",
+  "app.dashboard": "Дашборд",
+  "grid.empty": "Нет данных, соответствующих фильтрам.",
+  "grid.loading": "Загрузка...",
+  "status.synced": "Синхронизировано",
+  "status.stale": "Устаревшие данные",
+  "status.failed": "Ошибка"
+}

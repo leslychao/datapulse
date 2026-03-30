@@ -8,12 +8,12 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 
 ### IAM-01: Workspace creation
 
-- **Назначение:** Создание нового workspace (tenant).
-- **Trigger:** `POST /api/workspaces` (authenticated user).
-- **Main path:** Create workspace → creator becomes OWNER → audit_log entry. Workspace isolated: all subsequent entities scoped to this workspace.
-- **Dependencies:** Keycloak auth. User authenticated.
+- **Назначение:** Создание нового workspace под существующим tenant.
+- **Trigger:** `POST /api/tenants/{tenantId}/workspaces` (authenticated user).
+- **Main path:** First, tenant must exist (`POST /api/tenants`). Then workspace created under tenant → creator becomes OWNER → audit_log entry. Workspace isolated: all subsequent entities scoped to this workspace.
+- **Dependencies:** Keycloak auth. User authenticated. Tenant exists.
 - **Failure risks:** Duplicate workspace name → unique constraint. DB failure → transaction rollback.
-- **Uniqueness:** Tenant creation — foundation для всей data isolation. Единственный point of entry.
+- **Uniqueness:** Workspace creation under tenant — foundation для всей data isolation. Единственный point of entry.
 
 ### IAM-02: User invitation
 
@@ -95,3 +95,21 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 - **Dependencies:** audit_log.workspace_id FK. JWT workspace claims.
 - **Failure risks:** Missing workspace_id filter → cross-tenant audit leak. Enforced at repository level.
 - **Uniqueness:** Read-only audit scenario — другой data access pattern (audit, не operational data).
+
+### IAM-11: Tenant creation
+
+- **Назначение:** Создание нового tenant (организации).
+- **Trigger:** `POST /api/tenants` (authenticated user, no workspace context).
+- **Main path:** Create tenant → slug generated (kebab-case from name) → creator can then create workspaces under this tenant → audit_log entry.
+- **Dependencies:** Authenticated user. Unique tenant name.
+- **Failure risks:** Duplicate tenant name → slug collision handling (append numeric suffix). DB failure → transaction rollback.
+- **Uniqueness:** Organizational container creation. Предшествует workspace creation.
+
+### IAM-12: Ownership transfer
+
+- **Назначение:** Передача владения workspace другому пользователю.
+- **Trigger:** `POST /api/workspaces/{workspaceId}/ownership-transfer` (OWNER only). Body: `{ newOwnerUserId }`.
+- **Main path:** Validate new owner is active workspace member → current OWNER → ADMIN (role change) → new member → OWNER. Audit: old_owner, new_owner.
+- **Dependencies:** New owner must be existing workspace member. Current user must be OWNER.
+- **Failure risks:** New owner not a member → reject. Accidental transfer → audit trail for investigation.
+- **Uniqueness:** Единственный способ создать OWNER (кроме workspace creation). Bidirectional role change в одной транзакции.

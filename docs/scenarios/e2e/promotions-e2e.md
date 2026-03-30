@@ -11,8 +11,8 @@
 - **Business goal:** Промо-акция обнаружена, оценена, решение принято, участие активировано, pricing учитывает промо.
 - **Участвующие модули:** ETL (promo sync) → Promotions → Integration (write) → Pricing → Seller Ops → Audit.
 - **Основной поток:**
-  1. **ETL:** `PROMO_SYNC` → `canonical_promo_campaign` / `canonical_promo_product` created → `PROMO_SYNC_COMPLETED` event.
-  2. **Promotions:** New `promo_product` detected → evaluation triggered → margin check (P&L signals from Analytics) → margin OK + stock OK → `promo_decision` = `PARTICIPATE`.
+  1. **ETL:** `PROMO_SYNC` → `canonical_promo_campaign` / `canonical_promo_product` created → `ETL_SYNC_COMPLETED (PROMO ∈ completed_domains)` event.
+  2. **Promotions:** `ETL_SYNC_COMPLETED (PROMO ∈ completed_domains)` consumed → new `promo_product` detected → evaluation triggered → margin check (P&L signals from Analytics) → margin OK + stock OK → `promo_decision` = `PARTICIPATE`.
   3. **Promotions:** `promo_action` created → `EXECUTING` → call Ozon promo activate API → `SUCCEEDED`.
   4. **Pricing:** Next pricing run for this offer → `promo_guard` detects active promo → pricing skipped → explanation: `"promo_active"`.
   5. **Seller Ops:** Offer marked as "in promo" in grid. Promo journal shows decision and action.

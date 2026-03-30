@@ -100,10 +100,10 @@ Integration управляет marketplace connections, credentials (Vault), pro
 
 - **Назначение:** HashiCorp Vault недоступен.
 - **Trigger:** Vault connection error, timeout, sealed state.
-- **Main path:** Sync/write requiring credentials → fail → FAILED с error_details "vault_unavailable". Connection status НЕ меняется (infrastructure issue, не credential problem). Prolonged outage (>30 мин) → CRITICAL alert.
-- **Dependencies:** Vault health monitoring.
-- **Failure risks:** All syncs and writes blocked. No credential caching (security requirement).
-- **Uniqueness:** Infrastructure failure — другой failure source (Vault, не provider). Другое поведение (не retry на provider, а wait for Vault).
+- **Main path:** Sync/write requiring credentials → attempt to read from in-memory Caffeine cache → cache hit → proceed with cached credentials. Cache miss → attempt Vault read → fail → if cache TTL not expired for other entries, those still work. If cache expired AND Vault down → sync/write fails с error_details `vault_unavailable`. Connection status НЕ меняется (infrastructure issue, не credential problem). Prolonged outage (> cache TTL, default 1h) → все cached credentials expire → all syncs/writes blocked → CRITICAL alert.
+- **Dependencies:** Vault health monitoring. In-memory Caffeine cache (per-worker-instance, TTL = 1h configurable via `datapulse.vault.credential-cache-ttl`). Cache invalidation при credential rotation (Spring event).
+- **Failure risks:** All syncs and writes blocked after cache TTL expires. Ozon Performance OAuth2 access token кешируется отдельно (in-memory, short-lived). Security: cache хранит расшифрованные credentials в heap memory — JVM memory dumps restricted access.
+- **Uniqueness:** Infrastructure failure — другой failure source (Vault, не provider). Caffeine cache обеспечивает continuity при кратковременном outage. После истечения cache TTL — полная деградация.
 
 ### INT-12: Lane isolation — marketplace failure containment
 
@@ -131,3 +131,12 @@ Integration управляет marketplace connections, credentials (Vault), pro
 - **Dependencies:** Existing Ozon connection. Vault available.
 - **Failure risks:** Connection not Ozon → reject. Invalid performance credentials → validation failure.
 - **Uniqueness:** Дополнительный credential attachment — другой flow (не connection creation, а расширение существующего).
+
+### INT-15: Credential rotation full flow
+
+- **Назначение:** Полный цикл ротации credentials.
+- **Trigger:** `PUT /api/connections/{id}/credentials` с новыми credentials (ADMIN/OWNER).
+- **Main path:** Записать новый секрет в Vault (new version) → обновить `secret_reference` (vault_version, rotated_at) → async validation с новыми credentials → success: connection.status = ACTIVE; old secret version retained (Vault versioning) → failure: connection.status = AUTH_FAILED; rollback vault_version (point to old). Cache eviction через Spring event. Audit: `action_type = 'credential.rotated'`.
+- **Dependencies:** Vault available. New credentials valid. Caffeine cache eviction event.
+- **Failure risks:** New credentials also invalid → remain AUTH_FAILED. Rotation не прерывает текущие active syncs — они завершат работу с cached credentials.
+- **Uniqueness:** Recovery path с Vault versioning. Старая версия секрета не удаляется из Vault (audit trail).

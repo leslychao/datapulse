@@ -1,8 +1,6 @@
 ---
-description: 
 alwaysApply: true
 ---
-
 # Режим: только архитектура (docs-only)
 
 ## Контекст

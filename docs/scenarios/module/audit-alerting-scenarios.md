@@ -36,7 +36,7 @@ Audit & Alerting обеспечивает unified audit log, business-level aler
 ### AUD-04: Alert event — scheduled checker (stale data)
 
 - **Назначение:** Scheduled checker обнаруживает устаревшие данные.
-- **Trigger:** Scheduled job (every 30 min).
+- **Trigger:** Scheduled job (every 5 min (каждые 5 мин)).
 - **Main path:** Check data freshness per connection/domain → stale → find matching `alert_rule` → create `alert_event` (OPEN, type = STALE_DATA) → if `blocks_automation` = true → pricing pipeline paused → WebSocket notification.
 - **Dependencies:** `alert_rule` configured for connection. Freshness thresholds.
 - **Failure risks:** Alert rule not configured → no alert (silent stale). Too many alerts → alert fatigue.
@@ -45,11 +45,11 @@ Audit & Alerting обеспечивает unified audit log, business-level aler
 ### AUD-05: Alert event — event-driven (execution failure)
 
 - **Назначение:** Execution module сообщает о terminal failure.
-- **Trigger:** `price_action` → FAILED (terminal). Outbox event: `PRICE_ACTION_FAILED`.
-- **Main path:** Event consumed → find matching `alert_rule` → create `alert_event` (OPEN, type = ACTION_FAILED) → WebSocket notification.
-- **Dependencies:** Outbox event delivery. `alert_rule` for ACTION_FAILED type.
-- **Failure risks:** Event delivery delay → late alert. No matching rule → no alert.
-- **Uniqueness:** Event-driven (real-time) — другой trigger mechanism (outbox event, не scheduler).
+- **Trigger:** Spring `ApplicationEvent` (`AlertTriggeredEvent`) published by source module при terminal failure.
+- **Main path:** `ApplicationEvent` listener receives `AlertTriggeredEvent` → find matching `alert_rule` → create `alert_event` (OPEN, type = ACTION_FAILED) → WebSocket notification. Event-driven alerts can have `alert_rule_id` from a matching rule or be created without a rule.
+- **Dependencies:** Spring `ApplicationEvent` infrastructure. Matching `alert_rule` for event type.
+- **Failure risks:** Event delivery delay → late alert. No matching rule → alert created without rule linkage.
+- **Uniqueness:** Event-driven (real-time) — другой trigger mechanism (`ApplicationEvent`, не scheduler).
 
 ### AUD-06: Alert acknowledgement
 
@@ -95,3 +95,21 @@ Audit & Alerting обеспечивает unified audit log, business-level aler
 - **Dependencies:** WebSocket connection. Client subscribed. Workspace isolation.
 - **Failure risks:** Client disconnected → notification lost (WebSocket = best-effort). Mitigation: REST API for unread alerts (pull as fallback).
 - **Uniqueness:** Real-time delivery — другой transport (WebSocket, не REST). Best-effort (не guaranteed).
+
+### AUD-11: SPIKE_DETECTION checker
+
+- **Назначение:** Обнаружение резких скачков в ключевых метриках.
+- **Trigger:** Event-driven, после каждой ClickHouse materialization (`ETL_SYNC_COMPLETED` event).
+- **Main path:** Query ClickHouse: aggregate key measures (revenue, logistics costs, returns amount) за текущий день vs медиана за 30 дней per connection → if deviation > threshold (default: 3× median) → create `alert_event` (SPIKE_DETECTION).
+- **Dependencies:** Materialized data in ClickHouse. `alert_rule` с type = SPIKE_DETECTION. Sufficient historical data (> 7 days).
+- **Failure risks:** Legitimate spikes (sales event, holiday) → false positive. Short history → unstable baseline.
+- **Uniqueness:** Statistical anomaly detection (deviation vs baseline). Event-driven trigger (после materialization, не scheduled).
+
+### AUD-12: MISMATCH checker
+
+- **Назначение:** Обнаружение расхождений между связанными data domains.
+- **Trigger:** After each sync (`ETL_SYNC_COMPLETED` event).
+- **Main path:** Cross-domain consistency checks: compare last successful `price_action.target_price` vs `canonical_price_current.price` → if `|diff| > threshold` → mismatch record. Also check: expected vs actual promo participation.
+- **Dependencies:** Recent price sync. Successful price actions. Threshold configuration. `alert_rule` с type = MISMATCH.
+- **Failure risks:** Marketplace processing delay → temporary false mismatch. External price change (manual marketplace UI) → genuine mismatch, not system error.
+- **Uniqueness:** Cross-domain comparison (decision truth vs marketplace truth). Closes feedback loop.

@@ -609,26 +609,31 @@ Future consideration: mobile read-only notification view (separate app, not this
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| Framework | **React 18+** | Component model, ecosystem, team familiarity |
+| Framework | **Angular 19** (standalone components) | Strong typing, built-in DI, signals, enterprise-grade tooling |
 | Language | **TypeScript** (strict) | Type safety for complex data models |
-| Build | **Vite** | Fast dev server, modern bundling |
-| State management | **TanStack Query** (server state) + **Zustand** (client state) | Server-state-first architecture, minimal boilerplate |
-| Grid component | **TanStack Table** or **AG Grid Community** | Virtual scrolling, column control, sorting, filtering |
-| Routing | **React Router v6** | Standard, supports nested layouts |
-| Styling | **Tailwind CSS** | Utility-first matches dense UI, design tokens via CSS variables |
-| Icons | **Lucide React** | Clean, minimal line icons (similar to VS Code Codicons style) |
-| Charts | **Recharts** or **Lightweight Charts** (for sparklines) | Simple API, works with React |
-| WebSocket | **STOMP over SockJS** (Spring-compatible) | Matches backend stack |
-| Forms | **React Hook Form** + **Zod** | Validation, performance |
-| Date formatting | **date-fns** | Tree-shakeable, locale support |
-| Notifications | **Sonner** (toast) | Minimal, non-intrusive toast notifications |
+| Build | **Angular CLI** (`@angular/build`) | Official toolchain, esbuild-based since Angular 17+ |
+| Client state | **@ngrx/signals** (SignalStore) | Lightweight signal-based state, no boilerplate |
+| Server state | **TanStack Query** (`@tanstack/angular-query-experimental`) | Cache-first data fetching, background refresh |
+| Grid component | **AG Grid Community** (`ag-grid-angular`) | Virtual scrolling, column control, sorting, filtering, enterprise-grade |
+| Routing | **Angular Router** | Built-in, lazy loading, guards, resolvers |
+| Styling | **Tailwind CSS 4** | Utility-first matches dense UI, design tokens via CSS variables |
+| UI primitives | **Angular CDK** | Overlay, drag-drop, a11y, virtual scroll — unstyled building blocks |
+| Icons | **Lucide Angular** (`lucide-angular`) | Clean, minimal line icons (similar to VS Code Codicons style) |
+| Charts | **ngx-echarts** (Apache ECharts) | Powerful charting, sparklines, financial charts |
+| WebSocket | **@stomp/rx-stomp** | RxJS-native STOMP client, matches Spring backend |
+| Forms | **Angular Reactive Forms** + built-in validators | Native Angular solution, no extra dependencies |
+| Auth | **angular-oauth2-oidc** | PKCE flow with Keycloak, token refresh, silent renew |
+| i18n | **@ngx-translate/core** | String externalization, lazy locale loading |
+| Date formatting | **date-fns** | Tree-shakeable, locale support (`date-fns/locale/ru`) |
 
 ### Not using
 
-- CSS-in-JS (styled-components, emotion) — unnecessary complexity for utility-first approach
-- Redux — too heavy for this use case, TanStack Query handles server state
-- Material UI, Ant Design, Chakra — opinionated design systems that conflict with custom Cursor-like aesthetic
-- Next.js — no SSR needed, this is a SPA operational tool
+- Angular Material — opinionated Material Design aesthetic conflicts with custom Cursor-like look
+- NG-ZORRO (Ant Design for Angular) — same reason, too opinionated
+- PrimeNG — heavy, design system overhead
+- NgRx Store (full Redux pattern) — too heavy, SignalStore is sufficient
+- CSS-in-JS — unnecessary with Tailwind utility-first approach
+- SSR / Angular Universal — no SSR needed, this is a SPA operational tool
 
 ---
 
@@ -689,7 +694,7 @@ MVP ships with Russian-only UI. All labels, messages, tooltips, empty states, er
 
 English localization is not planned for initial release but the architecture should not prevent it:
 - All user-facing strings extracted into a single locale file (not hardcoded in components).
-- Use `react-i18next` for string externalization from day one, even if only `ru` locale exists.
+- Use `@ngx-translate/core` for string externalization from day one, even if only `ru` locale exists.
 - Keys in English, values in Russian: `{ "grid.empty": "Нет данных, соответствующих фильтрам." }`.
 
 ### Number and date formatting
