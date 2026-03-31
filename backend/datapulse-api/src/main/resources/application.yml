@@ -53,6 +53,15 @@ datapulse:
       state-keep-count: 3
       cron: "0 0 3 * * ?"
     temp-dir: ${DATAPULSE_ETL_TEMP_DIR:${java.io.tmpdir}/datapulse-raw}
+    sync-poll-interval: PT1M
+    ingest:
+      canonical-batch-size: 500
+      clickhouse-batch-size: 5000
+      job-timeout: PT2H
+      max-job-retries: 3
+      min-retry-backoff: PT5M
+      max-retry-backoff: PT30M
+      retry-backoff-multiplier: 2
   vault:
     uri: ${VAULT_ADDR:http://localhost:8200}
     token: ${VAULT_TOKEN:dev-token}
