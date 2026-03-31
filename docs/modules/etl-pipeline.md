@@ -817,6 +817,30 @@ Scheduled job (configurable interval, default: 15 min) сканирует `job_e
 - `price_policy`, `price_decision`, `price_action` — содержат `workspace_id` напрямую, потому что это бизнес-сущности уровня workspace (policy → workspace).
 - `audit_log`, `alert_rule`, `alert_event` — содержат `workspace_id` для прямого query без JOIN.
 
+### G-13: canonical_order grain mismatch — DOCUMENTED LIMITATION (2026-03-31)
+
+**Проблема:** `canonical_order` имеет разную гранулярность для WB и Ozon:
+
+| Провайдер | `external_order_id` | Grain | `quantity` |
+|-----------|---------------------|-------|------------|
+| WB | `srid` (per-unit row) | 1 row = 1 unit | Всегда 1 |
+| Ozon | `posting_number` (per-posting) | 1 row = 1 posting (может содержать N products) | Может быть >1 |
+
+**Последствия:**
+- `canonical_order` **не является consistent grain** для cross-platform сравнений
+- Для Ozon multi-product postings: `marketplace_offer_id` указывает на один из products
+- WB заказ с 3 unit'ами → 3 canonical_order rows; Ozon posting с 3 products → 1 row
+
+**Решение: оставить как есть.**
+
+Обоснование:
+1. `canonical_order` = **operational view**, не P&L grain. Для финансов используется `fact_finance`
+2. Cross-platform количественное сравнение orders возможно через aggregation (`SUM(quantity) GROUP BY connection_id, order_date`)
+3. Нормализация Ozon postings в per-product rows потребует N:1 split (сложнее, чем текущий подход)
+4. UPSERT key `(connection_id, external_order_id)` работает корректно для обоих провайдеров
+
+**Guardrail:** Аналитические запросы по `canonical_order` должны использовать `SUM(quantity)`, а не `COUNT(*)` для подсчёта единиц товара.
+
 ## Конфигурация MinIO
 
 ### Docker Compose
@@ -861,7 +885,7 @@ Normalizer разрешает provider-specific идентификаторы в 
 |----------|-------------|------------------------|-------|
 | Ozon (order-linked) | `posting.posting_number` | As-is (с суффиксом -N) | e.g. "87621408-0010-1" |
 | Ozon (acquiring) | — | **NULL** | Acquiring привязывается через order_id |
-| Ozon (standalone) | `posting_number` = "" | **NULL** | Standalone operation |
+| Ozon (standalone) | `posting_number` = "" or non-posting format | **NULL** | Standalone operation. Posting format: `^\d+-\d+-\d+$` (e.g. "87621408-0010-1"). Numeric-only strings (e.g. CPC campaign ID "20460416") и пустые строки → NULL |
 | WB | `srid` | As-is | Unique row identifier |
 
 ### order_id resolution
@@ -870,7 +894,7 @@ Normalizer разрешает provider-specific идентификаторы в 
 |----------|-------------|----------------------|-------|
 | Ozon (order-linked) | `posting.posting_number` | Strip `-N` suffix (DD-15) | e.g. "87621408-0010-1" → "87621408-0010" |
 | Ozon (acquiring) | `posting.posting_number` | As-is (уже без -N) | e.g. "87621408-0010" |
-| Ozon (standalone) | — | **NULL** | Standalone operation |
+| Ozon (standalone) | `posting_number` = "" or non-posting format | **NULL** | Same format check as posting_id resolution |
 | WB | `gNumber` | As-is | Order group number |
 
 ### seller_sku_id resolution
@@ -893,9 +917,9 @@ Normalizer разрешает provider-specific идентификаторы в 
 
 Posting-level net_payout (Σ across all operations) вычисляется в `mart_posting_pnl`, не в canonical layer.
 
-### attribution_level (computed at materialization)
+### attribution_level (computed by normalizer at INSERT)
 
-Materializer вычисляет `attribution_level` при записи в fact_finance:
+Normalizer вычисляет `attribution_level` при INSERT в `canonical_finance_entry` (PostgreSQL). Materializer **копирует** значение as-is в `fact_finance` (ClickHouse). Правило:
 
 ```
 IF posting_id IS NOT NULL OR order_id IS NOT NULL  → POSTING

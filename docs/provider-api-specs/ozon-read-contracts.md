@@ -153,7 +153,7 @@ Join: `product.description_category_id` → `tree.description_category_id`, `pro
 
 - `/v2/product/list` и `/v2/product/info` deprecated (404) — must use v3 (confirmed)
 - `brand` не является полем v3/product/info; доступен через `POST /v4/product/info/attributes` (attribute_id=85) (confirmed)
-- No `updated_at` in v3 response (confirmed)
+- `updated_at` IS present in v3/product/info/list response (confirmed 2026-03-31, previously documented as absent)
 - Prices in product/info are STRINGS (confirmed)
 
 ### Rate Limits
@@ -399,8 +399,10 @@ but it may be empty. Warehouse granularity falls back to `type` (FBO/FBS) when I
 | Auth     | `Client-Id` + `Api-Key` headers | confirmed      |
 
 
-FBS endpoint returned 400 for test account (no FBS setup).
+FBS endpoint **VERIFIED** (2026-03-31) — same structure as FBO with additional FBS-specific fields.
 FBO endpoint fully verified.
+
+> **Date range limit:** `PERIOD_IS_TOO_LONG` error if date range exceeds ~3 months. Use 1-month windows.
 
 ### Pagination
 
@@ -461,10 +463,38 @@ FBO endpoint fully verified.
 | -------------------- | ------------------------------------------ | -------------- |
 | `awaiting_packaging` | Waiting for seller to pack                 | confirmed      |
 | `delivering`         | In transit                                 | confirmed      |
-| `delivered`          | Delivered to customer                      | confirmed-docs |
-| `cancelled`          | Cancelled                                  | confirmed-docs |
-| `substatus`          | Sub-status detail (e.g. "posting_packing") | confirmed      |
+| `delivered`          | Delivered to customer                      | confirmed      |
+| `cancelled`          | Cancelled                                  | confirmed      |
+| `substatus`          | Sub-status detail (e.g. "posting_received", "posting_canceled") | confirmed |
 
+
+### FBS-specific Fields (verified 2026-03-31)
+
+| Field | Type | Semantics | Confidence |
+| ----- | ---- | --------- | ---------- |
+| `delivery_method.id` | long | Delivery method ID | confirmed |
+| `delivery_method.name` | string | Delivery method name | confirmed |
+| `delivery_method.warehouse_id` | long | Source warehouse ID | confirmed |
+| `delivery_method.warehouse` | string | Warehouse name | confirmed |
+| `delivery_method.tpl_provider_id` | long | TPL provider ID | confirmed |
+| `delivery_method.tpl_provider` | string | TPL provider name (e.g. "Доставка Ozon") | confirmed |
+| `tracking_number` | string | Tracking number (may be empty) | confirmed |
+| `tpl_integration_type` | string | Integration type (e.g. "ozon") | confirmed |
+| `shipment_date` | string | Shipment date (ISO 8601 UTC) | confirmed |
+| `delivering_date` | string | Delivery date (ISO 8601 UTC, null for cancelled) | confirmed |
+| `cancellation.cancel_reason_id` | int | Cancellation reason ID (0 = not cancelled, 402 = seller cancel) | confirmed |
+| `cancellation.cancel_reason` | string | Cancellation reason text | confirmed |
+| `cancellation.cancellation_type` | string | Who cancelled ("seller", etc.) | confirmed |
+| `cancellation.cancelled_after_ship` | boolean | Whether cancelled after shipment | confirmed |
+| `cancellation.affect_cancellation_rating` | boolean | Impacts seller rating | confirmed |
+| `financial_data.products[].customer_price` | number | **Buyer-paid price** (different from seller price!) | confirmed |
+| `financial_data.products[].customer_currency_code` | string | Customer currency code | confirmed |
+
+**CRITICAL (FBS customer_price):** FBS postings include `customer_price` which can be SIGNIFICANTLY lower than seller `price`.
+Example: `price: 293`, `customer_price: 105.71` → Ozon absorbs 187.29 RUB as marketing subsidy.
+This confirms DD-11: `accruals_for_sale` = seller-facing price, NOT buyer-paid price.
+
+**FBS date range limit:** `PERIOD_IS_TOO_LONG` error if date range exceeds ~3 months. Use 1-month windows.
 
 ### Analytics Data (inside `analytics_data`)
 
@@ -504,7 +534,10 @@ FBO endpoint fully verified.
 - Must combine both for full order picture (confirmed)
 - `financial_data` available even for non-delivered postings (confirmed — verified for awaiting_packaging)
 - `products[].price` is STRING, but `financial_data.products[].price` is NUMBER (confirmed)
-- `cancel_reason_id` present (0 = not cancelled) (confirmed)
+- `cancel_reason_id` present (0 = not cancelled, 402 = seller cancel) (confirmed)
+- **FBS verified (2026-03-31):** Same core structure as FBO; additional fields: `delivery_method`, `tracking_number`, `shipment_date`, `delivering_date`, `cancellation` (detailed), `customer_price`
+- **FBS customer_price:** Present in FBS financial_data (NOT in FBO). Buyer pays less than seller price when Ozon marketing applies.
+- **FBS date range limit:** `PERIOD_IS_TOO_LONG` for >3 months. v2/posting/fbs/list returns 404 (deprecated).
 
 ### Rate Limits
 
@@ -975,6 +1008,37 @@ and apply `ZoneOffset.ofHours(3)` to produce `OffsetDateTime`.
 
 ---
 
+## Rate Limits Summary (2026-03-31)
+
+Ozon Seller API **не документирует** per-endpoint rate limits в открытой документации.
+
+| # | Capability | Endpoint | Rate limit | Confidence |
+|---|------------|----------|-----------|------------|
+| 1 | Catalog | `/v3/product/list`, `/v3/product/info/list` | unknown | unknown |
+| 2 | Prices | `/v5/product/info/prices` | unknown | unknown |
+| 3 | Stocks | `/v4/product/info/stocks` | unknown | unknown |
+| 4 | Orders FBO | `/v2/posting/fbo/list` | unknown | unknown |
+| 5 | Orders FBS | `/v3/posting/fbs/list` | unknown | unknown |
+| 6 | Returns | `/v1/returns/list` | unknown | unknown |
+| 7 | Finance | `/v3/finance/transaction/list` | unknown | unknown |
+| 8 | Categories | `/v1/description-category/tree` | unknown | unknown |
+| 9 | Attributes | `/v4/product/info/attributes` | unknown | unknown |
+
+**Что известно из сообщества (Habr, форумы, 2025-2026):**
+- Ozon применяет rate limits, но конкретные значения не публикует
+- Типичное поведение при превышении: HTTP 429 Too Many Requests
+- Некоторые продавцы сообщают о лимитах ~60 req/min для data endpoints
+- Seller API product manager (Habr) подтвердил наличие лимитов без disclosure конкретных цифр
+
+**Рекомендация для реализации:**
+- **Adaptive rate limiting** (обязателен): exponential backoff при HTTP 429
+- Стартовый conservative interval: 1 request per 2 seconds (30 req/min)
+- Мониторинг: логировать 429 responses с timestamp, endpoint, backoff duration
+- Автоматическое увеличение interval при серии 429 → уменьшение при стабильных 200
+- Burst control: token bucket algorithm, per-endpoint counters
+
+---
+
 ## Summary: Contract Readiness per Capability
 
 
@@ -983,7 +1047,7 @@ and apply `ZoneOffset.ofHours(3)` to produce `OffsetDateTime`.
 | CATALOG    | **READY**         | v3 endpoint verified; `brand` available via v4/attributes (id=85); `updated_at` IS present (confirmed 2026-03-31)                           |
 | PRICES     | READY             | v5 endpoint fully verified; prices as numbers; currency explicit                                                                            |
 | STOCKS     | READY             | v4 endpoint verified; `warehouse_ids` exists (may be empty); `present`/`reserved` confirmed                                                 |
-| ORDERS     | PARTIAL           | FBO verified; FBS not tested (account without FBS); `financial_data` available                                                              |
+| ORDERS     | **READY**         | FBO verified; **FBS verified (2026-03-31)** — same structure + customer_price, cancellation, delivery_method fields |
 | SALES      | READY (composite) | Composite: delivered postings + finance `OperationAgentDeliveredToCustomer`; design confirmed                                               |
 | RETURNS    | READY             | v1 endpoint verified; financial amounts PRESENT (price, commission); dates confirmed                                                        |
 | FINANCES   | READY             | v3 endpoint verified; sign convention CONFIRMED; **23 operation types mapped** (Jan 2025 + Feb 2026); DD-15 acquiring dual format confirmed |
@@ -1001,7 +1065,7 @@ and apply `ZoneOffset.ofHours(3)` to produce `OffsetDateTime`.
 ### Remaining Gaps
 
 1. ~~Brand~~ — **RESOLVED**: available via `POST /v4/product/info/attributes` (attribute_id=85, "Бренд", required field)
-2. **FBS** — not empirically tested (account without FBS setup; FBS endpoint returns 400 for FBO-only accounts)
+2. ~~FBS~~ — **RESOLVED (2026-03-31)**: FBS endpoint verified. Same core contract as FBO, additional fields: `delivery_method`, `customer_price`, `cancellation`, `shipment_date`. Date range limit: ~3 months.
 3. **Rate limits** — not documented for any endpoint
 4. ~~Finance timezone~~ — **RESOLVED**: Moscow (UTC+3), empirically confirmed 2026-03-31 (7 data points, constant +3h offset)
 5. ~~Acquiring join~~ — **RESOLVED (DD-15)**: acquiring uses `order_number` format (without -N suffix), can be joined to posting

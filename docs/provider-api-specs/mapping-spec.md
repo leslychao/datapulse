@@ -99,31 +99,108 @@ Path: `result[].attributes[?(@.id==85)].values[0].value`
 attributes endpoint возвращает brand="BOROFONE" для product_id=1074782997.
 Требует дополнительного API-вызова при ingestion catalog.
 
-### DD-9: WB Finance Timestamp Format — Dual Parser Required
+### DD-9: WB Finance Timestamp Format — Dual Parser Required (updated 2026-03-31)
 
-**Решение:** WB finance поля `rr_dt`, `date_from`, `date_to`, `create_dt` могут приходить
-как date-only (`"2022-10-20"`) так и full ISO 8601 datetime (`"2025-12-30T22:54:20Z"`).
+**Решение:** WB finance timestamp поля имеют **разный формат** в official docs vs sandbox:
+
+| Поле | Official docs (v5 sample) | Sandbox (verified 2026-03-31) |
+|------|---------------------------|-------------------------------|
+| `sale_dt` | `"2022-10-20T00:00:00Z"` (datetime) | `"2026-01-02T06:54:29Z"` (datetime) |
+| `order_dt` | `"2022-10-13T00:00:00Z"` (datetime) | `"2026-01-02T06:54:29Z"` (datetime) |
+| `rr_dt` | `"2022-10-20"` (date-only) | `"2026-01-02T06:54:29Z"` (datetime!) |
+| `date_from` | `"2022-10-17"` (date-only) | `"2025-12-31T23:54:29Z"` (datetime!) |
+| `date_to` | `"2022-10-23"` (date-only) | `"2026-01-01T22:54:29Z"` (datetime!) |
+| `create_dt` | `"2022-10-24"` (date-only) | `"2026-01-01T22:54:29Z"` (datetime!) |
+| `fix_tariff_date_from` | — | `"2024-10-23"` (date-only) |
+| `fix_tariff_date_to` | — | `"2024-11-18"` (date-only) |
 
 **Обоснование:** Official docs v5 sample показывает date-only для `rr_dt`, `date_from`,
 `date_to`, `create_dt`. Sandbox API возвращает full ISO 8601 datetime для всех этих полей.
 `order_dt` и `sale_dt` в обоих источниках — ISO 8601 datetime.
+`fix_tariff_date_from/to` в sandbox — date-only (единственные стабильно date-only поля).
 
 **Реализация:** WB finance adapter ДОЛЖЕН использовать flexible parser:
 попытка ISO 8601 datetime → fallback на date-only → LocalDate.atStartOfDay(ZoneOffset.UTC).
 
-### DD-10: WB Finance Optional Fields (v5 Additions)
+### DD-17: WB sale_dt Nullability — sandbox-verified (2026-03-31)
 
-**Решение:** 15+ полей из official v5 docs (`cashback_amount`, `cashback_discount`,
-`delivery_method`, `kiz`, `seller_promo_*`, `loyalty_*`, `order_uid`, `report_type` и др.)
-отсутствуют в sandbox response. Считать их опциональными.
+**Решение:** `sale_dt` **всегда заполнен** в sandbox, включая non-sale entry types
+(logistics entries с `delivery_rub > 0`, `quantity = 0`).
+
+**Обоснование:** Sandbox response (177 KB, ~100 records) — все записи имеют `sale_dt`
+с ISO 8601 datetime. Записи являются logistics/delivery entries (`delivery_amount: 1`,
+`delivery_rub: 20`, `retail_price: 0`, `ppvz_for_pay: 0`).
+
+**Ограничение:** Sandbox не генерирует entry types `storage_fee`, `penalty`, `deduction`
+(все эти поля = 0 в sandbox). Для этих типов `sale_dt` **not confirmed on real data**.
+
+**Fallback strategy (обязателен):** Если `sale_dt` is null/empty → использовать `rr_dt`
+(report settlement date) как fallback для `canonical_finance_entry.entryDate`.
+Это гарантирует NOT NULL constraint и корректную привязку к периоду P&L.
+
+### DD-18: WB canonical_sale.external_sale_id = srid (2026-03-31)
+
+**Решение:** Для WB `canonical_sale.external_sale_id` = `srid` из `reportDetailByPeriod`.
+НЕ `saleID` из `/api/v1/supplier/sales` endpoint.
+
+**Обоснование:**
+- `canonical_sale` для WB заполняется из `reportDetailByPeriod` (DD-12: finance report = source of truth)
+- Finance report не содержит поля `saleID` (это поле только в sales endpoint)
+- `srid` — единственный стабильный идентификатор, присутствующий и в finance, и в sales, и в orders
+- `srid` = unique shipment/row identifier, фактически grain key строки отчёта
+
+**Sales endpoint** (`/api/v1/supplier/sales`):
+- `saleID` (e.g. "S3207347857") → operational monitoring только, не записывается в canonical
+- `srid` → cross-reference key для связи с finance report
+
+**Последствие:** `canonical_sale.external_sale_id` для WB — это shipment-level ID, не sale ID.
+Naming `external_sale_id` не полностью точен, но это documented limitation.
+
+### DD-10: WB Finance Optional Fields (v5 Additions) — EXPANDED 2026-03-31
+
+**Решение:** 25+ полей из official v5 docs отсутствуют в sandbox response.
+Считать их опциональными. Adapter: `@JsonIgnoreProperties(ignoreUnknown = true)`.
 
 **Обоснование:** Sandbox генерирует упрощённые test data с subset полей.
-В production эти поля скорее всего присутствуют. Adapter должен безопасно
-десериализовать response с/без этих полей (`@JsonIgnoreProperties(ignoreUnknown = true)`).
+Official v5 sample (dev.wildberries.ru, 2026-03-31) содержит все эти поля.
+
+**Полный список optional v5 полей (confirmed-docs):**
+
+| Поле | Тип | Семантика | P&L relevance |
+|------|-----|-----------|---------------|
+| `cashback_amount` | number | Cashback amount | YES — влияет на net payout |
+| `cashback_discount` | number | Cashback discount | YES |
+| `cashback_commission_change` | number | Cashback commission adjustment | YES |
+| `seller_promo_id` | int | Seller promo campaign ID | Informational (promo attribution) |
+| `seller_promo_discount` | number | Seller promo discount amount | YES — seller-funded promo cost |
+| `loyalty_id` | int | Loyalty program ID | Informational |
+| `loyalty_discount` | number | Loyalty program discount | YES |
+| `uuid_promocode` | string | Promo code UUID | Informational |
+| `sale_price_promocode_discount_prc` | number | Promo code discount % | Informational |
+| `order_uid` | string | Order unique ID (new v5) | Informational (cross-reference) |
+| `report_type` | int | Report type flag | Informational |
+| `delivery_method` | string | Delivery method (e.g. "FBS, (МГТ)") | Informational (segmentation) |
+| `kiz` | string | Marking code (Честный знак) | Informational (compliance) |
+| `trbx_id` | string | Transport box ID (e.g. "WB-TRBX-1234567") | Informational (logistics) |
+| `is_legal_entity` | boolean | Legal entity flag | Informational |
+| `installment_cofinancing_amount` | number | Installment co-financing | YES — impacts payout calculation |
+| `wibes_wb_discount_percent` | number | WB discount percentage | Informational |
+| `payment_schedule` | int | Payment schedule flag | Informational |
+| `fix_tariff_date_from` | string | Fixed tariff period start (date-only) | Informational |
+| `fix_tariff_date_to` | string | Fixed tariff period end (date-only) | Informational |
+| `dlv_prc` | number | Delivery percentage | Informational |
+| `srv_dbs` | boolean | DBS (delivery by seller) flag | Informational (fulfillment type) |
+| `payment_processing` | string | Payment processing description | Informational |
+| `acquiring_bank` | string | Acquiring bank name | Informational |
+| `site_country` | string | Marketplace country ("RU") | Informational |
 
 **Для P&L:** Поля `cashback_amount`, `cashback_commission_change`, `seller_promo_discount`,
-`loyalty_discount` влияют на расчёт итоговой суммы к выплате. Их учёт будет добавлен
-при реализации finance ingestion handler.
+`loyalty_discount`, `installment_cofinancing_amount` влияют на расчёт итоговой суммы
+к выплате. Их учёт будет добавлен при реализации finance ingestion handler.
+
+**StarsMembership:** Отсутствует в official v5 sample (2026-03-31). Видимо, заменено
+программой лояльности (`loyalty_id`, `loyalty_discount`) и кешбеком (`cashback_*`).
+Парсер должен обрабатывать оба набора полей для backward compatibility.
 
 ### DD-15: Ozon Acquiring Join Key — DUAL FORMAT (updated 2026-03-31)
 
@@ -148,6 +225,13 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 3. Unmatched: cross-month operations → resolve при расширении date window
 
 **Реализация:** `if (acq.posting_number == sale.posting_number) → match; else strip(sale.posting_number) == acq.posting_number → match`
+
+**Wider join window (recommended):** Для 16% unmatched ops (31 из 190 в тесте) причина —
+cross-month boundary: acquiring в Feb для sale из Jan. Решение:
+- Finance ingestion query ДОЛЖЕН запрашивать период **±1 месяц** от целевого
+- Join window: `sale.operation_date BETWEEN acq.operation_date - INTERVAL '35 days' AND acq.operation_date + INTERVAL '5 days'`
+- Unmatched после wider window → `attribution_level = 'ACCOUNT'` (pro-rata allocation)
+- Monitoring: `unmatched_acquiring_ratio` per connection per month → alert if > 5%
 
 ### DD-16: Ozon Storage Operations — no per-order attribution (2026-03-30)
 
@@ -196,6 +280,17 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 - `barcode` → `barcodes[]` (array, verified)
 - `visible` + `status` → `is_archived` + `is_autoarchived` (verified)
 - `brand` RESOLVED via v4/product/info/attributes (attribute_id=85, confirmed)
+- `updated_at` IS present in v3/product/info/list (confirmed 2026-03-31; previously documented as absent)
+
+**Acceptable limitation:** `type_id` (Ozon product type ID, confirmed in v3/product/info/list)
+is NOT mapped to NormalizedCatalogItem. Reason: no corresponding field in canonical model
+(`product_master`, `seller_sku`, `marketplace_offer`). If needed for analytics:
+add `type_id` to `marketplace_offer` as nullable field + join to categories via
+`description_category_id` + `type_id` → `/v1/description-category/tree`.
+
+**Optimization opportunity:** `updated_at` from v3/product/info/list can enable incremental
+catalog sync (only fetch products updated since last sync). Not required for Phase A/B but
+recommended for Phase C+ to reduce API calls. See DD in etl-pipeline.md.
 
 ### NormalizedCatalogItem → CanonicalOffer
 
@@ -258,14 +353,29 @@ CanonicalOffer реализована как три таблицы: `product_mas
 
 ## 3. STOCKS
 
-### WB → NormalizedStockItem
+### WB → NormalizedStockItem — CONFIRMED from Official Docs (2026-03-31)
 
 | WB field | Normalized field | Confidence | Notes |
 |----------|------------------|------------|-------|
-| (derived from WB article → vendorCode) | `sellerSku` | A | Not verified with data |
-| `warehouseId` | `warehouseId` | A | Field name not verified with real data |
-| stock quantity field | `available` | A | Field name not verified |
-| (not clearly in response) | `reserved` | U | May not be available |
+| `nmId` → lookup via `marketplace_offer.marketplace_sku` → `seller_sku.sku_code` | `sellerSku` | C-docs | No `vendorCode` in stocks response; join via `nmId` |
+| `warehouseId` | `warehouseId` | C-docs | Int, WB warehouse identifier |
+| `quantity` | `available` | C-docs | Available stock (per chrtId × warehouse) |
+| (not in response) | `reserved` | C-docs | **Field does not exist.** Set to 0 for WB |
+| `chrtId` | (informational) | C-docs | Size-level characteristic ID; needed for aggregation |
+| `warehouseName` | (informational) | C-docs | Warehouse name string |
+| `regionName` | (informational) | C-docs | Shipping region name |
+| `inWayToClient` | (informational) | C-docs | Units in transit to customer |
+| `inWayFromClient` | (informational) | C-docs | Units in transit from customer |
+
+**Granularity:** 1 row = 1 size (`chrtId`) × 1 warehouse (`warehouseId`).
+For product-level stock: `SUM(quantity) GROUP BY nmId, warehouseId`.
+
+**Verified changes from initial contract (2026-03-31):**
+- `vendorCode` is NOT in stocks response — resolved via `nmId` lookup through catalog
+- Field is `quantity` (not generic "stock quantity field")
+- `reserved` does NOT exist in this endpoint
+- Additional fields: `chrtId`, `warehouseName`, `regionName`, `inWayToClient`, `inWayFromClient`
+- Data freshness: updated every 30 minutes (confirmed-docs)
 
 ### Ozon → NormalizedStockItem
 
@@ -287,10 +397,10 @@ CanonicalOffer реализована как три таблицы: `product_mas
 
 | Normalized field | Canonical field (DDL: `canonical_stock_current`) | Confidence | Notes |
 |------------------|--------------------------------------------------|------------|-------|
-| (resolved via offer lookup) | `marketplace_offer_id` | C | |
-| `warehouseId` | `warehouse_id` | C (Ozon) / A (WB) | DD-2 for Ozon |
-| `available` | `available` | C (Ozon) / A (WB) | |
-| `reserved` | `reserved` | C (Ozon) / U (WB) | |
+| (resolved via offer lookup) | `marketplace_offer_id` | C | WB: via `nmId` → `marketplace_offer.marketplace_sku`; Ozon: via `offer_id` |
+| `warehouseId` | `warehouse_id` | C (Ozon) / C-docs (WB) | DD-2 for Ozon; WB: `warehouseId` confirmed in official docs |
+| `available` | `available` | C (Ozon) / C-docs (WB) | WB: `quantity` field (aggregated by nmId+warehouse) |
+| `reserved` | `reserved` | C (Ozon) / C-docs (WB) | **WB: always 0** — field does not exist in stocks endpoint |
 | (ingestion time) | `captured_at` | C | |
 
 ---
@@ -450,14 +560,14 @@ SPP не включается в формулу P&L как отдельная с
 
 | Normalized field | Canonical field (DDL: `canonical_sale`) | Confidence | Notes |
 |------------------|----------------------------------------|------------|-------|
-| `externalSaleId` | `external_sale_id` | C | |
+| `externalSaleId` | `external_sale_id` | C | WB: `srid` from finance report (DD-18); Ozon: `posting_number` |
 | (resolved) | `marketplace_offer_id` (FK → marketplace_offer) | C | |
 | (resolved) | `seller_sku_id` (FK → seller_sku) | C | Via offer lookup |
 | `quantity` | `quantity` | C | |
-| `saleAmount` | `sale_amount` | C (Ozon) / A (WB) | |
-| `commission` | `commission` | C (Ozon) / U (WB) | WB commission not in sales endpoint |
-| `currency` | `currency` | C (Ozon) / A (WB) | |
-| `saleDate` | `sale_date` | C (Ozon) / C-docs (WB) | |
+| `saleAmount` | `sale_amount` | C (Ozon) / C-docs (WB) | WB: `retail_price_withdisc_rub` from finance report |
+| `commission` | `commission` | C (Ozon) / C-docs (WB) | WB: `ppvz_sales_commission` from finance report (positive, DEBIT) |
+| `currency` | `currency` | C (Ozon) / C-docs (WB) | |
+| `saleDate` | `sale_date` | C (Ozon) / C-docs (WB) | WB: `sale_dt` from finance report |
 
 ---
 
@@ -815,7 +925,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 4. ~~WB Sales commission~~ — **RESOLVED**: `forPay` confirmed in sales endpoint; detailed commission in finance only
 5. ~~WB Price markup~~ — **RESOLVED**: `price` → `discountedPrice` → `clubDiscountedPrice` hierarchy confirmed
 6. ~~Ozon Brand~~ — **RESOLVED**: via `POST /v4/product/info/attributes` (attribute_id=85)
-7. **Ozon FBS** — NOT empirically tested (FBS endpoint returns 400 for FBO-only accounts)
+7. ~~Ozon FBS~~ — **RESOLVED (2026-03-31)**: FBS endpoint verified with real data. Same core contract as FBO, additional fields: `delivery_method`, `customer_price`, `cancellation`, `shipment_date`. Date range limit: ~3 months (`PERIOD_IS_TOO_LONG`).
 8. ~~WB revenue_amount~~ — **RESOLVED (DD-13)**: `retail_price_withdisc_rub`
 9. ~~Ozon acquiring join~~ — **RESOLVED (DD-15, updated)**: acquiring uses DUAL format (57% order_number, 43% full posting_number), exact+strip match strategy
 10. ~~Ozon storage attribution~~ — **RESOLVED (DD-16)**: daily aggregate, pro-rata allocation
@@ -829,7 +939,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 1. ~~WB with data~~ — **RESOLVED**: Sandbox account provides test data for all endpoints (finance, sales, orders, incomes, offices)
 2. ~~WB finance verification~~ — **DONE** (from official API documentation sample)
 3. ~~WB returns~~: **DONE** — endpoint works; root cause was date format, not token scope
-4. **Ozon FBS**: Test with FBS-enabled account (not a blocker — same contract as FBO per docs)
+4. ~~Ozon FBS~~: **DONE (2026-03-31)** — FBS verified with FBS-active account. Same core structure as FBO. Additional fields: `customer_price` (buyer-paid, lower than seller price), `delivery_method`, `cancellation`, `shipment_date`.
 5. ~~Ozon brand enrichment~~ — **DONE** (attribute_id=85 via v4/product/info/attributes)
 6. ~~Revenue mapping~~ — **DONE** (DD-13: WB=retail_price_withdisc_rub, Ozon=accruals_for_sale)
 7. ~~Acquiring join~~ — **DONE** (DD-15: order_number format join)
@@ -870,14 +980,15 @@ Write contracts documented in `write-contracts.md`. Key findings:
 
 - **WB Price Write**: `POST /api/v2/upload/task` — async model (upload → poll → verify)
 - **Ozon Price Write**: `POST /v1/product/import/prices` — synchronous model
-- **CRITICAL**: WB host `discounts-api.wildberries.ru` no longer resolves; migrated to `discounts-prices-api.wildberries.ru`
+- **WB host FIXED**: `discounts-api.wildberries.ru` → `discounts-prices-api.wildberries.ru` (DNS confirmed 2026-03-31)
+- **WB write endpoint WORKS**: sandbox returns 400 for invalid nmID (expected), production returns 401 for read-only token (need write-scope token)
+- **WB 401 confirmed (2026-03-31)**: `"read-only token scope not allowed for this route"` — need token with "Prices and Discounts → Write" scope
 - **Reconciliation read-after-write**: endpoints available (WB: `/api/v2/list/goods/filter`, Ozon: `/v5/product/info/prices`) but verification logic not implemented
-- **WB token scope**: production token returns 401 for write endpoint — needs "Prices and Discounts → Write" scope
 
 | Capability | WB | Ozon | Contract |
 |------------|----|------|----------|
-| Price Write | **BROKEN** (host DNS + token 401) | READY | write-contracts.md §1.1, §2.1 |
-| Write Poll | **BROKEN** (same host) | N/A | write-contracts.md §1.2 |
+| Price Write | **READY** (host confirmed, need write-scope token) | READY | write-contracts.md §1.1, §2.1 |
+| Write Poll | **READY** (same host as write) | N/A | write-contracts.md §1.2 |
 | Reconciliation Read | READY | READY | write-contracts.md §1.3, §2.2 |
 | Reconciliation Logic | NOT IMPLEMENTED | NOT IMPLEMENTED | ADR-016 gap |
 
@@ -887,8 +998,8 @@ Advertising read contracts documented in `promo-advertising-contracts.md` §2 (W
 
 | Capability | WB | Ozon | Contract |
 |------------|----|------|----------|
-| Ad Campaigns (dim) | NEEDS WORK (v2 DTO expansion) | NEEDS WORK (OAuth2 + adapter) | promo-advertising-contracts.md §2.1, §4.2 |
-| Ad Stats (fact) | NEEDS WORK (v3 POST→GET migration) | NEEDS WORK (OAuth2 + async flow) | promo-advertising-contracts.md §2.2, §4.3 |
+| Ad Campaigns (dim) | NEEDS WORK (v2 DTO expansion) | NEEDS WORK (OAuth2 credentials) | promo-advertising-contracts.md §2.1, §4.2 |
+| Ad Stats (fact) | **READY** (v3 GET endpoint verified 2026-03-31) | NEEDS WORK (OAuth2 credentials) | promo-advertising-contracts.md §2.2, §4.3 |
 
 **WB Advertising field mapping** (fullstats v3 → `fact_advertising`):
 
@@ -945,3 +1056,22 @@ Advertising read contracts documented in `promo-advertising-contracts.md` §2 (W
 | 9 | WB Orders/Sales amount fields | **BLOCKED** | Same account limitation. Confirmed via sandbox only. |
 
 **Documents updated:** mapping-spec.md, ozon-read-contracts.md, wb-read-contracts.md, etl-pipeline.md, analytics-pnl.md.
+
+### 2026-03-31 — Open Blockers Resolution Run
+
+**Scope:** 5 previously open blockers (B-2, B-3, B-4, P-4, V-1).
+
+| # | Blocker | Result | Key Finding |
+|---|---------|--------|-------------|
+| B-4 | WB Price Write (DNS + 401) | **RESOLVED** | Host `discounts-prices-api.wildberries.ru` confirmed (200 OK for read). Sandbox write: 400 "All item Nos. are specified incorrectly" (endpoint works, nmID not valid in sandbox). Production write: 401 `"read-only token scope not allowed for this route"`. **Contract is correct, need write-scope token.** |
+| B-3 | WB Advertising v3 fullstats | **RESOLVED** | `GET /adv/v3/fullstats` → 200 OK (returns `null` for no campaigns — expected). `POST /adv/v2/fullstats` → 404 (confirmed dead). `GET /api/advert/v2/adverts` → 200 OK `{"adverts":[]}`. v3 endpoint fully accessible. |
+| B-2 | Ozon Performance OAuth2 | **RESOLVED** | `POST /api/client/token` → 401 `{"error":"invalid_client"}` for test credentials (endpoint accessible). Old host `performance.ozon.ru` → 404 (migration confirmed). Standard `client_credentials` flow. Need real credentials from seller.ozon.ru → Settings → Performance API. |
+| P-4 | WB Promo Write | **RESOLVED** | `POST /api/v1/calendar/promotions/upload` → 401 `"read-only token scope not allowed for this route"` (endpoint exists). All alternative paths → 404. Official docs confirm this is the upload endpoint. Reads work with current token. **Contract path confirmed, need write-scope token.** |
+| V-1 | Ozon FBS Postings | **RESOLVED** | `POST /v3/posting/fbs/list` → 200 OK with full FBS posting data! Same core structure as FBO: `posting_number`, `products[]`, `financial_data`, `analytics_data`. Additional FBS fields: `delivery_method`, `customer_price`, `cancellation`, `shipment_date`. **Critical:** `customer_price` (105.71) << seller `price` (293) — confirms DD-11 (Ozon marketing subsidy). Date range limit: ~3 months (`PERIOD_IS_TOO_LONG`). v2 → 404 (deprecated). |
+
+**Summary of remaining operational items (no longer architectural blockers):**
+1. **WB Write-scope token:** Provision token with "Prices and Discounts → Write" + "Promotions → Write" scopes in WB seller cabinet
+2. **Ozon Performance credentials:** Register Performance API in seller.ozon.ru → Settings → API Keys
+3. **WB Advertising adapter:** Migrate code from POST to GET (v3 endpoint verified and accessible)
+
+**Documents updated:** mapping-spec.md, ozon-read-contracts.md, wb-read-contracts.md, write-contracts.md, promo-advertising-contracts.md.

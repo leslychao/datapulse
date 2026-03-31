@@ -221,6 +221,9 @@
 
 ## 3. STOCKS
 
+> **Updated 2026-03-31** — fields verified via official documentation (dev.wildberries.ru).
+> Previous version had Assumed/Unknown field names. Now Confirmed-docs.
+
 ### Endpoint
 
 | Свойство | Значение | Confidence |
@@ -228,66 +231,120 @@
 | Method | `POST` | confirmed-docs |
 | Path | `/api/analytics/v1/stocks-report/wb-warehouses` | confirmed |
 | Base URL | `https://seller-analytics-api.wildberries.ru` | confirmed |
-| Auth | API Key (Personal or Service token) | confirmed |
-| Token category | Analytics | confirmed |
+| Auth | API Key (Personal or Service token) | confirmed-docs |
+| Token category | Analytics | confirmed-docs |
 
 **NOTE**: Endpoint `/api/v1/analytics/stocks-report` returns 404 (deprecated).
 The correct path is `/api/analytics/v1/stocks-report/wb-warehouses`.
 Returns empty string for account without stock data.
 Old `GET /api/v1/supplier/stocks` is deprecated (disabled June 2026).
 
+### Response Structure — CONFIRMED from Official Docs
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "nmId": 47254354,
+        "chrtId": 91663228,
+        "warehouseId": 507,
+        "warehouseName": "Коледино",
+        "regionName": "Центральный",
+        "quantity": 43,
+        "inWayToClient": 14,
+        "inWayFromClient": 11
+      }
+    ]
+  }
+}
+```
+
 ### Pagination
 
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
-| Type | Offset-based | confirmed-docs |
+| Type | Offset-based (`offset` + `limit` in request body) | confirmed-docs |
 | Max rows | 250,000 per response | confirmed-docs |
 | Sort | Ascending by WB article (nmID) | confirmed-docs |
+| Request body fields | `nmIds[]`, `chrtIds[]`, `limit`, `offset` | confirmed-docs |
 
 ### Identifier Semantics
 
-| Provider field | Semantics | Confidence |
-|----------------|-----------|------------|
-| WB article (nmID equivalent) | Product identifier | confirmed-docs |
-| Warehouse ID | WB warehouse identifier | confirmed-docs |
-| Barcode | Product barcode at size level | assumed |
+| Provider field | Type | Semantics | Confidence |
+|----------------|------|-----------|------------|
+| `nmId` | long | WB product nomenclature ID (same as catalog `nmID`) | confirmed-docs |
+| `chrtId` | long | Size-level characteristic ID (same as catalog `sizes[].chrtID`) | confirmed-docs |
+| `warehouseId` | int | WB warehouse numeric identifier | confirmed-docs |
+| `warehouseName` | string | Warehouse name (e.g. "Коледино") | confirmed-docs |
 
-### Quantity Fields
+### Granularity
 
-| Field | Semantics | Confidence |
-|-------|-----------|------------|
-| Stock quantity fields | Available / reserved breakdown | assumed |
-| Warehouse granularity | Per-warehouse stock | confirmed-docs |
-| Shipping region | Included in response | confirmed-docs |
+**1 row = 1 size × 1 warehouse.** Data is at `(nmId, chrtId, warehouseId)` grain.
+For product-level stock, must aggregate: `SUM(quantity) GROUP BY nmId, warehouseId`.
+
+### Quantity Fields — CONFIRMED from Official Docs
+
+| Field | Type | Semantics | Sample | Confidence |
+|-------|------|-----------|--------|------------|
+| `quantity` | int | Available stock quantity at warehouse | 43 | confirmed-docs |
+| `inWayToClient` | int | Units in transit to customer | 14 | confirmed-docs |
+| `inWayFromClient` | int | Units in transit from customer (returns in transit) | 11 | confirmed-docs |
+
+**CRITICAL:** No `reserved` field exists in this endpoint. `reserved` in canonical DDL
+must be set to `0` for WB. `inWayToClient` and `inWayFromClient` are supplementary
+transit metrics, not "reserved" stock.
+
+### Additional Fields
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `regionName` | string | Shipping region (e.g. "Центральный") | confirmed-docs |
+
+### Join Key Semantics
+
+| Связь | Join key | Confidence |
+|-------|----------|------------|
+| Stocks → Catalog | `nmId` = catalog `nmID` | confirmed-docs |
+| Stocks → Catalog (size) | `chrtId` = catalog `sizes[].chrtID` | confirmed-docs |
+| Stocks → Warehouse | `warehouseId` → `warehouse.external_warehouse_id` | confirmed-docs |
+
+**NOTE:** No `vendorCode`/`barcode` in stocks response. Join to catalog is via `nmId` only.
+Resolved to `seller_sku` via: `nmId` → `marketplace_offer.marketplace_sku` → `seller_sku`.
 
 ### Timestamp Semantics
 
 | Field | Semantics | Confidence |
 |-------|-----------|------------|
-| Report timestamp | Point-in-time snapshot | assumed |
-| Data lag | Unknown exact delay | unknown |
+| (none) | No timestamps in stocks response | confirmed-docs |
+| Data freshness | Snapshot updated every 30 minutes | confirmed-docs |
 
 ### Data Freshness
 
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
-| Freshness | Not documented | unknown |
-| Report nature | Snapshot of current state | assumed |
+| Freshness | Updated once every 30 minutes | confirmed-docs |
+| Report nature | Snapshot of current state | confirmed-docs |
 
 ### Known Limitations
 
-- 1 request per 20 seconds (confirmed-docs)
-- Max 250,000 rows (confirmed-docs)
-- Ability to filter by specific items (confirmed-docs)
+- 3 requests per minute, burst 1 per 20 seconds (confirmed-docs)
+- Max 250,000 rows per response (confirmed-docs)
+- Ability to filter by specific `nmIds[]` and `chrtIds[]` (confirmed-docs)
 - Old `GET /api/v1/supplier/stocks` endpoint deprecated (confirmed-docs)
 - Old `/api/v1/analytics/stocks-report` returns 404 (confirmed)
 - Returns empty string for accounts without stock (confirmed)
+- No `reserved` field — only `quantity`, `inWayToClient`, `inWayFromClient` (confirmed-docs)
+- Grain is per-size (chrtId), NOT per-product — aggregation needed (confirmed-docs)
+- No `vendorCode`/`barcode` in response — join via `nmId` only (confirmed-docs)
 
 ### Rate Limits
 
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
-| Rate limit | 1 request per 20 seconds | confirmed-docs |
+| Rate limit | 3 requests per minute | confirmed-docs |
+| Burst | 1 request per 20 seconds | confirmed-docs |
+| Token types | Personal, Service | confirmed-docs |
 
 ---
 
@@ -681,15 +738,24 @@ Returns empty string for accounts without finance data (confirmed).
 | `uuid_promocode` | string | Promocode UUID | "" | confirmed-docs |
 | `sale_price_promocode_discount_prc` | number | Promo discount percent | 0 | confirmed-docs |
 
-#### Sandbox-only fields (confirmed 2026-03-30)
+#### Fields confirmed in both official docs AND sandbox (updated 2026-03-31)
+
+| Field | Type | Semantics | Official sample | Sandbox value | Confidence |
+|-------|------|-----------|-----------------|---------------|------------|
+| `installment_cofinancing_amount` | number | Installment co-financing amount | 0 | 0 | confirmed-docs+sandbox |
+| `wibes_wb_discount_percent` | number | WB discount percentage (WIBES program) | 1 | 0 | confirmed-docs+sandbox |
+| `is_legal_entity` | boolean | Legal entity flag | false | false | confirmed-docs+sandbox |
+| `trbx_id` | string | Transport box ID | "WB-TRBX-1234567" | "" | confirmed-docs+sandbox |
+| `srv_dbs` | boolean | DBS/FBS delivery marker | true | true | confirmed-docs+sandbox |
+| `dlv_prc` | number | Delivery percentage | 1.8 | 1.8 | confirmed-docs+sandbox |
+| `fix_tariff_date_from` | string | Fixed tariff start (date-only) | — | "2024-10-23" | confirmed-sandbox |
+| `fix_tariff_date_to` | string | Fixed tariff end (date-only) | — | "2024-11-18" | confirmed-sandbox |
+
+#### Sandbox-only fields
 
 | Field | Type | Semantics | Sandbox value | Notes |
 |-------|------|-----------|---------------|-------|
 | `rid` | number | Unknown (0 in all rows) | 0 | Present in sandbox only, absent from official docs |
-| `installment_cofinancing_amount` | number | Installment co-financing amount | 0 | Present in sandbox, may appear in production |
-| `wibes_wb_discount_percent` | number | WB discount percentage (WIBES program) | 0 | Present in sandbox, may appear in production |
-
-**NOTE**: `srv_dbs` field also present in sandbox (boolean, value `true`). Indicates DBS/FBS marker for row.
 
 ### Sign Convention — CONFIRMED from Official Sample + Sandbox
 
@@ -715,21 +781,32 @@ This is fundamentally different from Ozon, where negative values = costs.
 | Unit | Rubles (with kopecks as decimals) | confirmed-docs |
 | Fields ending in `_rub` | Explicitly in rubles | confirmed-docs |
 
-### Timestamp Semantics
+### Timestamp Semantics — verified 2026-03-31
 
-| Field | Format in Official Docs | Format in Sandbox | Confidence |
-|-------|------------------------|-------------------|------------|
-| `rr_dt` | `"2022-10-20"` (date-only) | `"2025-12-30T22:54:20Z"` (full ISO 8601) | **⚠️ DISCREPANCY** |
-| `date_from`, `date_to` | `"2022-10-17"` (date-only) | `"2025-12-29T23:54:20Z"` (full ISO 8601) | **⚠️ DISCREPANCY** |
-| `create_dt` | `"2022-10-24"` (date-only) | `"2025-12-30T22:54:20Z"` (full ISO 8601) | **⚠️ DISCREPANCY** |
-| `order_dt` | `"2022-10-13T00:00:00Z"` (ISO 8601) | `"2025-12-30T22:54:20Z"` (ISO 8601) | confirmed-docs+sandbox |
-| `sale_dt` | `"2022-10-20T00:00:00Z"` (ISO 8601) | `"2025-12-30T22:54:20Z"` (ISO 8601) | confirmed-docs+sandbox |
+| Field | Format in Official Docs | Format in Sandbox (2026-03-31) | Confidence |
+|-------|------------------------|-------------------------------|------------|
+| `rr_dt` | `"2022-10-20"` (date-only) | `"2026-01-02T06:54:29Z"` (full ISO 8601) | **⚠️ DISCREPANCY** |
+| `date_from`, `date_to` | `"2022-10-17"` (date-only) | `"2025-12-31T23:54:29Z"` (full ISO 8601) | **⚠️ DISCREPANCY** |
+| `create_dt` | `"2022-10-24"` (date-only) | `"2026-01-01T22:54:29Z"` (full ISO 8601) | **⚠️ DISCREPANCY** |
+| `order_dt` | `"2022-10-13T00:00:00Z"` (ISO 8601) | `"2026-01-02T06:54:29Z"` (ISO 8601) | confirmed-docs+sandbox |
+| `sale_dt` | `"2022-10-20T00:00:00Z"` (ISO 8601) | `"2026-01-02T06:54:29Z"` (ISO 8601) | confirmed-docs+sandbox |
 | `fix_tariff_date_from/to` | N/A | `"2024-10-23"` / `"2024-11-18"` (date-only) | confirmed-sandbox |
 
 **⚠️ CRITICAL: `rr_dt`, `date_from`, `date_to`, `create_dt` format discrepancy.**
 Official docs show date-only strings. Sandbox returns full ISO 8601 datetime.
 Official docs specify `dateFrom` input format as RFC3339 (accepts both date and datetime).
 **Implementation MUST parse both formats** (date-only and full ISO 8601 datetime).
+
+### sale_dt Nullability — sandbox-verified 2026-03-31
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| `sale_dt` populated for logistics entries | YES — always filled | confirmed-sandbox |
+| `sale_dt` populated for storage/penalty entries | Unknown — sandbox doesn't generate these | **unknown** |
+| Fallback strategy | If `sale_dt` is null → use `rr_dt` as fallback for `entryDate` | design decision (DD-17) |
+
+Sandbox verification: all 100+ records (logistics type, `delivery_rub: 20`, `quantity: 0`)
+had `sale_dt` populated with ISO 8601 datetime. Storage/penalty entry types not present in sandbox.
 
 ### Data Freshness
 
@@ -751,8 +828,10 @@ Official docs specify `dateFrom` input format as RFC3339 (accepts both date and 
 - Sandbox response is a SUBSET of production fields — newer fields (cashback, loyalty, delivery_method, kiz, seller_promo) absent in sandbox
 - `storage_fee`, `deduction`, `acceptance` fields present in docs but absent from sandbox response
 - `rid` field present in sandbox but absent from official docs (ignored)
-- **Timestamp format discrepancy**: `rr_dt`, `date_from`, `date_to`, `create_dt` — sandbox returns ISO 8601 datetime, official docs show date-only. Parser must handle both.
+- **Timestamp format discrepancy**: `rr_dt`, `date_from`, `date_to`, `create_dt` — sandbox returns ISO 8601 datetime, official docs show date-only. Parser must handle both (DD-9)
 - `site_country` format discrepancy: sandbox returns ISO code (`"RU"`), official docs show text (`"Россия"`)
+- **sale_dt nullability**: Always filled in sandbox (incl. logistics entries). Unknown for storage/penalty entries. Fallback: `rr_dt` (DD-17)
+- **v5 new fields confirmed in sandbox (2026-03-31)**: `is_legal_entity`, `trbx_id`, `installment_cofinancing_amount`, `wibes_wb_discount_percent`, `dlv_prc`, `fix_tariff_date_from/to`
 
 ### Rate Limits
 
@@ -1018,3 +1097,38 @@ Returns seller's own FBS warehouses. Empty for sellers without FBS setup.
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
 | Rate limit | Not explicitly documented | unknown |
+
+---
+
+## Rate Limits Summary (updated 2026-03-31)
+
+| # | Capability | Endpoint | Rate limit | Token category | Confidence |
+|---|------------|----------|-----------|----------------|------------|
+| 1 | Catalog | `/content/v2/get/cards/list` | Not documented | Content | unknown |
+| 2 | Prices | `/api/v2/list/goods/filter` | Not documented | Prices | unknown |
+| 3 | Stocks | `/api/analytics/v1/stocks-report/wb-warehouses` | 3 req/min, burst 1/20s | Analytics | confirmed-docs |
+| 4 | Orders | `/api/v1/supplier/orders` | 1 req/min | Statistics | confirmed-docs |
+| 5 | Sales | `/api/v1/supplier/sales` | 1 req/min | Statistics | confirmed-docs |
+| 6 | Returns | `/api/v1/analytics/goods-return` | 1 req/min, burst 10 | Analytics | confirmed-docs |
+| 7 | Finance | `/api/v5/supplier/reportDetailByPeriod` | 1 req/min | Statistics | confirmed-docs |
+| 8 | Incomes | `/api/v1/supplier/incomes` | 1 req/min | Statistics | confirmed-docs |
+| 9 | Offices | `/api/v3/offices` | Not documented | Marketplace | unknown |
+
+### WB Token Type Policy (effective 2026-03-30)
+
+С 30 марта 2026 WB ввёл дифференциацию rate limits по типу токена:
+
+| Token type | Scope | Rate limits |
+|------------|-------|-------------|
+| **Personal** | Proprietary software on own servers | Standard (full) limits |
+| **Service** | Cloud services from Business Solutions Catalog | Standard limits per service |
+| **Basic** | Auxiliary, limited data access | **Reduced** limits |
+| **Test** | Sandbox only | **Reduced** limits |
+
+**Datapulse использует Personal token** → стандартные rate limits.
+Service tokens имеют **независимые** лимиты per individual service.
+
+**Рекомендация для реализации:**
+- Для endpoints с unknown rate limit: adaptive rate limiting (exponential backoff при HTTP 429)
+- Стартовый safe interval: 1 request per 10 seconds для Content/Prices
+- Мониторинг: логировать 429 responses, автоматически увеличивать interval
