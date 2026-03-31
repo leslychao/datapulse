@@ -49,10 +49,12 @@ public class MemberService {
             throw BadRequestException.of("member.role.admin.cannot.assign.admin");
         }
 
+        MemberRole oldRole = member.getRole();
         member.setRole(request.role());
         memberRepository.save(member);
-        auditPublisher.publish("member.role.change", "workspace_member",
-                String.valueOf(targetUserId));
+        auditPublisher.publish("member.change_role", "workspace_member",
+                String.valueOf(targetUserId),
+                "{\"old_role\":\"%s\",\"new_role\":\"%s\"}".formatted(oldRole.name(), request.role().name()));
         return toResponse(member);
     }
 

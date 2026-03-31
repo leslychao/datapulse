@@ -118,7 +118,7 @@ public class InvitationService {
 
         invitation.setStatus(InvitationStatus.CANCELLED);
         invitationRepository.save(invitation);
-        auditPublisher.publish("invitation.cancel", "workspace_invitation",
+        auditPublisher.publish("member.cancel_invitation", "workspace_invitation",
                 String.valueOf(invitationId));
     }
 
@@ -194,7 +194,7 @@ public class InvitationService {
         invitation.setStatus(InvitationStatus.ACCEPTED);
         invitation.setAcceptedByUserId(acceptingUserId);
         invitationRepository.save(invitation);
-        auditPublisher.publish("invitation.accept", "workspace_invitation",
+        auditPublisher.publish("member.accept_invitation", "workspace_invitation",
                 String.valueOf(invitation.getId()));
 
         return new AcceptInvitationResponse(

@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
 @RequiredArgsConstructor
 public class TenancyAuditPublisher {
@@ -14,30 +16,11 @@ public class TenancyAuditPublisher {
     private final WorkspaceContext workspaceContext;
 
     public void publish(String actionType, String entityType, String entityId) {
-        Long workspaceId = workspaceContext.getWorkspaceId();
-        if (workspaceId == null) {
-            workspaceId = 0L;
-        }
-
-        eventPublisher.publishEvent(new AuditEvent(
-                workspaceId,
-                "USER",
-                workspaceContext.getUserId(),
-                actionType,
-                entityType,
-                entityId,
-                "SUCCESS",
-                null,
-                null,
-                null
-        ));
+        publish(actionType, entityType, entityId, null);
     }
 
     public void publish(String actionType, String entityType, String entityId, String details) {
-        Long workspaceId = workspaceContext.getWorkspaceId();
-        if (workspaceId == null) {
-            workspaceId = 0L;
-        }
+        long workspaceId = Objects.requireNonNullElse(workspaceContext.getWorkspaceId(), 0L);
 
         eventPublisher.publishEvent(new AuditEvent(
                 workspaceId,
