@@ -1,10 +1,14 @@
 package io.datapulse.etl.persistence.canonical;
 
 import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -39,19 +43,29 @@ public class CostProfileRepository {
             """;
 
     private static final String FIND_CURRENT_BY_SKU = """
-            SELECT id, seller_sku_id, cost_price, currency, valid_from, valid_to,
-                   updated_by_user_id, created_at, updated_at
-            FROM cost_profile
-            WHERE seller_sku_id = :sellerSkuId
-              AND valid_to IS NULL
+            SELECT cp.id, cp.seller_sku_id, cp.cost_price, cp.currency,
+                   cp.valid_from, cp.valid_to, cp.updated_by_user_id,
+                   cp.created_at, cp.updated_at
+            FROM cost_profile cp
+            WHERE cp.seller_sku_id = :sellerSkuId
+              AND cp.valid_to IS NULL
             """;
 
     private static final String FIND_HISTORY_BY_SKU = """
-            SELECT id, seller_sku_id, cost_price, currency, valid_from, valid_to,
-                   updated_by_user_id, created_at, updated_at
-            FROM cost_profile
-            WHERE seller_sku_id = :sellerSkuId
-            ORDER BY valid_from DESC
+            SELECT cp.id, cp.seller_sku_id, cp.cost_price, cp.currency,
+                   cp.valid_from, cp.valid_to, cp.updated_by_user_id,
+                   cp.created_at, cp.updated_at
+            FROM cost_profile cp
+            WHERE cp.seller_sku_id = :sellerSkuId
+            ORDER BY cp.valid_from DESC
+            """;
+
+    private static final String BASE_CURRENT_PROFILES = """
+            FROM cost_profile cp
+            JOIN seller_sku ss ON cp.seller_sku_id = ss.id
+            JOIN product_master pm ON ss.product_master_id = pm.id
+            WHERE cp.valid_to IS NULL
+              AND pm.workspace_id = :workspaceId
             """;
 
     public void closeCurrentVersion(long sellerSkuId, LocalDate newValidFrom) {
@@ -83,34 +97,92 @@ public class CostProfileRepository {
     }
 
     public List<CostProfileEntity> findCurrentBySku(long sellerSkuId) {
-        return jdbc.query(FIND_CURRENT_BY_SKU, Map.of("sellerSkuId", sellerSkuId),
-                (rs, rowNum) -> {
-                    var e = new CostProfileEntity();
-                    e.setId(rs.getLong("id"));
-                    e.setSellerSkuId(rs.getLong("seller_sku_id"));
-                    e.setCostPrice(rs.getBigDecimal("cost_price"));
-                    e.setCurrency(rs.getString("currency"));
-                    e.setValidFrom(rs.getDate("valid_from").toLocalDate());
-                    Date validTo = rs.getDate("valid_to");
-                    e.setValidTo(validTo != null ? validTo.toLocalDate() : null);
-                    e.setUpdatedByUserId(rs.getLong("updated_by_user_id"));
-                    return e;
-                });
+        return jdbc.query(FIND_CURRENT_BY_SKU, Map.of("sellerSkuId", sellerSkuId), this::mapEntity);
     }
 
     public List<CostProfileEntity> findHistoryBySku(long sellerSkuId) {
-        return jdbc.query(FIND_HISTORY_BY_SKU, Map.of("sellerSkuId", sellerSkuId),
-                (rs, rowNum) -> {
-                    var e = new CostProfileEntity();
-                    e.setId(rs.getLong("id"));
-                    e.setSellerSkuId(rs.getLong("seller_sku_id"));
-                    e.setCostPrice(rs.getBigDecimal("cost_price"));
-                    e.setCurrency(rs.getString("currency"));
-                    e.setValidFrom(rs.getDate("valid_from").toLocalDate());
-                    Date validTo = rs.getDate("valid_to");
-                    e.setValidTo(validTo != null ? validTo.toLocalDate() : null);
-                    e.setUpdatedByUserId(rs.getLong("updated_by_user_id"));
-                    return e;
-                });
+        return jdbc.query(FIND_HISTORY_BY_SKU, Map.of("sellerSkuId", sellerSkuId), this::mapEntity);
+    }
+
+    public List<CostProfileRow> findCurrentProfiles(long workspaceId, Long sellerSkuId,
+                                                    String search, int limit, long offset) {
+        var params = buildProfileFilterParams(workspaceId, sellerSkuId, search);
+        params.addValue("limit", limit);
+        params.addValue("offset", offset);
+
+        String sql = """
+                SELECT cp.id, cp.seller_sku_id, ss.sku_code, cp.cost_price, cp.currency,
+                       cp.valid_from, cp.valid_to, cp.updated_by_user_id,
+                       cp.created_at, cp.updated_at
+                """ + BASE_CURRENT_PROFILES
+                + buildProfileFilterClause(sellerSkuId, search) + """
+                ORDER BY ss.sku_code
+                LIMIT :limit OFFSET :offset
+                """;
+
+        return jdbc.query(sql, params, this::mapRow);
+    }
+
+    public long countCurrentProfiles(long workspaceId, Long sellerSkuId, String search) {
+        var params = buildProfileFilterParams(workspaceId, sellerSkuId, search);
+
+        String sql = "SELECT count(*) " + BASE_CURRENT_PROFILES
+                + buildProfileFilterClause(sellerSkuId, search);
+
+        return jdbc.queryForObject(sql, params, Long.class);
+    }
+
+    private MapSqlParameterSource buildProfileFilterParams(long workspaceId, Long sellerSkuId,
+                                                           String search) {
+        var params = new MapSqlParameterSource().addValue("workspaceId", workspaceId);
+        if (sellerSkuId != null) {
+            params.addValue("sellerSkuId", sellerSkuId);
+        }
+        if (search != null && !search.isBlank()) {
+            params.addValue("search", "%" + search.trim() + "%");
+        }
+        return params;
+    }
+
+    private String buildProfileFilterClause(Long sellerSkuId, String search) {
+        var sb = new StringBuilder();
+        if (sellerSkuId != null) {
+            sb.append(" AND cp.seller_sku_id = :sellerSkuId");
+        }
+        if (search != null && !search.isBlank()) {
+            sb.append(" AND ss.sku_code ILIKE :search");
+        }
+        return sb.toString();
+    }
+
+    private CostProfileEntity mapEntity(ResultSet rs, int rowNum) throws SQLException {
+        var e = new CostProfileEntity();
+        e.setId(rs.getLong("id"));
+        e.setSellerSkuId(rs.getLong("seller_sku_id"));
+        e.setCostPrice(rs.getBigDecimal("cost_price"));
+        e.setCurrency(rs.getString("currency"));
+        e.setValidFrom(rs.getDate("valid_from").toLocalDate());
+        Date validTo = rs.getDate("valid_to");
+        e.setValidTo(validTo != null ? validTo.toLocalDate() : null);
+        e.setUpdatedByUserId(rs.getLong("updated_by_user_id"));
+        e.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
+        e.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));
+        return e;
+    }
+
+    private CostProfileRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+        Date validTo = rs.getDate("valid_to");
+        return CostProfileRow.builder()
+                .id(rs.getLong("id"))
+                .sellerSkuId(rs.getLong("seller_sku_id"))
+                .skuCode(rs.getString("sku_code"))
+                .costPrice(rs.getBigDecimal("cost_price"))
+                .currency(rs.getString("currency"))
+                .validFrom(rs.getDate("valid_from").toLocalDate())
+                .validTo(validTo != null ? validTo.toLocalDate() : null)
+                .updatedByUserId(rs.getLong("updated_by_user_id"))
+                .createdAt(rs.getObject("created_at", OffsetDateTime.class))
+                .updatedAt(rs.getObject("updated_at", OffsetDateTime.class))
+                .build();
     }
 }

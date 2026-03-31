@@ -35,4 +35,12 @@ public final class MessageCodes {
     public static final String CONNECTION_MARKETPLACE_MISMATCH = "connection.marketplace.mismatch";
     public static final String CREDENTIALS_INVALID = "credentials.invalid";
     public static final String VAULT_UNAVAILABLE = "vault.unavailable";
+
+    // --- ETL ---
+    public static final String JOB_NOT_FOUND = "job.not.found";
+    public static final String JOB_NOT_RETRYABLE = "job.not.retryable";
+    public static final String JOB_ACTIVE_EXISTS = "job.active.exists";
+    public static final String COST_PROFILE_INVALID = "cost.profile.invalid";
+    public static final String COST_PROFILE_BULK_TOO_LARGE = "cost.profile.bulk.too.large";
+    public static final String SELLER_SKU_NOT_FOUND = "seller.sku.not.found";
 }

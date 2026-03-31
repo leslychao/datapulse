@@ -3,6 +3,7 @@ package io.datapulse.etl.persistence;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -108,6 +109,63 @@ public class JobExecutionRepository {
     public Optional<JobExecutionRow> findById(long id) {
         var rows = jdbc.query(FIND_BY_ID, Map.of("id", id), this::mapRow);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    public List<JobExecutionRow> findByConnectionId(long connectionId, String status,
+                                                     OffsetDateTime from, OffsetDateTime to,
+                                                     int limit, long offset) {
+        var params = buildFilterParams(connectionId, status, from, to);
+        params.addValue("limit", limit);
+        params.addValue("offset", offset);
+
+        String sql = """
+                SELECT id, connection_id, event_type, status, started_at, completed_at,
+                       error_details::text, checkpoint::text, created_at
+                FROM job_execution
+                """ + buildWhereClause(status, from, to) + """
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+                """;
+
+        return jdbc.query(sql, params, this::mapRow);
+    }
+
+    public long countByConnectionId(long connectionId, String status,
+                                    OffsetDateTime from, OffsetDateTime to) {
+        var params = buildFilterParams(connectionId, status, from, to);
+
+        String sql = "SELECT count(*) FROM job_execution " + buildWhereClause(status, from, to);
+
+        return jdbc.queryForObject(sql, params, Long.class);
+    }
+
+    private MapSqlParameterSource buildFilterParams(long connectionId, String status,
+                                                    OffsetDateTime from, OffsetDateTime to) {
+        var params = new MapSqlParameterSource().addValue("connectionId", connectionId);
+        if (status != null) {
+            params.addValue("status", status);
+        }
+        if (from != null) {
+            params.addValue("from", from);
+        }
+        if (to != null) {
+            params.addValue("to", to);
+        }
+        return params;
+    }
+
+    private String buildWhereClause(String status, OffsetDateTime from, OffsetDateTime to) {
+        var sb = new StringBuilder("WHERE connection_id = :connectionId");
+        if (status != null) {
+            sb.append(" AND status = :status");
+        }
+        if (from != null) {
+            sb.append(" AND created_at >= :from");
+        }
+        if (to != null) {
+            sb.append(" AND created_at <= :to");
+        }
+        return sb.toString();
     }
 
     public boolean existsActiveForConnection(long connectionId) {
