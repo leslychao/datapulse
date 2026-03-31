@@ -28,6 +28,12 @@ public class ProductMasterUpsertRepository {
                 IS DISTINCT FROM (EXCLUDED.name, EXCLUDED.brand)
             """;
 
+    private static final String UPDATE_BRAND = """
+            UPDATE product_master SET brand = ?, updated_at = now()
+            WHERE workspace_id = ? AND external_code = ?
+              AND brand IS DISTINCT FROM ?
+            """;
+
     public void batchUpsert(List<ProductMasterEntity> entities) {
         jdbc.batchUpdate(UPSERT, entities, DEFAULT_BATCH_SIZE,
                 (ps, e) -> {
@@ -38,4 +44,16 @@ public class ProductMasterUpsertRepository {
                     ps.setLong(5, e.getJobExecutionId());
                 });
     }
+
+    public void batchUpdateBrand(long workspaceId, List<BrandUpdate> updates) {
+        jdbc.batchUpdate(UPDATE_BRAND, updates, DEFAULT_BATCH_SIZE,
+                (ps, u) -> {
+                    ps.setString(1, u.brand());
+                    ps.setLong(2, workspaceId);
+                    ps.setString(3, u.externalCode());
+                    ps.setString(4, u.brand());
+                });
+    }
+
+    public record BrandUpdate(String externalCode, String brand) {}
 }

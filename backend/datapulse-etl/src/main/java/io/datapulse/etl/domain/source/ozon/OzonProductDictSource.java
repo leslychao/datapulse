@@ -19,6 +19,7 @@ import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
 import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.ProductMasterUpsertRepository;
+import io.datapulse.etl.persistence.canonical.ProductMasterUpsertRepository.BrandUpdate;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -88,12 +89,18 @@ public class OzonProductDictSource implements EventSource {
             List<CaptureResult> attrPages = attributesAdapter.captureAllPages(attrCtx, clientId, apiKey, productIds);
             SubSourceResult attrResult = subSourceRunner.processPages(
                     "OzonAttributesReadAdapter", attrPages, OzonAttributeResponse.OzonAttributeResult.class,
-                    batch -> batch.forEach(attr -> {
-                        String brand = normalizer.extractBrand(attr);
-                        if (brand != null) {
-                            log.debug("Brand enrichment: productId={}", attr);
+                    batch -> {
+                        List<BrandUpdate> updates = new ArrayList<>();
+                        for (var attr : batch) {
+                            String brand = normalizer.extractBrand(attr);
+                            if (brand != null) {
+                                updates.add(new BrandUpdate(String.valueOf(attr.id()), brand));
+                            }
                         }
-                    }));
+                        if (!updates.isEmpty()) {
+                            repository.batchUpdateBrand(ctx.workspaceId(), updates);
+                        }
+                    });
             results.add(attrResult);
         } catch (Exception e) {
             log.warn("Ozon attributes enrichment failed (soft dep): connectionId={}, error={}",

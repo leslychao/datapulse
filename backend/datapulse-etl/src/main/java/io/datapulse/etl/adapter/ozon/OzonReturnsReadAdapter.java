@@ -10,7 +10,7 @@ import io.datapulse.etl.adapter.util.StreamingPageCapture;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.PageCaptureResult;
-import io.datapulse.etl.domain.cursor.NoCursorExtractor;
+import io.datapulse.etl.domain.cursor.JsonPathCursorExtractor;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +25,8 @@ public class OzonReturnsReadAdapter {
 
     private static final String RETURNS_PATH = "/v1/returns/list";
     private static final int PAGE_LIMIT = 1000;
+    private static final JsonPathCursorExtractor LAST_ID_EXTRACTOR =
+            new JsonPathCursorExtractor("last_id");
 
     private final OzonApiCaller apiCaller;
     private final StreamingPageCapture pageCapture;
@@ -51,10 +53,17 @@ public class OzonReturnsReadAdapter {
                     clientId, apiKey);
 
             PageCaptureResult page = pageCapture.capture(
-                    body, context, pageNumber, NoCursorExtractor.INSTANCE);
+                    body, context, pageNumber, LAST_ID_EXTRACTOR);
             results.add(page.captureResult());
 
             pageNumber++;
+
+            String cursor = page.cursor();
+            if (cursor != null && !cursor.isEmpty() && !"0".equals(cursor)) {
+                lastId = Long.parseLong(cursor);
+            } else {
+                hasMore = false;
+            }
 
             if (page.captureResult().byteSize() < 200) {
                 hasMore = false;

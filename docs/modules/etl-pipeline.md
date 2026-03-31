@@ -473,13 +473,13 @@ warehouse:
 | `PRICES` | `PRICE_SNAPSHOT` | canonical_price_current | — |
 | `STOCKS` | `INVENTORY_FACT` | canonical_stock_current | — |
 | `ORDERS` | `SALES_FACT` | canonical_order | WB: orders endpoint; Ozon: postings endpoint |
-| `SALES` | `SALES_FACT` | canonical_sale (Ozon), canonical_return (Ozon) | WB: dim_product backfill only (sales/returns → FACT_FINANCE) |
-| `RETURNS` | `SALES_FACT` (Ozon), `FACT_FINANCE` (WB) | canonical_return | Ozon: через returns/list; WB: из finance report |
-| `FINANCE` | `FACT_FINANCE` | canonical_finance_entry; WB: + canonical_sale, canonical_return | WB: reportDetailByPeriod — source of truth для sales/returns/finance |
-| `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | — |
-| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | — |
+| `SALES` | `SALES_FACT` | canonical_sale | WB: statistics sales endpoint; Ozon: через postings (FBO/FBS) |
+| `RETURNS` | `SALES_FACT` | canonical_return | WB: analytics goods-return endpoint; Ozon: через returns/list |
+| `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list |
+| `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | **Not yet implemented.** EventSource not created; canonical tables exist but not populated by ETL |
+| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | **Not yet implemented (Phase B).** EventSource not created |
 
-**Примечание**: WB sales и returns извлекаются из `FACT_FINANCE` (finance report), а не из `SALES_FACT`. Поэтому `FACT_FINANCE` зависит от `SALES_FACT` в dependency graph — чтобы dim_product backfill был завершён до финансовой обработки.
+**Примечание**: WB sales и returns извлекаются из отдельных statistics/analytics endpoints (`/api/v1/supplier/sales` и `/api/v1/analytics/goods-return`) в рамках `SALES_FACT`, а не из `FACT_FINANCE`. `FACT_FINANCE` создаёт только `canonical_finance_entry`. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) обеспечивает, что canonical orders/sales/returns доступны для SKU resolution при финансовой нормализации.
 
 ## Граф зависимостей ETL events
 
@@ -513,14 +513,16 @@ CATEGORY_DICT ───────────────────┘      
 | Товары | `PRODUCT_DICT` | `dim_product` | `product_master`, `seller_sku`, `marketplace_offer` |
 | Цены | `PRICE_SNAPSHOT` | `fact_price_snapshot` | `canonical_price_current` |
 | Продажи (Ozon) | `SALES_FACT` | `fact_orders`, `fact_sales`, `fact_returns`, dim backfill | `canonical_order`, `canonical_sale`, `canonical_return` |
-| Продажи (WB) | `SALES_FACT` | `fact_orders`, dim_product backfill | `canonical_order` |
+| Продажи (WB) | `SALES_FACT` | `fact_orders`, `fact_sales`, `fact_returns` | `canonical_order`, `canonical_sale`, `canonical_return` |
 | Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_current` |
 | Финансы (Ozon) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
-| Финансы (WB) | `FACT_FINANCE` | `fact_sales`, `fact_returns`, `fact_finance` | `canonical_sale`, `canonical_return`, `canonical_finance_entry` |
-| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below) |
-| Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product` |
+| Финансы (WB) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
+| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below). **Not yet implemented (Phase B)** |
+| Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. **EventSource not yet implemented** |
 
 ### Pipeline invariant exception: Advertising (DD-AD-1)
+
+> **Implementation status:** `ADVERTISING_FACT` EventSource **не реализован**. Описание ниже — target design для Phase B.
 
 Advertising data (`ADVERTISING_FACT`) flows **Raw (S3) → Normalized (in-process) → ClickHouse** directly, без промежуточного canonical entity в PostgreSQL. Это единственное исключение из инварианта «Raw → Normalized → Canonical → Analytics». Raw payload сохраняется в S3 (как и все остальные domains), но canonical layer пропускается.
 
@@ -532,9 +534,9 @@ Advertising data (`ADVERTISING_FACT`) flows **Raw (S3) → Normalized (in-proces
 
 ### Platform-specific правила
 
-**WB sales/returns:** заполняются в обработчике `FACT_FINANCE`, не в `SALES_FACT`. WB `SALES_FACT` выполняет только dim_product backfill: обнаружение новых `marketplace_offer` записей по `nmId` из заказов, которых ещё нет в catalog (товары, снятые с продажи, но участвующие в заказах/возвратах). Backfill создаёт skeleton `marketplace_offer` (nmID, status=ARCHIVED) для обеспечения FK integrity при последующей финансовой загрузке. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) гарантирует порядок.
+**WB sales/returns:** заполняются в обработчике `SALES_FACT` из отдельных statistics/analytics endpoints. `WbSalesFactSource` содержит три последовательных sub-source: (a) orders (`GET /api/v1/supplier/orders`) → `canonical_order`, (b) sales (`GET /api/v1/supplier/sales`) → `canonical_sale`, (c) returns (`GET /api/v1/analytics/goods-return`) → `canonical_return`. `FACT_FINANCE` (`WbFinanceFactSource`) создаёт **только** `canonical_finance_entry` из `reportDetailByPeriod`. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) обеспечивает, что dim_product и canonical orders/sales/returns доступны для SKU resolution при финансовой нормализации.
 
-**Graceful degradation:** зависимость `FACT_FINANCE → SALES_FACT` — мягкая (soft dependency). Если `SALES_FACT` упал, `FACT_FINANCE` может выполниться при условии, что `PRODUCT_DICT` успешен (основной источник dim_product). Отсутствие backfill от SALES_FACT означает, что некоторые записи `dim_product` могут быть менее обогащёнными, но финансовые данные загрузятся корректно. Worker при failure SALES_FACT: логирует warning, продолжает с FACT_FINANCE. Job получает `COMPLETED_WITH_ERRORS`.
+**Graceful degradation:** зависимость `FACT_FINANCE → SALES_FACT` — мягкая (soft dependency). Если `SALES_FACT` упал, `FACT_FINANCE` может выполниться при условии, что `PRODUCT_DICT` успешен (основной источник dim_product). Отсутствие sales/returns от SALES_FACT не блокирует финансовую загрузку — finance entries сохраняются с SKU lookup по каталогу. Worker при failure SALES_FACT: логирует warning, продолжает с FACT_FINANCE. Job получает `COMPLETED_WITH_ERRORS`.
 
 **Ozon brand:** отсутствует в стандартном product/info; получается через отдельный `POST /v4/product/info/attributes` (attr_id=85).
 
@@ -614,8 +616,8 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 
 | Провайдер | ETL Event | Причина |
 |-----------|-----------|---------|
-| **Ozon** | `SALES_FACT` | Ozon returns — часть sales-домена |
-| **WB** | `FACT_FINANCE` | WB returns извлекаются из строк финансового отчёта |
+| **Ozon** | `SALES_FACT` | Ozon returns — часть sales-домена (через `POST /v1/returns/list`) |
+| **WB** | `SALES_FACT` | WB returns загружаются через analytics endpoint `GET /api/v1/analytics/goods-return`. Финансовые суммы по возвратам — в `canonical_finance_entry` (через `FACT_FINANCE`) |
 
 ## Ingestion flow
 
@@ -623,11 +625,11 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 
 | Trigger | Описание | Scope |
 |---------|----------|-------|
-| Scheduled (cron) | Configurable per connection. Default: 4x/day для finance, 2x/day для catalog/prices/stocks | Per marketplace_connection |
+| Scheduled | Uniform interval per connection (current implementation: every 6 hours for all domains). **Target design:** configurable per-domain cron (4x/day finance, 2x/day catalog/prices/stocks) | Per marketplace_connection |
 | Manual | Оператор запускает через UI / REST API | Per marketplace_connection |
 | System (after connection creation) | Первичная полная загрузка при создании подключения | Per marketplace_connection |
 
-**Scheduling model:** `marketplace_sync_state` хранит `next_scheduled_at` per connection. Spring `@Scheduled` job (1 min interval) сканирует `WHERE next_scheduled_at <= now() AND enabled = true` → INSERT `job_execution` → update `next_scheduled_at` по cron expression. **Distributed lock:** `@SchedulerLock` (ShedLock) на scheduler job — обязателен для кластера. Без него каждый instance API-сервера создаст дублирующий `job_execution`. `lockAtMostFor = PT5M` (макс. время удержания лока).
+**Scheduling model:** `marketplace_sync_state` хранит `next_scheduled_at` per connection. Spring `@Scheduled` job (configurable poll interval, default: 1 min) сканирует `WHERE next_scheduled_at <= now() AND enabled = true` → INSERT `job_execution` → update `next_scheduled_at`. **Current implementation:** `next_scheduled_at = now() + 6 hours` (uniform for all domains). **Target design:** per-domain cron expressions для разной частоты по типам данных. **Distributed lock:** `@SchedulerLock` (ShedLock) на scheduler job — обязателен для кластера. `lockAtMostFor = PT5M`.
 
 **Sync scope per run:**
 
@@ -636,26 +638,28 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 | `FULL_SYNC` | `FULL_SYNC` | Все domains в dependency graph | Initial load, manual full sync, recovery after prolonged outage |
 | `INCREMENTAL` | `INCREMENTAL` | Зависит от domain (см. ниже) | Regular scheduled syncs |
 
-**Incremental strategy per domain:**
+**Incremental strategy per domain (target design):**
 
-| Domain | Incremental strategy | Cursor / pagination |
-|--------|---------------------|---------------------|
-| Каталог | Full scan (catalog small, no incremental API) | Offset-based pagination |
-| Цены | Full scan per connection (no incremental API) | Offset-based pagination |
-| Остатки | Full scan per connection (real-time state, no delta) | Offset-based pagination |
-| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination |
-| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination |
-| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination |
-| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination |
-| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) |
-| Промо | Full scan (promo list small per connection) | Offset-based pagination |
-| Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based |
+> **Current implementation (Phase A):** все date-range domains используют упрощённую стратегию `now() - 7 days` вместо `last_success_at - overlap_buffer`. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке 7-дневного окна. `rrdid`-based cursor для WB finance и Ozon date-range chunking **не реализованы** — используется тот же hardcoded 7d window.
 
-**`overlap_buffer`:** configurable per domain (default: 2 hours). Overlapping window гарантирует, что late-arriving records не потеряются. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке.
+| Domain | Incremental strategy (target) | Cursor / pagination | Current impl |
+|--------|------------------------------|---------------------|--------------|
+| Каталог | Full scan (catalog small, no incremental API) | Offset-based / cursor pagination | Implemented |
+| Цены | Full scan per connection (no incremental API) | Offset-based pagination | Implemented |
+| Остатки | Full scan per connection (real-time state, no delta) | Offset-based pagination | Implemented |
+| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination | `now - 7d` hardcoded |
+| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination | `now - 7d` hardcoded |
+| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination | `now - 7d` hardcoded |
+| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination | `now - 7d` hardcoded |
+| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) | `now - 7d` hardcoded |
+| Промо | Full scan (promo list small per connection) | Offset-based pagination | EventSource not implemented |
+| Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based | EventSource not implemented |
 
-**Ozon finance date-range chunking:** API `/v3/finance/transaction/list` имеет ограничение — max 1 месяц между `date.from` и `date.to`. Если `last_success_at` старше 1 месяца (длительный outage, первая загрузка), Ozon-адаптер автоматически разбивает интервал на месячные чанки и выполняет N последовательных запросов. Каждый чанк обрабатывается с cursor-based pagination до исчерпания. Результаты всех чанков сохраняются в рамках одного `job_execution`.
+**`overlap_buffer` (target design):** configurable per domain (default: 2 hours). Overlapping window гарантирует, что late-arriving records не потеряются. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке.
 
-**WB finance `rrdid`-based cursor:** для WB финансов `overlap_buffer` не применяется. Курсор `rrdid` (монотонно возрастающий ID записи) сохраняется в `marketplace_sync_state`. Каждый sync начинается с `rrdid = last_rrdid`. UPSERT по `external_entry_id` (= WB `rrd_id`) обеспечивает идемпотентность, включая ретроактивные корректировки.
+**Ozon finance date-range chunking (target design, not yet implemented):** API `/v3/finance/transaction/list` имеет ограничение — max 1 месяц между `date.from` и `date.to`. Если `last_success_at` старше 1 месяца (длительный outage, первая загрузка), Ozon-адаптер автоматически разбивает интервал на месячные чанки и выполняет N последовательных запросов. Каждый чанк обрабатывается с cursor-based pagination до исчерпания. Результаты всех чанков сохраняются в рамках одного `job_execution`.
+
+**WB finance `rrdid`-based cursor (target design, not yet implemented):** для WB финансов `overlap_buffer` не применяется. Курсор `rrdid` (монотонно возрастающий ID записи) сохраняется в `marketplace_sync_state`. Каждый sync начинается с `rrdid = last_rrdid`. UPSERT по `external_entry_id` (= WB `rrd_id`) обеспечивает идемпотентность, включая ретроактивные корректировки.
 
 **Deduplication:** Raw layer — append-only (каждый sync создаёт новые `job_item` записи; `content_sha256` хранится для content tracking и forensic comparison). Canonical layer — UPSERT с `IS DISTINCT FROM` обеспечивает no-churn для unchanged records и идемпотентность при overlap window.
 
@@ -725,12 +729,12 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 |-----------|-------------------|---------------------|-------------|
 | `CATEGORY_DICT` | — (WB: categories из catalog) | `POST /v1/description-category/tree` | — |
 | `WAREHOUSE_DICT` | `GET /api/v3/offices` | — (Ozon: warehouses из stocks) | — |
-| `PRODUCT_DICT` | `GET /content/v2/get/cards/list` | 1. `POST /v3/product/info/list` 2. `POST /v4/product/info/attributes` (бренды) | Ozon: (2) зависит от product_id из (1) — **hard** |
+| `PRODUCT_DICT` | `GET /content/v2/get/cards/list` | 1. `POST /v3/product/list` (IDs) 2. `POST /v3/product/info/list` (full info) 3. `POST /v4/product/info/attributes` (бренды, **soft**) | Ozon: (2) зависит от product_id из (1) — **hard**; (3) — **soft** |
 | `PRICE_SNAPSHOT` | `GET /api/v2/list/goods/filter` | `POST /v5/product/info/prices` | — |
-| `INVENTORY_FACT` | `GET /api/v3/stocks/{warehouseId}` | `POST /v4/product/info/stocks` | — |
-| `SALES_FACT` | `GET /api/v1/supplier/orders` | 1. `POST /v3/posting/fbo/list` 2. `POST /v3/posting/fbs/list` 3. `POST /v1/returns/list` (Ozon returns) | Ozon: (1), (2), (3) **независимы** друг от друга |
+| `INVENTORY_FACT` | `POST /api/analytics/v1/stocks-report/wb-warehouses` | `POST /v4/product/info/stocks` | — |
+| `SALES_FACT` | 1. `GET /api/v1/supplier/orders` 2. `GET /api/v1/supplier/sales` 3. `GET /api/v1/analytics/goods-return` | 1. `POST /v2/posting/fbo/list` 2. `POST /v3/posting/fbs/list` 3. `POST /v1/returns/list` (Ozon returns) | WB: (1), (2), (3) **последовательно**; Ozon: (1), (2), (3) **независимы** |
 | `FACT_FINANCE` | `GET /api/v5/supplier/reportDetailByPeriod` | `POST /v3/finance/transaction/list` | — |
-| `PROMO_SYNC` | 1. `GET /api/v2/promo/adverts` 2. `GET /api/v2/promo/adverts/{id}/products` | 1. `GET /v1/actions` 2. `POST /v1/actions/products` | (2) зависит от promo_id из (1) — **hard** |
+| `PROMO_SYNC` | 1. `GET /api/v2/promo/adverts` 2. `GET /api/v2/promo/adverts/{id}/products` | 1. `GET /v1/actions` 2. `POST /v1/actions/products` | (2) зависит от promo_id из (1) — **hard**. **EventSource not yet implemented** |
 
 **Error handling на уровне sub-sources:**
 
@@ -790,7 +794,9 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 
 ### Materialization scope
 
-Materializer обрабатывает **только записи текущего `job_execution_id`** (job-scoped materialization). Canonical → ClickHouse delta определяется по `job_execution_id`, не по timestamp diff. Full re-materialization (Phase B: daily) — отдельный scheduled job.
+> **Implementation status (Phase A):** ClickHouse materializer реализован как **stub** — `ClickHouseMaterializer.materialize()` логирует вызов, но не выполняет записи в ClickHouse. Начальная миграция ClickHouse (`0001-initial.sql`) пуста (`SELECT 1`). Полная реализация materialization pipeline (создание dim/fact таблиц, batch INSERT, ReplacingMergeTree, job-scoped delta, daily re-materialization) запланирована на **Phase B (Trust Analytics)**.
+
+**Target design (Phase B):** Materializer обрабатывает **только записи текущего `job_execution_id`** (job-scoped materialization). Canonical → ClickHouse delta определяется по `job_execution_id`, не по timestamp diff. Full re-materialization (Phase B: daily) — отдельный scheduled job.
 
 ### Consumer error handling
 
@@ -1384,6 +1390,47 @@ ETL materializer записывает данные из canonical layer (Postgre
 | Partial failure | При ошибке INSERT одного batch → log error, continue с остальными. Job → `COMPLETED_WITH_ERRORS` |
 | Full re-materialization | Daily scheduled (ночной window). Перезаписывает все данные. Гарантирует eventual consistency CH ↔ PG |
 | Concurrent access | ClickHouse INSERT не блокирует SELECT. Читатели (seller-operations, analytics) видят consistent snapshot благодаря `FINAL` keyword в критических запросах |
+
+## Implementation Status (Phase A → Phase B gap analysis)
+
+Summary of gaps between this document (target design) and the current codebase.
+
+### Fully implemented
+
+| Area | Status |
+|------|--------|
+| Raw → Normalized → Canonical pipeline (core flow) | Implemented |
+| EventSource Strategy + Registry pattern | Implemented |
+| DAG execution (levels, hard/soft/independent deps) | Implemented |
+| S3 raw storage (MinIO, SHA-256, streaming) | Implemented |
+| CursorExtractor (JsonPath, NoCursor, TailField) | Implemented |
+| WB adapters (7 EventSources, 10 ReadAdapters) | Implemented |
+| Ozon adapters (7 EventSources, 13 ReadAdapters) | Implemented |
+| Normalized model (9 records) | Implemented |
+| Canonical persistence (JDBC batch upsert, IS DISTINCT FROM) | Implemented |
+| Scheduling (SyncScheduler, StaleJobDetector, ShedLock) | Implemented |
+| Job monitoring API (JobController, CostProfileController) | Implemented |
+| Retention (RetentionService, RetentionScheduler) | Implemented |
+| Cost profile SCD2 (CRUD + bulk CSV import) | Implemented |
+
+### Implemented with simplifications (Phase A)
+
+| Area | Current (Phase A) | Target (Phase B) |
+|------|-------------------|------------------|
+| Date-range strategy | Hardcoded `now() - 7 days` for all date-range domains | `last_success_at - overlap_buffer` per domain |
+| Scheduling interval | Uniform 6h for all domains per connection | Per-domain cron (4x/day finance, 2x/day catalog) |
+| WB finance cursor | Same 7d window | `rrdid`-based monotonic cursor |
+| Ozon finance chunking | Same 7d window | Automatic monthly chunk splitting for long gaps |
+| ClickHouse materializer | Stub (logs calls, no actual writes) | Full batch INSERT via ClickHouse JDBC |
+
+### Not yet implemented
+
+| Area | Notes |
+|------|-------|
+| `PROMO_SYNC` EventSource | WB + Ozon promo adapters exist as stubs; EventSource not created |
+| `ADVERTISING_FACT` EventSource | Target design: Raw → Normalized → ClickHouse (bypass canonical). Not started |
+| ClickHouse materialization | `ClickHouseMaterializer` is a stub. ClickHouse schema (`0001-initial.sql`) created but not populated |
+| Post-sync outbox events | Described in doc; not implemented |
 
 ## Связанные модули
 
