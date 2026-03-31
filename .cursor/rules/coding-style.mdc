@@ -1075,3 +1075,44 @@ public class TestOrderBuilder {
 - **Подавление через `@SuppressWarnings`** — только по правилам секции 28 (три исключения + обязательный комментарий).
 - **`//noinspection`** — **запрещён**. Если IDEA показывает ложное срабатывание — исправить код или создать issue.
 - **Generated code** (MapStruct, Lombok) — warnings в сгенерированном коде не считаются.
+
+## 45. Fully-Qualified Class Names — запрещены
+
+### Принцип
+
+В коде **запрещено** использовать fully-qualified class names (например, `java.util.List`, `org.springframework.stereotype.Service`). Всегда добавляй `import` и используй короткое имя класса.
+
+```java
+// ❌
+private final java.util.List<java.math.BigDecimal> prices;
+org.springframework.util.StringUtils.hasText(name);
+
+// ✅
+import java.util.List;
+import java.math.BigDecimal;
+import org.springframework.util.StringUtils;
+
+private final List<BigDecimal> prices;
+StringUtils.hasText(name);
+```
+
+### Единственное исключение — конфликт имён
+
+Fully-qualified name допускается **только** когда в одном файле нужны два класса с одинаковым простым именем из разных пакетов. В этом случае:
+
+1. **Более часто используемый** класс — импортируется и используется по короткому имени.
+2. **Менее часто используемый** — допускается fully-qualified, но только в местах непосредственного использования.
+
+```java
+// ✅ Допустимо при конфликте имён
+import java.util.Date;
+
+java.sql.Date sqlDate = new java.sql.Date(System.currentTimeMillis());
+Date utilDate = new Date();
+```
+
+### Красные флаги
+
+- Fully-qualified name без конфликта имён → добавить import, использовать короткое имя.
+- Несколько fully-qualified обращений к одному классу → точно нужен import.
+- Fully-qualified в аннотациях (`@org.springframework.stereotype.Service`) → всегда import.

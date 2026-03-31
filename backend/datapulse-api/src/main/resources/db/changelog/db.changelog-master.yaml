@@ -8,3 +8,6 @@ databaseChangeLog:
   - include:
       file: changes/0003-etl-tables.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0004-etl-canonical-tables.sql
+      relativeToChangelogFile: true
