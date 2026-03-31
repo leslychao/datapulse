@@ -194,7 +194,7 @@ Enum в `workspace_member.role`:
 |-------|----------|---------------|
 | `sub` | Keycloak user UUID | Связь с `app_user.external_id` |
 | `email` | Email пользователя | Fallback lookup: `app_user.email` |
-| `preferred_username` | Display name | UI display |
+| `preferred_username` | Display name (primary) | UI display; fallback chain: preferred_username → given_name + family_name → name claim → email |
 | `realm_access.roles` | Keycloak realm roles | Не используется для RBAC (роли — в `workspace_member`) |
 
 **WorkspaceContext resolution:**
@@ -205,7 +205,10 @@ Enum в `workspace_member.role`:
 3. HTTP header `X-Workspace-Id` → workspace_id
 4. Validate: workspace_member EXISTS (user_id, workspace_id, status = ACTIVE)
 5. Set WorkspaceContext (request-scoped bean): { user_id, workspace_id, role }
-6. @PreAuthorize checks reference WorkspaceContext.role
+6. Enrich SecurityContext: workspace role добавляется как GrantedAuthority (ROLE_{role})
+   в JwtAuthenticationToken — это позволяет @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+   работать корректно
+7. @PreAuthorize checks reference enriched authorities
 ```
 
 **Без `X-Workspace-Id`:** endpoints не привязанные к workspace (user profile, workspace list) работают без header. Все workspace-scoped endpoints — обязательный header, 400 при отсутствии.
@@ -261,6 +264,9 @@ PENDING → ACCEPTED → (workspace_member created)
 - Шаблон: `invitation-email.html` (Thymeleaf). Содержит: имя приглашающего, workspace name, ссылку с token, срок действия.
 - При ошибке отправки: `log.warn`, invitation остаётся PENDING. Оператор может Resend (генерирует новый token, обновляет token_hash и expires_at).
 - Phase A: SMTP relay (configurable). Phase G: transactional email service (SendGrid / AWS SES).
+- Конфигурация: `datapulse.mail.from` (обратный адрес), `datapulse.mail.invitation-base-url` (базовый URL для ссылки в email).
+- `InvitationMailService` — условный бин (`@ConditionalOnBean(JavaMailSender.class)`): если SMTP не настроен, email не отправляется, invitation остаётся PENDING.
+- Executor: `@Async("mailExecutor")` — отдельный thread pool для отправки email.
 
 ## Signup и регистрация
 
@@ -288,7 +294,7 @@ Datapulse не управляет паролями. Регистрация и а
 ```
 1. Пользователь получает email с invitation link (содержит token)
 2. Переход по ссылке → Keycloak login/register (если нет аккаунта)
-3. POST /api/invitations/{token}/accept (с JWT)
+3. POST /api/invitations/accept { token } (с JWT)
 4. Auto-provision app_user (если первый вход)
 5. Invitation validated: token_hash match, status = PENDING, not expired
 6. CREATE workspace_member (role из invitation)
@@ -337,7 +343,9 @@ ACTIVE → DEACTIVATED → ACTIVE (reactivation)
 
 Scheduled job (hourly): `UPDATE workspace_invitation SET status = 'EXPIRED' WHERE status = 'PENDING' AND expires_at < NOW()`.
 
-Default `expires_at`: 7 дней от создания. Configurable через `@ConfigurationProperties`.
+Default `expires_at`: 7 дней от создания. Cron: `datapulse.tenancy.invitation-expiry-cron` (default: `0 0 * * * *` — каждый час).
+
+Реализация: `InvitationExpiryScheduler` — `@Scheduled` + `@Transactional`, bulk JPQL UPDATE.
 
 ## Пользовательский сценарий: Онбординг (SC-1)
 
@@ -352,7 +360,9 @@ Default `expires_at`: 7 дней от создания. Configurable через 
 
 ### DDL: audit_log
 
-Авторитетная DDL `audit_log` определена в [Audit & Alerting](audit-alerting.md) §audit_log — schema. Tenancy & IAM публикует `AuditEvent` для workspace/user/invitation действий; Audit & Alerting listener записывает в единую таблицу.
+Авторитетная DDL `audit_log` определена в [Audit & Alerting](audit-alerting.md) §audit_log — schema. Tenancy & IAM публикует `AuditEvent` (из `io.datapulse.platform.audit`) для workspace/user/invitation действий; Audit & Alerting listener (`AuditEventListener`) записывает в единую таблицу.
+
+Публикация: `TenancyAuditPublisher` — helper-сервис, обёртка над `ApplicationEventPublisher`. Вызывается из `OnboardingService`, `MemberService`, `InvitationService` после каждого мутирующего действия.
 
 Audit records immutable: update и delete запрещены. Retention: не менее 12 месяцев.
 
@@ -399,7 +409,7 @@ Audit records immutable: update и delete запрещены. Retention: не м
 |--------|------|-------|----------|
 | POST | `/api/tenants/{tenantId}/workspaces` | OWNER (tenant) | Создать workspace. Body: `{ name }`. Response: `201 { id, name, slug }`. Создатель → OWNER |
 | GET | `/api/workspaces` | Authenticated | Список workspace-ов текущего пользователя (все memberships). No `X-Workspace-Id` header |
-| GET | `/api/workspaces/{workspaceId}` | Any role | Детали workspace |
+| GET | `/api/workspaces/{workspaceId}` | Any role | Детали workspace. Response: `{ id, name, slug, status, createdAt, tenantId, tenantName, tenantSlug }` |
 | PUT | `/api/workspaces/{workspaceId}` | ADMIN, OWNER | Обновить workspace (name). Body: `{ name }` |
 | POST | `/api/workspaces/{workspaceId}/suspend` | OWNER | Suspend workspace |
 | POST | `/api/workspaces/{workspaceId}/reactivate` | OWNER | Reactivate suspended workspace |
@@ -418,17 +428,17 @@ Audit records immutable: update и delete запрещены. Retention: не м
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/workspaces/{workspaceId}/invitations` | ADMIN, OWNER | Отправить приглашение. Body: `{ email, role }`. Response: `201`. Дубль на pending email → обновляет token и expires_at |
-| GET | `/api/workspaces/{workspaceId}/invitations` | ADMIN, OWNER | Список приглашений. Filter: `?status=PENDING` |
+| POST | `/api/workspaces/{workspaceId}/invitations` | ADMIN, OWNER | Отправить приглашение. Body: `{ email, role }`. Response: `201`. Дубль на pending email → обновляет role, token и expires_at |
+| GET | `/api/workspaces/{workspaceId}/invitations` | ADMIN, OWNER | Список приглашений (все статусы, сортировка по дате создания desc) |
 | DELETE | `/api/workspaces/{workspaceId}/invitations/{invitationId}` | ADMIN, OWNER | Отменить приглашение → `status = CANCELLED` |
 | POST | `/api/workspaces/{workspaceId}/invitations/{invitationId}/resend` | ADMIN, OWNER | Resend: новый token, обновлён expires_at, email отправлен |
-| POST | `/api/invitations/accept` | Authenticated (no workspace header) | Принять приглашение. Body: `{ token }`. Создаёт workspace_member |
+| POST | `/api/invitations/accept` | Authenticated (no workspace header) | Принять приглашение. Body: `{ token }`. Response: `{ workspaceId, workspaceName, role }`. Создаёт workspace_member. Errors: 404 — token not found; 409 — already accepted / already member; 410 — invitation expired |
 
 ### User profile
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/users/me` | Authenticated | Текущий пользователь: `{ id, email, name, memberships: [{ workspaceId, workspaceName, role }] }` |
+| GET | `/api/users/me` | Authenticated | Текущий пользователь: `{ id, email, name, needsOnboarding, memberships: [{ workspaceId, workspaceName, tenantId, tenantName, role }] }`. `needsOnboarding = true` если нет активных memberships |
 | PUT | `/api/users/me` | Authenticated | Обновить профиль. Body: `{ name }` |
 
 ### Audit log

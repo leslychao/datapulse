@@ -1,13 +1,18 @@
 package io.datapulse.tenancy.domain;
 
+import io.datapulse.common.exception.AppException;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.tenancy.api.AcceptInvitationResponse;
 import io.datapulse.tenancy.api.CreateInvitationRequest;
 import io.datapulse.tenancy.api.InvitationResponse;
+import io.datapulse.tenancy.persistence.AppUserEntity;
+import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceInvitationEntity;
 import io.datapulse.tenancy.persistence.WorkspaceInvitationRepository;
+import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.tenancy.persistence.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +39,9 @@ public class InvitationService {
     private final WorkspaceInvitationRepository invitationRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final AppUserRepository appUserRepository;
+    private final Optional<InvitationMailService> mailService;
+    private final TenancyAuditPublisher auditPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional(readOnly = true)
@@ -56,37 +64,45 @@ public class InvitationService {
             throw BadRequestException.of("invitation.admin.cannot.invite.admin");
         }
 
-        boolean alreadyMember = memberRepository.existsByWorkspace_IdAndUser_IdAndStatus(
-                workspaceId, null, MemberStatus.ACTIVE);
-        // Check by email instead — need to check if email already has active membership
-        // For now, we check for duplicate pending invitations
+        appUserRepository.findByEmail(request.email().trim().toLowerCase())
+                .ifPresent(existingUser -> {
+                    if (memberRepository.existsByWorkspace_IdAndUser_IdAndStatus(
+                            workspaceId, existingUser.getId(), MemberStatus.ACTIVE)) {
+                        throw ConflictException.of("invitation.user.already.member");
+                    }
+                });
 
         Optional<WorkspaceInvitationEntity> existing = invitationRepository
                 .findByWorkspace_IdAndEmailAndStatus(workspaceId, request.email(), InvitationStatus.PENDING);
 
-        if (existing.isPresent()) {
-            WorkspaceInvitationEntity inv = existing.get();
-            inv.setRole(request.role());
-            inv.setTokenHash(hashToken(generateToken()));
-            inv.setExpiresAt(OffsetDateTime.now().plusDays(EXPIRATION_DAYS));
-            invitationRepository.save(inv);
-            return toResponse(inv);
-        }
-
         WorkspaceEntity workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> NotFoundException.workspace(workspaceId));
 
-        String token = generateToken();
+        String rawToken = generateToken();
+
+        if (existing.isPresent()) {
+            WorkspaceInvitationEntity inv = existing.get();
+            inv.setRole(request.role());
+            inv.setTokenHash(hashToken(rawToken));
+            inv.setExpiresAt(OffsetDateTime.now().plusDays(EXPIRATION_DAYS));
+            invitationRepository.save(inv);
+            sendInvitationEmail(inv, rawToken, invitedByUserId, workspace.getName());
+            return toResponse(inv);
+        }
+
         WorkspaceInvitationEntity invitation = new WorkspaceInvitationEntity();
         invitation.setWorkspace(workspace);
         invitation.setEmail(request.email().trim().toLowerCase());
         invitation.setRole(request.role());
         invitation.setStatus(InvitationStatus.PENDING);
-        invitation.setTokenHash(hashToken(token));
+        invitation.setTokenHash(hashToken(rawToken));
         invitation.setExpiresAt(OffsetDateTime.now().plusDays(EXPIRATION_DAYS));
         invitation.setInvitedByUserId(invitedByUserId);
 
         invitationRepository.save(invitation);
+        auditPublisher.publish("member.invite", "workspace_invitation",
+                String.valueOf(invitation.getId()));
+        sendInvitationEmail(invitation, rawToken, invitedByUserId, workspace.getName());
         return toResponse(invitation);
     }
 
@@ -102,6 +118,8 @@ public class InvitationService {
 
         invitation.setStatus(InvitationStatus.CANCELLED);
         invitationRepository.save(invitation);
+        auditPublisher.publish("invitation.cancel", "workspace_invitation",
+                String.valueOf(invitationId));
     }
 
     @Transactional
@@ -114,10 +132,84 @@ public class InvitationService {
             throw BadRequestException.of("invitation.not.pending");
         }
 
-        invitation.setTokenHash(hashToken(generateToken()));
+        String rawToken = generateToken();
+        invitation.setTokenHash(hashToken(rawToken));
         invitation.setExpiresAt(OffsetDateTime.now().plusDays(EXPIRATION_DAYS));
         invitationRepository.save(invitation);
+
+        sendInvitationEmail(invitation, rawToken, invitation.getInvitedByUserId(),
+                invitation.getWorkspace().getName());
+
         return toResponse(invitation);
+    }
+
+    @Transactional
+    public AcceptInvitationResponse acceptInvitation(String rawToken, Long acceptingUserId) {
+        String tokenHash = hashToken(rawToken);
+
+        WorkspaceInvitationEntity invitation = invitationRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> NotFoundException.of("invitation.not.found"));
+
+        if (invitation.getStatus() == InvitationStatus.ACCEPTED) {
+            throw ConflictException.of("invitation.already.accepted");
+        }
+        if (invitation.getStatus() == InvitationStatus.EXPIRED
+                || invitation.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            invitation.setStatus(InvitationStatus.EXPIRED);
+            invitationRepository.save(invitation);
+            throw new AppException("invitation.expired", 410);
+        }
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw BadRequestException.of("invitation.not.pending");
+        }
+
+        AppUserEntity user = appUserRepository.findById(acceptingUserId)
+                .orElseThrow(() -> NotFoundException.entity("AppUser", acceptingUserId));
+
+        WorkspaceEntity workspace = invitation.getWorkspace();
+
+        Optional<WorkspaceMemberEntity> existingMembership = memberRepository
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), acceptingUserId);
+
+        if (existingMembership.isPresent()) {
+            WorkspaceMemberEntity existing = existingMembership.get();
+            if (existing.getStatus() == MemberStatus.ACTIVE) {
+                invitation.setStatus(InvitationStatus.ACCEPTED);
+                invitation.setAcceptedByUserId(acceptingUserId);
+                invitationRepository.save(invitation);
+                throw ConflictException.of("invitation.already.member");
+            }
+            existing.setStatus(MemberStatus.ACTIVE);
+            existing.setRole(invitation.getRole());
+            memberRepository.save(existing);
+        } else {
+            var member = new WorkspaceMemberEntity();
+            member.setWorkspace(workspace);
+            member.setUser(user);
+            member.setRole(invitation.getRole());
+            member.setStatus(MemberStatus.ACTIVE);
+            memberRepository.save(member);
+        }
+
+        invitation.setStatus(InvitationStatus.ACCEPTED);
+        invitation.setAcceptedByUserId(acceptingUserId);
+        invitationRepository.save(invitation);
+        auditPublisher.publish("invitation.accept", "workspace_invitation",
+                String.valueOf(invitation.getId()));
+
+        return new AcceptInvitationResponse(
+                workspace.getId(), workspace.getName(), invitation.getRole());
+    }
+
+    private void sendInvitationEmail(WorkspaceInvitationEntity invitation, String rawToken,
+                                      Long inviterUserId, String workspaceName) {
+        mailService.ifPresent(ms -> {
+            String inviterName = appUserRepository.findById(inviterUserId)
+                    .map(AppUserEntity::getName)
+                    .orElse("Коллега");
+            ms.sendInvitationEmail(invitation.getEmail(), inviterName,
+                    workspaceName, rawToken, EXPIRATION_DAYS);
+        });
     }
 
     private String generateToken() {

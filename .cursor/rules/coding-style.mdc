@@ -1116,3 +1116,61 @@ Date utilDate = new Date();
 - Fully-qualified name без конфликта имён → добавить import, использовать короткое имя.
 - Несколько fully-qualified обращений к одному классу → точно нужен import.
 - Fully-qualified в аннотациях (`@org.springframework.stereotype.Service`) → всегда import.
+
+## 46. Контроллеры не обращаются к репозиториям напрямую
+
+### Принцип
+
+Контроллер (`@RestController`) **никогда** не инжектирует и не вызывает репозиторий (`@Repository`, `JpaRepository`, `JdbcTemplate`) напрямую. Все обращения к данным — только через доменный сервис (`@Service`).
+
+Это обеспечивает чёткое разделение слоёв:
+
+```
+Controller (api/) → Service (domain/) → Repository (persistence/)
+```
+
+### Зачем
+
+- **Единая точка бизнес-логики.** Если контроллер ходит в репозиторий напрямую, бизнес-правила (валидация, авторизация, audit, события) обходятся. Другой контроллер или scheduled job, делающий то же самое, будет вынужден дублировать логику.
+- **Тестируемость.** Сервис легко тестировать unit-тестами с mock-репозиторием. Контроллер тестируется через `@WebMvcTest` с mock-сервисом. Если контроллер зависит от репозитория — тесты становятся интеграционными без необходимости.
+- **Направление зависимостей.** `api/` зависит от `domain/`, `domain/` зависит от `persistence/`. Контроллер, инжектирующий репозиторий, создаёт shortcut-зависимость, нарушающую слоистую архитектуру.
+
+### Красные флаги
+
+- `@RestController` класс имеет поле типа `*Repository` или `JdbcTemplate`
+- Контроллер вызывает `repository.findBy*`, `repository.save(...)`, `jdbcTemplate.query(...)`
+- Контроллер содержит `@Transactional` (признак того, что в нём живёт логика, которая должна быть в сервисе)
+
+### Как исправлять
+
+```java
+// ❌
+@RestController
+@RequiredArgsConstructor
+public class OrderController {
+    private final OrderRepository repository;
+
+    @GetMapping("/orders/{id}")
+    public OrderResponse getOrder(@PathVariable("id") long id) {
+        return repository.findById(id)
+                .map(this::toResponse)
+                .orElseThrow(() -> new NotFoundException("order.not-found"));
+    }
+}
+
+// ✅
+@RestController
+@RequiredArgsConstructor
+public class OrderController {
+    private final OrderService orderService;
+
+    @GetMapping("/orders/{id}")
+    public OrderResponse getOrder(@PathVariable("id") long id) {
+        return orderService.getOrder(id);
+    }
+}
+```
+
+### Единственное исключение
+
+Нет исключений. Даже для «простого CRUD без логики» — создавай тонкий сервис-прослойку. Бизнес-логика появится позже, и она должна оказаться в сервисе, а не в контроллере.

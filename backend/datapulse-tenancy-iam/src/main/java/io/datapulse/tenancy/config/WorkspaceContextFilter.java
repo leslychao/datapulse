@@ -14,12 +14,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Optional;
 
 @Slf4j
@@ -78,6 +83,12 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
             WorkspaceMemberEntity member = membership.get();
             workspaceContext.setWorkspaceId(workspaceId);
             workspaceContext.setRole(member.getRole().name());
+
+            Collection<GrantedAuthority> enrichedAuthorities = new ArrayList<>(jwtAuth.getAuthorities());
+            enrichedAuthorities.add(new SimpleGrantedAuthority("ROLE_" + member.getRole().name()));
+            JwtAuthenticationToken enrichedAuth = new JwtAuthenticationToken(
+                    jwtAuth.getToken(), enrichedAuthorities, jwtAuth.getName());
+            SecurityContextHolder.getContext().setAuthentication(enrichedAuth);
         }
 
         filterChain.doFilter(request, response);

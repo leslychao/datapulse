@@ -1,7 +1,11 @@
 package io.datapulse.tenancy.api;
 
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.tenancy.domain.MemberStatus;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
+import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
+import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.tenancy.persistence.WorkspaceRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,12 +19,35 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping(value = "/api/workspaces", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class WorkspaceController {
 
     private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceMemberRepository memberRepository;
+    private final WorkspaceContext workspaceContext;
+
+    @GetMapping
+    @Transactional(readOnly = true)
+    public List<WorkspaceListResponse> listWorkspaces() {
+        List<WorkspaceMemberEntity> memberships = memberRepository
+                .findByUser_IdAndStatus(workspaceContext.getUserId(), MemberStatus.ACTIVE);
+
+        return memberships.stream()
+                .map(m -> {
+                    WorkspaceEntity ws = m.getWorkspace();
+                    long membersCount = memberRepository.countByWorkspace_IdAndStatus(
+                            ws.getId(), MemberStatus.ACTIVE);
+                    return new WorkspaceListResponse(
+                            ws.getId(), ws.getName(), ws.getSlug(), ws.getStatus(),
+                            ws.getTenant().getId(), ws.getTenant().getName(),
+                            0, membersCount);
+                })
+                .toList();
+    }
 
     @GetMapping("/{workspaceId}")
     public WorkspaceResponse getWorkspace(@PathVariable("workspaceId") Long workspaceId) {

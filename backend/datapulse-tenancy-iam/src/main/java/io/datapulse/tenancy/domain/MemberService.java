@@ -17,6 +17,7 @@ import java.util.List;
 public class MemberService {
 
     private final WorkspaceMemberRepository memberRepository;
+    private final TenancyAuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
     public List<MemberResponse> listMembers(Long workspaceId) {
@@ -50,6 +51,8 @@ public class MemberService {
 
         member.setRole(request.role());
         memberRepository.save(member);
+        auditPublisher.publish("member.role.change", "workspace_member",
+                String.valueOf(targetUserId));
         return toResponse(member);
     }
 
@@ -68,6 +71,8 @@ public class MemberService {
 
         member.setStatus(MemberStatus.INACTIVE);
         memberRepository.save(member);
+        auditPublisher.publish("member.remove", "workspace_member",
+                String.valueOf(targetUserId));
     }
 
     private MemberResponse toResponse(WorkspaceMemberEntity entity) {

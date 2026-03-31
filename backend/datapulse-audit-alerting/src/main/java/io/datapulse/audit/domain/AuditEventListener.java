@@ -1,6 +1,6 @@
 package io.datapulse.audit.domain;
 
-import io.datapulse.audit.domain.event.AuditEvent;
+import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.audit.persistence.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

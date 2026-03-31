@@ -41,6 +41,11 @@ public class AsyncConfig implements AsyncConfigurer {
         return buildExecutor("notification-", 2, 5, 100);
     }
 
+    @Bean("mailExecutor")
+    public TaskExecutor mailExecutor() {
+        return buildExecutor("mail-", 1, 3, 50);
+    }
+
     @Override
     public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
         return (ex, method, params) ->

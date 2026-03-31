@@ -1,0 +1,25 @@
+package io.datapulse.tenancy.api;
+
+import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.tenancy.domain.InvitationService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(value = "/api/invitations", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
+public class InvitationAcceptController {
+
+    private final InvitationService invitationService;
+    private final WorkspaceContext workspaceContext;
+
+    @PostMapping("/accept")
+    public AcceptInvitationResponse acceptInvitation(@Valid @RequestBody AcceptInvitationRequest request) {
+        return invitationService.acceptInvitation(request.token(), workspaceContext.getUserId());
+    }
+}

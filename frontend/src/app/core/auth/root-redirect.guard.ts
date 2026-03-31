@@ -1,34 +1,25 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
-
-interface WorkspaceMembership {
-  workspace_id: number;
-}
-
-interface UserMeResponse {
-  needs_onboarding: boolean;
-  memberships: WorkspaceMembership[];
-}
+import { UserApiService } from '@core/api/user-api.service';
 
 const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
 
 export const rootRedirectGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const http = inject(HttpClient);
+  const userApi = inject(UserApiService);
 
   if (!authService.isAuthenticated()) {
     authService.initLogin();
     return false;
   }
 
-  const me = await firstValueFrom(http.get<UserMeResponse>('/api/users/me'));
+  const me = await firstValueFrom(userApi.getMe());
 
-  if (me.needs_onboarding) {
+  if (me.needsOnboarding) {
     return router.createUrlTree(['/onboarding']);
   }
 
@@ -37,16 +28,16 @@ export const rootRedirectGuard: CanActivateFn = async () => {
   }
 
   if (me.memberships.length === 1) {
-    return router.createUrlTree(['/workspace', me.memberships[0].workspace_id, 'grid']);
+    return router.createUrlTree(['/workspace', me.memberships[0].workspaceId, 'grid']);
   }
 
   const lastId = localStorage.getItem(LAST_WORKSPACE_KEY);
   const lastMembership = lastId
-    ? me.memberships.find((m) => String(m.workspace_id) === lastId)
+    ? me.memberships.find((m) => String(m.workspaceId) === lastId)
     : null;
 
   if (lastMembership) {
-    return router.createUrlTree(['/workspace', lastMembership.workspace_id, 'grid']);
+    return router.createUrlTree(['/workspace', lastMembership.workspaceId, 'grid']);
   }
 
   return router.createUrlTree(['/workspaces']);

@@ -11,8 +11,7 @@ export interface WorkspaceMembership {
 export interface UserProfile {
   id: number;
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   needsOnboarding: boolean;
   memberships: WorkspaceMembership[];
 }
