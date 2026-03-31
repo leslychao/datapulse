@@ -119,7 +119,7 @@
 | Reconciliation safety                 | Uncertain outcomes → RECONCILIATION_PENDING, не SUCCEEDED                                                |
 
 
-Детали реализации (state machine, outbox schema, CAS SQL, retry flow) — [Execution](modules/execution.md).
+Детали реализации (state machine, outbox schema, CAS SQL, retry flow) — [Execution](modules/execution.md). DLX retry для ETL sync jobs — [ETL Pipeline](modules/etl-pipeline.md) §Retry model.
 
 ### ClickHouse unavailability handling
 

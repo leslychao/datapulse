@@ -40,6 +40,7 @@ Datapulse реализуется как **explainable marketplace operating syst
 | 10  | Auditability & explainability       | Provenance, traceability, visible source semantics, explanation summary                                                      |
 | 11  | Safe simulated execution mode       | Полный pricing pipeline без реальной записи в маркетплейс; simulated shadow-state                                            |
 | 12  | Promotions management               | Оценка участия в промо-акциях маркетплейсов: eligibility → margin check → participation decision → execution → reconciliation |
+| 13  | AI-Powered Seller Intelligence      | LLM-driven intelligence: natural language навигация, объяснение аномалий, проактивные инсайты, дайджесты, pricing advisor. Self-hosted LLM, privacy-first |
 
 
 ## Success Criteria
@@ -52,6 +53,7 @@ Datapulse реализуется как **explainable marketplace operating syst
 6. Действия (price actions) проходят полный lifecycle с подтверждением результата
 7. Seller Operations Layer обеспечивает ежедневный рабочий контур (грид, очереди, журналы)
 8. Simulated mode позволяет безопасно тестировать автоматизацию без реальных записей в маркетплейс
+9. AI intelligence: natural language query в Ctrl+K конвертируется в фильтры грида; аномалии сопровождаются human-readable объяснением; проактивные инсайты доставляются без запроса пользователя
 
 ## Technology Stack
 
@@ -71,6 +73,7 @@ Datapulse реализуется как **explainable marketplace operating syst
 | Маппинг             | MapStruct                                          |
 | Кеш                 | Redis (distributed locks / cache only)             |
 | Объектное хранилище | S3-совместимое (raw artifacts, replay)             |
+| LLM Inference       | vLLM + Qwen3-8B (self-hosted, RTX 3060 12GB)      |
 
 
 ## Implementation Constraints
@@ -87,6 +90,8 @@ Datapulse реализуется как **explainable marketplace operating syst
 | **RabbitMQ — только transport/delay**             | Хранение retry truth, business truth, action lifecycle truth или decision truth в брокере запрещено.                               |
 | **Redis — только technical fast layer**           | Хранение canonical truth, action truth или hidden business state в Redis запрещено.                                                |
 | **Проприетарная лицензия**                        | Только для ревью, без прав на распространение.                                                                                     |
+| **Self-hosted LLM only**                          | Данные селлера не отправляются во внешние AI-сервисы (OpenAI, Anthropic, etc.). Только self-hosted модель в контуре Docker Compose. |
+| **LLM — enrichment, не critical path**            | Недоступность LLM не влияет на core functionality. Graceful degradation обязателен для всех AI-фич.                                |
 
 
 ## Delivery Phases
@@ -98,9 +103,9 @@ Datapulse реализуется как **explainable marketplace operating syst
 | **B — Trust Analytics**   | Правдивая аналитика                  | Facts/marts, truthful P&L, returns/penalties, inventory intelligence, anomaly controls. **B extended:** advertising data ingestion (WB + Ozon), advertising cost in P&L | Finance sign conventions validated, join keys confirmed. Advertising read contracts validated (WB fullstats v3, Ozon Performance API) | Data freshness visibility, reconciliation residual tracking       | Pricing decisions — без confirmed P&L truth                  |
 | **C — Pricing**           | Объяснимое ценообразование           | Policies, eligibility, signals, constraints, decision, explanation, manual approval                            | Price write contracts validated                                              | Decision-grade reads only from canonical, explanation audit trail | Auto-execution — без manual approval flow                    |
 | **D — Execution**         | Контролируемое исполнение            | Action lifecycle, executor, retries, reconciliation, failed action alerting, promo evaluation, promo execution | Reconciliation read contracts validated. Promo read contracts validated       | SUCCEEDED = confirmed only, CAS guards, outbox guarantee          | Full automation — без reconciliation                         |
-| **E — Seller Operations** | Операционный рабочий слой            | Grid, saved views, working queues, journals, mismatch monitor, promo analytics in grid                         | —                                                                            | Operational screen performance, server-side pagination            | —                                                            |
+| **E — Seller Operations** | Операционный рабочий слой            | Grid, saved views, working queues, journals, mismatch monitor, promo analytics in grid. **AI:** Smart Command Palette (natural language → filters/navigation) | —                                                                            | Operational screen performance, server-side pagination. LLM graceful degradation | —                                                            |
 | **F — Simulation**        | Безопасное тестирование              | Execution mode, simulated gateway, shadow-state, parity tests                                                  | —                                                                            | Simulated truth isolation from authoritative truth                | Production simulation — без parity tests                     |
-| **G — Intelligence**      | Расширенная аналитика                | Advanced advertising analytics (campaign optimization, ROAS modelling, bid analysis), scenario modelling       | —                                                                            | —                                                                 | —                                                            |
+| **G — Intelligence**      | Расширенная аналитика и AI           | Advanced advertising analytics (campaign optimization, ROAS modelling, bid analysis), scenario modelling. **AI-Powered Seller Intelligence:** anomaly explanation, weekly digest, pricing advisor, proactive insights, alert triage, morning briefing, impact narrative, auto-classification of unknown ops | —                                                                            | Self-hosted LLM (privacy-first), graceful degradation при недоступности LLM  | AI insights — без stable marts и alerting                    |
 
 
 ## Out of Scope
@@ -128,6 +133,7 @@ Datapulse реализуется как **explainable marketplace operating syst
 2. **Observability baseline** — Prometheus/Micrometer (метрики), Grafana (дашборды), Jaeger (distributed tracing), Loki (агрегация логов).
 3. **Raw artifacts storage** — S3-compatible хранилище.
 4. **Notification delivery** — WebSocket в UI. Алерты доставляются через интерфейс; оператор должен быть онлайн.
+5. **AI/LLM infrastructure** — Self-hosted Qwen3-8B через vLLM (OpenAI-compatible API) на бюджетном LLM-сервере (RTX 3060 12GB). Privacy-first: данные не покидают контур. Prompt template система с pre-aggregated данными. LLM вербализирует, не принимает решения. Hybrid thinking: non-thinking mode для быстрых задач (Command Palette), thinking mode для сложных (anomaly explanation, pricing advisor). Путь роста модели без изменения кода: 8B → 14B → 30B-A3B. Детали: [AI-Powered Seller Intelligence](features/2026-03-31-ai-llm-insights.md).
 
 ### B. Open design decisions (before implementation)
 

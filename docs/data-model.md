@@ -130,6 +130,7 @@ outbox_event:
 | event_type | Module | Consumer | Exchange / Queue | Описание |
 |------------|--------|----------|------------------|----------|
 | `ETL_SYNC_EXECUTE` | ETL Pipeline | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` | Запуск ETL sync run |
+| `ETL_SYNC_RETRY` | ETL Pipeline | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` (delayed via `etl.sync.wait` DLX) | DLX auto-retry failed job_execution с checkpoint resume. payload: `{ "jobExecutionId": <id> }` |
 | `ETL_SYNC_COMPLETED` | ETL Pipeline | `datapulse-pricing-worker`, `datapulse-api` | `datapulse.etl.events` / fanout | Уведомление о завершении sync |
 | `PRICING_RUN_EXECUTE` | Pricing | `datapulse-pricing-worker` | `pricing.run` / `pricing.run` | Запуск pricing run batch |
 | `PRICE_ACTION_EXECUTE` | Execution | `datapulse-executor-worker` | `price.execution` / `price.execution` | Исполнение price action |
@@ -146,7 +147,7 @@ outbox_event:
 | Runtime | Обрабатывает event types |
 |---------|--------------------------|
 | `datapulse-api` | — (не является outbox publisher) |
-| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_COMPLETED`, `REMATERIALIZATION_REQUESTED` |
+| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `REMATERIALIZATION_REQUESTED` |
 | `datapulse-pricing-worker` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE` |
 | `datapulse-executor-worker` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK`, `PROMO_ACTION_EXECUTE` |
 

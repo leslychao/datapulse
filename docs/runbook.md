@@ -39,7 +39,7 @@
 | Таблица | Индикатор проблемы | Запрос |
 |---------|-------------------|--------|
 | `outbox_event` | Backlog PENDING/ERROR | `SELECT status, COUNT(*) FROM outbox_event GROUP BY status` |
-| `job_execution` | Длительные IN_PROGRESS | `SELECT * FROM job_execution WHERE status = 'IN_PROGRESS' AND started_at < now() - interval '1 hour'` |
+| `job_execution` | Длительные IN_PROGRESS / зависшие RETRY_SCHEDULED | `SELECT * FROM job_execution WHERE (status = 'IN_PROGRESS' AND started_at < now() - interval '2 hours') OR (status = 'RETRY_SCHEDULED' AND (checkpoint->>'last_retry_at')::timestamptz < now() - interval '1 hour')` |
 | `job_item` | Накопление FAILED | `SELECT * FROM job_item WHERE status IN ('FAILED', 'RETRY_SCHEDULED')` |
 | `price_action` | Actions застряли в нетерминальных статусах | `SELECT status, COUNT(*) FROM price_action WHERE status NOT IN ('SUCCEEDED','FAILED') GROUP BY status` |
 | `price_action_attempt` | Retry exhaustion | `SELECT * FROM price_action_attempt WHERE status = 'FAILED' ORDER BY completed_at DESC` |
@@ -59,17 +59,17 @@
 
 ### FM-1: API маркетплейса возвращает 429
 
-**Симптомы:** ETL source execution в RETRY_SCHEDULED.
+**Симптомы:** `job_execution.status = 'RETRY_SCHEDULED'`, `checkpoint` содержит failed event с `error_type: API_ERROR`.
 
-**Восстановление:** Автоматическое — worker планирует delayed retry через outbox с backoff. После исчерпания попыток (default: 3) → FAILED, downstream шаги lane → SKIPPED.
+**Восстановление:** Автоматическое — worker сохраняет checkpoint (per-event progress) и планирует DLX retry через outbox с backoff (5 мин → 10 мин → 20 мин). При DLX retry worker возобновляет с места ошибки (checkpoint resume). После исчерпания попыток (`max_job_retries`, default: 3) → FAILED.
 
-**Действие:** Проверить job_item на accumulation RETRY_SCHEDULED.
+**Действие:** `SELECT id, status, checkpoint, error_details FROM job_execution WHERE status = 'RETRY_SCHEDULED'`. Проверить `checkpoint.events` — какие events зафейлились, какой cursor. Если retry не помогает — проверить rate limits маркетплейса.
 
 ### FM-2: API маркетплейса возвращает неожиданные ошибки
 
-**Симптомы:** ETL source → FAILED немедленно.
+**Симптомы:** `job_execution` → FAILED (non-retriable), `error_details` содержит причину.
 
-**Восстановление:** Ручное расследование. Проверить логи. Downstream шаги пропускаются.
+**Восстановление:** Ручное расследование. Проверить `error_details` и логи ingest-worker. DLX retry не срабатывает для non-retriable ошибок (4xx кроме 429, parse errors, credentials errors).
 
 **Действие:** Проверить, не связано ли с ломающим изменением API (R-01). Обновить контракт провайдера и адаптер.
 
@@ -134,10 +134,10 @@
 
 ### FM-10: ClickHouse materialization failure
 
-**Симптомы:** Stale data alert. Canonical data в PostgreSQL свежая (`canonical_price_current.updated_at` < threshold), но ClickHouse facts не обновлены. `job_execution` в статусе FAILED или IN_PROGRESS дольше ожидаемого.
+**Симптомы:** Stale data alert. Canonical data в PostgreSQL свежая (`canonical_price_current.updated_at` < threshold), но ClickHouse facts не обновлены. `job_execution` в статусе FAILED, RETRY_SCHEDULED или IN_PROGRESS дольше ожидаемого.
 
 **Диагностика:**
-1. `SELECT status, error_details FROM job_execution WHERE status IN ('FAILED', 'IN_PROGRESS') ORDER BY started_at DESC LIMIT 10`
+1. `SELECT status, error_details, checkpoint FROM job_execution WHERE status IN ('FAILED', 'IN_PROGRESS', 'RETRY_SCHEDULED') ORDER BY started_at DESC LIMIT 10`
 2. Проверить доступность ClickHouse: `SELECT 1 FROM system.one`
 3. Проверить логи ingest-worker на ClickHouse connection errors
 
@@ -177,7 +177,11 @@
 | `datapulse.etl.retry.min-backoff` | 5с | Минимальный backoff |
 | `datapulse.etl.retry.max-backoff` | 5мин | Максимальный backoff |
 | `datapulse.etl.raw-retention.keep-count` | 3 | Количество хранимых raw-снапшотов |
-| `datapulse.etl.stale-job-threshold` | 1h | Порог для перевода IN_PROGRESS → STALE |
+| `datapulse.etl.stale-job-threshold` | 2h | Порог для перевода IN_PROGRESS → STALE |
+| `datapulse.etl.stale-retry-threshold` | 1h | Порог для перевода RETRY_SCHEDULED → STALE (DLX message потерялось) |
+| `datapulse.etl.retry.max-job-retries` | 3 | Макс. DLX retry per job_execution |
+| `datapulse.etl.retry.dlx-min-backoff` | 5мин | Начальная задержка DLX retry |
+| `datapulse.etl.retry.dlx-max-backoff` | 30мин | Максимальная задержка DLX retry |
 
 ### RabbitMQ topology
 
@@ -269,7 +273,7 @@ Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 | Очистка кеша | Configurable | Вытеснение устаревших кешей |
 | Очистка инвайтов | Configurable | Удаление просроченных инвайтов |
 | Сверка алертов | Configurable | Переоценка условий алертов |
-| Stale job detector | Каждые 15 мин | Перевод зависших `job_execution` (IN_PROGRESS > 1h) в STALE |
+| Stale job detector | Каждые 15 мин | Перевод зависших `job_execution` (IN_PROGRESS > 2h, RETRY_SCHEDULED > 1h) в STALE |
 | Raw retention cleanup | Ежедневно | Удаление S3 objects по retention policy, обновление `job_item.status` → EXPIRED |
 
 ## Чеклист production readiness
