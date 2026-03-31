@@ -208,3 +208,4 @@ docs/scenarios/
 | Ozon FBS orders — не тестировался | ETL: FBS ingestion может иметь нюансы | Риск, покрыт в risk-register |
 | Ozon rate limits — не документированы | Integration: conservative defaults, эмпирическая корректировка | Риск, митигация описана |
 | Advertising ingestion — Ozon Performance partial | Analytics: ad_cost allocation для Ozon неполон | Риск для P&L accuracy |
+| On-demand rematerialization scenario missing | `REMATERIALIZATION_REQUESTED` flow (cost_profile bulk update, mapping fix) не имеет dedicated сценария | Minor — триггеры документированы в analytics-pnl.md §Materialization scheduling, добавить ANA-17 при следующей ревизии |

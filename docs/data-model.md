@@ -43,7 +43,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 
 | Модуль | Таблицы |
 |--------|---------|
-| [Tenancy & IAM](modules/tenancy-iam.md) | `tenant`, `workspace`, `app_user`, `workspace_member`, `workspace_invitation`, `audit_log` |
+| [Tenancy & IAM](modules/tenancy-iam.md) | `tenant`, `workspace`, `app_user`, `workspace_member`, `workspace_invitation` |
 | [Integration](modules/integration.md) | `marketplace_connection`, `secret_reference`, `marketplace_sync_state`, `integration_call_log` |
 | [ETL Pipeline](modules/etl-pipeline.md) | `category`, `warehouse`, `product_master`, `seller_sku`, `marketplace_offer`, `cost_profile`, `canonical_price_current`, `canonical_stock_current`, `canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`, `canonical_promo_product`, `job_execution`, `job_item` |
 | [Pricing](modules/pricing.md) | `price_policy` (versioned), `price_policy_assignment`, `price_decision` (policy_snapshot, explanation format), `pricing_run`, `manual_price_lock` |
@@ -135,6 +135,7 @@ outbox_event:
 | `RECONCILIATION_CHECK` | Execution | `datapulse-executor-worker` | `price.reconciliation` / `price.reconciliation` (delayed via DLX) | Deferred reconciliation check |
 | `PROMO_ACTION_EXECUTE` | Promotions | `datapulse-executor-worker` | `promo.execution` / `promo.execution` | Исполнение promo action |
 | `PROMO_EVALUATION_EXECUTE` | Promotions | `datapulse-pricing-worker` | `promo.evaluation` / `promo.evaluation` | Запуск promo evaluation batch |
+| `REMATERIALIZATION_REQUESTED` | Analytics | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` | On-demand rematerialization ClickHouse marts (triggered by ETL backfill or manual request) |
 
 ### Outbox poller
 
@@ -143,7 +144,7 @@ outbox_event:
 | Runtime | Обрабатывает event types |
 |---------|--------------------------|
 | `datapulse-api` | — (не является outbox publisher) |
-| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_COMPLETED` |
+| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_COMPLETED`, `REMATERIALIZATION_REQUESTED` |
 | `datapulse-pricing-worker` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE` |
 | `datapulse-executor-worker` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK`, `PROMO_ACTION_EXECUTE` |
 

@@ -518,6 +518,8 @@ Grain: product × month. Содержит rollup из mart_posting_pnl + PRODUCT
 | `product_refund_ratio` | Decimal(18,4) | product-month level | Yes | |
 | `net_cogs` | Decimal(18,2) | gross_cogs × (1 − product_refund_ratio) | Yes | |
 | `cogs_status` | LowCardinality(String) | worst of posting statuses | No | |
+| `advertising_cost` | Decimal(18,2) | SUM(fact_advertising.spend) allocated per product-month | Yes | 0 до Phase B extended; pro-rata or direct per §Advertising allocation |
+| `full_pnl` | Decimal(18,2) | net_payout − SUM(charges) − advertising_cost − net_cogs | Yes | Computed; NULL if COGS or advertising incomplete |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```

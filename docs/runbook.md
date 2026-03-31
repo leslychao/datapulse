@@ -119,7 +119,20 @@
 
 **Действие:** `SELECT * FROM price_action WHERE status = 'RECONCILIATION_PENDING' AND updated_at < now() - interval '30 minutes'`.
 
-### FM-9: ClickHouse materialization failure
+### FM-9: Vault недоступен
+
+**Симптомы:** Ошибки аутентификации при вызовах marketplace API. Логи Integration module: `Vault unreachable, using cached credentials`. Credential rotation невозможна.
+
+**Восстановление:**
+1. Adapter продолжает работу на last-known credentials (in-memory cache).
+2. Восстановить доступность Vault.
+3. Проверить, что credential rotation не заблокирована: запустить test connection через UI.
+
+**Влияние:** ETL и execution продолжают работу пока cached credentials валидны. Rotation и добавление новых connections невозможны. Если credentials expired во время outage — operations FAILED до восстановления Vault.
+
+**Действие:** Мониторить `integration.vault.cache_hit` metric. Если 100% cache hits → Vault недоступен.
+
+### FM-10: ClickHouse materialization failure
 
 **Симптомы:** Stale data alert. Canonical data в PostgreSQL свежая (`canonical_price_current.updated_at` < threshold), но ClickHouse facts не обновлены. `job_execution` в статусе FAILED или IN_PROGRESS дольше ожидаемого.
 
@@ -134,6 +147,22 @@
 3. При завершении sync — `marketplace_sync_state` обновится → stale data guard снимется
 
 **Влияние:** Canonical truth (PostgreSQL) не пострадала. Pricing заблокирован stale data guard (correct behavior). Analytics screens показывают устаревшие данные.
+
+### FM-11: Price actions застряли в промежуточном статусе
+
+**Симптомы:** Price actions в EXECUTING или SCHEDULED дольше ожидаемого. Stuck-state detector (каждые 5 мин) логирует предупреждения.
+
+**Диагностика:**
+1. `SELECT id, status, updated_at FROM price_action WHERE status IN ('EXECUTING', 'SCHEDULED') AND updated_at < now() - interval '15 minutes'`
+2. Проверить `price_action_attempt` — есть ли зависшие попытки
+3. Проверить логи executor-worker на marketplace API timeouts
+
+**Восстановление:**
+1. Stuck-state detector автоматически переводит застрявшие actions в `RECONCILIATION_PENDING`
+2. Reconciliation worker проверяет фактическое состояние через provider read API
+3. При подтверждении неизвестного исхода — manual investigation
+
+**Действие:** Если проблема массовая — проверить доступность marketplace API (FM-1, FM-2). Если единичная — проверить конкретный action через `price_action_attempt.response_payload`.
 
 ## Конфигурация
 
@@ -156,26 +185,29 @@
 
 ```
 Exchanges (direct):
-  etl.execution       — диспетчеризация ETL-задач
-  etl.execution.wait  — delayed retry (DLX target)
+  etl.sync              — диспетчеризация ETL-задач
+  etl.sync.wait         — delayed retry (DLX target)
+
+Fanout exchange:
+  datapulse.etl.events  — ETL_SYNC_COMPLETED fan-out (pricing-worker, api)
 
 Queues:
-  etl.execution       — ingest worker слушает
-  etl.execution.wait  — TTL expiration → DLX → etl.execution
+  etl.sync              — ingest worker слушает
+  etl.sync.wait         — TTL expiration → DLX → etl.sync
 
 Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 ```
 
-#### Action execution
+#### Price action execution
 
 ```
 Exchanges (direct):
-  action.execution       — диспетчеризация price actions
-  action.execution.wait  — delayed retry (DLX target)
+  price.execution       — диспетчеризация price actions
+  price.execution.wait  — delayed retry (DLX target)
 
 Queues:
-  action.execution       — executor worker слушает
-  action.execution.wait  — TTL expiration → DLX → action.execution
+  price.execution       — executor worker слушает
+  price.execution.wait  — TTL expiration → DLX → price.execution
 
 Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 ```
@@ -184,12 +216,36 @@ Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 
 ```
 Exchanges (direct):
-  action.reconciliation       — deferred reconciliation dispatch
-  action.reconciliation.wait  — delayed reconciliation (DLX)
+  price.reconciliation       — deferred reconciliation dispatch
+  price.reconciliation.wait  — delayed reconciliation (DLX)
 
 Queues:
-  action.reconciliation       — reconciliation consumer
-  action.reconciliation.wait  — TTL → DLX → action.reconciliation
+  price.reconciliation       — reconciliation consumer
+  price.reconciliation.wait  — TTL → DLX → price.reconciliation
+```
+
+#### Promo action execution
+
+```
+Exchanges (direct):
+  promo.execution       — диспетчеризация promo actions
+
+Queues:
+  promo.execution       — executor worker слушает (отдельная queue от price.execution)
+
+Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
+```
+
+#### Promo evaluation
+
+```
+Exchanges (direct):
+  promo.evaluation       — диспетчеризация promo evaluation batches
+
+Queues:
+  promo.evaluation       — pricing worker слушает
+
+Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 ```
 
 ## Базовые действия при сбоях

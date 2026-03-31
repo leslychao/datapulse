@@ -10,6 +10,8 @@
 Этот документ фиксирует write-контракты маркетплейсов для capability **Price Update**,
 используемые в подсистеме ценообразования Datapulse (`PriceUpdateService` → `MarketplacePriceAdapter`).
 
+> **Promo write contracts** (activate/deactivate) задокументированы отдельно: [Promo & Advertising Contracts](promo-advertising-contracts.md).
+
 Confidence levels:
 - **confirmed** — подтверждено реальным API-ответом или кодом
 - **confirmed-docs** — проверено по документации, но не вызывалось с реальными данными

@@ -824,8 +824,8 @@ minio:
   image: minio/minio:latest
   command: server /data --console-address ":9001"
   ports:
-    - "9000:9000"
-    - "9001:9001"
+    - "9010:9000"   # API (mapped to avoid conflicts; matches NFA Docker Compose)
+    - "9011:9001"   # Console
   environment:
     MINIO_ROOT_USER: datapulse
     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
