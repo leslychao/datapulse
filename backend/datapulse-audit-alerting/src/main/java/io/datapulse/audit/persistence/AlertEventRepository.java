@@ -1,8 +1,5 @@
 package io.datapulse.audit.persistence;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;

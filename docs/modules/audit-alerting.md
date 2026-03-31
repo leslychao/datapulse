@@ -83,9 +83,11 @@ audit_log:
 
 ### Audit write mechanism
 
-Через Spring `ApplicationEvent` → `@Async @TransactionalEventListener(AFTER_COMMIT)` → INSERT в отдельной транзакции. Failure to write audit — `log.error`, не прерывает основную операцию (best-effort durability).
+Через Spring `ApplicationEvent` → `@Async @TransactionalEventListener(AFTER_COMMIT)` → INSERT в отдельной транзакции (`REQUIRES_NEW`). Failure to write audit — `log.error`, не прерывает основную операцию (best-effort durability).
 
 Source-модули публикуют `AuditEvent` (domain event). Audit & Alerting listener записывает в `audit_log`. Source-модули не зависят от деталей хранения — только от контракта события.
+
+**Canonical location контракта:** `io.datapulse.platform.audit.AuditEvent` (модуль `datapulse-platform`). Source-модули зависят от `datapulse-platform`, listener в `datapulse-audit-alerting` слушает этот тип.
 
 ### Retention
 
@@ -358,6 +360,8 @@ Thresholds и calibration описаны в [Analytics & P&L](analytics-pnl.md) 
 
 Эти alerts не требуют `alert_rule` — они event-driven (publish `AlertTriggeredEvent` → Audit & Alerting listener → INSERT `alert_event` с `alert_rule_id = NULL`). Auto-resolve не применяется — lifecycle управляется оператором (ACKNOWLEDGED → RESOLVED) или module-specific logic.
 
+**Механизм подписки:** `AlertEventListener` использует `@EventListener` (а не `@TransactionalEventListener`), чтобы alert создавался даже при rollback source-транзакции — operational alert важнее транзакционной консистентности. Для сравнения: `AuditEventListener` использует `@TransactionalEventListener(AFTER_COMMIT)` — audit-запись создаётся только при успешном коммите source-операции.
+
 ---
 
 ## Notification
@@ -445,7 +449,7 @@ Single `datapulse-api` instance: in-memory `SimpleBrokerMessageHandler` (Spring 
 | `/api/notifications/unread-count` | GET | Unread count для badge |
 | `/api/notifications/{id}/read` | POST | Mark read |
 | `/api/notifications/read-all` | POST | Mark all read |
-| `/api/audit-log` | GET | Audit log (paginated, filtered by entity/actor/action_type) |
+| `/api/audit-log` | GET | Audit log (paginated, filtered by entityType/entityId/actorUserId/actionType/dateFrom/dateTo). Response `details` — JSON string (клиент парсит самостоятельно) |
 | `/api/alerts` | GET | Active alert events (paginated, filtered by severity/status/connection) |
 | `/api/alerts/{id}/acknowledge` | POST | OPEN → ACKNOWLEDGED |
 | `/api/alerts/{id}/resolve` | POST | ACKNOWLEDGED → RESOLVED |

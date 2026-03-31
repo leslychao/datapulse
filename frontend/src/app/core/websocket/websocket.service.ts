@@ -4,7 +4,10 @@ import { Subscription } from 'rxjs';
 
 import { environment } from '@env';
 import { AuthService } from '@core/auth/auth.service';
-import { ConnectionSyncStatus, SyncStatusStore } from '@shared/stores/sync-status.store';
+import { NotificationApiService } from '@core/api/notification-api.service';
+import { AppNotification } from '@core/models';
+import { SyncStatusStore } from '@shared/stores/sync-status.store';
+import { NotificationStore } from '@shared/stores/notification.store';
 
 interface SyncStatusMessage {
   connectionId: number;
@@ -13,13 +16,20 @@ interface SyncStatusMessage {
   status: 'OK' | 'STALE' | 'ERROR';
 }
 
+const INITIAL_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
   private readonly authService = inject(AuthService);
   private readonly zone = inject(NgZone);
   private readonly syncStore = inject(SyncStatusStore);
+  private readonly notificationStore = inject(NotificationStore);
+  private readonly notificationApi = inject(NotificationApiService);
   private rxStomp: RxStomp | null = null;
   private subscriptions: Subscription[] = [];
+  private reconnectAttempts = 0;
+  private lastMessageTimestamp: string | null = null;
 
   readonly connected = signal(false);
   readonly reconnecting = signal(false);
@@ -29,18 +39,17 @@ export class WebSocketService {
 
     const config: RxStompConfig = {
       brokerURL: this.buildWsUrl(),
-      connectHeaders: {
-        Authorization: `Bearer ${this.authService.accessToken}`,
-      },
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
-      reconnectDelay: 1000,
+      reconnectDelay: INITIAL_RECONNECT_DELAY_MS,
       beforeConnect: (client) => {
-        client.configure({
-          connectHeaders: {
-            Authorization: `Bearer ${this.authService.accessToken}`,
-          },
-        });
+        client.brokerURL = this.buildWsUrl();
+        const delay = Math.min(
+          INITIAL_RECONNECT_DELAY_MS * Math.pow(2, this.reconnectAttempts),
+          MAX_RECONNECT_DELAY_MS,
+        );
+        client.reconnectDelay = delay;
+        this.reconnectAttempts++;
       },
     };
 
@@ -49,8 +58,16 @@ export class WebSocketService {
 
     this.rxStomp.connectionState$.subscribe((state) => {
       this.zone.run(() => {
+        const wasReconnecting = this.reconnecting();
         this.connected.set(state === 1);
         this.reconnecting.set(state === 0 || state === 3);
+
+        if (state === 1) {
+          this.reconnectAttempts = 0;
+          if (wasReconnecting) {
+            this.syncMissedNotifications();
+          }
+        }
       });
     });
 
@@ -66,6 +83,7 @@ export class WebSocketService {
     }
     this.connected.set(false);
     this.reconnecting.set(false);
+    this.reconnectAttempts = 0;
   }
 
   subscribeTo<T>(destination: string, callback: (msg: T) => void): void {
@@ -81,7 +99,7 @@ export class WebSocketService {
 
   subscribeToWorkspace(workspaceId: number): void {
     this.subscribeTo(`/topic/workspace/${workspaceId}/alerts`, (_msg) => {
-      // TODO: dispatch to notification store
+      // TODO: dispatch to alert store when alert dashboard is implemented (Phase B)
     });
 
     this.subscribeTo<SyncStatusMessage>(
@@ -97,11 +115,23 @@ export class WebSocketService {
     );
 
     this.subscribeTo(`/topic/workspace/${workspaceId}/actions`, (_msg) => {
-      // TODO: dispatch to relevant store
+      // TODO: dispatch to action store when execution module is implemented (Phase D)
     });
 
-    this.subscribeTo(`/user/queue/notifications`, (_msg) => {
-      // TODO: dispatch to notification store
+    this.subscribeTo<AppNotification>(`/user/queue/notifications`, (msg) => {
+      this.notificationStore.addNotification(msg);
+      this.lastMessageTimestamp = new Date().toISOString();
+    });
+  }
+
+  private syncMissedNotifications(): void {
+    if (!this.lastMessageTimestamp) return;
+    this.notificationApi.list({ since: this.lastMessageTimestamp }).subscribe({
+      next: (notifications) => {
+        this.notificationStore.setNotifications(notifications);
+        const unreadCount = notifications.filter((n) => !n.read).length;
+        this.notificationStore.setUnreadCount(unreadCount);
+      },
     });
   }
 
