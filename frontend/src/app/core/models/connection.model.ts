@@ -1,5 +1,5 @@
 export type MarketplaceType = 'WB' | 'OZON';
-export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'SUSPENDED' | 'DISABLED' | 'ARCHIVED' | 'ERROR';
+export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'DISABLED' | 'ARCHIVED';
 
 export interface ConnectionSummary {
   id: number;
@@ -13,11 +13,17 @@ export interface ConnectionSummary {
 
 export interface ConnectionDetail {
   id: number;
-  name: string;
   marketplaceType: MarketplaceType;
+  name: string;
   status: ConnectionStatus;
+  externalAccountId: string | null;
+  lastCheckAt: string | null;
   lastSuccessAt: string | null;
+  lastErrorAt: string | null;
   lastErrorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  syncStates: SyncState[];
 }
 
 export interface CreateConnectionRequest {

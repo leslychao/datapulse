@@ -287,7 +287,6 @@ export class ConnectionsPageComponent {
       case 'ACTIVE': return 'Активно';
       case 'PENDING_VALIDATION': return 'Проверка';
       case 'AUTH_FAILED': return 'Ошибка авторизации';
-      case 'ERROR': return 'Ошибка';
       case 'DISABLED': return 'Отключено';
       case 'ARCHIVED': return 'В архиве';
       default: return status;
@@ -298,7 +297,7 @@ export class ConnectionsPageComponent {
     switch (status) {
       case 'ACTIVE': return 'success';
       case 'PENDING_VALIDATION': return 'info';
-      case 'AUTH_FAILED': case 'ERROR': return 'error';
+      case 'AUTH_FAILED': return 'error';
       case 'DISABLED': case 'ARCHIVED': return 'neutral';
       default: return 'neutral';
     }

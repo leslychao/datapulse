@@ -254,16 +254,19 @@ public class ConnectionService {
     }
 
     @Transactional
-    public void triggerSync(Long connectionId, Long workspaceId, Long userId) {
+    public void triggerSync(Long connectionId, Long workspaceId, Long userId,
+                            io.datapulse.integration.api.TriggerSyncRequest request) {
         MarketplaceConnectionEntity connection = findConnectionOrThrow(connectionId, workspaceId);
 
         if (!ConnectionStatus.ACTIVE.name().equals(connection.getStatus())) {
             throw BadRequestException.of("connection.sync.requires.active", connection.getStatus());
         }
 
-        log.info("Manual sync triggered: connectionId={}, workspaceId={}, userId={}",
-                connectionId, workspaceId, userId);
-        eventPublisher.publishEvent(new SyncTriggeredEvent(connectionId, workspaceId, userId));
+        List<String> domains = request != null ? request.domains() : null;
+
+        log.info("Manual sync triggered: connectionId={}, workspaceId={}, userId={}, domains={}",
+                connectionId, workspaceId, userId, domains);
+        eventPublisher.publishEvent(new SyncTriggeredEvent(connectionId, workspaceId, userId, domains));
     }
 
     @Transactional(readOnly = true)

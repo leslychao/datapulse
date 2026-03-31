@@ -298,7 +298,7 @@ export class StepConnectionComponent implements OnDestroy {
       return;
     }
 
-    if (status === 'AUTH_FAILED' || status === 'ERROR') {
+    if (status === 'AUTH_FAILED') {
       this.stopPolling();
       this.validationState.set('failure');
       this.errorMessage.set(

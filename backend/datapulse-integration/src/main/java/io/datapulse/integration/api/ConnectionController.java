@@ -107,12 +107,14 @@ public class ConnectionController {
     @PostMapping("/{connectionId}/sync")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
-    public void triggerSync(@PathVariable("connectionId") Long connectionId) {
+    public void triggerSync(@PathVariable("connectionId") Long connectionId,
+                            @RequestBody(required = false) TriggerSyncRequest request) {
         connectionService.triggerSync(
-                connectionId, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+                connectionId, workspaceContext.getWorkspaceId(), workspaceContext.getUserId(), request);
     }
 
     @GetMapping("/{connectionId}/call-log")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public Page<CallLogResponse> getCallLog(@PathVariable("connectionId") Long connectionId,
                                             CallLogFilter filter, Pageable pageable) {
         return connectionService.getCallLog(
