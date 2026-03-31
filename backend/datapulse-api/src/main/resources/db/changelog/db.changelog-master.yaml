@@ -1,0 +1,8 @@
+databaseChangeLog:
+  # Phase A: Foundation
+  # - include:
+  #     file: changes/0001-tenancy-iam-tables.sql
+  #     relativeToChangelogFile: true
+  # - include:
+  #     file: changes/0002-integration-tables.sql
+  #     relativeToChangelogFile: true

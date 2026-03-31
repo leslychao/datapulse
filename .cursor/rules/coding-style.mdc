@@ -639,7 +639,7 @@ public @interface ValidDateRange {
 ### Подход: модуль → слои внутри
 
 ```
-com.datapulse
+io.datapulse
   └── <module>/                 — pricing, etl, execution, analytics, ...
        ├── api/                 — контроллеры, request/response DTO
        ├── domain/              — сервисы, бизнес-логика, доменные события
@@ -653,7 +653,7 @@ com.datapulse
 - **Package-private по умолчанию** для внутренних классов модуля. `public` — только то, что вызывается из других модулей.
 - **Cross-module зависимости** — только через public API: domain events, public-сервисы, shared DTO из `api/`.
 - **Circular dependencies** между модулями — **запрещены**. Если два модуля зависят друг от друга → вынести общее в shared-пакет или использовать events.
-- **Shared пакеты** (`com.datapulse.common`, `com.datapulse.security`) — только для cross-cutting concerns: base entity, security context, exception hierarchy, common DTO.
+- **Shared пакеты** (`io.datapulse.common`, `io.datapulse.platform`) — только для cross-cutting concerns: base entity, security context, exception hierarchy, common DTO.
 - Один модуль = один bounded context. Не разносить логику одного модуля по нескольким top-level пакетам.
 
 ## 32. DTO дизайн и naming
@@ -883,7 +883,7 @@ javax.* / jakarta.*
                                 — пустая строка
 org.springframework.*
                                 — пустая строка
-com.datapulse.*
+io.datapulse.*
                                 — пустая строка
 [другие сторонние библиотеки]
                                 — пустая строка
@@ -975,7 +975,7 @@ public class TestOrderBuilder {
 |---------------------|---------------|
 | Одного класса | `private` метод |
 | Одного пакета/модуля | Package-private helper или shared сервис внутри модуля |
-| Нескольких модулей | Класс в `com.datapulse.common` или shared интерфейс с default-методом |
+| Нескольких модулей | Класс в `io.datapulse.common` или shared интерфейс с default-методом |
 | Strategy/handler реализаций | Базовый абстрактный класс с template method, или `default` метод в интерфейсе |
 | SQL-запросов | Общие фрагменты в `private static final String`, SQL composition через `String.formatted(...)` |
 

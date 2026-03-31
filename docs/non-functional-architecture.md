@@ -521,109 +521,159 @@ ClickHouse DDL управляется custom `ClickHouseMigrationRunner` (см. 
 
 ## Maven module structure
 
-Modular monolith — один Git repo, один root `pom.xml`, multi-module Maven project. Каждый runtime (api, ingest-worker, pricing-worker, executor-worker) — отдельный Spring Boot executable jar. Общий код — shared library modules.
+Modular monolith — один Git repo, один root `pom.xml`, multi-module Maven project. Один runtime entrypoint (`datapulse-api`) — Spring Boot executable jar. Бизнес-логика разделена по **per-module** Maven-артефактам: каждый бизнес-модуль — отдельный JAR с собственными entities, repos и сервисами.
+
+### Структура модулей
 
 ```
-datapulse/
+datapulse/backend/
 ├── pom.xml                          (parent POM, dependency management, plugin management)
 │
-├── datapulse-common/                (shared utilities, base classes, no Spring context)
+├── datapulse-common/                (чистая Java: exceptions, utils, message codes — без Spring)
 │   ├── pom.xml
-│   └── src/main/java/com/datapulse/common/
-│       ├── exception/               AppException, NotFoundException, BadRequestException, MessageCodes
-│       ├── model/                   BaseEntity, enums shared across modules
+│   └── src/main/java/io/datapulse/common/
+│       ├── exception/               AppException, NotFoundException, BadRequestException
+│       ├── error/                   ErrorResponse, MessageCodes
 │       └── util/                    SlugUtils, BigDecimalUtils, etc.
 │
-├── datapulse-domain/                (domain model: entities, records, events — no infrastructure)
+├── datapulse-platform/              (Spring-aware shared platform: base entity, security context, configs)
 │   ├── pom.xml                      depends on: datapulse-common
-│   └── src/main/java/com/datapulse/domain/
-│       ├── tenancy/                 Tenant, Workspace, AppUser, WorkspaceMember, WorkspaceInvitation
-│       ├── integration/             MarketplaceConnection, SecretReference, SyncState
-│       ├── etl/                     JobExecution, JobItem, canonical entities
-│       ├── pricing/                 PricePolicy, PriceDecision, PricingRun, ManualPriceLock
-│       ├── execution/               PriceAction, PriceActionAttempt, DeferredAction, SimulatedOfferState
-│       ├── promotions/              PromoPolicy, PromoEvaluation, PromoDecision, PromoAction
-│       ├── operations/              SavedView, WorkingQueueDefinition, WorkingQueueAssignment
-│       ├── audit/                   AuditLog, AlertRule, AlertEvent, UserNotification
-│       └── outbox/                  OutboxEvent
+│   └── src/main/java/io/datapulse/platform/
+│       ├── persistence/             BaseEntity (@MappedSuperclass)
+│       ├── security/                WorkspaceContext (request-scoped)
+│       ├── config/                  AsyncConfig, JacksonConfig, WebClientConfig
+│       └── observability/           MetricsFacade
 │
-├── datapulse-infrastructure/        (repositories, adapters, outbox, external integrations)
-│   ├── pom.xml                      depends on: datapulse-domain
-│   └── src/main/java/com/datapulse/infrastructure/
-│       ├── persistence/             JPA repos, JDBC repos (analytics, grid read model)
-│       ├── marketplace/             WB/Ozon API adapters (WebClient)
+├── datapulse-tenancy-iam/           (multi-tenancy, users, roles, invitations, auth)
+│   ├── pom.xml                      depends on: datapulse-platform
+│   └── src/main/java/io/datapulse/tenancy/
+│       ├── api/                     request/response records
+│       ├── domain/                  Tenant, Workspace, AppUser, WorkspaceMember, WorkspaceInvitation; services
+│       ├── persistence/             JPA repositories
+│       └── config/                  SecurityConfig, WorkspaceContextFilter
+│
+├── datapulse-integration/           (marketplace connections, credentials, health-check, call log)
+│   ├── pom.xml                      depends on: datapulse-tenancy-iam
+│   └── src/main/java/io/datapulse/integration/
+│       ├── api/                     request/response records
+│       ├── domain/                  MarketplaceConnection, SecretReference, SyncState; services
+│       ├── persistence/             JPA repositories
+│       ├── marketplace/             WB/Ozon API adapters (WebClient), rate limiters
 │       ├── vault/                   VaultCredentialStore, credential caching
-│       ├── s3/                      S3RawStorage (MinIO adapter)
-│       ├── clickhouse/              ClickHouse JDBC repos (materialization, analytics queries)
-│       ├── outbox/                  OutboxPoller, OutboxPublisher
-│       └── rabbitmq/                RabbitMQ producers, topology configuration
+│       └── config/                  ProviderProperties, RateLimitProperties
 │
-├── datapulse-service/               (business logic: services, pipelines, event listeners)
-│   ├── pom.xml                      depends on: datapulse-domain, datapulse-infrastructure
-│   └── src/main/java/com/datapulse/service/
-│       ├── tenancy/                 TenantService, WorkspaceService, InvitationService
-│       ├── integration/             ConnectionService, SyncSchedulerService
-│       ├── etl/                     IngestOrchestrator, adapters per domain, normalizers, canonical writers
-│       ├── pricing/                 PricingPipeline, strategies, constraints, guards, signal assembly
-│       ├── execution/               ActionLifecycleService, RetryService, ReconciliationService
-│       ├── promotions/              PromoEvaluationPipeline, PromoDecisionService, PromoActionService
-│       ├── operations/              GridService, SavedViewService, WorkingQueueService
-│       └── audit/                   AuditService, AlertCheckerService, NotificationService
+├── datapulse-etl/                   (canonical entities, ETL pipeline, raw layer, materializer)
+│   ├── pom.xml                      depends on: datapulse-integration
+│   └── src/main/java/io/datapulse/etl/
+│       ├── api/                     request/response records
+│       ├── domain/                  JobExecution, JobItem, canonical entities, cost_profile; services
+│       ├── persistence/             JPA repos (canonical), JDBC repos (ClickHouse materialization)
+│       ├── pipeline/                IngestOrchestrator, normalizers, canonical writers
+│       ├── raw/                     S3RawStorage, cursor extractors, streaming capture
+│       ├── outbox/                  OutboxEvent entity, OutboxPoller, OutboxPublisher
+│       └── config/                  EtlProperties, S3Properties, ClickHouseProperties
 │
-├── datapulse-api/                   (REST controllers, WebSocket, security config → executable jar)
-│   ├── pom.xml                      depends on: datapulse-service
-│   └── src/main/java/com/datapulse/api/
-│       ├── DatapulseApiApplication.java
-│       ├── config/                  SecurityConfig, WebSocketConfig, MapperConfig, CorsConfig
+├── datapulse-analytics-pnl/         (ClickHouse read repos, data quality checkers, mart queries)
+│   ├── pom.xml                      depends on: datapulse-etl
+│   └── src/main/java/io/datapulse/analytics/
+│       ├── api/                     response records (P&L, inventory, returns)
+│       ├── domain/                  DataQualityService, AnomalyChecker
+│       ├── persistence/             JDBC repos (ClickHouse reads: facts, marts, dashboards)
+│       └── config/                  AnalyticsProperties
+│
+├── datapulse-pricing/               (policies, strategies, signals, constraints, decisions)
+│   ├── pom.xml                      depends on: datapulse-etl (canonical entities)
+│   └── src/main/java/io/datapulse/pricing/
+│       ├── api/                     request/response records
+│       ├── domain/                  PricePolicy, PriceDecision, PricingRun, ManualPriceLock; services
+│       ├── persistence/             JPA repos, JDBC repos (ClickHouse signal assembly)
+│       ├── pipeline/                PricingPipeline, strategies, constraints, guards
+│       └── config/                  PricingProperties
+│
+├── datapulse-execution/             (action lifecycle, retry, reconciliation, simulation)
+│   ├── pom.xml                      depends on: datapulse-pricing, datapulse-integration
+│   └── src/main/java/io/datapulse/execution/
+│       ├── api/                     request/response records
+│       ├── domain/                  PriceAction, PriceActionAttempt, SimulatedOfferState; services
+│       ├── persistence/             JPA repos
+│       └── config/                  ExecutionProperties
+│
+├── datapulse-promotions/            (promo evaluation, decisions, actions)
+│   ├── pom.xml                      depends on: datapulse-pricing, datapulse-etl, datapulse-execution
+│   └── src/main/java/io/datapulse/promotions/
+│       ├── api/                     request/response records
+│       ├── domain/                  PromoPolicy, PromoEvaluation, PromoDecision, PromoAction; services
+│       ├── persistence/             JPA repos
+│       └── config/                  PromoProperties
+│
+├── datapulse-seller-operations/     (grid, saved views, working queues, journals)
+│   ├── pom.xml                      depends on: datapulse-etl, datapulse-analytics-pnl, datapulse-pricing
+│   └── src/main/java/io/datapulse/operations/
+│       ├── api/                     request/response records
+│       ├── domain/                  SavedView, WorkingQueueDefinition; services
+│       ├── persistence/             JPA repos, JDBC repos (grid read model: PG + ClickHouse)
+│       └── config/                  OperationsProperties
+│
+├── datapulse-audit-alerting/        (audit log, alerts, notifications)
+│   ├── pom.xml                      depends on: datapulse-platform
+│   └── src/main/java/io/datapulse/audit/
+│       ├── api/                     request/response records
+│       ├── domain/                  AuditLog, AlertRule, AlertEvent, UserNotification; services
+│       ├── persistence/             JPA repos
+│       ├── event/                   @EventListener-ы (audit events from all modules via Spring ApplicationEvent)
+│       └── config/                  AlertProperties
+│
+├── datapulse-api/                   (REST controllers, WebSocket, security config → Spring Boot executable jar)
+│   ├── pom.xml                      depends on: все бизнес-модули
+│   └── src/main/java/io/datapulse/api/
+│       ├── DatapulseApplication.java
+│       ├── config/                  WebSocketConfig, CorsConfig, RabbitMQ topology
 │       ├── controller/              REST controllers per module
 │       └── websocket/               STOMP handlers, notification push
-│
-├── datapulse-ingest-worker/         (ETL worker → executable jar)
-│   ├── pom.xml                      depends on: datapulse-service
-│   └── src/main/java/com/datapulse/worker/ingest/
-│       ├── IngestWorkerApplication.java
-│       ├── config/                  RabbitMQ listener config, outbox poller config
-│       └── listener/                ETL message consumers
-│
-├── datapulse-pricing-worker/        (pricing + promo evaluation worker → executable jar)
-│   ├── pom.xml                      depends on: datapulse-service
-│   └── src/main/java/com/datapulse/worker/pricing/
-│       ├── PricingWorkerApplication.java
-│       ├── config/                  RabbitMQ listener config, outbox poller config
-│       └── listener/                Pricing run consumer, promo evaluation consumer
-│
-├── datapulse-executor-worker/       (execution worker → executable jar)
-│   ├── pom.xml                      depends on: datapulse-service
-│   └── src/main/java/com/datapulse/worker/executor/
-│       ├── ExecutorWorkerApplication.java
-│       ├── config/                  RabbitMQ listener config, outbox poller config
-│       └── listener/                Price action consumer, promo action consumer
 │
 └── docs/                            (architecture documentation)
 ```
 
-**Принципы:**
+### Внутренняя структура каждого бизнес-модуля
+
+Каждый бизнес-модуль организован по слоям внутри (см. также coding-style §31):
+
+```
+io.datapulse.<module>/
+├── api/            request/response records (DTO), shared interfaces
+├── domain/         JPA entities, services, business logic, domain events
+├── persistence/    JPA repos, JDBC repos, RowMapper-ы
+├── event/          @EventListener-ы (если несколько)
+└── config/         @Configuration, @ConfigurationProperties
+```
+
+### Maven dependency DAG
+
+```
+common ← platform ← tenancy-iam ← integration ← etl
+                                                   ↑
+                                    analytics-pnl ─┘
+                                    pricing ─────── etl
+                                    execution ───── pricing + integration
+                                    promotions ──── pricing + etl + execution
+                                    seller-ops ──── etl + analytics-pnl + pricing
+                                    audit-alerting ── platform (Spring events, без module deps)
+
+                                    api ──── все бизнес-модули
+```
+
+Граф ациклический (DAG). Circular dependency = build failure.
+
+### Принципы
 
 | Принцип | Описание |
 |---------|----------|
-| Dependency direction | `common` ← `domain` ← `infrastructure` ← `service` ← `api/workers`. Строго однонаправленные зависимости, нижние слои не знают о верхних |
-| Domain purity | `datapulse-domain` — чистые Java классы (entities, records, enums, events). Без Spring-аннотаций кроме JPA (`@Entity`, `@Column`, etc.) |
-| Shared infrastructure | `datapulse-infrastructure` — один модуль (не per-module infra). Обоснование: modular monolith, единый persistence context, shared DB |
-| Executable modules | 4 Spring Boot apps (api, 3 workers). Каждый импортирует только нужные сервисы через `@ComponentScan` / `@Import` / `@Profile` |
+| Per-module boundaries | Каждый бизнес-модуль — отдельный Maven artifact. Границы enforce на уровне компиляции |
+| Dependency direction | `common` ← `platform` ← `бизнес-модули` ← `api`. Строго однонаправленные зависимости |
+| Module self-containment | Каждый модуль содержит свои entities, repos и сервисы. Cross-module доступ — через Maven dependency |
+| Shared read-side repos | Модуль может иметь собственные JDBC repos для чтения shared ClickHouse таблиц (pricing reads signals, seller-ops reads grid). Это не дублирование — это разные query-контракты |
 | No circular deps | Maven enforced — circular dependency = build failure |
-
-**Workers vs API — component scan scope:**
-
-Каждый worker подключает только необходимые сервисы:
-
-| Runtime | Сканирует пакеты |
-|---------|------------------|
-| `datapulse-api` | `com.datapulse.service.*`, `com.datapulse.infrastructure.*`, `com.datapulse.api.*` |
-| `datapulse-ingest-worker` | `com.datapulse.service.etl`, `com.datapulse.service.integration`, `com.datapulse.infrastructure.*` |
-| `datapulse-pricing-worker` | `com.datapulse.service.pricing`, `com.datapulse.service.promotions`, `com.datapulse.infrastructure.*` |
-| `datapulse-executor-worker` | `com.datapulse.service.execution`, `com.datapulse.service.promotions`, `com.datapulse.infrastructure.*` |
-
-Worker-ы не подключают REST controllers и WebSocket — эти компоненты только в `datapulse-api`.
+| Single runtime | Phase A–E: один `datapulse-api` runtime. Worker separation — Phase G при необходимости масштабирования |
 
 ## Migration strategy
 
