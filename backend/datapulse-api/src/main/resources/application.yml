@@ -79,6 +79,13 @@ datapulse:
     password: ${CH_PASSWORD:}
     migration:
       enabled: true
+  outbox:
+    enabled: true
+    runtime: ALL
+    poll-interval: PT1S
+    batch-size: 50
+    max-retry-count: 5
+    retry-backoff: PT30S
 
 management:
   endpoints:
