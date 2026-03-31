@@ -270,13 +270,62 @@ public record SimulationRequest(
 - **Infrastructure "should not happen"**: `IllegalStateException` с описательным сообщением.
 - **Non-fatal ошибки**: catch + `log.error/warn`, без rethrow.
 
-## 11. MapStruct маппинг
+## 11. Маппинг и конверсия типов
+
+Три инструмента — каждый для своего контекста:
+
+| Контекст | Инструмент | Когда |
+|-----------|-----------|-------|
+| JSON body (`@RequestBody` / response) | **Jackson** (`@JsonCreator`) | Десериализация enum / полиморфных типов из JSON |
+| URL / query / SpEL (`@PathVariable`, `@RequestParam`, SpEL в `@PreAuthorize`) | **Spring `Converter<S, T>`** | Преобразование строки из URL в enum, value object, кастомный ID-тип |
+| Object ↔ Object (entity ↔ DTO, request → entity) | **MapStruct** | Маппинг объектов с множеством полей, вложенными структурами, коллекциями |
+
+### MapStruct
 
 - `@Mapper(componentModel = "spring", config = BaseMapperConfig.class)`.
 - `BaseMapperConfig`: `unmappedTargetPolicy = ERROR`, `nullValuePropertyMappingStrategy = IGNORE`.
 - Основной метод: `toResponse(Entity)`.
 - Сложные маппинги: `@Mapping`, `@Named` + `qualifiedByName`, `default` методы для ручной сборки.
 - Вспомогательные маппeры подключаются через `uses = HelperMapper.class`.
+
+### Spring Converter
+
+Spring `Converter<S, T>` (`org.springframework.core.convert.converter`) — для простых type-pair преобразований, которые Spring применяет автоматически в MVC binding, SpEL и data binding.
+
+**Использовать для:**
+- `String → Enum` (case-insensitive) — чтобы `?status=active` корректно маппился в `Status.ACTIVE`.
+- `String → Value Object` — кастомные ID-типы (`ConnectionId`, `WorkspaceSlug`), если они используются как `@PathVariable` / `@RequestParam`.
+
+**Не использовать для:**
+- Entity ↔ DTO маппинга — это MapStruct (compile-time проверка полей через `unmappedTargetPolicy = ERROR`).
+- JSON-десериализации — это Jackson (`@JsonCreator` на enum-ах, `@JsonTypeInfo` для полиморфных типов).
+
+**Регистрация:** через `WebMvcConfigurer.addFormatters()` в `@Configuration` модуля.
+
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void addFormatters(FormatterRegistry registry) {
+        registry.addConverter(new StringToOrderStatusConverter());
+    }
+}
+```
+
+**Реализация:** один конвертер на type-pair, без бизнес-логики внутри.
+
+```java
+public class StringToOrderStatusConverter implements Converter<String, OrderStatus> {
+    @Override
+    public OrderStatus convert(String source) {
+        return OrderStatus.valueOf(source.trim().toUpperCase());
+    }
+}
+```
+
+**Naming:** `StringTo<TargetType>Converter` — `StringToMarketplaceTypeConverter`, `StringToConnectionIdConverter`.
+
+**Расположение:** пакет `config/` модуля, рядом с `@Configuration`-классом, который регистрирует конвертер. Если конвертеров много (3+) — отдельный sub-package `config/converter/`.
 
 ## 12. Логирование
 

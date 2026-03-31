@@ -1160,7 +1160,4 @@ Returns seller's own FBS warehouses. Empty for sellers without FBS setup.
 **Datapulse использует Personal token** → стандартные rate limits.
 Service tokens имеют **независимые** лимиты per individual service.
 
-**Рекомендация для реализации:**
-- Для endpoints с unknown rate limit: adaptive rate limiting (exponential backoff при HTTP 429)
-- Стартовый safe interval: 1 request per 10 seconds для Content/Prices
-- Мониторинг: логировать 429 responses, автоматически увеличивать interval
+**Реализация rate limiting:** см. [Integration §Rate limiting](../modules/integration.md#rate-limiting). Стартовый conservative rate для `WB_CONTENT` и `WB_PRICES_READ`: 1 req/10s.

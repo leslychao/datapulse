@@ -507,6 +507,7 @@ Pricing pipeline работает с конечной ценой для поку
 | Manual | REST API `POST /api/pricing/runs` → outbox → RabbitMQ | По требованию |
 | Schedule | Spring `@Scheduled` cron → outbox → RabbitMQ | Configurable cron |
 | Policy change | `@TransactionalEventListener(AFTER_COMMIT)` → outbox → RabbitMQ | При изменении/активации policy |
+| **Manual bulk** | REST API `POST /api/pricing/bulk-manual/apply` → synchronous run | По требованию (ad-hoc). Strategy = `MANUAL_OVERRIDE` (user-provided price). Guards: frequency, volatility, stock-out **не применяются**. См. [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
 
 #### Post-sync trigger flow
 
@@ -534,7 +535,9 @@ pricing_run:
   id                      BIGSERIAL PK
   workspace_id            BIGINT FK → workspace              NOT NULL
   connection_id           BIGINT FK → marketplace_connection  NOT NULL
-  trigger_type            VARCHAR(30) NOT NULL                -- POST_SYNC, MANUAL, SCHEDULED, POLICY_CHANGE
+  trigger_type            VARCHAR(30) NOT NULL                -- POST_SYNC, MANUAL, SCHEDULED, POLICY_CHANGE, MANUAL_BULK
+  request_hash            VARCHAR(64)                         -- SHA-256 дедупликации для MANUAL_BULK (nullable)
+  requested_offers_count  INT                                 -- для MANUAL_BULK: сколько offers в запросе (nullable)
   source_job_execution_id BIGINT FK → job_execution           (nullable — only for POST_SYNC)
   status                  VARCHAR(20) NOT NULL DEFAULT 'PENDING'
   total_offers            INT
@@ -662,6 +665,19 @@ Impact preview — часть операционного cockpit. UI интег�
 |--------|------|-------|----------|
 | POST | `/api/pricing/policies/{policyId}/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run preview. Response: aggregated summary + paginated per-offer breakdown |
 
+### Bulk manual price operations
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/pricing/bulk-manual/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run: constraints + guards per-offer. Body: `{ changes: [{ marketplaceOfferId, targetPrice }] }`. Response: per-offer result + summary. Max 500 offers. Timeout 30s |
+| POST | `/api/pricing/bulk-manual/apply` | PRICING_MANAGER, ADMIN, OWNER | Создаёт pricing_run (MANUAL_BULK) + decisions (MANUAL_OVERRIDE) + actions (APPROVED). Body: тот же формат. Idempotency: `request_hash` (SHA-256). Детали: [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
+
+### Bulk cost update
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/cost-profiles/bulk-update` | PRICING_MANAGER, ADMIN, OWNER | Массовое обновление себестоимости (SCD2). Body: `{ sellerSkuIds, operation, value, validFrom }`. Max 500 SKUs. Детали: [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
+
 ## Связанные модули
 
 - [Analytics & P&L](analytics-pnl.md) — derived signals через signal assembler
@@ -670,3 +686,4 @@ Impact preview — часть операционного cockpit. UI интег�
 - [Promotions](promotions.md) — Promo guard читает canonical participation_status; shared signal assembler
 - [Seller Operations](seller-operations.md) — price journal, recommendations UI, impact preview UI
 - Детальные write-контракты: [Write Contracts](../provider-api-specs/write-contracts.md)
+- [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) — Phase E: bulk manual pricing, draft mode, bulk cost update

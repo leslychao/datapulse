@@ -62,21 +62,23 @@ Integration управляет marketplace connections, credentials (Vault), pro
 
 ### INT-07: Rate limiting — token bucket
 
-- **Назначение:** Соблюдение rate limits маркетплейсов.
-- **Trigger:** Every outbound API call.
-- **Main path:** Acquire token from bucket → proceed. No token → wait (backoff) → retry acquire.
-- **Dependencies:** Rate limit config per provider per API group.
-- **Failure risks:** Incorrect limits → 429 responses. Recovery: adaptive backoff on 429.
-- **Uniqueness:** Infrastructure cross-cutting concern. Per-adapter, per-API-group granularity.
+- **Назначение:** Проактивное соблюдение rate limits маркетплейсов.
+- **Trigger:** Every outbound API call (ETL sync и Execution writes).
+- **Main path:** `rateLimiter.acquire(connectionId, group)` → Redis Lua tryAcquire → if token available → future completes immediately. If no token → future completes after `wait_ms` via `ScheduledExecutorService`. Caller: `future.get(timeout)` (Phase A, blocking) или `future.thenRun(apiCall)` (Phase G, non-blocking).
+- **Dependencies:** Redis (fallback: in-memory, 50% conservative rate). Rate limit config per (connection, group) via `@ConfigurationProperties`.
+- **Cross-runtime:** Один bucket per (connection_id, rate_limit_group), разделяется между ingest-worker (ETL) и executor-worker (Execution) через Redis.
+- **Ozon per-product:** Отдельный Redis sorted set `product_rate:{connection_id}:{product_id}` для 10 updates/hour per product. Проактивная проверка перед batch формированием.
+- **Failure risks:** Incorrect limits → 429. Recovery: AIMD adaptive adjustment (§Integration module). Redis down → in-memory fallback.
+- **Uniqueness:** Cross-cutting concern. Гранулярность: per-connection × per-rate-limit-group. Полная спецификация: [Integration §Rate limiting](../../modules/integration.md#rate-limiting).
 
 ### INT-08: Rate limit hit (429 response)
 
-- **Назначение:** Provider вернул 429 Too Many Requests.
+- **Назначение:** Реактивная обработка при получении HTTP 429 от маркетплейса.
 - **Trigger:** HTTP 429 response.
-- **Main path:** Backoff (exponential, with Retry-After header if present) → retry → success. If Retry-After present → use it as delay.
-- **Dependencies:** Retry policy. Rate limiter adjustment (reduce token refill rate temporarily).
-- **Failure risks:** Persistent 429 → sync stalled. Mitigation: max retry count, alert.
-- **Uniqueness:** Provider-initiated throttling — другой trigger (response-driven), другой recovery (adaptive backoff).
+- **Main path:** AIMD `decrease_factor` (halve current rate) → если `Retry-After` header присутствует — использовать как delay; иначе exponential backoff → retry → success.
+- **Dependencies:** Retry policy. AIMD state per (connection, rate_limit_group). Alert rules (`RateLimitThrottlingHigh`, `RateLimitThrottlingSustained`).
+- **Failure risks:** Persistent 429 → sync stalled, actions delayed. Mitigation: max retry count → FAILED + alert. AIMD снижает rate до `min_rate`.
+- **Uniqueness:** Provider-initiated throttling (response-driven). Отличается от INT-07 (проактивный) тем, что 429 — это сигнал: наш rate limiter не угадал. AIMD корректирует rate для будущих запросов.
 
 ### INT-09: Connection disable / archive
 

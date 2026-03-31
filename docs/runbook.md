@@ -59,11 +59,18 @@
 
 ### FM-1: API маркетплейса возвращает 429
 
-**Симптомы:** `job_execution.status = 'RETRY_SCHEDULED'`, `checkpoint` содержит failed event с `error_type: API_ERROR`.
+**Симптомы:** `job_execution.status = 'RETRY_SCHEDULED'`, `checkpoint` содержит failed event с `error_type: API_ERROR`. Prometheus: рост `marketplace_rate_limit_throttled_total`.
 
-**Восстановление:** Автоматическое — worker сохраняет checkpoint (per-event progress) и планирует DLX retry через outbox с backoff (5 мин → 10 мин → 20 мин). При DLX retry worker возобновляет с места ошибки (checkpoint resume). После исчерпания попыток (`max_job_retries`, default: 3) → FAILED.
+**Восстановление:** Автоматическое — worker сохраняет checkpoint (per-event progress) и планирует DLX retry через outbox с backoff (5 мин → 10 мин → 20 мин). AIMD автоматически снижает rate (×0.5) для затронутой rate limit group. При DLX retry worker возобновляет с места ошибки (checkpoint resume). После исчерпания попыток (`max_job_retries`, default: 3) → FAILED.
 
-**Действие:** `SELECT id, status, checkpoint, error_details FROM job_execution WHERE status = 'RETRY_SCHEDULED'`. Проверить `checkpoint.events` — какие events зафейлились, какой cursor. Если retry не помогает — проверить rate limits маркетплейса.
+**Диагностика:**
+
+1. `SELECT id, status, checkpoint, error_details FROM job_execution WHERE status = 'RETRY_SCHEDULED'` — какие events зафейлились, какой cursor.
+2. Prometheus: `marketplace_rate_limit_throttled_total{connection_id="...", rate_limit_group="..."}` — какая group throttle-ится.
+3. Prometheus: `marketplace_rate_limit_current_rate{...}` — текущий effective rate после AIMD adjustment.
+4. Prometheus: `marketplace_rate_limit_wait_seconds` p95 — насколько rate limiter тормозит запросы.
+5. Если rate слишком низкий после AIMD decrease — скорректировать `datapulse.integration.rate-limits.{provider}.{group}.*` в конфигурации.
+6. Если 429 устойчивые — возможно, лимиты маркетплейса изменились. Обновить `docs/provider-api-specs/` и конфигурацию.
 
 ### FM-2: API маркетплейса возвращает неожиданные ошибки
 
@@ -341,7 +348,7 @@ Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 
 **Действия:**
 1. Проверить `job_execution` для `ADVERTISING_FACT` pipeline — есть ли failed jobs?
-2. Проверить rate limit counters для `WB_ADVERT` (5 req/60s)
+2. Проверить token bucket `rate:{connection_id}:WB_ADVERT` в Redis (5 req/60s)
 3. Если scheduler пропускает — рестартовать ETL worker
 4. **P&L impact:** Advertising data в marts устаревает, но не обнуляется. P&L использует последние доступные данные
 

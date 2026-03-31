@@ -327,7 +327,7 @@ ORDER BY promo_decision.created_at DESC
 | `promo_type` | `canonical_promo_campaign.promo_type` | Тип акции |
 | `period` | `canonical_promo_campaign.date_from .. date_to` | Период акции |
 | `evaluation_result` | `promo_evaluation.evaluation_result` | PROFITABLE / MARGINAL / UNPROFITABLE / INSUFFICIENT_STOCK / INSUFFICIENT_DATA |
-| `participation_decision` | `promo_decision.decision_type` | PARTICIPATE / DECLINE / PENDING_REVIEW |
+| `participation_decision` | `promo_decision.decision_type` | PARTICIPATE / DECLINE / DEACTIVATE / PENDING_REVIEW |
 | `action_status` | `promo_action.status` | Статус promo action (nullable — RECOMMENDATION mode не создаёт action) |
 | `required_price` | `canonical_promo_product.required_price` | Цена участия |
 | `margin_at_promo_price` | `promo_evaluation.margin_at_promo_price` | Маржа при промо-цене (nullable — нет evaluation) |
@@ -668,7 +668,7 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 | `size` | int | Размер страницы (default 20) |
 | `from` | ISO date | Начало периода (inclusive, по `created_at`) |
 | `to` | ISO date | Конец периода (inclusive) |
-| `decisionType` | string | Фильтр: CHANGE / SKIP / HOLD (price) или PARTICIPATE / DECLINE / PENDING_REVIEW (promo) |
+| `decisionType` | string | Фильтр: CHANGE / SKIP / HOLD (price) или PARTICIPATE / DECLINE / DEACTIVATE / PENDING_REVIEW (promo) |
 | `actionStatus` | string | Фильтр по статусу action: SUCCEEDED / FAILED / ... |
 
 ### Mismatch Monitor
@@ -750,6 +750,63 @@ Grid read model — не отдельная таблица, а denormalized JDBC
 | `saved_view` | `idx_sv_user` | `(workspace_id, user_id)` |
 | `working_queue_assignment` | `idx_wqa_queue_status` | `(queue_definition_id, status)` |
 | `working_queue_assignment` | `idx_wqa_entity` | `(entity_type, entity_id)` |
+
+## Bulk Operations & Draft Mode
+
+Массовые операции и режим черновика — расширение Operational Grid для сценария «глобальный пересмотр цен» (альтернатива Excel export → modify → import). Детальная спецификация: [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md).
+
+### Bulk formula panel
+
+Доступ: при выделении ≥ 1 строки в гриде. Кнопка «Изменить цену» в Bulk Actions Bar.
+
+Фиксированный набор формул (не DSL):
+- Увеличить/уменьшить на %
+- Умножить на коэффициент
+- Установить фиксированную цену
+- Наценка от себестоимости
+- Округлить до шага
+
+Client-side preview (instant). Server-side dry-run при Apply (constraints + guards через [Pricing](pricing.md) `POST /api/pricing/bulk-manual/preview`).
+
+### Bulk cost update
+
+Массовое изменение себестоимости (SCD2). Кнопка «Себестоимость» в Bulk Actions Bar. Операции: фиксированная, % увеличение/уменьшение, коэффициент. API: `POST /api/cost-profiles/bulk-update`.
+
+### Draft Mode
+
+Toggle «Черновик» в toolbar грида. При активации:
+- Колонка `current_price` становится editable (double-click → number input)
+- Изменения хранятся **клиентски** (`Map<offerId, DraftChange>`)
+- Diff visualization: зачёркнутая старая цена, projected margin
+- Draft banner: counter, avg %, min margin, guards warning
+- «Показать diff» — фильтрует grid до изменённых строк
+
+Apply flow:
+1. «Применить» → `POST /api/pricing/bulk-manual/preview` (dry-run)
+2. Confirmation modal с summary + guards warnings
+3. `POST /api/pricing/bulk-manual/apply` → pricing_run (MANUAL_BULK) → decisions (MANUAL_OVERRIDE) → actions (APPROVED)
+4. Draft очищается, grid refresh
+
+Draft **не** persisted на сервере. `beforeunload` warning при несохранённых изменениях.
+
+### Permissions
+
+| Операция | Roles |
+|----------|-------|
+| Bulk price formula | PRICING_MANAGER, ADMIN, OWNER |
+| Bulk cost update | PRICING_MANAGER, ADMIN, OWNER |
+| Draft mode | PRICING_MANAGER, ADMIN, OWNER |
+
+### Пользовательский сценарий: SC-8 — Массовый пересмотр цен
+
+1. Оператор открывает Operational Grid, применяет фильтр (например, категория «Футболки», маркетплейс WB)
+2. Выделяет все отфильтрованные строки (или «Select all matching»)
+3. Нажимает «Изменить цену» → Formula Panel
+4. Выбирает «Увеличить на %», значение 5%, округление до 10 ₽
+5. Видит instant preview: средний %, min маржа, количество заблокированных
+6. Нажимает «Применить» → server-side dry-run → confirmation modal
+7. Подтверждает → pricing_run создаётся → actions отправляются на исполнение
+8. Grid обновляется: `lastActionStatus` = APPROVED → SCHEDULED → SUCCEEDED (WebSocket push)
 
 ## Обязательные свойства
 
@@ -833,3 +890,4 @@ Working Queues → claim item → investigate → approve/hold/dismiss → next 
 - [Pricing](pricing.md) — price decisions, manual locks, pricing runs
 - [Promotions](promotions.md) — promo journal, promo evaluation results, promo working queues
 - [Execution](execution.md) — action status, approvals, failed action queues
+- [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) — bulk formula, draft mode, bulk cost update

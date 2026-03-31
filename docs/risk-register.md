@@ -22,8 +22,8 @@
 | Риск        | API маркетплейсов throttle-ят запросы, вызывая неполную загрузку                |
 | Вероятность | Высокая (WB: 1 req/min для statistics; Ozon rate limits не документированы)     |
 | Влияние     | Среднее — устаревание данных, отложенная синхронизация                          |
-| Митигация   | Token-bucket rate limiting в адаптерах; DLX-based delayed retry; lane isolation |
-| Detection   | Provider throttling rates в метриках; accumulation RETRY_SCHEDULED в job_item   |
+| Митигация   | Redis-based token bucket per (connection, rate_limit_group) с cross-runtime координацией (ETL + Execution); AIMD adaptive rate для unknown лимитов; per-product counter (Ozon 10/hour); Retry-After header support; DLX-based delayed retry; lane isolation. Детали: [Integration §Rate limiting](modules/integration.md#rate-limiting) |
+| Detection   | `marketplace_rate_limit_throttled_total` (429 count), `marketplace_rate_limit_wait_seconds` (p95 > 60s), `RateLimitThrottlingSustained` alert; accumulation RETRY_SCHEDULED в job_item |
 
 
 ### R-03: Single-point-of-failure

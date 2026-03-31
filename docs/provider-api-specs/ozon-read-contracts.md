@@ -1060,12 +1060,7 @@ Ozon Seller API **не документирует** per-endpoint rate limits в 
 - Некоторые продавцы сообщают о лимитах ~60 req/min для data endpoints
 - Seller API product manager (Habr) подтвердил наличие лимитов без disclosure конкретных цифр
 
-**Рекомендация для реализации:**
-- **Adaptive rate limiting** (обязателен): exponential backoff при HTTP 429
-- Стартовый conservative interval: 1 request per 2 seconds (30 req/min)
-- Мониторинг: логировать 429 responses с timestamp, endpoint, backoff duration
-- Автоматическое увеличение interval при серии 429 → уменьшение при стабильных 200
-- Burst control: token bucket algorithm, per-endpoint counters
+**Реализация rate limiting:** см. [Integration §Rate limiting](../modules/integration.md#rate-limiting). Стартовый conservative rate для `OZON_DEFAULT`: 30 req/min.
 
 ---
 

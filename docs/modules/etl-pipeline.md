@@ -694,7 +694,7 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 
 **Реализация:** DAG executor вычисляет topological levels. Events одного уровня запускаются через `CompletableFuture` / virtual threads. Barrier — `CompletableFuture.allOf()`. Результат каждого event (success / partial / failed) передаётся на следующий уровень для проверки hard/soft зависимостей.
 
-**Shared rate limiter:** все параллельные events одного connection разделяют один rate limiter (token bucket per connection). Это предотвращает суммарное превышение API rate limits маркетплейса при параллельном выполнении events.
+**Shared rate limiter:** все параллельные events одного connection разделяют token bucket-ы из Integration модуля (Redis-based, ключ: `rate:{connection_id}:{rate_limit_group}`). Один bucket per (connection, rate_limit_group) — разные event types, использующие endpoints из одной rate limit group, конкурируют за токены. Этот же bucket разделяется с executor-worker (price/promo writes). Детали алгоритма, гранулярность, adaptive rate limiting и fallback — см. [Integration §Rate limiting](integration.md#rate-limiting).
 
 **Logging:** каждый параллельный event устанавливает MDC (Mapped Diagnostic Context) с `event_type`, чтобы логи не перемешивались и можно было фильтровать по event.
 
@@ -778,6 +778,7 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 | `ETL_SYNC_COMPLETED` | `{ connection_id, job_execution_id, sync_scope, completed_domains[], failed_domains[], completed_at }` | `datapulse-pricing-worker` | Запускает pricing run (если FINANCE ∈ completed_domains и есть active price_policies) |
 || `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-pricing-worker` | Запускает promo evaluation (если PROMO ∈ completed_domains и есть active promo_policies). См. [Promotions](promotions.md) §Post-sync promo evaluation trigger |
 | `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-api` | Обновляет UI через WebSocket (sync status badge) |
+| `ETL_PROMO_CAMPAIGN_STALE` | `{ connection_id, campaign_ids: [...] }` | `datapulse-pricing-worker` | Expires pending promo_actions для stale campaigns. См. [Promotions](promotions.md) §Stale campaign detection |
 
 **sync_scope** — перечень data domains, включённых в sync run (CATALOG, PRICES, STOCKS, ORDERS, SALES, RETURNS, FINANCE, PROMO).
 
@@ -957,7 +958,7 @@ Worker получает message:
 |---------|------------|
 | `job_execution` | ETL run: connection, event type, status, timing, error_details |
 | `job_item` | Index raw payload в S3: s3_key, sha256, byte_size, status |
-| `outbox_event` (shared) | Outbox для ETL step dispatch: `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`. Авторитетная DDL — [Data Model](../data-model.md) §outbox_event |
+| `outbox_event` (shared) | Outbox для ETL step dispatch: `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE`. Авторитетная DDL — [Data Model](../data-model.md) §outbox_event |
 
 ### job_execution lifecycle
 
@@ -1274,6 +1275,27 @@ canonical_promo_product:
 - Ozon: `/v1/actions` → `canonical_promo_campaign`; `/v1/actions/products` → `canonical_promo_product`
 
 Детальные маппинг-правила: [promo-advertising-contracts.md](../provider-api-specs/promo-advertising-contracts.md).
+
+### Stale campaign detection (post-sync cleanup)
+
+После каждого `PROMO_SYNC` ETL проверяет кампании, которые не возвращаются в ответах провайдера (маркетплейс удалил акцию). Признак: `synced_at` не обновлялся > 48 часов при активном sync'е для connection.
+
+```sql
+UPDATE canonical_promo_campaign
+SET status = 'ENDED', updated_at = NOW()
+WHERE connection_id = :connectionId
+  AND status IN ('UPCOMING', 'ACTIVE')
+  AND synced_at < NOW() - INTERVAL '48 hours'
+RETURNING id
+```
+
+Для каждой stale campaign ETL публикует outbox event `ETL_PROMO_CAMPAIGN_STALE` (fanout exchange `datapulse.etl.events`). Payload: `{ connection_id, campaign_ids: [...] }`.
+
+Consumers:
+- [Promotions](promotions.md) — expires PENDING_APPROVAL / APPROVED `promo_action` для stale campaigns
+- [Audit & Alerting](audit-alerting.md) — alert `PROMO_CAMPAIGN_STALE`
+
+**Порог 48 часов:** выбран с запасом — стандартный интервал PROMO_SYNC: 4–6 часов. Если кампания не появилась в 8+ sync'ах подряд — с высокой вероятностью удалена провайдером. Порог конфигурируется через `datapulse.etl.promo.stale-threshold`.
 
 ## REST API (ETL monitoring)
 

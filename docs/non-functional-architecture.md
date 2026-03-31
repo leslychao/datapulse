@@ -247,7 +247,8 @@ ClickHouse используется только для analytics (read-only д�
 | Use case | Описание | Fallback при недоступности Redis |
 |----------|----------|----------------------------------|
 | Distributed locks | Leader election при multi-instance workers (Phase G) | PostgreSQL advisory locks (single-instance fallback) |
-| Rate limit counters | Per-provider sliding window rate limit counters (Phase A) | In-memory rate limiter (per-instance, conservative) |
+| Rate limit token buckets | Per-connection × per-rate-limit-group token bucket (Lua-based, atomic). Ключ: `rate:{connection_id}:{rate_limit_group}`. Детали: [Integration §Rate limiting](modules/integration.md#rate-limiting) | In-memory token bucket (per-instance, 50% conservative rate) |
+| Per-product rate counters | Ozon per-product sliding window (sorted set, ключ: `product_rate:{connection_id}:{product_id}`, TTL 70 min). Детали: [Integration §Per-entity rate limiting](modules/integration.md#per-entity-rate-limiting-ozon) | Reactive only (no proactive check; rely on Ozon 429 + backoff) |
 | Session cache | Keycloak session cache acceleration (optional) | Direct Keycloak token validation (slower, still functional) |
 
 ### Запрещённые use cases
@@ -262,7 +263,7 @@ ClickHouse используется только для analytics (read-only д�
 
 ### Phase A deployment
 
-Redis включён в Docker Compose, но **не обязателен** для Phase A. Единственный use case Phase A — rate limit counters. При отсутствии Redis → fallback на in-memory rate limiter (conservative, per-instance).
+Redis включён в Docker Compose, но **не обязателен** для Phase A. Use cases Phase A — rate limit token buckets и per-product counters. При отсутствии Redis → fallback: in-memory token bucket с 50% conservative rate (API-level limiting работает; per-product proactive check отключается, Ozon per-product limit отрабатывается реактивно через 429 + backoff).
 
 Phase G: distributed locks для multi-instance deployment.
 

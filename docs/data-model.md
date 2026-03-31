@@ -48,9 +48,9 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | [Tenancy & IAM](modules/tenancy-iam.md) | `tenant`, `workspace`, `app_user`, `workspace_member`, `workspace_invitation` |
 | [Integration](modules/integration.md) | `marketplace_connection`, `secret_reference`, `marketplace_sync_state`, `integration_call_log` |
 | [ETL Pipeline](modules/etl-pipeline.md) | `category`, `warehouse`, `product_master`, `seller_sku`, `marketplace_offer`, `cost_profile`, `canonical_price_current`, `canonical_stock_current`, `canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`, `canonical_promo_product`, `job_execution`, `job_item` |
-| [Pricing](modules/pricing.md) | `price_policy` (versioned), `price_policy_assignment`, `price_decision` (policy_snapshot, explanation format), `pricing_run`, `manual_price_lock` |
+| [Pricing](modules/pricing.md) | `price_policy` (versioned), `price_policy_assignment`, `price_decision` (policy_snapshot, explanation format, strategy_type `MANUAL_OVERRIDE` for bulk), `pricing_run` (trigger_type incl. `MANUAL_BULK`, `request_hash`), `manual_price_lock` |
 | [Execution](modules/execution.md) | `price_action` (extended: decision FK, audit fields, reconciliation_source), `price_action_attempt` (provider request/response summaries, reconciliation read), `deferred_action`, `outbox_event`, `simulated_offer_state` |
-| [Promotions](modules/promotions.md) | `promo_policy` (versioned), `promo_policy_assignment`, `promo_evaluation`, `promo_decision` (policy_snapshot), `promo_action`. Canonical truth: `canonical_promo_campaign`, `canonical_promo_product` (owned by ETL, read + updated by Promotions) |
+| [Promotions](modules/promotions.md) | `promo_policy` (versioned), `promo_policy_assignment`, `promo_evaluation_run`, `promo_evaluation`, `promo_decision` (policy_snapshot), `promo_action`, `promo_action_attempt`. Canonical truth: `canonical_promo_campaign`, `canonical_promo_product` (owned by ETL, read + updated by Promotions) |
 | [Seller Operations](modules/seller-operations.md) | `saved_view`, `working_queue_definition`, `working_queue_assignment` |
 | [Audit & Alerting](modules/audit-alerting.md) | `audit_log`, `alert_rule`, `alert_event`, `user_notification` |
 
@@ -138,6 +138,7 @@ outbox_event:
 | `RECONCILIATION_CHECK` | Execution | `datapulse-executor-worker` | `price.reconciliation` / `price.reconciliation` (delayed via DLX) | Deferred reconciliation check |
 | `PROMO_ACTION_EXECUTE` | Promotions | `datapulse-executor-worker` | `promo.execution` / `promo.execution` | Исполнение promo action |
 | `PROMO_EVALUATION_EXECUTE` | Promotions | `datapulse-pricing-worker` | `promo.evaluation` / `promo.evaluation` | Запуск promo evaluation batch |
+| `ETL_PROMO_CAMPAIGN_STALE` | ETL Pipeline | `datapulse-pricing-worker` | `datapulse.etl.events` / fanout | Stale campaign detected — кампания не возвращается в PROMO_SYNC > 48h. Promotions expires pending actions |
 | `REMATERIALIZATION_REQUESTED` | Analytics | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` | On-demand rematerialization ClickHouse marts (triggered by ETL backfill or manual request) |
 
 ### Outbox poller
@@ -147,8 +148,8 @@ outbox_event:
 | Runtime | Обрабатывает event types |
 |---------|--------------------------|
 | `datapulse-api` | — (не является outbox publisher) |
-| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `REMATERIALIZATION_REQUESTED` |
-| `datapulse-pricing-worker` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE` |
+| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE`, `REMATERIALIZATION_REQUESTED` |
+| `datapulse-pricing-worker` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE`, `ETL_PROMO_CAMPAIGN_STALE` (via fanout — expires pending promo actions) |
 | `datapulse-executor-worker` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK`, `PROMO_ACTION_EXECUTE` |
 
 Poller: `SELECT ... FROM outbox_event WHERE status = 'PENDING' AND event_type IN (...) ORDER BY created_at LIMIT :batch FOR UPDATE SKIP LOCKED`. After publish → UPDATE status = 'PUBLISHED'. On failure → UPDATE status = 'FAILED', increment retry_count, set next_retry_at.

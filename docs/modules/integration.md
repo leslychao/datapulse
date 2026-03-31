@@ -204,48 +204,226 @@ Provider DTO и provider-specific response semantics остаются **внут
 
 ### Принципы
 
-- Каждый адаптер реализует rate limiting в соответствии с документированными или эмпирически определёнными лимитами провайдера.
-- Rate limiter — token-bucket на уровне адаптера.
-- При получении HTTP 429 — backoff и retry; не прерывать sync целиком.
-- Лимиты конфигурируются через `@ConfigurationProperties`.
+- Rate limiting — **проактивный** (не ждём 429, а сами ограничиваем темп запросов).
+- Лимиты конфигурируются через `@ConfigurationProperties` (`datapulse.integration.rate-limits.*`).
+- При получении HTTP 429 — backoff и retry; не прерывать sync / execution целиком.
+
+### Гранулярность: rate limit group × connection
+
+Маркетплейс привязывает лимиты к **аккаунту продавца** (по API-ключу). Поэтому rate limiter работает на уровне:
+
+```
+connection_id × rate_limit_group → один token bucket
+```
+
+- **connection_id** — конкретное подключение (`marketplace_connection`). Разные seller-аккаунты имеют независимые лимиты.
+- **rate_limit_group** — логическая группа endpoints с единым лимитом (например, `WB_STATISTICS`, `OZON_PROMO`).
+
+Все runtime-ы (ETL ingest-worker, executor-worker) **разделяют** один и тот же bucket для данной пары (connection, group). Координация — через Redis (см. §Реализация ниже).
+
+### Реализация: Redis-based token bucket
+
+**Алгоритм:** token bucket, реализованный как атомарная Lua-операция в Redis.
+
+**Redis key:** `rate:{connection_id}:{rate_limit_group}` → хранит `{ tokens: float, last_refill: epoch_ms }`.
+
+**Lua-скрипт (атомарно):**
+
+```
+1. Прочитать текущие tokens и last_refill
+2. Рассчитать delta = (now - last_refill) × rate
+3. tokens = min(tokens + delta, burst)
+4. Если tokens >= 1: tokens -= 1, вернуть 0 (разрешено, wait = 0)
+5. Иначе: вернуть время ожидания до следующего токена (wait_ms)
+```
+
+**Caller (adapter):** rate limiter предоставляет контракт `CompletableFuture<Void> acquire(connectionId, group)`:
+- Lua-скрипт возвращает `wait_ms`.
+- Если `wait_ms == 0` — future завершается немедленно (`complete()`).
+- Если `wait_ms > 0` — `ScheduledExecutorService.schedule(() -> future.complete(null), wait_ms, MILLISECONDS)`.
+- Caller вызывает `future.get(timeout, SECONDS)` (блокирующий, Phase A) или `future.thenRun(apiCall)` (non-blocking, Phase G).
+- Поддерживает `future.cancel()` при graceful shutdown.
+
+Параллельные потоки (ETL events, executor) конкурируют за токены через Redis — Redis сам обеспечивает serialization.
+
+**TTL:** ключ автоматически истекает через `max(burst / rate, 300)` секунд неактивности — чтобы не накапливался мусор.
+
+**Fallback при недоступности Redis:** in-memory token bucket (Caffeine-based, per-JVM) с **conservative rate** (50% от нормального). Это безопасно для single-instance Phase A. При multi-instance (Phase G) — in-memory fallback допускает суммарное превышение, но 429 handling + backoff компенсируют.
 
 ### Лимиты по провайдерам
 
 #### Wildberries
 
-
-| API Group                      | Limit                      | Источник      |
-| ------------------------------ | -------------------------- | ------------- |
-| Statistics (orders, sales)     | 1 запрос/мин               | Official docs |
-| Analytics (stocks)             | 1 запрос/20 сек            | Official docs |
-| Finance (reportDetailByPeriod) | 1 запрос/мин               | Official docs |
-| Promo (calendar)               | 10 запросов/6 сек, burst 5 | Эмпирически   |
-| Advertising                    | 5 запросов/60 сек          | Эмпирически   |
-
+| Rate Limit Group | Limit | Burst | Источник | Consumers |
+| --- | --- | --- | --- | --- |
+| `WB_STATISTICS` | 1 req/min | 1 | Official docs | ETL (orders, sales) |
+| `WB_ANALYTICS` | 1 req/20s | 1 | Official docs | ETL (stocks) |
+| `WB_FINANCE` | 1 req/min | 1 | Official docs | ETL (reportDetailByPeriod) |
+| `WB_PROMO` | 10 req/6s | 5 | Эмпирически | ETL (promo sync), Execution (promo write) |
+| `WB_PROMO_NOMENCLATURES` | 10 req/6s | 5 | Эмпирически | ETL (promo products) |
+| `WB_ADVERT` | 5 req/60s | 1 | Эмпирически | ETL (advertising) |
+| `WB_PRICE_UPDATE` | 5 req/min | 1 | Эмпирически | Execution (price write) |
+| `WB_CONTENT` | 1 req/10s | 1 | Conservative default | ETL (catalog) |
+| `WB_PRICES_READ` | 1 req/10s | 1 | Conservative default | ETL (price snapshot) |
 
 #### Ozon
 
+| Rate Limit Group | Limit | Burst | Источник | Consumers |
+| --- | --- | --- | --- | --- |
+| `OZON_DEFAULT` | 30 req/min | 3 | Conservative default | ETL (catalog, orders, finance, stocks) |
+| `OZON_PROMO` | 20 req/60s | 3 | Эмпирически | ETL (promo sync), Execution (promo write) |
+| `OZON_PRICE_UPDATE` | 30 req/min | 3 | Conservative default | Execution (price write) |
+| `OZON_PERFORMANCE` | 60 req/min | 5 | Производное от 100K/day | ETL (advertising) |
 
-| API Group       | Limit                    | Scope       | Источник      |
-| --------------- | ------------------------ | ----------- | ------------- |
-| Price Write     | 10 updates/hour          | per product | confirmed-docs |
-| Promo (actions) | 20 запросов/60 сек       | per account | Эмпирически   |
-| Все остальные   | Не документированы       | —           | Определяются эмпирически |
+**Колонка Consumers** — какие runtime-ы забирают токены из этого bucket. Если ETL и Execution используют один и тот же group — они конкурируют за бюджет через общий Redis bucket.
 
+### Per-entity rate limiting (Ozon)
+
+Ozon ограничивает обновление цены **per product**: 10 updates/hour per product (confirmed-docs). Это **не** API-level лимит, а business-level — один запрос может содержать до 1000 products, но каждый product имеет индивидуальный счётчик.
+
+**Механизм:** per-product sliding window counter в Redis.
+
+- **Redis key:** `product_rate:{connection_id}:{product_id}` → sorted set, элементы = timestamp обновления.
+- **При формировании batch:** для каждого product проверить `ZCOUNT key (now - 1h) +inf`. Если ≥ 10 → исключить product из текущего batch, отложить на следующий цикл.
+- **После успешного обновления:** `ZADD key now now` + `ZREMRANGEBYSCORE key 0 (now - 1h)` (очистка старых записей).
+- **TTL:** 70 минут на ключ (1h + 10 min buffer).
+
+**Важно:** это проактивная проверка. Если product всё же получил rejection от Ozon (per-product limit exceeded) — Execution классифицирует как `RETRIABLE_RATE_LIMIT` с backoff 10 min (см. [Execution](execution.md) §Классификация ошибок).
+
+### Adaptive rate limiting (для unknown лимитов)
+
+Для endpoint groups без документированных лимитов (`WB_CONTENT`, `WB_PRICES_READ`, `OZON_DEFAULT`) применяется адаптивная подстройка rate.
+
+**Алгоритм: AIMD (Additive Increase, Multiplicative Decrease)**
+
+```
+Параметры:
+  initial_rate     — стартовый conservative rate (из @ConfigurationProperties)
+  min_rate         — нижняя граница (не медленнее этого)
+  max_rate         — верхняя граница (2× initial_rate per group)
+  increase_pct     — процент увеличения rate при стабильных 2xx (пропорциональный)
+  decrease_factor  — множитель уменьшения при 429 (multiplicative, < 1.0)
+  stability_window — кол-во подряд успешных запросов перед увеличением rate
+
+Поведение:
+  При HTTP 429 (или ConnectionDegradedEvent от circuit breaker):
+    current_rate = max(current_rate × decrease_factor, min_rate)
+    Немедленно обновить token bucket rate
+    Если в ответе есть Retry-After header — использовать его как delay
+    Иначе — exponential backoff из retry policy
+
+  При stability_window подряд успешных (HTTP 2xx):
+    current_rate = min(current_rate × (1 + increase_pct), max_rate)
+    Обновить token bucket rate
+
+  При рестарте worker-а:
+    Начать с initial_rate (не сохраняем найденный rate между рестартами;
+    conservative start безопаснее, чем stale cached rate)
+```
+
+**Почему процентный increase, а не фиксированный step:** rate limit groups имеют разброс от 0.017 req/s (WB_STATISTICS) до 0.5 req/s (OZON_DEFAULT). Фиксированный step (0.5 req/s) для медленной group означает прыжок в 30 раз. Процентный increase (20%) масштабируется автоматически: медленные groups растут медленно, быстрые — быстрее.
+
+**Defaults:**
+
+| Параметр | Значение | Пример для OZON_DEFAULT (0.5 req/s) |
+| --- | --- | --- |
+| `initial_rate` | Per-group (см. таблицы выше) | 0.5 req/s |
+| `min_rate` | 1 req/60s | 0.017 req/s |
+| `max_rate` | 2× initial_rate per group | 1.0 req/s |
+| `increase_pct` | 0.2 (20%) | 0.5 → 0.6 → 0.72 → 0.86 → 1.0 (cap) |
+| `decrease_factor` | 0.5 (halve) | 0.5 → 0.25 → 0.125... |
+| `stability_window` | 20 consecutive 2xx | ~40s at 0.5 req/s |
+
+### Cross-runtime координация
+
+ETL (ingest-worker) и Execution (executor-worker) — разные JVM-процессы. Оба вызывают marketplace API через адаптеры Integration модуля.
+
+```
+┌─────────────────┐     ┌──────────────────┐
+│  ingest-worker  │     │  executor-worker  │
+│  (ETL sync)     │     │  (price/promo)    │
+└────────┬────────┘     └────────┬──────────┘
+         │                       │
+         │  acquire token        │  acquire token
+         └───────┐     ┌────────┘
+                 ▼     ▼
+         ┌───────────────────┐
+         │  Redis token bucket │
+         │  rate:{conn}:{grp}  │
+         └───────────────────┘
+                   │
+                   ▼
+         ┌──────────────────┐
+         │  Marketplace API  │
+         └──────────────────┘
+```
+
+**Инвариант:** один bucket per (connection_id, rate_limit_group) — независимо от того, сколько JVM-процессов конкурируют за токены. Redis обеспечивает координацию.
+
+**Приоритизация:** Phase A — FIFO (кто первый взял токен). Execution writes не имеют приоритета над ETL reads. Обоснование: rate limits маркетплейсов низкие (1 req/min для WB Statistics), гарантировать latency для writes при таких лимитах невозможно без starvation reads. Если в будущем потребуется приоритизация — рассмотреть weighted token bucket (Phase G, при наличии данных о реальных конфликтах).
+
+### Health-check и rate limit budget
+
+Health-check (§Health-check выше) вызывает lightweight API для проверки credentials. Эти запросы **проходят через тот же token bucket**, что и рабочие запросы.
+
+**Влияние:** для endpoints с лимитом 1 req/min (WB Statistics) health-check каждые 15 мин забирает 1 из ~15 доступных токенов за период. Потеря ~7% бюджета.
+
+**Допустимость:** приемлемо. Health-check выполняет endpoint из группы `WB_CONTENT` (lightweight, `GET /api/v2/cards/list?limit=1`), а не из `WB_STATISTICS`. Для Ozon — из `OZON_DEFAULT` (`POST /v1/product/list` с `limit=1`). Влияние на тяжёлые ETL groups (Statistics, Finance) — нулевое.
+
+**Инвариант:** health-check **обязан** проходить через token bucket. Иначе — риск 429 от маркетплейса, который может быть ошибочно интерпретирован как auth failure.
+
+### Multi-workspace, один аккаунт маркетплейса
+
+Если два workspace'а подключены к одному seller-аккаунту (одинаковый `external_account_id`) — маркетплейс видит один API-ключ и применяет единый лимит.
+
+**Текущее ограничение:** `UNIQUE (workspace_id, marketplace_type, external_account_id)` не запрещает двум workspace'ам подключить тот же аккаунт через разные API-ключи (разные `secret_reference`). В этом случае — два независимых token bucket, суммарно 2× нагрузка → 429.
+
+**Phase A решение (single-tenant):** не актуально — один workspace. Ограничение документируется.
+
+**Phase G решение:** при создании connection — проверить `external_account_id` глобально (cross-workspace). Если совпадение — привязать rate limiter к `external_account_id`, а не к `connection_id`:
+
+```
+Redis key: rate:{external_account_id}:{rate_limit_group}  (вместо rate:{connection_id}:{rate_limit_group})
+```
+
+Переключение гранулярности — через `@ConfigurationProperties` флаг `datapulse.integration.rate-limit-key-strategy=connection|external-account` (default: `connection` для Phase A).
 
 ### При отсутствии документированных лимитов
 
-Conservative defaults → мониторинг 429 responses → корректировка эмпирически → фиксация в конфигурации.
+1. Стартовать с conservative default (см. таблицы выше, группы с пометкой «Conservative default»).
+2. Включить adaptive rate limiting (§AIMD выше).
+3. Мониторить 429 responses (§Rate limit observability ниже).
+4. При стабилизации — зафиксировать найденный rate в `@ConfigurationProperties`.
+5. Обновить `docs/provider-api-specs/` с пометкой confidence = `empirical`.
+
+### Rate limit observability
+
+| Метрика | Тип | Labels | Описание |
+| --- | --- | --- | --- |
+| `marketplace_rate_limit_wait_seconds` | Histogram | `connection_id`, `rate_limit_group`, `marketplace_type` | Время ожидания токена в bucket. Показывает, насколько rate limiter тормозит запросы |
+| `marketplace_rate_limit_throttled_total` | Counter | `connection_id`, `rate_limit_group`, `marketplace_type` | Количество HTTP 429 ответов (проактивный limiter не спас) |
+| `marketplace_rate_limit_current_rate` | Gauge | `connection_id`, `rate_limit_group`, `marketplace_type` | Текущий effective rate (req/s) после adaptive adjustment |
+| `marketplace_rate_limit_tokens_available` | Gauge | `connection_id`, `rate_limit_group`, `marketplace_type` | Доступные токены в bucket (снимок) |
+| `ozon_product_rate_limit_exhausted_total` | Counter | `connection_id`, `product_id` | Ozon per-product 10/hour limit exhausted (product excluded from batch) |
+
+**Alert rules:**
+
+| Alert | Условие | Severity | Действие |
+| --- | --- | --- | --- |
+| `RateLimitThrottlingHigh` | `rate(marketplace_rate_limit_throttled_total[15m]) > 3` per connection/group | WARNING | Проверить лимиты, скорректировать rate |
+| `RateLimitThrottlingSustained` | `rate(marketplace_rate_limit_throttled_total[1h]) > 10` per connection/group | CRITICAL | Возможно, лимиты маркетплейса изменились. Manual investigation |
+| `RateLimitWaitExcessive` | `histogram_quantile(0.95, marketplace_rate_limit_wait_seconds) > 60` | WARNING | ETL sync замедлен rate limiter-ом. Может влиять на data freshness |
+| `OzonProductRateSaturation` | `rate(ozon_product_rate_limit_exhausted_total[1h]) > 50` (без label product_id) | WARNING | Массовое исчерпание per-product бюджета. Сигнал: pricing engine генерирует слишком частые изменения |
 
 ## Retry при ошибках провайдера
 
 
 | Тип ошибки                        | Поведение                                                  |
 | --------------------------------- | ---------------------------------------------------------- |
-| HTTP 429 (rate limit)             | Backoff + retry                                            |
-| HTTP 5xx (transient)              | Backoff + retry                                            |
+| HTTP 429 (rate limit)             | Если `Retry-After` header присутствует — использовать его как delay. Иначе — exponential backoff. AIMD decrease срабатывает в обоих случаях (§Adaptive rate limiting) |
+| HTTP 5xx (transient)              | Exponential backoff + retry                                |
 | HTTP 4xx (кроме 429)              | Не retry; зафиксировать ошибку, перейти к следующему item  |
-| Connection timeout                | Backoff + retry                                            |
+| Connection timeout                | Exponential backoff + retry                                |
 | Неизвестный payload / parse error | Зафиксировать ошибку, не retry; расследовать изменение API |
 
 
@@ -261,15 +439,17 @@ Health-check (§Health-check выше) обнаруживает полные aut
 
 | Сигнал | Порог | Реакция |
 |--------|-------|---------|
-| Error rate per connection за последние 15 мин | > 50% calls failed (5xx, timeout) при ≥ 5 calls | `ConnectionDegradedEvent` (Spring ApplicationEvent, in-process). Log warning. Backoff: увеличить интервал retry |
-| Latency p95 per connection | > 3× от baseline (rolling average) | Log warning. Не прерывать sync, но замедлить request rate |
+| Error rate per connection за последние 15 мин | > 50% calls failed (5xx, timeout) при ≥ 5 calls | `ConnectionDegradedEvent` (Spring ApplicationEvent, in-process). Log warning. AIMD реагирует: `current_rate × decrease_factor` для затронутых rate limit groups (§Adaptive rate limiting) |
+| Latency p95 per connection | > 3× от baseline (rolling average) | `ConnectionDegradedEvent`. Log warning. AIMD снижает rate. Sync не прерывается |
 | Consecutive sync job failures (одного domain) | 3 подряд | `SyncDomainStalled` alert (→ `alert_event` в БД + notification). Pause scheduled sync для этого domain+connection. Manual resume через API |
 
 **Отличие от health-check:**
 - Health-check определяет auth failures (credentials протухли / отозваны) → connection-level transition в `AUTH_FAILED`.
 - Circuit breaker определяет transient degradation → connection остаётся `ACTIVE`, но отдельные domain syncs могут быть приостановлены.
 
-**Recovery:** при успешном sync job после stall → automatic resume. При manual pause → manual resume через `POST /api/connections/{connectionId}/sync`.
+**Связь с AIMD:** circuit breaker — **детектор** проблемы, AIMD — **исполнитель** реакции. Circuit breaker не модифицирует rate напрямую. Он эмитирует `ConnectionDegradedEvent`, а AIMD слушает этот event и применяет `decrease_factor` к rate. Это обеспечивает единую точку управления rate (token bucket) и исключает двойное замедление.
+
+**Recovery:** при успешном sync job после stall → automatic resume. AIMD постепенно восстанавливает rate через stability_window. При manual pause → manual resume через `POST /api/connections/{connectionId}/sync`.
 
 ### Vault unavailability
 
