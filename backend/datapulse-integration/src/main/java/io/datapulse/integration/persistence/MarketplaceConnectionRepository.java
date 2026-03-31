@@ -11,6 +11,8 @@ public interface MarketplaceConnectionRepository extends JpaRepository<Marketpla
 
     Optional<MarketplaceConnectionEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
+    List<MarketplaceConnectionEntity> findAllByStatus(String status);
+
     boolean existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountId(
             Long workspaceId, String marketplaceType, String externalAccountId);
 }

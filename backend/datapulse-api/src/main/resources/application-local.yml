@@ -20,6 +20,18 @@ datapulse:
   vault:
     uri: http://localhost:8200
     token: dev-token
+  integration:
+    wildberries:
+      content-base-url: http://localhost:9091
+      prices-base-url: http://localhost:9091
+      statistics-base-url: http://localhost:9091
+      analytics-base-url: http://localhost:9091
+      marketplace-base-url: http://localhost:9091
+      advert-base-url: http://localhost:9091
+      promo-base-url: http://localhost:9091
+    ozon:
+      seller-base-url: http://localhost:9091
+      performance-base-url: http://localhost:9091
 
 logging:
   level:

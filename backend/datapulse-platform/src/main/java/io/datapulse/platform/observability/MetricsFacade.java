@@ -1,11 +1,14 @@
 package io.datapulse.platform.observability;
 
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.function.Supplier;
 
 @Component
 @RequiredArgsConstructor
@@ -32,5 +35,15 @@ public class MetricsFacade {
                 .tags(tags)
                 .register(meterRegistry)
                 .record(duration);
+    }
+
+    public void gauge(String name, Supplier<Number> valueSupplier, String... tags) {
+        Gauge.builder(name, valueSupplier)
+                .tags(Tags.of(tags))
+                .register(meterRegistry);
+    }
+
+    public MeterRegistry getRegistry() {
+        return meterRegistry;
     }
 }

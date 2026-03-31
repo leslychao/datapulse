@@ -2,6 +2,7 @@ package io.datapulse.integration.domain;
 
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.api.ValidateConnectionResponse;
+import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
@@ -32,6 +33,7 @@ public class ConnectionValidationService {
     private final CredentialStore credentialStore;
     private final ApplicationEventPublisher eventPublisher;
     private final WebClient.Builder webClientBuilder;
+    private final IntegrationProperties integrationProperties;
 
     @Async("integrationExecutor")
     public void validateAsync(Long connectionId) {
@@ -118,8 +120,9 @@ public class ConnectionValidationService {
 
     private ValidationResult validateWb(Map<String, String> credentials) {
         String apiToken = credentials.get("apiToken");
+        String baseUrl = integrationProperties.getWildberries().getContentBaseUrl();
         try {
-            webClientBuilder.build()
+            webClientBuilder.baseUrl(baseUrl).build()
                     .post()
                     .uri("/content/v2/get/cards/list")
                     .header("Authorization", apiToken)
@@ -146,8 +149,9 @@ public class ConnectionValidationService {
     private ValidationResult validateOzon(Map<String, String> credentials) {
         String clientId = credentials.get("clientId");
         String apiKey = credentials.get("apiKey");
+        String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
         try {
-            webClientBuilder.build()
+            webClientBuilder.baseUrl(baseUrl).build()
                     .post()
                     .uri("/v3/product/list")
                     .header("Client-Id", clientId)
