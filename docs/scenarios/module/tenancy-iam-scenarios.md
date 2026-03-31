@@ -81,7 +81,7 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 ### IAM-09: Invitation resend
 
 - **Назначение:** Повторная отправка приглашения.
-- **Trigger:** `POST /api/invitations/{id}/resend` (ADMIN/OWNER).
+- **Trigger:** `POST /api/workspaces/{workspaceId}/invitations/{invitationId}/resend` (ADMIN/OWNER).
 - **Main path:** Invitation still PENDING → regenerate token → send email → update sent_at.
 - **Dependencies:** Email service. Invitation in PENDING state.
 - **Failure risks:** Invitation already accepted → reject resend. Invitation expired → reject, suggest new invitation.
@@ -90,8 +90,8 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 ### IAM-10: Audit visibility boundaries
 
 - **Назначение:** Audit log доступен только в рамках workspace.
-- **Trigger:** `GET /api/audit-log` (any role).
-- **Main path:** Query filtered by workspace_id from JWT claims. Cross-workspace audit entries invisible.
+- **Trigger:** `GET /api/workspaces/{workspaceId}/audit-log` (ADMIN, OWNER).
+- **Main path:** Query filtered by workspace_id from JWT claims and path variable. Cross-workspace audit entries invisible.
 - **Dependencies:** audit_log.workspace_id FK. JWT workspace claims.
 - **Failure risks:** Missing workspace_id filter → cross-tenant audit leak. Enforced at repository level.
 - **Uniqueness:** Read-only audit scenario — другой data access pattern (audit, не operational data).
@@ -148,7 +148,7 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 ### IAM-16: Invitation expiration (PENDING → EXPIRED)
 
 - **Назначение:** Автоматическое истечение неиспользованных приглашений.
-- **Trigger:** Scheduled job (daily).
+- **Trigger:** Scheduled job (hourly).
 - **Main path:** SELECT invitations WHERE status = 'PENDING' AND expires_at < now() → UPDATE status = 'EXPIRED'. Expired invitation link → user clicks → 410 Gone (invitation expired). Admin notified (optional).
 - **Dependencies:** `workspace_invitation.expires_at` (default: created_at + 7 days). Scheduled job.
 - **Failure risks:** Legitimate delay (user on vacation) → invitation expires → admin must create new one. Aggressive expiry → user confusion.
@@ -157,7 +157,7 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 ### IAM-17: Invitation cancellation by admin
 
 - **Назначение:** Администратор отменяет pending приглашение.
-- **Trigger:** `DELETE /api/invitations/{id}` или `POST /api/invitations/{id}/cancel` (ADMIN/OWNER).
+- **Trigger:** `DELETE /api/workspaces/{workspaceId}/invitations/{invitationId}` (ADMIN/OWNER).
 - **Main path:** Validate invitation status = PENDING → UPDATE status = 'CANCELLED' → audit_log entry. Cancelled invitation link → user clicks → 410 Gone.
 - **Dependencies:** User role: ADMIN/OWNER. Invitation in PENDING state.
 - **Failure risks:** Race: cancellation + acceptance concurrent → CAS guard (status = PENDING). Already accepted → reject cancellation (409).

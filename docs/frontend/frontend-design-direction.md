@@ -437,6 +437,20 @@ Large exports (>10,000 rows) → async: "Export is being prepared. You'll be not
 Editable cells switch to edit mode on double-click.
 No modal forms for single-field edits. Save on blur or Enter. Cancel on Escape.
 
+**Editable columns in Operational Grid (Phase E):**
+
+| Column | Edit type | Backend action |
+|--------|-----------|----------------|
+| `cost_price` | Number input | `PUT /api/cost-profiles` (updates `cost_profile` SCD2) |
+| `manual_lock` | Toggle | `POST .../lock` or `POST .../unlock` (delegated to [Pricing](../modules/pricing.md)) |
+
+Все остальные grid-колонки — read-only. Bulk editing (cost_price для нескольких SKU) — через CSV import, не через inline edit.
+
+**Editable fields in Detail Panel:**
+- Cost price, lock status — как в гриде.
+- Hold reason, note — text input при manual actions (approve, hold, dismiss).
+- Остальные поля — read-only с drill-down.
+
 ### Context menu (right-click)
 
 On grid rows: Copy, Open in new tab, Export selection, and context-dependent domain actions.
@@ -717,6 +731,19 @@ Marketplace-specific and domain terms stay in original language where standard:
 - "Wildberries", "Ozon" — not translated
 
 ---
+
+## Backend dependencies — TBD
+
+Следующие frontend-возможности требуют backend-спецификации, которая ещё не описана в модульных документах:
+
+| Frontend capability | Required backend | Status |
+|---------------------|------------------|--------|
+| WebSocket real-time updates (grid rows, sync status, notifications) | Spring WebSocket/STOMP endpoints, topic structure, message formats per module | **TBD** — requires section in `non-functional-architecture.md` |
+| Command Palette search (Ctrl+K) | Global search API spanning entities (offers, views, workspaces, policies) | **TBD** — requires cross-module search endpoint in `datapulse-api` |
+| Notification bell (unread count, list) | REST API for `user_notification` (list, mark read, count) | **TBD** — requires REST contracts in [Audit & Alerting](../modules/audit-alerting.md) |
+| KPI summary strip (top of grid) | Aggregated metrics endpoint (total offers, avg margin, pending actions count) | **TBD** — lightweight aggregate query, может быть частью grid response или отдельный endpoint |
+
+Эти зависимости не блокируют проектирование frontend, но должны быть специфицированы до начала реализации.
 
 ## Related documents
 

@@ -45,9 +45,9 @@ Seller Operations предоставляет операционный интер
 ### SEL-05: Price Journal — action history
 
 - **Назначение:** Просмотр истории ценовых действий для конкретного offer.
-- **Trigger:** `GET /api/offers/{offerId}/price-journal` (any role).
-- **Main path:** Query `price_action` history → enrich with decision explanations → paginated response. Shows: `old_price`, `new_price`, status, `created_at`, reason, who approved.
-- **Dependencies:** `price_action` table. `pricing_decision` explanations. Workspace scoping.
+- **Trigger:** `GET /api/workspace/{workspaceId}/offers/{offerId}/price-journal` (any role).
+- **Main path:** Query `price_decision` JOIN `price_action` LEFT JOIN `price_action_attempt` → paginated response. Shows: `current_price`, `target_price`, `decision_type`, `action_status`, `explanation_summary`, `created_at`, `reconciliation_source`.
+- **Dependencies:** `price_decision`, `price_action`, `price_action_attempt` tables. Workspace scoping.
 - **Failure risks:** Large history → pagination. Missing explanations for old decisions → graceful null.
 - **Uniqueness:** Read-only audit/investigation — другой data shape (timeline, не grid).
 
@@ -90,8 +90,8 @@ Seller Operations предоставляет операционный интер
 ### SEL-10: Export (grid to CSV/Excel)
 
 - **Назначение:** Экспорт данных грида для внешнего анализа.
-- **Trigger:** `POST /api/grid/export` (ANALYST+).
-- **Main path:** Apply current filters → stream all matching rows (no pagination limit) → generate file → return download link.
+- **Trigger:** `GET /api/workspace/{workspaceId}/grid/export?[filters]` (ANALYST+).
+- **Main path:** Apply current filters → stream all matching rows (no pagination limit) → streaming response (`Content-Disposition: attachment`).
 - **Dependencies:** Same as grid query. File generation. Large export → streaming to avoid OOM.
 - **Failure risks:** Very large export → timeout. Mitigation: async export with notification.
 - **Uniqueness:** Bulk read + file generation — другой output format, другой performance profile.

@@ -28,7 +28,7 @@
 | [Analytics & P&L](modules/analytics-pnl.md) | B | Star schema (facts/dims/marts), P&L formula, fact_finance, inventory intelligence, returns & penalties, data quality controls, sanitation rationale |
 | [Pricing](modules/pricing.md) | C | Strategies (TARGET_MARGIN, PRICE_CORRIDOR), policies, signal assembly, constraints, guards, eligibility, decisions, explanations, execution modes |
 | [Execution](modules/execution.md) | D+F | Action lifecycle, outbox pattern, retry, CAS guards, reconciliation, simulation mode, shadow-state |
-| [Promotions](modules/promotions.md) | F+G | Promo evaluation, participation decisions, promo execution (activate/deactivate), promo analytics |
+| [Promotions](modules/promotions.md) | D+E | Promo evaluation, participation decisions, promo execution (activate/deactivate), promo analytics |
 | [Seller Operations](modules/seller-operations.md) | E | Operational grid, saved views, working queues, price/promo journals, mismatch monitor |
 | [Audit & Alerting](modules/audit-alerting.md) | A+B+E | Audit log, business alert rules & events, automation blocker, notifications (WebSocket + REST), unread tracking |
 
@@ -43,21 +43,21 @@
 
 | Document | Contents |
 |----------|----------|
-| [Coverage Matrix](scenarios/coverage-matrix.md) | Обзор: 118 module + 20 e2e сценариев, coverage strategy, gap analysis, prioritization |
+| [Coverage Matrix](scenarios/coverage-matrix.md) | Обзор: 160 module + 21 e2e сценариев, coverage strategy, gap analysis, prioritization |
 
 **Module Scenarios** (`scenarios/module/`):
 
 | Document | Module | Count |
 |----------|--------|-------|
-| [Execution](scenarios/module/execution-scenarios.md) | Action lifecycle, outbox, retry, reconciliation, simulation | 18 |
-| [ETL Pipeline](scenarios/module/etl-pipeline-scenarios.md) | Data pipeline, raw→canonical→analytics, idempotency | 16 |
-| [Pricing](scenarios/module/pricing-scenarios.md) | Pricing pipeline, strategies, guards, decisions | 16 |
-| [Integration](scenarios/module/integration-scenarios.md) | Connections, credentials, health-check, rate limits, circuit breaker | 14 |
-| [Analytics & P&L](scenarios/module/analytics-pnl-scenarios.md) | P&L computation, allocation, data quality, materialization | 12 |
-| [Promotions](scenarios/module/promotions-scenarios.md) | Promo lifecycle, evaluation, execution, pricing coordination | 12 |
-| [Tenancy & IAM](scenarios/module/tenancy-iam-scenarios.md) | Multi-tenancy, RBAC, invitations, workspace isolation | 10 |
-| [Seller Operations](scenarios/module/seller-operations-scenarios.md) | Grid, views, queues, journals, mismatch monitor | 10 |
-| [Audit & Alerting](scenarios/module/audit-alerting-scenarios.md) | Audit log, alerts, automation blocker, notifications | 10 |
+| [Execution](scenarios/module/execution-scenarios.md) | Action lifecycle, outbox, retry, reconciliation, simulation | 25 |
+| [ETL Pipeline](scenarios/module/etl-pipeline-scenarios.md) | Data pipeline, raw→canonical→analytics, idempotency | 20 |
+| [Pricing](scenarios/module/pricing-scenarios.md) | Pricing pipeline, strategies, guards, decisions | 24 |
+| [Integration](scenarios/module/integration-scenarios.md) | Connections, credentials, health-check, rate limits, circuit breaker | 16 |
+| [Analytics & P&L](scenarios/module/analytics-pnl-scenarios.md) | P&L computation, allocation, data quality, materialization | 16 |
+| [Promotions](scenarios/module/promotions-scenarios.md) | Promo lifecycle, evaluation, execution, pricing coordination | 16 |
+| [Tenancy & IAM](scenarios/module/tenancy-iam-scenarios.md) | Multi-tenancy, RBAC, invitations, workspace isolation | 17 |
+| [Seller Operations](scenarios/module/seller-operations-scenarios.md) | Grid, views, queues, journals, mismatch monitor | 12 |
+| [Audit & Alerting](scenarios/module/audit-alerting-scenarios.md) | Audit log, alerts, automation blocker, notifications | 14 |
 
 **E2E Scenarios** (`scenarios/e2e/`):
 
@@ -67,7 +67,7 @@
 | [Data Pipeline](scenarios/e2e/data-pipeline-e2e.md) | Connection → ingestion → analytics availability | 5 |
 | [Data Quality & Safety](scenarios/e2e/data-quality-safety-e2e.md) | Stale data → block → resolution, mismatch detection | 4 |
 | [Promotions](scenarios/e2e/promotions-e2e.md) | Promo discovery → evaluation → execution → pricing coordination | 3 |
-| [Operational Lifecycle](scenarios/e2e/operational-lifecycle-e2e.md) | Daily workflow, investigation, onboarding | 3 |
+| [Operational Lifecycle](scenarios/e2e/operational-lifecycle-e2e.md) | Daily workflow, investigation, onboarding | 4 |
 
 ### Operational & Policy Documents
 
@@ -110,7 +110,7 @@ modules/etl-pipeline.md          ← Phase A: data pipeline, raw layer, adapters
 modules/analytics-pnl.md         ← Phase B: star schema, P&L, inventory, returns
 modules/pricing.md               ← Phase C: strategies, policies, signals, decisions
 modules/execution.md             ← Phase D+F: actions, retry, reconciliation, simulation
-modules/promotions.md            ← Phase F+G: promo evaluation, participation, execution, analytics
+modules/promotions.md            ← Phase D+E: promo evaluation, participation, execution, analytics
 modules/seller-operations.md     ← Phase E: grid, views, queues, journals
 modules/audit-alerting.md       ← Phase A+B+E: audit, alerts, notifications
 
@@ -121,8 +121,8 @@ features/                        ← Feature specs with TBD
 Scenario Registry (verifies architecture integrity)
 ──────────────────────────────────────
 scenarios/coverage-matrix.md     ← Overview, strategy, gap analysis
-scenarios/module/                ← 9 files, 118 module-level scenarios
-scenarios/e2e/                   ← 5 files, 20 cross-module scenarios
+scenarios/module/                ← 9 files, 160 module-level scenarios
+scenarios/e2e/                   ← 5 files, 21 cross-module scenarios
 
 Operational
 ──────────────────────────────────────

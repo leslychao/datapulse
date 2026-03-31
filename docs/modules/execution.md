@@ -457,8 +457,8 @@ Pricing Pipeline (unchanged):
   Eligibility → Signal Assembly → Strategy → Constraints → Guards → Decision → Explanation
 
 Action Scheduling:
-  Decision = CHANGE → price_action (execution_mode = SIMULATED)
-  → PENDING_APPROVAL (or APPROVED, based on policy execution_mode)
+  Decision = CHANGE, policy execution_mode = SIMULATED
+  → price_action (execution_mode = SIMULATED, status = APPROVED)
 
 Execution:
   Worker claim → CAS: SCHEDULED → EXECUTING
@@ -506,7 +506,7 @@ Gateway selection: executor worker resolves gateway implementation по `price_a
 | Supersede | Полная логика (immediate + deferred) | Полная логика (idempotent — shared index per execution_mode) |
 | Hold/Cancel | Полная поддержка | Полная поддержка (оператор может hold/cancel simulated actions) |
 | Timing | Реальные задержки (30s–10min reconciliation) | Мгновенно (0ms default delay) |
-| State machine transitions | PENDING_APPROVAL → ... → RECONCILIATION_PENDING → SUCCEEDED/FAILED | PENDING_APPROVAL → ... → EXECUTING → SUCCEEDED |
+| State machine transitions | PENDING_APPROVAL → ... → RECONCILIATION_PENDING → SUCCEEDED/FAILED | APPROVED → SCHEDULED → EXECUTING → SUCCEEDED |
 | Audit | Полный (audit_log, attempt records) | Полный (идентичный формат, execution_mode = SIMULATED) |
 
 **Parity scope:** parity тесты верифицируют, что при одинаковых входных данных pricing pipeline (eligibility → decision → explanation) даёт идентичные результаты для SIMULATED и LIVE. Execution pipeline различается by design (no real writes). Parity тесты НЕ покрывают retry/reconciliation timing — это live-only поведение.
@@ -541,9 +541,9 @@ simulated_offer_state:
 
 | Scope | Механизм |
 |-------|----------|
-| Per-policy | `price_policy.execution_mode` определяет, создаются ли SIMULATED или LIVE actions |
-| Per-connection | Все policies на connection в simulated mode → все actions simulated |
-| Mixed | Одни policies в LIVE, другие в SIMULATED — допускается. Partial unique index `idx_price_action_active_offer` фильтрует по execution_mode, предотвращая конфликт live vs simulated active actions на один offer |
+| Per-policy | `price_policy.execution_mode = SIMULATED` → actions с `execution_mode = SIMULATED`. Остальные значения (SEMI_AUTO, FULL_AUTO) → `execution_mode = LIVE` |
+| Per-connection | Все policies на connection в SIMULATED mode → все actions simulated |
+| Mixed | Одни policies в LIVE mode (SEMI_AUTO/FULL_AUTO), другие в SIMULATED — допускается. Partial unique index `idx_price_action_active_offer` фильтрует по execution_mode, предотвращая конфликт live vs simulated active actions на один offer |
 
 **Partial unique index (расширение):**
 
@@ -589,7 +589,7 @@ Comparison report строится on-demand (не materialized view) — lightw
 Workflow перехода от симуляции к реальному исполнению:
 
 ```
-1. Policy в SIMULATED mode → pricing runs создают simulated actions
+1. Policy execution_mode = SIMULATED → pricing runs создают simulated actions (auto-approved)
 2. Оператор анализирует results (comparison metrics, price journal)
 3. Оператор меняет policy execution_mode на SEMI_AUTO
 4. Следующий pricing run создаёт LIVE actions с PENDING_APPROVAL
@@ -597,14 +597,16 @@ Workflow перехода от симуляции к реальному испо
 6. После N успешных cycles → переход на FULL_AUTO (safety gate)
 ```
 
-**Safety:** переключение на LIVE не изменяет существующие simulated actions. Они остаются в терминальном состоянии (SUCCEEDED) для reference. Новые pricing runs создают LIVE actions.
+**Прогрессия:** SIMULATED → SEMI_AUTO → FULL_AUTO. Каждый шаг повышает уровень автоматизации и доверия.
+
+**Safety:** переключение на SEMI_AUTO/FULL_AUTO не изменяет существующие simulated actions. Они остаются в терминальном состоянии (SUCCEEDED) для reference. Новые pricing runs создают LIVE actions.
 
 ### Outbox integration для simulated actions
 
 Simulated actions **проходят через outbox** (полный паритет с live):
 
 ```
-Simulated action APPROVED → INSERT outbox_event (type: ACTION_EXECUTE) → RabbitMQ
+Simulated action APPROVED → INSERT outbox_event (type: PRICE_ACTION_EXECUTE) → RabbitMQ
 → executor worker → resolves SimulatedPriceActionGateway → shadow-state update → SUCCEEDED
 ```
 

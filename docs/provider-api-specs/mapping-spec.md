@@ -18,8 +18,8 @@ Confidence levels:
 
 ### DD-1: Ozon Canonical Price
 
-**Решение:** `CanonicalPriceSnapshot.price` = `price.price` из v5/product/info/prices.
-`discountPrice` = `price.marketing_seller_price`.
+**Решение:** `CanonicalPriceCurrent.price` = `price.price` из v5/product/info/prices.
+`discount_price` = `price.marketing_seller_price`.
 
 **Обоснование:** В реальном ответе v5 `price` — это вложенный объект с числовыми полями.
 `price.price` = текущая активная цена продажи (273).
@@ -194,15 +194,17 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 
 ### NormalizedCatalogItem → CanonicalOffer
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| `sellerSku` | `sellerSku` | C | Direct mapping |
-| `marketplaceSku` | `marketplaceSku` | C | Direct mapping |
-| `name` | `productName` | C | |
-| `brand` | `brand` | C (WB sandbox) / C (Ozon via attributes) | WB: direct field. Ozon: via v4/attributes (id=85) |
-| `category` | `category` | C (WB sandbox) / C (Ozon) | Name for WB, ID for Ozon |
-| `barcode` | `barcode` | C (both) | |
-| `status` | `status` → `OfferStatus` | C (Ozon) / A (WB) | Ozon: `is_archived` verified; WB: derived |
+CanonicalOffer реализована как три таблицы: `product_master`, `seller_sku`, `marketplace_offer`. См. [ETL Pipeline](../modules/etl-pipeline.md) §Связи каталожных сущностей.
+
+| Normalized field | Canonical target table.field | Confidence | Notes |
+|------------------|------------------------------|------------|-------|
+| `sellerSku` | `seller_sku.sku_code` | C | Direct mapping |
+| `marketplaceSku` | `marketplace_offer.marketplace_sku` | C | Direct mapping |
+| `name` | `marketplace_offer.name` | C | |
+| `brand` | `product_master.brand` | C (WB sandbox) / C (Ozon via attributes) | WB: direct field. Ozon: via v4/attributes (id=85) |
+| `category` | `marketplace_offer.category_id` (FK → category) | C (WB sandbox) / C (Ozon) | Name for WB, ID for Ozon |
+| `barcode` | `seller_sku.barcode` | C (both) | |
+| `status` | `marketplace_offer.status` | C (Ozon) / A (WB) | Ozon: `is_archived` verified; WB: derived |
 
 ---
 
@@ -237,15 +239,15 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 - `currency_code` is inside `price` object
 - `marketing_seller_price` chosen as `discountPrice` per DD-1
 
-### NormalizedPriceItem → CanonicalPriceSnapshot
+### NormalizedPriceItem → CanonicalPriceCurrent
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| (resolved via offer lookup) | `canonicalOfferId` | C | Resolved by `resolveOffer()` in orchestrator |
+| Normalized field | Canonical field (DDL: `canonical_price_current`) | Confidence | Notes |
+|------------------|--------------------------------------------------|------------|-------|
+| (resolved via offer lookup) | `marketplace_offer_id` | C | Resolved by `resolveOffer()` in orchestrator |
 | `price` | `price` | C | |
-| `discountPrice` | `discountPrice` | C (Ozon) / A (WB) | Ozon: `marketing_seller_price`; WB: computed |
+| `discountPrice` | `discount_price` | C (Ozon) / A (WB) | Ozon: `marketing_seller_price`; WB: computed |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
-| (ingestion time) | `capturedAt` | C | Set from rawArtifact.capturedAt |
+| (ingestion time) | `captured_at` | C | Set from rawArtifact.capturedAt |
 
 ---
 
@@ -276,15 +278,15 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 - `warehouse_ids` IS present in v4 response (was documented as absent)
 - Ozon `warehouseId` mapping updated to use `warehouse_ids[0]` with type fallback (DD-2)
 
-### NormalizedStockItem → CanonicalStockSnapshot
+### NormalizedStockItem → CanonicalStockCurrent
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| (resolved via offer lookup) | `canonicalOfferId` | C | |
-| `warehouseId` | `warehouseId` | C (Ozon) / A (WB) | DD-2 for Ozon |
+| Normalized field | Canonical field (DDL: `canonical_stock_current`) | Confidence | Notes |
+|------------------|--------------------------------------------------|------------|-------|
+| (resolved via offer lookup) | `marketplace_offer_id` | C | |
+| `warehouseId` | `warehouse_id` | C (Ozon) / A (WB) | DD-2 for Ozon |
 | `available` | `available` | C (Ozon) / A (WB) | |
 | `reserved` | `reserved` | C (Ozon) / U (WB) | |
-| (ingestion time) | `capturedAt` | C | |
+| (ingestion time) | `captured_at` | C | |
 
 ---
 
@@ -325,16 +327,15 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 
 ### NormalizedOrderItem → CanonicalOrder
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| `externalOrderId` | `externalOrderId` | C | |
-| (resolved) | `canonicalOfferId` | C | |
-| `sellerSku` | `sellerSku` | C | |
+| Normalized field | Canonical field (DDL: `canonical_order`) | Confidence | Notes |
+|------------------|------------------------------------------|------------|-------|
+| `externalOrderId` | `external_order_id` | C | |
+| (resolved) | `marketplace_offer_id` (FK → marketplace_offer) | C | |
 | `quantity` | `quantity` | C | |
-| `pricePerUnit` | `pricePerUnit` | C (Ozon) / A (WB) | |
-| `totalAmount` | `totalAmount` | C (Ozon) / A (WB) | |
+| `pricePerUnit` | `price_per_unit` | C (Ozon) / A (WB) | |
+| `totalAmount` | `total_amount` | C (Ozon) / A (WB) | |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
-| `orderDate` | `orderDate` | C | |
+| `orderDate` | `order_date` | C | |
 | `status` | `status` | C (Ozon) / A (WB) | |
 
 ---
@@ -442,16 +443,16 @@ SPP не включается в формулу P&L как отдельная с
 
 ### NormalizedSaleItem → CanonicalSale
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| `externalSaleId` | `externalSaleId` | C | |
-| (resolved) | `canonicalOfferId` | C | |
-| `sellerSku` | `sellerSku` | C | |
+| Normalized field | Canonical field (DDL: `canonical_sale`) | Confidence | Notes |
+|------------------|----------------------------------------|------------|-------|
+| `externalSaleId` | `external_sale_id` | C | |
+| (resolved) | `marketplace_offer_id` (FK → marketplace_offer) | C | |
+| (resolved) | `seller_sku_id` (FK → seller_sku) | C | Via offer lookup |
 | `quantity` | `quantity` | C | |
-| `saleAmount` | `saleAmount` | C (Ozon) / A (WB) | |
+| `saleAmount` | `sale_amount` | C (Ozon) / A (WB) | |
 | `commission` | `commission` | C (Ozon) / U (WB) | WB commission not in sales endpoint |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
-| `saleDate` | `saleDate` | C (Ozon) / C-docs (WB) | |
+| `saleDate` | `sale_date` | C (Ozon) / C-docs (WB) | |
 
 ---
 
@@ -507,16 +508,16 @@ Must combine with `reportDetailByPeriod` for monetary values.
 
 ### NormalizedReturnItem → CanonicalReturn
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| `externalReturnId` | `externalReturnId` | C | |
-| (resolved) | `canonicalOfferId` | C | |
-| `sellerSku` | `sellerSku` | C | |
+| Normalized field | Canonical field (DDL: `canonical_return`) | Confidence | Notes |
+|------------------|------------------------------------------|------------|-------|
+| `externalReturnId` | `external_return_id` | C | |
+| (resolved) | `marketplace_offer_id` (FK → marketplace_offer) | C | |
+| (resolved) | `seller_sku_id` (FK → seller_sku) | C | Via offer lookup |
 | `quantity` | `quantity` | C (Ozon) / A (WB) | |
-| `returnAmount` | `returnAmount` | C (Ozon) / U (WB) | |
-| `returnReason` | `returnReason` | C | |
+| `returnAmount` | `return_amount` | C (Ozon) / U (WB) | |
+| `returnReason` | `return_reason` | C | |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
-| `returnDate` | `returnDate` | C (Ozon) / U (WB) | |
+| `returnDate` | `return_date` | C (Ozon) / U (WB) | |
 
 ---
 
@@ -665,15 +666,22 @@ This is consistent with the WB model where `retail_price_withdisc_rub` > buyer-p
 
 ### NormalizedFinanceItem → CanonicalFinanceEntry
 
-| Normalized field | Canonical field | Confidence | Notes |
-|------------------|-----------------|------------|-------|
-| `entryType` | `entryType` → `FinanceEntryType` | C (Ozon) / A (WB) | |
-| `externalRef` | `externalRef` | C | |
-| (resolved) | `canonicalOfferId` | C | |
-| `sellerSku` | `sellerSku` | C | |
+| Normalized field | Canonical field (DDL: `canonical_finance_entry`) | Confidence | Notes |
+|------------------|--------------------------------------------------|------------|-------|
+| `entryType` | `entry_type` → `FinanceEntryType` | C (Ozon) / A (WB) | |
+| `externalRef` | `external_entry_id` | C | rrd_id (WB), operation_id (Ozon) |
+| (resolved) | `seller_sku_id` (FK → seller_sku) | C | Via offer lookup; NULL if SKU not found |
 | `amount` | `amount` | C (Ozon) / A (WB) | Ozon sign convention verified |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
-| `entryDate` | `entryDate` | C (Ozon) / A (WB) | Ozon: custom format! |
+| `entryDate` | `entry_date` | C (Ozon) / A (WB) | Ozon: custom format! |
+
+---
+
+## 8. PROMO
+
+Promo mapping (WB + Ozon → CanonicalPromoCampaign, CanonicalPromoProduct) documented in a separate file: [promo-advertising-contracts.md](promo-advertising-contracts.md).
+
+Referenced from [ETL Pipeline](../modules/etl-pipeline.md) §Promo canonical entities.
 
 ---
 

@@ -77,7 +77,7 @@
 - **Business goal:** Тестирование pricing strategy без реального воздействия на маркетплейс.
 - **Участвующие модули:** Pricing → Execution (simulated) → Analytics (comparison).
 - **Основной поток:**
-  1. **Pricing:** Manual trigger (`execution_mode=SIMULATED`) → full pipeline → decision → action (`SIMULATED`).
+  1. **Pricing:** Pricing run для connection с policy `execution_mode=SIMULATED` → full pipeline → decision (`execution_mode=SIMULATED`) → action (APPROVED, `execution_mode=SIMULATED`).
   2. **Execution:** `SimulatedPriceActionGateway` → write to `simulated_offer_state` (shadow table). Reconciliation: compare with shadow state → `SUCCEEDED`.
   3. **Analytics:** Compare simulated decisions vs actual marketplace state. Calculate hypothetical P&L impact.
 - **Ключевые зависимости:** Simulation infrastructure. Shadow state isolation (separate partial unique index).

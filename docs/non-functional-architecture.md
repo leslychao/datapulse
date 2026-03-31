@@ -16,7 +16,7 @@
 
 | Требование                                              | Обоснование                                           |
 | ------------------------------------------------------- | ----------------------------------------------------- |
-| `@PreAuthorize` на уровне методов с SpEL                | Декларативная авторизация, account-scoped проверки    |
+| `@PreAuthorize` на уровне методов с SpEL                | Декларативная авторизация, workspace-scoped проверки  |
 | RBAC: OWNER, ADMIN, PRICING_MANAGER, OPERATOR, ANALYST, VIEWER | Минимально достаточный набор ролей; соответствует enum `workspace_member.role` |
 | Multi-tenant access isolation                           | `@PreAuthorize("@accessService.canRead(#connectionId)")` — проверка принадлежности connection к workspace пользователя |
 
@@ -483,16 +483,16 @@ Redis — ephemeral cache. Потеря данных допустима: cache w
 
 ### Инструмент
 
-Flyway — единственный механизм миграции схем PostgreSQL и ClickHouse.
+Liquibase — механизм миграции схем PostgreSQL. ClickHouse — custom `ClickHouseMigrationRunner` (см. §Migration strategy).
 
 ### Правила миграций
 
 | Правило | Обоснование |
 |---------|-------------|
-| Forward-only | Flyway `migrate` только вперёд. `undo` не используется — вместо этого compensating migration |
+| Forward-only | Liquibase `update` только вперёд. `rollback` — только для reversible changesets, для остальных — compensating migration |
 | Backward-compatible migrations | Каждая миграция должна быть совместима с предыдущей версией приложения (expand-contract pattern). Это обеспечивает zero-downtime deployment |
 | Один SQL-файл = одна логическая операция | Атомарность миграции. Не смешивать DDL разных модулей |
-| Naming convention | `V{version}__{module}_{description}.sql` (пример: `V012__etl_add_attribution_level.sql`) |
+| Naming convention | `{NNNN}-{short-description}.sql` (пример: `0012-etl-add-attribution-level.sql`). Подробности — в §Migration strategy |
 | Тестирование | Каждая миграция проверяется на test dataset перед production apply |
 
 ### Expand-contract pattern
@@ -507,14 +507,14 @@ Flyway — единственный механизм миграции схем P
 
 | Сценарий | Процедура |
 |----------|-----------|
-| Миграция failed (не применилась) | Flyway автоматически останавливается. Исправить SQL, повторить |
+| Миграция failed (не применилась) | Liquibase автоматически останавливается. Исправить SQL changeset, повторить `update` |
 | Миграция applied, но данные некорректны | Compensating migration — новый SQL-файл, исправляющий данные |
 | Миграция applied, нужно полностью откатить | Compensating migration + откат приложения на предыдущую версию (expand-contract обеспечивает совместимость) |
 | Catastrophic (миграция испортила production) | Point-in-time recovery PostgreSQL (см. [§Disaster Recovery Plan](#disaster-recovery-plan)) |
 
 ### ClickHouse миграции
 
-ClickHouse DDL управляется Flyway (отдельный datasource). Специфика:
+ClickHouse DDL управляется custom `ClickHouseMigrationRunner` (см. §Migration strategy). Специфика:
 - `ALTER TABLE` в ClickHouse имеет ограничения (нет транзакций).
 - При breaking change: DROP + re-create таблицы → full re-materialization из canonical.
 - Это допустимо, т.к. ClickHouse — derived store.

@@ -156,7 +156,7 @@ price_policy:
   min_price                 DECIMAL (nullable)
   max_price                 DECIMAL (nullable)
   guard_config              JSONB
-  execution_mode            ENUM (RECOMMENDATION, SEMI_AUTO, FULL_AUTO)
+  execution_mode            ENUM (RECOMMENDATION, SEMI_AUTO, FULL_AUTO, SIMULATED)
   approval_timeout_hours    INT DEFAULT 72
   priority                  INT DEFAULT 0
   version                   INT NOT NULL DEFAULT 1
@@ -358,7 +358,7 @@ price_decision:
   guards_evaluated          JSONB                              -- ordered list: [{ name, passed: bool, details }]
   skip_reason               VARCHAR(255)                       -- human-readable skip reason (nullable — only for SKIP/HOLD)
   explanation_summary       TEXT                               -- structured explanation (see §Explanation summary format)
-  execution_mode            VARCHAR(20) NOT NULL               -- LIVE, SIMULATED (from policy context)
+  execution_mode            VARCHAR(20) NOT NULL               -- LIVE, SIMULATED (derived: policy SIMULATED → SIMULATED, иначе LIVE)
   created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
 
   INDEX idx_pd_workspace_created (workspace_id, created_at DESC)
@@ -391,11 +391,14 @@ price_decision:
 
 ### Decision → Action
 
-- CHANGE + SEMI_AUTO → `price_action` PENDING_APPROVAL
-- CHANGE + FULL_AUTO → `price_action` APPROVED
+- CHANGE + SEMI_AUTO → `price_action` PENDING_APPROVAL (`execution_mode = LIVE`)
+- CHANGE + FULL_AUTO → `price_action` APPROVED (`execution_mode = LIVE`)
+- CHANGE + SIMULATED → `price_action` APPROVED (`execution_mode = SIMULATED`)
 - CHANGE + RECOMMENDATION → НЕ создаёт action; рекомендация в UI
 - SKIP → сохраняется для аудита
 - HOLD → недостаточность данных
+
+**Mapping `price_policy.execution_mode` → `price_decision.execution_mode`:** policy SIMULATED → decision SIMULATED, все остальные (RECOMMENDATION, SEMI_AUTO, FULL_AUTO) → decision LIVE. `price_decision.execution_mode` — derived поле для SQL-фильтрации; source of truth — `policy_snapshot.execution_mode` внутри decision.
 
 ### Action scheduling — обработка конфликтов с active action
 
@@ -468,9 +471,10 @@ price_decision:
 
 | Mode | Описание | Действие |
 |------|----------|----------|
-| **RECOMMENDATION** | Показывает рекомендацию | Decision сохраняется; оператор вручную создаёт action |
+| **RECOMMENDATION** | Показывает рекомендацию | Decision сохраняется; action НЕ создаётся. Рекомендация отображается в UI для ручного решения оператора |
 | **SEMI_AUTO** | Создаёт action PENDING_APPROVAL | Оператор одобряет или отклоняет |
 | **FULL_AUTO** | Создаёт action APPROVED | Контроль через guards; failed → alert |
+| **SIMULATED** | Симулированное исполнение | Action создаётся APPROVED с `execution_mode = SIMULATED`. Реальная запись на маркетплейс не выполняется; результат пишется в `simulated_offer_state` |
 
 ### Safety gate для FULL_AUTO
 

@@ -189,15 +189,18 @@ CAPTURED → PROCESSED → EXPIRED
 
 | Сущность | Категория | Назначение | Ключевые поля |
 |----------|-----------|------------|---------------|
-| `CanonicalOffer` | State | Товарное предложение | sellerSku, marketplaceSku, name, brand, category, status |
-| `CanonicalPriceSnapshot` | State | Снимок цены | price, discountPrice, currency, capturedAt |
-| `CanonicalStockSnapshot` | State | Снимок остатков | available, reserved, warehouseId |
+| `CanonicalOffer` (product_master, seller_sku, marketplace_offer) | State | Товарное предложение | sellerSku, marketplaceSku, name, brand, category, status |
+| `CanonicalPriceCurrent` | State | Текущая цена (latest per offer) | price, discountPrice, currency, capturedAt |
+| `CanonicalStockCurrent` | State | Текущие остатки (latest per offer × warehouse) | available, reserved, warehouseId |
 | `Category` | Dict | Категория маркетплейса | name, parentCategoryId, externalCategoryId |
 | `Warehouse` | Dict | Склад | name, warehouseType (FBO/FBS/SELLER), externalWarehouseId |
 | `CanonicalOrder` | Flow | Заказ/отправление | externalOrderId, quantity, pricePerUnit, status |
 | `CanonicalSale` | Flow | Продажа | saleAmount, commission |
 | `CanonicalReturn` | Flow | Возврат | returnAmount, returnReason, returnDate |
 | `CanonicalFinanceEntry` | Flow | Финансовая операция | id (PK), connection_id (FK marketplace_connection), source_platform, posting_id, order_id, seller_sku_id, entryType, amount (нормализованный знак), entryDate, job_execution_id (FK) |
+| `CanonicalPromoCampaign` | State | Акция маркетплейса | external_promo_id, promo_name, promo_type, status, date_from, date_to |
+| `CanonicalPromoProduct` | State | Участие товара в акции | participation_status, required_price, current_price |
+| `cost_profile` | State (SCD2) | Себестоимость SKU (ручной ввод) | seller_sku_id, cost_price, valid_from, valid_to |
 
 ### Canonical DDL
 
@@ -438,6 +441,24 @@ warehouse:
 - `category` — используется для pricing policy assignments (scope_type = CATEGORY), фильтрации в Seller Operations grid.
 - `warehouse` — FK для `canonical_stock_current.warehouse_id`, фильтрация остатков по типам складов.
 - Оба справочника — materialized в ClickHouse как `dim_category` / `dim_warehouse` для аналитики.
+
+## Data domain → ETL event mapping
+
+`marketplace_sync_state.data_domain` определяет, какие данные загружаются. ETL dependency graph определяет порядок обработки. Один ETL event может обслуживать несколько data domains, и одна fetch-операция может порождать записи в нескольких canonical таблицах.
+
+| data_domain | ETL event(s) | Canonical targets | Провайдер-специфика |
+|-------------|-------------|-------------------|---------------------|
+| `CATALOG` | `CATEGORY_DICT`, `WAREHOUSE_DICT`, `PRODUCT_DICT` | category, warehouse, product_master, seller_sku, marketplace_offer | — |
+| `PRICES` | `PRICE_SNAPSHOT` | canonical_price_current | — |
+| `STOCKS` | `INVENTORY_FACT` | canonical_stock_current | — |
+| `ORDERS` | `SALES_FACT` | canonical_order | WB: orders endpoint; Ozon: postings endpoint |
+| `SALES` | `SALES_FACT` | canonical_sale (Ozon), canonical_return (Ozon) | WB: dim_product backfill only (sales/returns → FACT_FINANCE) |
+| `RETURNS` | `SALES_FACT` (Ozon), `FACT_FINANCE` (WB) | canonical_return | Ozon: через returns/list; WB: из finance report |
+| `FINANCE` | `FACT_FINANCE` | canonical_finance_entry; WB: + canonical_sale, canonical_return | WB: reportDetailByPeriod — source of truth для sales/returns/finance |
+| `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | — |
+| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | — |
+
+**Примечание**: WB sales и returns извлекаются из `FACT_FINANCE` (finance report), а не из `SALES_FACT`. Поэтому `FACT_FINANCE` зависит от `SALES_FACT` в dependency graph — чтобы dim_product backfill был завершён до финансовой обработки.
 
 ## Граф зависимостей ETL events
 

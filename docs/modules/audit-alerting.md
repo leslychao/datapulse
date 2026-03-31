@@ -71,11 +71,13 @@ audit_log:
 | Prefix | Примеры | Source module |
 |--------|---------|--------------|
 | `connection.*` | `connection.create`, `connection.update`, `connection.delete`, `connection.sync.manual` | [Integration](integration.md) |
-| `credentials.*` | `credentials.access`, `credentials.rotate` | [Integration](integration.md) |
+| `credential.*` | `credential.access`, `credential.rotate` | [Integration](integration.md) |
 | `policy.*` | `policy.create`, `policy.update`, `policy.activate`, `policy.deactivate` | [Pricing](pricing.md) |
+| `lock.*` | `lock.create`, `lock.remove` | [Pricing](pricing.md) |
 | `action.*` | `action.approve`, `action.hold`, `action.cancel`, `action.manual_override` | [Execution](execution.md) |
-| `workspace.*` | `workspace.create`, `workspace.update` | [Tenancy & IAM](tenancy-iam.md) |
-| `user.*` | `user.invite`, `user.role_change`, `user.deactivate`, `user.login` | [Tenancy & IAM](tenancy-iam.md) |
+| `workspace.*` | `workspace.create`, `workspace.suspend`, `workspace.reactivate`, `workspace.archive`, `workspace.transfer_ownership` | [Tenancy & IAM](tenancy-iam.md) |
+| `user.*` | `user.provision`, `user.deactivate`, `user.reactivate` | [Tenancy & IAM](tenancy-iam.md) |
+| `member.*` | `member.invite`, `member.accept_invitation`, `member.cancel_invitation`, `member.change_role`, `member.remove` | [Tenancy & IAM](tenancy-iam.md) |
 | `promo.*` | `promo.participation.override`, `promo.activate`, `promo.deactivate` | [Promotions](promotions.md) |
 | `alert.*` | `alert.rule.create`, `alert.rule.update`, `alert.acknowledge`, `alert.resolve` | Audit & Alerting |
 
@@ -129,7 +131,7 @@ alert_rule:
 ```
 alert_event:
   id                    BIGSERIAL PK
-  alert_rule_id         BIGINT FK → alert_rule                      NOT NULL
+  alert_rule_id         BIGINT FK → alert_rule                      (nullable; NULL for event-driven alerts)
   workspace_id          BIGINT FK → workspace                       NOT NULL
   connection_id         BIGINT FK → marketplace_connection           (nullable)
   status                VARCHAR(20) NOT NULL                         -- OPEN, ACKNOWLEDGED, RESOLVED, AUTO_RESOLVED

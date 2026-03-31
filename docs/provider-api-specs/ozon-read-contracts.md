@@ -768,10 +768,11 @@ Acquiring operations have `delivery_schema = ""` and `warehouse_id = 0`, but `po
 |-------|--------|-----------|------------|
 | `operation_date` | "YYYY-MM-DD HH:MM:SS" (NOT ISO 8601!) | Financial operation date | confirmed |
 | `posting.order_date` | "YYYY-MM-DD HH:MM:SS" (NOT ISO 8601!) | Original order date | confirmed |
-| Timezone | Assumed Moscow time (not explicitly documented) | assumed |
+| Timezone | **Moscow (UTC+3)** — empirically confirmed 2026-03-31 (cross-reference `posting.created_at` UTC vs `finance.posting.order_date`: constant +3h offset, 7 data points; see mapping-spec.md DD-6) | confirmed |
 
 **CRITICAL**: Finance timestamps use custom format "YYYY-MM-DD HH:MM:SS",
-NOT ISO 8601. Parser must handle this format explicitly.
+NOT ISO 8601. Timezone is Moscow (UTC+3). Parser must handle this format explicitly
+and apply `ZoneOffset.ofHours(3)` to produce `OffsetDateTime`.
 
 ### Data Freshness
 
@@ -828,7 +829,7 @@ NOT ISO 8601. Parser must handle this format explicitly.
 1. ~~Brand~~ — **RESOLVED**: available via `POST /v4/product/info/attributes` (attribute_id=85, "Бренд", required field)
 2. **FBS** — not empirically tested (account without FBS setup; FBS endpoint returns 400 for FBO-only accounts)
 3. **Rate limits** — not documented for any endpoint
-4. **Finance timezone** — timestamps in custom format, timezone not explicit (assumed Moscow)
+4. ~~Finance timezone~~ — **RESOLVED**: Moscow (UTC+3), empirically confirmed 2026-03-31 (7 data points, constant +3h offset)
 5. ~~Acquiring join~~ — **RESOLVED (DD-15)**: acquiring uses `order_number` format (without -N suffix), can be joined to posting
 6. ~~Storage attribution~~ — **RESOLVED (DD-16)**: storage is daily aggregate, no per-order attribution; pro-rata allocation needed
 7. ~~Categories API~~ — **RESOLVED**: `POST /v1/description-category/tree` returns full hierarchy with `description_category_id` + `category_name`

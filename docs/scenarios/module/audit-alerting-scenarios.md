@@ -44,12 +44,12 @@ Audit & Alerting обеспечивает unified audit log, business-level aler
 
 ### AUD-05: Alert event — event-driven (execution failure)
 
-- **Назначение:** Execution module сообщает о terminal failure.
-- **Trigger:** Spring `ApplicationEvent` (`AlertTriggeredEvent`) published by source module при terminal failure.
-- **Main path:** `ApplicationEvent` listener receives `AlertTriggeredEvent` → find matching `alert_rule` → create `alert_event` (OPEN, type = ACTION_FAILED) → WebSocket notification. Event-driven alerts can have `alert_rule_id` from a matching rule or be created without a rule.
-- **Dependencies:** Spring `ApplicationEvent` infrastructure. Matching `alert_rule` for event type.
-- **Failure risks:** Event delivery delay → late alert. No matching rule → alert created without rule linkage.
-- **Uniqueness:** Event-driven (real-time) — другой trigger mechanism (`ApplicationEvent`, не scheduler).
+- **Назначение:** Source module (Execution, Pricing, Promotions) сообщает о значимом событии, требующем внимания оператора.
+- **Trigger:** Spring `ApplicationEvent` (`AlertTriggeredEvent`) published by source module (e.g. terminal failure, stuck state, reconciliation mismatch).
+- **Main path:** `ApplicationEvent` listener receives `AlertTriggeredEvent` → INSERT `alert_event` с `alert_rule_id = NULL` (event-driven alerts не требуют alert_rule) → severity и title из payload события → WebSocket notification → user_notification fan-out.
+- **Dependencies:** Spring `ApplicationEvent` infrastructure. Source module publishes `AlertTriggeredEvent` with: `workspaceId`, `connectionId`, `severity`, `title`, `details` (JSONB), `blocksAutomation`.
+- **Failure risks:** Event delivery delay → late alert. Listener failure → `log.error`, alert not created (best-effort). Source module forgets to publish event → silent failure.
+- **Uniqueness:** Event-driven (real-time) — другой trigger mechanism (`ApplicationEvent`, не scheduler). `alert_rule_id = NULL` — lifecycle управляется оператором (ACKNOWLEDGED → RESOLVED) или module-specific logic, auto-resolve не применяется.
 
 ### AUD-06: Alert acknowledgement
 
@@ -133,3 +133,12 @@ Audit & Alerting обеспечивает unified audit log, business-level aler
 - **Dependencies:** Workspace creation event (для seeding). User role: ADMIN/OWNER. `alert_rule` table.
 - **Failure risks:** Default thresholds не подходят для specific business → alerts too noisy or too silent → user must tune. Disabling blocks_automation rule without understanding consequences → pricing runs on stale data.
 - **Uniqueness:** Configuration management — другой actor (admin), другой business outcome (rule config, не alert event). Seeding — one-time initialization flow.
+
+### AUD-15: RESIDUAL_ANOMALY checker
+
+- **Назначение:** Обнаружение аномальных расхождений в reconciliation residual после materialization.
+- **Trigger:** Event-driven, после каждой ClickHouse materialization (`ETL_SYNC_COMPLETED` event).
+- **Main path:** Query ClickHouse: `mart_posting_pnl.reconciliation_residual` за последние 30 дней → вычислить baseline (mean + stddev) → для каждого offer с `abs_residual > mean + sigma_threshold × stddev` AND `abs_residual > min_absolute_threshold` → группировка аномалий по connection → find matching `alert_rule` (RESIDUAL_ANOMALY) → create `alert_event` (OPEN) per connection. Details JSONB содержит list of offer_ids и residuals.
+- **Dependencies:** Materialized data in ClickHouse (`mart_posting_pnl`). `alert_rule` с type = RESIDUAL_ANOMALY. Config: `{ "sigma_threshold": 2.0, "min_absolute_threshold": 500.0 }`.
+- **Failure risks:** ClickHouse unavailable → checker fails (logs error, retries next materialization). Volatile baseline in early stages → false positives. `min_absolute_threshold` guard mitigates penny-level noise.
+- **Uniqueness:** Statistical anomaly detection с двойным guard (sigma + absolute). Post-materialization trigger. `blocks_automation = true` по default (CRITICAL severity) — может блокировать pricing pipeline для connection.

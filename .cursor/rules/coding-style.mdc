@@ -681,21 +681,52 @@ public TaskExecutor notificationExecutor() {
 
 # Infrastructure & Operations
 
-## 34. Миграции БД (Flyway)
+## 34. Миграции БД (Liquibase)
 
-### Naming
+### Структура
 
-- Versioned: `V{NNN}__{snake_case_description}.sql` — `V001__create_accounts_table.sql`, `V002__add_tenant_id_to_orders.sql`.
-- Repeatable: `R__create_analytics_views.sql` — для views и functions, которые пересоздаются.
-- Нумерация — трёхзначная, с ведущими нулями.
+- Master changelog: `db/changelog/db.changelog-master.yaml` — перечисляет changeset-файлы в порядке применения.
+- Changeset-файлы: `db/changelog/changes/{NNNN}-{short-description}.sql` — SQL-формат с Liquibase-маркерами.
+- Нумерация — четырёхзначная, с ведущими нулями: `0001-tenancy-iam-tables.sql`, `0002-integration-tables.sql`.
+- Execution: только `datapulse-api` запускает миграции при старте. Workers — `liquibase.enabled=false`.
+
+### SQL Changeset
+
+```sql
+--liquibase formatted sql
+
+--changeset datapulse:0001-create-accounts-table
+CREATE TABLE account (
+    id bigserial PRIMARY KEY,
+    name varchar(255) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+--rollback DROP TABLE account;
+```
+
+### Master changelog (YAML)
+
+```yaml
+databaseChangeLog:
+  - include:
+      file: changes/0001-tenancy-iam-tables.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0002-integration-tables.sql
+      relativeToChangelogFile: true
+```
 
 ### Правила
 
 - **Одна миграция = один логический шаг** (создание таблицы, добавление колонки, создание индекса).
-- **Никогда не редактировать** уже применённые миграции. Откат — через новую forward migration.
-- **DDL и DML в разных миграциях** — не смешивать структурные изменения с данными.
-- **Seed data**: `R__` repeatable migration для справочников, или `@Profile("local")` data initializer для тестовых данных.
-- **Индексы**: создавать `CONCURRENTLY` где возможно, в отдельных миграциях.
+- **Никогда не редактировать** уже применённые changesets. Откат — через новый changeset с обратным изменением.
+- **DDL и DML в разных changesets** — не смешивать структурные изменения с данными.
+- **Rollback**: обязателен для DDL-changesets (`--rollback DROP TABLE ...`). Для irreversible changes (DROP, data migration) — секцию rollback опускать с комментарием.
+- **Author**: `datapulse` для всех changesets. Changeset id: `{NNNN}-{short-description}`, совпадает с именем файла.
+- **Context**: changeset с `context: local` для тестовых данных, или `@Profile("local")` data initializer.
+- **Индексы**: создавать `CONCURRENTLY` где возможно, в отдельных changesets.
+- **Preconditions**: `--preconditions onFail:MARK_RAN` для idempotent-миграций (если объект уже существует).
 
 ## 35. Retry & Resilience
 

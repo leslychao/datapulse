@@ -125,7 +125,7 @@ DISABLED → ACTIVE (admin re-enable + successful validation)
 - **Механизм:** scheduled job (каждые 15 мин) для всех ACTIVE connections.
 - **Проверка:** lightweight API call (WB: `GET /api/v2/cards/list?limit=1`; Ozon: `POST /v1/product/list` с `limit=1`).
 - **Success:** обновить `last_check_at`, `last_success_at`.
-- **Failure:** обновить `last_check_at`, `last_error_at`, `last_error_code`. Если 3 consecutive failures → `status = AUTH_FAILED`, dispatch `ConnectionHealthDegraded` event.
+- **Failure:** обновить `last_check_at`, `last_error_at`, `last_error_code`. Если 3 consecutive failures → `status = AUTH_FAILED`, dispatch `ConnectionHealthDegraded` event (Spring ApplicationEvent, in-process; не outbox).
 - **Config:** interval и failure threshold — `@ConfigurationProperties`.
 
 ### Разделение ответственности
@@ -261,9 +261,9 @@ Health-check (§Health-check выше) обнаруживает полные aut
 
 | Сигнал | Порог | Реакция |
 |--------|-------|---------|
-| Error rate per connection за последние 15 мин | > 50% calls failed (5xx, timeout) при ≥ 5 calls | `ConnectionDegradedEvent`. Log warning. Backoff: увеличить интервал retry |
+| Error rate per connection за последние 15 мин | > 50% calls failed (5xx, timeout) при ≥ 5 calls | `ConnectionDegradedEvent` (Spring ApplicationEvent, in-process). Log warning. Backoff: увеличить интервал retry |
 | Latency p95 per connection | > 3× от baseline (rolling average) | Log warning. Не прерывать sync, но замедлить request rate |
-| Consecutive sync job failures (одного domain) | 3 подряд | `SyncDomainStalled` alert. Pause scheduled sync для этого domain+connection. Manual resume через API |
+| Consecutive sync job failures (одного domain) | 3 подряд | `SyncDomainStalled` alert (→ `alert_event` в БД + notification). Pause scheduled sync для этого domain+connection. Manual resume через API |
 
 **Отличие от health-check:**
 - Health-check определяет auth failures (credentials протухли / отозваны) → connection-level transition в `AUTH_FAILED`.

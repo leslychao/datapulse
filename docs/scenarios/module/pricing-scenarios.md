@@ -8,7 +8,7 @@ Pricing отвечает за принятие ценовых решений: 8-
 
 **Стратегии:** TARGET_MARGIN, PRICE_CORRIDOR.
 
-**Режимы исполнения:** RECOMMENDATION, SEMI_AUTO, FULL_AUTO, SIMULATED.
+**Режимы исполнения (`price_policy.execution_mode`):** RECOMMENDATION, SEMI_AUTO, FULL_AUTO, SIMULATED. При SIMULATED → `price_decision.execution_mode = SIMULATED`, остальные → LIVE.
 
 ## Сценарии
 
@@ -106,8 +106,8 @@ Pricing отвечает за принятие ценовых решений: 8-
 
 - **Назначение:** Обновление policy создаёт новую версию, не мутирует существующую.
 - **Trigger:** `PUT /api/price-policies/{id}` (PRICING_MANAGER/ADMIN).
-- **Main path:** Increment version → new version active → existing actions continue with old version → next pricing run uses new version.
-- **Dependencies:** `price_policy.version`, `price_policy.effective_from`.
+- **Main path:** Atomic `UPDATE ... SET version = version + 1` → existing actions continue with old version (snapshot in `price_decision.policy_snapshot`) → next pricing run uses new version.
+- **Dependencies:** `price_policy.version` (атомарный инкремент при UPDATE pricing-logic полей).
 - **Failure risks:** Race: pricing run reads policy mid-update → version check ensures consistency.
 - **Uniqueness:** Versioned write — другая persistence semantics (append, не mutate).
 
@@ -150,8 +150,8 @@ Pricing отвечает за принятие ценовых решений: 8-
 ### PRC-16: Pricing simulation run
 
 - **Назначение:** Simulated pricing: полный pipeline + simulated execution.
-- **Trigger:** Manual trigger с `execution_mode = SIMULATED`.
-- **Main path:** Full pricing pipeline → decision → action (`execution_mode=SIMULATED`) → simulated write → shadow state.
+- **Trigger:** Pricing run (manual или post-sync) для connection, где policy имеет `execution_mode = SIMULATED`.
+- **Main path:** Full pricing pipeline → decision (`execution_mode=SIMULATED`) → action (APPROVED, `execution_mode=SIMULATED`) → SimulatedPriceActionGateway → shadow state.
 - **Dependencies:** Simulation infrastructure (EXE-16).
 - **Failure risks:** Simulation results diverge from reality (different state, timing).
 - **Uniqueness:** Другой execution mode. Результаты не влияют на реальные цены.

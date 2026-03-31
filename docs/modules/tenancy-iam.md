@@ -164,7 +164,7 @@ Enum в `workspace_member.role`:
 - Transfer: атомарно (одна транзакция) — старый OWNER → ADMIN, новый member → OWNER.
 - `workspace.owner_user_id` обновляется в той же транзакции.
 - Только текущий OWNER может инициировать transfer.
-- Audit: `action_type = 'workspace.ownership_transfer'`.
+- Audit: `action_type = 'workspace.transfer_ownership'`.
 
 ## Аутентификация
 
@@ -227,7 +227,7 @@ CorsFilter
 
 | Требование | Обоснование |
 |------------|-------------|
-| `@PreAuthorize` на уровне методов с SpEL | Декларативная авторизация, account-scoped проверки |
+| `@PreAuthorize` на уровне методов с SpEL | Декларативная авторизация, workspace-scoped проверки |
 | Multi-tenant access isolation | `@PreAuthorize("@accessService.canRead(#connectionId)")` — проверка принадлежности connection к workspace пользователя |
 
 Получение текущего пользователя в сервисах: через request-scoped context-бин. Прямой доступ к `SecurityContextHolder` — только в инфраструктурном коде (фильтры, handshake handlers).
@@ -246,6 +246,7 @@ PENDING → ACCEPTED → (workspace_member created)
 
 ### Правила
 
+- **Role constraint:** ADMIN может приглашать с ролями: PRICING_MANAGER, OPERATOR, ANALYST, VIEWER. OWNER может приглашать с любой ролью, включая ADMIN. Назначение роли OWNER через invitation невозможно — используй ownership transfer.
 - Приглашение содержит `token_hash` (SHA-256 от invitation token) — token отправляется по email, хранится только хеш.
 - `expires_at` — configurable timeout.
 - При принятии: создаётся `workspace_member` с указанной ролью.
@@ -357,19 +358,21 @@ Audit records immutable: update и delete запрещены. Retention: не м
 
 | Action type | Entity type | Описание |
 |-------------|-------------|----------|
-| `user.provisioned` | `app_user` | Auto-provision при первом логине |
-| `workspace.created` | `workspace` | Создание workspace |
-| `workspace.suspended` | `workspace` | Suspend |
-| `workspace.reactivated` | `workspace` | Reactivate |
-| `workspace.archived` | `workspace` | Archive |
-| `workspace.ownership_transfer` | `workspace` | OWNER transfer; details: `{ from, to }` |
-| `member.invited` | `workspace_invitation` | Приглашение отправлено |
-| `member.invitation_accepted` | `workspace_invitation` | Приглашение принято |
-| `member.invitation_cancelled` | `workspace_invitation` | Приглашение отменено |
-| `member.role_changed` | `workspace_member` | Роль изменена; details: `{ old_role, new_role }` |
-| `member.removed` | `workspace_member` | Удалён из workspace |
-| `credential.accessed` | `marketplace_connection` | Credential read (vault) |
-| `credential.rotated` | `marketplace_connection` | Credential rotation |
+| `user.provision` | `app_user` | Auto-provision при первом логине |
+| `user.deactivate` | `app_user` | Деактивация пользователя |
+| `user.reactivate` | `app_user` | Реактивация пользователя |
+| `workspace.create` | `workspace` | Создание workspace |
+| `workspace.suspend` | `workspace` | Suspend |
+| `workspace.reactivate` | `workspace` | Reactivate |
+| `workspace.archive` | `workspace` | Archive |
+| `workspace.transfer_ownership` | `workspace` | OWNER transfer; details: `{ from, to }` |
+| `member.invite` | `workspace_invitation` | Приглашение отправлено |
+| `member.accept_invitation` | `workspace_invitation` | Приглашение принято |
+| `member.cancel_invitation` | `workspace_invitation` | Приглашение отменено |
+| `member.change_role` | `workspace_member` | Роль изменена; details: `{ old_role, new_role }` |
+| `member.remove` | `workspace_member` | Удалён из workspace |
+| `credential.access` | `marketplace_connection` | Credential read (vault) |
+| `credential.rotate` | `marketplace_connection` | Credential rotation |
 
 ## Workspace isolation enforcement
 
