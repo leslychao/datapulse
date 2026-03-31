@@ -1,0 +1,408 @@
+---
+description: SOLID-принципы и паттерны проектирования в Java/Spring Boot — Strategy+Registry, Template Method, Decorator, Observer, Factory, Command. Красные флаги, механика реализации, типичные случаи.
+alwaysApply: true
+---
+
+# SOLID-принципы и Design Patterns
+
+---
+
+# Часть I. SOLID
+
+Пять принципов, которые определяют, **когда** нужен рефакторинг и **какой** паттерн выбрать. Каждый принцип ниже привязан к конкретным красным флагам и к паттернам из Части II.
+
+## S — Single Responsibility Principle (Принцип единственной ответственности)
+
+**Суть:** у класса должна быть одна причина для изменения. Если ты не можешь описать назначение класса одним предложением без слова «и» — его нужно разбить.
+
+### Красные флаги
+
+- Класс с 300+ строк, который растёт при каждом новом требовании
+- В имени класса хочется написать `*Manager`, `*Helper`, `*Utils` с 10+ методами, решающими разные задачи
+- Один метод меняется из-за бизнес-правил, другой — из-за смены формата данных, третий — из-за нового маркетплейса
+- 10+ зависимостей в конструкторе — сигнал, что класс делает слишком много
+
+### Как исправлять
+
+| Ситуация | Рефакторинг |
+|---|---|
+| Один класс обрабатывает N маркетплейсов | Strategy + Registry (паттерн 1) |
+| Один класс и fetch-ит, и нормализует, и сохраняет | Разделить на adapter, normalizer, repository |
+| Entity mapping смешан с бизнес-логикой | Вынести в отдельный mapper-сервис |
+| Контроллер содержит бизнес-логику | Перенести в доменный сервис |
+
+### Пример из проекта
+
+`EventRunner` (до рефакторинга) — 586 строк, 30+ зависимостей. Причины для изменения:
+1. Добавление нового маркетплейса
+2. Изменение маппинга normalized → canonical
+3. Изменение логики sub-source зависимостей
+
+После рефакторинга: `EventRunner` (50 строк, 1 зависимость) + 14 отдельных `EventSource` + `CanonicalEntityMapper` + `CaptureContextFactory`. Каждый класс — одна причина для изменения.
+
+## O — Open/Closed Principle (Принцип открытости/закрытости)
+
+**Суть:** код должен быть открыт для расширения, но закрыт для модификации. Добавление нового варианта не должно требовать правки существующих классов.
+
+### Красные флаги
+
+- Добавление нового маркетплейса / канала / формата → правки в 3+ существующих файлах
+- switch/if-else, куда постоянно добавляются новые case
+- Каждый новый вариант поведения ломает или рискует сломать существующие варианты
+- При code review часто звучит: «а ты проверил, что старые ветки не сломались?»
+
+### Как исправлять
+
+| Ситуация | Рефакторинг |
+|---|---|
+| Растущий switch по типу | Strategy + Registry (паттерн 1) |
+| Растущая цепочка if/else с побочными эффектами | Observer / Domain Events (паттерн 4) |
+| Новый формат экспорта = правка существующего экспортёра | Strategy (каждый формат — отдельный класс) |
+| Новый cross-cutting concern (метрики, audit) | Decorator (паттерн 3) |
+
+### Пример из проекта
+
+`EventSourceRegistry` + `@Component` — добавление Яндекс.Маркета = создание 7 новых классов в `source/yandex/`. Ноль правок в `EventRunner`, `DagExecutor`, `EventSourceRegistry`.
+
+## L — Liskov Substitution Principle (Принцип подстановки Лисков)
+
+**Суть:** любая реализация интерфейса должна быть полноценной заменой любой другой реализации. Caller не должен знать, какая конкретная реализация работает, и не должен проверять «а это случайно не тот особый случай?».
+
+### Красные флаги
+
+- Реализация бросает `UnsupportedOperationException` в методе интерфейса — значит, интерфейс слишком широкий
+- Caller проверяет `instanceof` после получения объекта из registry/factory — значит, контракт нечёткий
+- Реализация возвращает null там, где другие возвращают данные, и caller вынужден знать об этом
+- «Пустая» реализация, которая ничего не делает, но формально соответствует интерфейсу — допустимо, только если это семантически корректно (WB Category = no-op, потому что категории приходят с продуктами)
+
+### Как соблюдать
+
+- **Контракт интерфейса** описывает не только сигнатуру, но и семантику: что метод обязан вернуть, какие исключения допустимы, какие side effects гарантированы
+- **Pre/post-conditions** одинаковы для всех реализаций: если интерфейс обещает `List<SubSourceResult>` — все реализации возвращают непустой список (хотя бы с success/noop элементом)
+- **Не расширяй контракт** для одной реализации — если только одному маркетплейсу нужен дополнительный параметр, передавай его через `IngestContext.credentials()`, а не через дополнительный метод
+
+### Пример из проекта
+
+Все 14 `EventSource` реализаций возвращают `List<SubSourceResult>` — даже «пустые» (`WbCategoryDictSource` возвращает `List.of(SubSourceResult.success("WbCategoryDict", 0, 0))`). Caller (`EventRunner`) не проверяет, какой именно source сработал.
+
+## I — Interface Segregation Principle (Принцип разделения интерфейсов)
+
+**Суть:** клиент не должен зависеть от методов, которые он не использует. Лучше несколько узких интерфейсов, чем один широкий.
+
+### Красные флаги
+
+- Интерфейс с 7+ методами, но большинство реализаций используют только 2-3
+- Реализация вынуждена писать заглушки (`throw new UnsupportedOperationException()`) для неиспользуемых методов
+- Один интерфейс `MarketplaceAdapter` с методами `fetchProducts`, `fetchOrders`, `setPrice`, `updateStock`, `joinPromo` — read и write смешаны
+- При добавлении нового метода в интерфейс приходится обновлять все реализации, хотя метод нужен только одной
+
+### Как исправлять
+
+| Ситуация | Рефакторинг |
+|---|---|
+| God-interface с read + write методами | Разделить: `ProductReadAdapter`, `PriceWriteAdapter` |
+| Один adapter-интерфейс на все endpoints | Отдельный интерфейс на каждый endpoint / resource |
+| Жирный сервис-интерфейс | Разделить по use-case: `OrderQueryService`, `OrderCommandService` |
+
+### Связь с другими принципами
+
+ISP и SRP часто решают одну проблему с разных сторон:
+- **SRP** говорит: «разделяй по причинам изменения» (со стороны класса)
+- **ISP** говорит: «разделяй по потребностям клиента» (со стороны потребителя)
+
+### Пример из проекта
+
+ETL-адаптеры — каждый read-adapter отвечает за один endpoint: `WbPricesReadAdapter`, `WbStocksReadAdapter`, `WbOrdersReadAdapter`. Не один `WbAdapter` на всё.
+
+## D — Dependency Inversion Principle (Принцип инверсии зависимостей)
+
+**Суть:** модули верхнего уровня (бизнес-логика) не должны зависеть от модулей нижнего уровня (инфраструктура). Оба должны зависеть от абстракций.
+
+### Красные флаги
+
+- Доменный сервис импортирует конкретный HTTP-клиент, конкретную S3-библиотеку, конкретный драйвер БД
+- Бизнес-логика завязана на формат API конкретного маркетплейса (`if (response.getWbField() != null)`)
+- Невозможно написать unit-тест без поднятия реальной инфраструктуры
+- Смена библиотеки (RestTemplate → WebClient) требует правки бизнес-сервисов
+
+### Как соблюдать в Spring
+
+Spring DI делает механическую часть DIP тривиальной (constructor injection). Но архитектурная часть требует осознанности:
+
+| Слой | Зависит от | Не зависит от |
+|---|---|---|
+| `domain/` (бизнес-логика) | Интерфейсы репозиториев, adapter-контракты | Конкретные JDBC/JPA реализации, HTTP-клиенты |
+| `persistence/` | Интерфейсы из `domain/` (реализует их) | Бизнес-логика, контроллеры |
+| `api/` (контроллеры) | Доменные сервисы | Реализации репозиториев, инфраструктура |
+| `adapter/` (внешние API) | Провайдер-специфичные DTO, HTTP-клиент | Canonical model, бизнес-логика |
+
+### Границы между слоями
+
+- **adapter → domain:** adapter возвращает провайдер-DTO, normalizer (в `domain/`) преобразует в normalized model
+- **domain → persistence:** domain оперирует canonical entities, persistence реализует `*UpsertRepository` интерфейсы
+- **Направление зависимостей всегда к центру** (domain). Периферийные слои (adapter, persistence, api) зависят от domain, не наоборот
+
+### Пример из проекта
+
+`EventSource` (доменный контракт) не знает про HTTP, S3, Jackson. Конкретные реализации (`WbPriceSnapshotSource`) используют adapter-бины, но сам интерфейс — чистая абстракция. Заменить WB API на mock — дело одной `@TestConfiguration`.
+
+---
+
+# Часть II. Design Patterns
+
+Когда класс разрастается из-за множества вариантов поведения, переключаемых по дискриминатору (enum, тип маркетплейса, формат, канал) — это сигнал к декомпозиции через один из паттернов ниже. Не применяй паттерн ради паттерна; применяй, когда появляются красные флаги из SOLID.
+
+## 1. Strategy + Registry
+
+### Когда применять
+
+- switch/if-else цепочка по дискриминатору, где каждая ветка — самостоятельная логика с собственными зависимостями
+- Класс с 10+ инжектированными зависимостями, большинство нужны только для одной ветки
+- Добавление нового варианта требует правки существующего класса (нарушение Open/Closed)
+- Файл 300+ строк, растущий с каждым новым вариантом
+
+### Как реализовывать
+
+1. **Strategy interface** — один метод `execute(Context)`, плюс методы-дискриминаторы для идентификации (`marketplace()`, `type()`)
+2. **Реализации** — по одному `@Component` классу на вариант. Каждый инжектирует только свои зависимости
+3. **Registry** — `@Service` класс, принимает `List<Strategy>` через constructor injection, индексирует в `Map` по составному ключу
+4. **Dispatcher** — тонкий класс, который резолвит стратегию через registry и делегирует
+
+### Структура пакетов
+
+```
+domain/
+  Strategy.java          — интерфейс
+  StrategyRegistry.java  — реестр
+  Dispatcher.java        — тонкий диспетчер
+  source/
+    wb/                  — реализации для варианта A
+    ozon/                — реализации для варианта B
+```
+
+### Spring auto-discovery
+
+Реализации аннотируются `@Component`. Spring автоматически собирает все бины, реализующие интерфейс, через `List<T>` injection в конструкторе Registry. Ручная регистрация не нужна.
+
+### Shared logic
+
+Если реализации делят общую логику (entity mapping, context building) — выносить в отдельный `@Service` или utility class, инжектируемый в каждую реализацию. **Не** в базовый абстрактный класс (предпочитай композицию наследованию).
+
+### Типичные применения в проекте
+
+- ETL event sources (marketplace × eventType)
+- Pricing strategies (strategy type × marketplace)
+- Notification channels (email, push, telegram)
+- Export formatters (CSV, Excel, JSON)
+
+## 2. Template Method
+
+### Когда применять
+
+- 3+ классов с 80% одинаковым кодом, отличающихся в 2-3 шагах
+- Copy-paste при создании нового варианта (адаптера, генератора)
+- Алгоритм фиксирован, варьируются только детали
+
+### Как реализовывать
+
+1. Абстрактный базовый класс с `public final` методом-скелетом, вызывающим `protected abstract` шаги
+2. Конкретные реализации переопределяют только варьирующиеся шаги
+3. Общие шаги — `private` или `protected final` в базовом классе
+
+### Когда НЕ применять
+
+- Варьируется больше 50% алгоритма — лучше Strategy
+- Нужна композиция нескольких вариаций — лучше Decorator
+
+### Типичные применения
+
+- API read-адаптеры (buildRequest → call → parse → paginate)
+- Batch processors (load → validate → transform → persist)
+
+## 3. Decorator / Pipeline
+
+### Когда применять
+
+- Один и тот же try-catch/retry/logging/metrics обёрточный код скопирован в 5+ местах
+- Cross-cutting concerns (retry, rate limiting, audit) перемешаны с бизнес-логикой
+- Нужно гибко комбинировать поведения (retry + logging, retry + metrics + logging)
+
+### Как реализовывать
+
+1. Базовый интерфейс с основной операцией
+2. Decorator-классы, реализующие тот же интерфейс и оборачивающие другую реализацию
+3. Композиция через Spring `@Configuration` или builder
+
+### Типичные применения
+
+- WebClient interceptor chain (auth → retry → rate limit → logging)
+- Data transformation pipeline (clean → enrich → validate)
+
+## 4. Observer / Domain Events
+
+### Когда применять
+
+- Одно действие порождает 3+ независимых побочных эффектов
+- Сервис-инициатор знает о 5+ сервисах-получателях
+- Добавление новой реакции требует правки исходного сервиса
+- Побочные эффекты могут выполняться асинхронно
+
+### Как реализовывать
+
+1. Domain event как record: `OrderCreatedEvent(long orderId, ...)`
+2. Publisher: `applicationEventPublisher.publishEvent(new OrderCreatedEvent(...))`
+3. Listeners: отдельные `@Component` классы с `@EventListener` или `@TransactionalEventListener`
+4. Каждый listener — одна реакция, одна ответственность
+
+### Типичные применения
+
+- Post-action notifications (email, push, audit)
+- Cache invalidation после write-операций
+- Metrics/analytics events
+- Cross-module communication без circular dependencies
+
+## 5. Factory
+
+### Когда применять
+
+- Создание объекта требует 3+ шагов подготовки (собрать поля из разных источников, провалидировать, обогатить)
+- Один и тот же «рецепт» создания объекта дублируется в нескольких местах
+- Конструктор / record становится неудобным из-за количества параметров или условной логики при сборке
+- Создаваемый объект — **не Spring-бин** (DTO, value object, domain event, context), поэтому `@Component` не подходит
+
+### Разновидности
+
+**Static Factory Method** — самый простой вариант. Один статический метод в utility-классе или в самом создаваемом типе.
+
+```java
+// utility class — когда нужен доступ к внешнему контексту или нескольким источникам
+public final class CaptureContextFactory {
+    private CaptureContextFactory() {}
+    public static CaptureContext build(IngestContext ctx, EtlEventType event, String sourceId) { ... }
+}
+
+// static factory на самом типе — когда вся информация уже в параметрах
+public record SubSourceResult(...) {
+    public static SubSourceResult success(String sourceId, int pages, int records) { ... }
+    public static SubSourceResult failed(String sourceId, String error) { ... }
+}
+```
+
+**Factory as `@Service`** — когда для создания объекта нужны Spring-зависимости (репозиторий, vault, конфигурация). Фабрика становится Spring-бином и инжектирует то, что нужно для сборки.
+
+```java
+@Service
+@RequiredArgsConstructor
+public class IngestContextFactory {
+    private final CredentialResolver credentialResolver;
+    private final CheckpointManager checkpointManager;
+
+    public IngestContext create(JobExecution job, MarketplaceConnectionEntity conn) {
+        var credentials = credentialResolver.resolve(conn);
+        var checkpoint = checkpointManager.parse(job.getCheckpoint());
+        return new IngestContext(job.getId(), conn.getId(), ...);
+    }
+}
+```
+
+**Abstract Factory** — когда нужно создавать семейство связанных объектов, варьирующееся по дискриминатору. Редко нужен в Spring-мире; чаще заменяется Strategy + Registry.
+
+### Когда НЕ применять
+
+- Объект создаётся тривиально (1-2 поля из очевидных источников) — обычный конструктор / `new` достаточен
+- Объект — Spring-бин — используй `@Configuration` + `@Bean`, а не фабрику
+- Единственный вызов — не дублируется, нет смысла выносить
+
+### Naming
+
+- Utility factory: `*Factory` — `CaptureContextFactory`, `IngestContextFactory`
+- Static factory methods на типе: `of(...)`, `from(...)`, `success(...)`, `failed(...)` — без отдельного класса
+- Service factory: `*Factory` как `@Service`
+
+### Типичные применения
+
+- `CaptureContextFactory` — сборка контекста захвата из IngestContext
+- `IngestContextFactory` — сборка контекста инжеста из job + connection + vault
+- Domain event construction с обогащением (подтянуть имя пользователя, workspace slug)
+- Создание credential-объектов разного типа из Vault map
+
+## 6. Command
+
+### Когда применять
+
+- Действие нужно **сериализовать** — сохранить в БД / очередь / outbox для отложенного или гарантированного выполнения
+- Действие нужно **отменить** (undo) или **повторить** (retry) как единое целое
+- Набор разнородных операций обрабатывается единообразным pipeline-ом (валидация → выполнение → аудит)
+- Между «решением выполнить» и «самим выполнением» есть временной зазор (approval flow, scheduling, simulation → execute)
+
+### Как реализовывать
+
+1. **Command record** — immutable объект с полным описанием действия: что сделать, с какими параметрами, кем инициировано
+
+```java
+public record SetPriceCommand(
+    long productId,
+    long connectionId,
+    BigDecimal newPrice,
+    String reason,
+    long initiatedBy
+) {}
+```
+
+2. **CommandHandler** — `@Service`, выполняет конкретный тип команды. Один handler = один тип команды.
+
+```java
+@Service
+@RequiredArgsConstructor
+public class SetPriceCommandHandler {
+    private final PriceAdapter adapter;
+    private final AuditService audit;
+
+    public void handle(SetPriceCommand cmd) {
+        adapter.setPrice(cmd.productId(), cmd.newPrice());
+        audit.log(cmd);
+    }
+}
+```
+
+3. **Если типов команд много** — комбинируй с Strategy + Registry:
+   - Общий интерфейс `CommandHandler<T>` с `Class<T> commandType()` и `void handle(T command)`
+   - `CommandHandlerRegistry` собирает все handler-ы через `List<CommandHandler<?>>` injection
+   - `CommandDispatcher` резолвит handler по типу команды и делегирует
+
+### Сериализация для outbox / очередей
+
+Если команда уходит в outbox или message queue:
+- Command record сериализуется в JSON через Jackson
+- `commandType` хранится как строка-дискриминатор рядом с payload
+- При десериализации: по `commandType` определяется класс → Jackson десериализует → dispatcher выполняет
+
+### Когда НЕ применять
+
+- Действие выполняется синхронно и однократно, без retry/undo/audit — просто вызови метод сервиса
+- Нет временного зазора между решением и выполнением — Command добавляет лишний уровень indirection
+
+### Типичные применения
+
+- **Execution module** — action lifecycle: `SetPriceCommand`, `UpdateStockCommand`, `JoinPromoCommand` → outbox → executor
+- **Pricing decisions** — simulation → approval → execute как отдельные фазы над одной командой
+- **Bulk operations** — список команд, обрабатываемых в batch с per-item статусами
+- **Scheduled tasks** — команда создаётся сейчас, выполняется по расписанию
+
+## Общие правила
+
+- **Не применяй паттерн превентивно.** Если switch имеет 2 ветки и не растёт — оставь switch.
+- **Правило трёх:** первый раз — просто код, второй — заметка, третий — рефакторинг в паттерн.
+- **Композиция > наследование:** shared logic выносить в отдельные сервисы, а не в абстрактный базовый класс.
+- **Spring auto-discovery:** для Strategy + Registry всегда использовать `List<T>` injection — ручная регистрация запрещена.
+- **Один файл ≤ 150 строк** для реализации стратегии. Если больше — вероятно, нужна дальнейшая декомпозиция.
+
+## Связь SOLID → Паттерны (quick reference)
+
+| Нарушенный принцип | Красный флаг | Паттерн-решение |
+|---|---|---|
+| **SRP** — класс делает слишком много | 300+ строк, 10+ зависимостей, несколько причин для изменения | Strategy + Registry, Extract Class, Mapper |
+| **OCP** — правка существующего кода при расширении | switch с растущими case, правка 3+ файлов при добавлении варианта | Strategy + Registry, Observer, Decorator |
+| **LSP** — реализация не соответствует контракту | `UnsupportedOperationException`, instanceof-проверки caller-ом | Разделить интерфейс (ISP), уточнить контракт |
+| **ISP** — интерфейс слишком широкий | Заглушки в реализациях, 7+ методов при использовании 2-3 | Разделить на узкие интерфейсы по use-case |
+| **DIP** — бизнес-логика зависит от инфраструктуры | Импорт HTTP-клиента/драйвера в доменном сервисе | Интерфейс в domain/, реализация в infrastructure/ |
