@@ -31,6 +31,11 @@ public class AsyncConfig implements AsyncConfigurer {
         return buildExecutor("execution-", 2, 5, 50);
     }
 
+    @Bean("integrationExecutor")
+    public TaskExecutor integrationExecutor() {
+        return buildExecutor("integration-", 2, 4, 30);
+    }
+
     @Bean("notificationExecutor")
     public TaskExecutor notificationExecutor() {
         return buildExecutor("notification-", 2, 5, 100);

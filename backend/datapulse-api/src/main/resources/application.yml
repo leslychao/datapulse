@@ -37,6 +37,11 @@ spring:
       mail.smtp.starttls.enable: true
 
 datapulse:
+  vault:
+    uri: ${VAULT_ADDR:http://localhost:8200}
+    token: ${VAULT_TOKEN:dev-token}
+    credential-cache-ttl: 1h
+    base-path: secret/data/datapulse
   clickhouse:
     url: jdbc:clickhouse://${CH_HOST:localhost}:${CH_PORT:8123}/${CH_DATABASE:datapulse}
     username: ${CH_USERNAME:default}

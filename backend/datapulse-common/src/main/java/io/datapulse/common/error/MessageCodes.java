@@ -30,4 +30,9 @@ public final class MessageCodes {
 
     // --- Integration ---
     public static final String RATE_LIMITED = "api.rate.limited";
+    public static final String CONNECTION_DUPLICATE = "connection.duplicate";
+    public static final String CONNECTION_INVALID_STATE = "connection.invalid.state";
+    public static final String CONNECTION_MARKETPLACE_MISMATCH = "connection.marketplace.mismatch";
+    public static final String CREDENTIALS_INVALID = "credentials.invalid";
+    public static final String VAULT_UNAVAILABLE = "vault.unavailable";
 }

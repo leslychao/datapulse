@@ -16,6 +16,11 @@ spring:
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
 
+datapulse:
+  vault:
+    uri: http://localhost:8200
+    token: dev-token
+
 logging:
   level:
     io.datapulse: DEBUG
