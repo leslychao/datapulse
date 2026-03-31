@@ -36,6 +36,14 @@ spring:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
 
+datapulse:
+  clickhouse:
+    url: jdbc:clickhouse://${CH_HOST:localhost}:${CH_PORT:8123}/${CH_DATABASE:datapulse}
+    username: ${CH_USERNAME:default}
+    password: ${CH_PASSWORD:}
+    migration:
+      enabled: true
+
 management:
   endpoints:
     web:
