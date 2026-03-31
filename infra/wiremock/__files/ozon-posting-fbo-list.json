@@ -1,0 +1,118 @@
+{
+  "result": [
+    {
+      "order_id": 34821854683,
+      "order_number": "50852427-0132",
+      "posting_number": "50852427-0132-1",
+      "status": "delivered",
+      "substatus": "",
+      "cancel_reason_id": 0,
+      "created_at": "2026-03-20T19:11:19.066032Z",
+      "in_process_at": "2026-03-20T19:11:29.240343Z",
+      "products": [
+        {
+          "sku": 1595500037,
+          "name": "Наушники беспроводные серебряные",
+          "quantity": 1,
+          "offer_id": "588889999_серебряный",
+          "price": "103.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Москва",
+        "delivery_type": "PVZ",
+        "is_premium": false,
+        "payment_type_group_name": "Ozon Карта",
+        "warehouse_id": 1020000115166000,
+        "warehouse_name": "Маршала Жукова 3",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": 19.67,
+            "commission_percent": 19.1,
+            "payout": 83.33,
+            "product_id": 1595500037,
+            "old_price": 150,
+            "price": 103,
+            "total_discount_value": 47,
+            "total_discount_percent": 31.3,
+            "actions": [],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Москва",
+        "cluster_to": "Москва"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      }
+    },
+    {
+      "order_id": 34821854700,
+      "order_number": "50852427-0133",
+      "posting_number": "50852427-0133-1",
+      "status": "awaiting_packaging",
+      "substatus": "posting_packing",
+      "cancel_reason_id": 0,
+      "created_at": "2026-03-28T10:05:00.000000Z",
+      "in_process_at": "2026-03-28T10:05:10.000000Z",
+      "products": [
+        {
+          "sku": 1595285688,
+          "name": "Чехол для телефона плетёный кожаный",
+          "quantity": 2,
+          "offer_id": "588889995_плетёный",
+          "price": "273.00",
+          "digital_codes": [],
+          "currency_code": "RUB",
+          "is_marketplace_buyout": false
+        }
+      ],
+      "analytics_data": {
+        "city": "Санкт-Петербург",
+        "delivery_type": "PVZ",
+        "is_premium": false,
+        "payment_type_group_name": "Картой онлайн",
+        "warehouse_id": 1020000115166000,
+        "warehouse_name": "Маршала Жукова 3",
+        "is_legal": false,
+        "client_delivery_date_begin": null,
+        "client_delivery_date_end": null
+      },
+      "financial_data": {
+        "products": [
+          {
+            "commission_amount": 0,
+            "commission_percent": 0,
+            "payout": 0,
+            "product_id": 1595285688,
+            "old_price": 399,
+            "price": 273,
+            "total_discount_value": 126,
+            "total_discount_percent": 31.6,
+            "actions": [],
+            "currency_code": "RUB"
+          }
+        ],
+        "cluster_from": "Москва",
+        "cluster_to": "Санкт-Петербург"
+      },
+      "additional_data": [],
+      "legal_info": {
+        "company_name": "",
+        "inn": "",
+        "kpp": ""
+      }
+    }
+  ]
+}

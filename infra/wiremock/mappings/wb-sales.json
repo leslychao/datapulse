@@ -1,0 +1,14 @@
+{
+  "name": "WB Sales (statistics-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v1/supplier/sales"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-sales.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

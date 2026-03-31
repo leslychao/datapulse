@@ -74,6 +74,51 @@ ETL записывает данные из marketplace API. Promotions module ч
 - `BANNED` — маркетплейс заблокировал участие (Ozon banned_products)
 - `AUTO_DECLINED` — автоматически отклонён по promo_policy
 
+### Write boundary: canonical_promo_product
+
+ETL и Promotions записывают в одну таблицу. Поля разделены по ответственности; conflict resolution через conditional UPSERT.
+
+**ETL пишет (при каждом PROMO_SYNC):**
+
+Все поля canonical_promo_product, кроме `participation_decision_source` (только Promotions). Для `participation_status` ETL использует conditional UPSERT:
+
+```sql
+participation_status = CASE
+  WHEN EXCLUDED.participation_status IN ('PARTICIPATING', 'BANNED')
+    THEN EXCLUDED.participation_status
+  WHEN canonical_promo_product.participation_decision_source IN ('AUTO', 'MANUAL')
+    AND canonical_promo_product.participation_status IN ('DECLINED', 'REMOVED', 'AUTO_DECLINED')
+    AND EXCLUDED.participation_status = 'ELIGIBLE'
+    THEN canonical_promo_product.participation_status
+  ELSE EXCLUDED.participation_status
+END
+```
+
+**Правила merge:**
+
+| DB status | Provider status (sync) | Результат | Обоснование |
+|-----------|----------------------|-----------|-------------|
+| ELIGIBLE | ELIGIBLE | ELIGIBLE | Обычный sync |
+| ELIGIBLE | PARTICIPATING | PARTICIPATING | Marketplace подтвердил участие |
+| ELIGIBLE | BANNED | BANNED | Marketplace заблокировал |
+| DECLINED / REMOVED / AUTO_DECLINED | ELIGIBLE | **Preserve** DB value | Решение Datapulse сохраняется — маркетплейс не знает о нашем decline |
+| DECLINED / REMOVED / AUTO_DECLINED | PARTICIPATING | PARTICIPATING | Marketplace override (участие активировано вне Datapulse — возможно вручную в ЛК) |
+| DECLINED / REMOVED / AUTO_DECLINED | BANNED | BANNED | Marketplace заблокировал — приоритет выше Datapulse |
+| PARTICIPATING | ELIGIBLE | ELIGIBLE | Marketplace отменил участие (deactivation confirmed) |
+| PARTICIPATING | BANNED | BANNED | Marketplace заблокировал |
+
+**Promotions пишет (после execution / evaluation):**
+
+| Поле | Когда | Значение |
+|------|-------|----------|
+| `participation_status` | promo_action SUCCEEDED (activate) | `PARTICIPATING` |
+| `participation_status` | promo_action SUCCEEDED (deactivate) | `REMOVED` |
+| `participation_status` | Auto-decline по promo_policy | `AUTO_DECLINED` |
+| `participation_status` | Manual decline | `DECLINED` |
+| `participation_decision_source` | При любом обновлении Promotions | `AUTO` / `MANUAL` |
+
+**Concurrency:** Promotions использует точечный UPDATE с CAS (`WHERE id = ? AND participation_status = ?`), не UPSERT. ETL использует conditional UPSERT. Оба не конфликтуют при нормальном timing (Promotions обновляет между sync'ами). При overlap: ETL conditional UPSERT сохраняет Datapulse decisions (CASE logic выше).
+
 ### promo_policy
 
 Правила автоматического участия в акциях. Аналог `price_policy` для промо.
@@ -84,7 +129,7 @@ promo_policy:
   workspace_id                BIGINT FK → workspace
   name                        VARCHAR
   status                      ENUM (DRAFT, ACTIVE, PAUSED, ARCHIVED)
-  participation_mode          ENUM (RECOMMENDATION, SEMI_AUTO, FULL_AUTO)
+  participation_mode          ENUM (RECOMMENDATION, SEMI_AUTO, FULL_AUTO, SIMULATED)
   min_margin_pct              DECIMAL NOT NULL
   min_stock_days_of_cover     INT DEFAULT 7
   max_promo_discount_pct      DECIMAL (nullable)
@@ -108,6 +153,9 @@ promo_policy:
 | `RECOMMENDATION` | Показывает рекомендацию; оператор решает вручную |
 | `SEMI_AUTO` | Создаёт action PENDING_APPROVAL; оператор одобряет |
 | `FULL_AUTO` | Создаёт action APPROVED; контроль через guards |
+| `SIMULATED` | Создаёт action APPROVED с `execution_mode = SIMULATED`; реальный API не вызывается |
+
+**Mapping participation_mode → execution_mode:** policy SIMULATED → action `execution_mode = SIMULATED`. Все остальные (RECOMMENDATION, SEMI_AUTO, FULL_AUTO) → action `execution_mode = LIVE`. Аналогично [Pricing → execution_mode mapping](pricing.md#decision-и-explanation).
 
 ### promo_policy_assignment
 
@@ -197,11 +245,88 @@ promo_action:
 
 **Упрощения по сравнению с price_action:**
 - Нет RECONCILIATION_PENDING — promo activate/deactivate подтверждается re-read promo products при следующем `PROMO_SYNC`
-- Нет RETRY_SCHEDULED как отдельного состояния — retry через immediate backoff (max 2 attempts)
-- Нет SUPERSEDED — promo actions не конкурируют (одна акция = одно решение per product)
+- Нет RETRY_SCHEDULED как отдельного состояния — retry in-process (max 2 attempts, immediate backoff внутри consumer)
+- Нет SUPERSEDED — promo actions не конкурируют (одна акция = одно решение per product per campaign)
 - Нет ON_HOLD — promo actions time-sensitive (freeze_at deadline)
 
 **Reconciliation через sync:** после promo_action SUCCEEDED, следующий `PROMO_SYNC` верифицирует фактическое participation_status. Расхождение → alert в Promo Journal.
+
+### DB constraint
+
+Partial unique indexes гарантируют не более одного active action per product per campaign per execution_mode:
+
+```sql
+CREATE UNIQUE INDEX idx_promo_action_active_live
+ON promo_action (canonical_promo_campaign_id, marketplace_offer_id)
+WHERE execution_mode = 'LIVE'
+  AND status NOT IN ('SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED');
+
+CREATE UNIQUE INDEX idx_promo_action_active_simulated
+ON promo_action (canonical_promo_campaign_id, marketplace_offer_id)
+WHERE execution_mode = 'SIMULATED'
+  AND status NOT IN ('SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED');
+```
+
+При попытке создать дублирующий action → unique constraint violation → action не создаётся, evaluation log warning.
+
+### CAS guards
+
+Все переходы promo_action через CAS SQL (аналогично [Execution → CAS guards](execution.md#cas-compare-and-swap-guards)):
+
+```sql
+UPDATE promo_action
+SET status = :newStatus, updated_at = NOW()
+WHERE id = :id AND status = :expectedStatus
+```
+
+CAS return 0 rows → conflict detected → `log.warn`. API-инициированные переходы при conflict → HTTP 409.
+
+### Таблица переходов
+
+| Transition | Когда | Инициатор |
+|------------|-------|-----------|
+| `PENDING_APPROVAL → APPROVED` | Manual approval | operator |
+| `PENDING_APPROVAL → EXPIRED` | `freeze_at` deadline passed (scheduled job) | system |
+| `PENDING_APPROVAL → CANCELLED` | Manual cancel | operator |
+| `APPROVED → EXECUTING` | Worker claim (outbox consumer) | system |
+| `APPROVED → CANCELLED` | Manual cancel | operator |
+| `EXECUTING → SUCCEEDED` | Provider response confirms activation/deactivation | system |
+| `EXECUTING → FAILED` | Non-retriable error OR max attempts exhausted | system |
+| `CANCELLED` | Terminal | — |
+| `SUCCEEDED` | Terminal | — |
+| `FAILED` | Terminal | — |
+| `EXPIRED` | Terminal | — |
+
+### Retry — in-process
+
+Retry выполняется **in-process** (внутри consumer), не через outbox:
+
+```
+EXECUTING → provider call failed (retriable: 429, 503, connect timeout)
+  → attempt_count++ → immediate backoff (2s × attempt) → retry
+  → if attempt_count >= 2 → CAS: EXECUTING → FAILED
+```
+
+Read timeout (запрос отправлен, ответ не получен) → FAILED + reconciliation через следующий PROMO_SYNC (не retry, т.к. activate может быть уже применён).
+
+**Обоснование in-process retry:** promo writes идемпотентны (activate already-participating = no-op), max 2 попытки с малым backoff. Outbox-based retry оправдан для price_action (больше attempts, сложнее reconciliation), но избыточен для промо.
+
+### Stuck-state detector
+
+Scheduled job (совмещается с price_action stuck-state detector из [Execution](execution.md)):
+
+```sql
+SELECT * FROM promo_action
+WHERE status IN ('EXECUTING', 'APPROVED')
+  AND updated_at + state_ttl(status) < NOW()
+```
+
+| Застрявшее состояние | Default TTL | Эскалация |
+|---------------------|-------------|-----------|
+| `EXECUTING` | 5 min | → `FAILED` + alert (in-process retry не вернул результат) |
+| `APPROVED` | 5 min | → `FAILED` + alert (outbox delivery failure) |
+
+`PENDING_APPROVAL` не входит в stuck-detector — у него отдельный expiration через `freeze_at`.
 
 ## Evaluation Pipeline
 
@@ -216,17 +341,21 @@ promo_action:
 
 ### Post-sync promo evaluation trigger
 
-Аналогично [Pricing → Post-sync trigger](pricing.md#pricing-run), promo evaluation триггерится через `ETL_SYNC_COMPLETED`:
+Аналогично [Pricing → Post-sync trigger](pricing.md#pricing-run), promo evaluation триггерится через `ETL_SYNC_COMPLETED` с промежуточным outbox event:
 
 ```
 pricing-worker queue receives ETL_SYNC_COMPLETED:
   1. Check: PROMO ∈ completed_domains? (no → skip promo evaluation)
   2. Check: active promo_policies exist for connection_id? (no → skip)
   3. Check: no IN_PROGRESS promo evaluation for connection_id? (yes → skip, idempotent)
-  4. Execute promo evaluation batch for connection
+  4. INSERT outbox_event (type: PROMO_EVALUATION_EXECUTE, payload: { connection_id, job_execution_id })
+  5. Outbox poller → RabbitMQ exchange promo.evaluation
+  6. pricing-worker consumer picks up → executes promo evaluation batch
 ```
 
-**Идемпотентность:** pricing worker отслеживает `source_job_execution_id` per promo evaluation run. Повторная доставка `ETL_SYNC_COMPLETED` — дубликат игнорируется.
+Двухступенчатый подход (ETL_SYNC_COMPLETED → outbox → evaluation) аналогичен pricing (ETL_SYNC_COMPLETED → outbox(PRICING_RUN_EXECUTE) → pricing run). Обеспечивает reliability: при crash между шагами 4 и 6 outbox poller повторит delivery.
+
+**Идемпотентность:** pricing worker отслеживает `source_job_execution_id` per promo evaluation run. Повторная доставка `ETL_SYNC_COMPLETED` или `PROMO_EVALUATION_EXECUTE` — дубликат игнорируется.
 
 ### Pipeline
 
@@ -276,13 +405,15 @@ margin_at_promo_price = (promo_price − COGS) / promo_price − effective_cost_
 
 ### Evaluation → Decision mapping
 
-| evaluation_result | RECOMMENDATION mode | SEMI_AUTO mode | FULL_AUTO mode |
-|-------------------|---------------------|----------------|----------------|
-| PROFITABLE | Рекомендация «участвовать» | promo_action PENDING_APPROVAL | promo_action APPROVED |
-| MARGINAL | Рекомендация «на усмотрение» | promo_action PENDING_APPROVAL | promo_action PENDING_APPROVAL (safety) |
-| UNPROFITABLE | Рекомендация «отказаться» | Decline (no action) | Decline (no action) |
-| INSUFFICIENT_STOCK | Рекомендация «отказаться» | Decline (no action) | Decline (no action) |
-| INSUFFICIENT_DATA | Рекомендация «проверить данные» | promo_action PENDING_APPROVAL | promo_action PENDING_APPROVAL (safety) |
+| evaluation_result | RECOMMENDATION | SEMI_AUTO | FULL_AUTO | SIMULATED |
+|-------------------|---------------|-----------|-----------|-----------|
+| PROFITABLE | Рекомендация «участвовать» | promo_action PENDING_APPROVAL | promo_action APPROVED | promo_action APPROVED (simulated) |
+| MARGINAL | Рекомендация «на усмотрение» | promo_action PENDING_APPROVAL | promo_action PENDING_APPROVAL (safety) | promo_action APPROVED (simulated) |
+| UNPROFITABLE | Рекомендация «отказаться» | Decline (no action) | Decline (no action) | Decline (no action) |
+| INSUFFICIENT_STOCK | Рекомендация «отказаться» | Decline (no action) | Decline (no action) | Decline (no action) |
+| INSUFFICIENT_DATA | Рекомендация «проверить данные» | promo_action PENDING_APPROVAL | promo_action PENDING_APPROVAL (safety) | promo_action APPROVED (simulated) |
+
+SIMULATED mode: все actions создаются с `execution_mode = SIMULATED`. MARGINAL и INSUFFICIENT_DATA в SIMULATED создают simulated actions (не PENDING_APPROVAL) — цель: ответить «что было бы, если бы мы участвовали?», не защитить от пограничных решений.
 
 ### Batch processing
 
@@ -524,21 +655,40 @@ ORDER BY (connection_id, promo_campaign_id, promo_product_id)
 
 ### mart_promo_product_analysis (Phase G)
 
-| Мера | Описание |
-|------|----------|
-| `revenue_during_promo` | Выручка за период акции |
-| `revenue_before_promo` | Выручка за эквивалентный период до акции |
-| `revenue_uplift_pct` | Прирост выручки |
-| `margin_during_promo` | Маржа за период акции |
-| `margin_before_promo` | Маржа за эквивалентный период до акции |
-| `margin_delta` | Абсолютное изменение маржи |
-| `units_sold_during_promo` | Количество продаж |
-| `stock_out_during_promo` | Был ли stock-out во время акции |
-| `promo_price` | Цена в промо |
-| `regular_price` | Обычная цена |
-| `discount_pct` | Размер скидки |
+Grain: `promo_campaign × product` (один ряд per product per campaign). Post-mortem анализ после завершения акции.
 
-Dependencies: `fact_finance` (revenue, margin), `fact_sales` (units), `fact_inventory_snapshot` (stock-out), `dim_promo_campaign` + `fact_promo_product`.
+| Column | Type | Source | Notes |
+|--------|------|--------|-------|
+| `promo_campaign_id` | UInt64 | dim_promo_campaign | PK (part) |
+| `connection_id` | UInt32 | dim_promo_campaign | FK |
+| `source_platform` | LowCardinality(String) | dim_promo_campaign | `'ozon'` / `'wb'` |
+| `product_id` | UInt64 | fact_promo_product.product_id | PK (part), FK dim_product |
+| `seller_sku_id` | UInt64 | via dim_product | FK seller_sku |
+| `participation_status` | LowCardinality(String) | fact_promo_product | Final status |
+| `promo_price` | Decimal(18,2) | fact_promo_product | Цена в промо |
+| `regular_price` | Decimal(18,2) | fact_promo_product | Обычная цена |
+| `discount_pct` | Decimal(18,2) | computed | `(regular − promo) / regular × 100` |
+| `revenue_during_promo` | Decimal(18,2) | fact_finance | Выручка за период акции |
+| `revenue_before_promo` | Decimal(18,2) | fact_finance | Выручка за эквивалентный период до |
+| `revenue_uplift_pct` | Decimal(18,2) | computed | `(during − before) / NULLIF(before, 0) × 100` |
+| `margin_during_promo` | Decimal(18,2) | fact_finance + fact_product_cost | Маржа за период акции |
+| `margin_before_promo` | Decimal(18,2) | fact_finance + fact_product_cost | Маржа за аналогичный период до |
+| `margin_delta` | Decimal(18,2) | computed | Абсолютное изменение маржи |
+| `units_sold_during_promo` | UInt32 | fact_sales | Количество продаж |
+| `stock_out_during_promo` | UInt8 | fact_inventory_snapshot | `1` если stock-out был |
+| `ver` | UInt64 | — | Materialization timestamp |
+
+```sql
+ENGINE = ReplacingMergeTree(ver)
+PARTITION BY source_platform
+ORDER BY (connection_id, promo_campaign_id, product_id)
+```
+
+**Refresh trigger:** materialization после `canonical_promo_campaign.status = ENDED`. Полный пересчёт per campaign при daily re-materialization (Phase G).
+
+**«Before» period:** эквивалентный по длительности период непосредственно до `date_from` кампании. Если период до акции < 7 дней → `revenue_before_promo = NULL` (недостаточно данных для сравнения).
+
+Dependencies: `fact_finance` (revenue, margin), `fact_sales` (units), `fact_inventory_snapshot` (stock-out), `fact_product_cost` (COGS), `dim_promo_campaign` + `fact_promo_product`.
 
 ## Модель данных — retention
 

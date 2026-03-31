@@ -1,0 +1,102 @@
+{
+  "result": {
+    "operations": [
+      {
+        "operation_id": 28589489037,
+        "operation_type": "OperationAgentDeliveredToCustomer",
+        "operation_date": "2026-03-22 00:00:00",
+        "operation_type_name": "Доставка покупателю",
+        "delivery_charge": 0,
+        "return_delivery_charge": 0,
+        "accruals_for_sale": 103,
+        "sale_commission": -19.67,
+        "amount": 12.88,
+        "type": "orders",
+        "posting": {
+          "delivery_schema": "FBO",
+          "order_date": "2026-03-20 22:11:19",
+          "posting_number": "50852427-0132-1",
+          "warehouse_id": 1020000115166000
+        },
+        "items": [
+          {
+            "name": "Наушники беспроводные серебряные",
+            "sku": 1595500037
+          }
+        ],
+        "services": [
+          {
+            "name": "MarketplaceServiceItemDelivToCustomer",
+            "price": -8.45
+          },
+          {
+            "name": "MarketplaceServiceItemDirectFlowLogistic",
+            "price": -62.00
+          }
+        ]
+      },
+      {
+        "operation_id": 28589489038,
+        "operation_type": "MarketplaceServiceBrandCommission",
+        "operation_date": "2026-03-22 00:00:00",
+        "operation_type_name": "Комиссия за бренд",
+        "delivery_charge": 0,
+        "return_delivery_charge": 0,
+        "accruals_for_sale": 0,
+        "sale_commission": 0,
+        "amount": -0.52,
+        "type": "services",
+        "posting": {
+          "delivery_schema": "FBO",
+          "order_date": "2026-03-20 22:11:19",
+          "posting_number": "50852427-0132-1",
+          "warehouse_id": 1020000115166000
+        },
+        "items": [
+          {
+            "name": "Наушники беспроводные серебряные",
+            "sku": 1595500037
+          }
+        ],
+        "services": [
+          {
+            "name": "MarketplaceServiceBrandCommission",
+            "price": -0.52
+          }
+        ]
+      },
+      {
+        "operation_id": 28589489039,
+        "operation_type": "StarsMembership",
+        "operation_date": "2026-03-22 00:00:00",
+        "operation_type_name": "Подписка Stars",
+        "delivery_charge": 0,
+        "return_delivery_charge": 0,
+        "accruals_for_sale": 0,
+        "sale_commission": 0,
+        "amount": -0.52,
+        "type": "services",
+        "posting": {
+          "delivery_schema": "FBO",
+          "order_date": "2026-03-20 22:11:19",
+          "posting_number": "50852427-0132-1",
+          "warehouse_id": 1020000115166000
+        },
+        "items": [
+          {
+            "name": "Наушники беспроводные серебряные",
+            "sku": 1595500037
+          }
+        ],
+        "services": [
+          {
+            "name": "ItemAgentServiceStarsMembership",
+            "price": -0.52
+          }
+        ]
+      }
+    ],
+    "page_count": 1,
+    "row_count": 3
+  }
+}

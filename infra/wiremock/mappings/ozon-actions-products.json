@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Promo — Action Products v1",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v1/actions/products"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-actions-products.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

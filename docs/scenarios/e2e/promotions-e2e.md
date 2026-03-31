@@ -55,3 +55,23 @@
   - Deactivation rejected by marketplace (too late, promo already started) → forced participation → accept.
   - Rapid condition changes → re-evaluation oscillation. Mitigation: cooldown period.
 - **Почему обязательный:** Prevents participation in loss-making promos due to changed conditions.
+
+### E2E-PR-04: Simulated promo participation → comparison → transition to live
+
+- **Business goal:** Оператор оценивает, как повлияло бы участие в промо, не участвуя реально. Затем переходит на live-режим.
+- **Участвующие модули:** ETL (promo sync) → Promotions (simulated) → Analytics (ClickHouse) → Seller Ops (UI) → Promotions (live) → Integration (write) → Pricing.
+- **Основной поток:**
+  1. **Setup:** `promo_policy.participation_mode = SIMULATED` для connection.
+  2. **ETL:** `PROMO_SYNC` → new promo campaigns discovered → `canonical_promo_campaign` / `canonical_promo_product` created.
+  3. **Promotions (simulated):** `PROMO_EVALUATION_EXECUTE` → evaluation batch → margin & stock checks → decisions created as usual → `promo_action` created with `execution_mode = SIMULATED`, `status = APPROVED`. No marketplace API call. Action transitions directly to `SUCCEEDED` (simulated).
+  4. **Analytics:** `promo_action` (simulated) materialized в ClickHouse → `fact_promo_product` с `execution_mode = SIMULATED`. `mart_promo_product_analysis` available for comparison.
+  5. **Seller Ops (UI):** Оператор видит dashboard: simulated decisions рядом с actual marketplace results. Comparison: «если бы участвовали → ожидаемая маржа X%, фактическая маржа без промо Y%». Товары с positive uplift highlighted.
+  6. **Transition:** Оператор убеждён → обновляет `promo_policy.participation_mode` с `SIMULATED` на `SEMI_AUTO` или `FULL_AUTO`.
+  7. **Promotions (live):** Policy change triggers re-evaluation (PRO-17) → new evaluation batch → теперь `promo_action` создаётся с `execution_mode = LIVE` → outbox → marketplace API → activate.
+  8. **Pricing:** `promo_guard` обнаруживает активное участие → pricing skipped.
+- **Ключевые зависимости:** `SIMULATED` в `participation_mode` enum. `execution_mode` propagation from policy to action. ClickHouse simulated-vs-actual analytics. Policy change re-evaluation trigger (PRO-17).
+- **Failure paths:**
+  - Simulated actions accumulated, transition delayed → stale simulations no longer relevant (promo ended). Mitigation: UI shows only active campaigns.
+  - Transition to live during campaign `freeze_at` → marketplace rejects activate → FAILED. Mitigation: UI warning if `freeze_at` approaching.
+  - Simulated margin diverges from reality (COGS changed, marketplace commission changed between simulation and live). Mitigation: re-evaluation at transition time uses fresh signals.
+- **Почему обязательный:** Единственный E2E path для `SIMULATED` mode — ключевая business capability Phase F. Демонстрирует: discovery → evaluation → shadow execution → analytics comparison → confidence building → live transition. Аналог E2E-PE-04 (simulated pricing).

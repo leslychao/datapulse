@@ -1,0 +1,35 @@
+[
+  {
+    "id": 507921,
+    "name": "Коледино",
+    "address": "Московская область, Подольск, д. Коледино",
+    "city": "Коледино",
+    "longitude": 37.92211,
+    "latitude": 55.74251,
+    "cargoType": 1,
+    "deliveryType": 1,
+    "selected": true
+  },
+  {
+    "id": 117986,
+    "name": "Казань",
+    "address": "Республика Татарстан, Казань",
+    "city": "Казань",
+    "longitude": 49.1221,
+    "latitude": 55.7887,
+    "cargoType": 1,
+    "deliveryType": 1,
+    "selected": true
+  },
+  {
+    "id": 218623,
+    "name": "Краснодар 2",
+    "address": "Краснодарский край, Краснодар",
+    "city": "Краснодар",
+    "longitude": 38.9764,
+    "latitude": 45.0353,
+    "cargoType": 1,
+    "deliveryType": 2,
+    "selected": false
+  }
+]

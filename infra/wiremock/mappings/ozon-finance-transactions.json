@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Finance — Transaction List v3",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v3/finance/transaction/list"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-finance-transactions.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

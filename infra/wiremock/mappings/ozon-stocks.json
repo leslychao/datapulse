@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Stocks — Product Info Stocks v4",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v4/product/info/stocks"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-stocks.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

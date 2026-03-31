@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Catalog — Product List v3",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v3/product/list"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-product-list.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

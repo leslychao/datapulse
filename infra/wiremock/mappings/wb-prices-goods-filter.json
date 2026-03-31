@@ -1,0 +1,14 @@
+{
+  "name": "WB Prices — Goods Filter (discounts-prices-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v2/list/goods/filter"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-prices-goods-filter.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

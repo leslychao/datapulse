@@ -1,0 +1,26 @@
+{
+  "result": {
+    "items": [
+      {
+        "product_id": 1074782997,
+        "offer_id": "588889995_плетёный",
+        "has_fbo_stocks": true,
+        "has_fbs_stocks": false,
+        "archived": false,
+        "is_discounted": false,
+        "quants": []
+      },
+      {
+        "product_id": 1074914838,
+        "offer_id": "588889999_серебряный",
+        "has_fbo_stocks": true,
+        "has_fbs_stocks": false,
+        "archived": false,
+        "is_discounted": false,
+        "quants": []
+      }
+    ],
+    "total": 2,
+    "last_id": "WzEwNzQ5MTQ4MzgsMTA3NDkxNDgzOF0="
+  }
+}

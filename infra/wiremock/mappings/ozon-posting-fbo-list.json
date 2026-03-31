@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Orders — FBO Posting List v2",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/posting/fbo/list"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-posting-fbo-list.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

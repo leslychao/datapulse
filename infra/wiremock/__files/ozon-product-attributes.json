@@ -1,0 +1,44 @@
+{
+  "result": [
+    {
+      "id": 1074782997,
+      "attributes": [
+        {
+          "id": 85,
+          "complex_id": 0,
+          "values": [
+            {
+              "dictionary_value_id": 971163125,
+              "value": "BOROFONE"
+            }
+          ]
+        },
+        {
+          "id": 8229,
+          "complex_id": 0,
+          "values": [
+            {
+              "dictionary_value_id": 0,
+              "value": "Чехол для телефона плетёный кожаный"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1074914838,
+      "attributes": [
+        {
+          "id": 85,
+          "complex_id": 0,
+          "values": [
+            {
+              "dictionary_value_id": 971163200,
+              "value": "TestAudio"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

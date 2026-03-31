@@ -1,0 +1,14 @@
+{
+  "name": "WB Offices — WB-owned warehouses (marketplace-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v3/offices"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-offices.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

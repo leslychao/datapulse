@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Catalog — Description Category Tree v1",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v1/description-category/tree"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-category-tree.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

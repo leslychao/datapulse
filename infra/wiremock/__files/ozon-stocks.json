@@ -1,0 +1,50 @@
+{
+  "items": [
+    {
+      "product_id": 1074782997,
+      "offer_id": "588889995_плетёный",
+      "stocks": [
+        {
+          "type": "fbo",
+          "present": 20,
+          "reserved": 0,
+          "sku": 1595285688,
+          "shipment_type": "SHIPMENT_TYPE_GENERAL",
+          "warehouse_ids": []
+        },
+        {
+          "type": "fbs",
+          "present": 0,
+          "reserved": 0,
+          "sku": 1595285688,
+          "shipment_type": "SHIPMENT_TYPE_GENERAL",
+          "warehouse_ids": []
+        }
+      ]
+    },
+    {
+      "product_id": 1074914838,
+      "offer_id": "588889999_серебряный",
+      "stocks": [
+        {
+          "type": "fbo",
+          "present": 50,
+          "reserved": 2,
+          "sku": 1595500037,
+          "shipment_type": "SHIPMENT_TYPE_GENERAL",
+          "warehouse_ids": []
+        },
+        {
+          "type": "fbs",
+          "present": 0,
+          "reserved": 0,
+          "sku": 1595500037,
+          "shipment_type": "SHIPMENT_TYPE_GENERAL",
+          "warehouse_ids": []
+        }
+      ]
+    }
+  ],
+  "total": 2,
+  "cursor": "WzEwNzQ5MTQ4MzgsMTA3NDkxNDgzOF0="
+}

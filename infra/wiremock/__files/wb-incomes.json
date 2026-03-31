@@ -1,0 +1,32 @@
+[
+  {
+    "incomeId": 2031852,
+    "number": "",
+    "date": "2026-03-10T09:54:24Z",
+    "lastChangeDate": "2026-03-10T12:54:24Z",
+    "supplierArticle": "ART-001-BLK",
+    "techSize": "S",
+    "barcode": "88005553535",
+    "quantity": 50,
+    "totalPrice": 0,
+    "dateClose": "2026-03-10T09:54:24Z",
+    "warehouseName": "Коледино",
+    "nmId": 274849,
+    "status": "Принято"
+  },
+  {
+    "incomeId": 2031900,
+    "number": "",
+    "date": "2026-03-15T08:00:00Z",
+    "lastChangeDate": "2026-03-15T11:00:00Z",
+    "supplierArticle": "ART-002-WHT",
+    "techSize": "M",
+    "barcode": "88005553536",
+    "quantity": 120,
+    "totalPrice": 0,
+    "dateClose": "2026-03-15T08:00:00Z",
+    "warehouseName": "Коледино",
+    "nmId": 275100,
+    "status": "Принято"
+  }
+]

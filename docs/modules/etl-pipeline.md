@@ -335,16 +335,33 @@ canonical_finance_entry:
   connection_id           BIGINT FK → marketplace_connection  NOT NULL
   source_platform         VARCHAR(10) NOT NULL                -- 'ozon' / 'wb'
   external_entry_id       VARCHAR(120) NOT NULL               -- rrd_id (WB), operation_id (Ozon)
-  entry_type              VARCHAR(60) NOT NULL                -- SALE, RETURN, COMMISSION, LOGISTICS, PENALTY, STORAGE, etc.
+  entry_type              VARCHAR(60) NOT NULL                -- SALE_ACCRUAL, RETURN_REVERSAL, MARKETPLACE_COMMISSION, DELIVERY, STORAGE, PENALTY, etc. (full taxonomy in analytics-pnl.md §entry_type taxonomy)
   posting_id              VARCHAR(120)                        -- posting_number / srid (nullable — standalone ops)
   order_id                VARCHAR(120)                        -- order group ID (nullable)
   seller_sku_id           BIGINT FK → seller_sku              (nullable — SKU lookup miss)
   warehouse_id            BIGINT FK → warehouse               (nullable — populated from WB ppvz_office_id; NULL for Ozon and non-warehouse ops)
-  amount                  DECIMAL NOT NULL                    -- normalized sign: positive = credit, negative = debit
-  net_payout              DECIMAL                             -- seller payout (ppvz_for_pay WB, operation.amount Ozon)
+
+  -- Per-measure columns (composite row model, DD-8 in mapping-spec).
+  -- Signs: positive = credit to seller, negative = debit from seller.
+  -- WB: one reportDetailByPeriod row → all applicable measures populated from separate fields.
+  -- Ozon: one operation → accruals_for_sale, sale_commission, services[] decomposed into measures.
+  -- Non-applicable measures = 0.
+  revenue_amount                    DECIMAL NOT NULL DEFAULT 0   -- seller-facing price (WB: retail_price_withdisc_rub; Ozon: accruals_for_sale). Positive for sales
+  marketplace_commission_amount     DECIMAL NOT NULL DEFAULT 0   -- marketplace commission. Negative for sales, positive for return refunds
+  acquiring_commission_amount       DECIMAL NOT NULL DEFAULT 0   -- acquiring fee. Negative
+  logistics_cost_amount             DECIMAL NOT NULL DEFAULT 0   -- delivery, reverse logistics, last mile. Negative
+  storage_cost_amount               DECIMAL NOT NULL DEFAULT 0   -- storage fees. Negative
+  penalties_amount                  DECIMAL NOT NULL DEFAULT 0   -- penalties, deductions. Negative
+  acceptance_cost_amount            DECIMAL NOT NULL DEFAULT 0   -- acceptance fees. Negative
+  marketing_cost_amount             DECIMAL NOT NULL DEFAULT 0   -- marketplace marketing services (not ads). Negative
+  other_marketplace_charges_amount  DECIMAL NOT NULL DEFAULT 0   -- packaging, labeling, disposal, other. Negative
+  compensation_amount               DECIMAL NOT NULL DEFAULT 0   -- marketplace compensations. Positive
+  refund_amount                     DECIMAL NOT NULL DEFAULT 0   -- revenue reversal on returns. Negative (debit to seller)
+  net_payout                        DECIMAL                      -- seller payout (ppvz_for_pay WB, operation.amount Ozon)
+
   currency                VARCHAR(3) NOT NULL DEFAULT 'RUB'
   entry_date              TIMESTAMPTZ NOT NULL                -- operation date from provider
-  attribution_level       VARCHAR(10) NOT NULL                -- POSTING, PRODUCT, ACCOUNT (computed at materialization)
+  attribution_level       VARCHAR(10) NOT NULL                -- POSTING, PRODUCT, ACCOUNT (computed by normalizer at INSERT based on posting_id/order_id/seller_sku_id presence)
   job_execution_id        BIGINT FK → job_execution           NOT NULL
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -647,7 +664,7 @@ Worker обходит dependency graph (§Граф зависимостей) в 
 ```
 4. Fetch: HTTP → streaming write to temp file → S3 putObject → INSERT job_item (CAPTURED)
 5. Normalize: S3 getObject → streaming JSON parse (batch=500) → UPSERT canonical (с job_execution_id)
-6. Materialize: canonical WHERE job_execution_id = current → ClickHouse (ReplacingMergeTree)
+6. Materialize: canonical WHERE job_execution_id = current → ClickHouse facts (ReplacingMergeTree) → re-aggregate affected marts (mart_posting_pnl, mart_product_pnl, etc.)
 7. Update job_item.status → PROCESSED
 ```
 

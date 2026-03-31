@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Orders — FBS Posting List v3",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v3/posting/fbs/list"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-posting-fbs-list.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

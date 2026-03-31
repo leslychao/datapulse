@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Write — Actions Products Deactivate v1",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v1/actions/products/deactivate"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-actions-deactivate.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

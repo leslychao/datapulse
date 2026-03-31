@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Prices — Product Info Prices v5",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v5/product/info/prices"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-prices.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

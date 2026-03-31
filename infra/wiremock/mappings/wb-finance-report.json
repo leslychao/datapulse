@@ -1,0 +1,14 @@
+{
+  "name": "WB Finance — Report Detail By Period v5 (statistics-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v5/supplier/reportDetailByPeriod"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-finance-report.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

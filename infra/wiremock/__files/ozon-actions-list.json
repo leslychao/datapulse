@@ -1,0 +1,40 @@
+{
+  "result": [
+    {
+      "id": 1977747,
+      "title": "Электронный ассортимент — весенняя распродажа",
+      "action_type": "SALE",
+      "date_start": "2026-03-01T21:00:00Z",
+      "date_end": "2026-04-30T20:59:59Z",
+      "potential_products_count": 23,
+      "participating_products_count": 5,
+      "is_participating": true,
+      "description": "Специальные цены на электронику и аксессуары",
+      "freeze_date": "2026-04-25T21:00:00Z",
+      "is_voucher_action": false,
+      "banned_products_count": 0,
+      "with_targeting": false,
+      "order_amount": 0,
+      "discount_type": "PERCENT",
+      "discount_value": 15.0
+    },
+    {
+      "id": 1980100,
+      "title": "Летний сезон — купальники и аксессуары",
+      "action_type": "SALE",
+      "date_start": "2026-05-01T21:00:00Z",
+      "date_end": "2026-06-30T20:59:59Z",
+      "potential_products_count": 10,
+      "participating_products_count": 0,
+      "is_participating": false,
+      "description": "Подготовьтесь к лету",
+      "freeze_date": "2026-06-25T21:00:00Z",
+      "is_voucher_action": false,
+      "banned_products_count": 0,
+      "with_targeting": false,
+      "order_amount": 0,
+      "discount_type": "PERCENT",
+      "discount_value": 20.0
+    }
+  ]
+}

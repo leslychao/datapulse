@@ -518,6 +518,138 @@ PUT /api/connections/{connectionId}/performance-credentials
 |--------|------|-------|----------|
 | GET | `/api/connections/{connectionId}/call-log` | ADMIN, OWNER | Paginated call log. Filters: `?from=...&to=...&endpoint=...&httpStatus=...` |
 
+## Local Mode & WireMock
+
+### Назначение
+
+При локальной разработке (`spring.profiles.active=local`) все marketplace API-вызовы направляются на WireMock вместо реальных хостов провайдеров. Это позволяет:
+- Разрабатывать и отлаживать адаптеры без реальных credentials
+- Запускать интеграционные тесты offline
+- Тестировать write-операции (цены, промо) без побочных эффектов
+
+### Архитектура
+
+```
+┌─────────────────────┐
+│  datapulse-api /    │
+│  ingest-worker      │
+│  (profile=local)    │
+│                     │
+│  base-url →         │──► http://localhost:9091 ──► WireMock
+│  localhost:9091     │        (docker-compose)
+└─────────────────────┘
+
+┌─────────────────────┐
+│  datapulse-api /    │
+│  ingest-worker      │
+│  (profile=!local)   │
+│                     │
+│  base-url →         │──► https://api-seller.ozon.ru
+│  real hosts         │──► https://discounts-prices-api.wildberries.ru
+└─────────────────────┘
+```
+
+### Переключение base URL
+
+В `application-local.yml` все базовые URL маркетплейсов указывают на WireMock:
+
+```yaml
+datapulse:
+  integration:
+    wildberries:
+      content-base-url: http://localhost:9091
+      prices-base-url: http://localhost:9091
+      statistics-base-url: http://localhost:9091
+      analytics-base-url: http://localhost:9091
+      marketplace-base-url: http://localhost:9091
+      advert-base-url: http://localhost:9091
+      promo-base-url: http://localhost:9091
+    ozon:
+      seller-base-url: http://localhost:9091
+      performance-base-url: http://localhost:9091
+```
+
+WireMock матчит запросы по path pattern — один инстанс обслуживает все провайдеры.
+
+### WireMock в docker-compose
+
+Сервис `wiremock` в `infra/docker-compose.yml`, порт `9091:8080`. Включён `--global-response-templating` для динамических ответов.
+
+### Принцип создания стабов
+
+**Каждый WireMock-стаб строго соответствует задокументированному контракту** из `docs/provider-api-specs/`. Response body берётся из:
+1. Верифицированных примеров ответов в `wb-read-contracts.md`, `ozon-read-contracts.md`, `write-contracts.md`, `promo-advertising-contracts.md`
+2. Реальных ответов API, зафиксированных в `samples/empirical-verification-log.md`
+
+Запрещено выдумывать поля, менять типы данных или структуру ответа.
+
+### Матрица покрытия WireMock стабов
+
+#### Wildberries — Read
+
+| Capability | Endpoint | Method | Mapping file | Status |
+|------------|----------|--------|-------------|--------|
+| Catalog | `/content/v2/get/cards/list` | POST | `wb-catalog-cards-list.json` | ✅ |
+| Prices | `/api/v2/list/goods/filter` | GET | `wb-prices-goods-filter.json` | ✅ |
+| Stocks | `/api/analytics/v1/stocks-report/wb-warehouses` | POST | `wb-stocks-report.json` | ✅ |
+| Orders | `/api/v1/supplier/orders` | GET | `wb-orders.json` | ✅ |
+| Sales | `/api/v1/supplier/sales` | GET | `wb-sales.json` | ✅ |
+| Finance | `/api/v5/supplier/reportDetailByPeriod` | GET | `wb-finance-report.json` | ✅ |
+| Incomes | `/api/v1/supplier/incomes` | GET | `wb-incomes.json` | ✅ |
+| Offices (WB warehouses) | `/api/v3/offices` | GET | `wb-offices.json` | ✅ |
+| Seller warehouses (FBS) | `/api/v3/warehouses` | GET | `wb-warehouses-seller.json` | ✅ |
+| Returns | `/api/v1/analytics/goods-return` | GET | `wb-returns-goods-return.json` | ✅ |
+| Tariffs | `/api/v1/tariffs/commission` | GET | `wb-tariffs-commission.json` | ✅ |
+
+#### Wildberries — Write
+
+| Capability | Endpoint | Method | Mapping file | Status |
+|------------|----------|--------|-------------|--------|
+| Price upload | `/api/v2/upload/task` | POST | `wb-price-upload-task.json` | ✅ |
+| Price poll | `/api/v2/history/goods/task` | GET | `wb-price-upload-details.json` | ✅ |
+| Promo upload | `/api/v1/calendar/promotions/upload` | POST | `wb-promo-upload.json` | ✅ |
+
+#### Wildberries — Promo & Advertising
+
+| Capability | Endpoint | Method | Mapping file | Status |
+|------------|----------|--------|-------------|--------|
+| Promo list | `/api/v1/calendar/promotions` | GET | `wb-promo-promotions.json` | ✅ |
+| Promo details | `/api/v1/calendar/promotions/details` | GET | `wb-promo-promotion-details.json` | ✅ |
+| Promo products | `/api/v1/calendar/promotions/nomenclatures` | GET | `wb-promo-promotion-nomenclatures.json` | ✅ |
+| Ad campaigns | `/api/advert/v2/adverts` | GET | `wb-advertising-campaigns.json` | ✅ |
+| Ad fullstats | `/adv/v3/fullstats` | GET | `wb-advertising-fullstats.json` | ✅ |
+
+#### Ozon — Read
+
+| Capability | Endpoint | Method | Mapping file | Status |
+|------------|----------|--------|-------------|--------|
+| Product list | `/v3/product/list` | POST | `ozon-product-list.json` | ✅ |
+| Product info | `/v3/product/info/list` | POST | `ozon-product-info-list.json` | ✅ |
+| Category tree | `/v1/description-category/tree` | POST | `ozon-category-tree.json` | ✅ |
+| Attributes (brand) | `/v4/product/info/attributes` | POST | `ozon-product-attributes.json` | ✅ |
+| Prices | `/v5/product/info/prices` | POST | `ozon-prices.json` | ✅ |
+| Stocks | `/v4/product/info/stocks` | POST | `ozon-stocks.json` | ✅ |
+| Postings FBO | `/v2/posting/fbo/list` | POST | `ozon-posting-fbo-list.json` | ✅ |
+| Postings FBS | `/v3/posting/fbs/list` | POST | `ozon-posting-fbs-list.json` | ✅ |
+| Returns | `/v1/returns/list` | POST | `ozon-returns-list.json` | ✅ |
+| Finance | `/v3/finance/transaction/list` | POST | `ozon-finance-transactions.json` | ✅ |
+
+#### Ozon — Write
+
+| Capability | Endpoint | Method | Mapping file | Status |
+|------------|----------|--------|-------------|--------|
+| Price import | `/v1/product/import/prices` | POST | `ozon-import-prices.json` | ✅ |
+| Promo activate | `/v1/actions/products/activate` | POST | `ozon-actions-activate.json` | ✅ |
+| Promo deactivate | `/v1/actions/products/deactivate` | POST | `ozon-actions-deactivate.json` | ✅ |
+
+#### Ozon — Promo
+
+| Capability | Endpoint | Method | Mapping file | Status |
+|------------|----------|--------|-------------|--------|
+| Actions list | `/v1/actions` | GET | `ozon-actions-list.json` | ✅ |
+| Action products | `/v1/actions/products` | POST | `ozon-actions-products.json` | ✅ |
+| Action candidates | `/v1/actions/candidates` | POST | `ozon-actions-candidates.json` | ✅ |
+
 ## Связанные модули
 
 - [Tenancy & IAM](tenancy-iam.md) — workspace-привязка connections

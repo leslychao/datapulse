@@ -1,0 +1,14 @@
+{
+  "name": "WB Incomes / Supplies (statistics-api, deprecated June 2026)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/v1/supplier/incomes"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-incomes.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

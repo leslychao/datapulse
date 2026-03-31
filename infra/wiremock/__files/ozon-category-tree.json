@@ -1,0 +1,37 @@
+{
+  "result": [
+    {
+      "description_category_id": 17028634,
+      "category_name": "Электроника",
+      "disabled": false,
+      "children": [
+        {
+          "description_category_id": 17028700,
+          "category_name": "Аксессуары для телефонов",
+          "disabled": false,
+          "children": [
+            {
+              "type_name": "Чехол",
+              "type_id": 971081965,
+              "disabled": false,
+              "children": []
+            }
+          ]
+        },
+        {
+          "description_category_id": 17028800,
+          "category_name": "Наушники и гарнитуры",
+          "disabled": false,
+          "children": [
+            {
+              "type_name": "Наушники",
+              "type_id": 971082000,
+              "disabled": false,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

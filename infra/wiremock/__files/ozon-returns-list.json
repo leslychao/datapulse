@@ -1,0 +1,78 @@
+{
+  "returns": [
+    {
+      "id": 1000016684,
+      "company_id": 1943980,
+      "return_reason_name": "Не подошёл цвет",
+      "type": "Cancellation",
+      "schema": "Fbo",
+      "order_id": 24223824654,
+      "order_number": "43495982-0103",
+      "place": {
+        "id": 1020000115449000,
+        "name": "Склад Маршала Жукова",
+        "address": "Москва, ул. Маршала Жукова, 3"
+      },
+      "target_place": {
+        "id": 16583460360000,
+        "name": "Основной склад",
+        "address": "МО, Подольск"
+      },
+      "storage": {
+        "sum": {
+          "currency_code": "",
+          "price": 0
+        },
+        "tariffication_first_date": null,
+        "tariffication_start_date": null,
+        "arrived_moment": null,
+        "days": 0,
+        "utilization_sum": {
+          "currency_code": "",
+          "price": 0
+        },
+        "utilization_forecast_date": null
+      },
+      "product": {
+        "sku": 1595285688,
+        "offer_id": "588889995_плетёный",
+        "name": "Чехол для телефона плетёный кожаный",
+        "price": {
+          "currency_code": "RUB",
+          "price": 273
+        },
+        "price_without_commission": {
+          "currency_code": "RUB",
+          "price": 273
+        },
+        "commission_percent": 0,
+        "commission": {
+          "currency_code": "",
+          "price": 0
+        },
+        "quantity": 1
+      },
+      "logistic": {
+        "technical_return_moment": null,
+        "final_moment": "2026-03-15T22:06:27.340Z",
+        "cancelled_with_compensation_moment": null,
+        "return_date": "2026-03-14T01:47:09.440Z",
+        "barcode": "%101%26819284654"
+      },
+      "visual": {
+        "status": {
+          "id": 34,
+          "display_name": "На складе Ozon",
+          "sys_name": "ReturnedToOzon"
+        },
+        "change_moment": "2026-03-15T22:06:27.340Z"
+      },
+      "exemplars": [
+        {
+          "id": 1019625469589708,
+          "exemplar_id": 0
+        }
+      ]
+    }
+  ]
+}

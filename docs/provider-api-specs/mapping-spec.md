@@ -666,14 +666,39 @@ This is consistent with the WB model where `retail_price_withdisc_rub` > buyer-p
 
 ### NormalizedFinanceItem → CanonicalFinanceEntry
 
+Canonical DDL содержит per-measure columns (DD-8 composite row model). Normalizer decomposит provider-specific fields в individual measures:
+
 | Normalized field | Canonical field (DDL: `canonical_finance_entry`) | Confidence | Notes |
 |------------------|--------------------------------------------------|------------|-------|
 | `entryType` | `entry_type` → `FinanceEntryType` | C (Ozon) / A (WB) | |
 | `externalRef` | `external_entry_id` | C | rrd_id (WB), operation_id (Ozon) |
 | (resolved) | `seller_sku_id` (FK → seller_sku) | C | Via offer lookup; NULL if SKU not found |
-| `amount` | `amount` | C (Ozon) / A (WB) | Ozon sign convention verified |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
 | `entryDate` | `entry_date` | C (Ozon) / A (WB) | Ozon: custom format! |
+
+**Per-measure mapping (WB):**
+
+| WB finance field | → canonical measure column | Sign | Confidence |
+|------------------|---------------------------|------|------------|
+| `retail_price_withdisc_rub` | `revenue_amount` | positive (credit) | C-docs |
+| `ppvz_sales_commission` | `marketplace_commission_amount` | negate (debit) | C-docs |
+| `acquiring_fee` | `acquiring_commission_amount` | negate (debit) | C-docs |
+| `delivery_rub` + `rebill_logistic_cost` | `logistics_cost_amount` | negate (debit) | C |
+| `storage_fee` | `storage_cost_amount` | negate (debit) | C-docs |
+| `penalty` + `deduction` | `penalties_amount` | negate (debit) | C-docs |
+| `acceptance` | `acceptance_cost_amount` | negate (debit) | C-docs |
+| `additional_payment` | `compensation_amount` | positive (credit) | C-docs |
+| (return entries: retail_price_withdisc_rub) | `refund_amount` | negate (debit to seller) | C-docs |
+| `ppvz_for_pay` | `net_payout` | positive (credit) | C |
+
+**Per-measure mapping (Ozon):**
+
+| Ozon finance field | → canonical measure column | Sign | Confidence |
+|--------------------|---------------------------|------|------------|
+| `accruals_for_sale` | `revenue_amount` (sale) or `refund_amount` (return, negative) | as-is | C |
+| `sale_commission` | `marketplace_commission_amount` | as-is (negative for sale, positive for return refund) | C |
+| `services[].price` by service name | mapped per §Ozon services classification | as-is (negative) | C |
+| `amount` | `net_payout` | as-is (signed) | C |
 
 ---
 

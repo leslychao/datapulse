@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Catalog — Product Attributes v4 (brand)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v4/product/info/attributes"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-product-attributes.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

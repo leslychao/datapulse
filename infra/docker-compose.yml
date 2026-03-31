@@ -146,9 +146,9 @@ services:
 
   wiremock:
     image: wiremock/wiremock:3.12.1
-    container_name: datapulse-wb-mock
+    container_name: datapulse-wiremock
     ports:
-      - "9090:8080"
+      - "9091:8080"
     volumes:
       - ./wiremock/mappings:/home/wiremock/mappings:ro
       - ./wiremock/__files:/home/wiremock/__files:ro

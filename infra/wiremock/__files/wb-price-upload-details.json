@@ -1,25 +1,19 @@
 {
   "data": {
-    "id": 987654321,
-    "status": 3,
-    "uploadDate": "2026-03-29T10:00:00Z",
-    "activationDate": "2026-03-29T10:01:00Z",
-    "overCount": 0,
-    "details": [
+    "uploadID": 987654321,
+    "historyGoods": [
       {
-        "nmId": 274849,
+        "nmID": 274849,
         "vendorCode": "ART-001-BLK",
-        "price": 5000,
-        "discount": 10,
-        "status": 1,
+        "sizeID": 274848,
+        "status": "success",
         "errorText": ""
       },
       {
-        "nmId": 275100,
+        "nmID": 275100,
         "vendorCode": "ART-002-WHT",
-        "price": 2500,
-        "discount": 15,
-        "status": 1,
+        "sizeID": 275099,
+        "status": "success",
         "errorText": ""
       }
     ]

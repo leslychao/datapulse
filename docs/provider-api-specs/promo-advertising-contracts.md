@@ -1,4 +1,4 @@
-# Promo & Advertising — Provider Read Contracts
+# Promo & Advertising — Provider Read & Write Contracts
 
 **Статус:** endpoint-verified + code-verified
 **Источники:**
@@ -140,6 +140,50 @@ Additional fields from DTO (not verified with data):
 | `actionPrice` / `planPrice` | double | Promo price | code-verified |
 | `price` | double | Regular price | code-verified |
 | `inAction` | boolean | Whether product is in the promo | code-verified |
+
+---
+
+### 1.4 Upload Products to Promotion (WRITE) — TBD
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | assumed |
+| Path | `/api/v1/calendar/promotions/upload` | assumed |
+| Base URL | `https://dp-calendar-api.wildberries.ru` | assumed |
+| Auth | API Key (header `Authorization`) — **requires Promotion-scoped token** | assumed |
+| Status | **Requires empirical verification** | — |
+
+### Open Questions (see [promotions.md P-4](../modules/promotions.md))
+
+| # | Вопрос | Статус |
+|---|--------|--------|
+| 1 | Точный формат запроса (JSON body vs multipart) | not confirmed |
+| 2 | Поведение при невалидных SKU (rejection structure) | not confirmed |
+| 3 | Ограничения по timing (можно ли менять участие после `startDateTime`) | not confirmed |
+| 4 | Rate limits для write endpoint (same bucket as reads?) | not confirmed |
+| 5 | Requires separate Promotion-scoped token or same API key | not confirmed |
+
+### Assumed Request Structure
+
+```json
+{
+  "promotionId": 2235,
+  "nomenclatures": [
+    {
+      "nmId": 987654,
+      "actionPrice": 499
+    }
+  ]
+}
+```
+
+> **⚠ WARNING:** This structure is speculative based on naming patterns from read endpoints (§1.3). Real payload **must be verified** against WB documentation or sandbox before implementation.
+
+### Blocker
+
+WB promo write is blocked until:
+1. API documentation is found/verified at https://dev.wildberries.ru/openapi/promotion
+2. Promotion-scoped token availability is confirmed for the test account
 
 ---
 
@@ -483,6 +527,137 @@ The `WbAdapter.downloadAdvertisingFullStats()` currently sends a **POST body** t
 | `add_mode` | string | How product was added | code-verified |
 | `stock` | int | Available stock | code-verified |
 | `min_stock` | int | Minimum required stock | code-verified |
+
+---
+
+### 3.4 Activate Products in Action (WRITE)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v1/actions/products/activate` | confirmed-docs |
+| Base URL | `https://api-seller.ozon.ru` | confirmed-docs |
+| Auth | `Client-Id` + `Api-Key` headers | confirmed-docs |
+| Rate limit group | `OZON_PROMO` (20/60s) | assumed (same bucket as reads) |
+
+### Request Body
+
+```json
+{
+  "action_id": 1977747,
+  "products": [
+    {
+      "product_id": 12345,
+      "action_price": 499.0,
+      "stock": 100
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `action_id` | long | yes | Target promotion ID | confirmed-docs |
+| `products` | array | yes | Products to activate | confirmed-docs |
+| `products[].product_id` | long | yes | Ozon product ID | confirmed-docs |
+| `products[].action_price` | double | yes | Price for promo (must be ≤ `max_action_price`) | confirmed-docs |
+| `products[].stock` | int | no | Stock quantity | confirmed-docs |
+
+### Response Structure — confirmed-docs
+
+```json
+{
+  "result": {
+    "product_ids": [12345],
+    "rejected": [
+      {
+        "product_id": 99999,
+        "reason": "Product not eligible for this action"
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `result.product_ids` | long[] | Successfully activated products | confirmed-docs |
+| `result.rejected` | array | Rejected products with reasons | confirmed-docs |
+| `result.rejected[].product_id` | long | Rejected product ID | confirmed-docs |
+| `result.rejected[].reason` | string | Rejection reason (human-readable) | confirmed-docs |
+
+### Idempotency
+
+Activating an already-participating product is a **no-op**: it appears in `product_ids` without error. This makes the endpoint retry-safe.
+
+### Constraints
+
+- `action_price` must be ≤ `max_action_price` (from candidates/products response); otherwise rejected.
+- Products must be in eligible/candidate set; otherwise rejected with reason.
+- After `freeze_date` — activate may be rejected (unverified; depends on Ozon internal rules).
+
+---
+
+### 3.5 Deactivate Products from Action (WRITE)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v1/actions/products/deactivate` | confirmed-docs |
+| Base URL | `https://api-seller.ozon.ru` | confirmed-docs |
+| Auth | `Client-Id` + `Api-Key` headers | confirmed-docs |
+| Rate limit group | `OZON_PROMO` (20/60s) | assumed |
+
+### Request Body
+
+```json
+{
+  "action_id": 1977747,
+  "product_ids": [12345, 67890]
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `action_id` | long | yes | Target promotion ID | confirmed-docs |
+| `product_ids` | long[] | yes | Products to remove from promo | confirmed-docs |
+
+### Response Structure — confirmed-docs
+
+```json
+{
+  "result": {
+    "product_ids": [12345],
+    "rejected": [
+      {
+        "product_id": 67890,
+        "reason": "Product is not participating in this action"
+      }
+    ]
+  }
+}
+```
+
+Same structure as activate response.
+
+### Idempotency
+
+Deactivating a non-participating product → **rejected** with reason (not a no-op). Retry-safe only when product was actually participating.
+
+### Constraints
+
+- After `freeze_date` — deactivate may be rejected.
+- Banned products cannot be deactivated (already removed by Ozon).
+
+---
+
+### 3.6 Write Contracts — Reconciliation Strategy
+
+After activate/deactivate, `canonical_promo_product.participation_status` is updated optimistically based on API response:
+- Activate success → `PARTICIPATING`
+- Deactivate success → `REMOVED`
+
+Authoritative reconciliation occurs at next `PROMO_SYNC`: ETL re-reads products from §3.2 and candidates from §3.3, applying the conditional UPSERT logic described in [Promotions → Write boundary](../modules/promotions.md#write-boundary-canonical_promo_product).
 
 ---
 

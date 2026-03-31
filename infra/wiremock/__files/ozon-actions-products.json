@@ -1,0 +1,24 @@
+{
+  "result": {
+    "products": [
+      {
+        "id": 1074782997,
+        "price": 273.0,
+        "action_price": 232.0,
+        "max_action_price": 250.0,
+        "add_mode": "AUTO",
+        "stock": 20,
+        "min_stock": 0
+      },
+      {
+        "id": 1074914838,
+        "price": 103.0,
+        "action_price": 87.0,
+        "max_action_price": 95.0,
+        "add_mode": "MANUAL",
+        "stock": 50,
+        "min_stock": 0
+      }
+    ]
+  }
+}

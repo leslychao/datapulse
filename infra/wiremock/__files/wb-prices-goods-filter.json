@@ -1,0 +1,42 @@
+{
+  "data": {
+    "listGoods": [
+      {
+        "nmID": 274849,
+        "vendorCode": "ART-001-BLK",
+        "sizes": [
+          {
+            "sizeID": 274848,
+            "price": 5000,
+            "discountedPrice": 4500,
+            "clubDiscountedPrice": 4250,
+            "techSizeName": "S"
+          }
+        ],
+        "currencyIsoCode4217": "RUB",
+        "discount": 10,
+        "clubDiscount": 5,
+        "editableSizePrice": false
+      },
+      {
+        "nmID": 275100,
+        "vendorCode": "ART-002-WHT",
+        "sizes": [
+          {
+            "sizeID": 275099,
+            "price": 2500,
+            "discountedPrice": 2125,
+            "clubDiscountedPrice": 2000,
+            "techSizeName": "M"
+          }
+        ],
+        "currencyIsoCode4217": "RUB",
+        "discount": 15,
+        "clubDiscount": 5,
+        "editableSizePrice": false
+      }
+    ]
+  },
+  "error": false,
+  "errorText": ""
+}
