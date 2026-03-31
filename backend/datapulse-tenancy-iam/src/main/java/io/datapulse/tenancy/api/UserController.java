@@ -16,16 +16,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserProfileService userProfileService;
-    private final WorkspaceContext workspaceContext;
+  private final UserProfileService userProfileService;
+  private final WorkspaceContext workspaceContext;
 
-    @GetMapping("/me")
-    public UserProfileResponse getMe() {
-        return userProfileService.getProfile(workspaceContext.getUserId());
-    }
+  @GetMapping("/me")
+  public UserProfileResponse getMe() {
+    return userProfileService.getProfile(workspaceContext.getUserId());
+  }
 
-    @PutMapping("/me")
-    public UserProfileResponse updateMe(@Valid @RequestBody UpdateUserProfileRequest request) {
-        return userProfileService.updateProfile(workspaceContext.getUserId(), request);
-    }
+  @PutMapping("/me")
+  public UserProfileResponse updateMe(@Valid @RequestBody UpdateUserProfileRequest request) {
+    return userProfileService.updateProfile(workspaceContext.getUserId(), request);
+  }
 }
