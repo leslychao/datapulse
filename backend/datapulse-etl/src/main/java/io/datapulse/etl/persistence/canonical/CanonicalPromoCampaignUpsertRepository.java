@@ -8,6 +8,12 @@ import org.springframework.stereotype.Repository;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Batch upsert for canonical_promo_campaign table.
+ *
+ * <p><b>Not yet wired</b> into any EventSource. Will be used when
+ * PROMO_SYNC EventSource implementations are connected.</p>
+ */
 @Repository
 @RequiredArgsConstructor
 public class CanonicalPromoCampaignUpsertRepository {

@@ -8,12 +8,13 @@ import org.springframework.stereotype.Service;
 /**
  * Materializes canonical data from PostgreSQL to ClickHouse.
  *
- * <p><b>Phase A stub:</b> basic structure is in place. Full materialization
+ * <p><b>Phase B stub:</b> basic structure is in place. Full materialization
  * (per-domain fact/dim INSERT, re-aggregation of marts) will be implemented
- * in Phase B when ClickHouse schema and mart definitions are finalized.</p>
+ * when ClickHouse schema and mart definitions are finalized.</p>
  *
- * <p>This class is called from {@link io.datapulse.etl.domain.SubSourceRunner}
- * after canonical UPSERT completes for each page/batch.</p>
+ * <p><b>Not yet wired</b> into the ETL pipeline. Will be called from
+ * {@link io.datapulse.etl.domain.SubSourceRunner} after canonical UPSERT
+ * completes for each page/batch once Phase B work begins.</p>
  */
 @Slf4j
 @Service

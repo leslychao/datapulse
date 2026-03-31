@@ -1,5 +1,9 @@
 package io.datapulse.etl.adapter.util;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.PageCaptureResult;
@@ -48,9 +52,21 @@ public class StreamingPageCapture {
 
             return new PageCaptureResult(captureResult, cursor);
         } catch (Exception e) {
+            deleteTempFileSilently(writeResult.path());
             throw new IllegalStateException(
                     "Failed to capture page: requestId=%s, page=%d"
                             .formatted(context.requestId(), pageNumber), e);
+        }
+    }
+
+    private void deleteTempFileSilently(Path tempFile) {
+        if (tempFile == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(tempFile);
+        } catch (IOException e) {
+            log.warn("Failed to delete temp file: path={}", tempFile, e);
         }
     }
 }

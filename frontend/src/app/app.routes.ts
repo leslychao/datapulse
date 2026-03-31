@@ -1,12 +1,17 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { rootRedirectGuard } from './core/auth/root-redirect.guard';
+import { onboardingGuard } from './core/auth/onboarding.guard';
+import { workspaceGuard } from './core/auth/workspace.guard';
 
 export const routes: Routes = [
   {
     path: '',
+    pathMatch: 'full',
+    canActivate: [rootRedirectGuard],
     loadComponent: () =>
-      import('./features/landing/landing.component').then(
-        (m) => m.LandingComponent,
+      import('./features/callback/callback.component').then(
+        (m) => m.CallbackComponent,
       ),
   },
   {
@@ -17,20 +22,68 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'app',
+    path: 'workspaces',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/workspace-selector/workspace-selector.component').then(
+        (m) => m.WorkspaceSelectorComponent,
+      ),
+  },
+  {
+    path: 'onboarding',
+    canActivate: [authGuard, onboardingGuard],
+    loadComponent: () =>
+      import('./features/onboarding/onboarding-wizard.component').then(
+        (m) => m.OnboardingWizardComponent,
+      ),
+  },
+  {
+    path: 'invitations/accept',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/invitation/invitation-accept.component').then(
+        (m) => m.InvitationAcceptComponent,
+      ),
+  },
+  {
+    path: 'workspace/:workspaceId',
+    canActivate: [authGuard, workspaceGuard],
     loadComponent: () =>
       import('./shared/shell/shell.component').then((m) => m.ShellComponent),
-    canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: '', redirectTo: 'grid', pathMatch: 'full' },
       {
-        path: 'dashboard',
-        loadComponent: () =>
-          import('./features/dashboard/dashboard.component').then(
-            (m) => m.DashboardComponent,
-          ),
+        path: 'grid',
+        loadChildren: () => import('./features/grid/grid.routes'),
+        data: { breadcrumb: 'Операции' },
+      },
+      {
+        path: 'analytics',
+        loadChildren: () => import('./features/analytics/analytics.routes'),
+        data: { breadcrumb: 'Аналитика' },
+      },
+      {
+        path: 'pricing',
+        loadChildren: () => import('./features/pricing/pricing.routes'),
+        data: { breadcrumb: 'Ценообразование' },
+      },
+      {
+        path: 'promo',
+        loadChildren: () => import('./features/promo/promo.routes'),
+        data: { breadcrumb: 'Промо' },
+      },
+      {
+        path: 'settings',
+        loadChildren: () => import('./features/settings/settings.routes'),
+        data: { breadcrumb: 'Настройки' },
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  {
+    path: '**',
+    loadComponent: () =>
+      import('./features/not-found/not-found.component').then(
+        (m) => m.NotFoundComponent,
+      ),
+  },
 ];

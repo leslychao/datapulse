@@ -7,6 +7,13 @@ import org.springframework.stereotype.Repository;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Batch upsert for seller_sku table.
+ *
+ * <p><b>Not yet wired</b> into any EventSource. Will be used when
+ * product hierarchy resolution (product_master → seller_sku → marketplace_offer)
+ * is connected to the PRODUCT_DICT pipeline.</p>
+ */
 @Repository
 @RequiredArgsConstructor
 public class SellerSkuUpsertRepository {

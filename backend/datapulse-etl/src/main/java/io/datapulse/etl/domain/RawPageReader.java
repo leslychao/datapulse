@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.config.S3Properties;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
@@ -19,21 +20,21 @@ import org.springframework.stereotype.Service;
 
 /**
  * Reads raw JSON pages from S3 using Jackson streaming API.
- * Memory footprint bounded by batch size (~1.5 MB at batch=500).
+ * Batch size is controlled by {@code datapulse.etl.ingest.canonical-batch-size}
+ * (default 500, ~1.5 MB memory footprint per batch).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RawPageReader {
 
-    private static final int DEFAULT_BATCH_SIZE = 500;
-
     private final MinioClient minioClient;
     private final S3Properties s3Properties;
     private final ObjectMapper objectMapper;
+    private final IngestProperties ingestProperties;
 
     public <T> void readBatched(String s3Key, Class<T> recordType, Consumer<List<T>> batchConsumer) {
-        readBatched(s3Key, recordType, DEFAULT_BATCH_SIZE, batchConsumer);
+        readBatched(s3Key, recordType, ingestProperties.canonicalBatchSize(), batchConsumer);
     }
 
     public <T> void readBatched(String s3Key, Class<T> recordType, int batchSize,

@@ -1,46 +1,112 @@
 @import "tailwindcss";
 
 :root {
+  /* Colors — background */
   --bg-primary: #FFFFFF;
   --bg-secondary: #F9FAFB;
   --bg-tertiary: #F3F4F6;
   --bg-active: #EFF6FF;
+
+  /* Colors — borders */
   --border-default: #E5E7EB;
   --border-subtle: #F3F4F6;
+
+  /* Colors — text */
   --text-primary: #111827;
   --text-secondary: #6B7280;
   --text-tertiary: #9CA3AF;
+
+  /* Colors — accent */
   --accent-primary: #2563EB;
   --accent-primary-hover: #1D4ED8;
   --accent-subtle: #EFF6FF;
+
+  /* Colors — semantic */
   --status-success: #059669;
   --status-warning: #D97706;
   --status-error: #DC2626;
   --status-info: #2563EB;
   --status-neutral: #6B7280;
+
+  /* Colors — financial */
   --finance-positive: #059669;
   --finance-negative: #DC2626;
   --finance-zero: #6B7280;
+
+  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+
+  /* Typography */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  /* Radii */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+
+  /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
 }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  font-size: 14px;
+  font-size: var(--text-base);
   line-height: 1.4;
   color: var(--text-primary);
   background-color: var(--bg-primary);
   margin: 0;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Focus ring for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Spinner animation */
+@keyframes dp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dp-spinner {
+  animation: dp-spin 0.8s linear infinite;
 }
