@@ -41,7 +41,7 @@ public class RabbitTopologyConfig {
 
     // ── DLX TTL defaults (ms) ───────────────────────────────────────────────
 
-    private static final long ETL_WAIT_TTL = 30_000L;
+    private static final long ETL_WAIT_TTL = 1_500_000L;
     private static final long EXECUTION_WAIT_TTL = 60_000L;
     private static final long RECONCILIATION_WAIT_TTL = 60_000L;
 

@@ -1,0 +1,53 @@
+package io.datapulse.etl.scheduling;
+
+import java.time.OffsetDateTime;
+
+import io.datapulse.etl.config.IngestProperties;
+import io.datapulse.etl.persistence.JobExecutionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+/**
+ * Detects stale ETL jobs that are stuck in non-terminal states.
+ *
+ * <p>Two conditions:
+ * <ol>
+ *   <li>IN_PROGRESS for longer than {@code jobTimeout} (default 2h) — worker crash or hang</li>
+ *   <li>RETRY_SCHEDULED for longer than {@code staleRetryThreshold} (default 1h) — DLX message lost</li>
+ * </ol>
+ *
+ * <p>STALE is a terminal status. Recovery: next scheduled sync creates a new job_execution
+ * (concurrency guard excludes STALE jobs).
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class StaleJobDetector {
+
+    private final JobExecutionRepository jobExecutionRepository;
+    private final IngestProperties ingestProperties;
+
+    @Scheduled(fixedDelayString = "${datapulse.etl.stale-check-interval:PT15M}")
+    @SchedulerLock(name = "staleJobDetector", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
+    public void detectStaleJobs() {
+        try {
+            int staleInProgress = jobExecutionRepository.markStaleInProgress(
+                    OffsetDateTime.now().minus(ingestProperties.jobTimeout()));
+
+            int staleRetryScheduled = jobExecutionRepository.markStaleRetryScheduled(
+                    OffsetDateTime.now().minus(ingestProperties.staleRetryThreshold()));
+
+            if (staleInProgress > 0 || staleRetryScheduled > 0) {
+                log.warn("Stale jobs detected: inProgress={}, retryScheduled={}",
+                        staleInProgress, staleRetryScheduled);
+            } else {
+                log.debug("No stale jobs detected");
+            }
+        } catch (Exception e) {
+            log.error("Stale job detection failed", e);
+        }
+    }
+}

@@ -12,6 +12,7 @@ public record IngestProperties(
         @DefaultValue("PT2H") Duration jobTimeout,
         @DefaultValue("3") int maxJobRetries,
         @DefaultValue("PT5M") Duration minRetryBackoff,
-        @DefaultValue("PT30M") Duration maxRetryBackoff,
-        @DefaultValue("2") int retryBackoffMultiplier
+        @DefaultValue("PT20M") Duration maxRetryBackoff,
+        @DefaultValue("2") int retryBackoffMultiplier,
+        @DefaultValue("PT1H") Duration staleRetryThreshold
 ) {}

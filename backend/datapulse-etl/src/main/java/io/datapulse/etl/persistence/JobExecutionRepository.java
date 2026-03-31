@@ -59,6 +59,24 @@ public class JobExecutionRepository {
             )
             """;
 
+    private static final String MARK_STALE_IN_PROGRESS = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now()
+            WHERE status = 'IN_PROGRESS'
+              AND started_at < :threshold
+            """;
+
+    private static final String MARK_STALE_RETRY_SCHEDULED = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now()
+            WHERE status = 'RETRY_SCHEDULED'
+              AND COALESCE(
+                  (checkpoint->>'last_retry_at')::timestamptz,
+                  started_at,
+                  created_at
+              ) < :threshold
+            """;
+
     public long insert(long connectionId, String eventType) {
         var keyHolder = new GeneratedKeyHolder();
         var params = new MapSqlParameterSource()
@@ -97,6 +115,26 @@ public class JobExecutionRepository {
                 jdbc.queryForObject(EXISTS_ACTIVE_FOR_CONNECTION,
                         Map.of("connectionId", connectionId), Boolean.class)
         );
+    }
+
+    /**
+     * Marks IN_PROGRESS jobs as STALE when started_at is older than the given threshold.
+     *
+     * @return number of rows affected
+     */
+    public int markStaleInProgress(OffsetDateTime threshold) {
+        return jdbc.update(MARK_STALE_IN_PROGRESS, Map.of("threshold", threshold));
+    }
+
+    /**
+     * Marks RETRY_SCHEDULED jobs as STALE when last_retry_at (from checkpoint)
+     * is older than the given threshold. Falls back to started_at or created_at
+     * if last_retry_at is absent.
+     *
+     * @return number of rows affected
+     */
+    public int markStaleRetryScheduled(OffsetDateTime threshold) {
+        return jdbc.update(MARK_STALE_RETRY_SCHEDULED, Map.of("threshold", threshold));
     }
 
     private JobExecutionRow mapRow(ResultSet rs, int rowNum) throws SQLException {

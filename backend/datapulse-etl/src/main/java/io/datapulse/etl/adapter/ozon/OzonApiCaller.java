@@ -1,5 +1,6 @@
 package io.datapulse.etl.adapter.ozon;
 
+import io.datapulse.etl.adapter.util.HttpRetryClassifier;
 import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
@@ -21,15 +22,17 @@ public class OzonApiCaller {
     public Flux<DataBuffer> post(String path, Object body,
                                  long connectionId, RateLimitGroup group,
                                  String clientId, String apiKey) {
-        rateLimiter.acquire(connectionId, group).join();
-        String baseUrl = properties.getOzon().getSellerBaseUrl();
-        return webClientBuilder.build()
-                .post()
-                .uri(baseUrl + path)
-                .header("Client-Id", clientId)
-                .header("Api-Key", apiKey)
-                .bodyValue(body)
-                .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        return Flux.defer(() -> {
+            rateLimiter.acquire(connectionId, group).join();
+            String baseUrl = properties.getOzon().getSellerBaseUrl();
+            return webClientBuilder.build()
+                    .post()
+                    .uri(baseUrl + path)
+                    .header("Client-Id", clientId)
+                    .header("Api-Key", apiKey)
+                    .bodyValue(body)
+                    .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        }).retryWhen(HttpRetryClassifier.retrySpec());
     }
 
     private Flux<DataBuffer> handleResponse(ClientResponse response,

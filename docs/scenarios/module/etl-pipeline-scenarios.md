@@ -185,3 +185,21 @@ ETL Pipeline отвечает за движение данных от марке
 - **Dependencies:** S3 health check. Temp file on disk (buffer). Error threshold configuration.
 - **Failure risks:** S3 down prolonged → все syncs fail → data staleness → stale_data alert → automation blocked. Temp files accumulate on disk → disk pressure (R-CAP-07). Recovery: S3 восстановлен → next scheduled sync succeeds → full data restored via idempotent UPSERT.
 - **Uniqueness:** Infrastructure failure в первом слое pipeline (Raw). Отличается от ETL-10 (CH down на последнем слое): S3 down → canonical write тоже не произойдёт (pipeline sequential: raw → normalized → canonical).
+
+### ETL-21: HTTP retry within page fetch (Level 1)
+
+- **Назначение:** Автоматический retry при transient HTTP-ошибках во время загрузки страницы API маркетплейса.
+- **Trigger:** HTTP 429, 500, 502, 503, 504, connection timeout или read timeout при вызове API.
+- **Main path:** API call fails → Reactor `Retry.backoff(3, 1s).maxBackoff(10s).jitter(0.5)` → re-acquire rate limit → retry HTTP call → success → continue page processing.
+- **Dependencies:** `HttpRetryClassifier` (isRetryable filter). `MarketplaceRateLimiter` (re-acquired on each retry via `Flux.defer()`).
+- **Failure risks:** Retry exhausted (3 attempts) → exception propagated to EventSource → page fails → event FAILED. Retry на 401/403 не выполняется (credentials invalid — non-retriable).
+- **Uniqueness:** In-process retry, invisible to job lifecycle. Блокирует worker на время retry (не переходит к следующей page). Rate limiter вызывается повторно через `Flux.defer()` для корректного учёта rate limits.
+
+### ETL-22: DLX auto-retry with checkpoint resume (Level 2)
+
+- **Назначение:** Автоматический retry целого job через DLX после исчерпания HTTP retry (Level 1).
+- **Trigger:** HTTP retry exhausted на retriable-ошибке → event FAILED → `hasRetriableFailures = true` → `retryCount < maxJobRetries(3)`.
+- **Main path:** Worker фиксирует per-event checkpoint → `TransactionTemplate { CAS IN_PROGRESS → RETRY_SCHEDULED, UPDATE checkpoint (retry_count++, last_retry_at=now()), INSERT outbox ETL_SYNC_RETRY (delay_ms = exponential backoff) }` → outbox poller publishes with per-message TTL → `etl.sync.wait` queue → DLX delay (5m→10m→20m) → `etl.sync` queue → worker resume → read checkpoint → skip COMPLETED events → resume FAILED events from last_cursor → re-evaluate SKIPPED events (run if hard dep now OK).
+- **Dependencies:** Checkpoint JSON с per-event status + last_cursor + retry_count + last_retry_at. DLX topology (etl.sync.wait → etl.sync). Per-message TTL на outbox event. `IngestProperties.maxJobRetries = 3`.
+- **Failure risks:** DLX message lost (RabbitMQ failure) → RETRY_SCHEDULED stuck → stale job detector (ETL-17) переводит в STALE после 1 час. Same retriable error persists → retry exhausted → FAILED terminal. Per-message TTL ordering limitation в RabbitMQ (head-of-queue blocking) — acceptable delay.
+- **Uniqueness:** Тот же job_execution ID (не новый). Checkpoint обеспечивает incremental progress: каждый retry продолжает с места ошибки, а не с нуля. Exponential backoff (5m→10m→20m) через per-message TTL. Отличается от ETL-16 (manual retry): manual retry = новый job_execution без checkpoint.

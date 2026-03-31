@@ -1,5 +1,7 @@
 package io.datapulse.etl.domain;
 
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -103,6 +105,9 @@ public class CheckpointManager {
 
             root.put("events", events);
             root.put("retry_count", retryCount);
+            if (retryCount > 0) {
+                root.put("last_retry_at", OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+            }
 
             return objectMapper.writeValueAsString(root);
         } catch (JsonProcessingException e) {

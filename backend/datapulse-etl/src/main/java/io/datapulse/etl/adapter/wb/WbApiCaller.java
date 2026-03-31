@@ -3,6 +3,7 @@ package io.datapulse.etl.adapter.wb;
 import java.net.URI;
 import java.util.function.Function;
 
+import io.datapulse.etl.adapter.util.HttpRetryClassifier;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
@@ -22,34 +23,40 @@ public class WbApiCaller {
 
     public Flux<DataBuffer> get(String url, String apiToken,
                                 long connectionId, RateLimitGroup group) {
-        rateLimiter.acquire(connectionId, group).join();
-        return webClientBuilder.build()
-                .get()
-                .uri(url)
-                .header("Authorization", apiToken)
-                .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        return Flux.defer(() -> {
+            rateLimiter.acquire(connectionId, group).join();
+            return webClientBuilder.build()
+                    .get()
+                    .uri(url)
+                    .header("Authorization", apiToken)
+                    .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        }).retryWhen(HttpRetryClassifier.retrySpec());
     }
 
     public Flux<DataBuffer> get(String uriTemplate, Function<UriBuilder, URI> uriFunction,
                                 String apiToken,
                                 long connectionId, RateLimitGroup group) {
-        rateLimiter.acquire(connectionId, group).join();
-        return webClientBuilder.build()
-                .get()
-                .uri(uriTemplate, uriFunction)
-                .header("Authorization", apiToken)
-                .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        return Flux.defer(() -> {
+            rateLimiter.acquire(connectionId, group).join();
+            return webClientBuilder.build()
+                    .get()
+                    .uri(uriTemplate, uriFunction)
+                    .header("Authorization", apiToken)
+                    .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        }).retryWhen(HttpRetryClassifier.retrySpec());
     }
 
     public Flux<DataBuffer> post(String url, Object body, String apiToken,
                                  long connectionId, RateLimitGroup group) {
-        rateLimiter.acquire(connectionId, group).join();
-        return webClientBuilder.build()
-                .post()
-                .uri(url)
-                .header("Authorization", apiToken)
-                .bodyValue(body)
-                .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        return Flux.defer(() -> {
+            rateLimiter.acquire(connectionId, group).join();
+            return webClientBuilder.build()
+                    .post()
+                    .uri(url)
+                    .header("Authorization", apiToken)
+                    .bodyValue(body)
+                    .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        }).retryWhen(HttpRetryClassifier.retrySpec());
     }
 
     private Flux<DataBuffer> handleResponse(ClientResponse response,

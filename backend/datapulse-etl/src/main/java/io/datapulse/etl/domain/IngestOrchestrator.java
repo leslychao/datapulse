@@ -149,6 +149,7 @@ public class IngestOrchestrator {
     private void scheduleRetry(JobExecutionRow job, IngestContext context,
                                 Map<EtlEventType, EventResult> results, int retryCount) {
         int nextRetry = retryCount + 1;
+        long delayMs = calculateRetryDelay(retryCount);
 
         transactionTemplate.executeWithoutResult(tx -> {
             jobExecutionRepository.casStatus(
@@ -163,11 +164,18 @@ public class IngestOrchestrator {
                     job.getId(),
                     Map.of("jobExecutionId", job.getId(),
                             "connectionId", job.getConnectionId(),
-                            "retryCount", nextRetry));
+                            "retryCount", nextRetry,
+                            "delay_ms", delayMs));
         });
 
-        log.info("Retry scheduled: jobExecutionId={}, retryCount={}/{}",
-                job.getId(), nextRetry, ingestProperties.maxJobRetries());
+        log.info("Retry scheduled: jobExecutionId={}, retryCount={}/{}, delayMs={}",
+                job.getId(), nextRetry, ingestProperties.maxJobRetries(), delayMs);
+    }
+
+    private long calculateRetryDelay(int retryCount) {
+        long delayMs = ingestProperties.minRetryBackoff().toMillis()
+                * (long) Math.pow(ingestProperties.retryBackoffMultiplier(), retryCount);
+        return Math.min(delayMs, ingestProperties.maxRetryBackoff().toMillis());
     }
 
     private JobExecutionStatus determineFinalStatus(Map<EtlEventType, EventResult> results) {
