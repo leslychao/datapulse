@@ -1,4 +1,4 @@
 databaseChangeLog:
   - include:
-      file: changes/0001-initial.sql
+      file: changes/0001-tenancy-iam-tables.sql
       relativeToChangelogFile: true

@@ -21,7 +21,12 @@ public final class MessageCodes {
 
     // --- Workspace / Connection shortcuts ---
     public static final String WORKSPACE_NOT_FOUND = "workspace.not.found";
+    public static final String WORKSPACE_MEMBERSHIP_REQUIRED = "workspace.membership.required";
+    public static final String WORKSPACE_HEADER_MISSING = "workspace.header.missing";
     public static final String CONNECTION_NOT_FOUND = "connection.not.found";
+
+    // --- User ---
+    public static final String USER_DEACTIVATED = "user.deactivated";
 
     // --- Integration ---
     public static final String RATE_LIMITED = "api.rate.limited";

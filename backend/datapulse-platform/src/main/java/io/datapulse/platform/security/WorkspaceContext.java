@@ -1,10 +1,12 @@
 package io.datapulse.platform.security;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.RequestScope;
 
-@Data
+@Getter
+@Setter
 @Component
 @RequestScope
 public class WorkspaceContext {
