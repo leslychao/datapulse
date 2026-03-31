@@ -113,3 +113,52 @@ Tenancy & IAM отвечает за multi-tenant isolation (workspaces), user ma
 - **Dependencies:** New owner must be existing workspace member. Current user must be OWNER.
 - **Failure risks:** New owner not a member → reject. Accidental transfer → audit trail for investigation.
 - **Uniqueness:** Единственный способ создать OWNER (кроме workspace creation). Bidirectional role change в одной транзакции.
+
+### IAM-13: Workspace suspension / reactivation
+
+- **Назначение:** Приостановка workspace (billing issue, admin action) и восстановление.
+- **Trigger:** `POST /api/workspaces/{workspaceId}/suspend` (OWNER). Reactivation: `POST /api/workspaces/{workspaceId}/reactivate` (OWNER).
+- **Main path:**
+  - **Suspend:** ACTIVE → SUSPENDED. Все scheduled syncs paused. API переходит в read-only (403 на write operations). Actions в PENDING_APPROVAL → EXPIRED. Audit: `workspace.suspended`.
+  - **Reactivate:** SUSPENDED → ACTIVE. Syncs resume. Write operations restored. Audit: `workspace.reactivated`.
+- **Dependencies:** Workspace в ACTIVE (для suspend) или SUSPENDED (для reactivate). User role: OWNER.
+- **Failure risks:** Suspension во время active pricing run → in-flight actions завершаются, новые блокируются. Reactivation с stale credentials → syncs fail immediately (connection validation needed).
+- **Uniqueness:** Bidirectional non-terminal transition (ACTIVE ↔ SUSPENDED). Отличается от archival — данные остаются доступными на чтение, workspace восстановим.
+
+### IAM-14: User deactivation / reactivation
+
+- **Назначение:** Деактивация пользователя (аналог «удаления» с сохранением audit trail).
+- **Trigger:** Admin action на уровне workspace.
+- **Main path:**
+  - **Deactivate:** ACTIVE → DEACTIVATED. `workspace_member.status` → INACTIVE для всех memberships. JWT tokens invalidated (Keycloak session revocation). Assigned working queue items → unassigned. Manual price locks → retained (`locked_by` remains for audit). Audit: `user.deactivated`.
+  - **Reactivate:** DEACTIVATED → ACTIVE. Memberships restored to ACTIVE. Audit: `user.reactivated`.
+- **Dependencies:** Admin role in workspace. User не является последним OWNER (если OWNER — сначала ownership transfer).
+- **Failure risks:** Deactivated user's active sessions remain valid until JWT expires (short TTL mitigates). Reactivation не восстанавливает working queue assignments.
+- **Uniqueness:** User deletion не поддерживается (audit trail integrity). Deactivation — единственный способ revoke access с возможностью отката.
+
+### IAM-15: First user auto-provision (Keycloak → app_user)
+
+- **Назначение:** Автоматическое создание app_user при первом входе через Keycloak.
+- **Trigger:** Первый API-запрос с JWT от пользователя, которого нет в `app_user`.
+- **Main path:** JWT validated → `WorkspaceContextFilter` → lookup `app_user` by `external_id` (JWT `sub`) → not found → INSERT `app_user` (external_id, email, name, status = ACTIVE) → response: `needs_onboarding = true` (нет tenant/workspace) → frontend → onboarding wizard (create tenant → create workspace → connect marketplace).
+- **Dependencies:** Keycloak operational. JWT contains `sub`, `email`, `preferred_username`.
+- **Failure risks:** Duplicate `external_id` (re-registration in Keycloak with same sub — unlikely). Race: two concurrent first requests → unique constraint on `external_id` → second INSERT fails → retry lookup → success.
+- **Uniqueness:** Auto-provision в security filter — другой trigger (implicit, не explicit registration endpoint), другой flow (filter-level creation), другой outcome (onboarding flag, не workspace access).
+
+### IAM-16: Invitation expiration (PENDING → EXPIRED)
+
+- **Назначение:** Автоматическое истечение неиспользованных приглашений.
+- **Trigger:** Scheduled job (daily).
+- **Main path:** SELECT invitations WHERE status = 'PENDING' AND expires_at < now() → UPDATE status = 'EXPIRED'. Expired invitation link → user clicks → 410 Gone (invitation expired). Admin notified (optional).
+- **Dependencies:** `workspace_invitation.expires_at` (default: created_at + 7 days). Scheduled job.
+- **Failure risks:** Legitimate delay (user on vacation) → invitation expires → admin must create new one. Aggressive expiry → user confusion.
+- **Uniqueness:** Time-based terminal transition — аналогично EXE-03 (approval timeout). Другой recovery: admin создаёт новое приглашение (не resend — старый token невалиден).
+
+### IAM-17: Invitation cancellation by admin
+
+- **Назначение:** Администратор отменяет pending приглашение.
+- **Trigger:** `DELETE /api/invitations/{id}` или `POST /api/invitations/{id}/cancel` (ADMIN/OWNER).
+- **Main path:** Validate invitation status = PENDING → UPDATE status = 'CANCELLED' → audit_log entry. Cancelled invitation link → user clicks → 410 Gone.
+- **Dependencies:** User role: ADMIN/OWNER. Invitation in PENDING state.
+- **Failure risks:** Race: cancellation + acceptance concurrent → CAS guard (status = PENDING). Already accepted → reject cancellation (409).
+- **Uniqueness:** User-initiated terminal transition — другой actor (admin, не система), другой trigger (explicit cancel, не timeout).

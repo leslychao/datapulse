@@ -95,3 +95,21 @@ Seller Operations предоставляет операционный интер
 - **Dependencies:** Same as grid query. File generation. Large export → streaming to avoid OOM.
 - **Failure risks:** Very large export → timeout. Mitigation: async export with notification.
 - **Uniqueness:** Bulk read + file generation — другой output format, другой performance profile.
+
+### SEL-11: Working queue auto-population (scheduled criteria evaluation)
+
+- **Назначение:** Автоматическое наполнение working queues по заданным criteria.
+- **Trigger:** Scheduled job (every 5 min).
+- **Main path:** Для каждого enabled `working_queue_definition` с `auto_criteria` → evaluate criteria: PostgreSQL query (e.g. `price_action.status = 'FAILED'`) + optional ClickHouse enrichment (e.g. `stock_out_risk = 'CRITICAL'`) → merge results → INSERT `working_queue_assignment` (status = PENDING) → `ON CONFLICT DO NOTHING` (idempotent).
+- **Dependencies:** `working_queue_definition.auto_criteria` JSONB. PostgreSQL data (canonical state). ClickHouse data (analytics enrichment, optional). Scheduled job infrastructure.
+- **Failure risks:** ClickHouse down → queues с CH-only criteria не обновляются (PG-only queues unaffected). Criteria too broad → queue flooded. Criteria change → old assignments not cleaned up (separate auto-resolution handles this).
+- **Uniqueness:** Scheduled auto-population — другой trigger (scheduler, не user action). Cross-store criteria evaluation (PG + CH). Idempotent INSERT.
+
+### SEL-12: Working queue auto-resolution
+
+- **Назначение:** Автоматическое завершение queue assignments, когда условие больше не выполняется.
+- **Trigger:** Auto-population job (same 5 min schedule) — вторая фаза после population.
+- **Main path:** Для каждого active assignment (status = PENDING/IN_PROGRESS) → re-evaluate criteria → condition no longer matches (e.g. action перешёл из FAILED в SUCCEEDED через retry) → UPDATE assignment status = DONE. Operator notification optional.
+- **Dependencies:** Same criteria evaluation as SEL-11. Assignment status lifecycle.
+- **Failure risks:** Auto-resolution removes item that operator was actively investigating (status = IN_PROGRESS) → mitigation: only auto-resolve PENDING, not IN_PROGRESS. Stale CH data → false auto-resolution.
+- **Uniqueness:** Condition-driven cleanup — другой trigger (condition change, не user action). Аналог AUD-08 (alert auto-resolution) для working queues.

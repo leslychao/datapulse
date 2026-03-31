@@ -9,7 +9,7 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 ### ANA-01: P&L computation — happy path
 
 - **Назначение:** Расчёт P&L на уровне SKU/day/connection.
-- **Trigger:** Materialization после `FINANCE_SYNC_COMPLETED`.
+- **Trigger:** Materialization после `ETL_SYNC_COMPLETED` (FINANCE ∈ `completed_domains`).
 - **Main path:** `fact_finance` (CH) + `dim_product` + `cost_profile` (SCD2 COGS) → compute 13 P&L components: revenue_amount, marketplace_commission, acquiring_commission, logistics_cost, storage_cost, penalties, acceptance_cost, marketing_cost, other_marketplace_charges, advertising_cost (pro-rata allocation), refund_amount, compensation (+), COGS (SCD2) → net_profit. Примечание: `last_mile` — подкатегория `logistics_cost`, не отдельный P&L component. `promo_discount` не существует как P&L component (скидки уже отражены в `revenue_amount`).
 - **Dependencies:** Finance entries materialized. COGS available (`cost_profile`). `dim_product` linked.
 - **Failure risks:** Missing COGS → P&L incomplete (COGS=0, margin inflated). Missing finance entries → undercount.
@@ -18,7 +18,7 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 ### ANA-02: Advertising cost allocation
 
 - **Назначение:** Распределение рекламных затрат по SKU.
-- **Trigger:** Materialization после `AD_SYNC_COMPLETED`.
+- **Trigger:** Materialization после `ETL_SYNC_COMPLETED` (ADVERTISING ∈ `completed_domains`).
 - **Main path:** Direct attribution (ad_cost linked to specific SKU via campaign→product mapping) → allocate directly. Unattributed costs → pro-rata allocation по revenue share.
 - **Dependencies:** Advertising data synced. Campaign→product mapping. Revenue per SKU computed.
 - **Failure risks:** Missing campaign mapping → all costs go to pro-rata (less accurate). Ozon Performance API partial → undercount ad spend.
@@ -54,7 +54,7 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 ### ANA-06: Stale data detection
 
 - **Назначение:** Обнаружение устаревших аналитических данных.
-- **Trigger:** Scheduled checker (every 30 min).
+- **Trigger:** Scheduled checker (every 5 min).
 - **Main path:** Check mart freshness timestamps → if data older than threshold → create `alert_event` (`STALE_DATA`). If `blocks_automation = true` in `alert_rule` → pricing pipeline paused for connection.
 - **Dependencies:** Materialization timestamps. Alert rules. Automation blocker integration.
 - **Failure risks:** Stale due to CH outage → expected, already handled. Stale due to missed sync → need sync investigation.
@@ -63,7 +63,7 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 ### ANA-07: Spike detection
 
 - **Назначение:** Обнаружение внезапных скачков в ключевых метриках (revenue, returns, commission).
-- **Trigger:** Scheduled checker (daily).
+- **Trigger:** Event-driven, после каждой ClickHouse materialization (`ETL_SYNC_COMPLETED` event).
 - **Main path:** Compare current period vs rolling average → if deviation > threshold → `alert_event` (`METRIC_SPIKE`).
 - **Dependencies:** Historical data sufficient for baseline. Threshold configuration.
 - **Failure risks:** Legitimate spikes (sales event, holiday) → false positives.
@@ -81,7 +81,7 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 ### ANA-09: Inventory intelligence (days of cover, velocity)
 
 - **Назначение:** Расчёт операционных метрик по остаткам.
-- **Trigger:** Materialization после `STOCKS_SYNC_COMPLETED`.
+- **Trigger:** Materialization после `ETL_SYNC_COMPLETED` (STOCKS ∈ `completed_domains`).
 - **Main path:** `current_stock / avg_daily_sales` → days_of_cover. Sales trend → velocity. Store in mart.
 - **Dependencies:** Stock snapshots. Sales history (orders). Sufficient history for avg computation.
 - **Failure risks:** New SKU → insufficient history → velocity = NULL.
@@ -90,7 +90,7 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 ### ANA-10: Returns & penalties analysis
 
 - **Назначение:** Аналитика по возвратам и штрафам для понимания unit economics.
-- **Trigger:** Materialization после `FINANCE_SYNC_COMPLETED`.
+- **Trigger:** Materialization после `ETL_SYNC_COMPLETED` (FINANCE ∈ `completed_domains`).
 - **Main path:** Filter finance entries by type (RETURN, PENALTY) → aggregate by SKU, period → store in mart. Return rate = returns / sales.
 - **Dependencies:** Finance entries with correct `entry_type` classification.
 - **Failure risks:** Misclassified `entry_type` → incorrect return rate.
@@ -131,4 +131,22 @@ Analytics & P&L отвечает за вычисление unit economics и P&L
 - **Dependencies:** canonical_finance_entry fields: posting_id, order_id, seller_sku_id.
 - **Failure risks:** Новый тип операции МП с неожиданной комбинацией fields → неверная attribution. Mitigation: exhaustive enum, unrecognized → ACCOUNT + log.warn.
 - **Uniqueness:** Определяет, в какой mart попадает строка (mart_posting_pnl vs mart_product_pnl).
+
+### ANA-15: mart_product_pnl aggregation (posting → product roll-up)
+
+- **Назначение:** Roll-up P&L с уровня posting на уровень product × month.
+- **Trigger:** Materialization после обновления `mart_posting_pnl`.
+- **Main path:** `mart_posting_pnl` (POSTING attribution) → aggregate by product × month → add PRODUCT-level charges (fact_finance WHERE attribution_level = 'PRODUCT') → add ACCOUNT-level charges (pro-rata by revenue share) → add `advertising_cost` (из `fact_advertising`, SUM per product × month) → add `net_cogs` (из `fact_product_cost` × `fact_sales.quantity`, revenue-ratio netting) → store `mart_product_pnl`.
+- **Dependencies:** `mart_posting_pnl` computed. `fact_finance` (PRODUCT, ACCOUNT attribution). `fact_advertising` (Phase B extended). `fact_product_cost` + `fact_sales` (COGS).
+- **Failure risks:** ACCOUNT-level charges misattributed (revenue share denominator = 0 → equal distribution fallback). Missing `fact_advertising` → `advertising_cost = 0` (Phase B core). Missing COGS → `net_cogs = 0`, `cogs_status = NO_COST_PROFILE`.
+- **Uniqueness:** Multi-level aggregation — другой grain (product × month vs posting), другие dependencies (advertising + COGS + account charges), другой computation path. Posting-level P&L = marketplace P&L; product-level = full economic P&L.
+
+### ANA-16: Advertising ingestion first connection (Phase B extended activation)
+
+- **Назначение:** Первое подключение рекламных данных: переход от advertising_cost = 0 к реальным данным.
+- **Trigger:** Первый successful `ADVERTISING` sync → данные появляются в `fact_advertising`.
+- **Main path:** ETL advertising pipeline (ETL-18) → `fact_advertising` populated → full re-materialization `mart_product_pnl` ретроактивно (рекламные расходы добавляются за все прошлые периоды, покрытые `fact_advertising`) → UI предупреждение «Рекламные расходы не подключены» снимается для этого marketplace.
+- **Dependencies:** `fact_advertising` data available. Full re-materialization scheduled. Historical advertising data coverage.
+- **Failure risks:** Advertising data покрывает не весь исторический период → P&L accuracy improvement partial (old periods remain advertising_cost = 0). Re-materialization long → overlap с операционными queries.
+- **Uniqueness:** One-time activation event — другой trigger (first data arrival), другой scope (full re-materialization, не incremental), другой business outcome (P&L accuracy jump + UI indicator change).
 

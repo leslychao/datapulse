@@ -64,3 +64,21 @@
   - Missing COGS → P&L incomplete → user must import cost profiles.
   - No policy → no pricing decisions → user must configure.
 - **Почему обязательный:** User acquisition flow. Determines first impression and time-to-value.
+
+### E2E-OL-04: Multi-marketplace partial failure — lane isolation
+
+- **Business goal:** Сбой одного маркетплейса не влияет на работу другого.
+- **Участвующие модули:** Integration (lane isolation) → ETL (partial sync) → Audit & Alerting (selective alert) → Pricing (selective block) → Seller Ops (mixed freshness).
+- **Основной поток:**
+  1. **Integration:** WB connection → AUTH_FAILED (credentials expired). Ozon connection → ACTIVE.
+  2. **ETL:** WB syncs paused (no new data). Ozon syncs continue normally → `ETL_SYNC_COMPLETED` events for Ozon only.
+  3. **Audit & Alerting:** STALE_DATA alert for WB connection (blocks_automation = true). No alert for Ozon.
+  4. **Pricing:** Pricing run → check blocking alerts → WB connection blocked (stale data) → skip WB offers. Ozon offers → full pipeline → decisions + actions.
+  5. **Seller Ops:** Grid shows mixed state: WB offers with stale indicator + no recent decisions. Ozon offers with fresh data + active pricing.
+  6. **Resolution:** User updates WB credentials → AUTH_FAILED → ACTIVE → syncs resume → stale data alert AUTO_RESOLVED → WB pricing unblocked.
+- **Ключевые зависимости:** Per-connection alert scoping. Per-connection pricing block. Lane isolation in ETL.
+- **Failure paths:**
+  - Shared infrastructure failure (PostgreSQL, Vault) → both marketplaces affected (не lane-specific).
+  - WB stale data persists → WB offers never repriced → operator must investigate.
+  - Ozon rate limited simultaneously → both degraded but independently.
+- **Почему обязательный:** Validates lane isolation end-to-end. Real-world scenario: маркетплейсы ломаются независимо.

@@ -140,3 +140,12 @@ Integration управляет marketplace connections, credentials (Vault), pro
 - **Dependencies:** Vault available. New credentials valid. Caffeine cache eviction event.
 - **Failure risks:** New credentials also invalid → remain AUTH_FAILED. Rotation не прерывает текущие active syncs — они завершат работу с cached credentials.
 - **Uniqueness:** Recovery path с Vault versioning. Старая версия секрета не удаляется из Vault (audit trail).
+
+### INT-16: Connection re-enable (DISABLED → ACTIVE)
+
+- **Назначение:** Администратор восстанавливает отключённое подключение.
+- **Trigger:** `POST /api/connections/{id}/enable` (ADMIN/OWNER). Connection в статусе DISABLED.
+- **Main path:** DISABLED → async re-validation (credential check via provider API) → on success: ACTIVE → `marketplace_sync_state` records re-activated → scheduled syncs resume → first sync triggered. On failure: AUTH_FAILED (credentials expired during disable period).
+- **Dependencies:** Vault available (credentials still stored). Provider API reachable. User role: ADMIN/OWNER.
+- **Failure risks:** Credentials expired while connection was disabled → AUTH_FAILED → user must update credentials (INT-05) before re-enable. Sync schedules reset → first sync may trigger large data load if disabled for long period.
+- **Uniqueness:** Recovery path из DISABLED — другой source state (не AUTH_FAILED как в INT-05), другой trigger (admin explicit action, не credential update), другой business effect (schedules resume, potentially stale data catch-up).

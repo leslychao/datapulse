@@ -430,3 +430,533 @@ public record SimulationRequest(
 
 - Shared abstract test base classes — композиция через аннотации.
 - Hamcrest matchers — заменены AssertJ.
+
+---
+
+# Type Safety & Defensive Coding
+
+## 28. Generics & подавление предупреждений
+
+### `@SuppressWarnings("unchecked")` — запрещён по умолчанию
+
+Unchecked cast обходит проверку типов компилятором. Если тип неверен — `ClassCastException` в runtime вместо ошибки компиляции.
+
+**Правило:** если компилятор выдаёт unchecked warning — исправь код, а не подавляй предупреждение.
+
+```java
+// ❌
+Map<String, Object> map = (Map<String, Object>) objectMapper.readValue(json, Map.class);
+
+// ✅
+Map<String, Object> map = objectMapper.readValue(json, new TypeReference<>() {});
+```
+
+### Когда `@SuppressWarnings("unchecked")` допускается
+
+Три исключительных случая:
+
+1. **Инфраструктурный код**, где generic erasure делает типизацию невозможной (обёртки над сторонними библиотеками с raw types).
+2. **Varargs + generics** — `@SafeVarargs` на `final`/`private`/`static` методах.
+3. **Type-safe по конструкции** — контракт гарантирует соответствие типов (например, `Map<Class<T>, T>` — typesafe heterogeneous container).
+
+### Правила для исключений
+
+- **Минимальный scope** — на переменной или private-методе, **никогда** на классе.
+- **Обязательный комментарий** — почему это безопасно.
+- **Вынеси** unchecked cast в отдельный private helper, чтобы не «заражать» основной код.
+
+```java
+// ✅ Допустимое исключение
+@SuppressWarnings("unchecked") // safe: map is populated only via typed put(Class<T>, T)
+private <T> T getAdapter(Class<T> type) {
+    return (T) adapters.get(type);
+}
+```
+
+### Политика по типам предупреждений
+
+| Предупреждение | Политика |
+|----------------|----------|
+| `unchecked` | Запрещён, кроме трёх исключений выше |
+| `rawtypes` | Запрещён — всегда указывай type parameter |
+| `deprecation` | Запрещён — замени на актуальный API или создай задачу |
+| `unused` | Запрещён — удали неиспользуемый код |
+| `all` | **Категорически запрещён** |
+
+## 29. Избегание явных кастов
+
+### Принцип
+
+Явный каст `(TargetType) object` — сигнал, что система типов не работает на тебя. Стремись проектировать код так, чтобы касты не нужны.
+
+### Иерархия предпочтений
+
+1. **Generics** — тип задаётся один раз, дальше выводится автоматически
+2. **Pattern matching `instanceof`** — безопасный каст с проверкой (Java 17)
+3. **`Class.cast()`** — программный каст с понятным исключением
+4. **Явный каст `(Type)`** — крайний случай
+
+### Generics вместо Object + каст
+
+```java
+// ❌ Возвращает Object, caller кастит
+public Object getConfig(String key) { return configs.get(key); }
+String value = (String) configService.getConfig("timeout");
+
+// ✅ Generic метод — тип выводится автоматически
+public <T> T getConfig(String key, Class<T> type) {
+    return type.cast(configs.get(key));
+}
+String value = configService.getConfig("timeout", String.class);
+```
+
+### Generic-интерфейсы для Strategy / Handler
+
+```java
+// ❌ Базовый интерфейс без типа
+public interface Processor { Object process(Object input); }
+
+// ✅ Generic интерфейс — типы связаны
+public interface Processor<I, O> { O process(I input); }
+```
+
+### Typesafe heterogeneous container
+
+```java
+public class AdapterRegistry {
+    private final Map<Class<?>, Object> adapters = new HashMap<>();
+
+    public <T> void register(Class<T> type, T adapter) {
+        adapters.put(type, adapter);
+    }
+
+    public <T> T get(Class<T> type) {
+        return type.cast(adapters.get(type));
+    }
+}
+```
+
+### Pattern matching вместо каст-цепочек
+
+```java
+// ❌
+if (event instanceof OrderCreatedEvent) {
+    OrderCreatedEvent created = (OrderCreatedEvent) event;
+    processCreated(created);
+}
+
+// ✅ Pattern matching — проверка и привязка в одном шаге
+if (event instanceof OrderCreatedEvent created) {
+    processCreated(created);
+}
+```
+
+Если нужна проверка по нескольким подтипам — рассмотри полиморфный dispatch (метод в базовом типе) или sealed interface + switch expression.
+
+### Когда явный каст допустим
+
+- **Framework integration** — Spring / Jackson / JPA возвращают raw type без generic альтернативы.
+- **Внутри инфраструктурного кода** (один раз) с оборачиванием в type-safe public API.
+- **`Class.cast()`** внутри generic-методов.
+
+### Красный флаг
+
+Больше **2–3 явных кастов** в классе → пересмотреть дизайн типов. Где-то потерялась generic-параметризация или не хватает полиморфизма.
+
+## 30. Валидация — расширенная
+
+### Трёхуровневая модель
+
+| Уровень | Что проверяет | Как |
+|---------|---------------|-----|
+| Контроллер | Формат, структура, обязательные поля | `@Valid` + Jakarta Validation constraints на DTO |
+| Сервис | Бизнес-правила (уникальность, лимиты, права) | Programmatic checks, guard clauses, `ensure*` методы |
+| Домен | Инварианты сущностей | Проверки в конструкторах, factory-методах, `@PrePersist` |
+
+### Кастомные валидаторы
+
+- Naming: `@ValidDateRange`, `@UniqueWithinAccount`, `@SupportedCurrency`.
+- Реализация: `@Constraint(validatedBy = XxxValidator.class)` + `ConstraintValidator<A, T>`.
+- Cross-field validation: class-level constraint на DTO (validator получает весь объект).
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = DateRangeValidator.class)
+public @interface ValidDateRange {
+    String message() default "endDate must be after startDate";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+```
+
+### Запрещено
+
+- **Validation groups** — не используются. Вместо этого: разные DTO для create и update.
+- **Валидация бизнес-правил** в Jakarta-аннотациях — аннотации проверяют только формат.
+
+---
+
+# Design & Structure
+
+## 31. Структура пакетов
+
+### Подход: модуль → слои внутри
+
+```
+com.datapulse
+  └── <module>/                 — pricing, etl, execution, analytics, ...
+       ├── api/                 — контроллеры, request/response DTO
+       ├── domain/              — сервисы, бизнес-логика, доменные события
+       ├── persistence/         — репозитории, JPA-сущности, JDBC DAO, RowMapper-ы
+       ├── event/               — event listeners (если несколько) или в domain/
+       └── config/              — @Configuration, @ConfigurationProperties модуля
+```
+
+### Правила
+
+- **Package-private по умолчанию** для внутренних классов модуля. `public` — только то, что вызывается из других модулей.
+- **Cross-module зависимости** — только через public API: domain events, public-сервисы, shared DTO из `api/`.
+- **Circular dependencies** между модулями — **запрещены**. Если два модуля зависят друг от друга → вынести общее в shared-пакет или использовать events.
+- **Shared пакеты** (`com.datapulse.common`, `com.datapulse.security`) — только для cross-cutting concerns: base entity, security context, exception hierarchy, common DTO.
+- Один модуль = один bounded context. Не разносить логику одного модуля по нескольким top-level пакетам.
+
+## 32. DTO дизайн и naming
+
+### Naming convention
+
+| Тип | Паттерн | Пример |
+|-----|---------|--------|
+| Создание | `Create*Request` | `CreatePricingStrategyRequest` |
+| Обновление | `Update*Request` | `UpdatePricingStrategyRequest` |
+| Полный ответ | `*Response` | `PricingStrategyResponse` |
+| Лёгкий ответ (список) | `*SummaryResponse` | `PricingStrategySummaryResponse` |
+| Фильтр для списков | `*Filter` | `OrderFilter` |
+| Внутренний DTO (между слоями) | `*Dto` | `PriceCalculationDto` |
+
+### Правила
+
+- **Разные DTO для request и response** — никогда не переиспользовать одну и ту же модель.
+- **Разные DTO для create и update** — даже если поля пока совпадают. Они будут расходиться.
+- **List endpoint** возвращает `SummaryResponse` (лёгкие поля), **get by id** — полный `Response`.
+- **Вложенность**: один уровень вложенных records допускается (см. секцию 4). Глубже одного уровня — вынести в отдельный record.
+- **Filter-объекты**: record без аннотации, Spring bind из query string. Nullable поля для опциональных фильтров.
+
+```java
+public record OrderFilter(
+    Long accountId,
+    OrderStatus status,
+    LocalDate dateFrom,
+    LocalDate dateTo
+) {}
+```
+
+## 33. Асинхронная обработка
+
+### `@Async`
+
+- **Всегда с явным executor**: `@Async("notificationExecutor")`. Дефолтный `SimpleAsyncTaskExecutor` создаёт unbounded threads — **запрещён**.
+- **Конфигурация executor-ов** в `@Configuration`:
+
+```java
+@Bean("notificationExecutor")
+public TaskExecutor notificationExecutor() {
+    var executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(5);
+    executor.setQueueCapacity(100);
+    executor.setThreadNamePrefix("notification-");
+    executor.setRejectedExecutionHandler(new CallerRunsPolicy());
+    executor.initialize();
+    return executor;
+}
+```
+
+- **Thread name prefix** — обязателен, по имени модуля: `pricing-`, `etl-`, `notification-`.
+- **Возвращаемый тип**: `void` для fire-and-forget, `CompletableFuture<T>` когда caller ждёт результат.
+- **Error handling**: зарегистрировать `AsyncUncaughtExceptionHandler` — иначе ошибки в async-методах теряются молча.
+- **Вызов**: `@Async` метод вызывается только через Spring-прокси (из другого бина). Вызов `this.asyncMethod()` — прокси не сработает, метод выполнится синхронно.
+
+---
+
+# Infrastructure & Operations
+
+## 34. Миграции БД (Flyway)
+
+### Naming
+
+- Versioned: `V{NNN}__{snake_case_description}.sql` — `V001__create_accounts_table.sql`, `V002__add_tenant_id_to_orders.sql`.
+- Repeatable: `R__create_analytics_views.sql` — для views и functions, которые пересоздаются.
+- Нумерация — трёхзначная, с ведущими нулями.
+
+### Правила
+
+- **Одна миграция = один логический шаг** (создание таблицы, добавление колонки, создание индекса).
+- **Никогда не редактировать** уже применённые миграции. Откат — через новую forward migration.
+- **DDL и DML в разных миграциях** — не смешивать структурные изменения с данными.
+- **Seed data**: `R__` repeatable migration для справочников, или `@Profile("local")` data initializer для тестовых данных.
+- **Индексы**: создавать `CONCURRENTLY` где возможно, в отдельных миграциях.
+
+## 35. Retry & Resilience
+
+### WebClient (reactive)
+
+- **Reactor `Retry.backoff()`** — exponential backoff с jitter.
+- **Retryable exceptions** — whitelist: `WebClientResponseException` с 429, 500, 502, 503, 504.
+- **Не retryable**: 4xx (кроме 429), таймауты парсинга, ошибки валидации.
+
+```java
+.retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
+    .maxBackoff(Duration.ofSeconds(10))
+    .jitter(0.5)
+    .filter(ex -> isRetryable(ex)))
+```
+
+### Spring Retry (synchronous)
+
+- `@Retryable(retryFor = {TransientException.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))`.
+- `@Recover` — fallback-метод с теми же параметрами + exception первым аргументом.
+
+### Idempotency
+
+- Retry-safe = идемпотентный метод. Если операция не идемпотентна — использовать outbox pattern (см. модуль Execution).
+- Дедупликация: по `idempotencyKey` или `requestId` на уровне сервиса.
+
+### Circuit breaker
+
+- Resilience4j `@CircuitBreaker` — для marketplace API с нестабильным SLA.
+- Конфигурация через properties: `resilience4j.circuitbreaker.instances.<name>.*`.
+
+## 36. Кеширование
+
+### Инструмент
+
+- **Caffeine** (in-memory) — дефолт для single-instance данных (справочники, конфигурация, rate limits).
+- **Redis** — только когда нужен shared cache между instances или persistence.
+
+### Аннотации
+
+- `@Cacheable("cacheName")` — на read-методах.
+- `@CacheEvict("cacheName")` — на write-методах, которые инвалидируют кеш.
+- `@CacheEvict(allEntries = true)` — при bulk update.
+
+### Правила
+
+- **Cache names** — через константы: `public static final String CACHE_ACCOUNTS = "accounts"`.
+- **Tenant в ключе** — обязателен для multi-tenant данных: `@Cacheable(value = "products", key = "#accountId + ':' + #productId")`.
+- **TTL** — через properties (`spring.cache.caffeine.spec=maximumSize=1000,expireAfterWrite=5m`), не хардкод.
+- **Не кешировать**: мутабельные объекты, результаты с side effects, данные без tenant isolation.
+
+## 37. Конфигурация (`application.yml`)
+
+### Структура
+
+- **App properties** группируются по модулю: `datapulse.pricing.*`, `datapulse.etl.*`, `datapulse.integration.*`.
+- **Naming**: kebab-case для ключей — `datapulse.etl.batch-size`, не `datapulse.etl.batchSize`.
+- **Spring properties** — стандартные ключи без кастомного prefix.
+
+### Секреты
+
+- Через environment variables: `${DB_PASSWORD}`, `${WB_API_TOKEN}`.
+- **Никогда** не хранить секреты в yml, даже закомментированные.
+- `.env` файл для локальной разработки — в `.gitignore`.
+
+### Профили
+
+- `application.yml` — общая конфигурация (дефолты, структура).
+- `application-local.yml` — overrides для локальной разработки (debug logging, stub endpoints).
+- Больше профильных файлов **не создавать** без явной необходимости.
+
+## 38. Scheduling
+
+- **`@Scheduled`** — в dedicated `@Component` классах, не в бизнес-сервисах.
+- **Cron через properties**: `@Scheduled(cron = "${datapulse.etl.sync-cron}")`.
+- **Distributed lock**: `ShedLock` (`@SchedulerLock`) — обязателен для кластера. Без него job запустится на каждом instance.
+- **Error handling**: try-catch внутри scheduled метода — job не должен падать и останавливать scheduler.
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class EtlSyncScheduler {
+    private final EtlSyncService syncService;
+
+    @Scheduled(cron = "${datapulse.etl.sync-cron}")
+    @SchedulerLock(name = "etlSync", lockAtMostFor = "PT30M")
+    public void syncMarketplaceData() {
+        try {
+            syncService.runFullSync();
+        } catch (Exception e) {
+            log.error("ETL sync failed", e);
+        }
+    }
+}
+```
+
+---
+
+# Code Quality & Formatting
+
+## 39. Размеры и ограничения
+
+| Элемент | Рекомендация | Жёсткий лимит |
+|---------|-------------|---------------|
+| Метод | ≤ 30 строк | 50 строк |
+| Класс | ≤ 300 строк | 500 строк |
+| Параметры метода | ≤ 4 | 6 (если больше — вынести в объект) |
+| Вложенность (if/for/try) | ≤ 2 уровня | 3 уровня |
+| Цикломатическая сложность метода | ≤ 7 | 10 |
+
+При превышении рекомендации — рефакторинг: extract method, extract class, introduce parameter object.
+
+## 40. Порядок импортов
+
+```
+java.*
+javax.* / jakarta.*
+                                — пустая строка
+org.springframework.*
+                                — пустая строка
+com.datapulse.*
+                                — пустая строка
+[другие сторонние библиотеки]
+                                — пустая строка
+static imports
+```
+
+- **Wildcard imports (`*`)** — **запрещены**. Всегда явные импорты.
+- **Unused imports** — удалять. IDE авто-оптимизация включена.
+- **Static imports** — допускаются для: `assertThat`, `Mockito.*`, `BigDecimal.ZERO`, `HttpStatus.*`, `MediaType.*`.
+
+## 41. String formatting
+
+| Контекст | Способ |
+|----------|--------|
+| Логирование | SLF4J placeholders `{}`: `log.info("Started: orderId={}", id)` |
+| SQL, JSON шаблоны | Text blocks `"""..."""` |
+| Динамические бизнес-строки | `String.formatted(...)` или `"prefix" + value` для 2–3 частей |
+| Циклическая конкатенация | `StringBuilder` |
+| i18n сообщения | `MessageFormat.format(pattern, args)` через `MessageCodes` |
+
+- **`String.format()`** — не использовать, предпочитать `"...".formatted(...)` (тот же результат, но читаемее).
+- **`+` в цикле** — запрещён (создаёт O(n²) объектов).
+
+## 42. Тестирование — расширенное
+
+### Test data builders
+
+Для читаемых тестов — builder-паттерн с дефолтами:
+
+```java
+public class TestOrderBuilder {
+    private long accountId = 1L;
+    private BigDecimal total = BigDecimal.TEN;
+    private OrderStatus status = OrderStatus.NEW;
+
+    public static TestOrderBuilder anOrder() { return new TestOrderBuilder(); }
+    public TestOrderBuilder withTotal(BigDecimal total) { this.total = total; return this; }
+    public TestOrderBuilder withStatus(OrderStatus status) { this.status = status; return this; }
+    public Order build() { return new Order(accountId, total, status); }
+}
+```
+
+### Naming тестов
+
+- `should_<expectedBehavior>_when_<condition>`: `should_returnNotFound_when_orderDoesNotExist`.
+- Или `@DisplayName` с читаемым описанием на английском.
+- **Не** `testCreateOrder`, `test1`, `happyPath`.
+
+### Slice-тесты
+
+| Аннотация | Когда |
+|-----------|-------|
+| `@WebMvcTest(Controller.class)` | Тестирование контроллеров изолированно (security, validation, serialization) |
+| `@DataJpaTest` | Тестирование JPA-репозиториев с in-memory или Testcontainers |
+| `@SpringBootTest` | Full integration, E2E сценарии |
+
+Предпочитай slice-тесты — быстрее и изолированнее, чем `@SpringBootTest`.
+
+### WebClient / внешние API
+
+- **WireMock** или **MockWebServer** (OkHttp) — для тестирования WebClient-вызовов.
+- Стабовать реальные marketplace API — **обязательно**. Тесты не должны ходить в интернет.
+
+### Test fixtures
+
+- JSON-файлы для тестов: `src/test/resources/fixtures/<module>/`.
+- Загрузка: `@Value("classpath:fixtures/etl/wb-orders-response.json") Resource fixture` или `TestResourceUtils`.
+
+### Testcontainers
+
+- `withReuse(true)` для ускорения локальных прогонов.
+- Конфигурация в `@TestConfiguration` внутри тестового класса, через `@DynamicPropertySource`.
+
+## 43. DRY — устранение дублирования логики
+
+### Принцип
+
+Одна и та же логика не должна существовать в двух местах. Дублирование — это бомба замедленного действия: рано или поздно одну копию обновят, а вторую забудут.
+
+### Правило трёх
+
+- **Первый раз** — пишешь как есть.
+- **Второй раз** — допустимо, если контексты сильно различаются. Поставь себе мысленную заметку.
+- **Третий раз** — обязательный рефакторинг: вынеси в общую абстракцию.
+
+### Куда выносить
+
+| Дублирование внутри | Куда выносить |
+|---------------------|---------------|
+| Одного класса | `private` метод |
+| Одного пакета/модуля | Package-private helper или shared сервис внутри модуля |
+| Нескольких модулей | Класс в `com.datapulse.common` или shared интерфейс с default-методом |
+| Strategy/handler реализаций | Базовый абстрактный класс с template method, или `default` метод в интерфейсе |
+| SQL-запросов | Общие фрагменты в `private static final String`, SQL composition через `String.formatted(...)` |
+
+### Красные флаги
+
+- **Одинаковые блоки маппинга** в нескольких сервисах → вынести в MapStruct mapper или shared метод.
+- **Повторяющиеся guard clauses** (`if (account == null) throw ...`) → вынести в `ensure*` метод в сервисе или shared helper.
+- **Copy-paste SQL** с минимальными различиями → параметризовать через `String.formatted(...)` или вынести общие CTE/подзапросы.
+- **Одинаковая retry/error handling обёртка** → вынести в utility-метод или decorator.
+- **Повторяющаяся конфигурация WebClient** → централизовать в `@Configuration` (см. секцию 25).
+
+### Когда дублирование допустимо
+
+- **Тесты** — допускается повторение setup-кода для читаемости. Каждый тест должен быть самодостаточным. Test data builders (секция 42) — предпочтительный способ снизить повторение без потери читаемости.
+- **Разные bounded contexts** — если два модуля делают похожую, но не идентичную вещь, и их логика будет расходиться. Преждевременная абстракция хуже дублирования.
+- **Простые однострочники** — `Objects.requireNonNull`, `StringUtils.isBlank` проверки. Выносить их в обёртку — overengineering.
+
+## 44. Чистота файла в IDE (IntelliJ IDEA)
+
+### Принцип
+
+Каждый файл в проекте должен быть **«зелёным»** в IntelliJ IDEA — без жёлтых, серых и красных подсветок в scrollbar. Предупреждения IDE — это бесплатный code review, игнорировать их нельзя.
+
+### Что должно быть устранено
+
+| Подсветка IDEA | Что делать |
+|----------------|------------|
+| Unused import | Удалить (`Ctrl+Alt+O`) |
+| Unused variable / parameter | Удалить или использовать. Если параметр обязателен по контракту (interface) — допустимо |
+| Unused private method | Удалить |
+| Deprecation (зачёркнутый текст) | Заменить на актуальный API |
+| Can be replaced with... / Redundant... | Применить suggestion IDE — она обычно права |
+| Typo in name | Исправить имя или добавить в словарь проекта (`.idea/dictionaries/`) |
+| Raw type usage | Добавить type parameter (см. секцию 28) |
+| Unchecked cast | Устранить каст (см. секции 28–29) |
+| Nullable dereference | Добавить guard clause (см. секцию 13) |
+| String concatenation in loop | Заменить на `StringBuilder` (см. секцию 41) |
+
+### Перед коммитом — обязательный чеклист
+
+1. `Ctrl+Alt+L` — reformat code (или настроенный project code style)
+2. `Ctrl+Alt+O` — optimize imports
+3. Scrollbar файла — **без жёлтых и красных полос**
+4. `F2` — проверить, что нет warnings (IDEA перепрыгивает на следующий)
+
+### Допустимые исключения
+
+- **Подавление через `@SuppressWarnings`** — только по правилам секции 28 (три исключения + обязательный комментарий).
+- **`//noinspection`** — **запрещён**. Если IDEA показывает ложное срабатывание — исправить код или создать issue.
+- **Generated code** (MapStruct, Lombok) — warnings в сгенерированном коде не считаются.

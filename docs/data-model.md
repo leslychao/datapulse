@@ -132,6 +132,7 @@ outbox_event:
 | `PRICING_RUN_EXECUTE` | Pricing | `datapulse-pricing-worker` | `pricing.run` / `pricing.run` | Запуск pricing run batch |
 | `PRICE_ACTION_EXECUTE` | Execution | `datapulse-executor-worker` | `price.execution` / `price.execution` | Исполнение price action |
 | `PRICE_ACTION_RETRY` | Execution | `datapulse-executor-worker` | `price.execution` / `price.execution` (delayed) | Retry price action |
+| `RECONCILIATION_CHECK` | Execution | `datapulse-executor-worker` | `price.reconciliation` / `price.reconciliation` (delayed via DLX) | Deferred reconciliation check |
 | `PROMO_ACTION_EXECUTE` | Promotions | `datapulse-executor-worker` | `promo.execution` / `promo.execution` | Исполнение promo action |
 | `PROMO_EVALUATION_EXECUTE` | Promotions | `datapulse-pricing-worker` | `promo.evaluation` / `promo.evaluation` | Запуск promo evaluation batch |
 
@@ -144,7 +145,7 @@ outbox_event:
 | `datapulse-api` | — (не является outbox publisher) |
 | `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_COMPLETED` |
 | `datapulse-pricing-worker` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE` |
-| `datapulse-executor-worker` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `PROMO_ACTION_EXECUTE` |
+| `datapulse-executor-worker` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK`, `PROMO_ACTION_EXECUTE` |
 
 Poller: `SELECT ... FROM outbox_event WHERE status = 'PENDING' AND event_type IN (...) ORDER BY created_at LIMIT :batch FOR UPDATE SKIP LOCKED`. After publish → UPDATE status = 'PUBLISHED'. On failure → UPDATE status = 'FAILED', increment retry_count, set next_retry_at.
 

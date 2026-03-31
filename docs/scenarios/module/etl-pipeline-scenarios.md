@@ -167,3 +167,21 @@ ETL Pipeline отвечает за движение данных от марке
 - **Dependencies:** ClickHouse available. Campaign → product mapping для allocation.
 - **Failure risks:** ClickHouse down → advertising data lost until next re-materialization. No canonical fallback.
 - **Uniqueness:** Единственное исключение из pipeline invariant (Raw → Normalized → Canonical → Analytics). Обоснование: advertising data используется только для аналитики (P&L allocation, pricing signal `ad_cost_ratio`), ни один decision flow не читает advertising state из PostgreSQL.
+
+### ETL-19: Concurrent sync guard (duplicate job prevention)
+
+- **Назначение:** Предотвращение одновременного запуска двух sync jobs для одного connection/domain.
+- **Trigger:** Scheduled sync + manual trigger одновременно. Или scheduler fired twice (pod restart, clock drift).
+- **Main path:** Первый job → `marketplace_sync_state.status` = `SYNCING` (CAS: `IDLE → SYNCING`). Второй job → CAS fails (`status ≠ IDLE`) → job rejected → `log.debug("sync already in progress")` → no-op.
+- **Dependencies:** `marketplace_sync_state.status` field. CAS guard на transition `IDLE → SYNCING`.
+- **Failure risks:** Worker crash mid-sync → status stuck in `SYNCING` → ETL-17 (stale job detection) переводит в STALE → status reset → next sync proceeds. Race window: два jobs стартуют точно одновременно → CAS single winner.
+- **Uniqueness:** Concurrency guard — другой failure path (reject, не error). Защита от duplicate work, не от data corruption (canonical UPSERT IS DISTINCT FROM всё равно idempotent, но duplicate work = wasted API calls + rate limit consumption).
+
+### ETL-20: S3 unavailability mid-sync
+
+- **Назначение:** Обработка недоступности MinIO (S3) во время sync.
+- **Trigger:** S3 putObject fails (connection error, timeout, disk full).
+- **Main path:** API response получен → temp file written → S3 putObject fails → `job_item` не создаётся → page lost. Sync continues с следующей page (partial failure). Job завершается как `COMPLETED_WITH_ERRORS`. Error count tracked. При persistent S3 failure (все pages fail) → job `FAILED`.
+- **Dependencies:** S3 health check. Temp file on disk (buffer). Error threshold configuration.
+- **Failure risks:** S3 down prolonged → все syncs fail → data staleness → stale_data alert → automation blocked. Temp files accumulate on disk → disk pressure (R-CAP-07). Recovery: S3 восстановлен → next scheduled sync succeeds → full data restored via idempotent UPSERT.
+- **Uniqueness:** Infrastructure failure в первом слое pipeline (Raw). Отличается от ETL-10 (CH down на последнем слое): S3 down → canonical write тоже не произойдёт (pipeline sequential: raw → normalized → canonical).

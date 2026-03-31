@@ -66,8 +66,8 @@ Uncertain provider outcomes → `RECONCILIATION_PENDING`, не `SUCCEEDED`.
 ```
 Action approved → INSERT outbox_event (PENDING) → Outbox poller (1s)
  → claims batch (SELECT ... FOR UPDATE SKIP LOCKED)
- → publishes to RabbitMQ → marks SENT
- → on failure: marks ERROR, retry on next poll
+ → publishes to RabbitMQ → marks PUBLISHED
+ → on failure: marks FAILED, retry on next poll
 ```
 
 ### Outbox table
@@ -78,12 +78,12 @@ Action approved → INSERT outbox_event (PENDING) → Outbox poller (1s)
 
 ```
 Exchanges (direct):
-  action.execution       ← основная диспетчеризация
-  action.execution.wait  ← delayed retry (DLX target)
+  price.execution       ← основная диспетчеризация
+  price.execution.wait  ← delayed retry (DLX target)
 
 Queues:
-  action.execution       ← executor worker
-  action.execution.wait  ← TTL expiration → DLX → action.execution
+  price.execution       ← executor worker
+  price.execution.wait  ← TTL expiration → DLX → price.execution
 ```
 
 Consumer config: `AcknowledgeMode.AUTO`, `prefetchCount=1`, `defaultRequeueRejected=false`.
@@ -93,7 +93,7 @@ Consumer config: `AcknowledgeMode.AUTO`, `prefetchCount=1`, `defaultRequeueRejec
 `defaultRequeueRejected=false`. При unhandled exception в consumer:
 
 1. Message consumed (ACK), не requeue'd.
-2. `outbox_event.status` → ERROR, `last_error` записан.
+2. `outbox_event.status` → FAILED, `last_error` записан.
 3. `log.error` с `correlation_id`.
 4. Alert: «poison pill detected».
 
@@ -215,7 +215,7 @@ CAS: EXECUTING → RECONCILIATION_PENDING
     payload_json: { action_id, marketplace_offer_id, expected_price, attempt: 1 },
     ttl_millis: 30000
   }
-→ outbox poller → RabbitMQ (action.reconciliation.wait, DLX after TTL)
+→ outbox poller → RabbitMQ (price.reconciliation.wait, DLX after TTL)
 → reconciliation consumer:
     1. Read current price from marketplace (GET prices endpoint)
     2. Save evidence: UPDATE price_action_attempt SET
@@ -265,12 +265,12 @@ WHERE status IN ('EXECUTING', 'RETRY_SCHEDULED', 'RECONCILIATION_PENDING', 'SCHE
 
 ```
 Exchanges (direct):
-  action.reconciliation       ← reconciliation dispatch
-  action.reconciliation.wait  ← delayed reconciliation (DLX)
+  price.reconciliation       ← reconciliation dispatch
+  price.reconciliation.wait  ← delayed reconciliation (DLX)
 
 Queues:
-  action.reconciliation       ← reconciliation consumer
-  action.reconciliation.wait  ← TTL → DLX → action.reconciliation
+  price.reconciliation       ← reconciliation consumer
+  price.reconciliation.wait  ← TTL → DLX → price.reconciliation
 ```
 
 ## CAS (Compare-And-Swap) guards

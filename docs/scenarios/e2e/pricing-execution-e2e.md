@@ -32,7 +32,7 @@
   1. **Pricing:** Decision → action (`execution_mode=SEMI_AUTO`, `status=PENDING_APPROVAL`).
   2. **Seller Ops:** Pricing Manager видит pending action в UI → reviews price, margin, explanation.
   3. **Execution:** User approves → `APPROVED` → `SCHEDULED` → `EXECUTING` → provider write → `SUCCEEDED`.
-  4. Или: User rejects → `REJECTED` (terminal). Explanation logged.
+  4. Или: User rejects → `CANCELLED` (terminal, `cancel_reason` обязателен). Explanation logged.
 - **Ключевые зависимости:** User available for approval. Approval timeout (72h default).
 - **Failure paths:**
   - No approval within timeout → `EXPIRED`.

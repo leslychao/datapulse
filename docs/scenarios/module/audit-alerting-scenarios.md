@@ -113,3 +113,23 @@ Audit & Alerting обеспечивает unified audit log, business-level aler
 - **Dependencies:** Recent price sync. Successful price actions. Threshold configuration. `alert_rule` с type = MISMATCH.
 - **Failure risks:** Marketplace processing delay → temporary false mismatch. External price change (manual marketplace UI) → genuine mismatch, not system error.
 - **Uniqueness:** Cross-domain comparison (decision truth vs marketplace truth). Closes feedback loop.
+
+### AUD-13: MISSING_SYNC checker
+
+- **Назначение:** Обнаружение пропущенных синхронизаций по расписанию.
+- **Trigger:** Scheduled job (every 15 min).
+- **Main path:** Для каждого active connection: query `job_execution` → `MAX(started_at)` per domain → compare с expected interval (`expected_interval_minutes × tolerance_factor`) → если превышен → find matching `alert_rule` (MISSING_SYNC) → create `alert_event` (OPEN). Auto-resolve: new completed `job_execution` появился → condition cleared → AUTO_RESOLVED.
+- **Dependencies:** `alert_rule` с type = MISSING_SYNC. `job_execution` history. Expected sync interval config: `{ "expected_interval_minutes": 60, "tolerance_factor": 2.0 }`.
+- **Failure risks:** Connection DISABLED → checker не алертит (expected). Young connection (только подключена) → первый sync ещё не завершён → false positive. Mitigation: grace period after connection creation.
+- **Uniqueness:** Absence detection — алертит на отсутствие события (sync не произошёл), не на наличие проблемы. Другая detection logic (expected vs actual timing).
+
+### AUD-14: Alert rule CRUD + default seeding
+
+- **Назначение:** Управление правилами алертинга и автоматическая seed-рассылка при создании workspace.
+- **Trigger:** Workspace creation (seeding). `POST /PUT /DELETE /api/alert-rules` (ADMIN/OWNER).
+- **Main path:**
+  - **Seeding:** При создании workspace → INSERT default `alert_rule` для каждого rule_type (STALE_DATA, MISSING_SYNC, RESIDUAL_ANOMALY, SPIKE_DETECTION, MISMATCH) с рекомендованными thresholds и default severity/blocks_automation.
+  - **CRUD:** Admin creates custom rule (e.g. STALE_DATA для конкретного connection с threshold = 12h). Update: изменить threshold, severity, blocks_automation. Delete/disable: `enabled = false` → checker skips rule. Audit: `alert.rule.create`, `alert.rule.update`.
+- **Dependencies:** Workspace creation event (для seeding). User role: ADMIN/OWNER. `alert_rule` table.
+- **Failure risks:** Default thresholds не подходят для specific business → alerts too noisy or too silent → user must tune. Disabling blocks_automation rule without understanding consequences → pricing runs on stale data.
+- **Uniqueness:** Configuration management — другой actor (admin), другой business outcome (rule config, не alert event). Seeding — one-time initialization flow.

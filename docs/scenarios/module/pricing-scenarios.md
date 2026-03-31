@@ -201,6 +201,35 @@ Pricing отвечает за принятие ценовых решений: 8-
 - **Failure risks:** Conditions met but underlying data quality poor → false confidence. Safety gate — necessary but not sufficient.
 - **Uniqueness:** Meta-check на policy transition, не на individual pricing decision.
 
+### PRC-22: Commission source cascading fallback
+
+- **Назначение:** Каскадный fallback для определения commission rate в стратегии TARGET_MARGIN.
+- **Trigger:** Signal assembly stage: commission_source = `AUTO_WITH_MANUAL_FALLBACK` (default).
+- **Main path:** Step 1: Historical per-SKU (`lookback_days`, ≥ `min_transactions`) → достаточно данных → use. Step 2: Недостаточно → historical per-category → use. Step 3: Недостаточно → `commission_manual_pct` из strategy_params → use. Step 4: Не задан → decision = SKIP, skip_reason = `no_commission_data`.
+- **Dependencies:** `fact_finance` (ClickHouse) для historical computation. `price_policy.strategy_params.commission_manual_pct`. `min_transactions` threshold.
+- **Failure risks:** New SKU + new category → cascade до manual → если manual не задан → SKIP для всех новых товаров. User confusion: «почему нет решений?» → explanation should clarify fallback chain.
+- **Uniqueness:** 4-step cascade — каждый шаг другой data source, другой fallback trigger. Финальный SKIP — неочевидный business outcome.
+
+### PRC-23: Policy assignment conflict resolution (specificity + priority)
+
+- **Назначение:** Разрешение конфликтов при нескольких policy assignments для одного offer.
+- **Trigger:** Eligibility stage: resolve effective policy для marketplace_offer.
+- **Main path:** Offer имеет category_id = 42 и marketplace_connection_id = 1. Policy A assigned на CONNECTION (scope_type = CONNECTION, специфичность 1). Policy B assigned на CATEGORY 42 (scope_type = CATEGORY, специфичность 2). → Policy B wins (более специфичная). При равной специфичности: policy.priority (выше = важнее). При равном priority: наименьший id (first created wins).
+- **Dependencies:** `price_policy_assignment` table. `marketplace_offer.category_id`. Resolution algorithm.
+- **Failure risks:** SKU-level assignment забыта при bulk assignment → SKU policy overrides category/connection policy. Unexpected behavior if user assigns conflicting policies.
+- **Uniqueness:** Multi-level resolution — другой algorithm (specificity + priority + id tiebreak), другой failure mode (policy shadowing).
+
+### PRC-24: Price no-change (target = current)
+
+- **Назначение:** Pipeline отработал, но вычисленная цена совпадает с текущей.
+- **Trigger:** Strategy evaluation: computed target_price = canonical_price_current.price (после rounding и constraints).
+- **Main path:** Full pipeline → strategy evaluates → constraint resolution → target_price = current_price → decision_type = SKIP, skip_reason = `no_change` → explanation generated → NO action created. Log debug.
+- **Dependencies:** canonical_price_current. Strategy computation. Rounding config.
+- **Failure risks:** Rounding creates false no-change (price differs by < rounding_step). Legitimate: если данные не изменились — решение не нужно.
+- **Uniqueness:** Другой business outcome (SKIP, не guard block и не eligibility failure). Предотвращает создание бессмысленных actions в FULL_AUTO.
+
+---
+
 ## Индекс сценариев
 
 | ID | Кратко |
@@ -226,6 +255,9 @@ Pricing отвечает за принятие ценовых решений: 8-
 | PRC-19 | Guard: margin floor |
 | PRC-20 | Impact preview (dry-run) |
 | PRC-21 | Safety gate для FULL_AUTO |
+| PRC-22 | Commission source cascade |
+| PRC-23 | Policy assignment conflicts |
+| PRC-24 | Price no-change (target = current) |
 
 ## Связанные документы
 
