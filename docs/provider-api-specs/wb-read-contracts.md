@@ -967,7 +967,7 @@ After June 2026 when `/api/v1/supplier/incomes` is disabled:
 }
 ```
 
-### Field Semantics — VERIFIED
+### Field Semantics — VERIFIED (confirmed 2026-03-31, production 225 offices)
 
 | Field | Type | Semantics | Confidence |
 |-------|------|-----------|------------|
@@ -975,6 +975,7 @@ After June 2026 when `/api/v1/supplier/incomes` is disabled:
 | `name` | string | Office name (e.g. "Коледино-2", "Коледино Плюс") | confirmed |
 | `address` | string | Physical address | confirmed |
 | `city` | string | City name | confirmed |
+| `federalDistrict` | string | Federal district name (e.g. "Сибирский федеральный округ") | confirmed |
 | `longitude` | number | GPS longitude | confirmed |
 | `latitude` | number | GPS latitude | confirmed |
 | `cargoType` | int | Cargo type (1=mgt, 2=sgt, 3=kgt) | confirmed |

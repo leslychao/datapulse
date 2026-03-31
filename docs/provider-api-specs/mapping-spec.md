@@ -125,24 +125,29 @@ attributes endpoint возвращает brand="BOROFONE" для product_id=1074
 `loyalty_discount` влияют на расчёт итоговой суммы к выплате. Их учёт будет добавлен
 при реализации finance ingestion handler.
 
-### DD-15: Ozon Acquiring Join Key — order_number, NOT posting_number (2026-03-30)
+### DD-15: Ozon Acquiring Join Key — DUAL FORMAT (updated 2026-03-31)
 
-**Решение:** Ozon `MarketplaceRedistributionOfAcquiringOperation` использует `order_number` формат
-(без суффикса `-1`), а не полный `posting_number`.
+**Решение:** Ozon `MarketplaceRedistributionOfAcquiringOperation` использует **ДВА формата** `posting_number`:
+- **2-part format** (order_number, без суффикса `-N`): e.g. `"93284743-0263"` — 57% acquiring ops
+- **3-part format** (полный posting_number, с суффиксом `-N`): e.g. `"39222582-0174-1"` — 43% acquiring ops
 
-**Обоснование:** Эмпирически верифицировано (2026-03-30):
-- Sale operation для posting "0151413710-0012-1" → `posting.posting_number` = "0151413710-0012-1"
-- Acquiring operation для того же заказа → `posting.posting_number` = "0151413710-0012" (без -1)
-- При фильтрации по posting_number="0151413710-0012-1" → возвращаются sale + brand + stars (3 ops), НО НЕ acquiring
-- При фильтрации по posting_number="0151413710-0012" → возвращается acquiring (-0.58 RUB)
+**Обоснование:** Эмпирически верифицировано (2026-03-31, 190 acquiring ops / Feb 2026):
+- 109/190 (57%) — 2-part format (order_number)
+- 81/190 (43%) — 3-part format (full posting_number)
+- Cross-reference с 182 sale ops:
+  - 81 exact posting_number match (3-part acquiring = exact match to sale)
+  - 78 order_number match (2-part acquiring → strip -N from sale posting → match)
+  - 31 no match (cross-month: acquiring in Feb для sales в Jan; расширение date range покроет)
 
-**Join strategy для per-order P&L:**
-- Sale/BrandCommission/StarsMembership: join по `posting_number` (полный формат, с суффиксом)
-- Acquiring: join по `order_number` = `posting_number` без последнего `-N` суффикса
-- Реализация: `posting_number.substring(0, posting_number.lastIndexOf('-'))` → order_number
+**Предыдущая версия DD-15 (2026-03-30)** утверждала, что acquiring ВСЕГДА использует order_number format.
+Это было верно для наблюдённого примера, но не для всей выборки.
 
-**Альтернатива:** Acquiring может аллоцироваться на posting через `items[].sku` + `order_date` fuzzy match,
-но order_number join надёжнее и проще.
+**Join strategy для per-order P&L (обновлённая):**
+1. Exact match: `acquiring.posting_number = sale.posting_number` (covers 3-part format)
+2. Order match: strip `-N` от `sale.posting_number` → compare с 2-part `acquiring.posting_number`
+3. Unmatched: cross-month operations → resolve при расширении date window
+
+**Реализация:** `if (acq.posting_number == sale.posting_number) → match; else strip(sale.posting_number) == acq.posting_number → match`
 
 ### DD-16: Ozon Storage Operations — no per-order attribution (2026-03-30)
 
@@ -588,30 +593,48 @@ Use `@JsonIgnoreProperties(ignoreUnknown = true)` + nullable types.
 | (implicit) | `currency` | C | RUB (verified from context) |
 | `operation_date` | `entryDate` | C | Parse as "yyyy-MM-dd HH:mm:ss" NOT ISO 8601 (DD-6) |
 
-### Ozon operation_type → FinanceEntryType — VERIFIED (2026-03-30, real data, 7590 ops / Jan 2025)
+### Ozon operation_type → FinanceEntryType — VERIFIED (updated 2026-03-31, cross-verified Jan 2025 + Feb 2026)
 
-| Ozon operation_type | `type` cat | → FinanceEntryType | → fact_finance measure | Confidence | Sign |
-|---------------------|------------|---------------------|------------------------|------------|------|
-| `OperationAgentDeliveredToCustomer` | orders | SALE_ACCRUAL | `revenue_amount` (accruals_for_sale) | C | amount > 0 |
-| `ClientReturnAgentOperation` | returns | RETURN_REVERSAL | `refund_amount` (accruals_for_sale < 0) | C | amount < 0 |
-| `OperationAgentStornoDeliveredToCustomer` | returns | STORNO_CORRECTION | `refund_amount` | C | amount > 0 |
-| `OperationItemReturn` | returns | RETURN_LOGISTICS | `logistics_cost_amount` | C | amount < 0 |
-| `MarketplaceRedistributionOfAcquiringOperation` | other | ACQUIRING | `acquiring_commission_amount` | C | amount < 0 |
-| `MarketplaceServiceBrandCommission` | services | BRAND_COMMISSION | `marketplace_commission_amount` | C | amount < 0 |
-| `MarketplaceServiceItemCrossdocking` | services | LOGISTICS | `logistics_cost_amount` | C | amount < 0 |
-| `OperationElectronicServiceStencil` | services | PACKAGING | `other_marketplace_charges_amount` | C | amount < 0 |
-| `OperationMarketplaceServiceStorage` | services | STORAGE | `storage_cost_amount` | C | amount < 0 |
-| `StarsMembership` | services | SUBSCRIPTION | `other_marketplace_charges_amount` | C | amount < 0 |
-| `MarketplaceSaleReviewsOperation` | services | REVIEWS_PURCHASE | `marketing_cost_amount` | C | amount < 0 |
-| `DisposalReasonFailedToPickupOnTime` | services | DISPOSAL | `penalties_amount` | C | amount < 0 |
-| `DisposalReasonDamagedPackaging` | services | DISPOSAL | `penalties_amount` | C | amount < 0 |
-| `AccrualInternalClaim` | compensation | COMPENSATION | `compensation_amount` | C | amount > 0 |
-| `AccrualWithoutDocs` | compensation | COMPENSATION | `compensation_amount` | C | amount > 0 |
-| `MarketplaceSellerCompensationOperation` | compensation | COMPENSATION | `compensation_amount` | C | amount > 0 |
-| `OperationReturnGoodsFBSofRMS` | returns | FBS_RETURN_LOGISTICS | `logistics_cost_amount` | C | amount < 0 |
+**Baseline:** Jan 2025 (7590 ops, 17 types). **Update:** Feb 2026 (589 ops, 13 types — 6 new, 4 not observed).
 
-**17 operation types verified from real data (Jan 2025, 7590 operations).**
+| Ozon operation_type | `type` cat | → FinanceEntryType | → fact_finance measure | Confidence | Sign | First seen |
+|---------------------|------------|---------------------|------------------------|------------|------|-----------|
+| `OperationAgentDeliveredToCustomer` | orders | SALE_ACCRUAL | `revenue_amount` (accruals_for_sale) | C | amount > 0 | Jan 2025 |
+| `ClientReturnAgentOperation` | returns | RETURN_REVERSAL | `refund_amount` (accruals_for_sale < 0) | C | amount < 0 | Jan 2025 |
+| `OperationAgentStornoDeliveredToCustomer` | returns | STORNO_CORRECTION | `refund_amount` | C | amount > 0 | Jan 2025 |
+| `OperationItemReturn` | returns | RETURN_LOGISTICS | `logistics_cost_amount` | C | amount < 0 | Jan 2025 |
+| `MarketplaceRedistributionOfAcquiringOperation` | other | ACQUIRING | `acquiring_commission_amount` | C | amount < 0 | Jan 2025 |
+| `MarketplaceServiceBrandCommission` | services | BRAND_COMMISSION | `marketplace_commission_amount` | C | amount < 0 | Jan 2025 |
+| `MarketplaceServiceItemCrossdocking` | services | LOGISTICS | `logistics_cost_amount` | C | amount < 0 | Jan 2025 |
+| `OperationElectronicServiceStencil` | services | PACKAGING | `other_marketplace_charges_amount` | C | amount < 0 | Jan 2025 |
+| `OperationMarketplaceServiceStorage` | services | STORAGE | `storage_cost_amount` | C | amount < 0 | Jan 2025 |
+| `StarsMembership` | services | SUBSCRIPTION | `other_marketplace_charges_amount` | C | amount < 0 | Jan 2025 |
+| `MarketplaceSaleReviewsOperation` | services | REVIEWS_PURCHASE | `marketing_cost_amount` | C | amount < 0 | Jan 2025 |
+| `DisposalReasonFailedToPickupOnTime` | services | DISPOSAL | `penalties_amount` | C | amount < 0 | Jan 2025 |
+| `DisposalReasonDamagedPackaging` | services | DISPOSAL | `penalties_amount` | C | amount < 0 | Jan 2025 |
+| `AccrualInternalClaim` | compensation | COMPENSATION | `compensation_amount` | C | amount > 0 | Jan 2025 |
+| `AccrualWithoutDocs` | compensation | COMPENSATION | `compensation_amount` | C | amount > 0 | Jan 2025 |
+| `MarketplaceSellerCompensationOperation` | compensation | COMPENSATION | `compensation_amount` | C | amount > 0 | Jan 2025 |
+| `OperationReturnGoodsFBSofRMS` | returns | FBS_RETURN_LOGISTICS | `logistics_cost_amount` | C | amount < 0 | Jan 2025 |
+| `OperationMarketplaceCostPerClick` | services | CPC_ADVERTISING | `marketing_cost_amount` | C | amount < 0 | **Feb 2026** |
+| `OperationPromotionWithCostPerOrder` | services | PROMO_CPC | `marketing_cost_amount` | C | amount < 0 | **Feb 2026** |
+| `DefectRateCancellation` | services | DEFECT_PENALTY | `penalties_amount` | C | amount < 0 | **Feb 2026** |
+| `OperationPointsForReviews` | services | REVIEWS_PURCHASE | `marketing_cost_amount` | C | amount < 0 | **Feb 2026** |
+| `DefectFineShipmentDelayRated` | services | SHIPMENT_DELAY_FINE | `penalties_amount` | C | amount < 0 | **Feb 2026** |
+| `DefectFineCancellation` | services | CANCELLATION_FINE | `penalties_amount` | C | amount < 0 | **Feb 2026** |
+
+**23 operation types verified from real data (Jan 2025 + Feb 2026).**
 Unmapped types MUST default to OTHER with logging.
+
+**New types detail (Feb 2026, empirical):**
+- `OperationMarketplaceCostPerClick` (23 ops, e.g. -3.1 RUB): CPC advertising charge. `posting_number` = campaign/ad ID (numeric), not posting format. `items=[]`, `services=[]`. Attribution: ACCOUNT (pro-rata allocation).
+- `OperationPromotionWithCostPerOrder` (7 ops, e.g. -49.9 RUB): Promotion cost-per-order. `posting_number` = promotion ID (numeric). `items=[]`, `services=[]`. Attribution: ACCOUNT.
+- `DefectRateCancellation` (4 ops, -150 RUB): Defect rate penalty. `posting_number` = posting format, `warehouse_id` populated. Attribution: POSTING.
+- `OperationPointsForReviews` (2 ops, -585.6 RUB): Points for reviews (replaces or supplements `MarketplaceSaleReviewsOperation`). Standalone (`posting_number=""`). Attribution: ACCOUNT.
+- `DefectFineShipmentDelayRated` (1 op, -50 RUB): Shipment delay fine. `posting_number` = posting format. Attribution: POSTING.
+- `DefectFineCancellation` (1 op, -150 RUB): Cancellation fine. `posting_number` = posting format. Attribution: POSTING.
+
+**Observation (Feb 2026):** `StarsMembership` absent from Feb 2026 data (was 1854/7590 = 24% of ops in Jan 2025). Possible program change by Ozon. Adapter MUST handle both presence and absence.
 
 **CRITICAL: One posting → multiple finance operations.** A single delivery (posting "87621408-0010-1")
 generates 3 separate operations: `OperationAgentDeliveredToCustomer` (sale + commission + services),
@@ -634,6 +657,19 @@ Per-posting P&L requires aggregating ALL operations by `posting_number`.
 | `MarketplaceRedistributionOfAcquiringOperation` | `acquiring_commission_amount` | 1648 | -2,864 | C |
 | `MarketplaceServiceBrandCommission` | `marketplace_commission_amount` | 1847 | -1,398 | C |
 | `MarketplaceServiceItemDisposalDetailed` | `penalties_amount` | 4 | -300 | C |
+
+**Additional operation-level services (Feb 2026, no services[] breakdown — charges at operation level):**
+
+| Operation type (as service) | → fact_finance measure | Count (Feb) | Total (Feb) | Confidence |
+|----------------------------|------------------------|-------------|-------------|------------|
+| `OperationMarketplaceCostPerClick` | `marketing_cost_amount` | 23 | -71.3 | C |
+| `OperationPromotionWithCostPerOrder` | `marketing_cost_amount` | 7 | -349.3 | C |
+| `DefectRateCancellation` | `penalties_amount` | 4 | -600 | C |
+| `OperationPointsForReviews` | `marketing_cost_amount` | 2 | -1171.2 | C |
+| `DefectFineShipmentDelayRated` | `penalties_amount` | 1 | -50 | C |
+| `DefectFineCancellation` | `penalties_amount` | 1 | -150 | C |
+
+Note: These 6 types have `items=[]` and `services=[]`. Charge amount is at `operation.amount` only.
 
 ### Ozon Finance Breakdown Fields (per sale operation)
 
@@ -690,6 +726,8 @@ Canonical DDL содержит per-measure columns (DD-8 composite row model). N
 | `additional_payment` | `compensation_amount` | positive (credit) | C-docs |
 | (return entries: retail_price_withdisc_rub) | `refund_amount` | negate (debit to seller) | C-docs |
 | `ppvz_for_pay` | `net_payout` | positive (credit) | C |
+| N/A — WB has no marketplace marketing service charges | `marketing_cost_amount` | defaults to 0 | N/A |
+| N/A — WB reportDetailByPeriod has no packaging/labeling/disposal as separate columns | `other_marketplace_charges_amount` | defaults to 0 | N/A |
 
 **Per-measure mapping (Ozon):**
 
@@ -699,6 +737,7 @@ Canonical DDL содержит per-measure columns (DD-8 composite row model). N
 | `sale_commission` | `marketplace_commission_amount` | as-is (negative for sale, positive for return refund) | C |
 | `services[].price` by service name | mapped per §Ozon services classification | as-is (negative) | C |
 | `amount` | `net_payout` | as-is (signed) | C |
+| N/A — Ozon has no acceptance fee concept | `acceptance_cost_amount` | defaults to 0 | N/A |
 
 ---
 
@@ -729,10 +768,10 @@ offer_id (catalog) = offer_id (prices/stocks/postings) = seller's SKU
 sku (stocks) ↔ sku (postings) ↔ items[].sku (finance) — Ozon system SKU
 posting_number links orders ↔ sales ↔ returns ↔ finance (sale/brand/stars operations)
 
-ACQUIRING JOIN (DD-15):
-  acquiring.posting_number = posting.order_number (without -N suffix)
-  Join: strip last "-N" from posting_number to get order_number
-  Example: posting "0151413710-0012-1" → acquiring "0151413710-0012"
+ACQUIRING JOIN (DD-15, updated 2026-03-31):
+  DUAL FORMAT: 57% use order_number (2-part), 43% use full posting_number (3-part)
+  Join: exact match first, then strip-suffix match
+  Example: sale "39222582-0174-1" → acquiring "39222582-0174-1" (exact) OR "93284743-0263" (2-part)
 
 STANDALONE OPS (storage, disposal, reviews, compensation):
   posting_number = "" → use operation_id as unique key
@@ -756,7 +795,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 | ORDERS | **READY** (sandbox) | READY | Both verified; WB: isCancel/cancelDate confirmed |
 | SALES | **READY** (sandbox) | READY (composite) | WB: forPay/finishedPrice/priceWithDisc verified; Ozon: resolved (DD-3) |
 | RETURNS | **READY** | READY | WB: unblocked — date-only format was root cause; Ozon: all fields verified |
-| FINANCES | **READY** (sandbox+docs) | READY | Both fully verified: WB sign convention confirmed (DD-7); Ozon: DD-4 |
+| FINANCES | **READY** (sandbox+docs) | READY | Both fully verified: WB sign convention (DD-7); Ozon: 23 op types (DD-4), dual acquiring format (DD-15) |
 
 ### Resolved Blockers
 
@@ -764,7 +803,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 2. ~~CanonicalReturn.returnAmount (Ozon)~~ — **CONFIRMED** via `product.price.price` in returns endpoint
 3. ~~CanonicalReturn.returnDate (Ozon)~~ — **CONFIRMED** as `logistic.return_date` (ISO 8601 UTC)
 4. ~~CanonicalFinanceEntry sign semantics (Ozon)~~ — **CONFIRMED** (DD-4): positive = credit, negative = debit
-5. ~~CanonicalFinanceEntry.entryType mapping (Ozon)~~ — **10 types mapped** from empirical data
+5. ~~CanonicalFinanceEntry.entryType mapping (Ozon)~~ — **23 types mapped** from empirical data (Jan 2025 + Feb 2026)
 6. ~~CanonicalPriceSnapshot.discountPrice (Ozon)~~ — **RESOLVED** (DD-1): `marketing_seller_price`
 7. ~~CanonicalStockSnapshot.reserved (Ozon)~~ — **CONFIRMED** present in v4 response
 
@@ -778,7 +817,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 6. ~~Ozon Brand~~ — **RESOLVED**: via `POST /v4/product/info/attributes` (attribute_id=85)
 7. **Ozon FBS** — NOT empirically tested (FBS endpoint returns 400 for FBO-only accounts)
 8. ~~WB revenue_amount~~ — **RESOLVED (DD-13)**: `retail_price_withdisc_rub`
-9. ~~Ozon acquiring join~~ — **RESOLVED (DD-15)**: acquiring uses `order_number` format, join possible
+9. ~~Ozon acquiring join~~ — **RESOLVED (DD-15, updated)**: acquiring uses DUAL format (57% order_number, 43% full posting_number), exact+strip match strategy
 10. ~~Ozon storage attribution~~ — **RESOLVED (DD-16)**: daily aggregate, pro-rata allocation
 11. ~~WB SPP~~ — **RESOLVED (DD-14)**: не отдельный компонент P&L, WB компенсирует из своих средств
 12. ~~P&L formula~~ — **RESOLVED**: обновлена до 13 компонентов (storage, acceptance добавлены)
@@ -884,3 +923,25 @@ Advertising read contracts documented in `promo-advertising-contracts.md` §2 (W
 
 > Ozon `marketplace_sku` mapping requires cross-referencing campaign product list.
 > Full field inventory pending empirical verification (see promo-advertising-contracts.md §4.3).
+
+---
+
+## Verification Log
+
+### 2026-03-31 — Comprehensive Verification Run
+
+**Scope:** All 9 planned verification checks across WB and Ozon APIs.
+
+| # | Check | Result | Key Finding |
+|---|-------|--------|-------------|
+| 1 | WB Stocks field names | **BLOCKED** | 204 No Content — account has no stock data. Cannot verify field names empirically. Proceed with assumed field names; verify at first real customer onboarding. |
+| 2 | WB Finance entry types + v5 fields | **BLOCKED** | 204 No Content for all periods (Q1 2025, Q4 2025, Q1 2026). Account has no finance data. WB sign convention confirmed via sandbox + official docs only. |
+| 3 | WB Offices structure | **CONFIRMED** | 225 offices (production). New field discovered: `federalDistrict` (string). Structure matches docs + new field. Informational, no DDL impact. |
+| 4 | Ozon Finance — new operation types | **6 NEW TYPES** | Feb 2026 (589 ops) vs Jan 2025 (7590 ops): 6 new types — `OperationMarketplaceCostPerClick`, `OperationPromotionWithCostPerOrder`, `DefectRateCancellation`, `OperationPointsForReviews`, `DefectFineShipmentDelayRated`, `DefectFineCancellation`. `StarsMembership` absent (was 24% of ops). Total: 23 mapped types. |
+| 5 | DD-15 Acquiring join | **PARTIALLY CONTRADICTED** | Acquiring uses DUAL format: 57% order_number (2-part), 43% full posting_number (3-part). Updated join strategy: exact match first, then strip-suffix match. |
+| 6 | Ozon SKU lookup chain | **CONFIRMED** | `items[].sku` → `catalog sources[].sku` → `product_id` → `offer_id` verified end-to-end. |
+| 7 | Ozon `updated_at` in catalog | **CORRECTED** | `updated_at` IS present in v3/product/info/list (was documented as absent). Readiness: CATALOG upgraded from PARTIAL to READY. |
+| 8 | Cross-document consistency | **5/6 PASS** | DDL ↔ P&L formula: PASS. ETL events ↔ materialization: PASS. UPSERT keys ↔ DDL: PASS. data_domain ↔ ETL mapping: PASS. data-model.md ↔ etl-pipeline.md: PASS. mapping-spec measures ↔ DDL: FAIL (3 provider-specific N/A gaps now documented). |
+| 9 | WB Orders/Sales amount fields | **BLOCKED** | Same account limitation. Confirmed via sandbox only. |
+
+**Documents updated:** mapping-spec.md, ozon-read-contracts.md, wb-read-contracts.md, etl-pipeline.md, analytics-pnl.md.

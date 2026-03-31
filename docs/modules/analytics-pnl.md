@@ -835,10 +835,17 @@ ORDER BY (connection_id, source_platform, entry_id)
 | `LABELING` | `other_marketplace_charges_amount` | Маркировка | PRODUCT |
 | `DISPOSAL` | `other_marketplace_charges_amount` | Утилизация | ACCOUNT |
 | `MARKETING` | `marketing_cost_amount` | Маркетинговые услуги МП (не реклама) | ACCOUNT |
+| `CPC_ADVERTISING` | `marketing_cost_amount` | CPC-реклама через маркетплейс (Ozon `OperationMarketplaceCostPerClick`) | ACCOUNT |
+| `PROMO_CPC` | `marketing_cost_amount` | Промо с cost-per-order (Ozon `OperationPromotionWithCostPerOrder`) | ACCOUNT |
+| `REVIEWS_PURCHASE` | `marketing_cost_amount` | Покупка отзывов/баллов за отзывы (Ozon) | ACCOUNT |
+| `DEFECT_PENALTY` | `penalties_amount` | Штраф за дефект (Ozon `DefectRateCancellation`) | POSTING |
+| `SHIPMENT_DELAY_FINE` | `penalties_amount` | Штраф за задержку отправки (Ozon `DefectFineShipmentDelayRated`) | POSTING |
+| `CANCELLATION_FINE` | `penalties_amount` | Штраф за отмену (Ozon `DefectFineCancellation`) | POSTING |
 | `COMPENSATION` | `compensation_amount` | Компенсации от МП | POSTING or ACCOUNT |
+| `SUBSCRIPTION` | `other_marketplace_charges_amount` | Подписка (Ozon `StarsMembership` — absent since Feb 2026) | POSTING |
 | `OTHER` | `other_marketplace_charges_amount` | Нераспознанные операции | ACCOUNT |
 
-**Exhaustive mapping:** normalizer обязан классифицировать каждую provider-операцию. Нераспознанные типы → `OTHER` + `log.warn`. Периодический review `OTHER` entries для расширения taxonomy.
+**Exhaustive mapping:** normalizer обязан классифицировать каждую provider-операцию. Нераспознанные типы → `OTHER` + `log.warn`. Периодический review `OTHER` entries для расширения taxonomy. **Ozon operation types evolve over time** — 6 new types appeared between Jan 2025 and Feb 2026.
 
 ### Acquiring multi-posting allocation
 
