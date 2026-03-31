@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 
 @RestController
@@ -99,5 +102,20 @@ public class ConnectionController {
     @GetMapping("/{connectionId}/sync-state")
     public List<SyncStateResponse> getSyncStates(@PathVariable("connectionId") Long connectionId) {
         return connectionService.getSyncStates(connectionId, workspaceContext.getWorkspaceId());
+    }
+
+    @PostMapping("/{connectionId}/sync")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    public void triggerSync(@PathVariable("connectionId") Long connectionId) {
+        connectionService.triggerSync(
+                connectionId, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    }
+
+    @GetMapping("/{connectionId}/call-log")
+    public Page<CallLogResponse> getCallLog(@PathVariable("connectionId") Long connectionId,
+                                            CallLogFilter filter, Pageable pageable) {
+        return connectionService.getCallLog(
+                connectionId, workspaceContext.getWorkspaceId(), filter, pageable);
     }
 }

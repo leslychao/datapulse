@@ -4,11 +4,20 @@ import { Subscription } from 'rxjs';
 
 import { environment } from '@env';
 import { AuthService } from '@core/auth/auth.service';
+import { ConnectionSyncStatus, SyncStatusStore } from '@shared/stores/sync-status.store';
+
+interface SyncStatusMessage {
+  connectionId: number;
+  connectionName: string;
+  lastSuccessAt: string | null;
+  status: 'OK' | 'STALE' | 'ERROR';
+}
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
   private readonly authService = inject(AuthService);
   private readonly zone = inject(NgZone);
+  private readonly syncStore = inject(SyncStatusStore);
   private rxStomp: RxStomp | null = null;
   private subscriptions: Subscription[] = [];
 
@@ -40,7 +49,6 @@ export class WebSocketService {
 
     this.rxStomp.connectionState$.subscribe((state) => {
       this.zone.run(() => {
-        // RxStompState: 0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED
         this.connected.set(state === 1);
         this.reconnecting.set(state === 0 || state === 3);
       });
@@ -72,17 +80,28 @@ export class WebSocketService {
   }
 
   subscribeToWorkspace(workspaceId: number): void {
-    this.subscribeTo(`/topic/workspace/${workspaceId}/alerts`, (msg) => {
-      // dispatch to notification store
+    this.subscribeTo(`/topic/workspace/${workspaceId}/alerts`, (_msg) => {
+      // TODO: dispatch to notification store
     });
-    this.subscribeTo(`/topic/workspace/${workspaceId}/sync-status`, (msg) => {
-      // dispatch to sync status store
+
+    this.subscribeTo<SyncStatusMessage>(
+      `/topic/workspace/${workspaceId}/sync-status`,
+      (msg) => {
+        this.syncStore.updateConnection(msg.connectionId, {
+          connectionName: msg.connectionName,
+          lastSuccessAt: msg.lastSuccessAt,
+          status: msg.status,
+        });
+        this.syncStore.setLastUpdated(new Date().toISOString());
+      },
+    );
+
+    this.subscribeTo(`/topic/workspace/${workspaceId}/actions`, (_msg) => {
+      // TODO: dispatch to relevant store
     });
-    this.subscribeTo(`/topic/workspace/${workspaceId}/actions`, (msg) => {
-      // dispatch to relevant store
-    });
-    this.subscribeTo(`/user/queue/notifications`, (msg) => {
-      // dispatch to notification store
+
+    this.subscribeTo(`/user/queue/notifications`, (_msg) => {
+      // TODO: dispatch to notification store
     });
   }
 

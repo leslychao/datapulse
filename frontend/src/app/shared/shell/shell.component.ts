@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { RouterOutlet, ActivatedRoute } from '@angular/router';
 
 import { TopBarComponent } from './top-bar/top-bar.component';
@@ -8,9 +8,11 @@ import { DetailPanelComponent } from './detail-panel/detail-panel.component';
 import { BottomPanelComponent } from './bottom-panel/bottom-panel.component';
 import { StatusBarComponent } from './status-bar/status-bar.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
+import { ToastContainerComponent } from './toast/toast-container.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ShortcutService } from '@shared/services/shortcut.service';
+import { WebSocketService } from '@core/websocket/websocket.service';
 
 @Component({
   selector: 'dp-shell',
@@ -24,6 +26,7 @@ import { ShortcutService } from '@shared/services/shortcut.service';
     BottomPanelComponent,
     StatusBarComponent,
     CommandPaletteComponent,
+    ToastContainerComponent,
   ],
   template: `
     <div class="grid h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
@@ -60,13 +63,15 @@ import { ShortcutService } from '@shared/services/shortcut.service';
     </div>
 
     <dp-command-palette />
+    <dp-toast-container />
   `,
 })
-export class ShellComponent implements OnInit {
+export class ShellComponent implements OnInit, OnDestroy {
   protected readonly detailPanel = inject(DetailPanelService);
   private readonly workspaceStore = inject(WorkspaceContextStore);
   private readonly route = inject(ActivatedRoute);
   private readonly shortcuts = inject(ShortcutService);
+  private readonly webSocket = inject(WebSocketService);
 
   constructor() {
     this.shortcuts.init();
@@ -77,7 +82,13 @@ export class ShellComponent implements OnInit {
       const wsId = Number(params['workspaceId']);
       if (!isNaN(wsId) && wsId > 0) {
         this.workspaceStore.setWorkspace(wsId, '');
+        this.webSocket.connect(wsId);
+        this.webSocket.subscribeToWorkspace(wsId);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.webSocket.disconnect();
   }
 }

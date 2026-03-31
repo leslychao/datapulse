@@ -1,5 +1,6 @@
 package io.datapulse.tenancy.persistence;
 
+import io.datapulse.tenancy.domain.MemberRole;
 import io.datapulse.tenancy.domain.MemberStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -16,5 +17,9 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     List<WorkspaceMemberEntity> findByUser_IdAndStatus(Long userId, MemberStatus status);
 
+    List<WorkspaceMemberEntity> findByWorkspace_IdAndStatus(Long workspaceId, MemberStatus status);
+
     boolean existsByWorkspace_IdAndUser_IdAndStatus(Long workspaceId, Long userId, MemberStatus status);
+
+    long countByWorkspace_IdAndRoleAndStatus(Long workspaceId, MemberRole role, MemberStatus status);
 }

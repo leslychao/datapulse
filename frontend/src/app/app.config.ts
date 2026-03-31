@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { OAuthModule } from 'angular-oauth2-oidc';
+import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
@@ -24,6 +25,13 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimations(),
+    provideAngularQuery(
+      new QueryClient({
+        defaultOptions: {
+          queries: { staleTime: 30_000, retry: 1 },
+        },
+      }),
+    ),
     {
       provide: APP_INITIALIZER,
       useFactory: initializeAuth,

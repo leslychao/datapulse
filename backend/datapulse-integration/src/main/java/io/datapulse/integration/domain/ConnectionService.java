@@ -2,6 +2,8 @@ package io.datapulse.integration.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.integration.api.CallLogFilter;
+import io.datapulse.integration.api.CallLogResponse;
 import io.datapulse.integration.api.ConnectionMapper;
 import io.datapulse.integration.api.ConnectionResponse;
 import io.datapulse.integration.api.ConnectionSummaryResponse;
@@ -14,12 +16,17 @@ import io.datapulse.integration.api.ValidateConnectionResponse;
 import io.datapulse.integration.domain.event.ConnectionCreatedEvent;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
 import io.datapulse.integration.domain.event.CredentialRotatedEvent;
+import io.datapulse.integration.domain.event.SyncTriggeredEvent;
+import io.datapulse.integration.persistence.IntegrationCallLogEntity;
+import io.datapulse.integration.persistence.IntegrationCallLogRepository;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,6 +47,7 @@ public class ConnectionService {
     private final MarketplaceConnectionRepository connectionRepository;
     private final SecretReferenceRepository secretReferenceRepository;
     private final MarketplaceSyncStateRepository syncStateRepository;
+    private final IntegrationCallLogRepository callLogRepository;
     private final CredentialStore credentialStore;
     private final ConnectionValidationService validationService;
     private final ConnectionMapper connectionMapper;
@@ -243,6 +251,45 @@ public class ConnectionService {
         List<MarketplaceSyncStateEntity> syncStates =
                 syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
         return connectionMapper.toSyncStates(syncStates);
+    }
+
+    @Transactional
+    public void triggerSync(Long connectionId, Long workspaceId, Long userId) {
+        MarketplaceConnectionEntity connection = findConnectionOrThrow(connectionId, workspaceId);
+
+        if (!ConnectionStatus.ACTIVE.name().equals(connection.getStatus())) {
+            throw BadRequestException.of("connection.sync.requires.active", connection.getStatus());
+        }
+
+        log.info("Manual sync triggered: connectionId={}, workspaceId={}, userId={}",
+                connectionId, workspaceId, userId);
+        eventPublisher.publishEvent(new SyncTriggeredEvent(connectionId, workspaceId, userId));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CallLogResponse> getCallLog(Long connectionId, Long workspaceId,
+                                            CallLogFilter filter, Pageable pageable) {
+        findConnectionOrThrow(connectionId, workspaceId);
+        Page<IntegrationCallLogEntity> page = callLogRepository.findByFilters(
+                connectionId, filter.from(), filter.to(),
+                filter.endpoint(), filter.httpStatus(), pageable);
+        return page.map(this::toCallLogResponse);
+    }
+
+    private CallLogResponse toCallLogResponse(IntegrationCallLogEntity entity) {
+        return new CallLogResponse(
+                entity.getId(),
+                entity.getEndpoint(),
+                entity.getHttpMethod(),
+                entity.getHttpStatus(),
+                entity.getDurationMs(),
+                entity.getRequestSizeBytes(),
+                entity.getResponseSizeBytes(),
+                entity.getCorrelationId(),
+                entity.getErrorDetails(),
+                entity.getRetryAttempt(),
+                entity.getCreatedAt()
+        );
     }
 
     private MarketplaceConnectionEntity findConnectionOrThrow(Long connectionId, Long workspaceId) {
