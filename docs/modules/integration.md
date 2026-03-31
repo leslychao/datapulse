@@ -283,7 +283,7 @@ Health-check (§Health-check выше) обнаруживает полные aut
 | Vault down при price/promo write | Action attempt fails → retry (стандартный retry path из Execution). `error_class: INFRASTRUCTURE` | Write adapters получают credentials из Vault перед каждым вызовом |
 | Prolonged Vault outage (> 30 мин) | Alert: `VAULT_UNAVAILABLE` (CRITICAL). Все syncs stalled. Price/promo writes failing. Manual investigation required | Критическая зависимость |
 
-**Кеширование credentials в памяти не допускается** — secret material не должен покидать Vault дольше, чем на время одного API-вызова. Исключение: Ozon Performance OAuth2 access token (не secret, а derived short-lived token) кешируется in-memory с TTL.
+**Кеширование credentials:** допускается in-memory per-worker кеш (Caffeine) с коротким TTL для обеспечения continuity при кратковременном Vault outage. Детали — см. §Credential caching ниже. Credential material не попадает в shared store (Redis) — только heap memory с ограниченным TTL. Исключение с отдельным TTL: Ozon Performance OAuth2 access token (derived short-lived token, не secret).
 
 **Мониторинг:** Prometheus metric `vault_request_errors_total`, alert rule при > 3 errors за 5 мин.
 

@@ -1,6 +1,6 @@
 # Модуль: Promotions
 
-**Фаза:** F — Promotions Management
+**Фаза:** D — Execution (promo evaluation + execution), E — Seller Operations (promo analytics in grid)
 **Зависимости:** [ETL Pipeline](etl-pipeline.md) (promo discovery), [Analytics & P&L](analytics-pnl.md) (margin signals), [Pricing](pricing.md) (promo guard coordination), [Integration](integration.md) (write-адаптеры)
 **Runtime:** datapulse-api (policy CRUD, manual decisions), datapulse-pricing-worker (evaluation pipeline)
 
@@ -169,6 +169,9 @@ promo_policy_assignment:
   scope_type                  ENUM (CONNECTION, CATEGORY, SKU)
   category_id                 BIGINT (nullable)
   marketplace_offer_id        BIGINT (nullable, FK → marketplace_offer)
+
+  UNIQUE (promo_policy_id, marketplace_connection_id, scope_type, COALESCE(category_id, 0), COALESCE(marketplace_offer_id, 0))
+  -- одна запись per policy × scope target; предотвращает дублирующие назначения
 ```
 
 Разрешение конфликтов: специфичность + приоритет (идентично pricing).
@@ -608,6 +611,8 @@ Ozon price write API принимает `min_price` — минимальная �
 Materialization: `PROMO_SYNC` → `dim_promo_campaign` + `fact_promo_product` (уже реализовано в ETL).
 
 ### dim_promo_campaign (ClickHouse DDL)
+
+Grain: одна строка per промо-кампания (connection_id × promo_campaign_id).
 
 | Column | Type | Source | Notes |
 |--------|------|--------|-------|

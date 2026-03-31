@@ -189,6 +189,9 @@ price_policy_assignment:
   scope_type                ENUM (CONNECTION, CATEGORY, SKU)
   category_id               BIGINT (nullable)
   marketplace_offer_id      BIGINT (nullable, FK → marketplace_offer)
+
+  UNIQUE (price_policy_id, marketplace_connection_id, scope_type, COALESCE(category_id, 0), COALESCE(marketplace_offer_id, 0))
+  -- одна запись per policy × scope target; предотвращает дублирующие назначения
 ```
 
 ## Manual price lock

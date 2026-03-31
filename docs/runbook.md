@@ -296,10 +296,10 @@ Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 
 ### Открытые пункты (TBD)
 
-- [ ] Dashboard-ы для обязательных метрик
-- [ ] Инфраструктурные алерты (Grafana Alerting)
-- [ ] Стратегия бэкапов и восстановления PostgreSQL (RPO/RTO)
-- [ ] SLA/SLO
+- [ ] Dashboard-ы для обязательных метрик (implementation-time, метрики определены в NFA и модулях)
+- [ ] Инфраструктурные алерты (Grafana Alerting) (implementation-time)
+- [x] Стратегия бэкапов и восстановления PostgreSQL (RPO/RTO) — описана в [non-functional-architecture.md](non-functional-architecture.md) §Disaster Recovery Plan (RPO=5 мин, RTO=30 мин, pg_basebackup + WAL archiving)
+- [ ] SLA/SLO — определяются после Phase B (см. [non-functional-architecture.md](non-functional-architecture.md))
 
 ## Advertising Failure Scenarios
 

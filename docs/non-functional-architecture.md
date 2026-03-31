@@ -23,19 +23,7 @@
 
 ### Матрица разрешений
 
-
-| Capability                              | viewer | analyst | operator | pricing manager | admin |
-| --------------------------------------- | ------ | ------- | -------- | --------------- | ----- |
-| Просмотр данных (P&L, остатки, заказы)  | ✓      | ✓       | ✓        | ✓               | ✓     |
-| Saved views (создание / редактирование) | —      | ✓       | ✓        | ✓               | ✓     |
-| Working queues (просмотр / assignment)  | —      | —       | ✓        | ✓               | ✓     |
-| Manual price lock / hold                | —      | —       | ✓        | ✓               | ✓     |
-| Pricing policy configuration            | —      | —       | —        | ✓               | ✓     |
-| Manual approval / reject price actions  | —      | —       | —        | ✓               | ✓     |
-| Enable auto-execution                   | —      | —       | —        | ✓               | ✓     |
-| Marketplace account management          | —      | —       | —        | —               | ✓     |
-| User / role management                  | —      | —       | —        | —               | ✓     |
-| Workspace configuration                 | —      | —       | —        | —               | ✓     |
+Полная матрица разрешений по ролям определена в [Tenancy & IAM](modules/tenancy-iam.md) §Матрица разрешений — единственный источник правды для RBAC capabilities.
 
 
 ### Управление секретами

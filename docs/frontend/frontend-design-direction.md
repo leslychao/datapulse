@@ -738,9 +738,9 @@ Marketplace-specific and domain terms stay in original language where standard:
 
 | Frontend capability | Required backend | Status |
 |---------------------|------------------|--------|
-| WebSocket real-time updates (grid rows, sync status, notifications) | Spring WebSocket/STOMP endpoints, topic structure, message formats per module | **TBD** — requires section in `non-functional-architecture.md` |
+| WebSocket real-time updates (grid rows, sync status, notifications) | Spring WebSocket/STOMP endpoints, topic structure, message formats per module | **Частично описано** — WebSocket/STOMP architecture, destinations и auth описаны в [Audit & Alerting](../modules/audit-alerting.md) §WebSocket. Per-module message formats — TBD |
 | Command Palette search (Ctrl+K) | Global search API spanning entities (offers, views, workspaces, policies) | **TBD** — requires cross-module search endpoint in `datapulse-api` |
-| Notification bell (unread count, list) | REST API for `user_notification` (list, mark read, count) | **TBD** — requires REST contracts in [Audit & Alerting](../modules/audit-alerting.md) |
+| Notification bell (unread count, list) | REST API for `user_notification` (list, mark read, count) | **Описано** — REST API определён в [Audit & Alerting](../modules/audit-alerting.md) §REST API → Notifications |
 | KPI summary strip (top of grid) | Aggregated metrics endpoint (total offers, avg margin, pending actions count) | **TBD** — lightweight aggregate query, может быть частью grid response или отдельный endpoint |
 
 Эти зависимости не блокируют проектирование frontend, но должны быть специфицированы до начала реализации.

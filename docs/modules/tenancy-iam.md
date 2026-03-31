@@ -158,6 +158,8 @@ Enum в `workspace_member.role`:
 | User / role management | — | — | — | — | ✓ |
 | Workspace configuration | — | — | — | — | ✓ |
 
+> **OWNER** не выделен в отдельную колонку: OWNER наследует все permissions роли ADMIN и дополнительно обладает ownership-specific capabilities (ownership transfer, delete workspace). См. §Ownership transfer ниже.
+
 ### Ownership transfer
 
 - OWNER не может быть удалён из workspace, пока не назначен другой OWNER.

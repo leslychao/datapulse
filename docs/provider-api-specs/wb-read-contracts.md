@@ -696,6 +696,38 @@ Returns empty string for accounts without finance data (confirmed).
 | `supplier_oper_name` | Operation name: "Продажа", "Логистика", "Возврат" etc. | confirmed-docs+sandbox |
 | `bonus_type_name` | Penalty/bonus description when applicable | confirmed-docs |
 
+**doc_type_name known values** (official WB docs, 2026-03-30):
+- `"Продажа"` — sale (credit to seller)
+- `"Возврат"` — return (debit from seller)
+- (empty) — for logistics, storage, deductions, penalties
+
+**supplier_oper_name full list** (official WB docs seller.wildberries.ru, updated 2026-03-30):
+
+| supplier_oper_name | Semantics | Confidence |
+|---|---|---|
+| Продажа | Buyer purchased item | confirmed-docs |
+| Возврат | Buyer returned purchased item | confirmed-docs |
+| Логистика | Delivery (warehouse→PVZ, PVZ→warehouse, warehouse→seller) | confirmed-docs |
+| Хранение | Weekly storage fee at WB warehouses | confirmed-docs |
+| Обработка товара | Supply acceptance processing at warehouses | confirmed-docs |
+| Штраф | Penalty/fine (details in `bonus_type_name`) | confirmed-docs |
+| Удержания | Deductions: tariff constructor fees, Jam subscription, WB Promotion, other services | confirmed-docs |
+| Компенсация ущерба | Compensation for lost/substituted items (not seller's fault) | confirmed-docs |
+| Добровольная компенсация при возврате | Compensation for damaged items (with defect or incomplete set) | confirmed-docs |
+| Коррекция продаж | Correction of previously accrued sale amounts | confirmed-docs |
+| Коррекция логистики | Correction of previously accrued logistics amounts | confirmed-docs |
+| Коррекция эквайринга | Correction of previously accrued acquiring amounts | confirmed-docs |
+| Возмещение издержек по перевозке/по складским операциям с товаром | Reimbursement of third-party transport/warehouse costs | confirmed-docs |
+| Возмещение за выдачу и возврат товаров на ПВЗ | PVZ issuance/return service costs | confirmed-docs |
+| Услуга платной доставки | Paid delivery service for DBS/EDBS models | confirmed-docs |
+| Бронирование товара через самовывоз | Click & Collect (C&C) reservation | confirmed-docs |
+| Стоимость участия в программе лояльности | Cashback commission set by seller | confirmed-docs |
+| Сумма, удержанная за начисленные баллы программы лояльности | Buyer cashback deduction | confirmed-docs |
+| Компенсация скидки по программе лояльности | Cashback spent by buyer on item payment | confirmed-docs |
+| Разовое изменение срока перечисления денежных средств | "Withdraw now" service fee | confirmed-docs |
+
+**NOTE:** `supplier_oper_name` values can be combined with various `doc_type_name` values. For example, "Добровольная компенсация при возврате" appears with both "Продажа" (credit: WB compensates) and "Возврат" (debit: item returned to warehouse). Corrections (Коррекция *) can adjust amounts in either direction.
+
 ### Amount Fields — CONFIRMED from Official Docs + Sandbox
 
 | Field | Type | Semantics | Official sample | Sandbox verified | Confidence |

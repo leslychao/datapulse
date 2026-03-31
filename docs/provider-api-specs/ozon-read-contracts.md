@@ -850,7 +850,37 @@ Join to catalog requires `sku` → `product_id` → `offer_id` lookup.
 
 **23 operation types verified from real data (Jan 2025: 7590 ops + Feb 2026: 589 ops).**
 
-**Observation (Feb 2026):** `StarsMembership` completely absent (was 24% of ops in Jan 2025). Possible Ozon program change. `OperationPointsForReviews` may replace `MarketplaceSaleReviewsOperation`. Adapter MUST handle dynamic operation type evolution — unmapped types default to OTHER with logging.
+**Additional 21 types from official Ozon OpenAPI enum (C-docs, not yet observed in our data):**
+
+| `operation_type` | `type` (category) | Semantics | Source |
+|--|--|--|--|
+| `OperationAgentDeliveredToCustomerCanceled` | returns | Delivery cancellation accrual | Official enum |
+| `OperationClaim` | compensation | Claim accrual | Official enum |
+| `OperationCorrectionSeller` | other | Mutual settlement | Official enum |
+| `OperationDefectiveWriteOff` | compensation | Warehouse damaged goods compensation | Official enum |
+| `OperationLackWriteOff` | compensation | Warehouse lost goods compensation | Official enum |
+| `OperationSetOff` | other | Offset with counterparties | Official enum |
+| `OperationMarketplaceCrossDockServiceWriteOff` | services | Cross-dock delivery service | Official enum |
+| `ReturnAgentOperationRFBS` | returns | rFBS delivery return transfer | Official enum |
+| `MarketplaceSellerReexposureDeliveryReturnOperation` | transferDelivery | Buyer delivery transfer | Official enum |
+| `MarketplaceSellerShippingCompensationReturnOperation` | transferDelivery | Shipping fee compensation transfer | Official enum |
+| `MarketplaceMarketingActionCostOperation` | services | Product promotion services | Official enum |
+| `OperationMarketplaceServicePremiumCashback` | services | Premium promotion service | Official enum |
+| `MarketplaceServicePremiumPromotion` | services | Premium promotion fixed commission | Official enum |
+| `MarketplaceServicePremiumCashbackIndividualPoints` | services | Seller bonus promotion | Official enum |
+| `OperationSubscriptionPremium` | services | Premium subscription | Official enum |
+| `MarketplaceReturnStorageServiceAtThePickupPointFbsItem` | services | FBS short-term return storage at PVZ | Official enum |
+| `MarketplaceReturnStorageServiceInTheWarehouseFbsItem` | services | FBS long-term return storage in warehouse | Official enum |
+| `MarketplaceServiceItemDeliveryKGT` | services | Oversized item logistics | Official enum |
+| `OperationMarketplaceWithHoldingForUndeliverableGoods` | services | Delivery hold for undeliverable items | Official enum |
+| `OperationElectronicServicesPromotionInSearch` | services | Search promotion service | Official enum |
+| `OperationMarketplaceServiceItemElectronicServicesBrandShelf` | services | Brand shelf service | Official enum |
+
+**Total: 44 operation types known (23 empirical + 21 from official enum).** Mapping to FinanceEntryType and fact_finance measures — see mapping-spec.md §7.
+
+**NOTE:** 11 of our 23 empirical types are NOT in the official enum (added after Sept 2024 enum update). This confirms Ozon adds types without updating the public enum. Adapter MUST default unmapped types to OTHER with logging.
+
+**Observation (Feb 2026):** `StarsMembership` completely absent (was 24% of ops in Jan 2025). Possible Ozon program change. `OperationPointsForReviews` may replace `MarketplaceSaleReviewsOperation`. Adapter MUST handle dynamic operation type evolution.
 
 **New types characteristics:**
 

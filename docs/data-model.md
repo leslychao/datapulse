@@ -29,6 +29,8 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | `CanonicalPromoCampaign` | State | [ETL Pipeline](modules/etl-pipeline.md) |
 | `CanonicalPromoProduct` | State | [ETL Pipeline](modules/etl-pipeline.md) |
 | `cost_profile` (SCD2) | State | [ETL Pipeline](modules/etl-pipeline.md) |
+| `category` | Dict | [ETL Pipeline](modules/etl-pipeline.md) |
+| `warehouse` | Dict | [ETL Pipeline](modules/etl-pipeline.md) |
 
 ## Star schema (обзор)
 
@@ -70,7 +72,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 
 | Поле | Описание |
 |------|----------|
-| `connection_id` | FK на `marketplace_connection.id`. Единый tenant-isolation key для ETL, canonical и analytics слоёв. Каждый canonical/fact record привязан к конкретному подключению маркетплейса |
+| `connection_id` / `marketplace_connection_id` | FK на `marketplace_connection.id`. Единый tenant-isolation key для ETL, canonical и analytics слоёв. Каждый canonical/fact record привязан к конкретному подключению маркетплейса. **Naming convention:** flow/finance таблицы (`canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`) используют короткое имя `connection_id`; каталожные таблицы (`marketplace_offer`, `category`, `warehouse`) — полное `marketplace_connection_id`. Оба поля указывают на один FK. В ClickHouse повсеместно используется `connection_id` |
 | `posting_id` | Каноничный идентификатор отправки/строки. Resolved в canonical layer из provider-specific полей (см. [ETL Pipeline](modules/etl-pipeline.md) §Canonical finance resolution rules) |
 | `order_id` | Каноничный идентификатор заказа. Resolved в canonical layer |
 | `seller_sku_id` | FK на `seller_sku`. Resolved через canonical offer lookup |
@@ -157,10 +159,10 @@ Poller: `SELECT ... FROM outbox_event WHERE status = 'PENDING' AND event_type IN
 | **A — Foundation** | Tenancy, интеграция, canonical truth | [Tenancy & IAM](modules/tenancy-iam.md), [Integration](modules/integration.md), [ETL Pipeline](modules/etl-pipeline.md), [Audit & Alerting](modules/audit-alerting.md) (audit_log, system alerts) |
 | **B — Trust Analytics** | Правдивая аналитика | [Analytics & P&L](modules/analytics-pnl.md) |
 | **C — Pricing** | Объяснимое ценообразование | [Pricing](modules/pricing.md) |
-| **D — Execution** | Контролируемое исполнение | [Execution](modules/execution.md) |
-| **E — Seller Operations** | Операционный рабочий слой | [Seller Operations](modules/seller-operations.md) |
+| **D — Execution** | Контролируемое исполнение | [Execution](modules/execution.md), [Promotions](modules/promotions.md) (promo evaluation + promo execution) |
+| **E — Seller Operations** | Операционный рабочий слой | [Seller Operations](modules/seller-operations.md), [Promotions](modules/promotions.md) (promo analytics in grid) |
 | **B extended — Advertising Ingestion** | Рекламные данные для P&L | [Analytics & P&L](modules/analytics-pnl.md) (`dim_advertising_campaign`, `fact_advertising`) |
-| **F — Simulation & Promotions** | Безопасное тестирование; управление промо | [Execution](modules/execution.md) (simulation section), [Promotions](modules/promotions.md) |
+| **F — Simulation** | Безопасное тестирование | [Execution](modules/execution.md) (simulation section) |
 | **G — Intelligence** | Расширенная аналитика, advanced advertising analytics | Расширения существующих модулей, [Promotions](modules/promotions.md) (`mart_promo_product_analysis`) |
 
 ## Связанные документы

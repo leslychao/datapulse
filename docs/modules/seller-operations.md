@@ -39,7 +39,7 @@
 | `product_name` | `marketplace_offer.name` | PostgreSQL | Название товара |
 | `marketplace_type` | `marketplace_connection.marketplace_type` | PostgreSQL | WB / Ozon |
 | `connection_name` | `marketplace_connection.name` | PostgreSQL | Название подключения |
-| `status` | `marketplace_offer.status` | PostgreSQL | ACTIVE / INACTIVE |
+| `status` | `marketplace_offer.status` | PostgreSQL | ACTIVE / ARCHIVED / BLOCKED |
 | `category` | `category.name` (via marketplace_offer.category_id FK) | PostgreSQL | Категория |
 | `current_price` | `canonical_price_current.price` | PostgreSQL | Текущая цена |
 | `discount_price` | `canonical_price_current.discount_price` | PostgreSQL | Цена со скидкой |

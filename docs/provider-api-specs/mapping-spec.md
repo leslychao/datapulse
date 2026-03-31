@@ -194,9 +194,9 @@ Official v5 sample (dev.wildberries.ru, 2026-03-31) содержит все эт
 | `acquiring_bank` | string | Acquiring bank name | Informational |
 | `site_country` | string | Marketplace country ("RU") | Informational |
 
-**Для P&L:** Поля `cashback_amount`, `cashback_commission_change`, `seller_promo_discount`,
+**Для P&L:** Поля `cashback_amount`, `cashback_discount`, `cashback_commission_change`, `seller_promo_discount`,
 `loyalty_discount`, `installment_cofinancing_amount` влияют на расчёт итоговой суммы
-к выплате. Их учёт будет добавлен при реализации finance ingestion handler.
+к выплате. Canonical measure assignment: см. DD-19 в §NormalizedFinanceItem → CanonicalFinanceEntry.
 
 **StarsMembership:** Отсутствует в official v5 sample (2026-03-31). Видимо, заменено
 программой лояльности (`loyalty_id`, `loyalty_discount`) и кешбеком (`cashback_*`).
@@ -257,6 +257,7 @@ cross-month boundary: acquiring в Feb для sale из Jan. Решение:
 |----------|------------------|------------|-------|
 | `vendorCode` | `sellerSku` | C | Sandbox verified. Seller's own article, primary join key |
 | `nmID` | `marketplaceSku` | C | Sandbox verified. WB internal product ID, stored as string |
+| `imtID` | `marketplaceSkuAlt` | C | IMT-модель карточки (группирует sizes). Join key для WB internal grouping |
 | `title` | `name` | C | Sandbox verified |
 | `brand` | `brand` | C | Sandbox verified — brand IS in WB catalog response (unlike Ozon) |
 | `subjectName` | `category` | C | Sandbox verified. WB subject = product category |
@@ -269,16 +270,17 @@ cross-month boundary: acquiring в Feb для sale из Jan. Решение:
 |------------|------------------|------------|-------|
 | `offer_id` | `sellerSku` | C | Direct from v3 response |
 | `id` (= product_id) | `marketplaceSku` | C | Ozon product ID, stored as string |
+| `sources[].sku` | `marketplaceSkuAlt` | C | FBS/FBO warehouse SKU. Multiple values possible; take first non-null. Join key для Ozon finance/postings |
 | `name` | `name` | C | |
 | via `/v4/product/info/attributes`, attr_id=85 | `brand` | C | Brand via attribute API; `values[0].value` where `id==85` |
 | `description_category_id` | `category` | C | Category ID (replaces deprecated `category_id`); name requires lookup |
 | `barcodes[0]` | `barcode` | C | Array field; take first element |
-| `is_archived` + `is_autoarchived` | `status` | C | `false` + `false` → ACTIVE; any `true` → INACTIVE |
+| `is_archived` + `is_autoarchived` | `status` | C | `false` + `false` → ACTIVE; any `true` → ARCHIVED (aligned with marketplace_offer DDL: ACTIVE / ARCHIVED / BLOCKED) |
 
 **Verified changes from initial contract:**
 - `category_id` → `description_category_id` (verified)
 - `barcode` → `barcodes[]` (array, verified)
-- `visible` + `status` → `is_archived` + `is_autoarchived` (verified)
+- `visible` + `status` → `is_archived` + `is_autoarchived` (verified; maps to ACTIVE/ARCHIVED per DDL)
 - `brand` RESOLVED via v4/product/info/attributes (attribute_id=85, confirmed)
 - `updated_at` IS present in v3/product/info/list (confirmed 2026-03-31; previously documented as absent)
 
@@ -298,8 +300,10 @@ CanonicalOffer реализована как три таблицы: `product_mas
 
 | Normalized field | Canonical target table.field | Confidence | Notes |
 |------------------|------------------------------|------------|-------|
+| `sellerSku` | `product_master.external_code` | C | Phase A default: `external_code` = `sellerSku` (1:1 с seller_sku). Кросс-маркетплейсное объединение — Phase C (ручной merge или auto-match по barcode/name) |
 | `sellerSku` | `seller_sku.sku_code` | C | Direct mapping |
-| `marketplaceSku` | `marketplace_offer.marketplace_sku` | C | Direct mapping |
+| `marketplaceSku` | `marketplace_offer.marketplace_sku` | C | Direct mapping. WB: `nmID`; Ozon: `product_id` |
+| `marketplaceSkuAlt` | `marketplace_offer.marketplace_sku_alt` | C | WB: `imtID` (IMT-модель карточки); Ozon: `sku` (FBS/FBO warehouse SKU). Nullable |
 | `name` | `marketplace_offer.name` | C | |
 | `brand` | `product_master.brand` | C (WB sandbox) / C (Ozon via attributes) | WB: direct field. Ozon: via v4/attributes (id=85) |
 | `category` | `marketplace_offer.category_id` (FK → category) | C (WB sandbox) / C (Ozon) | Name for WB, ID for Ozon |
@@ -588,6 +592,22 @@ SPP не включается в формулу P&L как отдельная с
 **BLOCKER**: WB goods-return endpoint returned 400 for test account.
 Must combine with `reportDetailByPeriod` for monetary values.
 
+### WB → CanonicalReturn (from `reportDetailByPeriod` — source of truth)
+
+Аналогично `CanonicalSale`, WB returns материализуются из finance report. Строки с `doc_type_name = "Возврат"` создают `canonical_return`.
+
+| WB finance field | Canonical field | Confidence | Notes |
+|------------------|-----------------|------------|-------|
+| `srid` | `external_return_id` | C | Unique row identifier (аналогично canonical_sale) |
+| `sa_name` (= supplierArticle) | `seller_sku_id` (resolved) | C | Lookup: `vendorCode → seller_sku.id` |
+| `nm_id` | `marketplace_offer_id` (resolved) | C | Lookup: `nmID → marketplace_offer.marketplace_sku` |
+| `retail_price_withdisc_rub` | `return_amount` | C-docs | Отрицательная (WB: сторно → знак инвертирован normalizer-ом) |
+| `doc_type_name` = "Возврат" | `return_reason` | A | Грубая классификация; WB не предоставляет детальную причину в finance report |
+| `sale_dt` | `return_date` | C | Дата операции |
+| 1 per row | `quantity` | C | WB finance: 1 строка = 1 единица |
+
+**Filtering:** строки finance report с `doc_type_name = "Возврат"` → `canonical_return`. Остальные `doc_type_name` (включая "Продажа") → `canonical_sale` или `canonical_finance_entry`.
+
 ### Ozon → NormalizedReturnItem
 
 | Ozon field | Normalized field | Confidence | Notes |
@@ -652,7 +672,7 @@ Must combine with `reportDetailByPeriod` for monetary values.
 | `rrd_id` | `rowId` | C | Row-level unique ID, pagination cursor |
 
 **SIGN CONVENTION (DD-7):** All WB finance values are POSITIVE absolute amounts.
-Field name determines credit/debit semantics. When normalizing to canonical:
+Field name determines credit/debit semantics. Canonical sign convention (positive = credit to seller, negative = debit from seller) defined in [etl-pipeline.md](../modules/etl-pipeline.md) §Sign conventions. When normalizing to canonical:
 - CREDIT fields (positive in canonical): `ppvz_for_pay`, `ppvz_vw`, `additional_payment`
 - DEBIT fields (negate in canonical): all cost/fee fields below
 
@@ -677,9 +697,11 @@ Field name determines credit/debit semantics. When normalizing to canonical:
 | Operation | Relevant WB field | → NormalizedFinanceItem.amount | Confidence | Canonical sign |
 |-----------|-------------------|-------------------------------|------------|----------------|
 | Cashback | `cashback_amount` | amount | C-docs | negate (debit), absent in sandbox |
-| Cashback commission delta | `cashback_commission_change` | amount | C-docs | depends on sign, absent in sandbox |
+| Cashback discount | `cashback_discount` | amount | C-docs | negate (debit), absent in sandbox |
+| Cashback commission delta | `cashback_commission_change` | amount | C-docs | sign as-is (adjusts commission), absent in sandbox |
 | Seller promo | `seller_promo_discount` | amount | C-docs | negate (debit), absent in sandbox |
 | Loyalty | `loyalty_discount` | amount | C-docs | negate (debit), absent in sandbox |
+| Installment co-financing | `installment_cofinancing_amount` | amount | C-docs | negate (debit), absent in sandbox |
 
 **DD-8**: One WB `reportDetailByPeriod` row contains MULTIPLE financial
 dimensions simultaneously (commission + delivery + penalty in same row).
@@ -703,9 +725,11 @@ Use `@JsonIgnoreProperties(ignoreUnknown = true)` + nullable types.
 | (implicit) | `currency` | C | RUB (verified from context) |
 | `operation_date` | `entryDate` | C | Parse as "yyyy-MM-dd HH:mm:ss" NOT ISO 8601 (DD-6) |
 
-### Ozon operation_type → FinanceEntryType — VERIFIED (updated 2026-03-31, cross-verified Jan 2025 + Feb 2026)
+### Ozon operation_type → FinanceEntryType — COMPREHENSIVE (updated 2026-03-31)
 
-**Baseline:** Jan 2025 (7590 ops, 17 types). **Update:** Feb 2026 (589 ops, 13 types — 6 new, 4 not observed).
+**Sources:** Official Ozon OpenAPI enum (35 types) + empirical data Jan 2025 (7590 ops, 17 types) + Feb 2026 (589 ops, 13 types).
+
+**Part A — Empirically verified (23 types, from real API responses):**
 
 | Ozon operation_type | `type` cat | → FinanceEntryType | → fact_finance measure | Confidence | Sign | First seen |
 |---------------------|------------|---------------------|------------------------|------------|------|-----------|
@@ -733,7 +757,37 @@ Use `@JsonIgnoreProperties(ignoreUnknown = true)` + nullable types.
 | `DefectFineShipmentDelayRated` | services | SHIPMENT_DELAY_FINE | `penalties_amount` | C | amount < 0 | **Feb 2026** |
 | `DefectFineCancellation` | services | CANCELLATION_FINE | `penalties_amount` | C | amount < 0 | **Feb 2026** |
 
-**23 operation types verified from real data (Jan 2025 + Feb 2026).**
+**Part B — From official Ozon OpenAPI enum, not yet observed in our data (C-docs):**
+
+| Ozon operation_type | `type` cat | → FinanceEntryType | → fact_finance measure | Confidence | Sign (assumed) | Source |
+|---------------------|------------|---------------------|------------------------|------------|----------------|--------|
+| `OperationAgentDeliveredToCustomerCanceled` | returns | DELIVERY_CANCEL_ACCRUAL | `refund_amount` | C-docs | amount < 0 | Official enum: delivery cancellation accrual |
+| `OperationClaim` | compensation | CLAIM | `compensation_amount` | C-docs | amount > 0 | Official enum: claim accrual |
+| `OperationCorrectionSeller` | other | CORRECTION | `other_marketplace_charges_amount` | C-docs | ± | Official enum: mutual settlement |
+| `OperationDefectiveWriteOff` | compensation | DEFECTIVE_WRITEOFF | `compensation_amount` | C-docs | amount > 0 | Official enum: warehouse damaged goods compensation |
+| `OperationLackWriteOff` | compensation | LACK_WRITEOFF | `compensation_amount` | C-docs | amount > 0 | Official enum: warehouse lost goods compensation |
+| `OperationSetOff` | other | SETOFF | `other_marketplace_charges_amount` | C-docs | ± | Official enum: offset with counterparties |
+| `OperationMarketplaceCrossDockServiceWriteOff` | services | CROSSDOCK_LOGISTICS | `logistics_cost_amount` | C-docs | amount < 0 | Official enum: cross-dock delivery service |
+| `ReturnAgentOperationRFBS` | returns | RFBS_RETURN | `logistics_cost_amount` | C-docs | amount < 0 | Official enum: rFBS delivery return transfer |
+| `MarketplaceSellerReexposureDeliveryReturnOperation` | transferDelivery | REEXPOSURE_DELIVERY | `logistics_cost_amount` | C-docs | amount < 0 | Official enum: buyer delivery transfer |
+| `MarketplaceSellerShippingCompensationReturnOperation` | transferDelivery | SHIPPING_COMPENSATION | `compensation_amount` | C-docs | amount > 0 | Official enum: shipping fee compensation transfer |
+| `MarketplaceMarketingActionCostOperation` | services | MARKETING_ACTION | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: product promotion services |
+| `OperationMarketplaceServicePremiumCashback` | services | PREMIUM_CASHBACK | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: Premium promotion service |
+| `MarketplaceServicePremiumPromotion` | services | PREMIUM_PROMOTION | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: Premium promotion fixed commission |
+| `MarketplaceServicePremiumCashbackIndividualPoints` | services | PREMIUM_SELLER_BONUS | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: seller bonus promotion |
+| `OperationSubscriptionPremium` | services | PREMIUM_SUBSCRIPTION | `other_marketplace_charges_amount` | C-docs | amount < 0 | Official enum: Premium subscription |
+| `MarketplaceReturnStorageServiceAtThePickupPointFbsItem` | services | FBS_RETURN_STORAGE_PVZ | `storage_cost_amount` | C-docs | amount < 0 | Official enum: FBS short-term return storage at PVZ |
+| `MarketplaceReturnStorageServiceInTheWarehouseFbsItem` | services | FBS_RETURN_STORAGE_WH | `storage_cost_amount` | C-docs | amount < 0 | Official enum: FBS long-term return storage in warehouse |
+| `MarketplaceServiceItemDeliveryKGT` | services | KGT_LOGISTICS | `logistics_cost_amount` | C-docs | amount < 0 | Official enum: oversized item logistics |
+| `OperationMarketplaceWithHoldingForUndeliverableGoods` | services | WITHHOLDING_UNDELIVERABLE | `penalties_amount` | C-docs | amount < 0 | Official enum: delivery hold for undeliverable items |
+| `OperationElectronicServicesPromotionInSearch` | services | SEARCH_PROMOTION | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: search promotion service |
+| `OperationMarketplaceServiceItemElectronicServicesBrandShelf` | services | BRAND_SHELF | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: brand shelf service |
+| `ItemAgentServiceStarsMembership` | services | SUBSCRIPTION | `other_marketplace_charges_amount` | C-docs | amount < 0 | Official enum: stars service (alias of `StarsMembership`?) |
+
+**Total: 44 operation types mapped (23 empirical + 21 from official enum).**
+
+**Note:** 11 of our 23 empirical types (`DefectRateCancellation`, `DefectFineCancellation`, `DefectFineShipmentDelayRated`, `OperationMarketplaceCostPerClick`, `OperationPromotionWithCostPerOrder`, `OperationPointsForReviews`, `MarketplaceServiceBrandCommission`, `DisposalReasonFailedToPickupOnTime`, `DisposalReasonDamagedPackaging`, `AccrualInternalClaim`, `AccrualWithoutDocs`) are NOT in the official enum — they were added after the enum was last updated (Sept 2024). This confirms that Ozon adds new types without updating the enum.
+
 Unmapped types MUST default to OTHER with logging.
 
 **New types detail (Feb 2026, empirical):**
@@ -836,8 +890,64 @@ Canonical DDL содержит per-measure columns (DD-8 composite row model). N
 | `additional_payment` | `compensation_amount` | positive (credit) | C-docs |
 | (return entries: retail_price_withdisc_rub) | `refund_amount` | negate (debit to seller) | C-docs |
 | `ppvz_for_pay` | `net_payout` | positive (credit) | C |
-| N/A — WB has no marketplace marketing service charges | `marketing_cost_amount` | defaults to 0 | N/A |
-| N/A — WB reportDetailByPeriod has no packaging/labeling/disposal as separate columns | `other_marketplace_charges_amount` | defaults to 0 | N/A |
+| `seller_promo_discount` | `marketing_cost_amount` | negate (debit) | C-docs |
+| `cashback_amount` + `cashback_discount` + `loyalty_discount` + `installment_cofinancing_amount` | `other_marketplace_charges_amount` | negate (debit) | C-docs |
+| `cashback_commission_change` | `marketplace_commission_amount` (additive) | sign as-is (adjusts base commission) | C-docs |
+
+**DD-19: WB v5 P&L fields → canonical measures (2026-03-31)**
+
+6 полей v5, помеченных как P&L-relevant в DD-10, теперь имеют назначенные canonical measures:
+
+| WB v5 field | → canonical measure | Обоснование |
+|---|---|---|
+| `seller_promo_discount` | `marketing_cost_amount` | Селлерская промо-скидка — маркетинговый расход продавца |
+| `cashback_amount` | `other_marketplace_charges_amount` | Кешбек — удержание МП |
+| `cashback_discount` | `other_marketplace_charges_amount` | Скидка кешбека — удержание МП |
+| `cashback_commission_change` | `marketplace_commission_amount` | Дельта комиссии из-за кешбека — корректировка основной комиссии |
+| `loyalty_discount` | `other_marketplace_charges_amount` | Скидка лояльности — удержание МП |
+| `installment_cofinancing_amount` | `other_marketplace_charges_amount` | Софинансирование рассрочки — удержание |
+
+**DD-20: WB informational fields — deliberately excluded from canonical mapping (2026-03-31)**
+
+Следующие поля из `reportDetailByPeriod` являются **внутренним breakdown WB** и НЕ маппятся в отдельные canonical measures, т.к. уже покрыты `retail_price_withdisc_rub` (revenue) и другими measures:
+
+| WB field | Semantics | Why excluded |
+|---|---|---|
+| `ppvz_vw` | Вознаграждение продавца (доля от цены) | Sub-component of revenue. DD-13: «НЕ подходит» для revenue_amount. Already covered by `retail_price_withdisc_rub` |
+| `ppvz_vw_nds` | НДС на вознаграждение | VAT breakdown of `ppvz_vw`. Already included in `retail_price_withdisc_rub` |
+| `retail_price` | Базовая розничная цена (до скидок) | Informational; pre-discount price |
+| `retail_amount` | Фактическая сумма реализации покупателю | Informational; buyer-paid amount (after SPP) |
+| `acquiring_percent` | Процент эквайринга | Informational; absolute amount in `acquiring_fee` |
+| `ppvz_spp_prc` | Процент СПП (скидка постоянного покупателя) | Informational; DD-14: SPP не компонент P&L |
+
+**DD-21: WB supplier_oper_name full list (2026-03-31, official WB docs)**
+
+Полный перечень значений поля `supplier_oper_name` (= "Обоснование для оплаты") из официальной документации WB (seller.wildberries.ru, обновлено 30.03.2026):
+
+| supplier_oper_name | Семантика | Влияет на P&L | Наш маппинг |
+|---|---|---|---|
+| Продажа | Покупатель выкупил товар | Yes: `revenue_amount` | ✅ via `retail_price_withdisc_rub` |
+| Возврат | Покупатель вернул товар | Yes: `refund_amount` | ✅ via `retail_price_withdisc_rub` (return entry) |
+| Логистика | Доставка товара | Yes: `logistics_cost_amount` | ✅ via `delivery_rub` |
+| Хранение | Оплата хранения на складах WB | Yes: `storage_cost_amount` | ✅ via `storage_fee` |
+| Обработка товара | Приёмка поставок на складах | Yes: `acceptance_cost_amount` | ✅ via `acceptance` |
+| Штраф | Штрафные санкции | Yes: `penalties_amount` | ✅ via `penalty` |
+| Удержания | Оплата сервисов WB (ВБ.Продвижение, Джем, и пр.) | Yes: `penalties_amount` | ✅ via `deduction` |
+| Компенсация ущерба | Компенсация утерянного/подменённого товара | Yes: `compensation_amount` | ✅ via `additional_payment` |
+| Добровольная компенсация при возврате | Компенсация повреждённого товара | Yes: `compensation_amount` | ✅ via `additional_payment` |
+| Коррекция продаж/логистики/эквайринга | Корректировка ранее начисленных сумм | Yes: varies by type | ⚠️ Handled via composite row — correction adjusts the corresponding amount field |
+| Возмещение издержек по перевозке | Расходы сторонних перевозчиков | Yes: `logistics_cost_amount` | ✅ via `rebill_logistic_cost` |
+| Возмещение за выдачу и возврат товаров на ПВЗ | Расходы на услуги ПВЗ | Yes: `logistics_cost_amount` | ✅ via `rebill_logistic_cost` |
+| Услуга платной доставки | DBS/EDBS платная доставка | Yes: `logistics_cost_amount` | ⚠️ New: DBS-specific, maps to `delivery_rub` field |
+| Бронирование товара через самовывоз | C&C (Click & Collect) бронирование | Informational | ⚠️ New: C&C model, likely zero-impact on P&L measures |
+| Стоимость участия в программе лояльности | Комиссия за кешбек продавца | Yes: `other_marketplace_charges_amount` | ✅ via `cashback_amount` (DD-19) |
+| Сумма, удержанная за начисленные баллы программы лояльности | Кешбек покупателя | Yes: `other_marketplace_charges_amount` | ✅ via `cashback_discount` (DD-19) |
+| Компенсация скидки по программе лояльности | Кешбек, потраченный на оплату товара | Yes: `other_marketplace_charges_amount` | ✅ via `loyalty_discount` (DD-19) |
+| Разовое изменение срока перечисления денежных средств | Комиссия за услугу «Вывести сейчас» | Yes: `other_marketplace_charges_amount` | ⚠️ New: early withdrawal fee, maps to `deduction` field |
+
+**Notes:**
+- Коррекция: WB корректирует ранее начисленные суммы (продажи, логистика, эквайринг). Correction row содержит дельту в соответствующем amount-поле (e.g., `retail_price_withdisc_rub` для коррекции продаж). Composite row model обрабатывает это автоматически.
+- Услуга платной доставки (DBS) и Бронирование (C&C) — специфичны для моделей продаж, которые пока не активны у нашего тестового продавца. Финансовый impact попадает в стандартные поля (`delivery_rub`, `deduction`).
 
 **Per-measure mapping (Ozon):**
 
@@ -905,7 +1015,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 | ORDERS | **READY** (sandbox) | READY | Both verified; WB: isCancel/cancelDate confirmed |
 | SALES | **READY** (sandbox) | READY (composite) | WB: forPay/finishedPrice/priceWithDisc verified; Ozon: resolved (DD-3) |
 | RETURNS | **READY** | READY | WB: unblocked — date-only format was root cause; Ozon: all fields verified |
-| FINANCES | **READY** (sandbox+docs) | READY | Both fully verified: WB sign convention (DD-7); Ozon: 23 op types (DD-4), dual acquiring format (DD-15) |
+| FINANCES | **READY** (sandbox+docs) | READY | Both fully verified: WB sign convention (DD-7), v5 P&L fields mapped (DD-19), supplier_oper_name full list (DD-21); Ozon: 44 op types mapped (23 empirical + 21 official enum), dual acquiring format (DD-15) |
 
 ### Resolved Blockers
 
@@ -913,7 +1023,7 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 2. ~~CanonicalReturn.returnAmount (Ozon)~~ — **CONFIRMED** via `product.price.price` in returns endpoint
 3. ~~CanonicalReturn.returnDate (Ozon)~~ — **CONFIRMED** as `logistic.return_date` (ISO 8601 UTC)
 4. ~~CanonicalFinanceEntry sign semantics (Ozon)~~ — **CONFIRMED** (DD-4): positive = credit, negative = debit
-5. ~~CanonicalFinanceEntry.entryType mapping (Ozon)~~ — **23 types mapped** from empirical data (Jan 2025 + Feb 2026)
+5. ~~CanonicalFinanceEntry.entryType mapping (Ozon)~~ — **44 types mapped** (23 empirical + 21 from official OpenAPI enum, 2026-03-31)
 6. ~~CanonicalPriceSnapshot.discountPrice (Ozon)~~ — **RESOLVED** (DD-1): `marketing_seller_price`
 7. ~~CanonicalStockSnapshot.reserved (Ozon)~~ — **CONFIRMED** present in v4 response
 
@@ -1075,3 +1185,18 @@ Advertising read contracts documented in `promo-advertising-contracts.md` §2 (W
 3. **WB Advertising adapter:** Migrate code from POST to GET (v3 endpoint verified and accessible)
 
 **Documents updated:** mapping-spec.md, ozon-read-contracts.md, wb-read-contracts.md, write-contracts.md, promo-advertising-contracts.md.
+
+### 2026-03-31 — Completeness Audit: Official Enum + Docs Cross-Reference
+
+**Scope:** Cross-reference our mapping against official Ozon OpenAPI enum and WB official documentation to find unmapped operation types/fields.
+
+| # | Check | Result | Key Finding |
+|---|-------|--------|-------------|
+| 1 | Ozon operation_type completeness | **21 NEW TYPES** | Official Ozon OpenAPI enum (Apifox mirror, Sept 2024 version) contains 35 types. We had 23 from empirical data. 21 additional types found in enum but not yet observed: `OperationAgentDeliveredToCustomerCanceled`, `OperationClaim`, `OperationCorrectionSeller`, `OperationDefectiveWriteOff`, `OperationLackWriteOff`, `OperationSetOff`, `OperationMarketplaceCrossDockServiceWriteOff`, `ReturnAgentOperationRFBS`, Premium-related (4 types), FBS return storage (2 types), KGT logistics, search/brand shelf promotion (2 types), shipping compensation, withholding. All mapped to FinanceEntryType + fact_finance measure. |
+| 2 | Ozon enum vs empirical gap | **11 types in our data NOT in official enum** | `DefectRateCancellation`, `DefectFineCancellation`, `DefectFineShipmentDelayRated`, `OperationMarketplaceCostPerClick`, `OperationPromotionWithCostPerOrder`, `OperationPointsForReviews`, `MarketplaceServiceBrandCommission`, `DisposalReasonFailedToPickupOnTime`, `DisposalReasonDamagedPackaging`, `AccrualInternalClaim`, `AccrualWithoutDocs`. Confirms Ozon adds types without updating public enum. |
+| 3 | WB supplier_oper_name completeness | **10 NEW VALUES** | Official WB docs (seller.wildberries.ru, 2026-03-30) list 18+ values. We had ~8 implicit. Added: Компенсация ущерба, Добровольная компенсация при возврате, Коррекция (продаж/логистики/эквайринга), Услуга платной доставки, Бронирование (C&C), loyalty program (3 types), Вывести сейчас. All mapped to existing amount fields. |
+| 4 | WB v5 P&L fields canonical mapping | **6 FIELDS MAPPED** | `cashback_amount`, `cashback_discount`, `cashback_commission_change`, `seller_promo_discount`, `loyalty_discount`, `installment_cofinancing_amount` — all assigned canonical measures (DD-19). No DDL changes needed. |
+| 5 | WB informational fields | **6 FIELDS DOCUMENTED** | `ppvz_vw`, `ppvz_vw_nds`, `retail_price`, `retail_amount`, `acquiring_percent`, `ppvz_spp_prc` — deliberately excluded from canonical mapping with rationale (DD-20). |
+
+**Total operation types: Ozon 44 (was 23), WB supplier_oper_name 18+ (was ~8).**
+**Documents updated:** mapping-spec.md, ozon-read-contracts.md, wb-read-contracts.md.
