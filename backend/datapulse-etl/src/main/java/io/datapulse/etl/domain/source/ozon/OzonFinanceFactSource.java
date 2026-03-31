@@ -6,7 +6,7 @@ import java.util.List;
 import io.datapulse.etl.adapter.ozon.OzonFinanceNormalizer;
 import io.datapulse.etl.adapter.ozon.OzonFinanceReadAdapter;
 import io.datapulse.etl.adapter.ozon.dto.OzonFinanceTransaction;
-import io.datapulse.etl.domain.CanonicalEntityMapper;
+import io.datapulse.etl.domain.CanonicalFinanceNormalizer;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
@@ -26,7 +26,7 @@ public class OzonFinanceFactSource implements EventSource {
     private final OzonFinanceReadAdapter adapter;
     private final OzonFinanceNormalizer normalizer;
     private final CanonicalFinanceEntryUpsertRepository repository;
-    private final CanonicalEntityMapper mapper;
+    private final CanonicalFinanceNormalizer financeNormalizer;
     private final SubSourceRunner subSourceRunner;
 
     @Override
@@ -50,9 +50,12 @@ public class OzonFinanceFactSource implements EventSource {
 
         SubSourceResult result = subSourceRunner.processPages(
                 "OzonFinanceReadAdapter", pages, OzonFinanceTransaction.class,
-                batch -> repository.batchUpsert(batch.stream()
-                        .map(tx -> mapper.toFinanceEntry(normalizer.normalizeFinanceTransaction(tx), ctx))
-                        .toList()));
+                batch -> {
+                    var normalized = batch.stream()
+                            .map(normalizer::normalizeFinanceTransaction)
+                            .toList();
+                    repository.batchUpsert(financeNormalizer.normalizeBatch(normalized, ctx));
+                });
         return List.of(result);
     }
 }

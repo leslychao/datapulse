@@ -117,19 +117,43 @@ public class CanonicalEntityMapper {
         return entity;
     }
 
-    public CanonicalFinanceEntryEntity toFinanceEntry(NormalizedFinanceItem norm, IngestContext ctx) {
+    /**
+     * Maps a NormalizedFinanceItem to a canonical entity with all 12 measure columns,
+     * resolved seller_sku_id, warehouse_id, and computed attribution_level.
+     *
+     * @param sellerSkuId      resolved FK to seller_sku (nullable — SKU lookup miss)
+     * @param warehouseId      resolved FK to warehouse (nullable — non-warehouse ops)
+     * @param attributionLevel computed: POSTING, PRODUCT, or ACCOUNT
+     */
+    public CanonicalFinanceEntryEntity toFinanceEntry(NormalizedFinanceItem norm,
+                                                      IngestContext ctx,
+                                                      Long sellerSkuId,
+                                                      Long warehouseId,
+                                                      String attributionLevel) {
         var entity = new CanonicalFinanceEntryEntity();
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalEntryId(norm.externalEntryId());
-        entity.setEntryType(norm.entryType());
+        entity.setEntryType(norm.entryType().canonicalName());
         entity.setPostingId(norm.postingId());
         entity.setOrderId(norm.orderId());
-        entity.setEntryDate(norm.entryDate());
-        entity.setCurrency(norm.currency());
+        entity.setSellerSkuId(sellerSkuId);
+        entity.setWarehouseId(warehouseId);
         entity.setRevenueAmount(norm.revenueAmount());
         entity.setMarketplaceCommissionAmount(norm.marketplaceCommissionAmount());
+        entity.setAcquiringCommissionAmount(norm.acquiringCommissionAmount());
         entity.setLogisticsCostAmount(norm.logisticsCostAmount());
+        entity.setStorageCostAmount(norm.storageCostAmount());
+        entity.setPenaltiesAmount(norm.penaltiesAmount());
+        entity.setAcceptanceCostAmount(norm.acceptanceCostAmount());
+        entity.setMarketingCostAmount(norm.marketingCostAmount());
+        entity.setOtherMarketplaceChargesAmount(norm.otherMarketplaceChargesAmount());
+        entity.setCompensationAmount(norm.compensationAmount());
+        entity.setRefundAmount(norm.refundAmount());
+        entity.setNetPayout(norm.netPayout());
+        entity.setCurrency(norm.currency());
+        entity.setEntryDate(norm.entryDate());
+        entity.setAttributionLevel(attributionLevel);
         entity.setJobExecutionId(ctx.jobExecutionId());
         return entity;
     }

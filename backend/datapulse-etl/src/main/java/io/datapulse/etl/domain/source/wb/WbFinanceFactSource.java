@@ -6,7 +6,7 @@ import java.util.List;
 import io.datapulse.etl.adapter.wb.WbFinanceReadAdapter;
 import io.datapulse.etl.adapter.wb.WbNormalizer;
 import io.datapulse.etl.adapter.wb.dto.WbFinanceRow;
-import io.datapulse.etl.domain.CanonicalEntityMapper;
+import io.datapulse.etl.domain.CanonicalFinanceNormalizer;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
@@ -26,7 +26,7 @@ public class WbFinanceFactSource implements EventSource {
     private final WbFinanceReadAdapter adapter;
     private final WbNormalizer normalizer;
     private final CanonicalFinanceEntryUpsertRepository repository;
-    private final CanonicalEntityMapper mapper;
+    private final CanonicalFinanceNormalizer financeNormalizer;
     private final SubSourceRunner subSourceRunner;
 
     @Override
@@ -48,9 +48,12 @@ public class WbFinanceFactSource implements EventSource {
 
         SubSourceResult result = subSourceRunner.processPages(
                 "WbFinanceReadAdapter", pages, WbFinanceRow.class,
-                batch -> repository.batchUpsert(batch.stream()
-                        .map(row -> mapper.toFinanceEntry(normalizer.normalizeFinance(row), ctx))
-                        .toList()));
+                batch -> {
+                    var normalized = batch.stream()
+                            .map(normalizer::normalizeFinance)
+                            .toList();
+                    repository.batchUpsert(financeNormalizer.normalizeBatch(normalized, ctx));
+                });
         return List.of(result);
     }
 }

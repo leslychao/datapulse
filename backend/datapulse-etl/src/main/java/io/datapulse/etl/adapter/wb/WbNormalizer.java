@@ -118,36 +118,52 @@ public class WbNormalizer {
 
     /**
      * DD-7: Sign conventions — debit fields multiplied by -1.
-     * DD-8: Composite row model — single WB row maps to single NormalizedFinanceItem.
+     * DD-8: Composite row model — single WB row maps to single NormalizedFinanceItem with 12 measures.
      * DD-9: Dual-format timestamp parsing.
      * DD-17: sale_dt fallback to rr_dt.
+     *
+     * <p>For WB_RETURN entries, revenue goes to refund_amount (negative = debit to seller)
+     * and revenue_amount stays zero. For all other types, revenue populates revenue_amount.</p>
      */
     public NormalizedFinanceItem normalizeFinance(WbFinanceRow row) {
         OffsetDateTime entryDate = resolveEntryDate(row);
         FinanceEntryType entryType = FinanceEntryType.fromWbDocTypeName(row.docTypeName());
 
+        boolean isReturn = entryType == FinanceEntryType.WB_RETURN;
+        BigDecimal retailPrice = safe(row.retailPriceWithdiscRub());
+        BigDecimal revenueAmount = isReturn ? BigDecimal.ZERO : retailPrice;
+        BigDecimal refundAmount = isReturn ? retailPrice.negate() : BigDecimal.ZERO;
+
+        BigDecimal marketingCost = negate(safe(row.cashbackAmount()))
+                .add(negate(safe(row.sellerPromoDiscount())))
+                .add(negate(safe(row.loyaltyDiscount())));
+
+        String warehouseExternalId = row.ppvzOfficeId() != null
+                ? String.valueOf(row.ppvzOfficeId())
+                : null;
+
         return new NormalizedFinanceItem(
                 String.valueOf(row.rrdId()),
-                entryType.name(),
+                entryType,
                 row.srid(),
                 row.orderUid(),
                 row.saName(),
-                row.officeName(),
-                safe(row.retailPriceWithdiscRub()),
+                String.valueOf(row.nmId()),
+                warehouseExternalId,
+                revenueAmount,
                 negate(safe(row.ppvzSalesCommission())),
                 negate(safe(row.acquiringFee())),
                 negate(safe(row.deliveryRub())).add(negate(safe(row.rebillLogisticCost()))),
                 negate(safe(row.storageFee())),
                 negate(safe(row.penalty())),
                 negate(safe(row.acceptance())),
-                BigDecimal.ZERO,
+                marketingCost,
                 negate(safe(row.deduction())),
                 safe(row.additionalPayment()),
-                BigDecimal.ZERO,
+                refundAmount,
                 safe(row.ppvzForPay()),
                 row.currencyName(),
-                entryDate,
-                "ORDER"
+                entryDate
         );
     }
 
