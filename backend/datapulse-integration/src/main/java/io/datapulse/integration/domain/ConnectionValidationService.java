@@ -2,7 +2,6 @@ package io.datapulse.integration.domain;
 
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.api.ValidateConnectionResponse;
-import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
@@ -16,10 +15,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -32,8 +30,7 @@ public class ConnectionValidationService {
     private final MarketplaceSyncStateRepository syncStateRepository;
     private final CredentialStore credentialStore;
     private final ApplicationEventPublisher eventPublisher;
-    private final WebClient.Builder webClientBuilder;
-    private final IntegrationProperties integrationProperties;
+    private final List<MarketplaceHealthProbe> healthProbes;
 
     @Async("integrationExecutor")
     public void validateAsync(Long connectionId) {
@@ -42,7 +39,7 @@ public class ConnectionValidationService {
             MarketplaceConnectionEntity connection = connectionRepository.findById(connectionId)
                     .orElseThrow(() -> NotFoundException.connection(connectionId));
 
-            ValidationResult result = performValidation(connection);
+            HealthProbeResult result = performValidation(connection);
 
             if (result.success()) {
                 applyValidationSuccess(connectionId, result.externalAccountId());
@@ -60,7 +57,7 @@ public class ConnectionValidationService {
     }
 
     public ValidateConnectionResponse validateSync(MarketplaceConnectionEntity connection) {
-        ValidationResult result = performValidation(connection);
+        HealthProbeResult result = performValidation(connection);
         if (result.success()) {
             return new ValidateConnectionResponse(true, null);
         }
@@ -105,74 +102,21 @@ public class ConnectionValidationService {
                 connectionId, oldStatus, ConnectionStatus.AUTH_FAILED.name(), "validation_failure"));
     }
 
-    private ValidationResult performValidation(MarketplaceConnectionEntity connection) {
+    private HealthProbeResult performValidation(MarketplaceConnectionEntity connection) {
         SecretReferenceEntity secretRef = secretReferenceRepository.findById(connection.getSecretReferenceId())
                 .orElseThrow(() -> NotFoundException.entity("SecretReference", connection.getSecretReferenceId()));
 
         Map<String, String> credentials = credentialStore.read(secretRef.getVaultPath(), secretRef.getVaultKey());
         MarketplaceType marketplaceType = MarketplaceType.valueOf(connection.getMarketplaceType());
 
-        return switch (marketplaceType) {
-            case WB -> validateWb(credentials);
-            case OZON -> validateOzon(credentials);
-        };
+        return resolveProbe(marketplaceType).probe(credentials);
     }
 
-    private ValidationResult validateWb(Map<String, String> credentials) {
-        String apiToken = credentials.get("apiToken");
-        String baseUrl = integrationProperties.getWildberries().getContentBaseUrl();
-        try {
-            webClientBuilder.baseUrl(baseUrl).build()
-                    .post()
-                    .uri("/content/v2/get/cards/list")
-                    .header("Authorization", apiToken)
-                    .bodyValue(Map.of(
-                            "settings", Map.of("cursor", Map.of("limit", 1))))
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            return ValidationResult.success(null);
-        } catch (WebClientResponseException.Unauthorized e) {
-            return ValidationResult.failure("AUTH_FAILED");
-        } catch (WebClientResponseException.Forbidden e) {
-            return ValidationResult.failure("AUTH_FAILED");
-        } catch (WebClientResponseException e) {
-            log.warn("WB validation unexpected status: status={}", e.getStatusCode().value());
-            return ValidationResult.failure("HTTP_" + e.getStatusCode().value());
-        } catch (Exception e) {
-            log.error("WB validation error", e);
-            return ValidationResult.failure("CONNECTION_ERROR");
-        }
-    }
-
-    private ValidationResult validateOzon(Map<String, String> credentials) {
-        String clientId = credentials.get("clientId");
-        String apiKey = credentials.get("apiKey");
-        String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
-        try {
-            webClientBuilder.baseUrl(baseUrl).build()
-                    .post()
-                    .uri("/v3/product/list")
-                    .header("Client-Id", clientId)
-                    .header("Api-Key", apiKey)
-                    .bodyValue(Map.of("filter", Map.of(), "limit", 1))
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            return ValidationResult.success(clientId);
-        } catch (WebClientResponseException.Unauthorized e) {
-            return ValidationResult.failure("AUTH_FAILED");
-        } catch (WebClientResponseException.Forbidden e) {
-            return ValidationResult.failure("AUTH_FAILED");
-        } catch (WebClientResponseException e) {
-            log.warn("Ozon validation unexpected status: status={}", e.getStatusCode().value());
-            return ValidationResult.failure("HTTP_" + e.getStatusCode().value());
-        } catch (Exception e) {
-            log.error("Ozon validation error", e);
-            return ValidationResult.failure("CONNECTION_ERROR");
-        }
+    private MarketplaceHealthProbe resolveProbe(MarketplaceType type) {
+        return healthProbes.stream()
+                .filter(p -> p.marketplaceType() == type)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No health probe for " + type));
     }
 
     private void createSyncStatesForConnection(MarketplaceConnectionEntity connection) {
@@ -187,13 +131,4 @@ public class ConnectionValidationService {
                 connection.getId(), DataDomain.values().length);
     }
 
-    private record ValidationResult(boolean success, String externalAccountId, String errorCode) {
-        static ValidationResult success(String externalAccountId) {
-            return new ValidationResult(true, externalAccountId, null);
-        }
-
-        static ValidationResult failure(String errorCode) {
-            return new ValidationResult(false, null, errorCode);
-        }
-    }
 }

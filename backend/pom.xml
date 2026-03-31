@@ -38,6 +38,7 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <clickhouse-jdbc.version>0.9.6</clickhouse-jdbc.version>
         <minio.version>9.0.0</minio.version>
+        <okhttp.version>5.2.1</okhttp.version>
         <shedlock.version>7.7.0</shedlock.version>
         <spring-vault.version>3.1.2</spring-vault.version>
     </properties>
@@ -128,6 +129,11 @@
                 <version>${minio.version}</version>
             </dependency>
             <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-jvm</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>net.javacrumbs.shedlock</groupId>
                 <artifactId>shedlock-spring</artifactId>
                 <version>${shedlock.version}</version>
@@ -141,10 +147,6 @@
                 <groupId>org.springframework.vault</groupId>
                 <artifactId>spring-vault-core</artifactId>
                 <version>${spring-vault.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-data-redis</artifactId>
             </dependency>
         </dependencies>
     </dependencyManagement>

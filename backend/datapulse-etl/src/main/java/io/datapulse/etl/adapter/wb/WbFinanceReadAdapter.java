@@ -10,13 +10,12 @@ import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.PageCaptureResult;
 import io.datapulse.etl.domain.cursor.TailFieldExtractor;
-import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
+import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 /**
@@ -29,14 +28,13 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class WbFinanceReadAdapter {
 
-    private static final String BASE_URL = "https://statistics-api.wildberries.ru";
     private static final String FINANCE_PATH = "/api/v5/supplier/reportDetailByPeriod";
     private static final int PAGE_LIMIT = 100_000;
 
     private static final TailFieldExtractor CURSOR_EXTRACTOR = TailFieldExtractor.wbRrdId();
 
-    private final WebClient.Builder webClientBuilder;
-    private final MarketplaceRateLimiter rateLimiter;
+    private final WbApiCaller apiCaller;
+    private final IntegrationProperties properties;
     private final StreamingPageCapture pageCapture;
 
     public List<CaptureResult> captureAllPages(CaptureContext context, String apiToken,
@@ -46,30 +44,19 @@ public class WbFinanceReadAdapter {
         int pageNumber = 0;
         boolean hasMore = true;
 
-        while (hasMore) {
-            rateLimiter.acquire(context.connectionId(), RateLimitGroup.WB_STATISTICS).join();
+        String baseUrl = properties.getWildberries().getStatisticsBaseUrl();
 
+        while (hasMore) {
             long currentRrdid = rrdid;
-            Flux<DataBuffer> body = webClientBuilder.build()
-                    .get()
-                    .uri(BASE_URL + FINANCE_PATH, uriBuilder -> uriBuilder
+            Flux<DataBuffer> body = apiCaller.get(
+                    baseUrl + FINANCE_PATH,
+                    uriBuilder -> uriBuilder
                             .queryParam("dateFrom", dateFrom.format(DateTimeFormatter.ISO_LOCAL_DATE))
                             .queryParam("dateTo", dateTo.format(DateTimeFormatter.ISO_LOCAL_DATE))
                             .queryParam("limit", PAGE_LIMIT)
                             .queryParam("rrdid", currentRrdid)
-                            .build())
-                    .header("Authorization", apiToken)
-                    .exchangeToFlux(response -> {
-                        int status = response.statusCode().value();
-                        rateLimiter.onResponse(context.connectionId(), RateLimitGroup.WB_STATISTICS, status);
-                        if (status == 204) {
-                            return Flux.empty();
-                        }
-                        if (response.statusCode().isError()) {
-                            return response.createException().flatMapMany(Flux::error);
-                        }
-                        return response.bodyToFlux(DataBuffer.class);
-                    });
+                            .build(),
+                    apiToken, context.connectionId(), RateLimitGroup.WB_STATISTICS);
 
             PageCaptureResult page;
             try {

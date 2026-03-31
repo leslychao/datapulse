@@ -2,7 +2,6 @@ package io.datapulse.integration.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.datapulse.common.exception.BadRequestException;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -68,7 +67,7 @@ public final class CredentialMapper {
             throw BadRequestException.of("credentials.invalid", field);
         }
         String value = node.get(field).asText();
-        if (StringUtils.isBlank(value)) {
+        if (value == null || value.isBlank()) {
             throw BadRequestException.of("credentials.invalid", field);
         }
         return value.trim();

@@ -8,13 +8,11 @@ import io.datapulse.etl.adapter.util.StreamingPageCapture;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.cursor.NoCursorExtractor;
-import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 @Slf4j
@@ -22,12 +20,10 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class OzonProductInfoReadAdapter {
 
-    private static final String BASE_URL = "https://api-seller.ozon.ru";
     private static final String PRODUCT_INFO_PATH = "/v3/product/info/list";
     private static final int BATCH_SIZE = 1000;
 
-    private final WebClient.Builder webClientBuilder;
-    private final MarketplaceRateLimiter rateLimiter;
+    private final OzonApiCaller apiCaller;
     private final StreamingPageCapture pageCapture;
 
     public List<CaptureResult> captureAllBatches(CaptureContext context,
@@ -39,22 +35,10 @@ public class OzonProductInfoReadAdapter {
             List<Long> batch = productIds.subList(i, Math.min(i + BATCH_SIZE, productIds.size()));
             int pageNumber = i / BATCH_SIZE;
 
-            rateLimiter.acquire(context.connectionId(), RateLimitGroup.OZON_DEFAULT).join();
-
-            Flux<DataBuffer> body = webClientBuilder.build()
-                    .post()
-                    .uri(BASE_URL + PRODUCT_INFO_PATH)
-                    .header("Client-Id", clientId)
-                    .header("Api-Key", apiKey)
-                    .bodyValue(Map.of("product_id", batch))
-                    .exchangeToFlux(response -> {
-                        int status = response.statusCode().value();
-                        rateLimiter.onResponse(context.connectionId(), RateLimitGroup.OZON_DEFAULT, status);
-                        if (response.statusCode().isError()) {
-                            return response.createException().flatMapMany(Flux::error);
-                        }
-                        return response.bodyToFlux(DataBuffer.class);
-                    });
+            Flux<DataBuffer> body = apiCaller.post(PRODUCT_INFO_PATH,
+                    Map.of("product_id", batch),
+                    context.connectionId(), RateLimitGroup.OZON_DEFAULT,
+                    clientId, apiKey);
 
             var page = pageCapture.capture(body, context, pageNumber, NoCursorExtractor.INSTANCE);
             results.add(page.captureResult());

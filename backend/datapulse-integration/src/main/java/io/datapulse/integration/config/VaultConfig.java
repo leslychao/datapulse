@@ -7,9 +7,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.vault.authentication.TokenAuthentication;
 import org.springframework.vault.client.VaultEndpoint;
-import org.springframework.vault.core.VaultKeyValueOperations;
 import org.springframework.vault.core.VaultKeyValueOperationsSupport;
 import org.springframework.vault.core.VaultTemplate;
+import org.springframework.vault.core.VaultVersionedKeyValueOperations;
 
 import java.net.URI;
 import java.util.Map;
@@ -25,8 +25,8 @@ public class VaultConfig {
     }
 
     @Bean
-    public VaultKeyValueOperations vaultKeyValueOperations(VaultTemplate vaultTemplate) {
-        return vaultTemplate.opsForKeyValue("secret", VaultKeyValueOperationsSupport.KeyValueBackend.KV_2);
+    public VaultVersionedKeyValueOperations vaultKeyValueOperations(VaultTemplate vaultTemplate) {
+        return vaultTemplate.opsForVersionedKeyValue("secret");
     }
 
     @Bean("credentialCache")

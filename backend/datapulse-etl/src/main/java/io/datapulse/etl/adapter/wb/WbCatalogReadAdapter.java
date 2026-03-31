@@ -9,13 +9,12 @@ import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.PageCaptureResult;
 import io.datapulse.etl.domain.cursor.JsonPathCursorExtractor;
-import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
+import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 @Slf4j
@@ -23,15 +22,14 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class WbCatalogReadAdapter {
 
-    private static final String BASE_URL = "https://content-api.wildberries.ru";
     private static final String CARDS_LIST_PATH = "/content/v2/get/cards/list";
     private static final int PAGE_LIMIT = 100;
 
     private static final JsonPathCursorExtractor CURSOR_EXTRACTOR =
             new JsonPathCursorExtractor("cursor.nmID");
 
-    private final WebClient.Builder webClientBuilder;
-    private final MarketplaceRateLimiter rateLimiter;
+    private final WbApiCaller apiCaller;
+    private final IntegrationProperties properties;
     private final StreamingPageCapture pageCapture;
 
     public List<CaptureResult> captureAllPages(CaptureContext context, String apiToken) {
@@ -41,22 +39,12 @@ public class WbCatalogReadAdapter {
         int pageNumber = 0;
         boolean hasMore = true;
 
-        while (hasMore) {
-            rateLimiter.acquire(context.connectionId(), RateLimitGroup.WB_CONTENT).join();
+        String baseUrl = properties.getWildberries().getContentBaseUrl();
 
-            Flux<DataBuffer> body = webClientBuilder.build()
-                    .post()
-                    .uri(BASE_URL + CARDS_LIST_PATH)
-                    .header("Authorization", apiToken)
-                    .bodyValue(buildCursorRequest(updatedAt, nmId))
-                    .exchangeToFlux(response -> {
-                        int status = response.statusCode().value();
-                        rateLimiter.onResponse(context.connectionId(), RateLimitGroup.WB_CONTENT, status);
-                        if (response.statusCode().isError()) {
-                            return response.createException().flatMapMany(Flux::error);
-                        }
-                        return response.bodyToFlux(DataBuffer.class);
-                    });
+        while (hasMore) {
+            Flux<DataBuffer> body = apiCaller.post(
+                    baseUrl + CARDS_LIST_PATH, buildCursorRequest(updatedAt, nmId),
+                    apiToken, context.connectionId(), RateLimitGroup.WB_CONTENT);
 
             PageCaptureResult page = pageCapture.capture(body, context, pageNumber, CURSOR_EXTRACTOR);
             results.add(page.captureResult());

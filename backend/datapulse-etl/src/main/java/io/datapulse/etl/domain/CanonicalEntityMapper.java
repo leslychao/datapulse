@@ -122,7 +122,7 @@ public class CanonicalEntityMapper {
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalEntryId(norm.externalEntryId());
-        entity.setEntryType(norm.entryType().name());
+        entity.setEntryType(norm.entryType());
         entity.setPostingId(norm.postingId());
         entity.setOrderId(norm.orderId());
         entity.setEntryDate(norm.entryDate());

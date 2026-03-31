@@ -122,7 +122,7 @@ public class S3RawStorage {
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(s3Properties.rawBucket())
                     .object(s3Key)
-                    .stream(fileStream, byteSize, -1)
+                    .stream(fileStream, byteSize, -1L)
                     .contentType("application/json")
                     .build());
         }

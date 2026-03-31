@@ -7,8 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.vault.VaultException;
-import org.springframework.vault.core.VaultKeyValueOperations;
-import org.springframework.vault.support.VaultResponse;
+import org.springframework.vault.core.VaultVersionedKeyValueOperations;
 import org.springframework.vault.support.Versioned;
 
 import java.util.Collections;
@@ -22,7 +21,7 @@ public class VaultCredentialStore implements CredentialStore {
 
     private static final int VAULT_UNAVAILABLE_STATUS = 503;
 
-    private final VaultKeyValueOperations vaultKv;
+    private final VaultVersionedKeyValueOperations vaultKv;
     private final Cache<String, Map<String, String>> credentialCache;
 
     @Override
@@ -57,12 +56,12 @@ public class VaultCredentialStore implements CredentialStore {
         }
 
         try {
-            VaultResponse response = vaultKv.get(vaultPath);
-            if (response == null || response.getData() == null) {
+            Versioned<Map<String, Object>> versioned = vaultKv.get(vaultPath);
+            if (versioned == null || versioned.getData() == null) {
                 throw new AppException("vault.secret.not.found", 404, vaultPath);
             }
 
-            Object raw = response.getData().get(vaultKey);
+            Object raw = versioned.getData().get(vaultKey);
             if (!(raw instanceof Map<?, ?> rawMap)) {
                 throw new AppException("vault.secret.not.found", 404, vaultPath, vaultKey);
             }

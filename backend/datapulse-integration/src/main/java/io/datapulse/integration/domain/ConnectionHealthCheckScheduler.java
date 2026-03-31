@@ -15,8 +15,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -24,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -38,7 +37,7 @@ public class ConnectionHealthCheckScheduler {
     private final MarketplaceRateLimiter rateLimiter;
     private final IntegrationProperties properties;
     private final ApplicationEventPublisher eventPublisher;
-    private final WebClient.Builder webClientBuilder;
+    private final List<MarketplaceHealthProbe> healthProbes;
 
     private final ConcurrentHashMap<Long, AtomicInteger> failureCounts = new ConcurrentHashMap<>();
 
@@ -102,56 +101,16 @@ public class ConnectionHealthCheckScheduler {
     private String performHealthCall(MarketplaceConnectionEntity connection,
                                      MarketplaceType marketplaceType,
                                      Map<String, String> credentials) {
-        return switch (marketplaceType) {
-            case WB -> callWbHealthCheck(credentials);
-            case OZON -> callOzonHealthCheck(credentials, marketplaceType);
-        };
+        MarketplaceHealthProbe probe = resolveProbe(marketplaceType);
+        HealthProbeResult result = probe.probe(credentials);
+        return result.success() ? null : result.errorCode();
     }
 
-    private String callWbHealthCheck(Map<String, String> credentials) {
-        String apiToken = credentials.get("apiToken");
-        String baseUrl = properties.getWildberries().getContentBaseUrl();
-        try {
-            webClientBuilder.baseUrl(baseUrl).build()
-                    .post()
-                    .uri("/content/v2/get/cards/list")
-                    .header("Authorization", apiToken)
-                    .bodyValue(Map.of("settings", Map.of("cursor", Map.of("limit", 1))))
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-            return null;
-        } catch (WebClientResponseException.Unauthorized | WebClientResponseException.Forbidden e) {
-            return "AUTH_FAILED";
-        } catch (WebClientResponseException e) {
-            return "HTTP_" + e.getStatusCode().value();
-        } catch (Exception e) {
-            return "CONNECTION_ERROR";
-        }
-    }
-
-    private String callOzonHealthCheck(Map<String, String> credentials, MarketplaceType type) {
-        String clientId = credentials.get("clientId");
-        String apiKey = credentials.get("apiKey");
-        String baseUrl = properties.getOzon().getSellerBaseUrl();
-        try {
-            webClientBuilder.baseUrl(baseUrl).build()
-                    .post()
-                    .uri("/v3/product/list")
-                    .header("Client-Id", clientId)
-                    .header("Api-Key", apiKey)
-                    .bodyValue(Map.of("filter", Map.of(), "limit", 1))
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-            return null;
-        } catch (WebClientResponseException.Unauthorized | WebClientResponseException.Forbidden e) {
-            return "AUTH_FAILED";
-        } catch (WebClientResponseException e) {
-            return "HTTP_" + e.getStatusCode().value();
-        } catch (Exception e) {
-            return "CONNECTION_ERROR";
-        }
+    private MarketplaceHealthProbe resolveProbe(MarketplaceType type) {
+        return healthProbes.stream()
+                .filter(p -> p.marketplaceType() == type)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No health probe for " + type));
     }
 
     @Transactional
@@ -228,7 +187,7 @@ public class ConnectionHealthCheckScheduler {
     private void cleanupStaleFailureCounts(List<MarketplaceConnectionEntity> activeConnections) {
         var activeIds = activeConnections.stream()
                 .map(MarketplaceConnectionEntity::getId)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         failureCounts.keySet().removeIf(id -> !activeIds.contains(id));
     }
 

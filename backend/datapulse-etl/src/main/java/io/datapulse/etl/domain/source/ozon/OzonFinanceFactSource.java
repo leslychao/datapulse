@@ -3,8 +3,8 @@ package io.datapulse.etl.domain.source.ozon;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import io.datapulse.etl.adapter.ozon.OzonFinanceNormalizer;
 import io.datapulse.etl.adapter.ozon.OzonFinanceReadAdapter;
-import io.datapulse.etl.adapter.ozon.OzonNormalizer;
 import io.datapulse.etl.adapter.ozon.dto.OzonFinanceTransaction;
 import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 public class OzonFinanceFactSource implements EventSource {
 
     private final OzonFinanceReadAdapter adapter;
-    private final OzonNormalizer normalizer;
+    private final OzonFinanceNormalizer normalizer;
     private final CanonicalFinanceEntryUpsertRepository repository;
     private final CanonicalEntityMapper mapper;
     private final SubSourceRunner subSourceRunner;
