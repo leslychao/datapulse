@@ -43,4 +43,10 @@ public final class MessageCodes {
     public static final String COST_PROFILE_INVALID = "cost.profile.invalid";
     public static final String COST_PROFILE_BULK_TOO_LARGE = "cost.profile.bulk.too.large";
     public static final String SELLER_SKU_NOT_FOUND = "seller.sku.not.found";
+
+    // --- Audit & Alerting ---
+    public static final String AUDIT_LOG_NOT_FOUND = "audit.log.not.found";
+    public static final String ALERT_EVENT_NOT_FOUND = "alert.event.not.found";
+    public static final String ALERT_EVENT_INVALID_STATE = "alert.event.invalid.state";
+    public static final String ALERT_RULE_NOT_FOUND = "alert.rule.not.found";
 }
