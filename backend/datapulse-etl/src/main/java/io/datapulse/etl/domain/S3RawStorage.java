@@ -34,6 +34,35 @@ public class S3RawStorage {
     private final EtlProperties etlProperties;
     private final JobItemRepository jobItemRepository;
 
+    /**
+     * Accepts an already-written temp file (from {@link io.datapulse.etl.adapter.util.StreamingResponseWriter}).
+     * Uploads to S3, inserts job_item, deletes temp file. No double disk-write.
+     */
+    public CaptureResult captureFromFile(Path existingTempFile, String sha256, long byteSize,
+                                         CaptureContext context, int pageNumber) {
+        try {
+            String s3Key = buildS3Key(
+                    context.connectionId(), context.etlEvent().name(),
+                    context.sourceId(), context.requestId(), pageNumber
+            );
+
+            uploadToS3(s3Key, existingTempFile, byteSize);
+
+            long jobItemId = insertJobItemFromContext(context, s3Key, sha256, byteSize, pageNumber);
+
+            log.info("Raw page captured: s3Key={}, byteSize={}, sha256={}",
+                    s3Key, byteSize, sha256);
+
+            return new CaptureResult(jobItemId, s3Key, sha256, byteSize);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to capture from file: requestId=%s, page=%d"
+                            .formatted(context.requestId(), pageNumber), e);
+        } finally {
+            deleteTempFileSilently(existingTempFile);
+        }
+    }
+
     public CaptureResult capture(CaptureRequest request) {
         Path tempFile = null;
         try {
@@ -105,6 +134,21 @@ public class S3RawStorage {
                 .requestId(request.requestId())
                 .sourceId(request.sourceId())
                 .pageNumber(request.pageNumber())
+                .s3Key(s3Key)
+                .contentSha256(sha256)
+                .byteSize(byteSize)
+                .build();
+
+        return jobItemRepository.insert(row);
+    }
+
+    private long insertJobItemFromContext(CaptureContext context, String s3Key,
+                                          String sha256, long byteSize, int pageNumber) {
+        var row = JobItemRow.builder()
+                .jobExecutionId(context.jobExecutionId())
+                .requestId(context.requestId())
+                .sourceId(context.sourceId())
+                .pageNumber(pageNumber)
                 .s3Key(s3Key)
                 .contentSha256(sha256)
                 .byteSize(byteSize)
