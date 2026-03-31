@@ -50,6 +50,7 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{workspaceId}")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public WorkspaceResponse getWorkspace(@PathVariable("workspaceId") Long workspaceId) {
         WorkspaceEntity ws = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> NotFoundException.workspace(workspaceId));
@@ -58,7 +59,7 @@ public class WorkspaceController {
 
     @PutMapping("/{workspaceId}")
     @Transactional
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public WorkspaceResponse updateWorkspace(@PathVariable("workspaceId") Long workspaceId,
                                              @Valid @RequestBody UpdateWorkspaceRequest request) {
         WorkspaceEntity ws = workspaceRepository.findById(workspaceId)

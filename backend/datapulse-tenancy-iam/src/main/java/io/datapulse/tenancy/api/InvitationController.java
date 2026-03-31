@@ -27,14 +27,14 @@ public class InvitationController {
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public List<InvitationResponse> listInvitations(@PathVariable("workspaceId") Long workspaceId) {
         return invitationService.listInvitations(workspaceId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public InvitationResponse createInvitation(@PathVariable("workspaceId") Long workspaceId,
                                                @Valid @RequestBody CreateInvitationRequest request) {
         return invitationService.createInvitation(
@@ -44,14 +44,14 @@ public class InvitationController {
 
     @DeleteMapping("/{invitationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public void cancelInvitation(@PathVariable("workspaceId") Long workspaceId,
                                  @PathVariable("invitationId") Long invitationId) {
         invitationService.cancelInvitation(workspaceId, invitationId);
     }
 
     @PostMapping("/{invitationId}/resend")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public InvitationResponse resendInvitation(@PathVariable("workspaceId") Long workspaceId,
                                                @PathVariable("invitationId") Long invitationId) {
         return invitationService.resendInvitation(workspaceId, invitationId);

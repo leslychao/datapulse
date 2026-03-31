@@ -1,18 +1,19 @@
 package io.datapulse.tenancy.domain;
 
+import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.tenancy.api.CreateTenantRequest;
 import io.datapulse.tenancy.api.CreateWorkspaceRequest;
 import io.datapulse.tenancy.api.TenantResponse;
 import io.datapulse.tenancy.api.WorkspaceListResponse;
+import io.datapulse.tenancy.persistence.AppUserEntity;
+import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.TenantEntity;
 import io.datapulse.tenancy.persistence.TenantRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.tenancy.persistence.WorkspaceRepository;
-import io.datapulse.tenancy.persistence.AppUserEntity;
-import io.datapulse.tenancy.persistence.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OnboardingService {
 
     private static final int MAX_SLUG_RETRIES = 3;
+    private static final int MAX_TENANTS_PER_USER = 3;
 
     private final TenantRepository tenantRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -31,6 +33,11 @@ public class OnboardingService {
 
     @Transactional
     public TenantResponse createTenant(CreateTenantRequest request, Long ownerUserId) {
+        long ownedCount = tenantRepository.countByOwnerUserId(ownerUserId);
+        if (ownedCount >= MAX_TENANTS_PER_USER) {
+            throw BadRequestException.of("tenant.limit.exceeded", MAX_TENANTS_PER_USER);
+        }
+
         String name = request.name().trim();
         String slug = generateUniqueSlug(name, tenantRepository::existsBySlug);
 

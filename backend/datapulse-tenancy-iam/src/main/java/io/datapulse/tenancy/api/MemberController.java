@@ -27,12 +27,13 @@ public class MemberController {
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<MemberResponse> listMembers(@PathVariable("workspaceId") Long workspaceId) {
         return memberService.listMembers(workspaceId);
     }
 
     @PutMapping("/{userId}/role")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public MemberResponse changeRole(@PathVariable("workspaceId") Long workspaceId,
                                      @PathVariable("userId") Long userId,
                                      @Valid @RequestBody UpdateMemberRoleRequest request) {
@@ -43,7 +44,7 @@ public class MemberController {
 
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public void removeMember(@PathVariable("workspaceId") Long workspaceId,
                              @PathVariable("userId") Long userId) {
         memberService.removeMember(workspaceId, userId, workspaceContext.getUserId());

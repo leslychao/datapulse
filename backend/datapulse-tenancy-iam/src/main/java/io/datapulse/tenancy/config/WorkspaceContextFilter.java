@@ -1,5 +1,6 @@
 package io.datapulse.tenancy.config;
 
+import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.MemberStatus;
 import io.datapulse.tenancy.domain.UserStatus;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -37,6 +39,7 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
     private final AppUserRepository appUserRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceContext workspaceContext;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -107,7 +110,14 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
         user.setEmail(email);
         user.setName(name != null ? name : email);
         user.setStatus(UserStatus.ACTIVE);
-        return appUserRepository.save(user);
+        AppUserEntity saved = appUserRepository.save(user);
+
+        eventPublisher.publishEvent(new AuditEvent(
+                0L, "SYSTEM", saved.getId(), "user.provision",
+                "app_user", String.valueOf(saved.getId()),
+                "SUCCESS", null, null, null));
+
+        return saved;
     }
 
     private String resolveDisplayName(JwtAuthenticationToken jwtAuth) {

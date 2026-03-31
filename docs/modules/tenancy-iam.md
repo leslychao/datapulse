@@ -211,15 +211,15 @@ Enum в `workspace_member.role`:
 7. @PreAuthorize checks reference enriched authorities
 ```
 
-**Без `X-Workspace-Id`:** endpoints не привязанные к workspace (user profile, workspace list) работают без header. Все workspace-scoped endpoints — обязательный header, 400 при отсутствии.
+**Без `X-Workspace-Id`:** endpoints не привязанные к workspace (user profile, workspace list, invitation accept) работают без header. Workspace-scoped endpoints: если header отсутствует, `WorkspaceContextFilter` не заполняет `WorkspaceContext` и не обогащает `SecurityContext` ролевыми `GrantedAuthority`. В результате `@PreAuthorize` (проверяющий `hasAnyAuthority('ROLE_...')` или `@workspaceAccessService.isCurrentWorkspace(...)`) отклоняет запрос с HTTP 403.
 
 ### Security filter chain
 
 ```
 CorsFilter
 → OAuth2ResourceServerFilter (Spring Security — JWT validation, issuer check)
-→ WorkspaceContextFilter (X-Workspace-Id → membership check → WorkspaceContext bean)
-→ @PreAuthorize handlers (SpEL, role-based)
+→ WorkspaceContextFilter (X-Workspace-Id → membership check → WorkspaceContext bean + RBAC enrichment)
+→ @PreAuthorize handlers (SpEL, role-based + workspace access checks)
 ```
 
 | Настройка | Значение | Обоснование |
@@ -227,13 +227,27 @@ CorsFilter
 | CORS | Configurable allowed origins | SPA на отдельном домене |
 | CSRF | Disabled | Stateless JWT API, CSRF не применим |
 | Session | Stateless (`SessionCreationPolicy.STATELESS`) | JWT — единственный auth mechanism |
+| `/ws/**` | `permitAll()` | WebSocket endpoint. Аутентификация — на уровне STOMP handshake (за пределами HTTP filter chain). WebSocket security описан в модуле Integration |
+| Actuator | `permitAll()` для `/actuator/health`, `/actuator/info`, `/actuator/prometheus` | Health checks и мониторинг |
 
 ## Авторизация
 
 | Требование | Обоснование |
 |------------|-------------|
 | `@PreAuthorize` на уровне методов с SpEL | Декларативная авторизация, workspace-scoped проверки |
-| Multi-tenant access isolation | `@PreAuthorize("@accessService.canRead(#connectionId)")` — проверка принадлежности connection к workspace пользователя |
+| Multi-tenant access isolation | `@workspaceAccessService.isCurrentWorkspace(#workspaceId)` — SpEL-проверка, что path-переменная `{workspaceId}` совпадает с `X-Workspace-Id` header (предотвращение IDOR) |
+| RBAC | `hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')` — проверка ролевых `GrantedAuthority`, обогащённых в `WorkspaceContextFilter` |
+
+**`WorkspaceAccessService`** (`io.datapulse.platform.security`) — access-checking bean для SpEL:
+- `isCurrentWorkspace(Long workspaceId)` — проверяет, что path workspaceId == `WorkspaceContext.workspaceId` (предотвращает IDOR-атаки, где path variable отличается от header).
+- Применяется ко всем endpoint-ам с `{workspaceId}` в path: MemberController, InvitationController, WorkspaceController (get/update).
+- Для endpoint-ов с `{connectionId}` (ConnectionController, JobController): workspace isolation обеспечивается на уровне сервиса — service-методы принимают `workspaceContext.getWorkspaceId()` и скопируют запросы в БД.
+
+**Формат `@PreAuthorize` для workspace-scoped endpoint-ов с RBAC:**
+```java
+@PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+```
+Обе проверки (workspace identity + RBAC) комбинируются через `and` в одной SpEL-аннотации на уровне метода. Класс-уровневый `@PreAuthorize` не используется, т.к. в Spring Security 6.x метод-уровневый `@PreAuthorize` перекрывает класс-уровневый.
 
 Получение текущего пользователя в сервисах: через request-scoped context-бин. Прямой доступ к `SecurityContextHolder` — только в инфраструктурном коде (фильтры, handshake handlers).
 
@@ -305,7 +319,7 @@ Datapulse не управляет паролями. Регистрация и а
 ### Ограничения Phase A
 
 - Один workspace per tenant (multi-workspace — Phase G).
-- Tenant creation доступна любому зарегистрированному пользователю (rate limit: 3 tenants per user).
+- Tenant creation доступна любому зарегистрированному пользователю (rate limit: 3 tenants per user). Реализация: `OnboardingService.createTenant()` проверяет `tenantRepository.countByOwnerUserId(ownerUserId) >= MAX_TENANTS_PER_USER` и выбрасывает `BadRequestException("tenant.limit.exceeded")` при превышении.
 
 ## Entity lifecycles
 
@@ -362,7 +376,7 @@ Default `expires_at`: 7 дней от создания. Cron: `datapulse.tenancy
 
 Авторитетная DDL `audit_log` определена в [Audit & Alerting](audit-alerting.md) §audit_log — schema. Tenancy & IAM публикует `AuditEvent` (из `io.datapulse.platform.audit`) для workspace/user/invitation действий; Audit & Alerting listener (`AuditEventListener`) записывает в единую таблицу.
 
-Публикация: `TenancyAuditPublisher` — helper-сервис, обёртка над `ApplicationEventPublisher`. Вызывается из `OnboardingService`, `MemberService`, `InvitationService` после каждого мутирующего действия.
+Публикация: `TenancyAuditPublisher` — helper-сервис, обёртка над `ApplicationEventPublisher`. Вызывается из `OnboardingService`, `MemberService`, `InvitationService` после каждого мутирующего действия. Исключение: `user.provision` публикуется из `WorkspaceContextFilter.provisionUser()` напрямую через `ApplicationEventPublisher` (workspace context ещё не инициализирован, `workspaceId = 0`, `actorType = "SYSTEM"`).
 
 Audit records immutable: update и delete запрещены. Retention: не менее 12 месяцев.
 
@@ -446,6 +460,31 @@ Audit records immutable: update и delete запрещены. Retention: не м
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
 | GET | `/api/workspaces/{workspaceId}/audit-log` | ADMIN, OWNER | Paginated audit log. Filters: `?actionType=...&from=...&to=...&userId=...` |
+
+## Frontend: Workspace Context
+
+### WorkspaceContextStore
+
+`WorkspaceContextStore` (`shared/stores/workspace-context.store.ts`) — глобальный NgRx SignalStore (`providedIn: 'root'`), хранящий текущий workspace context на стороне SPA.
+
+**State:**
+- `currentWorkspaceId: number | null`
+- `currentWorkspaceName: string | null`
+- `loading: boolean`
+
+**Methods:**
+- `setWorkspace(id, name)` — устанавливает текущий workspace, сохраняет `id` в `localStorage` (`dp_last_workspace_id`) для persistence между сессиями.
+- `clearWorkspace()` — сбрасывает context.
+- `setLoading(boolean)` — флаг загрузки.
+
+**Computed:**
+- `hasWorkspace` — `true` если `currentWorkspaceId !== null`.
+
+**Использование:**
+- `auth.interceptor.ts` — читает `currentWorkspaceId` и проставляет header `X-Workspace-Id` во все HTTP-запросы.
+- `workspace.guard.ts` — проверяет наличие workspace перед входом в workspace-scoped routes; если нет — redirect на workspace selector.
+- Shell-компоненты (top-bar, status-bar, activity-bar) — отображают текущий workspace.
+- Workspace selector и onboarding wizard — вызывают `setWorkspace()` после выбора/создания.
 
 ## Связанные модули
 
