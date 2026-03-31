@@ -83,7 +83,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 
 | Entrypoint | Phase | Ответственность |
 |------------|-------|-----------------|
-| `datapulse-api` | A | REST API: tenancy, connections, sync triggers, reads |
+| `datapulse-api` | A | REST API: tenancy, connections, sync triggers, reads. Phase A: также outbox poller (`runtime: ALL`) и WebSocket push |
 | `datapulse-ingest-worker` | A | Data pipeline: fetch → raw → normalize → canonicalize → materialize |
 | `datapulse-pricing-worker` | C, F | Pricing pipeline: eligibility → decision → explanation; Promo evaluation pipeline |
 | `datapulse-executor-worker` | D, F | Price action execution + Promo action execution, retries, reconciliation |
@@ -130,12 +130,12 @@ outbox_event:
 | event_type | Module | Consumer | Exchange / Queue | Описание |
 |------------|--------|----------|------------------|----------|
 | `ETL_SYNC_EXECUTE` | ETL Pipeline | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` | Запуск ETL sync run |
-| `ETL_SYNC_RETRY` | ETL Pipeline | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` (delayed via `etl.sync.wait` DLX) | DLX auto-retry failed job_execution с checkpoint resume. payload: `{ "jobExecutionId": <id> }` |
+| `ETL_SYNC_RETRY` | ETL Pipeline | `datapulse-ingest-worker` | Publish → `etl.sync.wait` / `etl.sync.wait` (wait queue, TTL 25 min) → DLX → `etl.sync` / `etl.sync` | DLX auto-retry failed job_execution с checkpoint resume. payload: `{ "jobExecutionId": <id> }` |
 | `ETL_SYNC_COMPLETED` | ETL Pipeline | `datapulse-pricing-worker`, `datapulse-api` | `datapulse.etl.events` / fanout | Уведомление о завершении sync |
 | `PRICING_RUN_EXECUTE` | Pricing | `datapulse-pricing-worker` | `pricing.run` / `pricing.run` | Запуск pricing run batch |
 | `PRICE_ACTION_EXECUTE` | Execution | `datapulse-executor-worker` | `price.execution` / `price.execution` | Исполнение price action |
-| `PRICE_ACTION_RETRY` | Execution | `datapulse-executor-worker` | `price.execution` / `price.execution` (delayed) | Retry price action |
-| `RECONCILIATION_CHECK` | Execution | `datapulse-executor-worker` | `price.reconciliation` / `price.reconciliation` (delayed via DLX) | Deferred reconciliation check |
+| `PRICE_ACTION_RETRY` | Execution | `datapulse-executor-worker` | Publish → `price.execution.wait` / `price.execution.wait` (wait queue, TTL 1 min) → DLX → `price.execution` / `price.execution` | Retry price action |
+| `RECONCILIATION_CHECK` | Execution | `datapulse-executor-worker` | Publish → `price.reconciliation.wait` / `price.reconciliation.wait` (wait queue, TTL 1 min) → DLX → `price.reconciliation` / `price.reconciliation` | Deferred reconciliation check |
 | `PROMO_ACTION_EXECUTE` | Promotions | `datapulse-executor-worker` | `promo.execution` / `promo.execution` | Исполнение promo action |
 | `PROMO_EVALUATION_EXECUTE` | Promotions | `datapulse-pricing-worker` | `promo.evaluation` / `promo.evaluation` | Запуск promo evaluation batch |
 | `ETL_PROMO_CAMPAIGN_STALE` | ETL Pipeline | `datapulse-pricing-worker` | `datapulse.etl.events` / fanout | Stale campaign detected — кампания не возвращается в PROMO_SYNC > 48h. Promotions expires pending actions |
@@ -145,14 +145,39 @@ outbox_event:
 
 Единый outbox poller (`@Scheduled`, per worker instance) в каждом runtime:
 
-| Runtime | Обрабатывает event types |
-|---------|--------------------------|
-| `datapulse-api` | — (не является outbox publisher) |
-| `datapulse-ingest-worker` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE`, `REMATERIALIZATION_REQUESTED` |
-| `datapulse-pricing-worker` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE`, `ETL_PROMO_CAMPAIGN_STALE` (via fanout — expires pending promo actions) |
-| `datapulse-executor-worker` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK`, `PROMO_ACTION_EXECUTE` |
+**Phase A (single runtime):** `datapulse-api` выполняет роль единственного outbox poller с `runtime: ALL` — обрабатывает все event types. Это упрощение для single-runtime deployment.
+
+**Phase G (multi-runtime):** при разделении на отдельные worker-процессы каждый runtime обрабатывает только свои event types:
+
+| Runtime | `OutboxRuntime` enum | Обрабатывает event types |
+|---------|---------------------|--------------------------|
+| `datapulse-api` | `ALL` (Phase A) | Все event types (Phase A single-runtime). Phase G: только WebSocket push через RabbitMQ listener, outbox poller отключается |
+| `datapulse-ingest-worker` | `INGEST` | `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE`, `REMATERIALIZATION_REQUESTED` |
+| `datapulse-pricing-worker` | `PRICING` | `PRICING_RUN_EXECUTE`, `PROMO_EVALUATION_EXECUTE`. Дополнительно получает `ETL_PROMO_CAMPAIGN_STALE` через fanout queue `etl.events.pricing-worker` (не через outbox poller) |
+| `datapulse-executor-worker` | `EXECUTOR` | `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK`, `PROMO_ACTION_EXECUTE` |
 
 Poller: `SELECT ... FROM outbox_event WHERE status = 'PENDING' AND event_type IN (...) ORDER BY created_at LIMIT :batch FOR UPDATE SKIP LOCKED`. After publish → UPDATE status = 'PUBLISHED'. On failure → UPDATE status = 'FAILED', increment retry_count, set next_retry_at.
+
+## AuditEvent — shared domain event
+
+`AuditEvent` — record в `datapulse-platform/audit/`, публикуемый через Spring `ApplicationEventPublisher` из любого бизнес-модуля. Consumed `AuditEventListener` в `datapulse-audit-alerting` → persist в `audit_log`.
+
+```
+AuditEvent(
+  workspaceId     long                  -- workspace scope
+  actorType       String                -- USER, SYSTEM, SCHEDULER
+  actorUserId     Long                  -- nullable (NULL для SYSTEM/SCHEDULER)
+  actionType      String                -- dot-separated key: "workspace.create", "member.invite"
+  entityType      String                -- target entity table: "workspace", "workspace_invitation"
+  entityId        String                -- PK or composite key
+  outcome         String                -- SUCCESS, DENIED, FAILED
+  details         String                -- JSON context payload (nullable)
+  ipAddress       String                -- client IP (nullable)
+  correlationId   String                -- request correlation UUID (nullable)
+)
+```
+
+Расположен в `datapulse-platform` (а не в `datapulse-audit-alerting`), чтобы любой бизнес-модуль мог публиковать audit events без dependency на audit module.
 
 ## Scope реализации по фазам
 

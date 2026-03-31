@@ -18,8 +18,19 @@
 | ------------------------------------------------------- | ----------------------------------------------------- |
 | `@PreAuthorize` на уровне методов с SpEL                | Декларативная авторизация, workspace-scoped проверки  |
 | RBAC: OWNER, ADMIN, PRICING_MANAGER, OPERATOR, ANALYST, VIEWER | Минимально достаточный набор ролей; соответствует enum `workspace_member.role` |
-| Multi-tenant access isolation                           | `@PreAuthorize("@accessService.canRead(#connectionId)")` — проверка принадлежности connection к workspace пользователя |
+| Multi-tenant access isolation                           | `@PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")` — проверка принадлежности ресурса к workspace пользователя |
 
+
+### Access-checking bean
+
+`WorkspaceAccessService` (`@Service("workspaceAccessService")`) — bean для SpEL-выражений в `@PreAuthorize`. Расположен в `datapulse-platform/security/`.
+
+| Метод | Назначение | Пример SpEL |
+|-------|-----------|-------------|
+| `isCurrentWorkspace(Long workspaceId)` | Проверяет, что `workspaceId` совпадает с текущим workspace из `WorkspaceContext` | `@PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")` |
+| `hasRole(String... roles)` | Проверяет, что текущая роль пользователя входит в список | `@PreAuthorize("@workspaceAccessService.hasRole('ADMIN', 'OWNER')")` |
+| `isAdminOrOwner()` | Shortcut для `hasRole("ADMIN", "OWNER")` | `@PreAuthorize("@workspaceAccessService.isAdminOrOwner()")` |
+| `isOwner()` | Shortcut для `hasRole("OWNER")` | `@PreAuthorize("@workspaceAccessService.isOwner()")` |
 
 ### Матрица разрешений
 
@@ -105,6 +116,18 @@
 | Агрегация логов | Loki | Централизованный сбор логов из всех runtime entrypoints |
 | Alerting | Grafana Alerting | Alert rules для critical metric thresholds |
 
+### Реализация по фазам
+
+**Phase A (текущая):**
+- `MetricsFacade` (`datapulse-platform/observability/`) — generic-обёртка над Micrometer `MeterRegistry`: `startTimer`, `stopTimer`, `incrementCounter`, `recordDuration`, `gauge`. Конкретные имена метрик определяются вызывающим кодом в бизнес-модулях.
+- Prometheus endpoint: `management.endpoints.web.exposure.include: prometheus`.
+- Structured logging через SLF4J (`@Slf4j`), key=value формат.
+
+**Phase B (планируется):**
+- Correlation context propagation (MDC-based interceptor для HTTP requests, `@Async` task decorator, RabbitMQ message header propagation).
+- Именованные метрики по группам из таблицы выше (Integration, Sync, Pipeline и т.д.) — регистрируются через `MetricsFacade` в бизнес-модулях.
+- Интеграция Jaeger (OpenTelemetry bridge), Loki, Grafana dashboards.
+
 ## NFR-4: Устойчивость и восстановление
 
 
@@ -120,6 +143,48 @@
 
 
 Детали реализации (state machine, outbox schema, CAS SQL, retry flow) — [Execution](modules/execution.md). DLX retry для ETL sync jobs — [ETL Pipeline](modules/etl-pipeline.md) §Retry model.
+
+### RabbitMQ topology
+
+Конфигурация: `RabbitTopologyConfig` (`datapulse-api/config/`) — единый `Declarables` bean, декларирующий все exchanges, queues и bindings при старте приложения.
+
+**Exchanges (10):**
+
+| Exchange | Тип | Назначение |
+|----------|-----|-----------|
+| `etl.sync` | Direct | ETL sync run dispatch |
+| `etl.sync.wait` | Direct | DLX wait queue для ETL retry (TTL → re-route в `etl.sync`) |
+| `datapulse.etl.events` | Fanout | Broadcast: `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE` |
+| `pricing.run` | Direct | Pricing run batch dispatch |
+| `price.execution` | Direct | Price action execution dispatch |
+| `price.execution.wait` | Direct | DLX wait queue для price action retry (TTL → re-route в `price.execution`) |
+| `price.reconciliation` | Direct | Deferred reconciliation check dispatch |
+| `price.reconciliation.wait` | Direct | DLX wait queue для reconciliation (TTL → re-route в `price.reconciliation`) |
+| `promo.execution` | Direct | Promo action execution dispatch |
+| `promo.evaluation` | Direct | Promo evaluation batch dispatch |
+
+**DLX (Dead Letter Exchange) wait queues:**
+
+Паттерн: outbox publisher отправляет retry/delayed event в **wait exchange** → message попадает в **wait queue** с TTL → по истечении TTL message перенаправляется (DLX) в **main exchange** → main queue → consumer.
+
+| Wait queue | TTL | DLX target exchange | DLX routing key |
+|------------|-----|---------------------|-----------------|
+| `etl.sync.wait` | 25 мин (1,500,000 ms) | `etl.sync` | `etl.sync` |
+| `price.execution.wait` | 1 мин (60,000 ms) | `price.execution` | `price.execution` |
+| `price.reconciliation.wait` | 1 мин (60,000 ms) | `price.reconciliation` | `price.reconciliation` |
+
+**Fanout consumer queues:**
+
+| Queue | Привязана к exchange | Consumer |
+|-------|---------------------|----------|
+| `etl.events.pricing-worker` | `datapulse.etl.events` (fanout) | `datapulse-pricing-worker` |
+| `etl.events.api` | `datapulse.etl.events` (fanout) | `datapulse-api` (`SyncStatusPushListener` → WebSocket push) |
+
+**Consumer config** (`RabbitConsumerConfig`):
+- `AcknowledgeMode.AUTO` — сообщение ACK при успешном завершении listener-метода, NACK при exception.
+- `prefetchCount = 1` — один message за раз (sequential processing, prevent overload).
+- `defaultRequeueRejected = false` — rejected messages не возвращаются в очередь (предотвращение poison message loop).
+- `Jackson2JsonMessageConverter` — JSON сериализация/десериализация.
 
 ### ClickHouse unavailability handling
 
@@ -292,6 +357,34 @@ Phase G: distributed locks для multi-instance deployment.
 
 Validation errors (`400`) содержат `fieldErrors[]`: `field`, `messageKey`, `rejectedValue`.
 
+### Exception hierarchy
+
+Базовый класс: `AppException(String messageKey, int statusCode, Object... args)` extends `RuntimeException`. Расположен в `datapulse-common/exception/`.
+
+| Класс | HTTP status | Назначение |
+|-------|-------------|-----------|
+| `AppException` | Произвольный (по `statusCode`) | Базовый класс. `@Getter`, поля: `messageKey`, `statusCode`, `args` |
+| `BadRequestException` | 400 | Невалидный запрос. Static factories: `of(messageKey, args...)`, `validationFailed(field)` |
+| `NotFoundException` | 404 | Ресурс не найден. Static factories: `of(messageKey, args...)`, `entity(entityName, id)`, `workspace(id)`, `connection(id)` |
+| `ConflictException` | 409 | Конфликт состояния (duplicate, concurrent modification). Static factory: `of(messageKey, args...)` |
+
+Все подклассы имеют `private` конструкторы; создание — только через static factory methods.
+
+`ApiExceptionHandler` (`@RestControllerAdvice` в `datapulse-api`) обрабатывает: `AppException` → `ErrorResponse`, `MethodArgumentNotValidException` → 400 с `fieldErrors`, `AccessDeniedException` → 403, `Exception` (fallback) → 500.
+
+`MessageCodes` (`datapulse-common/error/`) — `public final class` с `public static final String` dot-separated ключами для i18n (e.g. `entity.not.found`, `connection.duplicate`).
+
+### Property prefixes
+
+| Prefix | Модуль | Описание |
+|--------|--------|----------|
+| `datapulse.s3.*` | ETL Pipeline | S3/MinIO endpoint, credentials, bucket names |
+| `datapulse.etl.*` | ETL Pipeline | Retention, batch sizes, job timeout, retry params |
+| `datapulse.vault.*` | Integration | Vault URI, token, cache TTL, base path |
+| `datapulse.integration.*` | Integration | Provider base URLs, health-check interval |
+| `datapulse.clickhouse.*` | Analytics | ClickHouse JDBC URL, credentials, migration toggle |
+| `datapulse.outbox.*` | Platform/API | Outbox poller: `enabled`, `runtime` (enum: `INGEST`/`PRICING`/`EXECUTOR`/`ALL`), `poll-interval`, `batch-size`, `max-retry-count`, `retry-backoff` |
+
 ### Health & Readiness
 
 - Health endpoint для каждого runtime entrypoint.
@@ -300,13 +393,41 @@ Validation errors (`400`) содержат `fieldErrors[]`: `field`, `messageKey
 
 ## NFR-8: Доставка уведомлений
 
-Детали реализации (STOMP destinations, message flow, authentication, reconnection, scalability) — [Audit & Alerting](modules/audit-alerting.md) §Notification.
+Детали бизнес-алертов (alert lifecycle, notification persistence) — [Audit & Alerting](modules/audit-alerting.md) §Notification.
 
 | Требование | Обоснование |
 |------------|-------------|
-| Канал доставки — WebSocket (STOMP) в UI | Оператор получает алерты в реальном времени при работе в интерфейсе |
-| Без email / Telegram / push | Сознательное ограничение: оператор должен быть онлайн |
+| Канал доставки — WebSocket (STOMP) в UI | Оператор получает алерты и sync-статус в реальном времени при работе в интерфейсе |
+| Без email / Telegram / push **для runtime-уведомлений** | Сознательное ограничение: оператор должен быть онлайн. Email используется **только** для workspace invitations (приглашения пользователей), не для operational notifications |
 | Reconnection fallback | При потере WebSocket — exponential backoff reconnect + REST API для sync текущего состояния |
+
+### WebSocket implementation
+
+Реализация в `datapulse-api/websocket/` (4 файла). Все файлы — в пакете `io.datapulse.api.websocket`.
+
+**Транспорт:**
+- STOMP over WebSocket, endpoint: `/ws` с SockJS fallback.
+- Simple broker: `/topic`, `/user`. Application destination prefix: `/app`. User destination prefix: `/user`.
+- Конфигурация: `WebSocketConfig` implements `WebSocketMessageBrokerConfigurer`.
+
+**Аутентификация:**
+- `JwtHandshakeInterceptor` (`HandshakeInterceptor`) — при WebSocket handshake извлекает JWT из query parameter `?token=`, декодирует через `JwtDecoder`, резолвит `AppUserEntity` и набор workspace ID из активных membership-ов.
+- Session attributes: `ws.userId` (Long), `ws.workspaceIds` (Set\<Long\>).
+- Отклоняет handshake при: отсутствии токена, невалидном JWT, неизвестном пользователе.
+
+**Авторизация подписок:**
+- `WorkspaceChannelInterceptor` (`ChannelInterceptor`) — перехватывает STOMP `SUBSCRIBE`. Проверяет, что destination `/topic/workspace/{id}/*` доступен пользователю (workspace ID есть в `ws.workspaceIds` из session). Отклоняет подписку `MessageDeliveryException` при нарушении.
+- Destinations вне паттерна `/topic/workspace/{id}/*` — не ограничиваются workspace-проверкой.
+
+**ETL sync status push:**
+- `SyncStatusPushListener` (`@RabbitListener(queues = "etl.events.api")`) — слушает `ETL_SYNC_COMPLETED` из fanout exchange `datapulse.etl.events`.
+- Извлекает `connectionId` из payload, резолвит `workspaceId` через `MarketplaceConnectionRepository`.
+- Пушит в `/topic/workspace/{workspaceId}/sync-status`.
+- Это позволяет UI обновлять статус синхронизации в реальном времени без polling REST API.
+
+### Email (scope ограничен)
+
+Инфраструктура email (`spring.mail.*` config, `mailExecutor` async executor) существует **исключительно** для workspace invitations (`WorkspaceInvitation` flow). Email **не используется** для operational notifications, алертов или sync-статусов.
 
 ## Infrastructure: Docker Compose (development)
 
@@ -521,7 +642,7 @@ datapulse/backend/
 ├── datapulse-common/                (чистая Java: exceptions, utils, message codes — без Spring)
 │   ├── pom.xml
 │   └── src/main/java/io/datapulse/common/
-│       ├── exception/               AppException, NotFoundException, BadRequestException
+│       ├── exception/               AppException, NotFoundException, BadRequestException, ConflictException
 │       ├── error/                   ErrorResponse, MessageCodes
 │       └── util/                    SlugUtils, BigDecimalUtils, etc.
 │
@@ -529,9 +650,11 @@ datapulse/backend/
 │   ├── pom.xml                      depends on: datapulse-common
 │   └── src/main/java/io/datapulse/platform/
 │       ├── persistence/             BaseEntity (@MappedSuperclass)
-│       ├── security/                WorkspaceContext (request-scoped)
-│       ├── config/                  AsyncConfig, JacksonConfig, WebClientConfig
-│       └── observability/           MetricsFacade
+│       ├── security/                WorkspaceContext (request-scoped), WorkspaceAccessService
+│       ├── config/                  AsyncConfig, JacksonConfig, WebClientConfig, SchedulingConfig, BaseMapperConfig
+│       ├── observability/           MetricsFacade
+│       ├── outbox/                  OutboxEvent, OutboxService, OutboxEventRepository, OutboxEventPollerRepository, OutboxEventType, OutboxEventStatus, OutboxRuntime
+│       └── audit/                   AuditEvent (shared domain event record)
 │
 ├── datapulse-tenancy-iam/           (multi-tenancy, users, roles, invitations, auth)
 │   ├── pom.xml                      depends on: datapulse-platform
@@ -559,7 +682,6 @@ datapulse/backend/
 │       ├── persistence/             JPA repos (canonical), JDBC repos (ClickHouse materialization)
 │       ├── pipeline/                IngestOrchestrator, normalizers, canonical writers
 │       ├── raw/                     S3RawStorage, cursor extractors, streaming capture
-│       ├── outbox/                  OutboxEvent entity, OutboxPoller, OutboxPublisher
 │       └── config/                  EtlProperties, S3Properties, ClickHouseProperties
 │
 ├── datapulse-analytics-pnl/         (ClickHouse read repos, data quality checkers, mart queries)
@@ -616,9 +738,11 @@ datapulse/backend/
 │   ├── pom.xml                      depends on: все бизнес-модули
 │   └── src/main/java/io/datapulse/api/
 │       ├── DatapulseApplication.java
-│       ├── config/                  WebSocketConfig, CorsConfig, RabbitMQ topology
+│       ├── config/                  WebSocketConfig, CorsConfig, RabbitTopologyConfig, RabbitConsumerConfig
+│       ├── error/                   ApiExceptionHandler (@RestControllerAdvice)
+│       ├── outbox/                  OutboxPoller, OutboxEventPublisher, OutboxPollerProperties
 │       ├── controller/              REST controllers per module
-│       └── websocket/               STOMP handlers, notification push
+│       └── websocket/               JwtHandshakeInterceptor, WorkspaceChannelInterceptor, SyncStatusPushListener, WebSocketConfig
 │
 └── docs/                            (architecture documentation)
 ```
@@ -686,14 +810,11 @@ src/main/resources/db/changelog/
 ├── changes/
 │   ├── 0001-tenancy-iam-tables.sql
 │   ├── 0002-integration-tables.sql
-│   ├── 0003-etl-canonical-tables.sql
-│   ├── 0004-outbox-event.sql
-│   ├── 0005-pricing-tables.sql
-│   ├── 0006-execution-tables.sql
-│   ├── 0007-promotions-tables.sql
-│   ├── 0008-seller-operations-tables.sql
+│   ├── 0003-etl-tables.sql
+│   ├── 0004-etl-canonical-tables.sql
+│   ├── 0005-outbox-event.sql
+│   ├── ...                              (будущие: pricing, execution, promotions, seller-operations)
 │   ├── 0009-audit-alerting-tables.sql
-│   ├── 0010-seed-default-alert-rules.sql
 │   └── ...
 ```
 
@@ -704,7 +825,7 @@ ClickHouse не поддерживается Liquibase. Стратегия:
 | Аспект | Описание |
 |--------|----------|
 | Формат | Plain SQL scripts с sequential numbering |
-| Execution | Custom `ClickHouseMigrationRunner` (`@Component`, Phase A). При старте `datapulse-ingest-worker` — единственный runner |
+| Execution | Custom `ClickHouseMigrationRunner` (`@Component`). **Phase A (single runtime):** запускается в `datapulse-api` (`datapulse.clickhouse.migration.enabled=true`). **Phase G (multi-runtime):** перенести в `datapulse-ingest-worker` как единственный runner |
 | State tracking | Таблица `_schema_version` в ClickHouse: `(version UInt32, script_name String, applied_at DateTime, checksum String)` |
 | Idempotency | `IF NOT EXISTS` в DDL. Runner проверяет `_schema_version` — already applied scripts пропускаются |
 | Directory | `db/clickhouse/NNNN-short-description.sql` |
