@@ -11,6 +11,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -71,4 +72,7 @@ public class PricePolicyEntity extends BaseEntity {
 
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
+
+    @Formula("(SELECT count(*) FROM price_policy_assignment ppa WHERE ppa.price_policy_id = id)")
+    private Integer assignmentsCount;
 }

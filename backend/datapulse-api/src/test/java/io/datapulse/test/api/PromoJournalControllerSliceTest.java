@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.datapulse.platform.security.WorkspaceAccessService;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.sellerops.api.PromoJournalController;
+import io.datapulse.tenancy.persistence.AppUserRepository;
+import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.sellerops.api.PromoJournalEntryResponse;
 import io.datapulse.sellerops.domain.PromoJournalService;
 import java.math.BigDecimal;
@@ -23,7 +25,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -38,11 +40,17 @@ class PromoJournalControllerSliceTest {
   @Autowired
   private MockMvc mockMvc;
 
-  @MockBean
+  @MockitoBean
   private PromoJournalService journalService;
 
-  @MockBean
+  @MockitoBean
   private WorkspaceContext workspaceContext;
+
+  @MockitoBean
+  private AppUserRepository appUserRepository;
+
+  @MockitoBean
+  private WorkspaceMemberRepository workspaceMemberRepository;
 
   @BeforeEach
   void setUp() {

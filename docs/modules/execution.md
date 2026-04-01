@@ -735,21 +735,21 @@ deferred_action:
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/actions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&status=...&executionMode=...&from=...&to=...` |
-| GET | `/api/actions/{actionId}` | Any role | Детали action: all fields + attempt history |
-| GET | `/api/actions/{actionId}/attempts` | Any role | Список attempts с provider request/response summaries |
+| GET | `/api/workspaces/{workspaceId}/actions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&status=...&executionMode=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/actions/{actionId}` | Any role | Детали action: all fields + attempt history |
+| GET | `/api/workspaces/{workspaceId}/actions/{actionId}/attempts` | Any role | Список attempts с provider request/response summaries |
 
 ### Manual interventions
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/actions/{actionId}/approve` | PRICING_MANAGER, ADMIN, OWNER | Approve: PENDING_APPROVAL → APPROVED. Bulk: `POST /api/actions/bulk-approve` Body: `{ actionIds: [...] }` |
-| POST | `/api/actions/{actionId}/reject` | PRICING_MANAGER, ADMIN, OWNER | Reject: PENDING_APPROVAL → CANCELLED. Body: `{ cancelReason }` |
-| POST | `/api/actions/{actionId}/hold` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Hold: APPROVED → ON_HOLD. Body: `{ holdReason }` |
-| POST | `/api/actions/{actionId}/resume` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Resume: ON_HOLD → APPROVED |
-| POST | `/api/actions/{actionId}/cancel` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Cancel. Body: `{ cancelReason }`. Допустимые состояния: PENDING_APPROVAL, APPROVED, ON_HOLD, SCHEDULED, RETRY_SCHEDULED, RECONCILIATION_PENDING |
-| POST | `/api/actions/{actionId}/retry` | PRICING_MANAGER, ADMIN, OWNER | Retry failed: FAILED → создаёт новый action (re-run). Body: `{ retryReason }` |
-| POST | `/api/actions/{actionId}/reconcile` | ADMIN, OWNER | Manual reconciliation. Body: `{ outcome: "SUCCEEDED" / "FAILED", manualOverrideReason }` |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/approve` | PRICING_MANAGER, ADMIN, OWNER | Approve: PENDING_APPROVAL → APPROVED. Bulk: `POST /api/workspaces/{workspaceId}/actions/bulk-approve` Body: `{ actionIds: [...] }` |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/reject` | PRICING_MANAGER, ADMIN, OWNER | Reject: PENDING_APPROVAL → CANCELLED. Body: `{ cancelReason }` |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/hold` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Hold: APPROVED → ON_HOLD. Body: `{ holdReason }` |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/resume` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Resume: ON_HOLD → APPROVED |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/cancel` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Cancel. Body: `{ cancelReason }`. Допустимые состояния: PENDING_APPROVAL, APPROVED, ON_HOLD, SCHEDULED, RETRY_SCHEDULED, RECONCILIATION_PENDING |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/retry` | PRICING_MANAGER, ADMIN, OWNER | Retry failed: FAILED → создаёт новый action (re-run). Body: `{ retryReason }` |
+| POST | `/api/workspaces/{workspaceId}/actions/{actionId}/reconcile` | ADMIN, OWNER | Manual reconciliation. Body: `{ outcome: "SUCCEEDED" / "FAILED", manualOverrideReason }` |
 
 ### Simulation
 

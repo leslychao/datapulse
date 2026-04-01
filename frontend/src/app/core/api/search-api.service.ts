@@ -15,6 +15,6 @@ export class SearchApiService {
     if (limit != null) {
       params = params.set('limit', limit);
     }
-    return this.http.get<SearchResult>(`${this.base}/workspace/${workspaceId}/search`, { params });
+    return this.http.get<SearchResult>(`${this.base}/workspaces/${workspaceId}/search`, { params });
   }
 }

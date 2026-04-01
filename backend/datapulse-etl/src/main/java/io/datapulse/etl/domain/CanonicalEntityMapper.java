@@ -123,7 +123,7 @@ public class CanonicalEntityMapper {
         entity.setQuantity(norm.quantity());
         entity.setPricePerUnit(norm.pricePerUnit());
         entity.setTotalAmount(norm.totalAmount());
-        entity.setCurrency(norm.currency());
+        entity.setCurrency(norm.currency() != null ? norm.currency() : "RUB");
         entity.setStatus(norm.status());
         entity.setFulfillmentType(norm.fulfillmentType());
         entity.setRegion(norm.region());
@@ -140,6 +140,7 @@ public class CanonicalEntityMapper {
         entity.setSaleAmount(norm.saleAmount());
         entity.setCommission(norm.commission());
         entity.setQuantity(norm.quantity());
+        entity.setCurrency(norm.currency() != null ? norm.currency() : "RUB");
         entity.setJobExecutionId(ctx.jobExecutionId());
         return entity;
     }

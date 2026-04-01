@@ -127,6 +127,13 @@ public class OzonNormalizer {
     public NormalizedOrderItem normalizeFboPosting(OzonFboPosting posting,
                                                    OzonFboPosting.OzonPostingProduct product) {
         OffsetDateTime orderDate = OzonTimestampParser.parseIso8601(posting.createdAt());
+        if (orderDate == null) {
+            orderDate = OzonTimestampParser.parseIso8601(posting.inProcessAt());
+        }
+        if (orderDate == null) {
+            orderDate = OffsetDateTime.now();
+            log.warn("FBO posting has no date, using now(): postingNumber={}", posting.postingNumber());
+        }
         BigDecimal pricePerUnit = parseBigDecimal(product.price());
         BigDecimal totalAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
         String region = posting.analyticsData() != null ? posting.analyticsData().region() : null;
@@ -148,6 +155,13 @@ public class OzonNormalizer {
     public NormalizedOrderItem normalizeFbsPosting(OzonFbsPosting posting,
                                                    OzonFboPosting.OzonPostingProduct product) {
         OffsetDateTime orderDate = OzonTimestampParser.parseIso8601(posting.createdAt());
+        if (orderDate == null) {
+            orderDate = OzonTimestampParser.parseIso8601(posting.inProcessAt());
+        }
+        if (orderDate == null) {
+            orderDate = OffsetDateTime.now();
+            log.warn("FBS posting has no date, using now(): postingNumber={}", posting.postingNumber());
+        }
         BigDecimal pricePerUnit = parseBigDecimal(product.price());
         BigDecimal totalAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
         String region = posting.analyticsData() != null ? posting.analyticsData().region() : null;
@@ -176,6 +190,14 @@ public class OzonNormalizer {
     public NormalizedSaleItem normalizeFboSale(OzonFboPosting posting,
                                                OzonFboPosting.OzonPostingProduct product) {
         OffsetDateTime saleDate = OzonTimestampParser.parseIso8601(posting.createdAt());
+        if (saleDate == null) {
+            saleDate = OzonTimestampParser.parseIso8601(posting.inProcessAt());
+        }
+        if (saleDate == null) {
+            saleDate = OffsetDateTime.now();
+            log.warn("FBO posting has no date for sale, using now(): postingNumber={}",
+                    posting.postingNumber());
+        }
         BigDecimal pricePerUnit = parseBigDecimal(product.price());
         BigDecimal saleAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
 
@@ -193,6 +215,14 @@ public class OzonNormalizer {
     public NormalizedSaleItem normalizeFbsSale(OzonFbsPosting posting,
                                                OzonFboPosting.OzonPostingProduct product) {
         OffsetDateTime saleDate = OzonTimestampParser.parseIso8601(posting.createdAt());
+        if (saleDate == null) {
+            saleDate = OzonTimestampParser.parseIso8601(posting.inProcessAt());
+        }
+        if (saleDate == null) {
+            saleDate = OffsetDateTime.now();
+            log.warn("FBS posting has no date for sale, using now(): postingNumber={}",
+                    posting.postingNumber());
+        }
         BigDecimal pricePerUnit = parseBigDecimal(product.price());
         BigDecimal saleAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
 

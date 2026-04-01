@@ -1,12 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { NgClass } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectMutation,
@@ -14,7 +14,15 @@ import {
   QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { LucideAngularModule, X, RefreshCw, Check, Ban, ArrowUpRight, CircleCheck } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  X,
+  RefreshCw,
+  Check,
+  Ban,
+  ArrowUpRight,
+  CircleCheck,
+} from 'lucide-angular';
 
 import { MismatchApiService } from '@core/api/mismatch-api.service';
 import { MarketplaceType, MismatchDetail, MismatchStatus } from '@core/models';
@@ -28,26 +36,15 @@ import { MismatchResolveModalComponent } from './mismatch-resolve-modal.componen
 
 type DetailTab = 'comparison' | 'timeline' | 'action';
 
-function marketplaceFromString(t: string): MarketplaceType {
+function mp(t: string): MarketplaceType {
   return t === 'OZON' ? 'OZON' : 'WB';
 }
 
-function statusColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' | 'neutral' {
-  switch (st) {
-    case 'ACTIVE':
-      return 'warning';
-    case 'CRITICAL':
-      return 'error';
-    case 'RESOLVED':
-    case 'AUTO_RESOLVED':
-      return 'success';
-    case 'ACKNOWLEDGED':
-      return 'info';
-    case 'IGNORED':
-      return 'neutral';
-    default:
-      return 'neutral';
-  }
+function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' | 'neutral' {
+  if (st === 'ACTIVE') return 'warning';
+  if (st === 'RESOLVED' || st === 'AUTO_RESOLVED') return 'success';
+  if (st === 'ACKNOWLEDGED') return 'info';
+  return 'neutral';
 }
 
 @Component({
@@ -55,6 +52,7 @@ function statusColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'inf
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgClass,
     TranslatePipe,
     LucideAngularModule,
     MarketplaceBadgeComponent,
@@ -64,93 +62,51 @@ function statusColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'inf
     MismatchResolveModalComponent,
   ],
   template: `
-    <aside
-      class="flex h-full w-[min(440px,100vw)] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]"
-    >
+    <aside class="flex h-full w-[min(440px,100vw)] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]">
       <div class="flex items-start justify-between gap-3 border-b border-[var(--border-default)] px-4 py-3">
         <div class="min-w-0 flex-1">
           @if (detailQuery.isPending()) {
             <div class="dp-shimmer mb-2 h-4 w-3/4 rounded-[var(--radius-sm)]"></div>
             <div class="dp-shimmer h-3 w-1/2 rounded-[var(--radius-sm)]"></div>
-          } @else if (detailQuery.data(); as d) {
-            <h2 class="truncate text-base font-semibold text-[var(--text-primary)]">{{ d.offer.offerName }}</h2>
-            <p class="mt-0.5 font-mono text-[var(--text-xs)] text-[var(--text-secondary)]">{{ d.offer.skuCode }}</p>
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <dp-marketplace-badge [type]="mpType(d)" />
-              <dp-status-badge [label]="'mismatches.type.' + d.type | translate" [color]="'info'" [dot]="true" />
-              <dp-status-badge
-                [label]="'mismatches.severity.' + d.severity | translate"
-                [color]="d.severity === 'CRITICAL' ? 'error' : 'warning'"
-                [dot]="true"
-              />
-              <dp-status-badge
-                [label]="'mismatches.status.' + d.status | translate"
-                [color]="statusColor(d.status)"
-                [dot]="true"
-              />
-            </div>
-            <p class="mt-2 text-[var(--text-xs)] text-[var(--text-secondary)]">
-              {{ 'mismatches.detail.detected' | translate }}: {{ d.detectedAt | dpDateFormat }}
-            </p>
+          } @else {
+            @if (detailQuery.data(); as d) {
+              <h2 class="truncate text-base font-semibold text-[var(--text-primary)]">{{ d.offer.offerName }}</h2>
+              <p class="mt-0.5 font-mono text-[var(--text-xs)] text-[var(--text-secondary)]">{{ d.offer.skuCode }}</p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <dp-marketplace-badge [type]="mpType(d)" />
+                <dp-status-badge [label]="'mismatches.type.' + d.type | translate" [color]="'info'" [dot]="true" />
+                <dp-status-badge [label]="'mismatches.severity.' + d.severity | translate" [color]="d.severity === 'CRITICAL' ? 'error' : 'warning'" [dot]="true" />
+                <dp-status-badge [label]="'mismatches.status.' + d.status | translate" [color]="badgeForStatus(d.status)" [dot]="true" />
+              </div>
+              <p class="mt-2 text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.detail.detected' | translate }}: {{ d.detectedAt | dpDateFormat }}</p>
+            }
           }
         </div>
-        <button
-          type="button"
-          (click)="closed.emit()"
-          class="cursor-pointer rounded-[var(--radius-md)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-          [attr.aria-label]="'mismatches.detail.close' | translate"
-        >
+        <button type="button" (click)="closed.emit()" class="cursor-pointer rounded-[var(--radius-md)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]" [attr.aria-label]="'mismatches.detail.close' | translate">
           <lucide-icon [img]="CloseIcon" [size]="18" />
         </button>
       </div>
-
       <div class="flex gap-1 border-b border-[var(--border-default)] px-2 pt-2">
-        @for (tab of tabs; track tab.id) {
-          <button
-            type="button"
-            (click)="activeTab.set(tab.id)"
-            class="cursor-pointer rounded-t-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors"
-            [class.bg-[var(--bg-tertiary)]]="activeTab() === tab.id"
-            [class.text-[var(--text-primary)]]="activeTab() === tab.id"
-            [class.text-[var(--text-secondary)]]="activeTab() !== tab.id"
-          >
-            {{ tab.labelKey | translate }}
-          </button>
-        }
+        <button type="button" (click)="activeTab.set('comparison')" [ngClass]="tabCls('comparison')">{{ 'mismatches.tabs.comparison' | translate }}</button>
+        <button type="button" (click)="activeTab.set('timeline')" [ngClass]="tabCls('timeline')">{{ 'mismatches.tabs.timeline' | translate }}</button>
+        <button type="button" (click)="activeTab.set('action')" [ngClass]="tabCls('action')">{{ 'mismatches.tabs.action' | translate }}</button>
       </div>
-
       <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         @if (detailQuery.data(); as d) {
           @if (activeTab() === 'comparison') {
             <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
               <table class="w-full text-sm">
-                <thead class="bg-[var(--bg-secondary)] text-left text-[var(--text-secondary)]">
-                  <tr>
-                    <th class="px-3 py-2">{{ 'mismatches.detail.field' | translate }}</th>
-                    <th class="px-3 py-2">{{ 'mismatches.detail.expected' | translate }}</th>
-                    <th class="px-3 py-2">{{ 'mismatches.detail.actual' | translate }}</th>
-                  </tr>
-                </thead>
+                <thead class="bg-[var(--bg-secondary)] text-left text-[var(--text-secondary)]"><tr><th class="px-3 py-2">{{ 'mismatches.detail.field' | translate }}</th><th class="px-3 py-2">{{ 'mismatches.detail.expected' | translate }}</th><th class="px-3 py-2">{{ 'mismatches.detail.actual' | translate }}</th></tr></thead>
                 <tbody class="divide-y divide-[var(--border-subtle)]">
                   <tr>
                     <td class="px-3 py-2 text-[var(--text-secondary)]">{{ 'mismatches.detail.value_row' | translate }}</td>
-                    <td
-                      class="max-w-[140px] break-words px-3 py-2 font-mono text-[var(--text-primary)]"
-                      [class.bg-[color-mix(in_srgb,var(--status-warning)_12%,transparent)]]="d.expectedValue !== d.actualValue"
-                    >
-                      {{ d.expectedValue }}
-                    </td>
-                    <td
-                      class="max-w-[140px] break-words px-3 py-2 font-mono text-[var(--text-primary)]"
-                      [class.bg-[color-mix(in_srgb,var(--status-error)_12%,transparent)]]="d.expectedValue !== d.actualValue"
-                    >
-                      {{ d.actualValue }}
-                    </td>
+                    <td class="max-w-[140px] break-words px-3 py-2 font-mono" [ngClass]="cellExpected(d)">{{ d.expectedValue }}</td>
+                    <td class="max-w-[140px] break-words px-3 py-2 font-mono" [ngClass]="cellActual(d)">{{ d.actualValue }}</td>
                   </tr>
                   <tr>
                     <td class="px-3 py-2 text-[var(--text-secondary)]">{{ 'mismatches.detail.source' | translate }}</td>
-                    <td class="px-3 py-2 text-[var(--text-primary)]">{{ d.expectedSource }}</td>
-                    <td class="px-3 py-2 text-[var(--text-primary)]">{{ d.actualSource }}</td>
+                    <td class="px-3 py-2">{{ d.expectedSource }}</td>
+                    <td class="px-3 py-2">{{ d.actualSource }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -159,13 +115,10 @@ function statusColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'inf
             @if (d.timeline.length === 0) {
               <p class="text-sm text-[var(--text-secondary)]">{{ 'mismatches.detail.timeline_empty' | translate }}</p>
             } @else {
-              <ul class="relative border-l border-[var(--border-default)] pl-4">
+              <ul class="space-y-3 border-l border-[var(--border-default)] pl-3">
                 @for (ev of d.timeline; track ev.timestamp + ev.eventType) {
-                  <li class="mb-4 ml-1">
-                    <span
-                      class="absolute -left-[5px] mt-1.5 h-2 w-2 rounded-full"
-                      [style.background-color]="timelineDotColor(ev.eventType)"
-                    ></span>
+                  <li class="relative pl-2">
+                    <span class="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full" [style.background-color]="dot(ev.eventType)"></span>
                     <p class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ ev.timestamp | dpDateFormat }}</p>
                     <p class="text-sm text-[var(--text-primary)]">{{ ev.description }}</p>
                     <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ ev.actor }}</p>
@@ -173,98 +126,30 @@ function statusColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'inf
                 }
               </ul>
             }
+          } @else if (!d.relatedAction) {
+            <p class="text-sm text-[var(--text-secondary)]">{{ 'mismatches.detail.no_action' | translate }}</p>
           } @else {
-            @if (!d.relatedAction) {
-              <p class="text-sm text-[var(--text-secondary)]">{{ 'mismatches.detail.no_action' | translate }}</p>
-            } @else {
-              <dl class="space-y-2 text-sm">
-                <div class="flex justify-between gap-2">
-                  <dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.action_id' | translate }}</dt>
-                  <dd class="font-mono text-[var(--text-primary)]">{{ d.relatedAction.actionId }}</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.action_status' | translate }}</dt>
-                  <dd class="text-[var(--text-primary)]">{{ d.relatedAction.status }}</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.target_price' | translate }}</dt>
-                  <dd class="font-mono text-[var(--text-primary)]">{{ d.relatedAction.targetPrice }}</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.executed_at' | translate }}</dt>
-                  <dd class="text-[var(--text-primary)]">{{ d.relatedAction.executedAt | dpDateFormat }}</dd>
-                </div>
-              </dl>
-            }
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.action_id' | translate }}</dt><dd class="font-mono">{{ d.relatedAction.actionId }}</dd></div>
+              <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.action_status' | translate }}</dt><dd>{{ d.relatedAction.status }}</dd></div>
+              <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.target_price' | translate }}</dt><dd class="font-mono">{{ d.relatedAction.targetPrice }}</dd></div>
+              <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.executed_at' | translate }}</dt><dd>{{ d.relatedAction.executedAt | dpDateFormat }}</dd></div>
+            </dl>
           }
         }
       </div>
-
       <div class="border-t border-[var(--border-default)] px-4 py-3">
         <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            (click)="ackMutation.mutate()"
-            [disabled]="ackMutation.isPending() || !canAck()"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
-          >
-            <lucide-icon [img]="CheckIcon" [size]="14" />
-            {{ 'mismatches.detail.ack' | translate }}
-          </button>
-          <button
-            type="button"
-            (click)="retryMutation.mutate()"
-            [disabled]="retryMutation.isPending() || !detailQuery.data()?.relatedActionId"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
-          >
-            <lucide-icon [img]="RefreshIcon" [size]="14" />
-            {{ 'mismatches.detail.retry' | translate }}
-          </button>
-          <button
-            type="button"
-            (click)="showIgnoreModal.set(true)"
-            [disabled]="!detailQuery.data()"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
-          >
-            <lucide-icon [img]="BanIcon" [size]="14" />
-            {{ 'mismatches.detail.ignore' | translate }}
-          </button>
-          <button
-            type="button"
-            (click)="onEscalate()"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-          >
-            <lucide-icon [img]="EscalateIcon" [size]="14" />
-            {{ 'mismatches.detail.escalate' | translate }}
-          </button>
-          <button
-            type="button"
-            (click)="showResolveModal.set(true)"
-            [disabled]="!detailQuery.data()"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
-          >
-            <lucide-icon [img]="ResolveIcon" [size]="14" />
-            {{ 'mismatches.detail.resolve' | translate }}
-          </button>
+          <button type="button" (click)="ackMutation.mutate()" [disabled]="ackMutation.isPending() || !canAck()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] disabled:opacity-50"><lucide-icon [img]="CheckIcon" [size]="14" />{{ 'mismatches.detail.ack' | translate }}</button>
+          <button type="button" (click)="retryMutation.mutate()" [disabled]="retryMutation.isPending() || !detailQuery.data()?.relatedActionId" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] disabled:opacity-50"><lucide-icon [img]="RefreshIcon" [size]="14" />{{ 'mismatches.detail.retry' | translate }}</button>
+          <button type="button" (click)="showIgnoreModal.set(true)" [disabled]="!detailQuery.data()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] disabled:opacity-50"><lucide-icon [img]="BanIcon" [size]="14" />{{ 'mismatches.detail.ignore' | translate }}</button>
+          <button type="button" (click)="onEscalate()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)]"><lucide-icon [img]="EscalateIcon" [size]="14" />{{ 'mismatches.detail.escalate' | translate }}</button>
+          <button type="button" (click)="showResolveModal.set(true)" [disabled]="!detailQuery.data()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"><lucide-icon [img]="ResolveIcon" [size]="14" />{{ 'mismatches.detail.resolve' | translate }}</button>
         </div>
       </div>
     </aside>
-
-    <dp-mismatch-resolve-modal
-      [open]="showResolveModal()"
-      (resolved)="onResolve($event)"
-      (cancelled)="showResolveModal.set(false)"
-    />
-
-    <dp-confirmation-modal
-      [open]="showIgnoreModal()"
-      [title]="'mismatches.ignore.title' | translate"
-      [message]="'mismatches.ignore.message' | translate"
-      [confirmLabel]="'mismatches.ignore.confirm' | translate"
-      [danger]="true"
-      (confirmed)="onIgnoreConfirm()"
-      (cancelled)="showIgnoreModal.set(false)"
-    />
+    <dp-mismatch-resolve-modal [open]="showResolveModal()" (resolved)="onResolve($event)" (cancelled)="showResolveModal.set(false)" />
+    <dp-confirmation-modal [open]="showIgnoreModal()" [title]="'mismatches.ignore.title' | translate" [message]="'mismatches.ignore.message' | translate" [confirmLabel]="'mismatches.ignore.confirm' | translate" [danger]="true" (confirmed)="onIgnoreConfirm()" (cancelled)="showIgnoreModal.set(false)" />
   `,
 })
 export class MismatchDetailPanelComponent {
@@ -288,26 +173,16 @@ export class MismatchDetailPanelComponent {
   readonly showResolveModal = signal(false);
   readonly showIgnoreModal = signal(false);
 
-  readonly tabs: { id: DetailTab; labelKey: string }[] = [
-    { id: 'comparison', labelKey: 'mismatches.tabs.comparison' },
-    { id: 'timeline', labelKey: 'mismatches.tabs.timeline' },
-    { id: 'action', labelKey: 'mismatches.tabs.action' },
-  ];
-
   readonly detailQuery = injectQuery(() => ({
     queryKey: ['mismatch-detail', this.ws.currentWorkspaceId(), this.mismatchId()],
     queryFn: () =>
-      lastValueFrom(
-        this.api.getDetail(this.ws.currentWorkspaceId()!, this.mismatchId()),
-      ),
+      lastValueFrom(this.api.getDetail(this.ws.currentWorkspaceId()!, this.mismatchId())),
     enabled: !!this.ws.currentWorkspaceId() && this.mismatchId() > 0,
   }));
 
   readonly ackMutation = injectMutation(() => ({
     mutationFn: () =>
-      lastValueFrom(
-        this.api.acknowledge(this.ws.currentWorkspaceId()!, this.mismatchId()),
-      ),
+      lastValueFrom(this.api.acknowledge(this.ws.currentWorkspaceId()!, this.mismatchId())),
     onSuccess: () => {
       this.toast.success(this.translate.instant('mismatches.toast.ack'));
       this.queryClient.invalidateQueries({ queryKey: ['mismatch-detail'] });
@@ -331,9 +206,7 @@ export class MismatchDetailPanelComponent {
 
   readonly resolveMutation = injectMutation(() => ({
     mutationFn: (body: { resolution: string; note: string }) =>
-      lastValueFrom(
-        this.api.resolve(this.ws.currentWorkspaceId()!, this.mismatchId(), body),
-      ),
+      lastValueFrom(this.api.resolve(this.ws.currentWorkspaceId()!, this.mismatchId(), body)),
     onSuccess: () => {
       this.showResolveModal.set(false);
       this.toast.success(this.translate.instant('mismatches.toast.resolve'));
@@ -343,15 +216,32 @@ export class MismatchDetailPanelComponent {
     onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
   }));
 
-  protected mpType(d: MismatchDetail): MarketplaceType {
-    return marketplaceFromString(d.offer.marketplaceType);
+  protected tabCls(id: DetailTab): Record<string, boolean> {
+    const on = this.activeTab() === id;
+    return {
+      'cursor-pointer rounded-t-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors': true,
+      'bg-[var(--bg-tertiary)] text-[var(--text-primary)]': on,
+      'text-[var(--text-secondary)]': !on,
+    };
   }
 
-  protected statusColor(st: MismatchStatus) {
-    return statusColor(st);
+  protected cellExpected(d: MismatchDetail): Record<string, boolean> {
+    const diff = d.expectedValue !== d.actualValue;
+    return {
+      'text-[var(--text-primary)]': true,
+      'bg-[color-mix(in_srgb,var(--status-warning)_12%,transparent)]': diff,
+    };
   }
 
-  protected timelineDotColor(eventType: string): string {
+  protected cellActual(d: MismatchDetail): Record<string, boolean> {
+    const diff = d.expectedValue !== d.actualValue;
+    return {
+      'text-[var(--text-primary)]': true,
+      'bg-[color-mix(in_srgb,var(--status-error)_12%,transparent)]': diff,
+    };
+  }
+
+  protected dot(eventType: string): string {
     if (eventType.includes('ERROR') || eventType.includes('FAIL')) return 'var(--status-error)';
     if (eventType.includes('WARN')) return 'var(--status-warning)';
     return 'var(--accent-primary)';
@@ -363,10 +253,7 @@ export class MismatchDetailPanelComponent {
   }
 
   protected onResolve(payload: { resolution: string; note: string }): void {
-    this.resolveMutation.mutate({
-      resolution: payload.resolution,
-      note: payload.note,
-    });
+    this.resolveMutation.mutate({ resolution: payload.resolution, note: payload.note });
   }
 
   protected onIgnoreConfirm(): void {
@@ -379,5 +266,13 @@ export class MismatchDetailPanelComponent {
 
   protected onEscalate(): void {
     this.toast.info(this.translate.instant('mismatches.toast.escalate'));
+  }
+
+  protected mpType(d: MismatchDetail): MarketplaceType {
+    return mp(d.offer.marketplaceType);
+  }
+
+  protected badgeForStatus(st: MismatchStatus) {
+    return stColor(st);
   }
 }

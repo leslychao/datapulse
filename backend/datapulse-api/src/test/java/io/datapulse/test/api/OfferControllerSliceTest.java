@@ -9,6 +9,8 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.platform.security.WorkspaceAccessService;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.sellerops.api.OfferController;
+import io.datapulse.tenancy.persistence.AppUserRepository;
+import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.sellerops.api.OfferDetailResponse;
 import io.datapulse.sellerops.api.OfferDetailResponse.ActionInfo;
 import io.datapulse.sellerops.api.OfferDetailResponse.DecisionInfo;
@@ -24,23 +26,31 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(OfferController.class)
 @Import(WorkspaceAccessService.class)
+@EnableMethodSecurity
 class OfferControllerSliceTest {
 
   @Autowired
   private MockMvc mockMvc;
 
-  @MockBean
+  @MockitoBean
   private OfferService offerService;
 
-  @MockBean
+  @MockitoBean
   private WorkspaceContext workspaceContext;
+
+  @MockitoBean
+  private AppUserRepository appUserRepository;
+
+  @MockitoBean
+  private WorkspaceMemberRepository workspaceMemberRepository;
 
   @BeforeEach
   void setUp() {

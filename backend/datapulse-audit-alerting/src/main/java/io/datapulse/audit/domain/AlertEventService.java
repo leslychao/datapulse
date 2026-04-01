@@ -4,6 +4,7 @@ import java.util.List;
 
 import io.datapulse.audit.api.AlertEventFilter;
 import io.datapulse.audit.api.AlertEventResponse;
+import io.datapulse.audit.api.AlertSummaryResponse;
 import io.datapulse.audit.domain.event.AlertEventCreatedEvent;
 import io.datapulse.audit.domain.event.AlertResolvedEvent;
 import io.datapulse.audit.persistence.AlertEventRepository;
@@ -26,6 +27,11 @@ public class AlertEventService {
 
     private final AlertEventRepository alertEventRepository;
     private final ApplicationEventPublisher eventPublisher;
+
+    @Transactional(readOnly = true)
+    public AlertSummaryResponse getSummary(long workspaceId) {
+        return alertEventRepository.getSummary(workspaceId);
+    }
 
     @Transactional(readOnly = true)
     public Page<AlertEventResponse> listAlerts(long workspaceId, AlertEventFilter filter, Pageable pageable) {

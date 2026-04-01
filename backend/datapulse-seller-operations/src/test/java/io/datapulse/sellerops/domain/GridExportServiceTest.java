@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -77,8 +78,6 @@ class GridExportServiceTest {
 
       when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(0)))
           .thenReturn(List.of(row));
-      when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(500)))
-          .thenReturn(List.of());
 
       var enrichment = ClickHouseEnrichment.builder()
           .offerId(1L)
@@ -99,7 +98,7 @@ class GridExportServiceTest {
 
       service.exportCsv(WORKSPACE_ID, filter, out);
 
-      String csv = out.toString();
+      String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("Артикул");
       assertThat(csv).contains("SKU-001");
       assertThat(csv).contains("Product 1");
@@ -119,7 +118,7 @@ class GridExportServiceTest {
 
       service.exportCsv(WORKSPACE_ID, filter, out);
 
-      String csv = out.toString();
+      String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("Артикул");
       assertThat(csv.lines().count()).isEqualTo(1);
     }
@@ -136,8 +135,6 @@ class GridExportServiceTest {
 
       when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(0)))
           .thenReturn(List.of(row));
-      when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(500)))
-          .thenReturn(List.of());
       when(chRepository.findEnrichment(anyList()))
           .thenThrow(new RuntimeException("ClickHouse unavailable"));
 
@@ -147,7 +144,7 @@ class GridExportServiceTest {
 
       service.exportCsv(WORKSPACE_ID, filter, out);
 
-      String csv = out.toString();
+      String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("SKU-001");
     }
 
@@ -168,7 +165,6 @@ class GridExportServiceTest {
 
       when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(0)))
           .thenReturn(List.of(row1, row2));
-      when(chRepository.findEnrichment(anyList())).thenReturn(Map.of());
 
       var out = new ByteArrayOutputStream();
       GridFilter filter = new GridFilter(null, null, null, null,
@@ -192,8 +188,6 @@ class GridExportServiceTest {
 
       when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(0)))
           .thenReturn(List.of(row));
-      when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(500)))
-          .thenReturn(List.of());
       when(chRepository.findEnrichment(anyList())).thenReturn(Map.of());
 
       var out = new ByteArrayOutputStream();
@@ -202,7 +196,7 @@ class GridExportServiceTest {
 
       service.exportCsv(WORKSPACE_ID, filter, out);
 
-      String csv = out.toString();
+      String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("\"SKU;001\"");
       assertThat(csv).contains("\"Product; with; semicolons\"");
     }
@@ -219,8 +213,6 @@ class GridExportServiceTest {
 
       when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(0)))
           .thenReturn(List.of(row));
-      when(pgRepository.findBatchForExport(eq(WORKSPACE_ID), any(), anyInt(), eq(500)))
-          .thenReturn(List.of());
       when(chRepository.findEnrichment(anyList())).thenReturn(Map.of());
 
       var out = new ByteArrayOutputStream();
@@ -229,7 +221,7 @@ class GridExportServiceTest {
 
       service.exportCsv(WORKSPACE_ID, filter, out);
 
-      String csv = out.toString();
+      String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("Да");
     }
   }

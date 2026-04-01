@@ -52,20 +52,20 @@ export class PricingApiService {
     }
 
     return this.http.get<Page<PricingPolicySummary>>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies`,
       { params },
     );
   }
 
   getPolicy(workspaceId: number, policyId: number): Observable<PricingPolicy> {
     return this.http.get<PricingPolicy>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}`,
     );
   }
 
   createPolicy(workspaceId: number, req: CreatePolicyRequest): Observable<PricingPolicy> {
     return this.http.post<PricingPolicy>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies`,
       req,
     );
   }
@@ -76,34 +76,34 @@ export class PricingApiService {
     req: UpdatePolicyRequest,
   ): Observable<PricingPolicy> {
     return this.http.put<PricingPolicy>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}`,
       req,
     );
   }
 
   deletePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.delete<void>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}`,
     );
   }
 
   activatePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/activate`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/activate`,
       {},
     );
   }
 
   pausePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/pause`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/pause`,
       {},
     );
   }
 
   archivePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/archive`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/archive`,
       {},
     );
   }
@@ -113,7 +113,7 @@ export class PricingApiService {
     policyId: number,
   ): Observable<PolicyAssignment[]> {
     return this.http.get<PolicyAssignment[]>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/assignments`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments`,
     );
   }
 
@@ -123,7 +123,7 @@ export class PricingApiService {
     req: CreateAssignmentRequest,
   ): Observable<PolicyAssignment> {
     return this.http.post<PolicyAssignment>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/assignments`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments`,
       req,
     );
   }
@@ -134,7 +134,7 @@ export class PricingApiService {
     assignmentId: number,
   ): Observable<void> {
     return this.http.delete<void>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/assignments/${assignmentId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments/${assignmentId}`,
     );
   }
 
@@ -146,7 +146,7 @@ export class PricingApiService {
   ): Observable<ImpactPreviewResponse> {
     const params = new HttpParams().set('page', page).set('size', size);
     return this.http.post<ImpactPreviewResponse>(
-      `${this.base}/workspace/${workspaceId}/pricing/policies/${policyId}/preview`,
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/preview`,
       {},
       { params },
     );
@@ -181,14 +181,14 @@ export class PricingApiService {
     }
 
     return this.http.get<Page<PricingRunSummary>>(
-      `${this.base}/workspace/${workspaceId}/pricing/runs`,
+      `${this.base}/workspaces/${workspaceId}/pricing/runs`,
       { params },
     );
   }
 
   getRunDetail(workspaceId: number, runId: number): Observable<PricingRunDetail> {
     return this.http.get<PricingRunDetail>(
-      `${this.base}/workspace/${workspaceId}/pricing/runs/${runId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/runs/${runId}`,
     );
   }
 
@@ -197,7 +197,7 @@ export class PricingApiService {
     connectionId: number,
   ): Observable<PricingRunSummary> {
     return this.http.post<PricingRunSummary>(
-      `${this.base}/workspace/${workspaceId}/pricing/runs`,
+      `${this.base}/workspaces/${workspaceId}/pricing/runs`,
       { connectionId },
     );
   }
@@ -237,7 +237,7 @@ export class PricingApiService {
     }
 
     return this.http.get<Page<PricingDecisionSummary>>(
-      `${this.base}/workspace/${workspaceId}/pricing/decisions`,
+      `${this.base}/workspaces/${workspaceId}/pricing/decisions`,
       { params },
     );
   }
@@ -247,7 +247,7 @@ export class PricingApiService {
     decisionId: number,
   ): Observable<PricingDecisionDetail> {
     return this.http.get<PricingDecisionDetail>(
-      `${this.base}/workspace/${workspaceId}/pricing/decisions/${decisionId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/decisions/${decisionId}`,
     );
   }
 
@@ -271,21 +271,21 @@ export class PricingApiService {
     }
 
     return this.http.get<Page<ManualPriceLock>>(
-      `${this.base}/workspace/${workspaceId}/pricing/locks`,
+      `${this.base}/workspaces/${workspaceId}/pricing/locks`,
       { params },
     );
   }
 
   createLock(workspaceId: number, req: CreateLockRequest): Observable<ManualPriceLock> {
     return this.http.post<ManualPriceLock>(
-      `${this.base}/workspace/${workspaceId}/pricing/locks`,
+      `${this.base}/workspaces/${workspaceId}/pricing/locks`,
       req,
     );
   }
 
   deleteLock(workspaceId: number, lockId: number): Observable<void> {
     return this.http.delete<void>(
-      `${this.base}/workspace/${workspaceId}/pricing/locks/${lockId}`,
+      `${this.base}/workspaces/${workspaceId}/pricing/locks/${lockId}`,
     );
   }
 }

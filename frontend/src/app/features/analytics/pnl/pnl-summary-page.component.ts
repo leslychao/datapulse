@@ -13,93 +13,97 @@ import type { EChartsOption } from 'echarts';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { KpiCardComponent } from '@shared/components/kpi-card.component';
+import { SectionCardComponent } from '@shared/components/section-card.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 
 function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-interface KpiCard {
+type TrendDir = 'up' | 'down' | 'neutral';
+
+interface KpiItem {
   labelKey: string;
-  value: number;
+  formattedValue: string;
   deltaPct: number | null;
+  direction: TrendDir;
 }
 
 @Component({
   selector: 'dp-pnl-summary-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent],
+  imports: [
+    TranslatePipe,
+    ChartComponent,
+    KpiCardComponent,
+    SectionCardComponent,
+    EmptyStateComponent,
+    MonthPickerComponent,
+  ],
   template: `
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-5">
       <!-- Filter bar -->
-      <div class="flex items-center gap-3">
-        <input
-          type="month"
-          [value]="period()"
-          (change)="onPeriodChange($event)"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                 outline-none focus:border-[var(--accent-primary)]"
-        />
+      <div class="flex items-center">
+        <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
       </div>
 
       @if (summaryQuery.isPending()) {
-        <div class="grid grid-cols-3 gap-3 lg:grid-cols-6">
-          @for (i of shimmerCards; track i) {
-            <div class="dp-shimmer h-[88px] rounded-[var(--radius-md)]"></div>
-          }
-        </div>
-      }
-
-      @if (summaryQuery.data(); as s) {
-        <!-- KPI Cards -->
-        <div class="grid grid-cols-3 gap-3 lg:grid-cols-6">
-          @for (kpi of kpiCards(); track kpi.labelKey) {
-            <div
-              class="flex flex-col gap-1 rounded-[var(--radius-md)] bg-[var(--bg-primary)]
-                     p-3 shadow-[var(--shadow-sm)]"
-            >
-              <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                {{ kpi.labelKey | translate }}
-              </span>
-              <span class="font-mono text-[length:var(--text-lg)] font-semibold"
-                    [class]="moneyColorClass(kpi.value)">
-                {{ formatMoney(kpi.value) }}
-              </span>
-              @if (kpi.deltaPct != null) {
-                <span class="text-[length:var(--text-xs)] font-mono"
-                      [class]="formatDelta(kpi.deltaPct).colorClass">
-                  {{ formatDelta(kpi.deltaPct).text }}
-                </span>
-              }
-            </div>
+        <!-- Shimmer: KPI cards -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          @for (_ of shimmerCards; track $index) {
+            <dp-kpi-card label="" [loading]="true" />
           }
         </div>
 
-        <!-- Charts row -->
+        <!-- Shimmer: Charts -->
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div class="col-span-1 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-4
-                      shadow-[var(--shadow-sm)] lg:col-span-2">
-            <h3 class="mb-2 text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
-              {{ 'analytics.pnl.trend_title' | translate }}
-            </h3>
+          <dp-section-card
+            [title]="'analytics.pnl.trend_title' | translate"
+            class="lg:col-span-2"
+          >
+            <div class="dp-shimmer h-[240px] rounded-[var(--radius-sm)]"></div>
+          </dp-section-card>
+          <dp-section-card [title]="'analytics.pnl.cost_breakdown' | translate">
+            <div class="dp-shimmer h-[240px] rounded-[var(--radius-sm)]"></div>
+          </dp-section-card>
+        </div>
+      } @else if (summaryQuery.isError()) {
+        <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
+      } @else {
+        <!-- KPI cards -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          @for (kpi of kpiCards(); track kpi.labelKey) {
+            <dp-kpi-card
+              [label]="kpi.labelKey | translate"
+              [value]="kpi.formattedValue"
+              [trend]="kpi.deltaPct"
+              [trendDirection]="kpi.direction"
+            />
+          }
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <dp-section-card
+            [title]="'analytics.pnl.trend_title' | translate"
+            class="lg:col-span-2"
+          >
             <dp-chart
               [options]="trendOptions()"
-              height="200px"
+              height="240px"
               [loading]="trendQuery.isPending()"
             />
-          </div>
-          <div class="rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-4 shadow-[var(--shadow-sm)]">
-            <h3 class="mb-2 text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
-              {{ 'analytics.pnl.cost_breakdown' | translate }}
-            </h3>
+          </dp-section-card>
+          <dp-section-card [title]="'analytics.pnl.cost_breakdown' | translate">
             <dp-chart
               [options]="donutOptions()"
               height="240px"
-              [loading]="summaryQuery.isPending()"
             />
-          </div>
+          </dp-section-card>
         </div>
       }
     </div>
@@ -134,16 +138,16 @@ export class PnlSummaryPageComponent {
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
-  readonly kpiCards = computed<KpiCard[]>(() => {
+  readonly kpiCards = computed<KpiItem[]>(() => {
     const s = this.summaryQuery.data();
     if (!s) return [];
     return [
-      { labelKey: 'analytics.pnl.kpi.revenue', value: s.revenueAmount, deltaPct: s.revenueDeltaPct },
-      { labelKey: 'analytics.pnl.kpi.total_costs', value: s.totalCostsAmount, deltaPct: s.costsDeltaPct },
-      { labelKey: 'analytics.pnl.kpi.cogs', value: s.cogsAmount, deltaPct: s.cogsDeltaPct },
-      { labelKey: 'analytics.pnl.kpi.advertising', value: s.advertisingCostAmount, deltaPct: s.advertisingDeltaPct },
-      { labelKey: 'analytics.pnl.kpi.pnl', value: s.fullPnl, deltaPct: s.pnlDeltaPct },
-      { labelKey: 'analytics.pnl.kpi.residual', value: s.reconciliationResidual, deltaPct: null },
+      this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct),
+      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct),
+      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct),
+      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct),
+      this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct),
+      this.buildKpi('analytics.pnl.kpi.residual', s.reconciliationResidual, null),
     ];
   });
 
@@ -205,11 +209,6 @@ export class PnlSummaryPageComponent {
     };
   });
 
-  onPeriodChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.period.set(input.value);
-  }
-
   formatMoney(value: number | null): string {
     if (value == null) return '—';
     const abs = Math.abs(value);
@@ -218,37 +217,17 @@ export class PnlSummaryPageComponent {
     return `${sign}${formatted} ₽`;
   }
 
-  formatPct(value: number | null): string {
-    if (value == null) return '—';
-    return (
-      value.toLocaleString('ru-RU', {
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
-      }) + '%'
-    );
-  }
-
-  formatDelta(value: number | null): { text: string; colorClass: string } {
-    if (value == null) return { text: '', colorClass: '' };
-    if (value > 0)
-      return {
-        text: `↑ ${this.formatPct(value)}`,
-        colorClass: 'text-[var(--finance-positive)]',
-      };
-    if (value < 0)
-      return {
-        text: `↓ ${this.formatPct(Math.abs(value))}`,
-        colorClass: 'text-[var(--finance-negative)]',
-      };
+  private buildKpi(labelKey: string, value: number, deltaPct: number | null): KpiItem {
     return {
-      text: `→ ${this.formatPct(0)}`,
-      colorClass: 'text-[var(--finance-zero)]',
+      labelKey,
+      formattedValue: this.formatMoney(value),
+      deltaPct,
+      direction: this.trendDir(deltaPct),
     };
   }
 
-  moneyColorClass(value: number): string {
-    if (value > 0) return 'text-[var(--finance-positive)]';
-    if (value < 0) return 'text-[var(--finance-negative)]';
-    return 'text-[var(--finance-zero)]';
+  private trendDir(delta: number | null): TrendDir {
+    if (delta == null || delta === 0) return 'neutral';
+    return delta > 0 ? 'up' : 'down';
   }
 }

@@ -21,7 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/promo/policies", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/promo/policies",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PromoPolicyController {
 
@@ -31,47 +32,62 @@ public class PromoPolicyController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public PromoPolicyResponse createPolicy(@Valid @RequestBody CreatePromoPolicyRequest request) {
-        return policyService.createPolicy(
-                request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    public PromoPolicyResponse createPolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @Valid @RequestBody CreatePromoPolicyRequest request) {
+        return policyService.createPolicy(request, workspaceId,
+                workspaceContext.getUserId());
     }
 
     @GetMapping
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<PromoPolicySummaryResponse> listPolicies(
+            @PathVariable("workspaceId") long workspaceId,
             @RequestParam(value = "status", required = false) PromoPolicyStatus status) {
-        return policyService.listPolicies(workspaceContext.getWorkspaceId(), status);
+        return policyService.listPolicies(workspaceId, status);
     }
 
     @GetMapping("/{policyId}")
-    public PromoPolicyResponse getPolicy(@PathVariable("policyId") Long policyId) {
-        return policyService.getPolicy(policyId, workspaceContext.getWorkspaceId());
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PromoPolicyResponse getPolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        return policyService.getPolicy(policyId, workspaceId);
     }
 
     @PutMapping("/{policyId}")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public PromoPolicyResponse updatePolicy(@PathVariable("policyId") Long policyId,
-                                            @Valid @RequestBody UpdatePromoPolicyRequest request) {
-        return policyService.updatePolicy(policyId, request, workspaceContext.getWorkspaceId());
+    public PromoPolicyResponse updatePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            @Valid @RequestBody UpdatePromoPolicyRequest request) {
+        return policyService.updatePolicy(policyId, request, workspaceId);
     }
 
     @PostMapping("/{policyId}/activate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void activatePolicy(@PathVariable("policyId") Long policyId) {
-        policyService.activatePolicy(policyId, workspaceContext.getWorkspaceId());
+    public void activatePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        policyService.activatePolicy(policyId, workspaceId);
     }
 
     @PostMapping("/{policyId}/pause")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void pausePolicy(@PathVariable("policyId") Long policyId) {
-        policyService.pausePolicy(policyId, workspaceContext.getWorkspaceId());
+    public void pausePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        policyService.pausePolicy(policyId, workspaceId);
     }
 
     @PostMapping("/{policyId}/archive")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void archivePolicy(@PathVariable("policyId") Long policyId) {
-        policyService.archivePolicy(policyId, workspaceContext.getWorkspaceId());
+    public void archivePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        policyService.archivePolicy(policyId, workspaceId);
     }
 }

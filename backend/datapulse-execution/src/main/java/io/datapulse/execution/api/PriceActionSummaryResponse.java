@@ -8,11 +8,15 @@ import java.time.OffsetDateTime;
 
 public record PriceActionSummaryResponse(
         long id,
-        long marketplaceOfferId,
+        String offerName,
+        String sku,
+        String marketplace,
+        String connectionName,
         ActionExecutionMode executionMode,
         ActionStatus status,
         BigDecimal targetPrice,
         BigDecimal currentPriceAtCreation,
+        BigDecimal priceDeltaPct,
         int attemptCount,
         int maxAttempts,
         OffsetDateTime createdAt,

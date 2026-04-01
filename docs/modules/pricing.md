@@ -504,10 +504,10 @@ Pricing pipeline работает с конечной ценой для поку
 | Триггер | Механизм | Частота |
 |---------|----------|---------|
 | Post-sync | RabbitMQ event `ETL_SYNC_COMPLETED` (outbox, [ETL Pipeline](etl-pipeline.md#post-sync-outbox-events)) | После успешного ETL sync (1-4 раза в день) |
-| Manual | REST API `POST /api/pricing/runs` → outbox → RabbitMQ | По требованию |
+| Manual | REST API `POST /api/workspaces/{workspaceId}/pricing/runs` → outbox → RabbitMQ | По требованию |
 | Schedule | Spring `@Scheduled` cron → outbox → RabbitMQ | Configurable cron |
 | Policy change | `@TransactionalEventListener(AFTER_COMMIT)` → outbox → RabbitMQ | При изменении/активации policy |
-| **Manual bulk** | REST API `POST /api/pricing/bulk-manual/apply` → synchronous run | По требованию (ad-hoc). Strategy = `MANUAL_OVERRIDE` (user-provided price). Guards: frequency, volatility, stock-out **не применяются**. См. [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
+| **Manual bulk** | REST API `POST /api/workspaces/{workspaceId}/pricing/bulk-manual/apply` → synchronous run | По требованию (ad-hoc). Strategy = `MANUAL_OVERRIDE` (user-provided price). Guards: frequency, volatility, stock-out **не применяются**. См. [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
 
 #### Post-sync trigger flow
 
@@ -620,57 +620,57 @@ Impact preview — часть операционного cockpit. UI интег�
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/policies` | PRICING_MANAGER, ADMIN, OWNER | Создать policy. Body: `{ name, strategyType, strategyParams, minMarginPct, maxPriceChangePct, minPrice, maxPrice, guardConfig, executionMode, priority }`. Status = DRAFT. Response: `201` |
-| GET | `/api/pricing/policies` | Any role | Список policies workspace. Filters: `?status=ACTIVE&strategyType=...` |
-| GET | `/api/pricing/policies/{policyId}` | Any role | Детали policy |
-| PUT | `/api/pricing/policies/{policyId}` | PRICING_MANAGER, ADMIN, OWNER | Обновить policy (инкрементирует version). Body: все изменяемые поля |
-| POST | `/api/pricing/policies/{policyId}/activate` | PRICING_MANAGER, ADMIN, OWNER | DRAFT/PAUSED → ACTIVE |
-| POST | `/api/pricing/policies/{policyId}/pause` | PRICING_MANAGER, ADMIN, OWNER | ACTIVE → PAUSED |
-| POST | `/api/pricing/policies/{policyId}/archive` | PRICING_MANAGER, ADMIN, OWNER | → ARCHIVED |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies` | PRICING_MANAGER, ADMIN, OWNER | Создать policy. Body: `{ name, strategyType, strategyParams, minMarginPct, maxPriceChangePct, minPrice, maxPrice, guardConfig, executionMode, priority }`. Status = DRAFT. Response: `201` |
+| GET | `/api/workspaces/{workspaceId}/pricing/policies` | Any role | Paginated. Список policies workspace. Filters: `?status=ACTIVE&strategyType=...` |
+| GET | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}` | Any role | Детали policy |
+| PUT | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}` | PRICING_MANAGER, ADMIN, OWNER | Обновить policy (инкрементирует version). Body: все изменяемые поля |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/activate` | PRICING_MANAGER, ADMIN, OWNER | DRAFT/PAUSED → ACTIVE |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/pause` | PRICING_MANAGER, ADMIN, OWNER | ACTIVE → PAUSED |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/archive` | PRICING_MANAGER, ADMIN, OWNER | → ARCHIVED |
 
 ### Policy assignments
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/pricing/policies/{policyId}/assignments` | Any role | Список assignments |
-| POST | `/api/pricing/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment. Body: `{ connectionId, scopeType, categoryId?, marketplaceOfferId? }` |
-| DELETE | `/api/pricing/policies/{policyId}/assignments/{assignmentId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить assignment |
+| GET | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments` | Any role | Список assignments |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment. Body: `{ connectionId, scopeType, categoryId?, marketplaceOfferId? }` |
+| DELETE | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments/{assignmentId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить assignment |
 
 ### Manual price lock
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/locks` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Создать lock. Body: `{ marketplaceOfferId, lockedPrice, reason, expiresAt? }` |
-| GET | `/api/pricing/locks` | Any role | Active locks. Filter: `?marketplaceOfferId=...` |
-| DELETE | `/api/pricing/locks/{lockId}` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Unlock (manual) |
+| POST | `/api/workspaces/{workspaceId}/pricing/locks` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Создать lock. Body: `{ marketplaceOfferId, lockedPrice, reason, expiresAt? }` |
+| GET | `/api/workspaces/{workspaceId}/pricing/locks` | Any role | Active locks. Filter: `?marketplaceOfferId=...` |
+| DELETE | `/api/workspaces/{workspaceId}/pricing/locks/{lockId}` | OPERATOR, PRICING_MANAGER, ADMIN, OWNER | Unlock (manual) |
 
 ### Pricing runs
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run. Body: `{ connectionId }` |
-| GET | `/api/pricing/runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
-| GET | `/api/pricing/runs/{runId}` | Any role | Детали run: status, counts, timing |
+| POST | `/api/workspaces/{workspaceId}/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run. Body: `{ connectionId }` |
+| GET | `/api/workspaces/{workspaceId}/pricing/runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/pricing/runs/{runId}` | Any role | Детали run: status, counts, timing |
 
 ### Decisions
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/pricing/decisions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&decisionType=...&pricingRunId=...&from=...&to=...` |
-| GET | `/api/pricing/decisions/{decisionId}` | Any role | Полные детали decision: signal_snapshot, constraints_applied, guards_evaluated, explanation_summary |
+| GET | `/api/workspaces/{workspaceId}/pricing/decisions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&decisionType=...&pricingRunId=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/pricing/decisions/{decisionId}` | Any role | Полные детали decision: signal_snapshot, constraints_applied, guards_evaluated, explanation_summary |
 
 ### Impact preview
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/policies/{policyId}/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run preview. Response: aggregated summary + paginated per-offer breakdown |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run preview. Response: aggregated summary + paginated per-offer breakdown |
 
 ### Bulk manual price operations
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/bulk-manual/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run: constraints + guards per-offer. Body: `{ changes: [{ marketplaceOfferId, targetPrice }] }`. Response: per-offer result + summary. Max 500 offers. Timeout 30s |
-| POST | `/api/pricing/bulk-manual/apply` | PRICING_MANAGER, ADMIN, OWNER | Создаёт pricing_run (MANUAL_BULK) + decisions (MANUAL_OVERRIDE) + actions (APPROVED). Body: тот же формат. Idempotency: `request_hash` (SHA-256). Детали: [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
+| POST | `/api/workspaces/{workspaceId}/pricing/bulk-manual/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run: constraints + guards per-offer. Body: `{ changes: [{ marketplaceOfferId, targetPrice }] }`. Response: per-offer result + summary. Max 500 offers. Timeout 30s |
+| POST | `/api/workspaces/{workspaceId}/pricing/bulk-manual/apply` | PRICING_MANAGER, ADMIN, OWNER | Создаёт pricing_run (MANUAL_BULK) + decisions (MANUAL_OVERRIDE) + actions (APPROVED). Body: тот же формат. Idempotency: `request_hash` (SHA-256). Детали: [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
 
 ### Bulk cost update
 

@@ -218,12 +218,12 @@ class PriceJournalServiceTest {
 
       when(journalRepository.findByOfferId(
           WORKSPACE_ID, OFFER_ID, null, null, null, null, pageable))
-          .thenReturn(new PageImpl<>(List.of(row), pageable, 25));
+          .thenReturn(new PageImpl<>(List.of(row), pageable, 30));
 
       Page<PriceJournalEntryResponse> result = service.getJournal(
           WORKSPACE_ID, OFFER_ID, null, null, null, null, pageable);
 
-      assertThat(result.getTotalElements()).isEqualTo(25);
+      assertThat(result.getTotalElements()).isEqualTo(30);
       assertThat(result.getNumber()).isEqualTo(2);
       assertThat(result.getSize()).isEqualTo(10);
       assertThat(result.getTotalPages()).isEqualTo(3);

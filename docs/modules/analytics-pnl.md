@@ -1228,11 +1228,11 @@ ClickHouse schema управляется numbered SQL migration scripts (`db/cli
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/analytics/pnl/summary` | Any role | P&L summary per connection. Filters: `?connectionId=...&from=...&to=...`. Response: aggregated P&L components |
-| GET | `/api/analytics/pnl/by-product` | Any role | P&L по продуктам. Paginated. Filters: `?connectionId=...&period=YYYYMM&sellerSkuId=...&search=...`. Sort: any P&L column |
-| GET | `/api/analytics/pnl/by-posting` | Any role | P&L по отправкам. Paginated. Filters: `?connectionId=...&from=...&to=...&sellerSkuId=...` |
-| GET | `/api/analytics/pnl/posting/{postingId}/details` | Any role | Drill-down: все fact_finance entries для posting. Response: `[{ entryType, measures, entryDate }]`. **NB:** acquiring ops (posting_id = NULL) не включены; для acquiring drill-down — lookup по order_id через `mart_posting_pnl.order_id` |
-| GET | `/api/analytics/pnl/trend` | Any role | P&L trend by period (daily/weekly/monthly). Filters: `?connectionId=...&from=...&to=...&granularity=MONTHLY`. Data source: `mart_product_pnl` (aggregated by period). Daily granularity = SUM per day из `fact_finance` (не хранится в mart, вычисляется on-the-fly) |
+| GET | `/api/workspaces/{workspaceId}/analytics/pnl/summary` | Any role | P&L summary per connection. Filters: `?connectionId=...&from=...&to=...&period=YYYY-MM`. Response: aggregated P&L components |
+| GET | `/api/workspaces/{workspaceId}/analytics/pnl/by-product` | Any role | P&L по продуктам. Paginated. Filters: `?connectionId=...&period=YYYY-MM&sellerSkuId=...&search=...`. Sort: any P&L column. **NB:** frontend отправляет `period` как `YYYY-MM`, бэкенд конвертирует в UInt32 `YYYYMM` через `PnlFilter.periodAsInt()` |
+| GET | `/api/workspaces/{workspaceId}/analytics/pnl/by-posting` | Any role | P&L по отправкам. Paginated. Filters: `?connectionId=...&from=...&to=...&sellerSkuId=...` |
+| GET | `/api/workspaces/{workspaceId}/analytics/pnl/posting/{postingId}/details` | Any role | Drill-down: все fact_finance entries для posting. Response: `[{ entryType, measures, entryDate }]`. **NB:** acquiring ops (posting_id = NULL) не включены; для acquiring drill-down — lookup по order_id через `mart_posting_pnl.order_id` |
+| GET | `/api/workspaces/{workspaceId}/analytics/pnl/trend` | Any role | P&L trend by period (daily/weekly/monthly). Filters: `?connectionId=...&from=...&to=...&period=YYYY-MM&granularity=MONTHLY`. Data source: `mart_product_pnl` (aggregated by period). Daily granularity = SUM per day из `fact_finance` (не хранится в mart, вычисляется on-the-fly) |
 
 ### Inventory intelligence
 
@@ -1246,9 +1246,9 @@ ClickHouse schema управляется numbered SQL migration scripts (`db/cli
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/analytics/returns/summary` | Any role | Return rate summary. Filter: `?connectionId=...&period=YYYYMM` |
-| GET | `/api/analytics/returns/by-product` | Any role | Per-product return analysis. Paginated. Includes return_rate_pct, top_reason, financial_impact |
-| GET | `/api/analytics/returns/trend` | Any role | Return rate trend over time |
+| GET | `/api/workspaces/{workspaceId}/analytics/returns/summary` | Any role | Return rate summary. Filter: `?connectionId=...&period=YYYY-MM` |
+| GET | `/api/workspaces/{workspaceId}/analytics/returns/by-product` | Any role | Per-product return analysis. Paginated. Includes return_rate_pct, top_reason, financial_impact |
+| GET | `/api/workspaces/{workspaceId}/analytics/returns/trend` | Any role | Return rate trend over time |
 
 ### Data quality
 

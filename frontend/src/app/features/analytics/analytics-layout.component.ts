@@ -69,15 +69,15 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
 
       <!-- Sub-navigation -->
       @if (subNavLinks().length > 0) {
-        <div class="flex gap-1 border-b border-[var(--border-subtle)] px-4">
+        <div class="flex gap-1 px-4 py-2">
           @for (link of subNavLinks(); track link.path) {
             <a
               [routerLink]="link.path"
-              routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
+              routerLinkActive="bg-[var(--accent-subtle)] text-[var(--accent-primary)] font-medium"
               [routerLinkActiveOptions]="{ exact: link.exact }"
-              class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-xs)]
-                     text-[var(--text-tertiary)] transition-colors
-                     hover:text-[var(--text-secondary)]"
+              class="rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)]
+                     text-[var(--text-secondary)] transition-colors
+                     hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
             >
               {{ link.label }}
             </a>
@@ -86,7 +86,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
       }
 
       <!-- Page content -->
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto p-6">
         <router-outlet />
       </div>
     </div>

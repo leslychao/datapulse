@@ -9,6 +9,10 @@ import java.time.OffsetDateTime;
 public record PriceActionSummaryRow(
         long id,
         long marketplaceOfferId,
+        String offerName,
+        String sku,
+        String marketplace,
+        String connectionName,
         ActionExecutionMode executionMode,
         ActionStatus status,
         BigDecimal targetPrice,

@@ -28,6 +28,7 @@ public final class OzonServiceClassifier {
             Map.entry("MarketplaceServiceItemRedistributionReturnsPVZ", MeasureColumn.LOGISTICS),
             Map.entry("MarketplaceServiceItemRedistributionDropOffApvz", MeasureColumn.LOGISTICS),
             Map.entry("MarketplaceServiceItemDropoffPVZ", MeasureColumn.LOGISTICS),
+            Map.entry("MarketplaceServiceItemRedistributionLastMileCourier", MeasureColumn.LOGISTICS),
 
             // Acquiring (embedded in sale operation services[])
             Map.entry("MarketplaceRedistributionOfAcquiringOperation", MeasureColumn.ACQUIRING),

@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import io.datapulse.audit.api.AlertEventFilter;
 import io.datapulse.audit.api.AlertEventResponse;
+import io.datapulse.audit.api.AlertSummaryResponse;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -54,6 +55,27 @@ public class AlertEventRepository {
                                 String severity, String title,
                                 String details, boolean blocksAutomation) {
         return doInsert(alertRuleId, workspaceId, connectionId, severity, title, details, blocksAutomation);
+    }
+
+    private static final String SUMMARY_SQL = """
+            SELECT
+                count(*) FILTER (WHERE status = 'OPEN' AND severity = 'CRITICAL') AS open_critical,
+                count(*) FILTER (WHERE status = 'OPEN' AND severity = 'WARNING') AS open_warning,
+                count(*) FILTER (WHERE status = 'ACKNOWLEDGED') AS acknowledged,
+                count(*) FILTER (WHERE status IN ('RESOLVED', 'AUTO_RESOLVED')
+                    AND resolved_at >= now() - INTERVAL '7 days') AS resolved_last_7_days
+            FROM alert_event
+            WHERE workspace_id = :workspaceId
+            """;
+
+    public AlertSummaryResponse getSummary(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        return jdbc.queryForObject(SUMMARY_SQL, params, (rs, rowNum) ->
+                new AlertSummaryResponse(
+                        rs.getLong("open_critical"),
+                        rs.getLong("open_warning"),
+                        rs.getLong("acknowledged"),
+                        rs.getLong("resolved_last_7_days")));
     }
 
     public List<AlertEventResponse> findAll(long workspaceId, AlertEventFilter filter,

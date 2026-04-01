@@ -25,7 +25,7 @@ describe('OfferApiService', () => {
   it('getOffer should call correct URL', () => {
     service.getOffer(1, 100).subscribe();
 
-    const req = httpMock.expectOne(`${base}/workspace/1/offers/100`);
+    const req = httpMock.expectOne(`${base}/workspaces/1/offers/100`);
     expect(req.request.method).toBe('GET');
     req.flush({ offerId: 100 });
   });
@@ -34,7 +34,7 @@ describe('OfferApiService', () => {
     service.getPriceJournal(1, 100, 0, 20).subscribe();
 
     const req = httpMock.expectOne(
-      (r) => r.url === `${base}/workspace/1/offers/100/price-journal`,
+      (r) => r.url === `${base}/workspaces/1/offers/100/price-journal`,
     );
     expect(req.request.params.get('page')).toBe('0');
     expect(req.request.params.get('size')).toBe('20');
@@ -45,7 +45,7 @@ describe('OfferApiService', () => {
     service.getPriceJournal(1, 100, 0, 20, 'SKIP').subscribe();
 
     const req = httpMock.expectOne(
-      (r) => r.url === `${base}/workspace/1/offers/100/price-journal`,
+      (r) => r.url === `${base}/workspaces/1/offers/100/price-journal`,
     );
     expect(req.request.params.get('decisionType')).toBe('SKIP');
     req.flush({ content: [], totalElements: 0 });
@@ -55,7 +55,7 @@ describe('OfferApiService', () => {
     service.getPromoJournal(1, 100, 2, 10).subscribe();
 
     const req = httpMock.expectOne(
-      (r) => r.url === `${base}/workspace/1/offers/100/promo-journal`,
+      (r) => r.url === `${base}/workspaces/1/offers/100/promo-journal`,
     );
     expect(req.request.params.get('page')).toBe('2');
     expect(req.request.params.get('size')).toBe('10');
@@ -66,7 +66,7 @@ describe('OfferApiService', () => {
     service.getActionHistory(1, 100, 0, 20).subscribe();
 
     const req = httpMock.expectOne(
-      (r) => r.url === `${base}/workspace/1/offers/100/action-history`,
+      (r) => r.url === `${base}/workspaces/1/offers/100/action-history`,
     );
     expect(req.request.method).toBe('GET');
     req.flush({ content: [], totalElements: 0 });
@@ -102,7 +102,7 @@ describe('OfferApiService', () => {
     const lockReq = { lockedPrice: 999, reason: 'Hold for promo' };
     service.lockOffer(1, 100, lockReq).subscribe();
 
-    const req = httpMock.expectOne(`${base}/workspace/1/offers/100/lock`);
+    const req = httpMock.expectOne(`${base}/workspaces/1/offers/100/lock`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(lockReq);
     req.flush(null);
@@ -111,7 +111,7 @@ describe('OfferApiService', () => {
   it('unlockOffer should POST empty body', () => {
     service.unlockOffer(1, 100).subscribe();
 
-    const req = httpMock.expectOne(`${base}/workspace/1/offers/100/unlock`);
+    const req = httpMock.expectOne(`${base}/workspaces/1/offers/100/unlock`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({});
     req.flush(null);

@@ -100,7 +100,7 @@
 | `commissions[]`           | array    | Commission rates per sale schema (FBO/FBS/RFBS/FBP) | confirmed  |
 | `model_info`              | object   | Model info with `model_id` and `count`              | confirmed  |
 | `volume_weight`           | number   | Volume weight                                       | confirmed  |
-| `stocks`                  | object   | Summary stock info                                  | confirmed  |
+| `stocks`                  | object   | Summary stock info: `{ coming, present, reserved }` (NOT an array) | confirmed  |
 
 
 **Поля, отсутствующие в v3 product/info (были в v2 доках):**
@@ -630,10 +630,11 @@ Ozon does not have a dedicated "sales" endpoint. Sales data is derived from:
 ### Pagination
 
 
-| Свойство | Значение                           | Confidence |
-| -------- | ---------------------------------- | ---------- |
-| Type     | Offset-based (`offset` + `limit`)  | confirmed  |
-| Filter   | `last_free_waiting_day` date range | confirmed  |
+| Свойство  | Значение                                                                                          | Confidence |
+| --------- | ------------------------------------------------------------------------------------------------- | ---------- |
+| Type      | Cursor-based (`last_id` + `limit`, max 500)                                                       | confirmed  |
+| Filter    | One of: `logistic_return_date`, `storage_tariffication_start_date`, `visual_status_change_moment` | confirmed  |
+| Note      | Only one time-based filter per request; `last_free_waiting_day` is NOT valid for v1                | confirmed  |
 
 
 ### Response Structure
@@ -976,6 +977,22 @@ Join strategy: exact match first, then strip-suffix match. See mapping-spec.md D
 | Service name                             | Semantics       | Count (Jan) | Total (Jan, RUB) | Confidence |
 | ---------------------------------------- | --------------- | ----------- | ---------------- | ---------- |
 | `MarketplaceServiceItemDisposalDetailed` | Disposal charge | 4           | -300             | confirmed  |
+
+
+**Additional services (observed Apr 2026):**
+
+
+| Service name                                              | Semantics                                      | Confidence |
+| --------------------------------------------------------- | ---------------------------------------------- | ---------- |
+| `MarketplaceServiceItemRedistributionLastMileCourier`     | Last-mile courier redistribution (logistics)   | confirmed  |
+
+
+**Additional operation types (observed Apr 2026):**
+
+
+| `operation_type`            | Semantics                   | Measure column | Confidence |
+| --------------------------- | --------------------------- | -------------- | ---------- |
+| `InsuranceServiceSellerItem`| Seller insurance service fee | OTHER          | confirmed  |
 
 
 **Key insight**: Forward logistics dominates costs (-119,908 RUB from `DirectFlowLogistic` vs -14,557 from `DelivToCustomer`). Return services are mostly zero-cost except `ReturnFlowLogistic` (-6,146) and `RedistributionReturnsPVZ` (-900).

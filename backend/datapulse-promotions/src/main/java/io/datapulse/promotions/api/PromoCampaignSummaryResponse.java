@@ -4,17 +4,17 @@ import java.time.OffsetDateTime;
 
 public record PromoCampaignSummaryResponse(
         Long id,
-        Long connectionId,
-        String externalPromoId,
-        String sourcePlatform,
         String promoName,
+        String sourcePlatform,
         String promoType,
-        String status,
+        String mechanic,
         OffsetDateTime dateFrom,
         OffsetDateTime dateTo,
         OffsetDateTime freezeAt,
-        String description,
-        Boolean isParticipating,
-        OffsetDateTime syncedAt
+        int eligibleCount,
+        int participatedCount,
+        String status,
+        Long connectionId,
+        String connectionName
 ) {
 }

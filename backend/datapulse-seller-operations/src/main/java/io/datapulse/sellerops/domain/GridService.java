@@ -1,10 +1,13 @@
 package io.datapulse.sellerops.domain;
 
 import io.datapulse.sellerops.api.GridFilter;
+import io.datapulse.sellerops.api.GridKpiResponse;
 import io.datapulse.sellerops.api.GridRowResponse;
 import io.datapulse.sellerops.config.GridProperties;
 import io.datapulse.sellerops.persistence.ClickHouseEnrichment;
+import io.datapulse.sellerops.persistence.ClickHouseKpiRow;
 import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
+import io.datapulse.sellerops.persistence.GridKpiRow;
 import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
 import io.datapulse.sellerops.persistence.GridRow;
 import lombok.RequiredArgsConstructor;
@@ -50,8 +53,33 @@ public class GridService {
         return new PageImpl<>(enrichedRows, pageable, pgPage.getTotalElements());
     }
 
+    @Transactional(readOnly = true)
+    public GridKpiResponse getGridKpi(long workspaceId) {
+        GridKpiRow pgKpi = pgRepository.findKpi(workspaceId);
+        ClickHouseKpiRow chKpi = fetchChKpiSafely(workspaceId);
+
+        return new GridKpiResponse(
+                pgKpi.totalOffers(),
+                pgKpi.avgMarginPct(),
+                null,
+                pgKpi.pendingActionsCount(),
+                chKpi.criticalStockCount(),
+                chKpi.revenue30dTotal(),
+                chKpi.revenue30dTrend());
+    }
+
     public boolean isSortableColumn(String column) {
         return pgRepository.isSortableColumn(column);
+    }
+
+    private ClickHouseKpiRow fetchChKpiSafely(long workspaceId) {
+        try {
+            List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+            return chRepository.findKpi(connectionIds);
+        } catch (Exception e) {
+            log.warn("ClickHouse KPI query failed, returning zeroes: error={}", e.getMessage());
+            return new ClickHouseKpiRow(0, null, null);
+        }
     }
 
     private Map<Long, ClickHouseEnrichment> fetchEnrichmentSafely(List<Long> offerIds) {

@@ -12,27 +12,27 @@ export class ViewApiService {
 
   listViews(workspaceId: number): Observable<GridView[]> {
     return this.http.get<GridView[]>(
-      `${this.base}/workspace/${workspaceId}/views`,
+      `${this.base}/workspaces/${workspaceId}/views`,
     );
   }
 
   createView(workspaceId: number, req: CreateViewRequest): Observable<GridView> {
     return this.http.post<GridView>(
-      `${this.base}/workspace/${workspaceId}/views`,
+      `${this.base}/workspaces/${workspaceId}/views`,
       req,
     );
   }
 
   updateView(workspaceId: number, viewId: number, req: UpdateViewRequest): Observable<GridView> {
     return this.http.put<GridView>(
-      `${this.base}/workspace/${workspaceId}/views/${viewId}`,
+      `${this.base}/workspaces/${workspaceId}/views/${viewId}`,
       req,
     );
   }
 
   deleteView(workspaceId: number, viewId: number): Observable<void> {
     return this.http.delete<void>(
-      `${this.base}/workspace/${workspaceId}/views/${viewId}`,
+      `${this.base}/workspaces/${workspaceId}/views/${viewId}`,
     );
   }
 }

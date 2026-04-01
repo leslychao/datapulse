@@ -36,6 +36,12 @@ public class GridController {
     private final SavedViewService savedViewService;
     private final GridProperties gridProperties;
 
+    @GetMapping("/kpi")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public GridKpiResponse getKpi(@PathVariable("workspaceId") Long workspaceId) {
+        return gridService.getGridKpi(workspaceId);
+    }
+
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<GridRowResponse> getGrid(

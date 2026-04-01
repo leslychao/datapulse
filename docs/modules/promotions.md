@@ -730,44 +730,44 @@ Ozon price write API принимает `min_price` — минимальная �
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/promo/campaigns` | Any role | Paginated. Filters: `?connectionId=...&status=ACTIVE&marketplaceType=...&from=...&to=...` |
-| GET | `/api/promo/campaigns/{campaignId}` | Any role | Детали campaign + product stats (total, eligible, participating, declined) |
-| GET | `/api/promo/campaigns/{campaignId}/products` | Any role | Products in campaign. Paginated. Filters: `?participationStatus=...&search=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/campaigns` | Any role | Paginated. Filters: `?connectionId=...&status=ACTIVE&marketplaceType=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/campaigns/{campaignId}` | Any role | Детали campaign + product stats (total, eligible, participating, declined) |
+| GET | `/api/workspaces/{workspaceId}/promo/campaigns/{campaignId}/products` | Any role | Products in campaign. Paginated. Filters: `?participationStatus=...&search=...` |
 
 ### Promo policies
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/promo/policies` | PRICING_MANAGER, ADMIN, OWNER | Создать promo policy. Status = DRAFT. Response: `201` |
-| GET | `/api/promo/policies` | Any role | Список promo policies |
-| GET | `/api/promo/policies/{policyId}` | Any role | Детали policy |
-| PUT | `/api/promo/policies/{policyId}` | PRICING_MANAGER, ADMIN, OWNER | Обновить policy (инкрементирует version) |
-| POST | `/api/promo/policies/{policyId}/activate` | PRICING_MANAGER, ADMIN, OWNER | DRAFT/PAUSED → ACTIVE |
-| POST | `/api/promo/policies/{policyId}/pause` | PRICING_MANAGER, ADMIN, OWNER | ACTIVE → PAUSED |
-| POST | `/api/promo/policies/{policyId}/archive` | PRICING_MANAGER, ADMIN, OWNER | → ARCHIVED |
+| POST | `/api/workspaces/{workspaceId}/promo/policies` | PRICING_MANAGER, ADMIN, OWNER | Создать promo policy. Status = DRAFT. Response: `201` |
+| GET | `/api/workspaces/{workspaceId}/promo/policies` | Any role | Список promo policies |
+| GET | `/api/workspaces/{workspaceId}/promo/policies/{policyId}` | Any role | Детали policy |
+| PUT | `/api/workspaces/{workspaceId}/promo/policies/{policyId}` | PRICING_MANAGER, ADMIN, OWNER | Обновить policy (инкрементирует version) |
+| POST | `/api/workspaces/{workspaceId}/promo/policies/{policyId}/activate` | PRICING_MANAGER, ADMIN, OWNER | DRAFT/PAUSED → ACTIVE |
+| POST | `/api/workspaces/{workspaceId}/promo/policies/{policyId}/pause` | PRICING_MANAGER, ADMIN, OWNER | ACTIVE → PAUSED |
+| POST | `/api/workspaces/{workspaceId}/promo/policies/{policyId}/archive` | PRICING_MANAGER, ADMIN, OWNER | → ARCHIVED |
 
 ### Policy assignments
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/promo/policies/{policyId}/assignments` | Any role | Список assignments |
-| POST | `/api/promo/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment |
-| DELETE | `/api/promo/policies/{policyId}/assignments/{assignmentId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить assignment |
+| GET | `/api/workspaces/{workspaceId}/promo/policies/{policyId}/assignments` | Any role | Список assignments |
+| POST | `/api/workspaces/{workspaceId}/promo/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment |
+| DELETE | `/api/workspaces/{workspaceId}/promo/policies/{policyId}/assignments/{assignmentId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить assignment |
 
 ### Evaluation runs
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/promo/evaluation-runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
-| GET | `/api/promo/evaluation-runs/{runId}` | Any role | Детали run: status, counts, timing |
-| POST | `/api/promo/evaluation-runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual promo evaluation. Body: `{ connectionId }` |
+| GET | `/api/workspaces/{workspaceId}/promo/evaluation-runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/evaluation-runs/{runId}` | Any role | Детали run: status, counts, timing |
+| POST | `/api/workspaces/{workspaceId}/promo/evaluation-runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual promo evaluation. Body: `{ connectionId }` |
 
 ### Evaluations & decisions
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/promo/evaluations` | Any role | Paginated. Filters: `?campaignId=...&marketplaceOfferId=...&evaluationResult=...&runId=...` |
-| GET | `/api/promo/decisions` | Any role | Paginated. Filters: `?campaignId=...&decisionType=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/evaluations` | Any role | Paginated. Filters: `?campaignId=...&marketplaceOfferId=...&evaluationResult=...&runId=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/decisions` | Any role | Paginated. Filters: `?campaignId=...&decisionType=...&from=...&to=...` |
 
 ### Manual promo actions
 
@@ -775,15 +775,15 @@ Ozon price write API принимает `min_price` — минимальная �
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/promo/products/{promoProductId}/participate` | PRICING_MANAGER, ADMIN, OWNER | Manual participate. Body: `{ targetPromoPrice? }`. Creates promo_decision (PARTICIPATE) + promo_action APPROVED |
-| POST | `/api/promo/products/{promoProductId}/decline` | PRICING_MANAGER, ADMIN, OWNER | Manual decline. Body: `{ reason? }`. Creates promo_decision (DECLINE), updates canonical status |
-| POST | `/api/promo/products/{promoProductId}/deactivate` | PRICING_MANAGER, ADMIN, OWNER | Manual deactivate (PARTICIPATING product). Body: `{ reason? }`. Creates promo_decision (DEACTIVATE) + promo_action DEACTIVATE APPROVED |
-| POST | `/api/promo/actions/{actionId}/approve` | PRICING_MANAGER, ADMIN, OWNER | Approve PENDING_APPROVAL promo_action |
-| POST | `/api/promo/actions/{actionId}/reject` | PRICING_MANAGER, ADMIN, OWNER | Reject PENDING_APPROVAL. Body: `{ reason }` |
-| POST | `/api/promo/actions/{actionId}/cancel` | PRICING_MANAGER, ADMIN, OWNER | Cancel. Body: `{ cancelReason }` |
-| POST | `/api/promo/actions/bulk-approve` | PRICING_MANAGER, ADMIN, OWNER | Bulk approve. Body: `{ actionIds: [...] }`. Response: `{ succeeded: [...], failed: [{ actionId, reason }] }` |
-| POST | `/api/promo/actions/bulk-reject` | PRICING_MANAGER, ADMIN, OWNER | Bulk reject. Body: `{ actionIds: [...], reason }`. Response: `{ succeeded: [...], failed: [{ actionId, reason }] }` |
-| GET | `/api/promo/actions` | Any role | Paginated. Filters: `?campaignId=...&status=...&actionType=...` |
+| POST | `/api/workspaces/{workspaceId}/promo/products/{promoProductId}/participate` | PRICING_MANAGER, ADMIN, OWNER | Manual participate. Body: `{ targetPromoPrice? }`. Creates promo_decision (PARTICIPATE) + promo_action APPROVED |
+| POST | `/api/workspaces/{workspaceId}/promo/products/{promoProductId}/decline` | PRICING_MANAGER, ADMIN, OWNER | Manual decline. Body: `{ reason? }`. Creates promo_decision (DECLINE), updates canonical status |
+| POST | `/api/workspaces/{workspaceId}/promo/products/{promoProductId}/deactivate` | PRICING_MANAGER, ADMIN, OWNER | Manual deactivate (PARTICIPATING product). Body: `{ reason? }`. Creates promo_decision (DEACTIVATE) + promo_action DEACTIVATE APPROVED |
+| POST | `/api/workspaces/{workspaceId}/promo/actions/{actionId}/approve` | PRICING_MANAGER, ADMIN, OWNER | Approve PENDING_APPROVAL promo_action |
+| POST | `/api/workspaces/{workspaceId}/promo/actions/{actionId}/reject` | PRICING_MANAGER, ADMIN, OWNER | Reject PENDING_APPROVAL. Body: `{ reason }` |
+| POST | `/api/workspaces/{workspaceId}/promo/actions/{actionId}/cancel` | PRICING_MANAGER, ADMIN, OWNER | Cancel. Body: `{ cancelReason }` |
+| POST | `/api/workspaces/{workspaceId}/promo/actions/bulk-approve` | PRICING_MANAGER, ADMIN, OWNER | Bulk approve. Body: `{ actionIds: [...] }`. Response: `{ succeeded: [...], failed: [{ actionId, reason }] }` |
+| POST | `/api/workspaces/{workspaceId}/promo/actions/bulk-reject` | PRICING_MANAGER, ADMIN, OWNER | Bulk reject. Body: `{ actionIds: [...], reason }`. Response: `{ succeeded: [...], failed: [{ actionId, reason }] }` |
+| GET | `/api/workspaces/{workspaceId}/promo/actions` | Any role | Paginated. Filters: `?campaignId=...&status=...&actionType=...` |
 
 ## Аналитика (ClickHouse)
 

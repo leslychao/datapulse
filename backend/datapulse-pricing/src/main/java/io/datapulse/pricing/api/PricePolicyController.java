@@ -1,11 +1,13 @@
 package io.datapulse.pricing.api;
 
+import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.pricing.domain.PolicyStatus;
 import io.datapulse.pricing.domain.PolicyType;
 import io.datapulse.pricing.domain.PricePolicyService;
-import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,10 +21,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
-@RequestMapping(value = "/api/pricing/policies", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/pricing/policies",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PricePolicyController {
 
@@ -32,48 +33,64 @@ public class PricePolicyController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public PricePolicyResponse createPolicy(@Valid @RequestBody CreatePricePolicyRequest request) {
-        return policyService.createPolicy(
-                request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    public PricePolicyResponse createPolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @Valid @RequestBody CreatePricePolicyRequest request) {
+        return policyService.createPolicy(request, workspaceId,
+                workspaceContext.getUserId());
     }
 
     @GetMapping
-    public List<PricePolicySummaryResponse> listPolicies(
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public Page<PricePolicySummaryResponse> listPolicies(
+            @PathVariable("workspaceId") long workspaceId,
             @RequestParam(value = "status", required = false) PolicyStatus status,
-            @RequestParam(value = "strategyType", required = false) PolicyType strategyType) {
-        return policyService.listPolicies(workspaceContext.getWorkspaceId(), status, strategyType);
+            @RequestParam(value = "strategyType", required = false) PolicyType strategyType,
+            Pageable pageable) {
+        return policyService.listPoliciesPaged(workspaceId, status, strategyType, pageable);
     }
 
     @GetMapping("/{policyId}")
-    public PricePolicyResponse getPolicy(@PathVariable("policyId") Long policyId) {
-        return policyService.getPolicy(policyId, workspaceContext.getWorkspaceId());
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PricePolicyResponse getPolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        return policyService.getPolicy(policyId, workspaceId);
     }
 
     @PutMapping("/{policyId}")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public PricePolicyResponse updatePolicy(@PathVariable("policyId") Long policyId,
-                                            @Valid @RequestBody UpdatePricePolicyRequest request) {
-        return policyService.updatePolicy(policyId, request, workspaceContext.getWorkspaceId());
+    public PricePolicyResponse updatePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            @Valid @RequestBody UpdatePricePolicyRequest request) {
+        return policyService.updatePolicy(policyId, request, workspaceId);
     }
 
     @PostMapping("/{policyId}/activate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void activatePolicy(@PathVariable("policyId") Long policyId) {
-        policyService.activatePolicy(policyId, workspaceContext.getWorkspaceId());
+    public void activatePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        policyService.activatePolicy(policyId, workspaceId);
     }
 
     @PostMapping("/{policyId}/pause")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void pausePolicy(@PathVariable("policyId") Long policyId) {
-        policyService.pausePolicy(policyId, workspaceContext.getWorkspaceId());
+    public void pausePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        policyService.pausePolicy(policyId, workspaceId);
     }
 
     @PostMapping("/{policyId}/archive")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void archivePolicy(@PathVariable("policyId") Long policyId) {
-        policyService.archivePolicy(policyId, workspaceContext.getWorkspaceId());
+    public void archivePolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        policyService.archivePolicy(policyId, workspaceId);
     }
 }

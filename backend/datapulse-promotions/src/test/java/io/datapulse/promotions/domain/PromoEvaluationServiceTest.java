@@ -96,7 +96,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_evaluate_profitable_eligible_product_as_participate() {
+    void should_evaluate_profitable_eligible_product_as_participate() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
 
@@ -122,7 +122,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_evaluate_unprofitable_product_as_decline() {
+    void should_evaluate_unprofitable_product_as_decline() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
 
@@ -143,7 +143,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_classify_insufficient_data_when_cogs_null() {
+    void should_classify_insufficient_data_when_cogs_null() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
 
@@ -188,7 +188,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_set_failed_status_when_exception() {
+    void should_set_failed_status_when_exception() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
       when(policyResolver.loadEligibleProducts(CONNECTION_ID, WORKSPACE_ID))
@@ -202,7 +202,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_not_create_action_for_recommendation_mode() {
+    void should_not_create_action_for_recommendation_mode() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
 
@@ -223,7 +223,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_create_pending_approval_action_for_semi_auto() {
+    void should_create_pending_approval_action_for_semi_auto() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
 
@@ -244,7 +244,7 @@ class PromoEvaluationServiceTest {
     }
 
     @Test
-    void should_deactivate_unprofitable_participating_product() {
+    void should_deactivate_unprofitable_participating_product() throws Exception {
       var run = buildRun(PromoRunStatus.PENDING);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
 

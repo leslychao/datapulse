@@ -14,6 +14,8 @@ public record PricePolicySummaryResponse(
         ExecutionMode executionMode,
         Integer priority,
         Integer version,
+        Integer assignmentsCount,
+        OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
 }

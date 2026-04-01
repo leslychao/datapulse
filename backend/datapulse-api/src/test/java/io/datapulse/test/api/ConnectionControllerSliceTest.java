@@ -14,6 +14,8 @@ import io.datapulse.integration.api.ConnectionResponse;
 import io.datapulse.integration.api.ConnectionSummaryResponse;
 import io.datapulse.integration.domain.ConnectionService;
 import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.tenancy.persistence.AppUserRepository;
+import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,22 +24,30 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ConnectionController.class)
+@EnableMethodSecurity
 class ConnectionControllerSliceTest {
 
   @Autowired
   private MockMvc mockMvc;
 
-  @MockBean
+  @MockitoBean
   private ConnectionService connectionService;
 
-  @MockBean
+  @MockitoBean
   private WorkspaceContext workspaceContext;
+
+  @MockitoBean
+  private AppUserRepository appUserRepository;
+
+  @MockitoBean
+  private WorkspaceMemberRepository workspaceMemberRepository;
 
   @BeforeEach
   void setUp() {

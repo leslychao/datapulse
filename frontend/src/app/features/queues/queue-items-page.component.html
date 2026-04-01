@@ -1,0 +1,220 @@
+<div class="flex h-full min-h-0 flex-col bg-[var(--bg-primary)]">
+  <!-- Queue header -->
+  <header class="border-b border-[var(--border-default)] px-4 py-3">
+    @if (queueQuery.isPending()) {
+      <div class="h-6 w-48 animate-pulse rounded bg-[var(--bg-tertiary)]"></div>
+    } @else if (queueQuery.isError()) {
+      <p class="text-sm text-[var(--status-error)]">{{ 'queues.page.load_error' | translate }}</p>
+    } @else {
+      @if (queueQuery.data(); as q) {
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h1 class="text-lg font-semibold text-[var(--text-primary)]">{{ q.name }}</h1>
+          <span
+            class="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[var(--text-xs)] tabular-nums text-[var(--text-secondary)]"
+          >
+            {{ q.totalActiveCount }}
+          </span>
+        </div>
+        <p class="mt-1 text-sm text-[var(--text-secondary)]">
+          {{ 'queues.type.' + q.queueType | translate }}
+        </p>
+      }
+    }
+  </header>
+
+  <!-- Filter bar -->
+  <div
+    class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+  >
+    <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+      <span>{{ 'queues.filters.status' | translate }}</span>
+      <select
+        class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-sm text-[var(--text-primary)]"
+        [value]="statusFilter()"
+        (change)="onStatusChange($any($event.target).value)"
+      >
+        <option value="">{{ 'queues.filters.status_all' | translate }}</option>
+        @for (st of statusOptions; track st) {
+          <option [value]="st">{{ 'queues.item_status.' + st | translate }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-secondary)]">
+      <input
+        type="checkbox"
+        [checked]="assignedToMe()"
+        (change)="onAssignedToggle()"
+        class="rounded border-[var(--border-default)]"
+      />
+      {{ 'queues.filters.assigned_me' | translate }}
+    </label>
+
+    <div class="flex min-w-[200px] flex-1 items-center gap-2">
+      <input
+        type="search"
+        class="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
+        [placeholder]="'queues.filters.search_placeholder' | translate"
+        [value]="searchQuery()"
+        (input)="applySearch($any($event.target).value)"
+      />
+    </div>
+  </div>
+
+  <!-- Grid / empty / error -->
+  <div class="relative min-h-0 flex-1 px-4 py-3">
+    @if (itemsQuery.isError()) {
+      <div class="flex h-48 flex-col items-center justify-center gap-2 text-sm text-[var(--status-error)]">
+        <span>{{ 'queues.page.items_error' | translate }}</span>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-3 py-1.5 text-sm text-white"
+          (click)="itemsQuery.refetch()"
+        >
+          {{ 'actions.retry' | translate }}
+        </button>
+      </div>
+    } @else if (!itemsQuery.isPending() && totalElements() === 0) {
+      <div
+        class="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-6 py-10 text-center"
+      >
+        <lucide-icon [img]="checkIcon" [size]="40" class="text-[var(--status-success)]" />
+        <p class="max-w-md text-sm text-[var(--text-secondary)]">
+          {{ 'queues.page.empty' | translate }}
+        </p>
+      </div>
+    } @else {
+      <div class="h-[min(560px,calc(100vh-260px))] w-full min-h-[320px]">
+        <ag-grid-angular
+          class="ag-theme-alpine h-full w-full"
+          [columnDefs]="columnDefs()"
+          [defaultColDef]="defaultColDef"
+          [rowData]="rowData()"
+          [getRowId]="getRowId"
+          [rowSelection]="'multiple'"
+          [suppressCellFocus]="true"
+          [animateRows]="false"
+          [loading]="itemsQuery.isPending()"
+          (gridReady)="onGridReady($event)"
+          (selectionChanged)="onSelectionChanged($event)"
+        />
+      </div>
+    }
+  </div>
+
+  <!-- Bulk action bar -->
+  @if (selectedRows().length > 0) {
+    <div
+      class="flex flex-wrap items-center gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+      aria-live="polite"
+    >
+      <span class="text-sm text-[var(--text-secondary)]">
+        {{ 'queues.bulk.selected' | translate: { count: selectedRows().length } }}
+      </span>
+
+      @if (showDecisionBulk() && selectedPriceActionIds().length > 0) {
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)]"
+          (click)="bulkApprove()"
+          [disabled]="bulkApproveMutation.isPending()"
+        >
+          {{ 'queues.bulk.approve' | translate }}
+        </button>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
+          (click)="openBulkReject()"
+          [disabled]="bulkRejectMutation.isPending()"
+        >
+          {{ 'queues.bulk.reject' | translate }}
+        </button>
+      }
+
+      <button
+        type="button"
+        class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+        (click)="clearSelection()"
+      >
+        {{ 'actions.cancel' | translate }}
+      </button>
+    </div>
+  }
+
+  <!-- Pagination -->
+  @if (!itemsQuery.isError() && totalElements() > 0) {
+    <footer
+      class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] px-4 py-2.5 text-sm text-[var(--text-secondary)]"
+    >
+      <div class="flex items-center gap-2">
+        <span>{{ 'queues.page.rows_per_page' | translate }}</span>
+        <select
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1"
+          [value]="pageSize()"
+          (change)="setPageSize(+$any($event.target).value)"
+        >
+          @for (n of pageSizeOptions; track n) {
+            <option [value]="n">{{ n }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] px-2 py-1 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+          (click)="prevPage()"
+          [disabled]="pageIndex() <= 0 || itemsQuery.isPending()"
+        >
+          {{ 'queues.page.prev' | translate }}
+        </button>
+        <span class="tabular-nums">
+          {{ pageIndex() + 1 }} / {{ totalPages() }}
+        </span>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] px-2 py-1 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+          (click)="nextPage()"
+          [disabled]="pageIndex() >= totalPages() - 1 || itemsQuery.isPending()"
+        >
+          {{ 'queues.page.next' | translate }}
+        </button>
+      </div>
+    </footer>
+  }
+</div>
+
+@if (bulkRejectOpen()) {
+  <div class="fixed inset-0 z-[8500] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40" (click)="cancelBulkReject()"></div>
+    <div
+      class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-5 shadow-[var(--shadow-md)]"
+    >
+      <h3 class="text-base font-semibold text-[var(--text-primary)]">
+        {{ 'queues.bulk.reject_title' | translate }}
+      </h3>
+      <textarea
+        rows="3"
+        class="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
+        [value]="bulkRejectReason()"
+        (input)="bulkRejectReason.set($any($event.target).value)"
+        [placeholder]="'queues.bulk.reject_placeholder' | translate"
+      ></textarea>
+      <div class="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+          (click)="cancelBulkReject()"
+        >
+          {{ 'actions.cancel' | translate }}
+        </button>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] bg-[var(--status-error)] px-3 py-1.5 text-sm font-medium text-white"
+          (click)="confirmBulkReject()"
+        >
+          {{ 'queues.bulk.reject_confirm' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

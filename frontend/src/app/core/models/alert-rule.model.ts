@@ -1,11 +1,6 @@
-export type AlertRuleType =
-  | 'STALE_DATA'
-  | 'MISSING_SYNC'
-  | 'RESIDUAL_ANOMALY'
-  | 'SPIKE_DETECTION'
-  | 'MISMATCH';
+import type { AlertRuleType, AlertSeverity } from './alert.model';
 
-export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+export type { AlertRuleType, AlertSeverity };
 
 export interface AlertRule {
   id: number;

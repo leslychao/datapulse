@@ -8,6 +8,9 @@ import {
   Tag,
   Gift,
   PlayCircle,
+  ArrowLeftRight,
+  ListTodo,
+  Bell,
   Settings,
 } from 'lucide-angular';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -83,6 +86,9 @@ export class ActivityBarComponent {
     { icon: Tag, route: 'pricing', tooltip: 'Ценообразование' },
     { icon: Gift, route: 'promo', tooltip: 'Промо' },
     { icon: PlayCircle, route: 'execution', tooltip: 'Действия' },
+    { icon: ArrowLeftRight, route: 'mismatches', tooltip: 'Расхождения' },
+    { icon: ListTodo, route: 'queues', tooltip: 'Очереди' },
+    { icon: Bell, route: 'alerts', tooltip: 'Алерты и уведомления' },
   ];
 
   readonly settingsItem: NavItem = {

@@ -21,7 +21,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/promo/actions", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/promo/actions",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PromoActionController {
 
@@ -29,53 +30,60 @@ public class PromoActionController {
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoActionResponse> listActions(
+            @PathVariable("workspaceId") long workspaceId,
             @RequestParam(value = "campaignId", required = false) Long campaignId,
             @RequestParam(value = "status", required = false) PromoActionStatus status,
             @RequestParam(value = "actionType", required = false) PromoActionType actionType,
             Pageable pageable) {
-        return actionService.listActions(
-                workspaceContext.getWorkspaceId(), campaignId, status, actionType, pageable);
+        return actionService.listActions(workspaceId, campaignId, status, actionType, pageable);
     }
 
     @PostMapping("/{actionId}/approve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void approveAction(@PathVariable("actionId") Long actionId) {
-        actionService.approveAction(actionId, workspaceContext.getWorkspaceId());
+    public void approveAction(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("actionId") Long actionId) {
+        actionService.approveAction(actionId, workspaceId);
     }
 
     @PostMapping("/{actionId}/reject")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void rejectAction(@PathVariable("actionId") Long actionId,
-                             @Valid @RequestBody RejectPromoActionRequest request) {
-        actionService.rejectAction(actionId, request.reason(), workspaceContext.getWorkspaceId());
+    public void rejectAction(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("actionId") Long actionId,
+            @Valid @RequestBody RejectPromoActionRequest request) {
+        actionService.rejectAction(actionId, request.reason(), workspaceId);
     }
 
     @PostMapping("/{actionId}/cancel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void cancelAction(@PathVariable("actionId") Long actionId,
-                             @Valid @RequestBody CancelPromoActionRequest request) {
-        actionService.cancelAction(
-                actionId, request.cancelReason(), workspaceContext.getWorkspaceId());
+    public void cancelAction(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("actionId") Long actionId,
+            @Valid @RequestBody CancelPromoActionRequest request) {
+        actionService.cancelAction(actionId, request.cancelReason(), workspaceId);
     }
 
     @PostMapping("/bulk-approve")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public BulkPromoActionResponse bulkApprove(
+            @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody BulkPromoActionRequest request) {
-        return actionService.bulkApprove(request, workspaceContext.getWorkspaceId());
+        return actionService.bulkApprove(request, workspaceId);
     }
 
     @PostMapping("/bulk-reject")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public BulkPromoActionResponse bulkReject(
+            @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody BulkRejectPromoActionRequest request) {
         return actionService.bulkReject(
                 new BulkPromoActionRequest(request.actionIds()),
-                request.reason(),
-                workspaceContext.getWorkspaceId());
+                request.reason(), workspaceId);
     }
 }

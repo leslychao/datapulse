@@ -111,8 +111,6 @@ class ConnectionServiceTest {
       ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
       verify(eventPublisher).publishEvent(eventCaptor.capture());
       assertThat(eventCaptor.getValue()).isInstanceOf(ConnectionCreatedEvent.class);
-
-      verify(validationService).validateAsync(1L);
     }
 
     @Test
@@ -191,7 +189,10 @@ class ConnectionServiceTest {
       connectionService.enableConnection(1L, 1L);
 
       assertThat(conn.getStatus()).isEqualTo(ConnectionStatus.PENDING_VALIDATION.name());
-      verify(validationService).validateAsync(1L);
+
+      ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher).publishEvent(captor.capture());
+      assertThat(captor.getValue()).isInstanceOf(ConnectionStatusChangedEvent.class);
     }
 
     @Test

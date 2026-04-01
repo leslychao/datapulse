@@ -20,10 +20,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/actions", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/actions",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PriceActionController {
 
@@ -32,20 +35,27 @@ public class PriceActionController {
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
-    public Page<PriceActionSummaryResponse> list(PriceActionFilter filter,
-                                                  Pageable pageable) {
-        return actionService.listActions(
-                workspaceContext.getWorkspaceId(), filter, pageable)
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public Page<PriceActionSummaryResponse> list(
+            @PathVariable("workspaceId") long workspaceId,
+            PriceActionFilter filter,
+            Pageable pageable) {
+        return actionService.listActions(workspaceId, filter, pageable)
                 .map(this::toSummaryResponse);
     }
 
     @GetMapping("/{actionId}")
-    public PriceActionResponse get(@PathVariable("actionId") long actionId) {
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PriceActionResponse get(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("actionId") long actionId) {
         return toResponse(actionService.getAction(actionId));
     }
 
     @GetMapping("/{actionId}/attempts")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<PriceActionAttemptResponse> listAttempts(
+            @PathVariable("workspaceId") long workspaceId,
             @PathVariable("actionId") long actionId) {
         return actionService.getAttempts(actionId).stream()
                 .map(this::toAttemptResponse)
@@ -54,13 +64,15 @@ public class PriceActionController {
 
     @PostMapping("/{actionId}/approve")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void approve(@PathVariable("actionId") long actionId) {
+    public void approve(@PathVariable("workspaceId") long workspaceId,
+                        @PathVariable("actionId") long actionId) {
         actionService.casApprove(actionId, workspaceContext.getUserId());
     }
 
     @PostMapping("/bulk-approve")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void bulkApprove(@Valid @RequestBody BulkApproveRequest request) {
+    public void bulkApprove(@PathVariable("workspaceId") long workspaceId,
+                            @Valid @RequestBody BulkApproveRequest request) {
         for (long actionId : request.actionIds()) {
             try {
                 actionService.casApprove(actionId, workspaceContext.getUserId());
@@ -72,41 +84,47 @@ public class PriceActionController {
 
     @PostMapping("/{actionId}/reject")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void reject(@PathVariable("actionId") long actionId,
+    public void reject(@PathVariable("workspaceId") long workspaceId,
+                        @PathVariable("actionId") long actionId,
                         @Valid @RequestBody CancelRequest request) {
         actionService.casReject(actionId, request.cancelReason());
     }
 
     @PostMapping("/{actionId}/hold")
     @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void hold(@PathVariable("actionId") long actionId,
+    public void hold(@PathVariable("workspaceId") long workspaceId,
+                      @PathVariable("actionId") long actionId,
                       @Valid @RequestBody HoldRequest request) {
         actionService.casHold(actionId, request.holdReason());
     }
 
     @PostMapping("/{actionId}/resume")
     @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void resume(@PathVariable("actionId") long actionId) {
+    public void resume(@PathVariable("workspaceId") long workspaceId,
+                        @PathVariable("actionId") long actionId) {
         actionService.casResume(actionId, workspaceContext.getUserId());
     }
 
     @PostMapping("/{actionId}/cancel")
     @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void cancel(@PathVariable("actionId") long actionId,
+    public void cancel(@PathVariable("workspaceId") long workspaceId,
+                        @PathVariable("actionId") long actionId,
                         @Valid @RequestBody CancelRequest request) {
         actionService.casCancel(actionId, request.cancelReason());
     }
 
     @PostMapping("/{actionId}/retry")
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void retry(@PathVariable("actionId") long actionId,
+    public void retry(@PathVariable("workspaceId") long workspaceId,
+                       @PathVariable("actionId") long actionId,
                        @Valid @RequestBody RetryRequest request) {
         actionService.retryFailed(actionId);
     }
 
     @PostMapping("/{actionId}/reconcile")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
-    public void reconcile(@PathVariable("actionId") long actionId,
+    public void reconcile(@PathVariable("workspaceId") long workspaceId,
+                           @PathVariable("actionId") long actionId,
                            @Valid @RequestBody ReconcileRequest request) {
         boolean succeeded =
                 request.outcome() == ReconcileRequest.ReconcileOutcome.SUCCEEDED;
@@ -116,10 +134,20 @@ public class PriceActionController {
     }
 
     private PriceActionSummaryResponse toSummaryResponse(PriceActionSummaryRow row) {
+        BigDecimal deltaPct = null;
+        if (row.currentPriceAtCreation() != null
+                && row.currentPriceAtCreation().compareTo(BigDecimal.ZERO) != 0
+                && row.targetPrice() != null) {
+            deltaPct = row.targetPrice()
+                    .subtract(row.currentPriceAtCreation())
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(row.currentPriceAtCreation(), 2, RoundingMode.HALF_UP);
+        }
         return new PriceActionSummaryResponse(
-                row.id(), row.marketplaceOfferId(),
+                row.id(), row.offerName(), row.sku(),
+                row.marketplace(), row.connectionName(),
                 row.executionMode(), row.status(),
-                row.targetPrice(), row.currentPriceAtCreation(),
+                row.targetPrice(), row.currentPriceAtCreation(), deltaPct,
                 row.attemptCount(), row.maxAttempts(),
                 row.createdAt(), row.updatedAt()
         );

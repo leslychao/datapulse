@@ -1,0 +1,141 @@
+@if (open()) {
+  <div class="fixed inset-0 z-[9000] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40" (click)="close()"></div>
+    <div
+      class="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]"
+    >
+      <div class="border-b border-[var(--border-default)] px-5 py-4">
+        <h2 class="text-base font-semibold text-[var(--text-primary)]">
+          {{ 'queues.builder.title' | translate }}
+        </h2>
+      </div>
+      <form class="flex min-h-0 flex-1 flex-col" [formGroup]="form" (ngSubmit)="submit()">
+        <div class="space-y-4 overflow-y-auto px-5 py-4">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-[var(--text-secondary)]" for="q-name">{{
+              'queues.builder.name' | translate
+            }}</label>
+            <input
+              id="q-name"
+              type="text"
+              formControlName="name"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+            />
+            @if (form.controls.name.touched && form.controls.name.invalid) {
+              <span class="text-[var(--text-xs)] text-[var(--status-error)]">{{
+                'queues.builder.name_error' | translate
+              }}</span>
+            }
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-[var(--text-secondary)]" for="q-type">{{
+              'queues.builder.queue_type' | translate
+            }}</label>
+            <select
+              id="q-type"
+              formControlName="queueType"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+            >
+              @for (t of queueTypes; track t) {
+                <option [value]="t">{{ 'queues.type.' + t | translate }}</option>
+              }
+            </select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-[var(--text-secondary)]" for="q-entity">{{
+              'queues.builder.entity_type' | translate
+            }}</label>
+            <select
+              id="q-entity"
+              formControlName="entityType"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+            >
+              @for (e of entityTypes; track e) {
+                <option [value]="e">{{ 'queues.builder.entity.' + e | translate }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-[var(--text-primary)]">{{
+                'queues.builder.rules' | translate
+              }}</span>
+              <button
+                type="button"
+                class="text-sm text-[var(--accent-primary)] hover:underline"
+                (click)="addRule()"
+              >
+                {{ 'queues.builder.add_rule' | translate }}
+              </button>
+            </div>
+            <div formArrayName="rules" class="space-y-2">
+              @for (rule of rules.controls; track $index; let i = $index) {
+                <div [formGroupName]="i" class="flex flex-wrap items-end gap-2">
+                  <select
+                    formControlName="field"
+                    class="min-w-[120px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  >
+                    @for (f of fieldOptions(); track f) {
+                      <option [value]="f">{{ f }}</option>
+                    }
+                  </select>
+                  <select
+                    formControlName="op"
+                    class="w-24 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  >
+                    @for (o of operators; track o) {
+                      <option [value]="o">{{ 'queues.builder.op.' + o | translate }}</option>
+                    }
+                  </select>
+                  <input
+                    type="text"
+                    formControlName="value"
+                    class="min-w-[100px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  />
+                  <button
+                    type="button"
+                    class="rounded-[var(--radius-md)] px-2 py-1.5 text-sm text-[var(--status-error)] hover:bg-[var(--bg-tertiary)]"
+                    (click)="removeRule(i)"
+                    [attr.aria-label]="'queues.builder.remove_rule' | translate"
+                  >
+                    ×
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+          <div
+            class="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]"
+          >
+            <span>{{ 'queues.builder.preview_label' | translate }}</span>
+            <span class="font-mono text-[var(--text-primary)]">{{ previewCount() ?? '—' }}</span>
+            <button
+              type="button"
+              class="ml-auto text-[var(--accent-primary)] hover:underline"
+              (click)="runPreview()"
+              [disabled]="previewMutation.isPending()"
+            >
+              {{ 'queues.builder.preview_refresh' | translate }}
+            </button>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 border-t border-[var(--border-default)] px-5 py-4">
+          <button
+            type="button"
+            class="rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            (click)="close()"
+          >
+            {{ 'actions.cancel' | translate }}
+          </button>
+          <button
+            type="submit"
+            class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
+            [disabled]="createMutation.isPending()"
+          >
+            {{ 'queues.builder.submit' | translate }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

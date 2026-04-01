@@ -91,6 +91,58 @@ public class GridClickHouseReadRepository {
                 .collect(Collectors.toMap(ClickHouseEnrichment::getOfferId, Function.identity()));
     }
 
+    private static final String KPI_SQL = """
+            SELECT
+                inv.critical_stock_count,
+                cur.revenue_30d_total,
+                CASE
+                    WHEN prev.revenue_prev_30d IS NOT NULL AND prev.revenue_prev_30d > 0
+                    THEN round((cur.revenue_30d_total - prev.revenue_prev_30d)
+                               / prev.revenue_prev_30d * 100, 2)
+                    ELSE NULL
+                END AS revenue_30d_trend
+            FROM (
+                SELECT countDistinct(product_id) AS critical_stock_count
+                FROM mart_inventory_analysis FINAL
+                WHERE connection_id IN (:connectionIds)
+                  AND stock_out_risk = 'CRITICAL'
+                  AND analysis_date = (
+                      SELECT max(analysis_date)
+                      FROM mart_inventory_analysis FINAL
+                      WHERE connection_id IN (:connectionIds)
+                  )
+            ) inv
+            CROSS JOIN (
+                SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_30d_total
+                FROM fact_finance FINAL ff
+                WHERE ff.connection_id IN (:connectionIds)
+                  AND ff.entry_date >= today() - 30
+            ) cur
+            CROSS JOIN (
+                SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_prev_30d
+                FROM fact_finance FINAL ff
+                WHERE ff.connection_id IN (:connectionIds)
+                  AND ff.entry_date >= today() - 60
+                  AND ff.entry_date < today() - 30
+            ) prev
+            """;
+
+    public ClickHouseKpiRow findKpi(List<Long> connectionIds) {
+        if (connectionIds == null || connectionIds.isEmpty()) {
+            return new ClickHouseKpiRow(0, null, null);
+        }
+
+        var params = new MapSqlParameterSource("connectionIds", connectionIds);
+        return ch.queryForObject(KPI_SQL, params, this::mapKpi);
+    }
+
+    private ClickHouseKpiRow mapKpi(ResultSet rs, int rowNum) throws SQLException {
+        return new ClickHouseKpiRow(
+                rs.getLong("critical_stock_count"),
+                rs.getBigDecimal("revenue_30d_total"),
+                rs.getBigDecimal("revenue_30d_trend"));
+    }
+
     private ClickHouseEnrichment mapEnrichment(ResultSet rs, int rowNum) throws SQLException {
         return ClickHouseEnrichment.builder()
                 .offerId(rs.getLong("offer_id"))

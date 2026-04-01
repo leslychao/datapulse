@@ -19,7 +19,7 @@ public record OzonProductInfo(
         @JsonProperty("is_autoarchived") boolean isAutoarchived,
         OzonProductVisibility visibility,
         List<OzonProductSource> sources,
-        List<OzonProductStock> stocks
+        OzonProductStockSummary stocks
 ) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -34,8 +34,8 @@ public record OzonProductInfo(
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record OzonProductStock(
-            String type,
+    public record OzonProductStockSummary(
+            int coming,
             int present,
             int reserved
     ) {}

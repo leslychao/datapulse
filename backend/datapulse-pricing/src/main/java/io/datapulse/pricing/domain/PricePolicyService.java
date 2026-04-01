@@ -14,6 +14,8 @@ import io.datapulse.pricing.persistence.PricePolicyEntity;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +76,28 @@ public class PricePolicyService {
         }
 
         return policyMapper.toSummaries(entities);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PricePolicySummaryResponse> listPoliciesPaged(
+            long workspaceId, PolicyStatus status,
+            PolicyType strategyType, Pageable pageable) {
+        Page<PricePolicyEntity> page;
+
+        if (status != null && strategyType != null) {
+            page = policyRepository.findAllByWorkspaceIdAndStatusAndStrategyType(
+                    workspaceId, status, strategyType, pageable);
+        } else if (status != null) {
+            page = policyRepository.findAllByWorkspaceIdAndStatus(
+                    workspaceId, status, pageable);
+        } else if (strategyType != null) {
+            page = policyRepository.findAllByWorkspaceIdAndStrategyType(
+                    workspaceId, strategyType, pageable);
+        } else {
+            page = policyRepository.findAllByWorkspaceId(workspaceId, pageable);
+        }
+
+        return page.map(policyMapper::toSummary);
     }
 
     @Transactional(readOnly = true)

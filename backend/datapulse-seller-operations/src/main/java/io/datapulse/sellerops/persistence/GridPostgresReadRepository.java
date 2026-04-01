@@ -297,6 +297,54 @@ public class GridPostgresReadRepository {
                 .build();
     }
 
+    public GridKpiRow findKpi(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        return jdbc.queryForObject(KPI_SQL, params, this::mapKpiRow);
+    }
+
+    public List<Long> findConnectionIds(long workspaceId) {
+        return jdbc.queryForList(
+                "SELECT id FROM marketplace_connection WHERE workspace_id = :workspaceId",
+                new MapSqlParameterSource("workspaceId", workspaceId),
+                Long.class);
+    }
+
+    private static final String KPI_SQL = """
+            SELECT
+                COUNT(*)                    AS total_offers,
+                AVG(
+                    CASE WHEN cpc.price > 0 AND cp.cost_price IS NOT NULL
+                         THEN ROUND((cpc.price - cp.cost_price) / NULLIF(cpc.price, 0) * 100, 2)
+                         ELSE NULL END
+                )                           AS avg_margin_pct,
+                (
+                    SELECT COUNT(*)
+                    FROM price_action pa
+                    WHERE pa.workspace_id = :workspaceId
+                      AND pa.status IN ('PENDING_APPROVAL', 'APPROVED', 'ON_HOLD', 'SCHEDULED')
+                )                           AS pending_actions_count
+            FROM marketplace_offer mo
+            JOIN marketplace_connection mc ON mc.id = mo.marketplace_connection_id
+            LEFT JOIN canonical_price_current cpc ON cpc.marketplace_offer_id = mo.id
+            LEFT JOIN LATERAL (
+                SELECT cost_price
+                FROM cost_profile
+                WHERE seller_sku_id = mo.seller_sku_id
+                  AND valid_from <= CURRENT_DATE
+                  AND (valid_to IS NULL OR valid_to > CURRENT_DATE)
+                ORDER BY valid_from DESC
+                LIMIT 1
+            ) cp ON true
+            WHERE mc.workspace_id = :workspaceId
+            """;
+
+    private GridKpiRow mapKpiRow(ResultSet rs, int rowNum) throws SQLException {
+        return new GridKpiRow(
+                rs.getLong("total_offers"),
+                rs.getBigDecimal("avg_margin_pct"),
+                rs.getLong("pending_actions_count"));
+    }
+
     private Integer getBoxedInt(ResultSet rs, String column) throws SQLException {
         int val = rs.getInt(column);
         return rs.wasNull() ? null : val;

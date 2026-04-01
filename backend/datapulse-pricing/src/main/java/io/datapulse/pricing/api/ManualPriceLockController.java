@@ -1,7 +1,7 @@
 package io.datapulse.pricing.api;
 
-import io.datapulse.pricing.domain.ManualPriceLockService;
 import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.pricing.domain.ManualPriceLockService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,7 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/pricing/locks", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/pricing/locks",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class ManualPriceLockController {
 
@@ -30,21 +31,27 @@ public class ManualPriceLockController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public ManualLockResponse createLock(@Valid @RequestBody CreateManualLockRequest request) {
-        return lockService.createLock(
-                request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    public ManualLockResponse createLock(
+            @PathVariable("workspaceId") long workspaceId,
+            @Valid @RequestBody CreateManualLockRequest request) {
+        return lockService.createLock(request, workspaceId,
+                workspaceContext.getUserId());
     }
 
     @GetMapping
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<ManualLockResponse> listActiveLocks(
+            @PathVariable("workspaceId") long workspaceId,
             @RequestParam(value = "marketplaceOfferId", required = false) Long marketplaceOfferId) {
-        return lockService.listActiveLocks(workspaceContext.getWorkspaceId(), marketplaceOfferId);
+        return lockService.listActiveLocks(workspaceId, marketplaceOfferId);
     }
 
     @DeleteMapping("/{lockId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void unlock(@PathVariable("lockId") Long lockId) {
-        lockService.unlock(lockId, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    public void unlock(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("lockId") Long lockId) {
+        lockService.unlock(lockId, workspaceId, workspaceContext.getUserId());
     }
 }

@@ -144,11 +144,10 @@ class GridServiceTest {
       when(pgRepository.findAll(WORKSPACE_ID, filter, pageable))
           .thenReturn(new PageImpl<>(List.of(row), pageable, 1));
       when(chRepository.findEnrichment(anyList())).thenReturn(Map.of());
-      when(gridProperties.getFreshnessThresholdHours()).thenReturn(6);
 
       Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result.getContent().get(0).freshness())
+      assertThat(result.getContent().get(0).dataFreshness())
           .isEqualTo(DataFreshness.STALE.name());
     }
 
@@ -169,7 +168,7 @@ class GridServiceTest {
 
       Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result.getContent().get(0).freshness())
+      assertThat(result.getContent().get(0).dataFreshness())
           .isEqualTo(DataFreshness.FRESH.name());
     }
   }

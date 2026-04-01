@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -124,15 +126,26 @@ public class ConnectionValidationService {
     }
 
     private void createSyncStatesForConnection(MarketplaceConnectionEntity connection) {
+        List<MarketplaceSyncStateEntity> existing =
+            syncStateRepository.findAllByMarketplaceConnectionId(connection.getId());
+        Set<String> existingDomains = existing.stream()
+            .map(MarketplaceSyncStateEntity::getDataDomain)
+            .collect(Collectors.toSet());
+
+        int created = 0;
         for (DataDomain domain : DataDomain.values()) {
+            if (existingDomains.contains(domain.name())) {
+                continue;
+            }
             MarketplaceSyncStateEntity syncState = new MarketplaceSyncStateEntity();
             syncState.setMarketplaceConnectionId(connection.getId());
             syncState.setDataDomain(domain.name());
             syncState.setStatus(SyncStatus.IDLE.name());
             syncStateRepository.save(syncState);
+            created++;
         }
-        log.info("Sync states created: connectionId={}, domains={}",
-                connection.getId(), DataDomain.values().length);
+        log.info("Sync states created: connectionId={}, created={}, alreadyExisted={}",
+                connection.getId(), created, existingDomains.size());
     }
 
 }

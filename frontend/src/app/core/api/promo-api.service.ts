@@ -64,14 +64,14 @@ export class PromoApiService {
     }
 
     return this.http.get<Page<PromoCampaignSummary>>(
-      `${this.base}/workspace/${workspaceId}/promo/campaigns`,
+      `${this.base}/workspaces/${workspaceId}/promo/campaigns`,
       { params },
     );
   }
 
   getCampaign(workspaceId: number, campaignId: number): Observable<PromoCampaign> {
     return this.http.get<PromoCampaign>(
-      `${this.base}/workspace/${workspaceId}/promo/campaigns/${campaignId}`,
+      `${this.base}/workspaces/${workspaceId}/promo/campaigns/${campaignId}`,
     );
   }
 
@@ -105,7 +105,7 @@ export class PromoApiService {
     }
 
     return this.http.get<Page<PromoProductSummary>>(
-      `${this.base}/workspace/${workspaceId}/promo/campaigns/${campaignId}/products`,
+      `${this.base}/workspaces/${workspaceId}/promo/campaigns/${campaignId}/products`,
       { params },
     );
   }
@@ -135,14 +135,14 @@ export class PromoApiService {
     }
 
     return this.http.get<Page<PromoPolicySummary>>(
-      `${this.base}/workspace/${workspaceId}/promo/policies`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies`,
       { params },
     );
   }
 
   getPolicy(workspaceId: number, policyId: number): Observable<PromoPolicy> {
     return this.http.get<PromoPolicy>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}`,
     );
   }
 
@@ -151,7 +151,7 @@ export class PromoApiService {
     req: CreatePromoPolicyRequest,
   ): Observable<PromoPolicy> {
     return this.http.post<PromoPolicy>(
-      `${this.base}/workspace/${workspaceId}/promo/policies`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies`,
       req,
     );
   }
@@ -162,28 +162,28 @@ export class PromoApiService {
     req: UpdatePromoPolicyRequest,
   ): Observable<PromoPolicy> {
     return this.http.put<PromoPolicy>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}`,
       req,
     );
   }
 
   activatePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}/activate`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}/activate`,
       {},
     );
   }
 
   pausePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}/pause`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}/pause`,
       {},
     );
   }
 
   archivePolicy(workspaceId: number, policyId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}/archive`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}/archive`,
       {},
     );
   }
@@ -195,7 +195,7 @@ export class PromoApiService {
     policyId: number,
   ): Observable<PromoPolicyAssignment[]> {
     return this.http.get<PromoPolicyAssignment[]>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}/assignments`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}/assignments`,
     );
   }
 
@@ -205,7 +205,7 @@ export class PromoApiService {
     req: CreatePromoAssignmentRequest,
   ): Observable<PromoPolicyAssignment> {
     return this.http.post<PromoPolicyAssignment>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}/assignments`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}/assignments`,
       req,
     );
   }
@@ -216,7 +216,7 @@ export class PromoApiService {
     assignmentId: number,
   ): Observable<void> {
     return this.http.delete<void>(
-      `${this.base}/workspace/${workspaceId}/promo/policies/${policyId}/assignments/${assignmentId}`,
+      `${this.base}/workspaces/${workspaceId}/promo/policies/${policyId}/assignments/${assignmentId}`,
     );
   }
 
@@ -257,7 +257,7 @@ export class PromoApiService {
     }
 
     return this.http.get<Page<PromoEvaluation>>(
-      `${this.base}/workspace/${workspaceId}/promo/evaluations`,
+      `${this.base}/workspaces/${workspaceId}/promo/evaluations`,
       { params },
     );
   }
@@ -299,7 +299,7 @@ export class PromoApiService {
     }
 
     return this.http.get<Page<PromoDecision>>(
-      `${this.base}/workspace/${workspaceId}/promo/decisions`,
+      `${this.base}/workspaces/${workspaceId}/promo/decisions`,
       { params },
     );
   }
@@ -309,7 +309,7 @@ export class PromoApiService {
     decisionId: number,
   ): Observable<PromoDecisionDetail> {
     return this.http.get<PromoDecisionDetail>(
-      `${this.base}/workspace/${workspaceId}/promo/decisions/${decisionId}`,
+      `${this.base}/workspaces/${workspaceId}/promo/decisions/${decisionId}`,
     );
   }
 
@@ -321,7 +321,7 @@ export class PromoApiService {
     body: { targetPromoPrice?: number; reason?: string },
   ): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/products/${promoProductId}/participate`,
+      `${this.base}/workspaces/${workspaceId}/promo/products/${promoProductId}/participate`,
       body,
     );
   }
@@ -332,14 +332,14 @@ export class PromoApiService {
     body: { reason?: string },
   ): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/products/${promoProductId}/decline`,
+      `${this.base}/workspaces/${workspaceId}/promo/products/${promoProductId}/decline`,
       body,
     );
   }
 
   approveAction(workspaceId: number, actionId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/actions/${actionId}/approve`,
+      `${this.base}/workspaces/${workspaceId}/promo/actions/${actionId}/approve`,
       {},
     );
   }
@@ -350,7 +350,7 @@ export class PromoApiService {
     body: { reason: string },
   ): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/actions/${actionId}/reject`,
+      `${this.base}/workspaces/${workspaceId}/promo/actions/${actionId}/reject`,
       body,
     );
   }
@@ -361,7 +361,7 @@ export class PromoApiService {
     body: { cancelReason: string },
   ): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/promo/actions/${actionId}/cancel`,
+      `${this.base}/workspaces/${workspaceId}/promo/actions/${actionId}/cancel`,
       body,
     );
   }

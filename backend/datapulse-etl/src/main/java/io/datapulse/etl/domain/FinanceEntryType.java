@@ -40,6 +40,7 @@ public enum FinanceEntryType {
     REVIEWS_POINTS("OperationPointsForReviews", MeasureColumn.MARKETING),
     SHIPMENT_DELAY_FINE("DefectFineShipmentDelayRated", MeasureColumn.PENALTIES),
     CANCELLATION_FINE("DefectFineCancellation", MeasureColumn.PENALTIES),
+    INSURANCE_SELLER("InsuranceServiceSellerItem", MeasureColumn.OTHER),
 
     // --- Ozon official enum (21 types, C-docs, not yet observed) ---
     DELIVERY_CANCEL_ACCRUAL("OperationAgentDeliveredToCustomerCanceled", MeasureColumn.REFUND),

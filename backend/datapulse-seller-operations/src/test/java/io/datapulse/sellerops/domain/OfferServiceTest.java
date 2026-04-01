@@ -49,6 +49,10 @@ class OfferServiceTest {
     @Test
     void should_return_full_detail_with_enrichment() {
       var row = buildOfferRow(true, true, true, true);
+      row.setLockId(50L);
+      row.setLockedPrice(new BigDecimal("999"));
+      row.setLockReason("Test lock");
+      row.setLockedAt(OffsetDateTime.now().minusDays(1));
       when(detailRepository.findById(WORKSPACE_ID, OFFER_ID))
           .thenReturn(Optional.of(row));
 

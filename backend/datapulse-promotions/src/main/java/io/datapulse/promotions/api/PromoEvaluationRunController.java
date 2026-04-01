@@ -1,6 +1,5 @@
 package io.datapulse.promotions.api;
 
-import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.promotions.domain.PromoEvaluationRunApiService;
 import io.datapulse.promotions.domain.PromoRunStatus;
 import jakarta.validation.Valid;
@@ -23,24 +22,26 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping(value = "/api/promo/evaluation-runs", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/promo/evaluation-runs",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PromoEvaluationRunController {
 
     private final PromoEvaluationRunApiService runApiService;
-    private final WorkspaceContext workspaceContext;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public PromoEvaluationRunResponse triggerRun(
+            @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody TriggerPromoEvaluationRunRequest request) {
-        return runApiService.triggerManualRun(
-                request.connectionId(), workspaceContext.getWorkspaceId());
+        return runApiService.triggerManualRun(request.connectionId(), workspaceId);
     }
 
     @GetMapping
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoEvaluationRunResponse> listRuns(
+            @PathVariable("workspaceId") long workspaceId,
             @RequestParam(value = "connectionId", required = false) Long connectionId,
             @RequestParam(value = "status", required = false) PromoRunStatus status,
             @RequestParam(value = "from", required = false)
@@ -48,13 +49,14 @@ public class PromoEvaluationRunController {
             @RequestParam(value = "to", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Pageable pageable) {
-        return runApiService.listRuns(
-                workspaceContext.getWorkspaceId(), connectionId, status,
-                from, to, pageable);
+        return runApiService.listRuns(workspaceId, connectionId, status, from, to, pageable);
     }
 
     @GetMapping("/{runId}")
-    public PromoEvaluationRunResponse getRun(@PathVariable("runId") Long runId) {
-        return runApiService.getRun(runId, workspaceContext.getWorkspaceId());
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PromoEvaluationRunResponse getRun(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("runId") Long runId) {
+        return runApiService.getRun(runId, workspaceId);
     }
 }

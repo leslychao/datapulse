@@ -1,7 +1,6 @@
 package io.datapulse.pricing.api;
 
 import io.datapulse.pricing.domain.PricePolicyAssignmentService;
-import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,34 +18,39 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/pricing/policies/{policyId}/assignments",
-        produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(
+    value = "/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PricePolicyAssignmentController {
 
     private final PricePolicyAssignmentService assignmentService;
-    private final WorkspaceContext workspaceContext;
 
     @GetMapping
-    public List<AssignmentResponse> listAssignments(@PathVariable("policyId") Long policyId) {
-        return assignmentService.listAssignments(policyId, workspaceContext.getWorkspaceId());
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public List<AssignmentResponse> listAssignments(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId) {
+        return assignmentService.listAssignments(policyId, workspaceId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public AssignmentResponse createAssignment(@PathVariable("policyId") Long policyId,
-                                               @Valid @RequestBody CreateAssignmentRequest request) {
-        return assignmentService.createAssignment(
-                policyId, request, workspaceContext.getWorkspaceId());
+    public AssignmentResponse createAssignment(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            @Valid @RequestBody CreateAssignmentRequest request) {
+        return assignmentService.createAssignment(policyId, request, workspaceId);
     }
 
     @DeleteMapping("/{assignmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void deleteAssignment(@PathVariable("policyId") Long policyId,
-                                 @PathVariable("assignmentId") Long assignmentId) {
-        assignmentService.deleteAssignment(
-                policyId, assignmentId, workspaceContext.getWorkspaceId());
+    public void deleteAssignment(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            @PathVariable("assignmentId") Long assignmentId) {
+        assignmentService.deleteAssignment(policyId, assignmentId, workspaceId);
     }
 }

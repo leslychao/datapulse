@@ -31,7 +31,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<PnlSummary> {
     return this.http.get<PnlSummary>(
-      `${this.base}/workspace/${workspaceId}/analytics/pnl/summary`,
+      `${this.base}/workspaces/${workspaceId}/analytics/pnl/summary`,
       { params: this.buildParams(filter) },
     );
   }
@@ -41,7 +41,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<PnlTrendPoint[]> {
     return this.http.get<PnlTrendPoint[]>(
-      `${this.base}/workspace/${workspaceId}/analytics/pnl/trend`,
+      `${this.base}/workspaces/${workspaceId}/analytics/pnl/trend`,
       { params: this.buildParams(filter) },
     );
   }
@@ -58,7 +58,7 @@ export class AnalyticsApiService {
       .set('size', size)
       .set('sort', sort);
     return this.http.get<Page<PnlByProduct>>(
-      `${this.base}/workspace/${workspaceId}/analytics/pnl/by-product`,
+      `${this.base}/workspaces/${workspaceId}/analytics/pnl/by-product`,
       { params },
     );
   }
@@ -75,7 +75,7 @@ export class AnalyticsApiService {
       .set('size', size)
       .set('sort', sort);
     return this.http.get<Page<PnlByPosting>>(
-      `${this.base}/workspace/${workspaceId}/analytics/pnl/by-posting`,
+      `${this.base}/workspaces/${workspaceId}/analytics/pnl/by-posting`,
       { params },
     );
   }
@@ -85,7 +85,7 @@ export class AnalyticsApiService {
     postingId: string,
   ): Observable<PostingDetail> {
     return this.http.get<PostingDetail>(
-      `${this.base}/workspace/${workspaceId}/analytics/pnl/posting/${postingId}/details`,
+      `${this.base}/workspaces/${workspaceId}/analytics/pnl/posting/${postingId}/details`,
     );
   }
 
@@ -94,7 +94,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<InventoryOverview> {
     return this.http.get<InventoryOverview>(
-      `${this.base}/workspace/${workspaceId}/analytics/inventory/overview`,
+      `${this.base}/workspaces/${workspaceId}/analytics/inventory/overview`,
       { params: this.buildParams(filter) },
     );
   }
@@ -111,7 +111,7 @@ export class AnalyticsApiService {
       .set('size', size)
       .set('sort', sort);
     return this.http.get<Page<InventoryByProduct>>(
-      `${this.base}/workspace/${workspaceId}/analytics/inventory/by-product`,
+      `${this.base}/workspaces/${workspaceId}/analytics/inventory/by-product`,
       { params },
     );
   }
@@ -121,7 +121,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<StockHistoryPoint[]> {
     return this.http.get<StockHistoryPoint[]>(
-      `${this.base}/workspace/${workspaceId}/analytics/inventory/stock-history`,
+      `${this.base}/workspaces/${workspaceId}/analytics/inventory/stock-history`,
       { params: this.buildParams(filter) },
     );
   }
@@ -131,7 +131,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<ReturnsSummary> {
     return this.http.get<ReturnsSummary>(
-      `${this.base}/workspace/${workspaceId}/analytics/returns/summary`,
+      `${this.base}/workspaces/${workspaceId}/analytics/returns/summary`,
       { params: this.buildParams(filter) },
     );
   }
@@ -148,7 +148,7 @@ export class AnalyticsApiService {
       .set('size', size)
       .set('sort', sort);
     return this.http.get<Page<ReturnsByProduct>>(
-      `${this.base}/workspace/${workspaceId}/analytics/returns/by-product`,
+      `${this.base}/workspaces/${workspaceId}/analytics/returns/by-product`,
       { params },
     );
   }
@@ -158,7 +158,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<ReturnsTrendPoint[]> {
     return this.http.get<ReturnsTrendPoint[]>(
-      `${this.base}/workspace/${workspaceId}/analytics/returns/trend`,
+      `${this.base}/workspaces/${workspaceId}/analytics/returns/trend`,
       { params: this.buildParams(filter) },
     );
   }
@@ -168,7 +168,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<DataQualityStatus> {
     return this.http.get<DataQualityStatus>(
-      `${this.base}/workspace/${workspaceId}/analytics/data-quality/status`,
+      `${this.base}/workspaces/${workspaceId}/analytics/data-quality/status`,
       { params: this.buildParams(filter) },
     );
   }
@@ -178,7 +178,7 @@ export class AnalyticsApiService {
     filter: AnalyticsFilter,
   ): Observable<ReconciliationResult> {
     return this.http.get<ReconciliationResult>(
-      `${this.base}/workspace/${workspaceId}/analytics/data-quality/reconciliation`,
+      `${this.base}/workspaces/${workspaceId}/analytics/data-quality/reconciliation`,
       { params: this.buildParams(filter) },
     );
   }
@@ -188,7 +188,7 @@ export class AnalyticsApiService {
     entryId: number,
   ): Observable<{ url: string }> {
     return this.http.get<{ url: string }>(
-      `${this.base}/workspace/${workspaceId}/analytics/provenance/entry/${entryId}/raw`,
+      `${this.base}/workspaces/${workspaceId}/analytics/provenance/entry/${entryId}/raw`,
     );
   }
 

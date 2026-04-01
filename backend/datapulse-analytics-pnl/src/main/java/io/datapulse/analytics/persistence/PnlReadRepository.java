@@ -282,9 +282,9 @@ public class PnlReadRepository {
             sb.append(" AND m.connection_id = :connectionId");
             params.addValue("connectionId", filter.connectionId());
         }
-        if (filter.period() != null) {
+        if (filter.periodAsInt() != null) {
             sb.append(" AND m.period = :period");
-            params.addValue("period", filter.period());
+            params.addValue("period", filter.periodAsInt());
         }
         if (filter.sellerSkuId() != null) {
             sb.append(" AND m.seller_sku_id = :sellerSkuId");

@@ -80,20 +80,20 @@ export class OfferApiService {
     }
 
     return this.http.get<Page<OfferSummary>>(
-      `${this.base}/workspace/${workspaceId}/grid`,
+      `${this.base}/workspaces/${workspaceId}/grid`,
       { params },
     );
   }
 
   getOffer(workspaceId: number, offerId: number): Observable<OfferDetail> {
     return this.http.get<OfferDetail>(
-      `${this.base}/workspace/${workspaceId}/offers/${offerId}`,
+      `${this.base}/workspaces/${workspaceId}/offers/${offerId}`,
     );
   }
 
   getGridKpi(workspaceId: number): Observable<GridKpi> {
     return this.http.get<GridKpi>(
-      `${this.base}/workspace/${workspaceId}/grid/kpi`,
+      `${this.base}/workspaces/${workspaceId}/grid/kpi`,
     );
   }
 
@@ -118,7 +118,7 @@ export class OfferApiService {
     }
 
     return this.http.get(
-      `${this.base}/workspace/${workspaceId}/grid/export`,
+      `${this.base}/workspaces/${workspaceId}/grid/export`,
       { params, responseType: 'blob' },
     );
   }
@@ -133,7 +133,7 @@ export class OfferApiService {
     let params = new HttpParams().set('page', page).set('size', size);
     if (decisionType) params = params.set('decisionType', decisionType);
     return this.http.get<Page<PriceJournalEntry>>(
-      `${this.base}/workspace/${workspaceId}/offers/${offerId}/price-journal`,
+      `${this.base}/workspaces/${workspaceId}/offers/${offerId}/price-journal`,
       { params },
     );
   }
@@ -146,7 +146,7 @@ export class OfferApiService {
   ): Observable<Page<PromoJournalEntry>> {
     const params = new HttpParams().set('page', page).set('size', size);
     return this.http.get<Page<PromoJournalEntry>>(
-      `${this.base}/workspace/${workspaceId}/offers/${offerId}/promo-journal`,
+      `${this.base}/workspaces/${workspaceId}/offers/${offerId}/promo-journal`,
       { params },
     );
   }
@@ -159,20 +159,20 @@ export class OfferApiService {
   ): Observable<Page<ActionHistoryEntry>> {
     const params = new HttpParams().set('page', page).set('size', size);
     return this.http.get<Page<ActionHistoryEntry>>(
-      `${this.base}/workspace/${workspaceId}/offers/${offerId}/action-history`,
+      `${this.base}/workspaces/${workspaceId}/offers/${offerId}/action-history`,
       { params },
     );
   }
 
   lockOffer(workspaceId: number, offerId: number, req: LockPriceRequest): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/offers/${offerId}/lock`, req,
+      `${this.base}/workspaces/${workspaceId}/offers/${offerId}/lock`, req,
     );
   }
 
   unlockOffer(workspaceId: number, offerId: number): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/workspace/${workspaceId}/offers/${offerId}/unlock`, {},
+      `${this.base}/workspaces/${workspaceId}/offers/${offerId}/unlock`, {},
     );
   }
 
@@ -206,13 +206,13 @@ export class OfferApiService {
 
   bulkManualPreview(workspaceId: number, req: BulkManualPreviewRequest): Observable<BulkManualPreviewResponse> {
     return this.http.post<BulkManualPreviewResponse>(
-      `${this.base}/workspace/${workspaceId}/pricing/bulk-manual/preview`, req,
+      `${this.base}/workspaces/${workspaceId}/pricing/bulk-manual/preview`, req,
     );
   }
 
   bulkManualApply(workspaceId: number, req: BulkManualPreviewRequest): Observable<BulkActionResponse> {
     return this.http.post<BulkActionResponse>(
-      `${this.base}/workspace/${workspaceId}/pricing/bulk-manual/apply`, req,
+      `${this.base}/workspaces/${workspaceId}/pricing/bulk-manual/apply`, req,
     );
   }
 }

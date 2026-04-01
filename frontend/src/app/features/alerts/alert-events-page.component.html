@@ -1,0 +1,129 @@
+<div class="flex h-full min-h-0 flex-col">
+  <div class="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-4 py-3">
+    <lucide-icon [img]="alertCircleIcon" [size]="22" class="text-[var(--status-warning)]" />
+    <h1 class="text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
+      {{ 'alerts.events.title' | translate }}
+    </h1>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="flex shrink-0 flex-wrap gap-3 bg-[var(--bg-secondary)] px-4 py-3">
+    <button
+      type="button"
+      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      (click)="onKpiClick('critical')"
+    >
+      <dp-kpi-card
+        [label]="'alerts.kpi.critical' | translate"
+        [value]="summaryQuery.data()?.openCritical ?? null"
+        [loading]="summaryQuery.isPending()"
+      />
+    </button>
+    <button
+      type="button"
+      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      (click)="onKpiClick('warning')"
+    >
+      <dp-kpi-card
+        [label]="'alerts.kpi.warning' | translate"
+        [value]="summaryQuery.data()?.openWarning ?? null"
+        [loading]="summaryQuery.isPending()"
+      />
+    </button>
+    <button
+      type="button"
+      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      (click)="onKpiClick('ack')"
+    >
+      <dp-kpi-card
+        [label]="'alerts.kpi.acknowledged' | translate"
+        [value]="summaryQuery.data()?.acknowledged ?? null"
+        [loading]="summaryQuery.isPending()"
+      />
+    </button>
+    <button
+      type="button"
+      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      (click)="onKpiClick('resolved')"
+    >
+      <dp-kpi-card
+        [label]="'alerts.kpi.resolved_7d' | translate"
+        [value]="summaryQuery.data()?.resolvedLast7Days ?? null"
+        [loading]="summaryQuery.isPending()"
+      />
+    </button>
+  </div>
+
+  <dp-filter-bar
+    [filters]="filterConfigs()"
+    [values]="filterValues()"
+    (filtersChanged)="onFiltersChanged($event)"
+  />
+
+  <div class="flex min-h-0 flex-1 flex-col px-4 py-3">
+    @if (alertsQuery.isError()) {
+      <dp-empty-state
+        [message]="'alerts.events.load_error' | translate"
+        [actionLabel]="'actions.retry' | translate"
+        (action)="alertsQuery.refetch()"
+      />
+    } @else if (alertsQuery.isPending()) {
+      <div class="flex flex-1 items-center justify-center py-16">
+        <span
+          class="dp-spinner inline-block h-10 w-10 rounded-full border-2 border-[var(--border-default)]"
+          style="border-top-color: var(--accent-primary)"
+        ></span>
+      </div>
+    } @else if (totalElements() === 0) {
+      <div
+        class="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)] py-16 text-center"
+      >
+        <lucide-icon [img]="checkCircleIcon" [size]="40" class="text-[var(--status-success)]" />
+        <p class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+          {{ 'alerts.events.empty_ok' | translate }}
+        </p>
+      </div>
+    } @else {
+      <ag-grid-angular
+        class="ag-theme-alpine min-h-[360px] w-full flex-1"
+        [columnDefs]="columnDefs"
+        [rowData]="rows()"
+        [localeText]="localeText"
+        [pagination]="false"
+        [suppressCellFocus]="true"
+        [animateRows]="false"
+        [getRowId]="getRowId"
+        (rowClicked)="onRowClicked($event)"
+        (sortChanged)="onSortChanged($event)"
+      />
+    }
+  </div>
+
+  @if (!alertsQuery.isPending() && !alertsQuery.isError() && totalElements() > 0) {
+    <div
+      class="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+    >
+      <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        {{ 'alerts.pagination.summary' | translate: { page: pageIndex() + 1, total: totalPages(), count: totalElements() } }}
+      </span>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="pageIndex() <= 0"
+          (click)="prevPage()"
+        >
+          {{ 'alerts.pagination.prev' | translate }}
+        </button>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="pageIndex() + 1 >= totalPages()"
+          (click)="nextPage()"
+        >
+          {{ 'alerts.pagination.next' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+</div>

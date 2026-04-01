@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/promo/products", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/promo/products",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PromoProductController {
 
@@ -25,36 +26,42 @@ public class PromoProductController {
     @PostMapping("/{promoProductId}/participate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void participate(@PathVariable("promoProductId") Long promoProductId,
-                            @Valid @RequestBody(required = false) ManualParticipateRequest request) {
+    public void participate(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("promoProductId") Long promoProductId,
+            @Valid @RequestBody(required = false) ManualParticipateRequest request) {
         decisionService.manualParticipate(
                 promoProductId,
                 request != null ? request.targetPromoPrice() : null,
-                workspaceContext.getWorkspaceId(),
+                workspaceId,
                 workspaceContext.getUserId());
     }
 
     @PostMapping("/{promoProductId}/decline")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void decline(@PathVariable("promoProductId") Long promoProductId,
-                        @Valid @RequestBody(required = false) ManualDeclineRequest request) {
+    public void decline(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("promoProductId") Long promoProductId,
+            @Valid @RequestBody(required = false) ManualDeclineRequest request) {
         decisionService.manualDecline(
                 promoProductId,
                 request != null ? request.reason() : null,
-                workspaceContext.getWorkspaceId(),
+                workspaceId,
                 workspaceContext.getUserId());
     }
 
     @PostMapping("/{promoProductId}/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void deactivate(@PathVariable("promoProductId") Long promoProductId,
-                           @Valid @RequestBody(required = false) ManualDeclineRequest request) {
+    public void deactivate(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("promoProductId") Long promoProductId,
+            @Valid @RequestBody(required = false) ManualDeclineRequest request) {
         decisionService.manualDeactivate(
                 promoProductId,
                 request != null ? request.reason() : null,
-                workspaceContext.getWorkspaceId(),
+                workspaceId,
                 workspaceContext.getUserId());
     }
 }

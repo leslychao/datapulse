@@ -16,6 +16,12 @@ const RULE_TYPE_LABELS: Record<AlertRuleType, string> = {
   RESIDUAL_ANOMALY: 'Аномалия reconciliation',
   SPIKE_DETECTION: 'Всплеск метрик',
   MISMATCH: 'Расхождения данных',
+  ACTION_FAILED: 'Ошибка действия',
+  STUCK_STATE: 'Застрявшее состояние',
+  RECONCILIATION_FAILED: 'Ошибка reconciliation',
+  POISON_PILL: 'Poison pill',
+  PROMO_MISMATCH: 'Расхождение промо',
+  ACTION_DEFERRED: 'Отложенное действие',
 };
 
 const SEVERITY_LABELS: Record<AlertSeverity, string> = {
@@ -58,6 +64,12 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
   MISMATCH: [
     { key: 'max_orphan_count', label: 'Максимум расхождений без алерта', min: 0 },
   ],
+  ACTION_FAILED: [{ key: 'consecutive_failures', label: 'Подряд ошибок', min: 1 }],
+  STUCK_STATE: [{ key: 'stuck_hours', label: 'Часов в застрявшем статусе', min: 1 }],
+  RECONCILIATION_FAILED: [{ key: 'retry_exhausted', label: 'Исчерпаны повторы', min: 0, max: 1 }],
+  POISON_PILL: [{ key: 'enabled', label: 'Включено', min: 0, max: 1 }],
+  PROMO_MISMATCH: [{ key: 'max_delta_pct', label: 'Макс. Δ%', min: 0, max: 100, step: 0.1 }],
+  ACTION_DEFERRED: [{ key: 'defer_hours', label: 'Часов отложено', min: 1 }],
 };
 
 @Component({

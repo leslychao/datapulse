@@ -49,14 +49,14 @@ export class ActionApiService {
     }
 
     return this.http.get<Page<ActionSummary>>(
-      `${this.base}/workspace/${workspaceId}/actions`,
+      `${this.base}/workspaces/${workspaceId}/actions`,
       { params },
     );
   }
 
   getAction(workspaceId: number, actionId: number): Observable<ActionDetail> {
     return this.http.get<ActionDetail>(
-      `${this.base}/workspace/${workspaceId}/actions/${actionId}`,
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}`,
     );
   }
 

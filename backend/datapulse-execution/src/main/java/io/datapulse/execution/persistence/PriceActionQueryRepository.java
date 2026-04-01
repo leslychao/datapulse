@@ -31,15 +31,23 @@ public class PriceActionQueryRepository {
     );
 
     private static final String BASE_SELECT = """
-            SELECT pa.id, pa.marketplace_offer_id, pa.execution_mode, pa.status,
+            SELECT pa.id, pa.marketplace_offer_id,
+                   mo.name AS offer_name, mo.marketplace_sku AS sku,
+                   mc.marketplace_type AS marketplace, mc.name AS connection_name,
+                   pa.execution_mode, pa.status,
                    pa.target_price, pa.current_price_at_creation,
                    pa.attempt_count, pa.max_attempts,
                    pa.created_at, pa.updated_at
             FROM price_action pa
+            JOIN marketplace_offer mo ON pa.marketplace_offer_id = mo.id
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             """;
 
     private static final String BASE_COUNT = """
-            SELECT COUNT(*) FROM price_action pa
+            SELECT COUNT(*)
+            FROM price_action pa
+            JOIN marketplace_offer mo ON pa.marketplace_offer_id = mo.id
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             """;
 
     public Page<PriceActionSummaryRow> findAll(long workspaceId,
@@ -66,6 +74,10 @@ public class PriceActionQueryRepository {
                 new PriceActionSummaryRow(
                         rs.getLong("id"),
                         rs.getLong("marketplace_offer_id"),
+                        rs.getString("offer_name"),
+                        rs.getString("sku"),
+                        rs.getString("marketplace"),
+                        rs.getString("connection_name"),
                         ActionExecutionMode.valueOf(rs.getString("execution_mode")),
                         ActionStatus.valueOf(rs.getString("status")),
                         rs.getBigDecimal("target_price"),

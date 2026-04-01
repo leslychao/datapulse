@@ -78,6 +78,21 @@ export const routes: Routes = [
         data: { breadcrumb: 'Исполнение' },
       },
       {
+        path: 'mismatches',
+        loadChildren: () => import('./features/mismatches/mismatches.routes'),
+        data: { breadcrumb: 'Расхождения' },
+      },
+      {
+        path: 'queues',
+        loadChildren: () => import('./features/queues/queues.routes'),
+        data: { breadcrumb: 'Очереди' },
+      },
+      {
+        path: 'alerts',
+        loadChildren: () => import('./features/alerts/alerts.routes'),
+        data: { breadcrumb: 'Алерты' },
+      },
+      {
         path: 'settings',
         loadChildren: () => import('./features/settings/settings.routes'),
         data: { breadcrumb: 'Настройки' },

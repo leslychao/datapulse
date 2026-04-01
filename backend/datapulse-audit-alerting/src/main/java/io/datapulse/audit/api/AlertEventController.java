@@ -20,6 +20,11 @@ public class AlertEventController {
     private final AlertEventService alertEventService;
     private final WorkspaceContext workspaceContext;
 
+    @GetMapping("/summary")
+    public AlertSummaryResponse getSummary() {
+        return alertEventService.getSummary(workspaceContext.getWorkspaceId());
+    }
+
     @GetMapping
     public Page<AlertEventResponse> listAlerts(AlertEventFilter filter, Pageable pageable) {
         return alertEventService.listAlerts(workspaceContext.getWorkspaceId(), filter, pageable);

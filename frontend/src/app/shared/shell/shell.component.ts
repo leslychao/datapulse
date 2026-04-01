@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit, viewChild } from '@angular/core';
 import { RouterOutlet, ActivatedRoute } from '@angular/router';
 
 import { TopBarComponent } from './top-bar/top-bar.component';
@@ -10,6 +10,9 @@ import { StatusBarComponent } from './status-bar/status-bar.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
 import { ToastContainerComponent } from './toast/toast-container.component';
 import { OfferDetailPanelComponent } from '@features/grid/components/offer-detail/offer-detail-panel.component';
+import { AlertDetailPanelComponent } from '@features/alerts/alert-detail-panel.component';
+import { AutomationBlockerBannerComponent } from './automation-blocker-banner.component';
+import { ConnectionLostBannerComponent } from './connection-lost-banner.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ShortcutService } from '@shared/services/shortcut.service';
@@ -30,6 +33,9 @@ import { WebSocketService } from '@core/websocket/websocket.service';
     CommandPaletteComponent,
     ToastContainerComponent,
     OfferDetailPanelComponent,
+    AlertDetailPanelComponent,
+    AutomationBlockerBannerComponent,
+    ConnectionLostBannerComponent,
   ],
   template: `
     <div class="grid h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
@@ -42,7 +48,8 @@ import { WebSocketService } from '@core/websocket/websocket.service';
                   'actbar  bottom  detail'
                   'status  status  status';">
       <dp-top-bar style="grid-area: topbar"
-                  class="border-b border-[var(--border-default)]" />
+                  class="border-b border-[var(--border-default)]"
+                  (searchRequested)="openCommandPalette()" />
 
       <dp-activity-bar style="grid-area: actbar"
                        class="border-r border-[var(--border-default)]" />
@@ -56,11 +63,18 @@ import { WebSocketService } from '@core/websocket/websocket.service';
           @if (detailPanel.entityType() === 'offer') {
             <dp-offer-detail-panel />
           }
+          @if (detailPanel.entityType() === 'alert') {
+            <dp-alert-detail-panel />
+          }
         </dp-detail-panel>
       }
 
-      <main style="grid-area: main" class="overflow-auto bg-[var(--bg-primary)]">
-        <router-outlet />
+      <main style="grid-area: main" class="flex flex-col overflow-auto bg-[var(--bg-primary)]">
+        <dp-automation-blocker-banner />
+        <dp-connection-lost-banner />
+        <div class="flex-1 overflow-auto">
+          <router-outlet />
+        </div>
       </main>
 
       <dp-bottom-panel style="grid-area: bottom" />
@@ -74,6 +88,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
   `,
 })
 export class ShellComponent implements OnInit, OnDestroy {
+  protected readonly commandPalette = viewChild.required(CommandPaletteComponent);
   protected readonly detailPanel = inject(DetailPanelService);
   private readonly workspaceStore = inject(WorkspaceContextStore);
   private readonly route = inject(ActivatedRoute);
@@ -82,6 +97,10 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   constructor() {
     this.shortcuts.init();
+  }
+
+  protected openCommandPalette(): void {
+    this.commandPalette().open();
   }
 
   ngOnInit(): void {

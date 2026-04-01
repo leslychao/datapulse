@@ -1,7 +1,6 @@
 package io.datapulse.pricing.api;
 
 import io.datapulse.pricing.domain.PricingRunApiService;
-import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,28 +17,36 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/pricing/runs", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/pricing/runs",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class PricingRunController {
 
     private final PricingRunApiService runApiService;
-    private final WorkspaceContext workspaceContext;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public PricingRunResponse triggerRun(@Valid @RequestBody TriggerPricingRunRequest request) {
-        return runApiService.triggerManualRun(
-                request.connectionId(), workspaceContext.getWorkspaceId());
+    public PricingRunResponse triggerRun(
+            @PathVariable("workspaceId") long workspaceId,
+            @Valid @RequestBody TriggerPricingRunRequest request) {
+        return runApiService.triggerManualRun(request.connectionId(), workspaceId);
     }
 
     @GetMapping
-    public Page<PricingRunResponse> listRuns(PricingRunFilter filter, Pageable pageable) {
-        return runApiService.listRuns(workspaceContext.getWorkspaceId(), filter, pageable);
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public Page<PricingRunResponse> listRuns(
+            @PathVariable("workspaceId") long workspaceId,
+            PricingRunFilter filter,
+            Pageable pageable) {
+        return runApiService.listRuns(workspaceId, filter, pageable);
     }
 
     @GetMapping("/{runId}")
-    public PricingRunResponse getRun(@PathVariable("runId") Long runId) {
-        return runApiService.getRun(runId, workspaceContext.getWorkspaceId());
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PricingRunResponse getRun(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("runId") Long runId) {
+        return runApiService.getRun(runId, workspaceId);
     }
 }

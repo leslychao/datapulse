@@ -24,7 +24,7 @@ import reactor.core.publisher.Flux;
 public class OzonReturnsReadAdapter {
 
     private static final String RETURNS_PATH = "/v1/returns/list";
-    private static final int PAGE_LIMIT = 1000;
+    private static final int PAGE_LIMIT = 500;
     private static final JsonPathCursorExtractor LAST_ID_EXTRACTOR =
             new JsonPathCursorExtractor("last_id");
 
@@ -44,7 +44,7 @@ public class OzonReturnsReadAdapter {
             Flux<DataBuffer> body = apiCaller.post(RETURNS_PATH,
                     Map.of(
                             "filter", Map.of(
-                                    "last_free_waiting_day", Map.of(
+                                    "logistic_return_date", Map.of(
                                             "time_from", since.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
                                             "time_to", to.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))),
                             "last_id", currentLastId,

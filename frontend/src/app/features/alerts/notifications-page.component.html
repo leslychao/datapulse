@@ -1,0 +1,114 @@
+<div class="flex h-full min-h-0 flex-col">
+  <div class="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-4 py-3">
+    <lucide-icon [img]="bellIcon" [size]="22" class="text-[var(--accent-primary)]" />
+    <h1 class="text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
+      {{ 'alerts.notifications.title' | translate }}
+    </h1>
+    <button
+      type="button"
+      class="ml-auto cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+      [disabled]="markAllReadMutation.isPending() || notificationsQuery.isPending()"
+      (click)="markAllRead()"
+    >
+      {{ 'alerts.notifications.mark_all' | translate }}
+    </button>
+  </div>
+
+  <dp-filter-bar
+    [filters]="filterConfigs()"
+    [values]="filterValues()"
+    (filtersChanged)="onFiltersChanged($event)"
+  />
+
+  @if (selectedRows().length > 0) {
+    <div
+      class="flex shrink-0 items-center gap-4 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+      aria-live="polite"
+    >
+      <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        {{ selectedRows().length }} {{ 'alerts.notifications.bulk_selected' | translate }}
+      </span>
+      <button
+        type="button"
+        class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-[length:var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+        (click)="bulkMarkRead()"
+      >
+        {{ 'alerts.notifications.bulk_mark_read' | translate }}
+      </button>
+    </div>
+  }
+
+  <div class="flex min-h-0 flex-1 flex-col px-4 py-3">
+    @if (notificationsQuery.isError()) {
+      <dp-empty-state
+        [message]="'alerts.notifications.load_error' | translate"
+        [actionLabel]="'actions.retry' | translate"
+        (action)="notificationsQuery.refetch()"
+      />
+    } @else if (notificationsQuery.isPending()) {
+      <div class="flex flex-1 items-center justify-center py-16">
+        <span
+          class="dp-spinner inline-block h-10 w-10 rounded-full border-2 border-[var(--border-default)]"
+          style="border-top-color: var(--accent-primary)"
+        ></span>
+      </div>
+    } @else if (totalFiltered() === 0) {
+      <dp-empty-state
+        [message]="
+          (hasNoServerRows() ? 'alerts.notifications.empty' : 'alerts.notifications.empty_filtered')
+            | translate
+        "
+      />
+    } @else {
+      <ag-grid-angular
+        class="ag-theme-alpine min-h-[360px] w-full flex-1"
+        [columnDefs]="columnDefs"
+        [rowData]="pagedRows()"
+        [localeText]="localeText"
+        [pagination]="false"
+        [rowSelection]="'multiple'"
+        [suppressCellFocus]="true"
+        [animateRows]="false"
+        [getRowId]="getRowId"
+        (gridReady)="onGridReady($event)"
+        (selectionChanged)="onSelectionChanged($event)"
+      />
+    }
+  </div>
+
+  @if (!notificationsQuery.isPending() && !notificationsQuery.isError() && totalFiltered() > 0) {
+    <div
+      class="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+    >
+      <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        {{
+          'alerts.pagination.summary'
+            | translate
+              : {
+                  page: pageIndex() + 1,
+                  total: totalPages(),
+                  count: totalFiltered(),
+                }
+        }}
+      </span>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="pageIndex() <= 0"
+          (click)="prevPage()"
+        >
+          {{ 'alerts.pagination.prev' | translate }}
+        </button>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="pageIndex() + 1 >= totalPages()"
+          (click)="nextPage()"
+        >
+          {{ 'alerts.pagination.next' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+</div>

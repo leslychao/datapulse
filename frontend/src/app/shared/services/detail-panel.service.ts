@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DetailPanelEntityType = 'connection' | 'offer';
+export type DetailPanelEntityType = 'connection' | 'offer' | 'alert';
 
 const MIN_WIDTH = 320;
 const MAX_VIEWPORT_RATIO = 0.5;
