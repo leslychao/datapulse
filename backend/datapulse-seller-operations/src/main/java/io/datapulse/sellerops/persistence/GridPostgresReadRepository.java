@@ -1,7 +1,6 @@
 package io.datapulse.sellerops.persistence;
 
 import io.datapulse.sellerops.api.GridFilter;
-import io.datapulse.sellerops.api.SearchResultResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -309,35 +308,6 @@ public class GridPostgresReadRepository {
                 new MapSqlParameterSource("workspaceId", workspaceId),
                 Long.class);
     }
-
-    public List<SearchResultResponse> search(long workspaceId, String query, int limit) {
-        String pattern = "%" + query.replace("%", "\\%").replace("_", "\\_") + "%";
-        return jdbc.query(SEARCH_SQL,
-            new MapSqlParameterSource()
-                .addValue("workspaceId", workspaceId)
-                .addValue("pattern", pattern)
-                .addValue("limit", limit),
-            (rs, rowNum) -> new SearchResultResponse(
-                rs.getLong("offer_id"),
-                rs.getString("sku"),
-                rs.getString("product_name"),
-                rs.getString("marketplace_type"),
-                rs.getString("connection_name")));
-    }
-
-    private static final String SEARCH_SQL = """
-            SELECT co.id AS offer_id, co.marketplace_sku AS sku,
-                   co.product_name, co.marketplace_type,
-                   mc.name AS connection_name
-            FROM canonical_offer co
-            JOIN marketplace_connection mc ON mc.id = co.connection_id
-            WHERE co.workspace_id = :workspaceId
-              AND (co.marketplace_sku ILIKE :pattern
-                   OR co.product_name ILIKE :pattern
-                   OR co.barcode ILIKE :pattern)
-            ORDER BY co.product_name
-            LIMIT :limit
-            """;
 
     private static final String KPI_SQL = """
             SELECT

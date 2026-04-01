@@ -5,6 +5,7 @@ import io.datapulse.promotions.domain.PromoPolicyStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 public record PromoPolicyResponse(
         Long id,
@@ -14,9 +15,9 @@ public record PromoPolicyResponse(
         BigDecimal minMarginPct,
         Integer minStockDaysOfCover,
         BigDecimal maxPromoDiscountPct,
-        String autoParticipateCategories,
-        String autoDeclineCategories,
-        String evaluationConfig,
+        List<String> autoParticipateCategories,
+        List<String> autoDeclineCategories,
+        Object evaluationConfig,
         Integer version,
         Long createdBy,
         OffsetDateTime createdAt,

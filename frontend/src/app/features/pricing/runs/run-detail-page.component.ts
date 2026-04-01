@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -87,11 +87,11 @@ const STRATEGY_LABEL: Record<string, string> = {
           (click)="goBack()"
           class="cursor-pointer rounded-[var(--radius-sm)] px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
         >
-          ← Назад к прогонам
+          {{ 'pricing.runs.back' | translate }}
         </button>
         @if (run()) {
           <span class="text-sm font-medium text-[var(--text-primary)]">
-            Прогон #{{ run()!.id }}
+            {{ 'pricing.runs.detail.run_number' | translate:{ id: run()!.id } }}
           </span>
         }
       </div>
@@ -115,27 +115,27 @@ const STRATEGY_LABEL: Record<string, string> = {
         <!-- KPI Strip -->
         <div class="flex gap-3 bg-[var(--bg-secondary)] px-4 py-3">
           <dp-kpi-card
-            label="Всего офферов"
+            [label]="'pricing.runs.kpi.total' | translate"
             [value]="run()!.totalOffers"
             [loading]="false"
           />
           <dp-kpi-card
-            label="Подходящих"
+            [label]="'pricing.runs.kpi.eligible' | translate"
             [value]="run()!.eligibleCount"
             [loading]="false"
           />
           <dp-kpi-card
-            label="Изменений"
+            [label]="'pricing.runs.kpi.changed' | translate"
             [value]="run()!.changeCount"
             [loading]="false"
           />
           <dp-kpi-card
-            label="Пропусков"
+            [label]="'pricing.runs.kpi.skipped' | translate"
             [value]="run()!.skipCount"
             [loading]="false"
           />
           <dp-kpi-card
-            label="Ожидание"
+            [label]="'pricing.runs.kpi.hold' | translate"
             [value]="run()!.holdCount"
             [loading]="false"
           />
@@ -198,7 +198,7 @@ const STRATEGY_LABEL: Record<string, string> = {
             />
           } @else if (!decisionsQuery.isPending() && decisionRows().length === 0) {
             <dp-empty-state
-              message="Решений по данному прогону пока нет."
+              [message]="'pricing.runs.detail.empty_decisions' | translate"
             />
           } @else {
             <dp-data-grid

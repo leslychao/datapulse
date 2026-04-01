@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,7 +38,7 @@ class AlertCheckerSchedulerTest {
   private AlertRuleResponse buildRule(long id) {
     return new AlertRuleResponse(
         id, 1L, "STALE_DATA", "connection", 10L,
-        "{\"hours\":24}", true, "WARNING", true,
+        Map.of("hours", 24), true, "WARNING", true,
         OffsetDateTime.now(), OffsetDateTime.now());
   }
 

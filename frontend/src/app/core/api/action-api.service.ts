@@ -7,8 +7,8 @@ import {
   ActionDetail,
   ActionFilter,
   ActionSummary,
+  BulkActionResponse,
   BulkApproveRequest,
-  BulkApproveResponse,
   Page,
 } from '@core/models';
 
@@ -96,17 +96,24 @@ export class ActionApiService {
     );
   }
 
-  bulkApprove(workspaceId: number, req: BulkApproveRequest): Observable<BulkApproveResponse> {
-    return this.http.post<BulkApproveResponse>(
+  bulkApprove(workspaceId: number, req: BulkApproveRequest): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(
       `${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, req,
     );
   }
 
-  getSimulationComparison(): Observable<any> {
-    return this.http.get(`${this.base}/simulation/comparison`);
+  getSimulationComparison(workspaceId: number, connectionId: number): Observable<any> {
+    const params = new HttpParams().set('connectionId', connectionId);
+    return this.http.get(
+      `${this.base}/workspaces/${workspaceId}/simulation/comparison`,
+      { params },
+    );
   }
 
-  resetShadowState(): Observable<void> {
-    return this.http.delete<void>(`${this.base}/simulation/shadow-state`);
+  resetShadowState(workspaceId: number, connectionId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/workspaces/${workspaceId}/simulation/shadow-state`,
+      { body: { connectionId } },
+    );
   }
 }

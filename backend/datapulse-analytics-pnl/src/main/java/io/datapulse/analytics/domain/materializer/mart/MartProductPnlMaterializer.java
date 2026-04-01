@@ -116,7 +116,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                         countIf(cogs_status = 'NO_COST_PROFILE') > 0, 'NO_COST_PROFILE',
                         'OK'
                     ) AS cogs_status
-                FROM mart_posting_pnl FINAL
+                FROM mart_posting_pnl
                 GROUP BY connection_id, source_platform,
                          coalesce(seller_sku_id, 0), coalesce(product_id, 0),
                          toYYYYMM(finance_date)
@@ -145,7 +145,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                     sum(net_payout) AS net_payout,
                     NULL AS gross_cogs,
                     'NO_SALES' AS cogs_status
-                FROM fact_finance FINAL
+                FROM fact_finance
                 WHERE attribution_level = 'PRODUCT'
                 GROUP BY connection_id, coalesce(seller_sku_id, 0), toYYYYMM(finance_date)
 
@@ -173,10 +173,11 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                     sum(net_payout) AS net_payout,
                     NULL AS gross_cogs,
                     'NO_SALES' AS cogs_status
-                FROM fact_finance FINAL
+                FROM fact_finance
                 WHERE attribution_level = 'ACCOUNT'
                 GROUP BY connection_id, toYYYYMM(finance_date)
             )
+            SETTINGS final = 1
             """;
 
     private final MaterializationJdbc jdbc;

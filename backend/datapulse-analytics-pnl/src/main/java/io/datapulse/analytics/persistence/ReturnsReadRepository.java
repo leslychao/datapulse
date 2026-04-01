@@ -21,6 +21,8 @@ public class ReturnsReadRepository {
 
     private final ClickHouseReadJdbc jdbc;
 
+    private static final String SETTINGS_FINAL = "\nSETTINGS final = 1";
+
     private static final Map<String, String> SORT_WHITELIST = Map.of(
             "returnRatePct", "return_rate_pct",
             "returnQuantity", "return_quantity",
@@ -44,7 +46,7 @@ public class ReturnsReadRepository {
                 sum(financial_refund_amount) AS financial_refund_amount,
                 sum(penalties_amount) AS penalties_amount,
                 topK(1)(top_return_reason)[1] AS top_return_reason
-            FROM mart_returns_analysis FINAL
+            FROM mart_returns_analysis
             WHERE connection_id IN (:connectionIds)
             """;
 
@@ -65,8 +67,8 @@ public class ReturnsReadRepository {
                 m.financial_refund_amount,
                 m.penalties_amount,
                 m.top_return_reason
-            FROM mart_returns_analysis FINAL AS m
-            LEFT JOIN dim_product FINAL AS p ON m.product_id = p.product_id
+            FROM mart_returns_analysis AS m
+            LEFT JOIN dim_product AS p ON m.product_id = p.product_id
             WHERE m.connection_id IN (:connectionIds)
             """;
 
@@ -78,7 +80,7 @@ public class ReturnsReadRepository {
                 if(sum(sale_quantity) > 0,
                    sum(return_quantity) / sum(sale_quantity) * 100, NULL) AS return_rate_pct,
                 sum(financial_refund_amount) AS financial_refund_amount
-            FROM mart_returns_analysis FINAL
+            FROM mart_returns_analysis
             WHERE connection_id IN (:connectionIds)
             """;
 
@@ -87,6 +89,7 @@ public class ReturnsReadRepository {
         var sb = new StringBuilder(SUMMARY_SQL);
         appendFilter(sb, params, filter);
         sb.append(" GROUP BY connection_id, source_platform");
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, this::mapSummary);
     }
@@ -103,6 +106,7 @@ public class ReturnsReadRepository {
         sb.append(" LIMIT :limit OFFSET :offset");
         params.addValue("limit", limit);
         params.addValue("offset", offset);
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, this::mapProductReturn);
     }
@@ -110,12 +114,13 @@ public class ReturnsReadRepository {
     public long countByProduct(List<Long> connectionIds, ReturnsFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
         var sb = new StringBuilder("""
-                SELECT count(*) FROM mart_returns_analysis FINAL AS m
-                LEFT JOIN dim_product FINAL AS p ON m.product_id = p.product_id
+                SELECT count(*) FROM mart_returns_analysis AS m
+                LEFT JOIN dim_product AS p ON m.product_id = p.product_id
                 WHERE m.connection_id IN (:connectionIds)
                 """);
         appendFilter(sb, params, filter);
         appendSearchFilter(sb, params, filter);
+        sb.append(SETTINGS_FINAL);
 
         Long result = jdbc.ch().queryForObject(sb.toString(), params, Long.class);
         return result != null ? result : 0L;
@@ -126,6 +131,7 @@ public class ReturnsReadRepository {
         var sb = new StringBuilder(TREND_SQL);
         appendFilter(sb, params, filter);
         sb.append(" GROUP BY period ORDER BY period");
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, (rs, rowNum) -> new ReturnsTrendResponse(
                 rs.getInt("period"),

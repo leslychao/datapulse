@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { ActionApiService } from '@core/api/action-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
@@ -24,7 +25,21 @@ import { ToastService } from '@shared/shell/toast/toast.service';
   template: `
     <div class="flex flex-col gap-6 p-6">
       <div class="flex items-center justify-between">
-        <h1 class="text-lg font-semibold text-[var(--text-primary)]">{{ 'execution.simulation.title' | translate }}</h1>
+        <div class="flex items-center gap-4">
+          <h1 class="text-lg font-semibold text-[var(--text-primary)]">{{ 'execution.simulation.title' | translate }}</h1>
+          @if (connectionsQuery.data(); as connections) {
+            <select
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              [value]="connectionId()"
+              (change)="onConnectionChange($event)"
+            >
+              <option [value]="0" disabled>{{ 'execution.simulation.select_connection' | translate }}</option>
+              @for (conn of connections; track conn.id) {
+                <option [value]="conn.id">{{ conn.name }}</option>
+              }
+            </select>
+          }
+        </div>
         <button
           (click)="showResetModal.set(true)"
           class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--status-error)] px-4 py-2 text-sm font-medium text-[var(--status-error)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)]"
@@ -64,21 +79,40 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 })
 export class SimulationPageComponent {
   private readonly actionApi = inject(ActionApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
+  protected readonly connectionId = signal(0);
   protected readonly showResetModal = signal(false);
   protected readonly marginChartOptions = {};
 
-  protected readonly simulationQuery = injectQuery(() => ({
-    queryKey: ['simulation', this.wsStore.currentWorkspaceId()],
-    queryFn: () => lastValueFrom(this.actionApi.getSimulationComparison()),
-    enabled: !!this.wsStore.currentWorkspaceId(),
+  protected readonly connectionsQuery = injectQuery(() => ({
+    queryKey: ['connections'],
+    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
   }));
 
+  private readonly canQuery = computed(
+    () => !!this.wsStore.currentWorkspaceId() && this.connectionId() > 0,
+  );
+
+  protected readonly simulationQuery = injectQuery(() => {
+    const wsId = this.wsStore.currentWorkspaceId();
+    const connId = this.connectionId();
+    return {
+      queryKey: ['simulation', wsId, connId],
+      queryFn: () => lastValueFrom(this.actionApi.getSimulationComparison(wsId!, connId)),
+      enabled: this.canQuery(),
+    };
+  });
+
   protected readonly resetMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.actionApi.resetShadowState()),
+    mutationFn: () => {
+      const wsId = this.wsStore.currentWorkspaceId()!;
+      const connId = this.connectionId();
+      return lastValueFrom(this.actionApi.resetShadowState(wsId, connId));
+    },
     onSuccess: () => {
       this.showResetModal.set(false);
       this.simulationQuery.refetch();
@@ -86,6 +120,10 @@ export class SimulationPageComponent {
     },
     onError: () => this.toast.error(this.translate.instant('common.error')),
   }));
+
+  protected onConnectionChange(event: Event): void {
+    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
+  }
 
   protected onResetConfirmed(): void {
     this.resetMutation.mutate(undefined);

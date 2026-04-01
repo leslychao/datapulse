@@ -8,7 +8,7 @@ public record AlertRuleResponse(
         String ruleType,
         String targetEntityType,
         Long targetEntityId,
-        String config,
+        Object config,
         boolean enabled,
         String severity,
         boolean blocksAutomation,

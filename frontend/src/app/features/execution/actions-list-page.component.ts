@@ -388,15 +388,16 @@ export class ActionsListPageComponent {
   private readonly bulkApproveMutation = injectMutation(() => ({
     mutationFn: (actionIds: number[]) =>
       lastValueFrom(this.actionApi.bulkApprove(this.wsStore.currentWorkspaceId()!, { actionIds })),
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       this.showBulkApproveModal.set(false);
       this.selectedRows.set([]);
       this.queryClient.invalidateQueries({ queryKey: ['actions'] });
-      if (result.failed === 0) {
-        this.toast.success(`Одобрено: ${result.approved} действий`);
+      const failed = result.skipped + result.errored;
+      if (failed === 0) {
+        this.toast.success(`Одобрено: ${result.processed} действий`);
       } else {
         this.toast.warning(
-          `Одобрено: ${result.approved} из ${result.approved + result.failed}. ${result.failed} действий были изменены другим пользователем.`,
+          `Одобрено: ${result.processed} из ${result.processed + failed}. ${failed} действий были изменены другим пользователем.`,
         );
       }
     },

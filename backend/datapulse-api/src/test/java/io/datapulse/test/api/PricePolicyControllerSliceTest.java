@@ -25,7 +25,9 @@ import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -83,7 +85,7 @@ class PricePolicyControllerSliceTest {
           1, 1, 5, now, now);
       var page = new PageImpl<>(List.of(summary), PageRequest.of(0, 20), 1);
 
-      when(policyService.listPoliciesPaged(eq(1L), isNull(), isNull(), any()))
+      when(policyService.listPoliciesPaged(eq(1L), isNull(), isNull(), any(Pageable.class)))
           .thenReturn(page);
 
       mockMvc.perform(get(BASE_URL))
@@ -104,7 +106,8 @@ class PricePolicyControllerSliceTest {
       when(policyService.createPolicy(any(), eq(1L), eq(10L)))
           .thenReturn(new PricePolicyResponse(
               1L, "New Policy", PolicyStatus.DRAFT, PolicyType.TARGET_MARGIN,
-              "{}", BigDecimal.TEN, BigDecimal.valueOf(15), null, null, "{}",
+              Collections.emptyMap(), BigDecimal.TEN, BigDecimal.valueOf(15), null, null,
+              Collections.emptyMap(),
               ExecutionMode.RECOMMENDATION, 24, 1, 1, 10L,
               OffsetDateTime.now(), OffsetDateTime.now()));
 

@@ -470,6 +470,7 @@
   "execution.simulation.reset_message": "Все данные симуляции будут удалены. Это действие необратимо.",
   "execution.simulation.reset_confirm_word": "СБРОСИТЬ",
   "execution.simulation.reset_success": "Shadow state сброшен",
+  "execution.simulation.select_connection": "Выберите подключение",
 
   "promo.tabs.campaigns": "Кампании",
   "promo.tabs.policies": "Промо-политики",
@@ -1647,5 +1648,28 @@
   "month.10": "Ноябрь",
   "month.11": "Декабрь",
 
-  "pricing.runs.detail_error": "Не удалось загрузить детали прогона"
+  "pricing.runs.detail_error": "Не удалось загрузить детали прогона",
+
+  "pricing.runs.trigger_modal.description": "Выберите подключение для ручного запуска прогона ценообразования.",
+  "pricing.runs.trigger_modal.connection_label": "Подключение",
+  "pricing.runs.trigger_modal.connection_placeholder": "Выберите подключение",
+  "pricing.runs.trigger_modal.submitting": "Запуск...",
+  "pricing.runs.trigger_modal.submit": "Запустить",
+  "pricing.runs.detail.run_number": "Прогон #{{id}}",
+  "pricing.runs.detail.empty_decisions": "Решений по данному прогону пока нет.",
+  "pricing.runs.detail.started": "Начат {{time}}",
+
+  "pricing.locks.form.offer_id_label": "ID оффера",
+  "pricing.locks.form.price_label": "Цена",
+  "pricing.locks.form.reason_label": "Причина",
+  "pricing.locks.form.optional": "Необязательно",
+  "pricing.locks.form.submit": "Заблокировать",
+
+  "pricing.assignments.form.connection_id_label": "ID подключения",
+  "pricing.assignments.form.scope_label": "Область",
+  "pricing.assignments.form.category_id_label": "ID категории",
+  "pricing.assignments.form.offer_id_label": "ID оффера",
+  "pricing.assignments.form.submit": "Добавить",
+  "pricing.assignments.back_short": "← Назад",
+  "pricing.assignments.delete_message": "Удалить назначение?"
 }

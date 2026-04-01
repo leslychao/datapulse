@@ -2,6 +2,7 @@ package io.datapulse.pricing.persistence;
 
 import io.datapulse.pricing.domain.PolicyStatus;
 import io.datapulse.pricing.domain.PolicyType;
+import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,14 +24,15 @@ public interface PricePolicyRepository extends JpaRepository<PricePolicyEntity, 
 
     Page<PricePolicyEntity> findAllByWorkspaceId(Long workspaceId, Pageable pageable);
 
-    Page<PricePolicyEntity> findAllByWorkspaceIdAndStatus(
-            Long workspaceId, PolicyStatus status, Pageable pageable);
+    Page<PricePolicyEntity> findAllByWorkspaceIdAndStatusIn(
+            Long workspaceId, Collection<PolicyStatus> statuses, Pageable pageable);
 
     Page<PricePolicyEntity> findAllByWorkspaceIdAndStrategyType(
             Long workspaceId, PolicyType strategyType, Pageable pageable);
 
-    Page<PricePolicyEntity> findAllByWorkspaceIdAndStatusAndStrategyType(
-            Long workspaceId, PolicyStatus status, PolicyType strategyType, Pageable pageable);
+    Page<PricePolicyEntity> findAllByWorkspaceIdAndStatusInAndStrategyType(
+            Long workspaceId, Collection<PolicyStatus> statuses,
+            PolicyType strategyType, Pageable pageable);
 
     Optional<PricePolicyEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 }

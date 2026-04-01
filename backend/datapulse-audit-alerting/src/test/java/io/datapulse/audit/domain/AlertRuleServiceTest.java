@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,7 +35,7 @@ class AlertRuleServiceTest {
   private AlertRuleResponse buildRule(long id, boolean enabled) {
     return new AlertRuleResponse(
         id, 1L, "STALE_DATA", "connection", 10L,
-        "{\"hours\":24}", enabled, "WARNING", true,
+        Map.of("hours", 24), enabled, "WARNING", true,
         OffsetDateTime.now(), OffsetDateTime.now());
   }
 

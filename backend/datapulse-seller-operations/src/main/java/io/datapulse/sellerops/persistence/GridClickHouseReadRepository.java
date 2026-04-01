@@ -37,10 +37,10 @@ public class GridClickHouseReadRepository {
                 ret.return_rate_pct
             FROM (
                 SELECT product_id, days_of_cover, stock_out_risk
-                FROM mart_inventory_analysis FINAL
+                FROM mart_inventory_analysis
                 WHERE product_id IN (:offerIds)
                   AND analysis_date = (
-                      SELECT max(analysis_date) FROM mart_inventory_analysis FINAL
+                      SELECT max(analysis_date) FROM mart_inventory_analysis
                       WHERE product_id IN (:offerIds)
                   )
             ) inv
@@ -50,8 +50,8 @@ public class GridClickHouseReadRepository {
                     sum(ff.revenue_amount) AS revenue_30d,
                     sumIf(ff.net_payout,
                           ff.attribution_level IN ('POSTING', 'PRODUCT')) AS net_pnl_30d
-                FROM fact_finance FINAL ff
-                JOIN dim_product FINAL dp
+                FROM fact_finance AS ff
+                JOIN dim_product AS dp
                     ON ff.seller_sku_id = dp.seller_sku_id
                     AND ff.connection_id = dp.connection_id
                 WHERE dp.product_id IN (:offerIds)
@@ -62,20 +62,21 @@ public class GridClickHouseReadRepository {
                 SELECT
                     product_id,
                     toDecimal64(sum(quantity), 2) / 14 AS velocity_14d
-                FROM fact_sales FINAL
+                FROM fact_sales
                 WHERE product_id IN (:offerIds)
                   AND sale_date >= today() - 14
                 GROUP BY product_id
             ) sales ON inv.product_id = sales.product_id
             LEFT JOIN (
                 SELECT product_id, return_rate_pct
-                FROM mart_returns_analysis FINAL
+                FROM mart_returns_analysis
                 WHERE product_id IN (:offerIds)
                   AND period = (
-                      SELECT max(period) FROM mart_returns_analysis FINAL
+                      SELECT max(period) FROM mart_returns_analysis
                       WHERE product_id IN (:offerIds)
                   )
             ) ret ON inv.product_id = ret.product_id
+            SETTINGS final = 1
             """;
 
     public Map<Long, ClickHouseEnrichment> findEnrichment(List<Long> offerIds) {
@@ -103,28 +104,29 @@ public class GridClickHouseReadRepository {
                 END AS revenue_30d_trend
             FROM (
                 SELECT countDistinct(product_id) AS critical_stock_count
-                FROM mart_inventory_analysis FINAL
+                FROM mart_inventory_analysis
                 WHERE connection_id IN (:connectionIds)
                   AND stock_out_risk = 'CRITICAL'
                   AND analysis_date = (
                       SELECT max(analysis_date)
-                      FROM mart_inventory_analysis FINAL
+                      FROM mart_inventory_analysis
                       WHERE connection_id IN (:connectionIds)
                   )
             ) inv
             CROSS JOIN (
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_30d_total
-                FROM fact_finance FINAL ff
+                FROM fact_finance AS ff
                 WHERE ff.connection_id IN (:connectionIds)
                   AND ff.finance_date >= today() - 30
             ) cur
             CROSS JOIN (
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_prev_30d
-                FROM fact_finance FINAL ff
+                FROM fact_finance AS ff
                 WHERE ff.connection_id IN (:connectionIds)
                   AND ff.finance_date >= today() - 60
                   AND ff.finance_date < today() - 30
             ) prev
+            SETTINGS final = 1
             """;
 
     public ClickHouseKpiRow findKpi(List<Long> connectionIds) {

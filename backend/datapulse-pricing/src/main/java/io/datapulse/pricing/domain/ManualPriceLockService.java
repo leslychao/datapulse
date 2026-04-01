@@ -74,6 +74,22 @@ public class ManualPriceLockService {
             throw NotFoundException.entity("ManualPriceLock", lockId);
         }
 
+        doUnlock(entity, userId);
+    }
+
+    @Transactional
+    public void unlockByOfferId(long offerId, long workspaceId, long userId) {
+        ManualPriceLockEntity entity = lockRepository.findActiveLock(offerId)
+                .orElseThrow(() -> NotFoundException.of(MessageCodes.PRICING_LOCK_NOT_FOUND));
+
+        if (!entity.getWorkspaceId().equals(workspaceId)) {
+            throw NotFoundException.of(MessageCodes.PRICING_LOCK_NOT_FOUND);
+        }
+
+        doUnlock(entity, userId);
+    }
+
+    private void doUnlock(ManualPriceLockEntity entity, long userId) {
         if (entity.getUnlockedAt() != null) {
             return;
         }
@@ -83,6 +99,6 @@ public class ManualPriceLockService {
         lockRepository.save(entity);
 
         log.info("Manual price lock removed: id={}, offerId={}, unlockedBy={}",
-                lockId, entity.getMarketplaceOfferId(), userId);
+                entity.getId(), entity.getMarketplaceOfferId(), userId);
     }
 }

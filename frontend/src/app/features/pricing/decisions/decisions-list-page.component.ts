@@ -70,8 +70,8 @@ const EXECUTION_MODE_LABEL: Record<string, string> = {
         } @else if (!decisionsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
             [message]="hasActiveFilters()
-              ? 'Нет решений, соответствующих фильтрам.'
-              : 'Решений пока нет. Они появятся после первого прогона ценообразования.'"
+              ? ('pricing.decisions.empty_filtered' | translate)
+              : ('pricing.decisions.empty' | translate)"
             [actionLabel]="hasActiveFilters()
               ? ('filter_bar.reset_all' | translate)
               : ''"

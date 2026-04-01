@@ -1,7 +1,6 @@
 package io.datapulse.sellerops.api;
 
 import io.datapulse.sellerops.domain.SearchService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +20,7 @@ public class SearchController {
 
   @GetMapping
   @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-  public List<SearchResultResponse> search(
+  public SearchResultResponse search(
       @PathVariable("workspaceId") long workspaceId,
       @RequestParam("q") String query,
       @RequestParam(value = "limit", defaultValue = "20") int limit) {

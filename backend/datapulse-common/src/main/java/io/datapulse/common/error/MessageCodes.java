@@ -68,6 +68,7 @@ public final class MessageCodes {
     public static final String JOB_NOT_FOUND = "job.not.found";
     public static final String JOB_NOT_RETRYABLE = "job.not.retryable";
     public static final String JOB_ACTIVE_EXISTS = "job.active.exists";
+    public static final String COST_PROFILE_NOT_FOUND = "cost.profile.not_found";
     public static final String COST_PROFILE_INVALID = "cost.profile.invalid";
     public static final String COST_PROFILE_BULK_TOO_LARGE = "cost.profile.bulk.too.large";
     public static final String SELLER_SKU_NOT_FOUND = "seller.sku.not.found";
@@ -101,6 +102,7 @@ public final class MessageCodes {
     public static final String PRICING_POLICY_INVALID_STATE = "pricing.policy.invalid_state";
     public static final String PRICING_ASSIGNMENT_DUPLICATE = "pricing.assignment.duplicate";
     public static final String PRICING_LOCK_ALREADY_EXISTS = "pricing.lock.already_exists";
+    public static final String PRICING_LOCK_NOT_FOUND = "pricing.lock.not_found";
     public static final String PRICING_RUN_ALREADY_IN_PROGRESS = "pricing.run.already_in_progress";
     public static final String PRICING_BULK_DUPLICATE = "pricing.bulk.duplicate";
     public static final String PRICING_BULK_TOO_LARGE = "pricing.bulk.too_large";

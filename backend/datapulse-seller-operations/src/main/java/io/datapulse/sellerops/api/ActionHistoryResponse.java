@@ -4,13 +4,14 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 public record ActionHistoryResponse(
-    long actionId,
+    long id,
+    OffsetDateTime actionDate,
+    String actionType,
     String status,
-    String executionMode,
     BigDecimal targetPrice,
-    BigDecimal currentPriceAtCreation,
-    String cancelReason,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    BigDecimal actualPrice,
+    String executionMode,
+    String reason,
+    String initiatedBy
 ) {
 }

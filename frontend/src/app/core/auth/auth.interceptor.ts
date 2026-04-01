@@ -2,7 +2,10 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
+import { TranslateService } from '@ngx-translate/core';
+
 import { AuthService } from './auth.service';
+import { ToastService } from '@shared/shell/toast/toast.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
 const WORKSPACE_HEADER_SKIP_PATHS = [
@@ -14,6 +17,8 @@ const WORKSPACE_HEADER_SKIP_PATHS = [
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
+  const toast = inject(ToastService);
+  const translate = inject(TranslateService);
   const workspaceStore = inject(WorkspaceContextStore, { optional: true });
 
   if (!req.url.startsWith('/api/')) {
@@ -39,8 +44,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(authReq).pipe(
     catchError((error) => {
-      if (error instanceof HttpErrorResponse && error.status === 401) {
-        authService.login();
+      if (error instanceof HttpErrorResponse) {
+        if (error.status === 401) {
+          authService.login();
+        } else if (error.status === 403) {
+          toast.error(translate.instant('auth.forbidden'));
+        }
       }
       return throwError(() => error);
     }),

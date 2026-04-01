@@ -58,25 +58,26 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
               max(captured_date) AS analysis_date,
               argMax(available, captured_at) AS available,
               argMax(reserved, captured_at) AS reserved
-          FROM fact_inventory_snapshot FINAL
+          FROM fact_inventory_snapshot
           GROUP BY connection_id, source_platform, product_id, warehouse_id
       ) inv
-      LEFT JOIN dim_product FINAL dp
+      LEFT JOIN dim_product AS dp
           ON inv.product_id = dp.product_id AND inv.connection_id = dp.connection_id
       LEFT JOIN (
           SELECT
               product_id,
               connection_id,
               toDecimal64(sum(quantity), 2) / %d AS avg_daily_sales
-          FROM fact_sales FINAL
+          FROM fact_sales
           WHERE sale_date >= today() - %d
           GROUP BY product_id, connection_id
       ) sales_agg ON inv.product_id = sales_agg.product_id
           AND inv.connection_id = sales_agg.connection_id
-      LEFT JOIN fact_product_cost FINAL fpc
+      LEFT JOIN fact_product_cost AS fpc
           ON dp.seller_sku_id = fpc.seller_sku_id
           AND today() >= fpc.valid_from
           AND (fpc.valid_to IS NULL OR today() < fpc.valid_to)
+      SETTINGS final = 1
       """;
 
   private final MaterializationJdbc jdbc;

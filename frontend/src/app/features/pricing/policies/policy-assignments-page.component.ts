@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
@@ -62,8 +62,8 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
             (click)="navigateBack()"
             class="cursor-pointer rounded-[var(--radius-md)] px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
           >
-            ← Назад
-          </button>
+          {{ 'pricing.assignments.back_short' | translate }}
+        </button>
           <h2 class="text-base font-semibold text-[var(--text-primary)]">
             {{ 'pricing.assignments.title' | translate }}
           </h2>
@@ -72,7 +72,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
           (click)="showCreateForm.set(true)"
           class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
         >
-          Добавить назначение
+          {{ 'pricing.assignments.add' | translate }}
         </button>
       </div>
 
@@ -84,7 +84,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                ID подключения
+                {{ 'pricing.assignments.form.connection_id_label' | translate }}
               </label>
               <input
                 type="number"
@@ -95,7 +95,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                Область
+                {{ 'pricing.assignments.form.scope_label' | translate }}
               </label>
               <div class="flex h-8 items-center gap-3">
                 @for (opt of scopeOptions; track opt.value) {
@@ -107,7 +107,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
                       [(ngModel)]="formScopeType"
                       class="accent-[var(--accent-primary)]"
                     />
-                    {{ opt.label }}
+                    {{ opt.labelKey | translate }}
                   </label>
                 }
               </div>
@@ -115,7 +115,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
             @if (formScopeType === 'CATEGORY') {
               <div class="flex flex-col gap-1">
                 <label class="text-[11px] text-[var(--text-tertiary)]">
-                  ID категории
+                  {{ 'pricing.assignments.form.category_id_label' | translate }}
                 </label>
                 <input
                   type="number"
@@ -128,7 +128,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
             @if (formScopeType === 'SKU') {
               <div class="flex flex-col gap-1">
                 <label class="text-[11px] text-[var(--text-tertiary)]">
-                  ID оффера
+                  {{ 'pricing.assignments.form.offer_id_label' | translate }}
                 </label>
                 <input
                   type="number"
@@ -144,13 +144,13 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
                 [disabled]="!isFormValid()"
                 class="h-8 cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Добавить
+                {{ 'pricing.assignments.form.submit' | translate }}
               </button>
               <button
                 (click)="cancelCreate()"
                 class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
               >
-                Отмена
+                {{ 'actions.cancel' | translate }}
               </button>
             </div>
           </div>
@@ -167,8 +167,8 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
           />
         } @else if (!assignmentsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="'Нет назначений для этой политики.'"
-            [actionLabel]="'Добавить назначение'"
+            [message]="'pricing.assignments.empty' | translate"
+            [actionLabel]="'pricing.assignments.add' | translate"
             (action)="showCreateForm.set(true)"
           />
         } @else {
@@ -187,7 +187,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
     <dp-confirmation-modal
       [open]="showDeleteModal()"
       [title]="'pricing.assignments.delete_title' | translate"
-      [message]="'Удалить назначение?'"
+      [message]="'pricing.assignments.delete_message' | translate"
       [confirmLabel]="'actions.delete' | translate"
       [danger]="true"
       (confirmed)="executeDelete()"
@@ -200,6 +200,7 @@ export class PolicyAssignmentsPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
 
   readonly policyId = input.required<number>();
@@ -214,9 +215,9 @@ export class PolicyAssignmentsPageComponent {
   formMarketplaceOfferId: number | null = null;
 
   readonly scopeOptions = [
-    { value: 'CONNECTION' as const, label: 'Подключение' },
-    { value: 'CATEGORY' as const, label: 'Категория' },
-    { value: 'SKU' as const, label: 'Товар' },
+    { value: 'CONNECTION' as const, labelKey: 'pricing.assignments.scope.CONNECTION' },
+    { value: 'CATEGORY' as const, labelKey: 'pricing.assignments.scope.CATEGORY' },
+    { value: 'SKU' as const, labelKey: 'pricing.assignments.scope.SKU' },
   ];
 
   readonly columnDefs = [
@@ -312,9 +313,9 @@ export class PolicyAssignmentsPageComponent {
     onSuccess: () => {
       this.resetForm();
       this.queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      this.toast.success('Назначение добавлено');
+      this.toast.success(this.translate.instant('pricing.assignments.created'));
     },
-    onError: () => this.toast.error('Не удалось добавить назначение'),
+    onError: () => this.toast.error(this.translate.instant('pricing.assignments.create_error')),
   }));
 
   private readonly deleteMutation = injectMutation(() => ({
@@ -330,11 +331,11 @@ export class PolicyAssignmentsPageComponent {
       this.showDeleteModal.set(false);
       this.deleteTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      this.toast.success('Назначение удалено');
+      this.toast.success(this.translate.instant('pricing.assignments.deleted'));
     },
     onError: () => {
       this.showDeleteModal.set(false);
-      this.toast.error('Не удалось удалить назначение');
+      this.toast.error(this.translate.instant('pricing.assignments.delete_error'));
     },
   }));
 

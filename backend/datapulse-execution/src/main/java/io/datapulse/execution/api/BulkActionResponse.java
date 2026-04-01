@@ -1,9 +1,8 @@
-package io.datapulse.pricing.api;
+package io.datapulse.execution.api;
 
 import java.util.List;
 
-public record BulkManualApplyResponse(
-    Long pricingRunId,
+public record BulkActionResponse(
     int processed,
     int skipped,
     int errored,

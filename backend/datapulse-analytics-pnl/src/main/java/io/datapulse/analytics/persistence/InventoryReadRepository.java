@@ -22,6 +22,8 @@ public class InventoryReadRepository {
 
     private final ClickHouseReadJdbc jdbc;
 
+    private static final String SETTINGS_FINAL = "\nSETTINGS final = 1";
+
     private static final Map<String, String> SORT_WHITELIST = Map.of(
             "daysOfCover", "days_of_cover",
             "available", "available",
@@ -39,10 +41,10 @@ public class InventoryReadRepository {
                 countIf(m.stock_out_risk = 'WARNING') AS warning_risk_count,
                 countIf(m.stock_out_risk = 'NORMAL') AS normal_risk_count,
                 sum(m.frozen_capital) AS total_frozen_capital
-            FROM mart_inventory_analysis FINAL AS m
+            FROM mart_inventory_analysis AS m
             WHERE m.connection_id IN (:connectionIds)
               AND m.analysis_date = (
-                  SELECT max(analysis_date) FROM mart_inventory_analysis FINAL
+                  SELECT max(analysis_date) FROM mart_inventory_analysis
                   WHERE connection_id IN (:connectionIds)
               )
             """;
@@ -66,12 +68,12 @@ public class InventoryReadRepository {
                 m.cost_price,
                 m.frozen_capital,
                 m.recommended_replenishment
-            FROM mart_inventory_analysis FINAL AS m
-            LEFT JOIN dim_product FINAL AS p ON m.product_id = p.product_id
-            LEFT JOIN dim_warehouse FINAL AS w ON m.warehouse_id = w.warehouse_id
+            FROM mart_inventory_analysis AS m
+            LEFT JOIN dim_product AS p ON m.product_id = p.product_id
+            LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
             WHERE m.connection_id IN (:connectionIds)
               AND m.analysis_date = (
-                  SELECT max(analysis_date) FROM mart_inventory_analysis FINAL
+                  SELECT max(analysis_date) FROM mart_inventory_analysis
                   WHERE connection_id IN (:connectionIds)
               )
             """;
@@ -83,19 +85,21 @@ public class InventoryReadRepository {
                 reserved,
                 warehouse_id,
                 w.name AS warehouse_name
-            FROM fact_inventory_snapshot FINAL AS s
-            LEFT JOIN dim_warehouse FINAL AS w ON s.warehouse_id = w.warehouse_id
+            FROM fact_inventory_snapshot AS s
+            LEFT JOIN dim_warehouse AS w ON s.warehouse_id = w.warehouse_id
             WHERE s.product_id = :productId
               AND s.connection_id IN (:connectionIds)
               AND s.captured_date >= :dateFrom
               AND s.captured_date <= :dateTo
             ORDER BY date, warehouse_id
+            SETTINGS final = 1
             """;
 
     public InventoryOverviewResponse findOverview(List<Long> connectionIds, InventoryFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
         var sb = new StringBuilder(OVERVIEW_SQL);
         appendOverviewFilter(sb, params, filter);
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().queryForObject(sb.toString(), params, (rs, rowNum) -> new InventoryOverviewResponse(
                 rs.getInt("total_skus"),
@@ -117,6 +121,7 @@ public class InventoryReadRepository {
         sb.append(" LIMIT :limit OFFSET :offset");
         params.addValue("limit", limit);
         params.addValue("offset", offset);
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, this::mapProductInventory);
     }
@@ -124,15 +129,16 @@ public class InventoryReadRepository {
     public long countByProduct(List<Long> connectionIds, InventoryFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
         var sb = new StringBuilder("""
-                SELECT count(*) FROM mart_inventory_analysis FINAL AS m
-                LEFT JOIN dim_product FINAL AS p ON m.product_id = p.product_id
+                SELECT count(*) FROM mart_inventory_analysis AS m
+                LEFT JOIN dim_product AS p ON m.product_id = p.product_id
                 WHERE m.connection_id IN (:connectionIds)
                   AND m.analysis_date = (
-                      SELECT max(analysis_date) FROM mart_inventory_analysis FINAL
+                      SELECT max(analysis_date) FROM mart_inventory_analysis
                       WHERE connection_id IN (:connectionIds)
                   )
                 """);
         appendProductFilter(sb, params, filter);
+        sb.append(SETTINGS_FINAL);
 
         Long result = jdbc.ch().queryForObject(sb.toString(), params, Long.class);
         return result != null ? result : 0L;

@@ -57,7 +57,7 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                     sum(quantity) AS return_quantity,
                     sum(coalesce(return_amount, toDecimal64(0, 2))) AS return_amount,
                     topK(1)(return_reason)[1] AS top_return_reason
-                FROM fact_returns FINAL
+                FROM fact_returns
                 GROUP BY connection_id, coalesce(product_id, 0),
                          coalesce(seller_sku_id, 0), toYYYYMM(return_date)
             ) r
@@ -70,7 +70,7 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                     toYYYYMM(sale_date) AS period,
                     count() AS sale_count,
                     sum(quantity) AS sale_quantity
-                FROM fact_sales FINAL
+                FROM fact_sales
                 GROUP BY connection_id, coalesce(product_id, 0),
                          coalesce(seller_sku_id, 0), toYYYYMM(sale_date)
             ) s ON r.connection_id = s.connection_id
@@ -84,12 +84,13 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                     toYYYYMM(finance_date) AS period,
                     sum(refund_amount) AS financial_refund_amount,
                     sum(penalties_amount) AS penalties_amount
-                FROM fact_finance FINAL
+                FROM fact_finance
                 WHERE attribution_level = 'POSTING'
                 GROUP BY connection_id, coalesce(seller_sku_id, 0), toYYYYMM(finance_date)
             ) fin ON r.connection_id = fin.connection_id
                 AND r.seller_sku_id = fin.seller_sku_id
                 AND r.period = fin.period
+            SETTINGS final = 1
             """;
 
     private final MaterializationJdbc jdbc;

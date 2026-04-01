@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
@@ -56,7 +56,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           (click)="showCreateForm.set(true)"
           class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
         >
-          Заблокировать цену
+          {{ 'pricing.locks.create' | translate }}
         </button>
       </div>
 
@@ -68,7 +68,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                ID оффера
+                {{ 'pricing.locks.form.offer_id_label' | translate }}
               </label>
               <input
                 type="number"
@@ -79,7 +79,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                Цена
+                {{ 'pricing.locks.form.price_label' | translate }}
               </label>
               <input
                 type="number"
@@ -90,18 +90,18 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                Причина
+                {{ 'pricing.locks.form.reason_label' | translate }}
               </label>
               <input
                 type="text"
                 [(ngModel)]="formReason"
                 class="h-8 w-56 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                placeholder="Необязательно"
+                [placeholder]="'pricing.locks.form.optional' | translate"
               />
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                Истекает
+                {{ 'pricing.locks.form.expires_at' | translate }}
               </label>
               <input
                 type="date"
@@ -115,13 +115,13 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
                 [disabled]="!isFormValid()"
                 class="h-8 cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Заблокировать
+                {{ 'pricing.locks.form.submit' | translate }}
               </button>
               <button
                 (click)="cancelCreate()"
                 class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
               >
-                Отмена
+                {{ 'actions.cancel' | translate }}
               </button>
             </div>
           </div>
@@ -145,7 +145,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           />
         } @else if (!locksQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="'Нет активных блокировок цен.'"
+            [message]="'pricing.locks.empty' | translate"
           />
         } @else {
           <dp-data-grid
@@ -175,6 +175,7 @@ export class LocksPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
 
   readonly filterValues = signal<Record<string, any>>({});
@@ -346,9 +347,9 @@ export class LocksPageComponent {
     onSuccess: () => {
       this.resetForm();
       this.queryClient.invalidateQueries({ queryKey: ['locks'] });
-      this.toast.success('Цена заблокирована');
+      this.toast.success(this.translate.instant('pricing.locks.created'));
     },
-    onError: () => this.toast.error('Не удалось заблокировать цену'),
+    onError: () => this.toast.error(this.translate.instant('pricing.locks.create_error')),
   }));
 
   private readonly deleteMutation = injectMutation(() => ({
@@ -363,11 +364,11 @@ export class LocksPageComponent {
       this.showUnlockModal.set(false);
       this.unlockTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['locks'] });
-      this.toast.success('Цена разблокирована');
+      this.toast.success(this.translate.instant('pricing.locks.unlocked'));
     },
     onError: () => {
       this.showUnlockModal.set(false);
-      this.toast.error('Не удалось разблокировать цену');
+      this.toast.error(this.translate.instant('pricing.locks.unlock_error'));
     },
   }));
 

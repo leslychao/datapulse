@@ -109,12 +109,12 @@ export class DraftBannerComponent {
       this.showPreview.set(false);
       this.gridStore.clearDraftChanges();
       this.gridStore.setDraftMode(false);
-      if (res.failed > 0) {
+      if (res.errored > 0) {
         this.toast.warning(this.translate.instant('draft.partial_success', {
-          succeeded: res.succeeded, total: res.succeeded + res.failed, failed: res.failed,
+          succeeded: res.processed, total: res.processed + res.errored, failed: res.errored,
         }));
       } else {
-        this.toast.success(this.translate.instant('draft.success', { count: res.succeeded }));
+        this.toast.success(this.translate.instant('draft.success', { count: res.processed }));
       }
       this.queryClient.invalidateQueries({ queryKey: ['offers'] });
       this.queryClient.invalidateQueries({ queryKey: ['grid-kpi'] });

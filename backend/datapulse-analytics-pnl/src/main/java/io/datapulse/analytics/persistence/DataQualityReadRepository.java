@@ -29,10 +29,11 @@ public class DataQualityReadRepository {
                     + sum(other_marketplace_charges_amount) + sum(compensation_amount)
                     + sum(refund_amount) AS total_measures_sum,
                 sum(reconciliation_residual) AS total_residual
-            FROM mart_posting_pnl FINAL
+            FROM mart_posting_pnl
             WHERE connection_id IN (:connectionIds)
             GROUP BY connection_id, source_platform, period
             ORDER BY connection_id, period DESC
+            SETTINGS final = 1
             """;
 
     private static final String BASELINE_SQL = """
@@ -47,11 +48,12 @@ public class DataQualityReadRepository {
                     source_platform,
                     toYYYYMM(finance_date) AS period,
                     abs(sum(reconciliation_residual)) / nullIf(abs(sum(net_payout)), 0) AS abs_residual_ratio
-                FROM mart_posting_pnl FINAL
+                FROM mart_posting_pnl
                 WHERE connection_id IN (:connectionIds)
                 GROUP BY connection_id, source_platform, period
             )
             GROUP BY connection_id, source_platform
+            SETTINGS final = 1
             """;
 
     public List<ReconciliationResponse> findReconciliation(List<Long> connectionIds, int stdMultiplier) {

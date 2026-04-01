@@ -179,8 +179,9 @@ export interface BulkActionRequest {
 }
 
 export interface BulkActionResponse {
-  succeeded: number;
-  failed: number;
+  processed: number;
+  skipped: number;
+  errored: number;
   errors: string[];
 }
 

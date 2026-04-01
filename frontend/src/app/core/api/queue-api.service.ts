@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '@env';
-import { BulkActionResult, CreateQueueRequest, Page, Queue, QueueFilter, QueueItem } from '@core/models';
+import { BulkActionResponse, CreateQueueRequest, Page, Queue, QueueFilter, QueueItem } from '@core/models';
 
 @Injectable({ providedIn: 'root' })
 export class QueueApiService {
@@ -62,11 +62,11 @@ export class QueueApiService {
     return this.http.post<{ matchCount: number }>(`${this.base}/workspaces/${workspaceId}/queues/preview-count`, { autoCriteria });
   }
 
-  bulkApprove(workspaceId: number, actionIds: number[]): Observable<BulkActionResult> {
-    return this.http.post<BulkActionResult>(`${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, { actionIds });
+  bulkApprove(workspaceId: number, actionIds: number[]): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(`${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, { actionIds });
   }
 
-  bulkReject(workspaceId: number, actionIds: number[], cancelReason: string): Observable<BulkActionResult> {
-    return this.http.post<BulkActionResult>(`${this.base}/workspaces/${workspaceId}/actions/bulk-reject`, { actionIds, cancelReason });
+  bulkReject(workspaceId: number, actionIds: number[], cancelReason: string): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(`${this.base}/workspaces/${workspaceId}/actions/bulk-reject`, { actionIds, cancelReason });
   }
 }

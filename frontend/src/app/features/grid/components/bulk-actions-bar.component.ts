@@ -126,12 +126,13 @@ export class BulkActionsBarComponent {
     onSuccess: (res) => {
       this.showApproveModal.set(false);
       this.gridStore.clearSelection();
-      if (res.failed > 0) {
+      const failed = res.skipped + res.errored;
+      if (failed > 0) {
         this.toast.warning(this.translate.instant('grid.bulk.approve_partial', {
-          succeeded: res.succeeded, total: res.succeeded + res.failed, failed: res.failed,
+          succeeded: res.processed, total: res.processed + failed, failed,
         }));
       } else {
-        this.toast.success(this.translate.instant('grid.bulk.approve_success', { count: res.succeeded }));
+        this.toast.success(this.translate.instant('grid.bulk.approve_success', { count: res.processed }));
       }
       this.invalidateQueries();
     },
@@ -147,12 +148,13 @@ export class BulkActionsBarComponent {
     onSuccess: (res) => {
       this.showRejectModal.set(false);
       this.gridStore.clearSelection();
-      if (res.failed > 0) {
+      const failed = res.skipped + res.errored;
+      if (failed > 0) {
         this.toast.warning(this.translate.instant('grid.bulk.reject_partial', {
-          succeeded: res.succeeded, total: res.succeeded + res.failed, failed: res.failed,
+          succeeded: res.processed, total: res.processed + failed, failed,
         }));
       } else {
-        this.toast.success(this.translate.instant('grid.bulk.reject_success', { count: res.succeeded }));
+        this.toast.success(this.translate.instant('grid.bulk.reject_success', { count: res.processed }));
       }
       this.invalidateQueries();
     },

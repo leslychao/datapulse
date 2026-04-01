@@ -134,8 +134,9 @@ public class BulkManualPricingService {
     private BulkManualApplyResponse processApply(BulkManualPreviewRequest request,
                                                   Map<Long, EnrichedOfferRow> offers,
                                                   PricingRunEntity run, long workspaceId) {
-        int created = 0;
+        int processed = 0;
         int skipped = 0;
+        int errored = 0;
         List<String> errors = new ArrayList<>();
         List<PriceDecisionEntity> decisions = new ArrayList<>();
 
@@ -149,12 +150,12 @@ public class BulkManualPricingService {
                 PriceDecisionEntity decision = buildAndEvaluateDecision(run, offer, change.targetPrice());
                 if (decision != null) {
                     decisions.add(decision);
-                    created++;
+                    processed++;
                 } else {
                     skipped++;
                 }
             } catch (Exception e) {
-                skipped++;
+                errored++;
                 errors.add("offerId=%d: %s".formatted(change.marketplaceOfferId(), e.getMessage()));
                 log.warn("Bulk manual: failed to process offer {}: {}",
                         change.marketplaceOfferId(), e.getMessage());
@@ -172,8 +173,8 @@ public class BulkManualPricingService {
             }
         }
 
-        completeRun(run, request.changes().size(), created, skipped, errors);
-        return new BulkManualApplyResponse(run.getId(), created, skipped, errors);
+        completeRun(run, request.changes().size(), processed, skipped, errors);
+        return new BulkManualApplyResponse(run.getId(), processed, skipped, errored, errors);
     }
 
     private PriceDecisionEntity buildAndEvaluateDecision(PricingRunEntity run,

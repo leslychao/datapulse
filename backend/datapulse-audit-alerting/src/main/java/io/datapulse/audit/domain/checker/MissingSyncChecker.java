@@ -97,13 +97,19 @@ public class MissingSyncChecker implements AlertChecker {
         }
     }
 
-    private Map<String, Object> parseConfig(String configJson) {
-        try {
-            return objectMapper.readValue(configJson, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.warn("Failed to parse alert rule config, using defaults: error={}", e.getMessage());
-            return Map.of();
+    @SuppressWarnings("unchecked") // safe: config is always Map<String, Object> from JSON parsing
+    private Map<String, Object> parseConfig(Object config) {
+        if (config instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
         }
+        if (config instanceof String configJson) {
+            try {
+                return objectMapper.readValue(configJson, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse alert rule config, using defaults: error={}", e.getMessage());
+            }
+        }
+        return Map.of();
     }
 
     private double getDouble(Map<String, Object> config, String key, double defaultValue) {

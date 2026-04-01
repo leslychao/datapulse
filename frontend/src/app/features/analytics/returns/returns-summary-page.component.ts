@@ -77,7 +77,7 @@ function currentMonth(): string {
               {{ 'analytics.returns.kpi.top_reason' | translate }}
             </span>
             <span class="text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
-              {{ s.topReturnReason ?? '—' }}
+              {{ s.topReturnReason || '—' }}
             </span>
           </div>
         </div>

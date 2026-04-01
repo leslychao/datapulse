@@ -125,7 +125,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                     sum(compensation_amount) AS compensation_amount,
                     sum(refund_amount) AS refund_amount,
                     sum(net_payout) AS net_payout
-                FROM fact_finance FINAL
+                FROM fact_finance
                 WHERE attribution_level = 'POSTING'
                   AND posting_id IS NOT NULL
                   AND posting_id != ''
@@ -138,7 +138,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                     connection_id,
                     sum(acquiring_commission_amount) AS order_acquiring,
                     sum(net_payout) AS order_acquiring_payout
-                FROM fact_finance FINAL
+                FROM fact_finance
                 WHERE attribution_level = 'POSTING'
                   AND posting_id IS NULL
                   AND order_id IS NOT NULL
@@ -154,7 +154,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                 FROM (
                     SELECT posting_id, connection_id, any(order_id) AS order_id,
                            sum(revenue_amount) AS revenue_amount
-                    FROM fact_finance FINAL
+                    FROM fact_finance
                     WHERE attribution_level = 'POSTING'
                       AND posting_id IS NOT NULL AND posting_id != ''
                     GROUP BY posting_id, connection_id
@@ -165,19 +165,20 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
             -- Sales quantity for COGS
             LEFT JOIN (
                 SELECT posting_id, sum(quantity) AS quantity
-                FROM fact_sales FINAL
+                FROM fact_sales
                 WHERE posting_id IS NOT NULL AND posting_id != ''
                 GROUP BY posting_id
             ) s ON pm.posting_id = s.posting_id
             -- Product dimension for product_id resolution
-            LEFT JOIN dim_product FINAL dp
+            LEFT JOIN dim_product AS dp
                 ON pm.seller_sku_id = dp.seller_sku_id
                 AND pm.connection_id = dp.connection_id
             -- SCD2 cost for COGS
-            LEFT JOIN fact_product_cost FINAL fpc
+            LEFT JOIN fact_product_cost AS fpc
                 ON pm.seller_sku_id = fpc.seller_sku_id
                 AND pm.finance_date >= fpc.valid_from
                 AND (fpc.valid_to IS NULL OR pm.finance_date < fpc.valid_to)
+            SETTINGS final = 1
             """;
 
     private final MaterializationJdbc jdbc;

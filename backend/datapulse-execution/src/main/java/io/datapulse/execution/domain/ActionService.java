@@ -12,10 +12,14 @@ import io.datapulse.execution.persistence.DeferredActionRepository;
 import io.datapulse.execution.persistence.PriceActionAttemptEntity;
 import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionCasRepository;
+import io.datapulse.execution.persistence.PriceActionDetailRow;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionQueryRepository;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.execution.persistence.PriceActionStateTransitionEntity;
+import io.datapulse.execution.persistence.PriceActionStateTransitionRepository;
 import io.datapulse.execution.persistence.PriceActionSummaryRow;
+import io.datapulse.execution.persistence.PriceActionTransitionRow;
 import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
@@ -46,6 +50,7 @@ public class ActionService {
     private final PriceActionCasRepository casRepository;
     private final PriceActionAttemptRepository attemptRepository;
     private final PriceActionQueryRepository queryRepository;
+    private final PriceActionStateTransitionRepository stateTransitionRepository;
     private final DeferredActionRepository deferredActionRepository;
     private final OutboxService outboxService;
     private final ExecutionProperties properties;
@@ -65,9 +70,19 @@ public class ActionService {
     }
 
     @Transactional(readOnly = true)
+    public PriceActionDetailRow getActionDetailRow(long actionId) {
+        return queryRepository.findDetailById(actionId)
+            .orElseThrow(() -> NotFoundException.entity("price_action", actionId));
+    }
+
+    @Transactional(readOnly = true)
     public List<PriceActionAttemptEntity> getAttempts(long actionId) {
-        findActionOrThrow(actionId);
         return attemptRepository.findByPriceActionIdOrderByAttemptNumber(actionId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PriceActionTransitionRow> getTransitions(long actionId) {
+        return queryRepository.findTransitions(actionId);
     }
 
     @Transactional
@@ -85,9 +100,13 @@ public class ActionService {
             var active = existingActive.get();
 
             if (active.getStatus().isPreExecution()) {
-                int rows = casRepository.casSupersede(active.getId(), active.getStatus(), 0);
+                ActionStatus prevStatus = active.getStatus();
+                int rows = casRepository.casSupersede(active.getId(), prevStatus, 0);
                 if (rows == 0) {
-                    log.warn("CAS supersede conflict: actionId={}, status={}", active.getId(), active.getStatus());
+                    log.warn("CAS supersede conflict: actionId={}, status={}", active.getId(), prevStatus);
+                } else {
+                    recordTransition(active.getId(), prevStatus,
+                        ActionStatus.SUPERSEDED, null, null);
                 }
             } else {
                 deferAction(workspaceId, marketplaceOfferId, priceDecisionId,
@@ -135,12 +154,15 @@ public class ActionService {
     @Transactional
     public void casApprove(long actionId, Long userId) {
         var action = findActionOrThrow(actionId);
+        ActionStatus prevStatus = action.getStatus();
         ensureTransitionAllowed(action, ActionStatus.APPROVED);
 
-        int rows = casRepository.casApprove(actionId, action.getStatus(), userId);
+        int rows = casRepository.casApprove(actionId, prevStatus, userId);
         if (rows == 0) {
-            throwCasConflict(actionId, action.getStatus(), ActionStatus.APPROVED);
+            throwCasConflict(actionId, prevStatus, ActionStatus.APPROVED);
         }
+
+        recordTransition(actionId, prevStatus, ActionStatus.APPROVED, userId, null);
 
         action.setStatus(ActionStatus.APPROVED);
         action.setApprovedByUserId(userId);
@@ -166,6 +188,9 @@ public class ActionService {
             throwCasConflict(actionId, action.getStatus(), ActionStatus.CANCELLED);
         }
 
+        recordTransition(actionId, ActionStatus.PENDING_APPROVAL,
+            ActionStatus.CANCELLED, resolveCurrentUserId(), cancelReason);
+
         publishAudit("action.reject", actionId, "SUCCESS", cancelReason);
         log.info("Action rejected: actionId={}, reason={}", actionId, cancelReason);
     }
@@ -180,6 +205,9 @@ public class ActionService {
             throwCasConflict(actionId, action.getStatus(), ActionStatus.APPROVED);
         }
 
+        recordTransition(actionId, ActionStatus.ON_HOLD,
+            ActionStatus.APPROVED, userId, null);
+
         scheduleExecution(action);
 
         publishAudit("action.resume", actionId, "SUCCESS", null);
@@ -189,12 +217,16 @@ public class ActionService {
     @Transactional
     public void casHold(long actionId, String holdReason) {
         var action = findActionOrThrow(actionId);
+        ActionStatus prevStatus = action.getStatus();
         ensureTransitionAllowed(action, ActionStatus.ON_HOLD);
 
         int rows = casRepository.casHold(actionId, holdReason);
         if (rows == 0) {
-            throwCasConflict(actionId, action.getStatus(), ActionStatus.ON_HOLD);
+            throwCasConflict(actionId, prevStatus, ActionStatus.ON_HOLD);
         }
+
+        recordTransition(actionId, prevStatus, ActionStatus.ON_HOLD,
+            resolveCurrentUserId(), holdReason);
 
         publishAudit("action.hold", actionId, "SUCCESS", holdReason);
         log.info("Action put on hold: actionId={}, reason={}", actionId, holdReason);

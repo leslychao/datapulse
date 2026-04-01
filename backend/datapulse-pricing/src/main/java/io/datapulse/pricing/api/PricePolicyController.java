@@ -5,6 +5,7 @@ import io.datapulse.pricing.domain.PolicyStatus;
 import io.datapulse.pricing.domain.PolicyType;
 import io.datapulse.pricing.domain.PricePolicyService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,10 +46,10 @@ public class PricePolicyController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PricePolicySummaryResponse> listPolicies(
             @PathVariable("workspaceId") long workspaceId,
-            @RequestParam(value = "status", required = false) PolicyStatus status,
+            @RequestParam(value = "status", required = false) List<PolicyStatus> statuses,
             @RequestParam(value = "strategyType", required = false) PolicyType strategyType,
             Pageable pageable) {
-        return policyService.listPoliciesPaged(workspaceId, status, strategyType, pageable);
+        return policyService.listPoliciesPaged(workspaceId, statuses, strategyType, pageable);
     }
 
     @GetMapping("/{policyId}")

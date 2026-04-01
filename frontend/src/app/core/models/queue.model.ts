@@ -48,9 +48,3 @@ export interface QueueMatchRule {
   op: string;
   value: unknown;
 }
-
-export interface BulkActionResult {
-  processed: number;
-  failed: number;
-  results: { actionId: number; status?: string; error?: string; currentStatus?: string }[];
-}

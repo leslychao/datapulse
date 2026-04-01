@@ -1,5 +1,7 @@
 package io.datapulse.execution.api;
 
+import io.datapulse.common.exception.ConflictException;
+import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.execution.domain.ActionService;
 import io.datapulse.execution.domain.PriceActionFilter;
 import io.datapulse.execution.domain.ReconciliationService;
@@ -9,6 +11,7 @@ import io.datapulse.execution.persistence.PriceActionSummaryRow;
 import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
@@ -22,8 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping(value = "/api/workspaces/{workspaceId}/actions",
     produces = MediaType.APPLICATION_JSON_VALUE)
@@ -73,29 +78,55 @@ public class PriceActionController {
     @PostMapping("/bulk-approve")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
         + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void bulkApprove(@PathVariable("workspaceId") long workspaceId,
-                            @Valid @RequestBody BulkApproveRequest request) {
+    public BulkActionResponse bulkApprove(
+        @PathVariable("workspaceId") long workspaceId,
+        @Valid @RequestBody BulkApproveRequest request) {
+        int processed = 0;
+        int skipped = 0;
+        int errored = 0;
+        List<String> errors = new ArrayList<>();
+
         for (long actionId : request.actionIds()) {
             try {
                 actionService.casApprove(actionId, workspaceContext.getUserId());
+                processed++;
+            } catch (NotFoundException | ConflictException e) {
+                skipped++;
             } catch (Exception e) {
-                // CAS conflicts and not-found are expected during bulk operations
+                errored++;
+                errors.add("actionId=%d: %s".formatted(actionId, e.getMessage()));
+                log.warn("Bulk approve failed: actionId={}, error={}", actionId, e.getMessage());
             }
         }
+
+        return new BulkActionResponse(processed, skipped, errored, errors);
     }
 
     @PostMapping("/bulk-reject")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) "
         + "and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void bulkReject(@PathVariable("workspaceId") long workspaceId,
-                           @Valid @RequestBody BulkRejectRequest request) {
+    public BulkActionResponse bulkReject(
+        @PathVariable("workspaceId") long workspaceId,
+        @Valid @RequestBody BulkRejectRequest request) {
+        int processed = 0;
+        int skipped = 0;
+        int errored = 0;
+        List<String> errors = new ArrayList<>();
+
         for (long actionId : request.actionIds()) {
             try {
                 actionService.casReject(actionId, request.cancelReason());
+                processed++;
+            } catch (NotFoundException | ConflictException e) {
+                skipped++;
             } catch (Exception e) {
-                // CAS conflicts and not-found are expected during bulk operations
+                errored++;
+                errors.add("actionId=%d: %s".formatted(actionId, e.getMessage()));
+                log.warn("Bulk reject failed: actionId={}, error={}", actionId, e.getMessage());
             }
         }
+
+        return new BulkActionResponse(processed, skipped, errored, errors);
     }
 
     @PostMapping("/{actionId}/reject")

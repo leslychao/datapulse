@@ -87,9 +87,3 @@ export interface ActionFilter {
 export interface BulkApproveRequest {
   actionIds: number[];
 }
-
-export interface BulkApproveResponse {
-  approved: number;
-  failed: number;
-  failures: { actionId: number; reason: string; currentStatus: string }[];
-}

@@ -80,16 +80,17 @@ public class PricePolicyService {
 
     @Transactional(readOnly = true)
     public Page<PricePolicySummaryResponse> listPoliciesPaged(
-            long workspaceId, PolicyStatus status,
+            long workspaceId, List<PolicyStatus> statuses,
             PolicyType strategyType, Pageable pageable) {
+        boolean hasStatuses = statuses != null && !statuses.isEmpty();
         Page<PricePolicyEntity> page;
 
-        if (status != null && strategyType != null) {
-            page = policyRepository.findAllByWorkspaceIdAndStatusAndStrategyType(
-                    workspaceId, status, strategyType, pageable);
-        } else if (status != null) {
-            page = policyRepository.findAllByWorkspaceIdAndStatus(
-                    workspaceId, status, pageable);
+        if (hasStatuses && strategyType != null) {
+            page = policyRepository.findAllByWorkspaceIdAndStatusInAndStrategyType(
+                    workspaceId, statuses, strategyType, pageable);
+        } else if (hasStatuses) {
+            page = policyRepository.findAllByWorkspaceIdAndStatusIn(
+                    workspaceId, statuses, pageable);
         } else if (strategyType != null) {
             page = policyRepository.findAllByWorkspaceIdAndStrategyType(
                     workspaceId, strategyType, pageable);

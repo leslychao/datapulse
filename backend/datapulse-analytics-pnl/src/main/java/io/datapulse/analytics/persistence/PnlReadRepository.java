@@ -25,6 +25,8 @@ public class PnlReadRepository {
 
     private final ClickHouseReadJdbc jdbc;
 
+    private static final String SETTINGS_FINAL = "\nSETTINGS final = 1";
+
     private static final Map<String, String> PRODUCT_SORT_WHITELIST = Map.ofEntries(
             Map.entry("revenueAmount", "revenue_amount"),
             Map.entry("marketplacePnl", "marketplace_pnl"),
@@ -66,7 +68,7 @@ public class PnlReadRepository {
                 sum(advertising_cost) AS advertising_cost,
                 sum(marketplace_pnl) AS marketplace_pnl,
                 sum(full_pnl) AS full_pnl
-            FROM mart_product_pnl FINAL
+            FROM mart_product_pnl
             WHERE connection_id IN (:connectionIds)
             """;
 
@@ -98,8 +100,8 @@ public class PnlReadRepository {
                 m.advertising_cost,
                 m.marketplace_pnl,
                 m.full_pnl
-            FROM mart_product_pnl FINAL AS m
-            LEFT JOIN dim_product FINAL AS p ON m.product_id = p.product_id
+            FROM mart_product_pnl AS m
+            LEFT JOIN dim_product AS p ON m.product_id = p.product_id
             WHERE m.connection_id IN (:connectionIds)
             """;
 
@@ -129,7 +131,7 @@ public class PnlReadRepository {
                 net_cogs,
                 cogs_status,
                 reconciliation_residual
-            FROM mart_posting_pnl FINAL
+            FROM mart_posting_pnl
             WHERE connection_id IN (:connectionIds)
             """;
 
@@ -151,10 +153,11 @@ public class PnlReadRepository {
                 compensation_amount,
                 refund_amount,
                 net_payout
-            FROM fact_finance FINAL
+            FROM fact_finance
             WHERE posting_id = :postingId
               AND connection_id IN (:connectionIds)
             ORDER BY finance_date, entry_id
+            SETTINGS final = 1
             """;
 
     public List<PnlSummaryResponse> findSummary(List<Long> connectionIds, PnlFilter filter) {
@@ -162,6 +165,7 @@ public class PnlReadRepository {
         var sb = new StringBuilder(SUMMARY_SQL);
         appendPeriodFilter(sb, params, filter);
         sb.append(" GROUP BY connection_id, source_platform");
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, this::mapSummary);
     }
@@ -177,14 +181,16 @@ public class PnlReadRepository {
         sb.append(" LIMIT :limit OFFSET :offset");
         params.addValue("limit", limit);
         params.addValue("offset", offset);
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, this::mapProductPnl);
     }
 
     public long countByProduct(List<Long> connectionIds, PnlFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
-        var sb = new StringBuilder("SELECT count(*) FROM mart_product_pnl FINAL AS m WHERE m.connection_id IN (:connectionIds)");
+        var sb = new StringBuilder("SELECT count(*) FROM mart_product_pnl AS m WHERE m.connection_id IN (:connectionIds)");
         appendProductFilter(sb, params, filter);
+        sb.append(SETTINGS_FINAL);
 
         Long result = jdbc.ch().queryForObject(sb.toString(), params, Long.class);
         return result != null ? result : 0L;
@@ -201,14 +207,16 @@ public class PnlReadRepository {
         sb.append(" LIMIT :limit OFFSET :offset");
         params.addValue("limit", limit);
         params.addValue("offset", offset);
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, this::mapPostingPnl);
     }
 
     public long countByPosting(List<Long> connectionIds, PnlFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
-        var sb = new StringBuilder("SELECT count(*) FROM mart_posting_pnl FINAL WHERE connection_id IN (:connectionIds)");
+        var sb = new StringBuilder("SELECT count(*) FROM mart_posting_pnl WHERE connection_id IN (:connectionIds)");
         appendPostingFilter(sb, params, filter);
+        sb.append(SETTINGS_FINAL);
 
         Long result = jdbc.ch().queryForObject(sb.toString(), params, Long.class);
         return result != null ? result : 0L;
@@ -241,13 +249,14 @@ public class PnlReadRepository {
                     sum(net_cogs) AS net_cogs,
                     sum(marketplace_pnl) AS marketplace_pnl,
                     sum(full_pnl) AS full_pnl
-                FROM mart_product_pnl FINAL
+                FROM mart_product_pnl
                 WHERE connection_id IN (:connectionIds)
                 """.formatted(periodExpr);
 
         var sb = new StringBuilder(sql);
         appendPeriodFilter(sb, params, filter);
         sb.append(" GROUP BY period_label ORDER BY period_label");
+        sb.append(SETTINGS_FINAL);
 
         return jdbc.ch().query(sb.toString(), params, (rs, rowNum) -> new PnlTrendResponse(
                 rs.getString("period_label"),

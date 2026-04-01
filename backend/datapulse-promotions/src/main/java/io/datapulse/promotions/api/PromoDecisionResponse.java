@@ -11,7 +11,7 @@ public record PromoDecisionResponse(
         Long canonicalPromoProductId,
         Long promoEvaluationId,
         Integer policyVersion,
-        String policySnapshot,
+        Object policySnapshot,
         PromoDecisionType decisionType,
         ParticipationMode participationMode,
         String executionMode,

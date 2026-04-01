@@ -6,18 +6,23 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.audit.api.AlertRuleResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import lombok.RequiredArgsConstructor;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class AlertRuleRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ObjectMapper objectMapper;
 
     private static final String SELECT_COLUMNS = """
             SELECT id, workspace_id, rule_type, target_entity_type, target_entity_id,
@@ -93,12 +98,24 @@ public class AlertRuleRepository {
                 rs.getString("rule_type"),
                 rs.getString("target_entity_type"),
                 rs.getObject("target_entity_id", Long.class),
-                rs.getString("config"),
+                parseJson(rs.getString("config")),
                 rs.getBoolean("enabled"),
                 rs.getString("severity"),
                 rs.getBoolean("blocks_automation"),
                 rs.getObject("created_at", OffsetDateTime.class),
                 rs.getObject("updated_at", OffsetDateTime.class)
         );
+    }
+
+    private Object parseJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, Object.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to parse alert rule config JSON: {}", e.getMessage());
+            return null;
+        }
     }
 }

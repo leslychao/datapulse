@@ -1,7 +1,7 @@
 package io.datapulse.sellerops.domain;
 
 import io.datapulse.sellerops.api.SearchResultResponse;
-import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
+import io.datapulse.sellerops.persistence.SearchReadRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -10,12 +10,23 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class SearchService {
 
-  private final GridPostgresReadRepository gridPostgresReadRepository;
+  private static final int SECONDARY_LIMIT = 5;
 
-  public List<SearchResultResponse> search(long workspaceId, String query, int limit) {
+  private final SearchReadRepository searchReadRepository;
+
+  public SearchResultResponse search(long workspaceId, String query, int limit) {
     if (query == null || query.isBlank() || query.length() < 2) {
-      return List.of();
+      return new SearchResultResponse(List.of(), List.of(), List.of(), List.of());
     }
-    return gridPostgresReadRepository.search(workspaceId, query.trim(), limit);
+
+    String pattern = "%" + query.trim()
+        .replace("%", "\\%")
+        .replace("_", "\\_") + "%";
+
+    return new SearchResultResponse(
+        searchReadRepository.searchProducts(workspaceId, pattern, limit),
+        searchReadRepository.searchPolicies(workspaceId, pattern, SECONDARY_LIMIT),
+        searchReadRepository.searchPromos(workspaceId, pattern, SECONDARY_LIMIT),
+        searchReadRepository.searchViews(workspaceId, pattern, SECONDARY_LIMIT));
   }
 }
