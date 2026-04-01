@@ -88,4 +88,26 @@ public final class MessageCodes {
     public static final String EXECUTION_RECONCILIATION_INVALID_OUTCOME = "execution.reconciliation.invalid_outcome";
     public static final String EXECUTION_STUCK_STATE_DETECTED = "execution.stuck_state.detected";
     public static final String EXECUTION_POISON_PILL = "execution.poison_pill.detected";
+
+    // --- Promotions: Policy ---
+    public static final String PROMO_POLICY_NOT_FOUND = "promo.policy.not_found";
+    public static final String PROMO_POLICY_ARCHIVED = "promo.policy.archived";
+    public static final String PROMO_POLICY_INVALID_STATE = "promo.policy.invalid_state";
+    public static final String PROMO_ASSIGNMENT_DUPLICATE = "promo.assignment.duplicate";
+
+    // --- Promotions: Evaluation ---
+    public static final String PROMO_RUN_ALREADY_IN_PROGRESS = "promo.run.already_in_progress";
+    public static final String PROMO_RUN_NOT_FOUND = "promo.run.not_found";
+
+    // --- Promotions: Action ---
+    public static final String PROMO_ACTION_NOT_FOUND = "promo.action.not_found";
+    public static final String PROMO_ACTION_INVALID_TRANSITION = "promo.action.invalid_transition";
+    public static final String PROMO_ACTION_CAS_CONFLICT = "promo.action.cas_conflict";
+    public static final String PROMO_ACTION_NOT_CANCELLABLE = "promo.action.not_cancellable";
+
+    // --- Promotions: Product ---
+    public static final String PROMO_PRODUCT_NOT_FOUND = "promo.product.not_found";
+    public static final String PROMO_PRODUCT_NOT_ELIGIBLE = "promo.product.not_eligible";
+    public static final String PROMO_PRODUCT_NOT_PARTICIPATING = "promo.product.not_participating";
+    public static final String PROMO_CAMPAIGN_FROZEN = "promo.campaign.frozen";
 }

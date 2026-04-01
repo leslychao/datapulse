@@ -23,3 +23,6 @@ databaseChangeLog:
   - include:
       file: changes/0011-execution-tables.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0012-promotions-tables.sql
+      relativeToChangelogFile: true

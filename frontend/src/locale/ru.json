@@ -287,5 +287,20 @@
   "execution.reconciliation.mismatch": "Расхождение: целевая цена не совпадает с фактической.",
   "execution.reconciliation.invalid_outcome": "Недопустимый результат reconciliation.",
   "execution.stuck_state.detected": "Обнаружено застрявшее действие {{actionId}} в статусе {{status}}.",
-  "execution.poison_pill.detected": "Обнаружено повреждённое сообщение в очереди обработки."
+  "execution.poison_pill.detected": "Обнаружено повреждённое сообщение в очереди обработки.",
+
+  "promo.policy.not_found": "Промо-политика не найдена.",
+  "promo.policy.archived": "Невозможно изменить архивную промо-политику.",
+  "promo.policy.invalid_state": "Переход из состояния {{currentState}} в {{targetState}} невозможен.",
+  "promo.assignment.duplicate": "Назначение с такими параметрами уже существует.",
+  "promo.run.already_in_progress": "Для этого подключения уже выполняется оценка промо.",
+  "promo.run.not_found": "Запуск оценки промо не найден.",
+  "promo.action.not_found": "Промо-действие не найдено.",
+  "promo.action.invalid_transition": "Переход из {{currentStatus}} в {{targetStatus}} невозможен для промо-действия {{actionId}}.",
+  "promo.action.cas_conflict": "Конфликт: промо-действие {{actionId}} уже изменено.",
+  "promo.action.not_cancellable": "Промо-действие {{actionId}} нельзя отменить в статусе {{status}}.",
+  "promo.product.not_found": "Промо-товар не найден.",
+  "promo.product.not_eligible": "Товар не может участвовать в данной акции.",
+  "promo.product.not_participating": "Товар не участвует в данной акции.",
+  "promo.campaign.frozen": "Срок подачи заявки на участие в акции истёк."
 }
