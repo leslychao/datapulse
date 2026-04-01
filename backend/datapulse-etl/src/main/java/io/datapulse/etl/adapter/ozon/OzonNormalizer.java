@@ -6,6 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.datapulse.etl.adapter.ozon.dto.OzonActionDto;
+import io.datapulse.etl.adapter.ozon.dto.OzonActionProductDto;
 import io.datapulse.etl.adapter.ozon.dto.OzonAttributeResponse;
 import io.datapulse.etl.adapter.ozon.dto.OzonCategoryTreeResponse;
 import io.datapulse.etl.adapter.ozon.dto.OzonFboPosting;
@@ -19,8 +23,11 @@ import io.datapulse.etl.domain.normalized.NormalizedCatalogItem;
 import io.datapulse.etl.domain.normalized.NormalizedCategory;
 import io.datapulse.etl.domain.normalized.NormalizedOrderItem;
 import io.datapulse.etl.domain.normalized.NormalizedPriceItem;
+import io.datapulse.etl.domain.normalized.NormalizedPromoCampaign;
+import io.datapulse.etl.domain.normalized.NormalizedPromoProduct;
 import io.datapulse.etl.domain.normalized.NormalizedReturnItem;
 import io.datapulse.etl.domain.normalized.NormalizedStockItem;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -31,10 +38,13 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class OzonNormalizer {
 
     private static final long BRAND_ATTRIBUTE_ID = 85;
     private static final String MARKETPLACE_OZON = "OZON";
+
+    private final ObjectMapper objectMapper;
 
     public NormalizedCatalogItem normalizeProductInfo(OzonProductInfo info) {
         String marketplaceSku = String.valueOf(info.id());
@@ -207,6 +217,74 @@ public class OzonNormalizer {
                     MARKETPLACE_OZON
             ));
             flattenRecursive(node.children(), id, result);
+        }
+    }
+
+    public NormalizedPromoCampaign normalizeAction(OzonActionDto dto) {
+        OffsetDateTime dateFrom = dto.dateStart() != null
+                ? OzonTimestampParser.parseIso8601(dto.dateStart()) : null;
+        OffsetDateTime dateTo = dto.dateEnd() != null
+                ? OzonTimestampParser.parseIso8601(dto.dateEnd()) : null;
+        OffsetDateTime freezeAt = dto.freezeDate() != null && !dto.freezeDate().isBlank()
+                ? OzonTimestampParser.parseIso8601(dto.freezeDate()) : null;
+
+        String status = resolveOzonPromoStatus(dateFrom, dateTo);
+        String mechanic = dto.discountType() != null ? dto.discountType() : "DISCOUNT";
+        String rawPayload = serializeToJson(dto);
+
+        return new NormalizedPromoCampaign(
+                String.valueOf(dto.id()),
+                dto.title(),
+                dto.actionType() != null ? dto.actionType() : "unknown",
+                status,
+                dateFrom,
+                dateTo,
+                freezeAt,
+                dto.description(),
+                mechanic,
+                dto.isParticipating(),
+                rawPayload
+        );
+    }
+
+    public NormalizedPromoProduct normalizeActionProduct(OzonActionProductDto dto,
+                                                        long actionId,
+                                                        boolean isParticipating) {
+        String participationStatus = isParticipating ? "PARTICIPATING" : "ELIGIBLE";
+        BigDecimal requiredPrice = BigDecimal.valueOf(dto.actionPrice());
+        BigDecimal currentPrice = BigDecimal.valueOf(dto.price());
+        BigDecimal maxPromoPrice = BigDecimal.valueOf(dto.maxActionPrice());
+
+        return new NormalizedPromoProduct(
+                String.valueOf(actionId),
+                String.valueOf(dto.productId()),
+                participationStatus,
+                requiredPrice,
+                currentPrice,
+                maxPromoPrice,
+                dto.addMode(),
+                dto.minStock(),
+                dto.stock()
+        );
+    }
+
+    private String resolveOzonPromoStatus(OffsetDateTime dateFrom, OffsetDateTime dateTo) {
+        OffsetDateTime now = OffsetDateTime.now();
+        if (dateTo != null && dateTo.isBefore(now)) {
+            return "ENDED";
+        }
+        if (dateFrom != null && dateFrom.isAfter(now)) {
+            return "UPCOMING";
+        }
+        return "ACTIVE";
+    }
+
+    private String serializeToJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize promo payload: {}", e.getMessage());
+            return null;
         }
     }
 

@@ -476,8 +476,8 @@ warehouse:
 | `SALES` | `SALES_FACT` | canonical_sale | WB: statistics sales endpoint; Ozon: через postings (FBO/FBS) |
 | `RETURNS` | `SALES_FACT` | canonical_return | WB: analytics goods-return endpoint; Ozon: через returns/list |
 | `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list |
-| `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | **Not yet implemented.** EventSource not created; canonical tables exist but not populated by ETL |
-| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | **Not yet implemented (Phase B).** EventSource not created |
+| `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | WB: `WbPromoSyncSource` → calendar/promotions + nomenclatures; Ozon: `OzonPromoSyncSource` → actions + products/candidates |
+| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | **Stub (Phase B).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Blocked by F-1/F-2/F-3 |
 
 **Примечание**: WB sales и returns извлекаются из отдельных statistics/analytics endpoints (`/api/v1/supplier/sales` и `/api/v1/analytics/goods-return`) в рамках `SALES_FACT`, а не из `FACT_FINANCE`. `FACT_FINANCE` создаёт только `canonical_finance_entry`. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) обеспечивает, что canonical orders/sales/returns доступны для SKU resolution при финансовой нормализации.
 
@@ -517,12 +517,12 @@ CATEGORY_DICT ───────────────────┘      
 | Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_current` |
 | Финансы (Ozon) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
 | Финансы (WB) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
-| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below). **Not yet implemented (Phase B)** |
-| Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. **EventSource not yet implemented** |
+| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below). **Stub (Phase B)** |
+| Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. Implemented |
 
 ### Pipeline invariant exception: Advertising (DD-AD-1)
 
-> **Implementation status:** `ADVERTISING_FACT` EventSource **не реализован**. Описание ниже — target design для Phase B.
+> **Implementation status:** `ADVERTISING_FACT` EventSource зарегистрирован как **no-op stub** (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Описание ниже — target design для Phase B.
 
 Advertising data (`ADVERTISING_FACT`) flows **Raw (S3) → Normalized (in-process) → ClickHouse** directly, без промежуточного canonical entity в PostgreSQL. Это единственное исключение из инварианта «Raw → Normalized → Canonical → Analytics». Raw payload сохраняется в S3 (как и все остальные domains), но canonical layer пропускается.
 
@@ -652,8 +652,8 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 | Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination | `now - 7d` hardcoded |
 | Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination | `now - 7d` hardcoded |
 | Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) | `now - 7d` hardcoded |
-| Промо | Full scan (promo list small per connection) | Offset-based pagination | EventSource not implemented |
-| Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based | EventSource not implemented |
+| Промо | Full scan (promo list small per connection) | Offset-based pagination | Implemented (full scan per sync) |
+| Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based | Stub (Phase B) |
 
 **`overlap_buffer` (target design):** configurable per domain (default: 2 hours). Overlapping window гарантирует, что late-arriving records не потеряются. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке.
 
@@ -734,7 +734,7 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 | `INVENTORY_FACT` | `POST /api/analytics/v1/stocks-report/wb-warehouses` | `POST /v4/product/info/stocks` | — |
 | `SALES_FACT` | 1. `GET /api/v1/supplier/orders` 2. `GET /api/v1/supplier/sales` 3. `GET /api/v1/analytics/goods-return` | 1. `POST /v2/posting/fbo/list` 2. `POST /v3/posting/fbs/list` 3. `POST /v1/returns/list` (Ozon returns) | WB: (1), (2), (3) **последовательно**; Ozon: (1), (2), (3) **независимы** |
 | `FACT_FINANCE` | `GET /api/v5/supplier/reportDetailByPeriod` | `POST /v3/finance/transaction/list` | — |
-| `PROMO_SYNC` | 1. `GET /api/v2/promo/adverts` 2. `GET /api/v2/promo/adverts/{id}/products` | 1. `GET /v1/actions` 2. `POST /v1/actions/products` | (2) зависит от promo_id из (1) — **hard**. **EventSource not yet implemented** |
+| `PROMO_SYNC` | 1. `GET /api/v1/calendar/promotions` 2. `GET /api/v1/calendar/promotions/nomenclatures` (per promo) | 1. `GET /v1/actions` 2. `POST /v1/actions/products` + `POST /v1/actions/candidates` (per action) | (2) зависит от promo_id из (1) — **hard**. Implemented: `WbPromoSyncSource`, `OzonPromoSyncSource` |
 
 **Error handling на уровне sub-sources:**
 
@@ -1423,12 +1423,18 @@ Summary of gaps between this document (target design) and the current codebase.
 | Ozon finance chunking | Same 7d window | Automatic monthly chunk splitting for long gaps |
 | ClickHouse materializer | Stub (logs calls, no actual writes) | Full batch INSERT via ClickHouse JDBC |
 
+### Implemented (recent)
+
+| Area | Notes |
+|------|-------|
+| `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
+| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Phase B |
+
 ### Not yet implemented
 
 | Area | Notes |
 |------|-------|
-| `PROMO_SYNC` EventSource | WB + Ozon promo adapters exist as stubs; EventSource not created |
-| `ADVERTISING_FACT` EventSource | Target design: Raw → Normalized → ClickHouse (bypass canonical). Not started |
+| `ADVERTISING_FACT` full implementation | v2→v3 migration (F-1/F-2), Ozon OAuth2 (F-3), DTO expansion (F-4). Phase B |
 | ClickHouse materialization | `ClickHouseMaterializer` is a stub. ClickHouse schema (`0001-initial.sql`) created but not populated |
 | Post-sync outbox events | Described in doc; not implemented |
 

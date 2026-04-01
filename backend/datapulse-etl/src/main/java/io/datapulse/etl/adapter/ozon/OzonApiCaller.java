@@ -19,6 +19,21 @@ public class OzonApiCaller {
     private final IntegrationProperties properties;
     private final MarketplaceRateLimiter rateLimiter;
 
+    public Flux<DataBuffer> get(String path,
+                                long connectionId, RateLimitGroup group,
+                                String clientId, String apiKey) {
+        return Flux.defer(() -> {
+            rateLimiter.acquire(connectionId, group).join();
+            String baseUrl = properties.getOzon().getSellerBaseUrl();
+            return webClientBuilder.build()
+                    .get()
+                    .uri(baseUrl + path)
+                    .header("Client-Id", clientId)
+                    .header("Api-Key", apiKey)
+                    .exchangeToFlux(response -> handleResponse(response, connectionId, group));
+        }).retryWhen(HttpRetryClassifier.retrySpec());
+    }
+
     public Flux<DataBuffer> post(String path, Object body,
                                  long connectionId, RateLimitGroup group,
                                  String clientId, String apiKey) {

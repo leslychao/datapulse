@@ -2,14 +2,20 @@ package io.datapulse.etl.domain;
 
 import io.datapulse.etl.domain.normalized.NormalizedCatalogItem;
 import io.datapulse.etl.domain.normalized.NormalizedCategory;
+import java.time.OffsetDateTime;
+
 import io.datapulse.etl.domain.normalized.NormalizedFinanceItem;
 import io.datapulse.etl.domain.normalized.NormalizedOrderItem;
 import io.datapulse.etl.domain.normalized.NormalizedPriceItem;
+import io.datapulse.etl.domain.normalized.NormalizedPromoCampaign;
+import io.datapulse.etl.domain.normalized.NormalizedPromoProduct;
 import io.datapulse.etl.domain.normalized.NormalizedReturnItem;
 import io.datapulse.etl.domain.normalized.NormalizedSaleItem;
 import io.datapulse.etl.domain.normalized.NormalizedStockItem;
 import io.datapulse.etl.domain.normalized.NormalizedWarehouse;
 import io.datapulse.etl.persistence.canonical.CanonicalFinanceEntryEntity;
+import io.datapulse.etl.persistence.canonical.CanonicalPromoCampaignEntity;
+import io.datapulse.etl.persistence.canonical.CanonicalPromoProductEntity;
 import io.datapulse.etl.persistence.canonical.CanonicalOrderEntity;
 import io.datapulse.etl.persistence.canonical.CanonicalPriceCurrentEntity;
 import io.datapulse.etl.persistence.canonical.CanonicalReturnEntity;
@@ -155,6 +161,47 @@ public class CanonicalEntityMapper {
         entity.setEntryDate(norm.entryDate());
         entity.setAttributionLevel(attributionLevel);
         entity.setJobExecutionId(ctx.jobExecutionId());
+        return entity;
+    }
+
+    public CanonicalPromoCampaignEntity toPromoCampaign(NormalizedPromoCampaign norm,
+                                                          IngestContext ctx) {
+        var entity = new CanonicalPromoCampaignEntity();
+        entity.setConnectionId(ctx.connectionId());
+        entity.setExternalPromoId(norm.externalPromoId());
+        entity.setSourcePlatform(platformName(ctx));
+        entity.setPromoName(norm.promoName());
+        entity.setPromoType(norm.promoType());
+        entity.setStatus(norm.status());
+        entity.setDateFrom(norm.dateFrom());
+        entity.setDateTo(norm.dateTo());
+        entity.setFreezeAt(norm.freezeAt());
+        entity.setDescription(norm.description());
+        entity.setMechanic(norm.mechanic());
+        entity.setIsParticipating(norm.isParticipating());
+        entity.setRawPayload(norm.rawPayload());
+        entity.setJobExecutionId(ctx.jobExecutionId());
+        entity.setSyncedAt(OffsetDateTime.now());
+        return entity;
+    }
+
+    public CanonicalPromoProductEntity toPromoProduct(NormalizedPromoProduct norm,
+                                                      long campaignId,
+                                                      long marketplaceOfferId,
+                                                      IngestContext ctx) {
+        var entity = new CanonicalPromoProductEntity();
+        entity.setCanonicalPromoCampaignId(campaignId);
+        entity.setMarketplaceOfferId(marketplaceOfferId);
+        entity.setParticipationStatus(norm.participationStatus());
+        entity.setRequiredPrice(norm.requiredPrice());
+        entity.setCurrentPrice(norm.currentPrice());
+        entity.setMaxPromoPrice(norm.maxPromoPrice());
+        entity.setAddMode(norm.addMode());
+        entity.setMinStockRequired(norm.minStockRequired());
+        entity.setStockAvailable(norm.stockAvailable());
+        entity.setParticipationDecisionSource("SYSTEM");
+        entity.setJobExecutionId(ctx.jobExecutionId());
+        entity.setSyncedAt(OffsetDateTime.now());
         return entity;
     }
 
