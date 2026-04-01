@@ -374,7 +374,7 @@ export class QueueItemsPageComponent {
         headerName: this.translate.instant('queues.grid.actions'),
         sortable: false,
         filter: false,
-        pinned: 'right',
+        pinned: 'right' as const,
         flex: 0,
         width: this.actionColumnWidth(queueType),
         cellRenderer: (params: ICellRendererParams<QueueItem>) => {

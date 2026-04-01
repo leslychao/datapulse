@@ -65,7 +65,7 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
   `,
 })
 export class SearchInputComponent implements OnInit {
-  readonly placeholder = input('Поиск...');
+  readonly placeholder = input('');
   readonly debounceMs = input(300);
 
   readonly searchChange = output<string>();

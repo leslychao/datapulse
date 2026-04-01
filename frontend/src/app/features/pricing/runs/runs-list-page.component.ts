@@ -316,7 +316,7 @@ export class RunsListPageComponent {
       field: 'createdAt',
       width: 120,
       sortable: true,
-      sort: 'desc',
+      sort: 'desc' as const,
       valueFormatter: (params: any) => this.formatRelativeTime(params.value),
     },
   ];

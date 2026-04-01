@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'dp-date-range-picker',
@@ -48,14 +50,16 @@ import {
 
     @if (rangeError()) {
       <span class="mt-1 text-[length:var(--text-xs)] text-[var(--status-error)]">
-        Дата «от» не может быть позже даты «до»
+        {{ rangeErrorText }}
       </span>
     }
   `,
 })
 export class DateRangePickerComponent {
-  readonly labelFrom = input('От');
-  readonly labelTo = input('До');
+  private readonly translate = inject(TranslateService);
+
+  readonly labelFrom = input('');
+  readonly labelTo = input('');
   readonly from = input<string | null>(null);
   readonly to = input<string | null>(null);
 
@@ -66,6 +70,8 @@ export class DateRangePickerComponent {
 
   protected readonly fromValue = signal<string | null>(null);
   protected readonly toValue = signal<string | null>(null);
+
+  protected readonly rangeErrorText = this.translate.instant('form.date_range_error');
 
   protected readonly rangeError = computed(() => {
     const f = this.fromValue();

@@ -24,17 +24,8 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
-
-const AG_GRID_LOCALE_RU: Record<string, string> = {
-  page: 'Страница',
-  of: 'из',
-  to: 'по',
-  next: 'Вперёд',
-  previous: 'Назад',
-  loadingOoo: 'Загрузка...',
-  noRowsToShow: 'Нет данных',
-  pageSizeSelectorLabel: 'Строк на странице:',
-};
+import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
+import { formatDateTime } from '@shared/utils/format.utils';
 
 const NOTIFICATION_TYPES: NotificationType[] = [
   'ALERT',
@@ -42,17 +33,6 @@ const NOTIFICATION_TYPES: NotificationType[] = [
   'SYNC_COMPLETED',
   'ACTION_FAILED',
 ];
-
-function formatDt(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat('ru-RU', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
 
 @Component({
   selector: 'dp-notifications-page',
@@ -285,7 +265,7 @@ export class NotificationsPageComponent {
         width: 48,
         checkboxSelection: true,
         headerCheckboxSelection: true,
-        pinned: 'left',
+        pinned: 'left' as const,
         sortable: false,
         resizable: false,
       },
@@ -376,7 +356,7 @@ export class NotificationsPageComponent {
         field: 'createdAt',
         headerValueGetter: () => this.translate.instant('alerts.notifications.col.date'),
         width: 150,
-        valueFormatter: (p) => formatDt(p.value as string),
+        valueFormatter: (p) => formatDateTime(p.value as string),
       },
       {
         field: 'read',

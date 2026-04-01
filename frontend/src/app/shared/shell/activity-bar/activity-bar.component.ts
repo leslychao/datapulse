@@ -13,12 +13,13 @@ import {
   Bell,
   Settings,
 } from 'lucide-angular';
+import { TranslateService } from '@ngx-translate/core';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
 interface NavItem {
   icon: LucideIconData;
   route: string;
-  tooltip: string;
+  tooltipKey: string;
 }
 
 @Component({
@@ -29,7 +30,7 @@ interface NavItem {
   template: `
     <nav class="flex h-full w-12 flex-col items-center bg-[var(--bg-secondary)] py-3"
          role="navigation"
-         aria-label="Основная навигация">
+         aria-label="Main navigation">
       @for (item of topItems; track item.route) {
         <a [routerLink]="getRoute(item.route)"
            routerLinkActive="activity-bar-active"
@@ -37,14 +38,14 @@ interface NavItem {
                   rounded-[var(--radius-md)] text-[var(--text-secondary)]
                   transition-colors duration-[var(--transition-fast)]
                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-           [attr.aria-label]="item.tooltip"
+           [attr.aria-label]="t(item.tooltipKey)"
            role="tab">
           <lucide-icon [img]="item.icon" [size]="20" />
           <span class="pointer-events-none absolute left-14 z-50 hidden whitespace-nowrap
                        rounded-[var(--radius-md)] bg-[var(--bg-primary)] px-2 py-1
                        text-[13px] text-[var(--text-primary)] shadow-[var(--shadow-md)]
                        group-hover:block">
-            {{ item.tooltip }}
+            {{ t(item.tooltipKey) }}
           </span>
         </a>
       }
@@ -57,14 +58,14 @@ interface NavItem {
                 rounded-[var(--radius-md)] text-[var(--text-secondary)]
                 transition-colors duration-[var(--transition-fast)]
                 hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-         [attr.aria-label]="settingsItem.tooltip"
+         [attr.aria-label]="t(settingsItem.tooltipKey)"
          role="tab">
         <lucide-icon [img]="settingsItem.icon" [size]="20" />
         <span class="pointer-events-none absolute left-14 z-50 hidden whitespace-nowrap
                      rounded-[var(--radius-md)] bg-[var(--bg-primary)] px-2 py-1
                      text-[13px] text-[var(--text-primary)] shadow-[var(--shadow-md)]
                      group-hover:block">
-          {{ settingsItem.tooltip }}
+          {{ t(settingsItem.tooltipKey) }}
         </span>
       </a>
     </nav>
@@ -79,23 +80,28 @@ interface NavItem {
 })
 export class ActivityBarComponent {
   private readonly workspaceStore = inject(WorkspaceContextStore);
+  private readonly translate = inject(TranslateService);
 
   readonly topItems: NavItem[] = [
-    { icon: LayoutGrid, route: 'grid', tooltip: 'Операции' },
-    { icon: BarChart3, route: 'analytics', tooltip: 'Аналитика' },
-    { icon: Tag, route: 'pricing', tooltip: 'Ценообразование' },
-    { icon: Gift, route: 'promo', tooltip: 'Промо' },
-    { icon: PlayCircle, route: 'execution', tooltip: 'Действия' },
-    { icon: ArrowLeftRight, route: 'mismatches', tooltip: 'Расхождения' },
-    { icon: ListTodo, route: 'queues', tooltip: 'Очереди' },
-    { icon: Bell, route: 'alerts', tooltip: 'Алерты и уведомления' },
+    { icon: LayoutGrid, route: 'grid', tooltipKey: 'shell.nav.operations' },
+    { icon: BarChart3, route: 'analytics', tooltipKey: 'shell.nav.analytics' },
+    { icon: Tag, route: 'pricing', tooltipKey: 'shell.nav.pricing' },
+    { icon: Gift, route: 'promo', tooltipKey: 'shell.nav.promo' },
+    { icon: PlayCircle, route: 'execution', tooltipKey: 'shell.nav.execution' },
+    { icon: ArrowLeftRight, route: 'mismatches', tooltipKey: 'shell.nav.mismatches' },
+    { icon: ListTodo, route: 'queues', tooltipKey: 'shell.nav.queues' },
+    { icon: Bell, route: 'alerts', tooltipKey: 'shell.nav.alerts' },
   ];
 
   readonly settingsItem: NavItem = {
     icon: Settings,
     route: 'settings',
-    tooltip: 'Настройки',
+    tooltipKey: 'shell.nav.settings',
   };
+
+  t(key: string): string {
+    return this.translate.instant(key);
+  }
 
   getRoute(segment: string): string[] {
     const wsId = this.workspaceStore.currentWorkspaceId();

@@ -210,7 +210,7 @@ export class PolicyListPageComponent {
       headerName: 'Название',
       field: 'name',
       minWidth: 250,
-      pinned: 'left',
+      pinned: 'left' as const,
       sortable: true,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
@@ -289,7 +289,7 @@ export class PolicyListPageComponent {
       field: 'createdAt',
       width: 120,
       sortable: true,
-      sort: 'desc',
+      sort: 'desc' as const,
       valueFormatter: (params: any) => this.formatRelativeTime(params.value),
     },
     {

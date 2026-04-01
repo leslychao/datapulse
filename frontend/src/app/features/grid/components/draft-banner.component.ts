@@ -110,9 +110,11 @@ export class DraftBannerComponent {
       this.gridStore.clearDraftChanges();
       this.gridStore.setDraftMode(false);
       if (res.failed > 0) {
-        this.toast.warning(`Применено ${res.succeeded} из ${res.succeeded + res.failed}. ${res.failed} ошибок.`);
+        this.toast.warning(this.translate.instant('draft.partial_success', {
+          succeeded: res.succeeded, total: res.succeeded + res.failed, failed: res.failed,
+        }));
       } else {
-        this.toast.success(`${res.succeeded} ценовых действий создано`);
+        this.toast.success(this.translate.instant('draft.success', { count: res.succeeded }));
       }
       this.queryClient.invalidateQueries({ queryKey: ['offers'] });
       this.queryClient.invalidateQueries({ queryKey: ['grid-kpi'] });
@@ -120,7 +122,7 @@ export class DraftBannerComponent {
     },
     onError: () => {
       this.showPreview.set(false);
-      this.toast.error('Не удалось применить изменения');
+      this.toast.error(this.translate.instant('draft.apply_error'));
     },
   }));
 
@@ -136,7 +138,7 @@ export class DraftBannerComponent {
     const count = this.gridStore.draftCount();
     const avg = this.avgChange();
     const avgStr = avg !== null ? this.formatPct(avg) : '0%';
-    return `${count} товаров будет изменено\n\nСреднее изменение: ${avgStr}\n\nДействия будут созданы со статусом APPROVED и отправлены на исполнение.`;
+    return this.translate.instant('draft.preview_message', { count, avg: avgStr });
   }
 
   protected formatPct(v: number): string {

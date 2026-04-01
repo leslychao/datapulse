@@ -1,11 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, HostListener, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 
 @Component({
   selector: 'dp-confirmation-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   template: `
     @if (open()) {
       <div class="fixed inset-0 z-[9000] flex items-center justify-center">
@@ -22,7 +23,7 @@ import { FormsModule } from '@angular/forms';
           @if (typeToConfirm()) {
             <div class="mt-4 flex flex-col gap-1.5">
               <label class="text-sm text-[var(--text-secondary)]">
-                Введите <span class="font-medium text-[var(--text-primary)]">{{ typeToConfirm() }}</span> для подтверждения:
+                {{ 'confirmation.type_to_confirm' | translate:{ value: typeToConfirm() } }}
               </label>
               <input
                 type="text"
@@ -70,8 +71,8 @@ export class ConfirmationModalComponent {
   readonly open = input(false);
   readonly title = input('');
   readonly message = input('');
-  readonly confirmLabel = input('Подтвердить');
-  readonly cancelLabel = input('Отмена');
+  readonly confirmLabel = input('');
+  readonly cancelLabel = input('');
   readonly danger = input(false);
   readonly typeToConfirm = input<string | null>(null);
 

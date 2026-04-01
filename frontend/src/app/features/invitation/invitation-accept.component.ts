@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { InvitationApiService } from '@core/api/invitation-api.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -11,20 +12,11 @@ import { StatusMessageComponent } from '@shared/layout/status-message.component'
 
 type InvitationState = 'loading' | 'success' | 'expired' | 'alreadyAccepted' | 'notFound' | 'invalidLink' | 'serverError';
 
-const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  OWNER: 'Владелец',
-  ADMIN: 'Администратор',
-  PRICING_MANAGER: 'Менеджер цен',
-  OPERATOR: 'Оператор',
-  ANALYST: 'Аналитик',
-  VIEWER: 'Наблюдатель',
-};
-
 @Component({
   selector: 'dp-invitation-accept',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MinimalTopBarComponent, CenteredContentComponent, StatusMessageComponent],
+  imports: [MinimalTopBarComponent, CenteredContentComponent, StatusMessageComponent, TranslatePipe],
   template: `
     <div class="flex h-screen flex-col bg-[var(--bg-secondary)]">
       <dp-minimal-top-bar (logoutClick)="onLogout()" />
@@ -34,16 +26,16 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           @case ('loading') {
             <dp-status-message
               icon="spinner"
-              title="Принимаем приглашение..."
+              [title]="'invitation.loading' | translate"
             />
           }
 
           @case ('success') {
             <dp-status-message
               icon="success"
-              title="Добро пожаловать!"
+              [title]="'invitation.success_title' | translate"
               [description]="successDescription()"
-              actionLabel="Перейти в пространство"
+              [actionLabel]="'invitation.go_to_workspace' | translate"
               (actionClick)="onGoToWorkspace()"
             />
           }
@@ -51,9 +43,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           @case ('expired') {
             <dp-status-message
               icon="warning"
-              title="Приглашение истекло"
-              description="Срок действия этого приглашения истёк. Попросите администратора отправить новое."
-              actionLabel="На главную"
+              [title]="'invitation.expired_title' | translate"
+              [description]="'invitation.expired_description' | translate"
+              [actionLabel]="'actions.go_home' | translate"
               (actionClick)="onGoHome()"
             />
           }
@@ -61,9 +53,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           @case ('alreadyAccepted') {
             <dp-status-message
               icon="info"
-              title="Приглашение уже принято"
-              description="Вы уже являетесь участником этого пространства."
-              actionLabel="Перейти в пространство"
+              [title]="'invitation.already_accepted_title' | translate"
+              [description]="'invitation.already_accepted_description' | translate"
+              [actionLabel]="'invitation.go_to_workspace' | translate"
               (actionClick)="onGoToWorkspace()"
             />
           }
@@ -71,9 +63,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           @case ('notFound') {
             <dp-status-message
               icon="error"
-              title="Приглашение не найдено"
-              description="Приглашение не существует или было удалено."
-              actionLabel="На главную"
+              [title]="'invitation.not_found_title' | translate"
+              [description]="'invitation.not_found_description' | translate"
+              [actionLabel]="'actions.go_home' | translate"
               (actionClick)="onGoHome()"
             />
           }
@@ -81,9 +73,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           @case ('invalidLink') {
             <dp-status-message
               icon="error"
-              title="Некорректная ссылка"
-              description="Ссылка на приглашение повреждена или неполна."
-              actionLabel="На главную"
+              [title]="'invitation.invalid_link_title' | translate"
+              [description]="'invitation.invalid_link_description' | translate"
+              [actionLabel]="'actions.go_home' | translate"
               (actionClick)="onGoHome()"
             />
           }
@@ -91,9 +83,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           @case ('serverError') {
             <dp-status-message
               icon="error"
-              title="Ошибка сервера"
-              description="Не удалось обработать приглашение. Попробуйте позже."
-              actionLabel="Повторить"
+              [title]="'invitation.server_error_title' | translate"
+              [description]="'invitation.server_error_description' | translate"
+              [actionLabel]="'actions.retry' | translate"
               (actionClick)="onRetry()"
             />
           }
@@ -107,6 +99,7 @@ export class InvitationAcceptComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly invitationApi = inject(InvitationApiService);
   private readonly authService = inject(AuthService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly state = signal<InvitationState>('loading');
 
@@ -124,8 +117,11 @@ export class InvitationAcceptComponent implements OnInit {
 
   protected successDescription(): string {
     if (!this.result) return '';
-    const roleLabel = ROLE_LABELS[this.result.role as WorkspaceRole] ?? this.result.role;
-    return `Вы присоединились к пространству «${this.result.workspaceName}» с ролью ${roleLabel}.`;
+    const roleLabel = this.translate.instant(`role.${this.result.role}`);
+    return this.translate.instant('invitation.success_description', {
+      workspace: this.result.workspaceName,
+      role: roleLabel,
+    });
   }
 
   protected onGoToWorkspace(): void {

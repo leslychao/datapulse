@@ -240,7 +240,7 @@ export class DecisionsListPageComponent {
       field: 'createdAt',
       width: 130,
       sortable: true,
-      sort: 'desc',
+      sort: 'desc' as const,
       valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
     },
   ];

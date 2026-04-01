@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, HostListener, inject, OnD
 import { Router } from '@angular/router';
 import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { OfferSummary } from '@core/models';
@@ -241,8 +241,10 @@ export class GridPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  private readonly translate = inject(TranslateService);
+
   protected draftExitMessage(): string {
-    return `Отменить ${this.gridStore.draftCount()} изменений?`;
+    return this.translate.instant('draft.exit_message', { count: this.gridStore.draftCount() });
   }
 
   protected confirmDraftExit(): void {

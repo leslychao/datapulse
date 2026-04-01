@@ -169,7 +169,7 @@ export class CampaignListPageComponent {
       headerName: 'Название',
       field: 'promoName',
       minWidth: 250,
-      pinned: 'left',
+      pinned: 'left' as const,
       sortable: true,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
@@ -204,7 +204,7 @@ export class CampaignListPageComponent {
       field: 'dateFrom',
       width: 110,
       sortable: true,
-      sort: 'desc',
+      sort: 'desc' as const,
       valueFormatter: (params: any) => this.formatDate(params.value),
     },
     {

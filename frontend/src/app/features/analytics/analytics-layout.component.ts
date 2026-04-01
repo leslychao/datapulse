@@ -5,43 +5,43 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 
 interface NavTab {
-  label: string;
+  labelKey: string;
   path: string;
 }
 
 interface SubNavLink {
-  label: string;
+  labelKey: string;
   path: string;
   exact: boolean;
 }
 
 const SECTION_TABS: NavTab[] = [
-  { label: 'P&L', path: 'pnl' },
-  { label: 'Остатки', path: 'inventory' },
-  { label: 'Возвраты', path: 'returns' },
-  { label: 'Качество данных', path: 'data-quality' },
+  { labelKey: 'analytics.nav.pnl', path: 'pnl' },
+  { labelKey: 'analytics.nav.inventory', path: 'inventory' },
+  { labelKey: 'analytics.nav.returns', path: 'returns' },
+  { labelKey: 'analytics.nav.data_quality', path: 'data-quality' },
 ];
 
 const SUB_NAV: Record<string, SubNavLink[]> = {
   pnl: [
-    { label: 'Сводка', path: 'pnl', exact: true },
-    { label: 'По товарам', path: 'pnl/by-product', exact: true },
-    { label: 'По отправкам', path: 'pnl/by-posting', exact: true },
-    { label: 'Тренд', path: 'pnl/trend', exact: true },
+    { labelKey: 'analytics.subnav.pnl.summary', path: 'pnl', exact: true },
+    { labelKey: 'analytics.subnav.pnl.by_product', path: 'pnl/by-product', exact: true },
+    { labelKey: 'analytics.subnav.pnl.by_posting', path: 'pnl/by-posting', exact: true },
+    { labelKey: 'analytics.subnav.pnl.trend', path: 'pnl/trend', exact: true },
   ],
   inventory: [
-    { label: 'Обзор', path: 'inventory', exact: true },
-    { label: 'По товарам', path: 'inventory/by-product', exact: true },
-    { label: 'История', path: 'inventory/stock-history', exact: true },
+    { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory', exact: true },
+    { labelKey: 'analytics.subnav.inventory.by_product', path: 'inventory/by-product', exact: true },
+    { labelKey: 'analytics.subnav.inventory.history', path: 'inventory/stock-history', exact: true },
   ],
   returns: [
-    { label: 'Сводка', path: 'returns', exact: true },
-    { label: 'По товарам', path: 'returns/by-product', exact: true },
-    { label: 'Тренд', path: 'returns/trend', exact: true },
+    { labelKey: 'analytics.subnav.returns.summary', path: 'returns', exact: true },
+    { labelKey: 'analytics.subnav.returns.by_product', path: 'returns/by-product', exact: true },
+    { labelKey: 'analytics.subnav.returns.trend', path: 'returns/trend', exact: true },
   ],
   'data-quality': [
-    { label: 'Статус', path: 'data-quality', exact: true },
-    { label: 'Reconciliation', path: 'data-quality/reconciliation', exact: true },
+    { labelKey: 'analytics.subnav.data_quality.status', path: 'data-quality', exact: true },
+    { labelKey: 'analytics.subnav.data_quality.reconciliation', path: 'data-quality/reconciliation', exact: true },
   ],
 };
 
@@ -62,7 +62,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
                    font-medium text-[var(--text-secondary)] transition-colors
                    hover:text-[var(--text-primary)]"
           >
-            {{ tab.label }}
+            {{ tab.labelKey | translate }}
           </a>
         }
       </div>
@@ -79,7 +79,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
                      text-[var(--text-secondary)] transition-colors
                      hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
             >
-              {{ link.label }}
+              {{ link.labelKey | translate }}
             </a>
           }
         </div>

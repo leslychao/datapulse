@@ -162,7 +162,7 @@ export class PromoPolicyListPageComponent {
       headerName: 'Название',
       field: 'name',
       minWidth: 250,
-      pinned: 'left',
+      pinned: 'left' as const,
       sortable: true,
       cellRenderer: (params: any) => {
         if (!params.data) return '';

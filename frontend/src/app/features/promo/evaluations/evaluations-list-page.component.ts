@@ -267,7 +267,7 @@ export class EvaluationsListPageComponent {
       field: 'evaluatedAt',
       width: 130,
       sortable: true,
-      sort: 'desc',
+      sort: 'desc' as const,
       valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
     },
   ];

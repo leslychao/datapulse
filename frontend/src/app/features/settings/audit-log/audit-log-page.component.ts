@@ -3,6 +3,7 @@ import { JsonPipe } from '@angular/common';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { LucideAngularModule, ChevronRight, ChevronDown } from 'lucide-angular';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AuditLogApiService } from '@core/api/audit-log-api.service';
 import { AuditLogEntry, AuditOutcome } from '@core/models';
@@ -12,12 +13,6 @@ import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
-
-const OUTCOME_LABELS: Record<AuditOutcome, string> = {
-  SUCCESS: 'Успех',
-  DENIED: 'Отказ',
-  FAILED: 'Ошибка',
-};
 
 const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
   SUCCESS: 'success',
@@ -32,6 +27,7 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
   imports: [
     JsonPipe,
     LucideAngularModule,
+    TranslatePipe,
     SpinnerComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
@@ -41,8 +37,8 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
   template: `
     <div class="max-w-6xl">
       <div class="mb-6">
-        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">Журнал аудита</h1>
-        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">История действий пользователей и системы</p>
+        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.audit_log.title' | translate }}</h1>
+        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.audit_log.subtitle' | translate }}</p>
       </div>
 
       <dp-filter-bar
@@ -52,15 +48,15 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
       />
 
       @if (auditQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (auditQuery.data(); as page) {
         @if (page.content.length === 0) {
           <dp-empty-state
-            message="Нет записей, соответствующих фильтрам"
-            [hint]="hasActiveFilters() ? 'Попробуйте сбросить фильтры' : 'Действия будут записываться автоматически'"
-            [actionLabel]="hasActiveFilters() ? 'Сбросить фильтры' : ''"
+            [message]="hasActiveFilters() ? ('settings.audit_log.empty_filtered' | translate) : ('settings.audit_log.empty' | translate)"
+            [hint]="hasActiveFilters() ? ('settings.audit_log.empty_filtered_hint' | translate) : ('settings.audit_log.empty_hint' | translate)"
+            [actionLabel]="hasActiveFilters() ? ('settings.audit_log.reset_filters' | translate) : ''"
             (action)="onFiltersChanged({})"
           />
         } @else {
@@ -69,11 +65,11 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
               <thead>
                 <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
                   <th class="w-8 px-2 py-2"></th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Время</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Пользователь</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Действие</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Объект</th>
-                  <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">Результат</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_time' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_user' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_action' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_entity' | translate }}</th>
+                  <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_outcome' | translate }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,15 +110,15 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
                       <td colspan="6" class="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-8 py-4">
                         <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                           <div>
-                            <span class="text-[var(--text-tertiary)]">ID записи:</span>
+                            <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.id' | translate }}:</span>
                             <span class="ml-2 text-[var(--text-primary)]">{{ entry.id }}</span>
                           </div>
                           <div>
-                            <span class="text-[var(--text-tertiary)]">Тип актора:</span>
+                            <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.actor_type' | translate }}:</span>
                             <span class="ml-2 text-[var(--text-primary)]">{{ entry.actorType }}</span>
                           </div>
                           <div>
-                            <span class="text-[var(--text-tertiary)]">Пользователь:</span>
+                            <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.user' | translate }}:</span>
                             <span class="ml-2 text-[var(--text-primary)]">
                               {{ actorDisplayName(entry) }}
                               @if (entry.actorEmail) {
@@ -131,22 +127,22 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
                             </span>
                           </div>
                           <div>
-                            <span class="text-[var(--text-tertiary)]">IP:</span>
+                            <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.ip' | translate }}:</span>
                             <span class="ml-2 font-mono text-[var(--text-primary)]">{{ entry.ipAddress || '—' }}</span>
                           </div>
                           <div>
-                            <span class="text-[var(--text-tertiary)]">Тип сущности:</span>
+                            <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.entity_type' | translate }}:</span>
                             <span class="ml-2 text-[var(--text-primary)]">{{ entry.entityType }}</span>
                           </div>
                           <div>
-                            <span class="text-[var(--text-tertiary)]">ID сущности:</span>
+                            <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.entity_id' | translate }}:</span>
                             <span class="ml-2 text-[var(--text-primary)]">{{ entry.entityId || '—' }}</span>
                           </div>
                         </div>
 
                         @if (entry.details) {
                           <div class="mt-4">
-                            <span class="text-sm text-[var(--text-tertiary)]">Подробности:</span>
+                            <span class="text-sm text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.details' | translate }}:</span>
                             <pre
                               class="mt-1 max-h-48 overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-xs text-[var(--text-primary)]"
                             >{{ entry.details | json }}</pre>
@@ -160,12 +156,10 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
             </table>
           </div>
 
-          <!-- Pagination -->
           @if (page.totalPages > 1) {
             <div class="mt-4 flex items-center justify-between text-sm text-[var(--text-secondary)]">
               <span>
-                Показано {{ page.number * page.size + 1 }}–{{ Math.min((page.number + 1) * page.size, page.totalElements) }}
-                из {{ page.totalElements }}
+                {{ 'pagination.showing' | translate:{ from: page.number * page.size + 1, to: Math.min((page.number + 1) * page.size, page.totalElements), total: page.totalElements } }}
               </span>
               <div class="flex gap-2">
                 <button
@@ -173,14 +167,14 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
                   [disabled]="page.number === 0"
                   class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Назад
+                  {{ 'common.prev' | translate }}
                 </button>
                 <button
                   (click)="goToPage(page.number + 1)"
                   [disabled]="page.number >= page.totalPages - 1"
                   class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Вперёд
+                  {{ 'common.next' | translate }}
                 </button>
               </div>
             </div>
@@ -197,6 +191,7 @@ export class AuditLogPageComponent {
 
   private readonly auditLogApi = inject(AuditLogApiService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly expandedId = signal<number | null>(null);
   readonly filterValues = signal<Record<string, any>>({});
@@ -205,22 +200,22 @@ export class AuditLogPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'actionType',
-      label: 'Действие',
+      label: this.translate.instant('settings.audit_log.filter.action_type'),
       type: 'select',
       options: [
-        { value: 'connection', label: 'Подключения' },
-        { value: 'credential', label: 'Учётные данные' },
-        { value: 'member', label: 'Участники' },
-        { value: 'workspace', label: 'Workspace' },
-        { value: 'policy', label: 'Политики' },
-        { value: 'action', label: 'Действия' },
-        { value: 'promo', label: 'Промо' },
-        { value: 'alert', label: 'Алерты' },
+        { value: 'connection', label: this.translate.instant('settings.audit_log.filter.action_group.connection') },
+        { value: 'credential', label: this.translate.instant('settings.audit_log.filter.action_group.credential') },
+        { value: 'member', label: this.translate.instant('settings.audit_log.filter.action_group.member') },
+        { value: 'workspace', label: this.translate.instant('settings.audit_log.filter.action_group.workspace') },
+        { value: 'policy', label: this.translate.instant('settings.audit_log.filter.action_group.policy') },
+        { value: 'action', label: this.translate.instant('settings.audit_log.filter.action_group.action') },
+        { value: 'promo', label: this.translate.instant('settings.audit_log.filter.action_group.promo') },
+        { value: 'alert', label: this.translate.instant('settings.audit_log.filter.action_group.alert') },
       ],
     },
     {
       key: 'entityType',
-      label: 'Тип сущности',
+      label: this.translate.instant('settings.audit_log.filter.entity_type'),
       type: 'select',
       options: [
         { value: 'marketplace_connection', label: 'marketplace_connection' },
@@ -234,7 +229,7 @@ export class AuditLogPageComponent {
     },
     {
       key: 'period',
-      label: 'Период',
+      label: this.translate.instant('settings.audit_log.filter.period'),
       type: 'date-range',
     },
   ];
@@ -268,13 +263,13 @@ export class AuditLogPageComponent {
   });
 
   actorDisplayName(entry: AuditLogEntry): string {
-    if (entry.actorType === 'SYSTEM') return 'Система';
-    if (entry.actorType === 'SCHEDULER') return 'Планировщик';
-    return entry.actorName || 'Пользователь';
+    if (entry.actorType === 'SYSTEM') return this.translate.instant('settings.audit_log.actor.SYSTEM');
+    if (entry.actorType === 'SCHEDULER') return this.translate.instant('settings.audit_log.actor.SCHEDULER');
+    return entry.actorName || this.translate.instant('settings.audit_log.actor.user_fallback');
   }
 
   outcomeLabel(outcome: AuditOutcome): string {
-    return OUTCOME_LABELS[outcome] ?? outcome;
+    return this.translate.instant(`settings.audit_log.outcome.${outcome}`);
   }
 
   outcomeColor(outcome: AuditOutcome): StatusColor {

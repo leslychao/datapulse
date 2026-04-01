@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
 
@@ -15,47 +16,47 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
   selector: 'dp-step-tenant',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   template: `
     <div class="flex flex-col gap-6">
       <div>
-        <h2 class="text-lg font-semibold text-[var(--text-primary)]">Создайте организацию</h2>
+        <h2 class="text-lg font-semibold text-[var(--text-primary)]">{{ 'onboarding.tenant.title' | translate }}</h2>
         <p class="mt-1 text-sm text-[var(--text-secondary)]">
-          Организация — это ваша компания или бренд. В ней будут храниться все рабочие пространства.
+          {{ 'onboarding.tenant.description' | translate }}
         </p>
       </div>
 
       @if (existingTenant) {
         <div class="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
-          <span class="text-sm text-[var(--text-secondary)]">Организация</span>
+          <span class="text-sm text-[var(--text-secondary)]">{{ 'onboarding.tenant.label' | translate }}</span>
           <span class="text-base font-medium text-[var(--text-primary)]">{{ existingTenant.name }}</span>
-          <span class="text-xs text-[var(--status-success)]">Организация создана</span>
+          <span class="text-xs text-[var(--status-success)]">{{ 'onboarding.tenant.created' | translate }}</span>
         </div>
 
         <button
           (click)="created.emit({ tenantId: existingTenant!.id, tenantName: existingTenant!.name })"
           class="cursor-pointer self-end rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
         >
-          Далее
+          {{ 'actions.next' | translate }}
         </button>
       } @else {
         <form (submit)="$event.preventDefault(); onSubmit()" class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
             <label for="tenantName" class="text-sm font-medium text-[var(--text-primary)]">
-              Название организации
+              {{ 'onboarding.tenant.name_label' | translate }}
             </label>
             <input
               id="tenantName"
               type="text"
               [formControl]="nameControl"
-              placeholder="Например, «ИП Иванов» или «MegaStore»"
+              [placeholder]="'onboarding.tenant.name_placeholder' | translate"
               class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
             />
             @if (nameControl.touched && nameControl.hasError('required')) {
-              <span class="text-xs text-[var(--status-error)]">Название обязательно</span>
+              <span class="text-xs text-[var(--status-error)]">{{ 'form.required' | translate }}</span>
             }
             @if (nameControl.touched && nameControl.hasError('minlength')) {
-              <span class="text-xs text-[var(--status-error)]">Минимум 3 символа</span>
+              <span class="text-xs text-[var(--status-error)]">{{ 'form.min_length_3' | translate }}</span>
             }
           </div>
 
@@ -69,9 +70,9 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
             class="cursor-pointer self-end rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             @if (submitting()) {
-              Создание...
+              {{ 'onboarding.tenant.creating' | translate }}
             } @else {
-              Создать
+              {{ 'actions.create' | translate }}
             }
           </button>
         </form>
@@ -81,6 +82,7 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
 })
 export class StepTenantComponent {
   private readonly workspaceApi = inject(WorkspaceApiService);
+  private readonly translate = inject(TranslateService);
 
   @Input() existingTenant: { id: number; name: string } | null = null;
   @Output() created = new EventEmitter<{ tenantId: number; tenantName: string }>();
@@ -109,7 +111,7 @@ export class StepTenantComponent {
       },
       error: () => {
         this.submitting.set(false);
-        this.serverError.set('Не удалось создать организацию. Попробуйте ещё раз.');
+        this.serverError.set(this.translate.instant('onboarding.tenant.create_error'));
       },
     });
   }

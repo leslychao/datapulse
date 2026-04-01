@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { injectQuery, injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { ActionHistoryEntry } from '@core/models';
@@ -132,6 +132,7 @@ export class OfferActionHistoryTabComponent {
   private readonly offerApi = inject(OfferApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private readonly queryClient = injectQueryClient();
 
   readonly page = signal(0);
@@ -154,30 +155,30 @@ export class OfferActionHistoryTabComponent {
     mutationFn: (actionId: number) =>
       lastValueFrom(this.offerApi.approveAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
-      this.toast.success('Действие одобрено');
+      this.toast.success(this.translate.instant('detail.action_history.approve_success'));
       this.invalidateQueries();
     },
-    onError: () => this.toast.error('Не удалось одобрить действие'),
+    onError: () => this.toast.error(this.translate.instant('detail.action_history.approve_error')),
   }));
 
   readonly rejectMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
       lastValueFrom(this.offerApi.rejectAction(this.wsStore.currentWorkspaceId()!, actionId, '')),
     onSuccess: () => {
-      this.toast.success('Действие отклонено');
+      this.toast.success(this.translate.instant('detail.action_history.reject_success'));
       this.invalidateQueries();
     },
-    onError: () => this.toast.error('Не удалось отклонить действие'),
+    onError: () => this.toast.error(this.translate.instant('detail.action_history.reject_error')),
   }));
 
   readonly resumeMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
       lastValueFrom(this.offerApi.resumeAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
-      this.toast.success('Действие возобновлено');
+      this.toast.success(this.translate.instant('detail.action_history.resume_success'));
       this.invalidateQueries();
     },
-    onError: () => this.toast.error('Не удалось возобновить действие'),
+    onError: () => this.toast.error(this.translate.instant('detail.action_history.resume_error')),
   }));
 
   loadMore(): void {

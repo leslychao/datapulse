@@ -205,7 +205,7 @@ export class ActionsListPageComponent {
       headerCheckboxSelection: true,
       checkboxSelection: true,
       width: 40,
-      pinned: 'left',
+      pinned: 'left' as const,
       sortable: false,
       suppressMovable: true,
     },
@@ -213,7 +213,7 @@ export class ActionsListPageComponent {
       headerName: 'Оффер',
       field: 'offerName',
       minWidth: 250,
-      pinned: 'left',
+      pinned: 'left' as const,
       sortable: true,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
@@ -299,7 +299,7 @@ export class ActionsListPageComponent {
       field: 'createdAt',
       width: 120,
       sortable: true,
-      sort: 'desc',
+      sort: 'desc' as const,
       valueFormatter: (params: any) => this.formatRelativeTime(params.value),
     },
   ];

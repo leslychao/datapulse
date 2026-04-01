@@ -9,6 +9,7 @@ import { AlertApiService } from '@core/api/alert-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { formatDateTime } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-alert-detail-panel',
@@ -230,13 +231,7 @@ export class AlertDetailPanelComponent {
   }
 
   formatDt(iso: string): string {
-    try {
-      return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' }).format(
-        new Date(iso),
-      );
-    } catch {
-      return iso;
-    }
+    return formatDateTime(iso);
   }
 
   closePanel(): void {

@@ -1,42 +1,44 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
+import { formatMoney, formatPercent } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-kpi-strip',
   standalone: true,
-  imports: [KpiCardComponent],
+  imports: [KpiCardComponent, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex gap-3 bg-[var(--bg-secondary)] px-4 py-3">
       <dp-kpi-card
-        [label]="'Всего товаров'"
+        [label]="'grid.kpi.total_offers' | translate"
         [value]="totalOffers()"
         [loading]="kpiQuery.isPending()"
       />
       <dp-kpi-card
-        [label]="'Средняя маржа'"
+        [label]="'grid.kpi.avg_margin' | translate"
         [value]="avgMarginDisplay()"
         [trend]="kpiQuery.data()?.avgMarginTrend ?? null"
         [trendDirection]="avgMarginTrendDir()"
         [loading]="kpiQuery.isPending()"
       />
       <dp-kpi-card
-        [label]="'Ожидают действий'"
+        [label]="'grid.kpi.pending_actions' | translate"
         [value]="kpiQuery.data()?.pendingActionsCount ?? null"
         [loading]="kpiQuery.isPending()"
       />
       <dp-kpi-card
-        [label]="'Критический остаток'"
+        [label]="'grid.kpi.critical_stock' | translate"
         [value]="kpiQuery.data()?.criticalStockCount ?? null"
         [loading]="kpiQuery.isPending()"
       />
       <dp-kpi-card
-        [label]="'Выручка 30 дн.'"
+        [label]="'grid.kpi.revenue_30d' | translate"
         [value]="revenueDisplay()"
         [trend]="kpiQuery.data()?.revenue30dTrend ?? null"
         [trendDirection]="revenueTrendDir()"
@@ -64,14 +66,13 @@ export class KpiStripComponent {
   protected readonly avgMarginDisplay = computed(() => {
     const v = this.kpiQuery.data()?.avgMarginPct;
     if (v === null || v === undefined) return null;
-    return `${v.toFixed(1).replace('.', ',')}%`;
+    return formatPercent(v);
   });
 
   protected readonly revenueDisplay = computed(() => {
     const v = this.kpiQuery.data()?.revenue30dTotal;
     if (v === null || v === undefined) return null;
-    const formatted = Math.floor(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-    return `${formatted}\u00A0₽`;
+    return formatMoney(v);
   });
 
   protected readonly avgMarginTrendDir = computed(() => {

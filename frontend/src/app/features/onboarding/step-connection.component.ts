@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { MarketplaceType, ConnectionStatus } from '@core/models';
@@ -16,12 +17,6 @@ import { SpinnerComponent } from '@shared/layout/spinner.component';
 
 type ConnectionStep = 'select' | 'form';
 type ValidationState = 'idle' | 'submitting' | 'validating' | 'success' | 'failure' | 'timeout';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  AUTH_FAILED: 'Неверные credentials. Проверьте токен или ключ API и попробуйте снова.',
-  RATE_LIMITED: 'Слишком много запросов к маркетплейсу. Подождите минуту и попробуйте снова.',
-  TIMEOUT: 'Маркетплейс не ответил вовремя. Попробуйте позже.',
-};
 
 const POLL_INTERVAL = 3000;
 const POLL_TIMEOUT = 30000;
@@ -31,17 +26,16 @@ const SUCCESS_REDIRECT_DELAY = 2000;
   selector: 'dp-step-connection',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, SpinnerComponent],
+  imports: [ReactiveFormsModule, SpinnerComponent, TranslatePipe],
   template: `
     <div class="flex flex-col gap-6">
       <div>
-        <h2 class="text-lg font-semibold text-[var(--text-primary)]">Подключите маркетплейс</h2>
+        <h2 class="text-lg font-semibold text-[var(--text-primary)]">{{ 'onboarding.connection.title' | translate }}</h2>
         <p class="mt-1 text-sm text-[var(--text-secondary)]">
-          Подключите Wildberries или Ozon, чтобы загрузить товары и начать управлять ценами.
+          {{ 'onboarding.connection.description' | translate }}
         </p>
       </div>
 
-      <!-- Marketplace selection -->
       <div class="flex gap-4">
         <button
           (click)="onSelectMarketplace('WB')"
@@ -66,30 +60,27 @@ const SUCCESS_REDIRECT_DELAY = 2000;
         </button>
       </div>
 
-      <!-- Credential form -->
       @if (selectedMarketplace()) {
         <div class="animate-[slideDown_200ms_ease] flex flex-col gap-4">
           <form [formGroup]="form()" (ngSubmit)="onSubmit()" class="flex flex-col gap-4">
-            <!-- Connection name (shared) -->
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-[var(--text-primary)]">Название подключения</label>
+              <label class="text-sm font-medium text-[var(--text-primary)]">{{ 'onboarding.connection.name_label' | translate }}</label>
               <input
                 formControlName="name"
                 type="text"
-                placeholder="Например, «Основной кабинет WB»"
+                [placeholder]="'onboarding.connection.name_placeholder' | translate"
                 class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
               />
             </div>
 
             @if (selectedMarketplace() === 'WB') {
               <div class="flex flex-col gap-1.5">
-                <label class="text-sm font-medium text-[var(--text-primary)]">API-токен</label>
+                <label class="text-sm font-medium text-[var(--text-primary)]">{{ 'onboarding.connection.wb_token_label' | translate }}</label>
                 <div class="relative">
                   <textarea
                     formControlName="apiToken"
                     rows="3"
-                    
-                    placeholder="Вставьте API-токен из личного кабинета WB"
+                    [placeholder]="'onboarding.connection.wb_token_placeholder' | translate"
                     class="w-full resize-none rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 pr-10 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
                     [style.webkitTextSecurity]="showToken() ? 'none' : 'disc'"
                   ></textarea>
@@ -111,7 +102,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                   </button>
                 </div>
                 <span class="text-xs text-[var(--text-tertiary)]">
-                  Токен можно получить в разделе «Настройки → Доступ к API» личного кабинета Wildberries
+                  {{ 'onboarding.connection.wb_token_hint' | translate }}
                 </span>
               </div>
             }
@@ -122,10 +113,10 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                 <input
                   formControlName="clientId"
                   type="text"
-                  placeholder="Числовой Client ID из кабинета Ozon Seller"
+                  [placeholder]="'onboarding.connection.ozon_client_placeholder' | translate"
                   class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
                 />
-                <span class="text-xs text-[var(--text-tertiary)]">Найдите в разделе «Настройки → API ключи»</span>
+                <span class="text-xs text-[var(--text-tertiary)]">{{ 'onboarding.connection.ozon_client_hint' | translate }}</span>
               </div>
 
               <div class="flex flex-col gap-1.5">
@@ -133,7 +124,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                 <input
                   formControlName="apiKey"
                   [type]="showToken() ? 'text' : 'password'"
-                  placeholder="API-ключ из кабинета Ozon Seller"
+                  [placeholder]="'onboarding.connection.ozon_key_placeholder' | translate"
                   class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
                 />
                 <button
@@ -141,12 +132,11 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                   (click)="showToken.set(!showToken())"
                   class="self-start text-xs text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]"
                 >
-                  {{ showToken() ? 'Скрыть' : 'Показать' }}
+                  {{ showToken() ? ('onboarding.connection.hide' | translate) : ('onboarding.connection.show' | translate) }}
                 </button>
               </div>
             }
 
-            <!-- Validation status -->
             @if (validationState() === 'failure') {
               <div class="rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] px-3 py-2 text-sm text-[var(--status-error)]">
                 {{ errorMessage() }}
@@ -155,13 +145,13 @@ const SUCCESS_REDIRECT_DELAY = 2000;
 
             @if (validationState() === 'success') {
               <div class="rounded-[var(--radius-md)] border border-[var(--status-success)] bg-[color-mix(in_srgb,var(--status-success)_8%,transparent)] px-3 py-2 text-sm text-[var(--status-success)]">
-                Подключение успешно! Перенаправляем...
+                {{ 'onboarding.connection.success' | translate }}
               </div>
             }
 
             @if (validationState() === 'timeout') {
               <div class="rounded-[var(--radius-md)] border border-[var(--status-warning)] bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)] px-3 py-2 text-sm text-[var(--status-warning)]">
-                Маркетплейс не ответил вовремя. Попробуйте ещё раз.
+                {{ 'onboarding.connection.timeout' | translate }}
               </div>
             }
 
@@ -173,12 +163,12 @@ const SUCCESS_REDIRECT_DELAY = 2000;
               @if (validationState() === 'submitting' || validationState() === 'validating') {
                 <dp-spinner [size]="14" color="white" />
                 @if (validationState() === 'submitting') {
-                  Отправка...
+                  {{ 'onboarding.connection.submitting' | translate }}
                 } @else {
-                  Проверяем подключение...
+                  {{ 'onboarding.connection.validating' | translate }}
                 }
               } @else {
-                Подключить
+                {{ 'onboarding.connection.connect' | translate }}
               }
             </button>
           </form>
@@ -195,6 +185,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
 })
 export class StepConnectionComponent implements OnDestroy {
   private readonly connectionApi = inject(ConnectionApiService);
+  private readonly translate = inject(TranslateService);
 
   @Input() workspaceId!: number;
   @Output() completed = new EventEmitter<void>();
@@ -270,7 +261,7 @@ export class StepConnectionComponent implements OnDestroy {
       },
       error: () => {
         this.validationState.set('failure');
-        this.errorMessage.set('Не удалось создать подключение. Попробуйте ещё раз.');
+        this.errorMessage.set(this.translate.instant('onboarding.connection.create_error'));
         this.updateCanSubmit();
       },
     });
@@ -292,7 +283,7 @@ export class StepConnectionComponent implements OnDestroy {
         error: () => {
           this.stopPolling();
           this.validationState.set('failure');
-          this.errorMessage.set('Не удалось проверить подключение.');
+          this.errorMessage.set(this.translate.instant('onboarding.connection.validation_error'));
           this.updateCanSubmit();
         },
       });
@@ -313,8 +304,8 @@ export class StepConnectionComponent implements OnDestroy {
       this.validationState.set('failure');
       this.errorMessage.set(
         errorCode
-          ? (ERROR_MESSAGES[errorCode] ?? 'Не удалось проверить подключение.')
-          : 'Не удалось проверить подключение.',
+          ? this.translate.instant(`onboarding.connection.error.${errorCode}`)
+          : this.translate.instant('onboarding.connection.validation_error'),
       );
       this.updateCanSubmit();
     }

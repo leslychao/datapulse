@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { UserApiService } from '@core/api/user-api.service';
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
@@ -30,20 +31,11 @@ interface WorkspaceCard {
   marketplaces: string[];
 }
 
-const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  OWNER: 'Владелец',
-  ADMIN: 'Администратор',
-  PRICING_MANAGER: 'Менеджер цен',
-  OPERATOR: 'Оператор',
-  ANALYST: 'Аналитик',
-  VIEWER: 'Наблюдатель',
-};
-
 @Component({
   selector: 'dp-workspace-selector',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MinimalTopBarComponent, CenteredContentComponent, StatusMessageComponent],
+  imports: [MinimalTopBarComponent, CenteredContentComponent, StatusMessageComponent, TranslatePipe],
   template: `
     <div class="flex h-screen flex-col bg-[var(--bg-secondary)]">
       <dp-minimal-top-bar
@@ -54,7 +46,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
       @switch (state()) {
         @case ('loading') {
           <dp-centered-content>
-            <dp-status-message icon="spinner" title="Загрузка..." />
+            <dp-status-message icon="spinner" [title]="'workspace_selector.loading' | translate" />
           </dp-centered-content>
         }
 
@@ -62,9 +54,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           <dp-centered-content>
             <dp-status-message
               icon="error"
-              title="Не удалось загрузить рабочие пространства"
-              description="Попробуйте ещё раз."
-              actionLabel="Повторить"
+              [title]="'workspace_selector.error_title' | translate"
+              [description]="'workspace_selector.error_description' | translate"
+              [actionLabel]="'actions.retry' | translate"
               (actionClick)="loadData()"
             />
           </dp-centered-content>
@@ -74,9 +66,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
           <dp-centered-content>
             <dp-status-message
               icon="info"
-              title="Нет доступных рабочих пространств"
-              description="Создайте первое рабочее пространство, чтобы начать работу."
-              actionLabel="Создать рабочее пространство"
+              [title]="'workspace_selector.empty_title' | translate"
+              [description]="'workspace_selector.empty_description' | translate"
+              [actionLabel]="'workspace_selector.create' | translate"
               (actionClick)="onCreateWorkspace()"
             />
           </dp-centered-content>
@@ -85,7 +77,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
         @case ('loaded') {
           <dp-centered-content maxWidth="960px">
             <h1 class="mb-6 text-center text-xl font-semibold text-[var(--text-primary)]">
-              Выберите рабочее пространство
+              {{ 'workspace_selector.title' | translate }}
             </h1>
 
             <div class="grid justify-center gap-4" style="grid-template-columns: repeat(auto-fit, 280px);">
@@ -113,7 +105,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
                   }
 
                   <span class="text-sm text-[var(--text-secondary)]">
-                    {{ memberCountLabel(ws.membersCount) }}
+                    {{ 'workspace_selector.members_count' | translate:{ count: ws.membersCount } }}
                   </span>
                 </button>
               }
@@ -124,7 +116,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
                 (click)="onCreateWorkspace()"
                 class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-transparent px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
               >
-                Создать рабочее пространство
+                {{ 'workspace_selector.create' | translate }}
               </button>
             </div>
           </dp-centered-content>
@@ -138,6 +130,7 @@ export class WorkspaceSelectorComponent implements OnInit {
   private readonly workspaceApi = inject(WorkspaceApiService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly translate = inject(TranslateService);
 
   protected readonly state = signal<PageState>('loading');
   protected readonly workspaces = signal<WorkspaceCard[]>([]);
@@ -181,7 +174,7 @@ export class WorkspaceSelectorComponent implements OnInit {
   }
 
   protected roleLabel(role: WorkspaceRole): string {
-    return ROLE_LABELS[role];
+    return this.translate.instant(`role.${role}`);
   }
 
   protected roleBadgeClass(role: WorkspaceRole): string {
@@ -198,12 +191,6 @@ export class WorkspaceSelectorComponent implements OnInit {
       case 'VIEWER':
         return `${base} bg-[var(--bg-tertiary)] text-[var(--text-secondary)]`;
     }
-  }
-
-  protected memberCountLabel(count: number): string {
-    if (count === 1) return '1 участник';
-    if (count >= 2 && count <= 4) return `${count} участника`;
-    return `${count} участников`;
   }
 
   private mergeData(memberships: WorkspaceMembership[], details: WorkspaceDetail[]): WorkspaceCard[] {

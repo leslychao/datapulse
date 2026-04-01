@@ -174,7 +174,7 @@ export class CampaignDetailPageComponent {
       headerName: 'Товар',
       field: 'productName',
       minWidth: 280,
-      pinned: 'left',
+      pinned: 'left' as const,
       sortable: true,
       cellRenderer: (params: any) =>
         params.data

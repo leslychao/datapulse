@@ -13,7 +13,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { TranslatePipe } from '@ngx-translate/core';
+
 import {
   injectQuery,
   injectMutation,
@@ -39,7 +39,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
   selector: 'dp-policy-form-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslatePipe],
+  imports: [ReactiveFormsModule],
   templateUrl: './policy-form-page.component.html',
 })
 export class PolicyFormPageComponent {

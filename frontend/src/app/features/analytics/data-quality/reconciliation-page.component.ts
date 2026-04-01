@@ -180,7 +180,7 @@ export class ReconciliationPageComponent {
     const connIds = [...new Set(trend.map((t) => t.connectionId))];
     const periods = [...new Set(trend.map((t) => t.period))].sort();
 
-    const series: any[] = [];
+    const series: Record<string, unknown>[] = [];
     connIds.forEach((id, idx) => {
       const color = CONNECTION_PALETTE[idx % CONNECTION_PALETTE.length];
       const name = connMap.get(id) ?? `#${id}`;
@@ -238,9 +238,13 @@ export class ReconciliationPageComponent {
     return {
       tooltip: {
         trigger: 'axis',
-        formatter: (params: any) => {
-          const p = Array.isArray(params) ? params[0] : params;
-          return `${p.name}: ${p.value} записей`;
+        formatter: (params: unknown) => {
+          const arr = Array.isArray(params) ? params : [params];
+          const p = arr[0] as { name: string; value: number };
+          return this.t.instant('analytics.reconciliation.histogram_tooltip', {
+            label: p.name,
+            count: p.value,
+          });
         },
       },
       grid: { left: 50, right: 20, top: 8, bottom: 24 },
@@ -281,18 +285,15 @@ export class ReconciliationPageComponent {
   }
 
   statusLabel(status: ReconStatus): string {
-    return STATUS_LABELS[status] ?? status;
+    const key = STATUS_LABEL_KEYS[status];
+    return key ? this.t.instant(key) : status;
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    return value < 0 ? `−${formatted} ₽` : `${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   formatPct(value: number | null): string {
-    if (value == null) return '—';
-    return value.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    return formatPercent(value);
   }
 }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { LucideAngularModule, Check, X, Pause, Lock, Unlock } from 'lucide-angular';
 
 import { OfferApiService } from '@core/api/offer-api.service';
@@ -114,6 +114,8 @@ export class BulkActionsBarComponent {
   readonly lockIcon = Lock;
   readonly unlockIcon = Unlock;
 
+  private readonly translate = inject(TranslateService);
+
   readonly showApproveModal = signal(false);
   readonly showRejectModal = signal(false);
   readonly showHoldModal = signal(false);
@@ -125,15 +127,17 @@ export class BulkActionsBarComponent {
       this.showApproveModal.set(false);
       this.gridStore.clearSelection();
       if (res.failed > 0) {
-        this.toast.warning(`Одобрено ${res.succeeded} из ${res.succeeded + res.failed}. ${res.failed} не удалось.`);
+        this.toast.warning(this.translate.instant('grid.bulk.approve_partial', {
+          succeeded: res.succeeded, total: res.succeeded + res.failed, failed: res.failed,
+        }));
       } else {
-        this.toast.success(`${res.succeeded} действий одобрено`);
+        this.toast.success(this.translate.instant('grid.bulk.approve_success', { count: res.succeeded }));
       }
       this.invalidateQueries();
     },
     onError: () => {
       this.showApproveModal.set(false);
-      this.toast.error('Не удалось выполнить массовое одобрение');
+      this.toast.error(this.translate.instant('grid.bulk.approve_error'));
     },
   }));
 
@@ -144,36 +148,38 @@ export class BulkActionsBarComponent {
       this.showRejectModal.set(false);
       this.gridStore.clearSelection();
       if (res.failed > 0) {
-        this.toast.warning(`Отклонено ${res.succeeded} из ${res.succeeded + res.failed}. ${res.failed} не удалось.`);
+        this.toast.warning(this.translate.instant('grid.bulk.reject_partial', {
+          succeeded: res.succeeded, total: res.succeeded + res.failed, failed: res.failed,
+        }));
       } else {
-        this.toast.success(`${res.succeeded} действий отклонено`);
+        this.toast.success(this.translate.instant('grid.bulk.reject_success', { count: res.succeeded }));
       }
       this.invalidateQueries();
     },
     onError: () => {
       this.showRejectModal.set(false);
-      this.toast.error('Не удалось выполнить массовое отклонение');
+      this.toast.error(this.translate.instant('grid.bulk.reject_error'));
     },
   }));
 
   protected approveMessage(): string {
-    return `Одобрить ${this.gridStore.selectedCount()} ценовых действий?\n\nЭто запустит исполнение для выбранных товаров.`;
+    return this.translate.instant('grid.bulk.approve_message', { count: this.gridStore.selectedCount() });
   }
 
   protected approveLabel(): string {
-    return `Одобрить (${this.gridStore.selectedCount()})`;
+    return this.translate.instant('grid.bulk.approve_label', { count: this.gridStore.selectedCount() });
   }
 
   protected rejectMessage(): string {
-    return `Отклонить ${this.gridStore.selectedCount()} ценовых действий?`;
+    return this.translate.instant('grid.bulk.reject_message', { count: this.gridStore.selectedCount() });
   }
 
   protected rejectLabel(): string {
-    return `Отклонить (${this.gridStore.selectedCount()})`;
+    return this.translate.instant('grid.bulk.reject_label', { count: this.gridStore.selectedCount() });
   }
 
   protected holdMessage(): string {
-    return `Приостановить ${this.gridStore.selectedCount()} действий?`;
+    return this.translate.instant('grid.bulk.hold_message', { count: this.gridStore.selectedCount() });
   }
 
   onBulkApprove(): void {
@@ -188,7 +194,7 @@ export class BulkActionsBarComponent {
 
   onBulkHold(): void {
     this.showHoldModal.set(false);
-    this.toast.info('Массовая приостановка — в разработке');
+    this.toast.info(this.translate.instant('grid.bulk.hold_wip'));
   }
 
   private invalidateQueries(): void {

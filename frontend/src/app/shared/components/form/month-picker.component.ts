@@ -1,10 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { LucideAngularModule, Calendar, ChevronLeft, ChevronRight } from 'lucide-angular';
-
-const MONTHS_RU = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
-];
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'dp-month-picker',
@@ -20,7 +16,7 @@ const MONTHS_RU = [
         class="flex cursor-pointer items-center justify-center rounded-l-[var(--radius-md)] p-2
                text-[var(--text-secondary)] transition-colors
                hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
-        aria-label="Предыдущий месяц"
+        aria-label="Previous month"
       >
         <lucide-icon [img]="ChevronLeftIcon" [size]="16" />
       </button>
@@ -39,7 +35,7 @@ const MONTHS_RU = [
         class="flex cursor-pointer items-center justify-center rounded-r-[var(--radius-md)] p-2
                text-[var(--text-secondary)] transition-colors
                hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
-        aria-label="Следующий месяц"
+        aria-label="Next month"
       >
         <lucide-icon [img]="ChevronRightIcon" [size]="16" />
       </button>
@@ -47,6 +43,8 @@ const MONTHS_RU = [
   `,
 })
 export class MonthPickerComponent {
+  private readonly translate = inject(TranslateService);
+
   readonly value = input.required<string>();
   readonly valueChange = output<string>();
 
@@ -56,7 +54,8 @@ export class MonthPickerComponent {
 
   protected readonly displayLabel = computed(() => {
     const [year, month] = this.value().split('-').map(Number);
-    return `${MONTHS_RU[month - 1]} ${year}`;
+    const monthKey = `month.${month}`;
+    return `${this.translate.instant(monthKey)} ${year}`;
   });
 
   shiftMonth(delta: number): void {

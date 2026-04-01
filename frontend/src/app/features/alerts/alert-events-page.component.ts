@@ -34,17 +34,8 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { LucideAngularModule, AlertCircle, CheckCircle2 } from 'lucide-angular';
-
-const AG_GRID_LOCALE_RU: Record<string, string> = {
-  page: 'Страница',
-  of: 'из',
-  to: 'по',
-  next: 'Вперёд',
-  previous: 'Назад',
-  loadingOoo: 'Загрузка...',
-  noRowsToShow: 'Нет данных',
-  pageSizeSelectorLabel: 'Строк на странице:',
-};
+import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
+import { formatDateTime } from '@shared/utils/format.utils';
 
 const RULE_TYPES: AlertRuleType[] = [
   'STALE_DATA',
@@ -96,20 +87,6 @@ function buildAlertFilter(values: Record<string, unknown>): AlertFilter {
     }
   }
   return f;
-}
-
-function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) {
-    return '—';
-  }
-  try {
-    return new Intl.DateTimeFormat('ru-RU', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
 }
 
 @Component({

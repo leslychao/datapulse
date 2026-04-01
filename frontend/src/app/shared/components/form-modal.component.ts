@@ -70,8 +70,8 @@ import { ChangeDetectionStrategy, Component, HostListener, input, output } from 
 export class FormModalComponent {
   readonly title = input.required<string>();
   readonly isOpen = input(false);
-  readonly submitLabel = input('Сохранить');
-  readonly cancelLabel = input('Отмена');
+  readonly submitLabel = input('');
+  readonly cancelLabel = input('');
   readonly isPending = input(false);
   readonly submitDisabled = input(false);
 

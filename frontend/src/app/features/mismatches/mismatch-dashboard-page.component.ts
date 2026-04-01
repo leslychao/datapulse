@@ -211,7 +211,7 @@ export class MismatchDashboardPageComponent {
         headerCheckboxSelection: true,
         checkboxSelection: true,
         width: 44,
-        pinned: 'left',
+        pinned: 'left' as const,
         sortable: false,
         suppressMovable: true,
       },
@@ -220,7 +220,7 @@ export class MismatchDashboardPageComponent {
         colId: 'offerName',
         field: 'offerName',
         minWidth: 220,
-        pinned: 'left',
+        pinned: 'left' as const,
         sortable: true,
         cellRenderer: (p: ICellRendererParams<Mismatch>) => {
           const d = p.data;

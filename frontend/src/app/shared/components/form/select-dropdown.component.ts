@@ -84,7 +84,7 @@ export interface SelectOption {
 export class SelectDropdownComponent implements ControlValueAccessor {
   readonly label = input.required<string>();
   readonly options = input<SelectOption[]>([]);
-  readonly placeholder = input('Выберите...');
+  readonly placeholder = input('');
   readonly required = input(false);
   readonly errorMessage = input<string | null>(null);
   readonly disabled = input(false);

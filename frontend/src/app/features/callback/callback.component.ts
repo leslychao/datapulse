@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { AuthService } from '@core/auth/auth.service';
 import { StatusMessageComponent } from '@shared/layout/status-message.component';
@@ -12,22 +13,22 @@ type CallbackState = 'loading' | 'error';
   selector: 'dp-callback',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [StatusMessageComponent],
+  imports: [StatusMessageComponent, TranslatePipe],
   template: `
     <div class="flex h-screen items-center justify-center bg-[var(--bg-primary)]">
       @switch (state()) {
         @case ('loading') {
           <dp-status-message
             icon="spinner"
-            title="Выполняется вход..."
+            [title]="'callback.loading' | translate"
           />
         }
         @case ('error') {
           <dp-status-message
             icon="error"
-            title="Не удалось выполнить вход"
-            description="Попробуйте ещё раз."
-            actionLabel="Войти заново"
+            [title]="'callback.error_title' | translate"
+            [description]="'callback.error_description' | translate"
+            [actionLabel]="'callback.retry_login' | translate"
             (actionClick)="onRetryLogin()"
           />
         }
