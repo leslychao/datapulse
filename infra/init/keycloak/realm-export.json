@@ -100,15 +100,18 @@
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": false,
       "protocol": "openid-connect",
-      "secret": "proxy-secret-change-me",
+      "secret": "${OAUTH2_PROXY_CLIENT_SECRET}",
       "redirectUris": [
+        "http://localhost/oauth2/callback",
+        "http://localhost:80/oauth2/callback",
         "https://datapulse.example.com/oauth2/callback"
       ],
       "webOrigins": [
+        "http://localhost",
         "https://datapulse.example.com"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "https://datapulse.example.com/*"
+        "post.logout.redirect.uris": "http://localhost/*##https://datapulse.example.com/*"
       },
       "fullScopeAllowed": true
     },
