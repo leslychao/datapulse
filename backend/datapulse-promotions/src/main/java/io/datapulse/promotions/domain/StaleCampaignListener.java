@@ -16,9 +16,16 @@ public class StaleCampaignListener {
 
     private final PromoActionRepository actionRepository;
 
+    public void onCampaignsStale(List<Long> campaignIds) {
+        for (long campaignId : campaignIds) {
+            expirePendingActions(campaignId);
+        }
+    }
+
     @Transactional
-    public void onCampaignStale(long campaignId) {
-        List<PromoActionEntity> pendingActions = actionRepository.findPendingActionsByCampaignId(campaignId);
+    public void expirePendingActions(long campaignId) {
+        List<PromoActionEntity> pendingActions =
+                actionRepository.findPendingActionsByCampaignId(campaignId);
 
         if (pendingActions.isEmpty()) {
             log.debug("No pending promo actions for stale campaign: campaignId={}", campaignId);

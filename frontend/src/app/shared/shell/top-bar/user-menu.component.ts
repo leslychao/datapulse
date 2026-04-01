@@ -62,28 +62,24 @@ export class UserMenuComponent {
   protected readonly open = signal(false);
 
   protected readonly displayName = computed(() => {
-    const claims = this.authService.userClaims;
-    if (!claims) return '';
-    const given = (claims['given_name'] as string) ?? '';
-    const family = (claims['family_name'] as string) ?? '';
-    return `${given} ${family}`.trim() || ((claims['preferred_username'] as string) ?? '');
+    const user = this.authService.user();
+    return user?.name ?? '';
   });
 
   protected readonly email = computed(() => {
-    const claims = this.authService.userClaims;
-    return (claims?.['email'] as string) ?? '';
+    const user = this.authService.user();
+    return user?.email ?? '';
   });
 
   protected readonly initials = computed(() => {
-    const claims = this.authService.userClaims;
-    if (!claims) return '?';
-    const given = (claims['given_name'] as string) ?? '';
-    const family = (claims['family_name'] as string) ?? '';
-    if (given || family) {
-      return (given.charAt(0) + family.charAt(0)).toUpperCase();
-    }
-    const username = (claims['preferred_username'] as string) ?? '';
-    return username.charAt(0).toUpperCase() || '?';
+    const user = this.authService.user();
+    if (!user?.name) return '?';
+    const parts = user.name.split(' ');
+    return parts
+      .slice(0, 2)
+      .map((p) => p.charAt(0))
+      .join('')
+      .toUpperCase() || '?';
   });
 
   @HostListener('document:click', ['$event'])

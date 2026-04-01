@@ -1,12 +1,9 @@
 export const environment = {
   production: true,
   apiUrl: '/api',
-  keycloak: {
-    issuer: '/realms/datapulse',
-    clientId: 'datapulse-spa',
-    redirectUri: '/callback',
-    postLogoutRedirectUri: '/',
-    scope: 'openid email profile',
-  },
   wsUrl: '/ws',
+  oauth2: {
+    loginUrl: '/oauth2/start',
+    logoutUrl: '/oauth2/sign_out',
+  },
 };

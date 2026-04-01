@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+
 @RestController
 @RequestMapping(value = "/api/promo/decisions", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
@@ -23,8 +25,11 @@ public class PromoDecisionController {
     @GetMapping
     public Page<PromoDecisionResponse> listDecisions(
             @RequestParam(value = "decisionType", required = false) PromoDecisionType decisionType,
+            @RequestParam(value = "campaignId", required = false) Long campaignId,
+            @RequestParam(value = "from", required = false) LocalDate from,
+            @RequestParam(value = "to", required = false) LocalDate to,
             Pageable pageable) {
         return decisionService.listDecisions(
-                workspaceContext.getWorkspaceId(), decisionType, pageable);
+                workspaceContext.getWorkspaceId(), decisionType, campaignId, from, to, pageable);
     }
 }

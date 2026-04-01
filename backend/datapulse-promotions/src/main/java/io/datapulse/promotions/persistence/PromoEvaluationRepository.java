@@ -4,8 +4,6 @@ import io.datapulse.promotions.domain.PromoEvaluationResult;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -18,11 +16,6 @@ public interface PromoEvaluationRepository extends JpaRepository<PromoEvaluation
 
     Page<PromoEvaluationEntity> findAllByWorkspaceId(Long workspaceId, Pageable pageable);
 
-    @Query("""
-            SELECT e FROM PromoEvaluationEntity e
-            WHERE e.canonicalPromoProductId = :promoProductId
-            ORDER BY e.createdAt DESC
-            """)
-    Optional<PromoEvaluationEntity> findLatestByPromoProductId(
-            @Param("promoProductId") Long promoProductId);
+    Optional<PromoEvaluationEntity> findFirstByCanonicalPromoProductIdOrderByCreatedAtDesc(
+            Long canonicalPromoProductId);
 }

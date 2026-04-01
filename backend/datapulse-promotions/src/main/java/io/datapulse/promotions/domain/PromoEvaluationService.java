@@ -95,6 +95,7 @@ public class PromoEvaluationService {
         int declineCount = 0;
         int pendingReviewCount = 0;
         int deactivateCount = 0;
+        int skippedStableCount = 0;
         int errorCount = 0;
 
         List<PromoEvaluationEntity> evaluations = new ArrayList<>();
@@ -121,11 +122,16 @@ public class PromoEvaluationService {
                     actions.add(outcome.action());
                 }
 
-                switch (outcome.decisionType()) {
-                    case PARTICIPATE -> participateCount++;
-                    case DECLINE -> declineCount++;
-                    case PENDING_REVIEW -> pendingReviewCount++;
-                    case DEACTIVATE -> deactivateCount++;
+                if (outcome.evaluation().getSkipReason() != null
+                        && "stable_state".equals(outcome.evaluation().getSkipReason())) {
+                    skippedStableCount++;
+                } else {
+                    switch (outcome.decisionType()) {
+                        case PARTICIPATE -> participateCount++;
+                        case DECLINE -> declineCount++;
+                        case PENDING_REVIEW -> pendingReviewCount++;
+                        case DEACTIVATE -> deactivateCount++;
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Error evaluating promo product: promoProductId={}, error={}",
@@ -143,6 +149,10 @@ public class PromoEvaluationService {
         }
         if (!actions.isEmpty()) {
             saveActionsWithConflictHandling(actions);
+        }
+
+        if (skippedStableCount > 0) {
+            log.debug("PromoEvaluationRun: skipped {} stable-state products", skippedStableCount);
         }
 
         PromoRunStatus finalStatus = errorCount > 0
@@ -226,6 +236,11 @@ public class PromoEvaluationService {
         PromoEvaluationResult result = classifyResult(eval, policy);
         eval.setEvaluationResult(result);
 
+        if (isParticipating && isStableState(product.promoProductId(), result, eval.getMarginAtPromoPrice())) {
+            eval.setSkipReason("stable_state");
+            return new EvaluationOutcome(eval, null, null, PromoDecisionType.PARTICIPATE);
+        }
+
         PromoDecisionType decisionType = mapDecision(result, isParticipating, policy.getParticipationMode());
 
         if (decisionType == null) {
@@ -234,9 +249,32 @@ public class PromoEvaluationService {
         }
 
         PromoDecisionEntity decision = buildDecision(run, product, policy, snapshot, eval, decisionType);
-        PromoActionEntity action = buildAction(run, product, policy, decision, decisionType, isParticipating);
+        PromoActionEntity action = buildAction(
+                run, product, policy, decision, decisionType, isParticipating, result);
 
         return new EvaluationOutcome(eval, decision, action, decisionType);
+    }
+
+    private static final BigDecimal STABLE_STATE_THRESHOLD = new BigDecimal("0.01");
+
+    /**
+     * Checks if a PARTICIPATING product is in a stable state compared to its previous evaluation.
+     * Stable = same evaluation_result AND margin delta < 1 pp.
+     */
+    private boolean isStableState(long promoProductId, PromoEvaluationResult currentResult,
+                                   BigDecimal currentMargin) {
+        if (currentMargin == null) {
+            return false;
+        }
+
+        return evaluationRepository
+                .findFirstByCanonicalPromoProductIdOrderByCreatedAtDesc(promoProductId)
+                .filter(prev -> prev.getEvaluationResult() == currentResult)
+                .filter(prev -> currentResult == PromoEvaluationResult.PROFITABLE)
+                .filter(prev -> prev.getMarginAtPromoPrice() != null)
+                .filter(prev -> currentMargin.subtract(prev.getMarginAtPromoPrice()).abs()
+                        .compareTo(STABLE_STATE_THRESHOLD) < 0)
+                .isPresent();
     }
 
     private PromoEvaluationResult classifyResult(PromoEvaluationEntity eval, PromoPolicyEntity policy) {
@@ -288,10 +326,7 @@ public class PromoEvaluationService {
             case PROFITABLE -> null;
             case MARGINAL -> mode == ParticipationMode.RECOMMENDATION ? PromoDecisionType.PENDING_REVIEW : null;
             case UNPROFITABLE -> PromoDecisionType.DEACTIVATE;
-            case INSUFFICIENT_STOCK -> switch (mode) {
-                case FULL_AUTO -> PromoDecisionType.PENDING_REVIEW;
-                default -> PromoDecisionType.DEACTIVATE;
-            };
+            case INSUFFICIENT_STOCK -> PromoDecisionType.DEACTIVATE;
             case INSUFFICIENT_DATA -> null;
         };
     }
@@ -319,7 +354,8 @@ public class PromoEvaluationService {
 
     private PromoActionEntity buildAction(PromoEvaluationRunEntity run, PromoProductRow product,
                                            PromoPolicyEntity policy, PromoDecisionEntity decision,
-                                           PromoDecisionType decisionType, boolean isParticipating) {
+                                           PromoDecisionType decisionType, boolean isParticipating,
+                                           PromoEvaluationResult evaluationResult) {
         if (decisionType == PromoDecisionType.DECLINE) {
             return null;
         }
@@ -332,7 +368,7 @@ public class PromoEvaluationService {
                 : PromoActionType.ACTIVATE;
 
         PromoActionStatus initialStatus = resolveActionStatus(
-                policy.getParticipationMode(), decisionType);
+                policy.getParticipationMode(), decisionType, evaluationResult);
 
         var action = new PromoActionEntity();
         action.setWorkspaceId(run.getWorkspaceId());
@@ -352,8 +388,15 @@ public class PromoEvaluationService {
         return action;
     }
 
-    private PromoActionStatus resolveActionStatus(ParticipationMode mode, PromoDecisionType decisionType) {
+    private PromoActionStatus resolveActionStatus(ParticipationMode mode,
+                                                   PromoDecisionType decisionType,
+                                                   PromoEvaluationResult evaluationResult) {
         if (decisionType == PromoDecisionType.PENDING_REVIEW) {
+            return PromoActionStatus.PENDING_APPROVAL;
+        }
+        if (mode == ParticipationMode.FULL_AUTO
+                && evaluationResult == PromoEvaluationResult.INSUFFICIENT_STOCK
+                && decisionType == PromoDecisionType.DEACTIVATE) {
             return PromoActionStatus.PENDING_APPROVAL;
         }
         return switch (mode) {

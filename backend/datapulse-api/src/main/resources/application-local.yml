@@ -1,37 +1,20 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/datapulse
-    username: datapulse
-    password: changeme
-  jpa:
-    show-sql: true
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8080/realms/datapulse
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-
 datapulse:
-  vault:
-    uri: http://localhost:8200
-    token: dev-token
   integration:
     wildberries:
-      content-base-url: http://localhost:9091
-      prices-base-url: http://localhost:9091
-      statistics-base-url: http://localhost:9091
-      analytics-base-url: http://localhost:9091
-      marketplace-base-url: http://localhost:9091
-      advert-base-url: http://localhost:9091
-      promo-base-url: http://localhost:9091
+      content-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      prices-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      statistics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      analytics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      marketplace-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      advert-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      promo-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
     ozon:
-      seller-base-url: http://localhost:9091
-      performance-base-url: http://localhost:9091
+      seller-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      performance-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+
+spring:
+  jpa:
+    show-sql: true
 
 logging:
   level:

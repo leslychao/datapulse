@@ -3,6 +3,7 @@ package io.datapulse.promotions.api;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.promotions.domain.PromoActionService;
 import io.datapulse.promotions.domain.PromoActionStatus;
+import io.datapulse.promotions.domain.PromoActionType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,9 +32,10 @@ public class PromoActionController {
     public Page<PromoActionResponse> listActions(
             @RequestParam(value = "campaignId", required = false) Long campaignId,
             @RequestParam(value = "status", required = false) PromoActionStatus status,
+            @RequestParam(value = "actionType", required = false) PromoActionType actionType,
             Pageable pageable) {
         return actionService.listActions(
-                workspaceContext.getWorkspaceId(), campaignId, status, pageable);
+                workspaceContext.getWorkspaceId(), campaignId, status, actionType, pageable);
     }
 
     @PostMapping("/{actionId}/approve")

@@ -59,8 +59,8 @@ export class StatusBarComponent {
   );
 
   readonly userEmail = computed(() => {
-    const claims = this.authService.userClaims;
-    return (claims?.['email'] as string) ?? '';
+    const user = this.authService.user();
+    return user?.email ?? '';
   });
 
   healthColor(status: SyncHealth): string {

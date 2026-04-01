@@ -44,17 +44,16 @@ CREATE TABLE price_policy_assignment (
 
     CONSTRAINT fk_ppa_policy     FOREIGN KEY (price_policy_id)           REFERENCES price_policy           (id),
     CONSTRAINT fk_ppa_connection FOREIGN KEY (marketplace_connection_id) REFERENCES marketplace_connection (id),
-    CONSTRAINT fk_ppa_offer      FOREIGN KEY (marketplace_offer_id)      REFERENCES marketplace_offer      (id),
-
-    CONSTRAINT uq_ppa_policy_scope UNIQUE (
-        price_policy_id,
-        marketplace_connection_id,
-        scope_type,
-        COALESCE(category_id, 0),
-        COALESCE(marketplace_offer_id, 0)
-    )
+    CONSTRAINT fk_ppa_offer      FOREIGN KEY (marketplace_offer_id)      REFERENCES marketplace_offer      (id)
 );
 
+CREATE UNIQUE INDEX uq_ppa_policy_scope ON price_policy_assignment (
+    price_policy_id,
+    marketplace_connection_id,
+    scope_type,
+    COALESCE(category_id, 0),
+    COALESCE(marketplace_offer_id, 0)
+);
 CREATE INDEX idx_ppa_connection ON price_policy_assignment (marketplace_connection_id);
 CREATE INDEX idx_ppa_offer      ON price_policy_assignment (marketplace_offer_id) WHERE marketplace_offer_id IS NOT NULL;
 

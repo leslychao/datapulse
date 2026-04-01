@@ -33,6 +33,7 @@ public class DeferredActionProcessor {
             """;
 
     @Scheduled(fixedDelayString = "PT30S")
+    @Transactional
     public void processDeferred() {
         cleanupExpired();
         processPendingDeferred();
@@ -55,7 +56,6 @@ public class DeferredActionProcessor {
         }
     }
 
-    @Transactional
     void createActionFromDeferred(DeferredActionEntity deferred) {
         boolean autoApprove =
                 deferred.getExecutionMode() == ActionExecutionMode.SIMULATED;
@@ -87,7 +87,6 @@ public class DeferredActionProcessor {
         );
     }
 
-    @Transactional
     void cleanupExpired() {
         int deleted = deferredActionRepository.deleteExpired(OffsetDateTime.now());
         if (deleted > 0) {

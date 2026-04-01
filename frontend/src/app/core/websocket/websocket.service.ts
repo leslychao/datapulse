@@ -3,7 +3,6 @@ import { RxStomp, RxStompConfig } from '@stomp/rx-stomp';
 import { Subscription } from 'rxjs';
 
 import { environment } from '@env';
-import { AuthService } from '@core/auth/auth.service';
 import { NotificationApiService } from '@core/api/notification-api.service';
 import { AppNotification } from '@core/models';
 import { SyncStatusStore } from '@shared/stores/sync-status.store';
@@ -21,7 +20,6 @@ const MAX_RECONNECT_DELAY_MS = 30000;
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
-  private readonly authService = inject(AuthService);
   private readonly zone = inject(NgZone);
   private readonly syncStore = inject(SyncStatusStore);
   private readonly notificationStore = inject(NotificationStore);
@@ -137,11 +135,10 @@ export class WebSocketService {
 
   private buildWsUrl(): string {
     const base = environment.wsUrl;
-    const token = this.authService.accessToken;
     if (base.startsWith('ws')) {
-      return `${base}?token=${token}`;
+      return base;
     }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}${base}?token=${token}`;
+    return `${protocol}//${window.location.host}${base}`;
   }
 }

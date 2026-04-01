@@ -28,13 +28,13 @@ public interface PriceActionRepository extends JpaRepository<PriceActionEntity, 
             @Param("mode") ActionExecutionMode mode
     );
 
-    @Query("""
-            SELECT pa FROM PriceActionEntity pa
-            WHERE pa.status = :status
-              AND pa.updatedAt < CURRENT_TIMESTAMP - :minutesAgo * INTERVAL '1 minute'
-            """)
+    @Query(value = """
+            SELECT * FROM price_action
+            WHERE status = :status
+              AND updated_at < CURRENT_TIMESTAMP - CAST(:minutesAgo || ' minutes' AS INTERVAL)
+            """, nativeQuery = true)
     List<PriceActionEntity> findStuckInStatus(
-            @Param("status") ActionStatus status,
+            @Param("status") String status,
             @Param("minutesAgo") int minutesAgo
     );
 }

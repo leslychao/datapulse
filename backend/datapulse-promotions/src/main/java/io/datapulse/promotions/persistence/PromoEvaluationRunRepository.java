@@ -14,6 +14,9 @@ public interface PromoEvaluationRunRepository extends JpaRepository<PromoEvaluat
     Page<PromoEvaluationRunEntity> findAllByWorkspaceIdAndConnectionId(
             Long workspaceId, Long connectionId, Pageable pageable);
 
+    Page<PromoEvaluationRunEntity> findAllByWorkspaceIdAndStatus(
+            Long workspaceId, PromoRunStatus status, Pageable pageable);
+
     Optional<PromoEvaluationRunEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     boolean existsBySourceJobExecutionId(Long sourceJobExecutionId);

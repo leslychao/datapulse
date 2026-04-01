@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(
         prefix = "datapulse.clickhouse.migration",
         name = "enabled",
@@ -51,6 +50,13 @@ public class ClickHouseMigrationRunner implements ApplicationRunner {
 
     private final JdbcTemplate clickhouseJdbcTemplate;
     private final ClickHouseMigrationProperties properties;
+
+    public ClickHouseMigrationRunner(
+        @Qualifier("clickhouseJdbcTemplate") JdbcTemplate clickhouseJdbcTemplate,
+        ClickHouseMigrationProperties properties) {
+        this.clickhouseJdbcTemplate = clickhouseJdbcTemplate;
+        this.properties = properties;
+    }
 
     @Override
     public void run(ApplicationArguments args) throws Exception {

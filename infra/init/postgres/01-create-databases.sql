@@ -1,2 +1,5 @@
 CREATE DATABASE keycloak;
 GRANT ALL PRIVILEGES ON DATABASE keycloak TO datapulse;
+
+\c datapulse
+CREATE SCHEMA IF NOT EXISTS datapulse AUTHORIZATION datapulse;

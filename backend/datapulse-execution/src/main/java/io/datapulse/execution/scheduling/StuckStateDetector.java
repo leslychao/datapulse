@@ -42,7 +42,7 @@ public class StuckStateDetector {
     private void escalateStuckExecuting() {
         int ttlMinutes = toMinutes(properties.getStuckState().getExecutingTtl());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.EXECUTING, ttlMinutes);
+                .findStuckInStatus(ActionStatus.EXECUTING.name(), ttlMinutes);
 
         for (var action : stuck) {
             log.warn("Stuck EXECUTING action escalated to RECONCILIATION_PENDING: actionId={}, updatedAt={}",
@@ -58,7 +58,7 @@ public class StuckStateDetector {
     private void escalateStuckRetryScheduled() {
         int ttlMinutes = toMinutes(properties.getStuckState().getRetryScheduledGrace());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.RETRY_SCHEDULED, ttlMinutes);
+                .findStuckInStatus(ActionStatus.RETRY_SCHEDULED.name(), ttlMinutes);
 
         for (var action : stuck) {
             if (action.getNextAttemptAt() != null) {
@@ -78,7 +78,7 @@ public class StuckStateDetector {
     private void escalateStuckReconciliation() {
         int ttlMinutes = toMinutes(properties.getStuckState().getReconciliationPendingTtl());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.RECONCILIATION_PENDING, ttlMinutes);
+                .findStuckInStatus(ActionStatus.RECONCILIATION_PENDING.name(), ttlMinutes);
 
         for (var action : stuck) {
             log.warn("Stuck RECONCILIATION_PENDING action failed: actionId={}", action.getId());
@@ -95,7 +95,7 @@ public class StuckStateDetector {
     private void escalateStuckScheduled() {
         int ttlMinutes = toMinutes(properties.getStuckState().getScheduledTtl());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.SCHEDULED, ttlMinutes);
+                .findStuckInStatus(ActionStatus.SCHEDULED.name(), ttlMinutes);
 
         for (var action : stuck) {
             log.warn("Stuck SCHEDULED action failed (outbox delivery failure): actionId={}", action.getId());

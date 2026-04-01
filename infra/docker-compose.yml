@@ -1,27 +1,30 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:15
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     environment:
-      POSTGRES_DB: datapulse
-      POSTGRES_USER: datapulse
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-datapulse}
+      POSTGRES_USER: ${POSTGRES_USER:-datapulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init/postgres:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U datapulse"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datapulse}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3
+    environment:
+      CLICKHOUSE_USER: ${CH_USERNAME:-default}
+      CLICKHOUSE_PASSWORD: ${CH_PASSWORD:?CH_PASSWORD is required}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_DB: ${CH_DATABASE:-datapulse}
     ports:
-      - "8123:8123"
+      - "${CH_PORT:-8123}:8123"
       - "9000:9000"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -34,11 +37,11 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "5672:5672"
+      - "${RABBITMQ_PORT:-5672}:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: datapulse
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-datapulse}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
@@ -48,11 +51,11 @@ services:
   minio:
     image: minio/minio:latest
     ports:
-      - "9010:9000"
+      - "${S3_PORT:-9010}:9000"
       - "9011:9001"
     environment:
-      MINIO_ROOT_USER: datapulse
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-datapulse}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
@@ -70,21 +73,25 @@ services:
     volumes:
       - ./init/minio/init.sh:/init.sh
     environment:
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-datapulse}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     entrypoint: ["/bin/sh", "/init.sh"]
 
   keycloak:
     build: ./keycloak
     command: start-dev --import-realm
     ports:
-      - "8080:8080"
+      - "${KEYCLOAK_PORT:-8080}:8080"
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: datapulse
-      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB_USERNAME: ${POSTGRES_USER:-datapulse}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_STRICT: "false"
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
     volumes:
@@ -96,9 +103,9 @@ services:
   vault:
     image: hashicorp/vault:1.15
     ports:
-      - "8200:8200"
+      - "${VAULT_PORT:-8200}:8200"
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: dev-token
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:?VAULT_TOKEN is required}
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
     cap_add:
       - IPC_LOCK
@@ -111,25 +118,61 @@ services:
       - ./init/vault/setup.sh:/vault-init.sh
     environment:
       VAULT_ADDR: "http://vault:8200"
-      VAULT_TOKEN: dev-token
+      VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN is required}
     entrypoint: ["/bin/sh", "-c", "sleep 3 && /bin/sh /vault-init.sh"]
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    expose:
+      - "4180"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID:-datapulse-proxy}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:?OAUTH2_PROXY_CLIENT_SECRET is required}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-datapulse}
+      OAUTH2_PROXY_REDIRECT_URL: ${OAUTH2_PROXY_REDIRECT_URL:-http://localhost/oauth2/callback}
+      OAUTH2_PROXY_LOGIN_URL: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_VALIDATE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_UPSTREAM: static://202
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET is required}
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+      OAUTH2_PROXY_COOKIE_HTTPONLY: "true"
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_SCOPE: openid email profile
+      OAUTH2_PROXY_COOKIE_CSRF_PER_REQUEST: "true"
+    depends_on:
+      - keycloak
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    depends_on:
+      - oauth2-proxy
+
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
 
   grafana:
     image: grafana/grafana:latest
@@ -148,7 +191,7 @@ services:
     image: wiremock/wiremock:3.12.1
     container_name: datapulse-wiremock
     ports:
-      - "9091:8080"
+      - "${WIREMOCK_PORT:-9091}:8080"
     volumes:
       - ./wiremock/mappings:/home/wiremock/mappings:ro
       - ./wiremock/__files:/home/wiremock/__files:ro

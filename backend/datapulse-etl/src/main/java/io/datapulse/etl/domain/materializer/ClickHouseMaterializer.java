@@ -1,7 +1,7 @@
 package io.datapulse.etl.domain.materializer;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +18,14 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ClickHouseMaterializer {
 
     private final JdbcTemplate clickhouseJdbcTemplate;
+
+    public ClickHouseMaterializer(
+        @Qualifier("clickhouseJdbcTemplate") JdbcTemplate clickhouseJdbcTemplate) {
+        this.clickhouseJdbcTemplate = clickhouseJdbcTemplate;
+    }
 
     /**
      * Materializes records for the given job execution and event type to ClickHouse.

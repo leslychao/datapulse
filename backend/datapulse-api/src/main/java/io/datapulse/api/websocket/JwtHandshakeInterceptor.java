@@ -39,7 +39,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
                                    Map<String, Object> attributes) {
         String token = extractToken(request);
         if (token == null) {
-            log.debug("WebSocket handshake rejected: no token in query string");
+            log.debug("WebSocket handshake rejected: no token found");
             return false;
         }
 
@@ -79,6 +79,10 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     }
 
     private String extractToken(ServerHttpRequest request) {
+        String authHeader = request.getHeaders().getFirst("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
         if (request instanceof ServletServerHttpRequest servletRequest) {
             return servletRequest.getServletRequest().getParameter("token");
         }

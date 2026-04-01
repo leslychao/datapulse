@@ -46,10 +46,13 @@ CREATE TABLE promo_policy_assignment (
     CONSTRAINT fk_promo_assign_policy     FOREIGN KEY (promo_policy_id)           REFERENCES promo_policy (id),
     CONSTRAINT fk_promo_assign_connection FOREIGN KEY (marketplace_connection_id) REFERENCES marketplace_connection (id),
     CONSTRAINT fk_promo_assign_category   FOREIGN KEY (category_id)              REFERENCES category (id),
-    CONSTRAINT fk_promo_assign_offer      FOREIGN KEY (marketplace_offer_id)     REFERENCES marketplace_offer (id),
-    CONSTRAINT uq_promo_assign UNIQUE (promo_policy_id, marketplace_connection_id, scope_type, COALESCE(category_id, 0), COALESCE(marketplace_offer_id, 0))
+    CONSTRAINT fk_promo_assign_offer      FOREIGN KEY (marketplace_offer_id)     REFERENCES marketplace_offer (id)
 );
 
+CREATE UNIQUE INDEX uq_promo_assign ON promo_policy_assignment (
+    promo_policy_id, marketplace_connection_id, scope_type,
+    COALESCE(category_id, 0), COALESCE(marketplace_offer_id, 0)
+);
 CREATE INDEX idx_promo_assign_policy_id     ON promo_policy_assignment (promo_policy_id);
 CREATE INDEX idx_promo_assign_connection_id ON promo_policy_assignment (marketplace_connection_id);
 

@@ -2,8 +2,6 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@core/auth/auth.service';
-import { UserApiService } from '@core/api/user-api.service';
-import { UserProfile } from '@core/models';
 import { StatusMessageComponent } from '@shared/layout/status-message.component';
 
 const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
@@ -38,7 +36,6 @@ type CallbackState = 'loading' | 'error';
 })
 export class CallbackComponent implements OnInit {
   private readonly authService = inject(AuthService);
-  private readonly userApi = inject(UserApiService);
   private readonly router = inject(Router);
 
   protected readonly state = signal<CallbackState>('loading');
@@ -48,37 +45,35 @@ export class CallbackComponent implements OnInit {
   }
 
   protected onRetryLogin(): void {
-    this.authService.initLogin();
+    this.authService.login();
   }
 
-  private async processCallback(): Promise<void> {
-    try {
-      const authenticated = await this.authService.handleCallback();
-      if (!authenticated) {
-        this.state.set('error');
-        return;
-      }
-
-      const profile = await this.fetchProfile();
-      this.routeByProfile(profile);
-    } catch {
-      this.state.set('error');
-    }
-  }
-
-  private fetchProfile(): Promise<UserProfile> {
-    return new Promise((resolve, reject) => {
-      this.userApi.getMe().subscribe({ next: resolve, error: reject });
+  private processCallback(): void {
+    this.authService.checkSession().subscribe({
+      next: (ok) => {
+        if (!ok) {
+          this.state.set('error');
+          return;
+        }
+        this.routeAfterLogin();
+      },
+      error: () => this.state.set('error'),
     });
   }
 
-  private routeByProfile(profile: UserProfile): void {
-    if (profile.needsOnboarding) {
+  private routeAfterLogin(): void {
+    const me = this.authService.user();
+    if (!me) {
+      this.state.set('error');
+      return;
+    }
+
+    if (me.needsOnboarding) {
       this.router.navigate(['/onboarding']);
       return;
     }
 
-    const memberships = profile.memberships;
+    const memberships = me.memberships;
 
     if (memberships.length === 0) {
       this.router.navigate(['/workspaces']);

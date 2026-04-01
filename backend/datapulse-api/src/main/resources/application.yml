@@ -2,31 +2,35 @@ server:
   port: 8081
 
 spring:
+  config:
+    import: optional:file:../../infra/.env[.properties]
   application:
     name: datapulse-api
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:datapulse}
-    username: ${DB_USERNAME:datapulse}
-    password: ${DB_PASSWORD:changeme}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${POSTGRES_DB:datapulse}
+    username: ${POSTGRES_USER:datapulse}
+    password: ${POSTGRES_PASSWORD:}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
-        default_schema: public
+        default_schema: datapulse
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+    default-schema: datapulse
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/datapulse}
+          issuer-uri: http://localhost:${KEYCLOAK_PORT:8080}/realms/${KEYCLOAK_REALM:datapulse}
+          jwk-set-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8080}/realms/${KEYCLOAK_REALM:datapulse}/protocol/openid-connect/certs
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:datapulse}
-    password: ${RABBITMQ_PASSWORD:changeme}
+    username: ${RABBITMQ_USER:datapulse}
+    password: ${RABBITMQ_PASSWORD:}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -42,9 +46,9 @@ spring:
 
 datapulse:
   s3:
-    endpoint: ${S3_ENDPOINT:http://localhost:9010}
+    endpoint: http://${S3_HOST:localhost}:${S3_PORT:9010}
     access-key: ${S3_ACCESS_KEY:datapulse}
-    secret-key: ${S3_SECRET_KEY:changeme}
+    secret-key: ${S3_SECRET_KEY:}
     raw-bucket: datapulse-raw
   etl:
     retention:
@@ -63,8 +67,8 @@ datapulse:
       max-retry-backoff: PT30M
       retry-backoff-multiplier: 2
   vault:
-    uri: ${VAULT_ADDR:http://localhost:8200}
-    token: ${VAULT_TOKEN:dev-token}
+    uri: http://${VAULT_HOST:localhost}:${VAULT_PORT:8200}
+    token: ${VAULT_TOKEN:}
     credential-cache-ttl: 1h
     base-path: secret/data/datapulse
   integration:

@@ -5,15 +5,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.promotions.api.PromoDecisionMapper;
 import io.datapulse.promotions.api.PromoDecisionResponse;
 import io.datapulse.promotions.persistence.PromoActionEntity;
 import io.datapulse.promotions.persistence.PromoActionRepository;
 import io.datapulse.promotions.persistence.PromoDecisionEntity;
+import io.datapulse.promotions.persistence.PromoDecisionQueryRepository;
 import io.datapulse.promotions.persistence.PromoDecisionRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -30,15 +33,26 @@ import java.time.OffsetDateTime;
 public class PromoDecisionService {
 
     private final PromoDecisionRepository decisionRepository;
+    private final PromoDecisionQueryRepository decisionQueryRepository;
     private final PromoActionRepository actionRepository;
     private final PromoPolicyResolver policyResolver;
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final PromoDecisionMapper decisionMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public Page<PromoDecisionResponse> listDecisions(long workspaceId, PromoDecisionType decisionType,
-                                                      Pageable pageable) {
+                                                      Long campaignId, java.time.LocalDate from,
+                                                      java.time.LocalDate to, Pageable pageable) {
+        boolean hasExtraFilters = campaignId != null || from != null || to != null;
+
+        if (hasExtraFilters) {
+            return decisionQueryRepository.findFiltered(
+                    workspaceId, decisionType, campaignId, from, to, pageable)
+                    .map(decisionMapper::toResponse);
+        }
+
         Page<PromoDecisionEntity> page = decisionType != null
                 ? decisionRepository.findAllByWorkspaceIdAndDecisionType(workspaceId, decisionType, pageable)
                 : decisionRepository.findAllByWorkspaceId(workspaceId, pageable);
@@ -91,6 +105,8 @@ public class PromoDecisionService {
         action.setFreezeAtSnapshot(info.freezeAt());
         actionRepository.save(action);
 
+        publishAudit("promo.participate", workspaceId, userId,
+                "canonical_promo_product", promoProductId);
         log.info("Manual participate: promoProductId={}, actionId={}, userId={}",
                 promoProductId, action.getId(), userId);
     }
@@ -123,8 +139,10 @@ public class PromoDecisionService {
         decision.setExplanationSummary(reason != null ? reason : "Manual decline by user " + userId);
         decisionRepository.save(decision);
 
-        updateParticipationStatus(promoProductId, "DECLINED", "MANUAL");
+        updateParticipationStatus(promoProductId, "ELIGIBLE", "DECLINED", "MANUAL");
 
+        publishAudit("promo.decline", workspaceId, userId,
+                "canonical_promo_product", promoProductId);
         log.info("Manual decline: promoProductId={}, userId={}", promoProductId, userId);
     }
 
@@ -170,6 +188,8 @@ public class PromoDecisionService {
         action.setFreezeAtSnapshot(info.freezeAt());
         actionRepository.save(action);
 
+        publishAudit("promo.deactivate", workspaceId, userId,
+                "canonical_promo_product", promoProductId);
         log.info("Manual deactivate: promoProductId={}, actionId={}, userId={}",
                 promoProductId, action.getId(), userId);
     }
@@ -217,19 +237,26 @@ public class PromoDecisionService {
         }
     }
 
-    private void updateParticipationStatus(long promoProductId, String status, String decisionSource) {
+    private void updateParticipationStatus(long promoProductId, String expectedStatus,
+                                            String newStatus, String decisionSource) {
         var params = new MapSqlParameterSource()
                 .addValue("id", promoProductId)
-                .addValue("status", status)
+                .addValue("expectedStatus", expectedStatus)
+                .addValue("newStatus", newStatus)
                 .addValue("decisionSource", decisionSource);
 
-        jdbcTemplate.update("""
+        int updated = jdbcTemplate.update("""
                 UPDATE canonical_promo_product
-                SET participation_status = :status,
+                SET participation_status = :newStatus,
                     participation_decision_source = :decisionSource,
                     updated_at = NOW()
-                WHERE id = :id
+                WHERE id = :id AND participation_status = :expectedStatus
                 """, params);
+
+        if (updated == 0) {
+            log.warn("CAS conflict updating canonical_promo_product: id={}, expected={}, target={}",
+                    promoProductId, expectedStatus, newStatus);
+        }
     }
 
     private PromoPolicySnapshot buildSnapshot(PromoPolicyEntity policy) {
@@ -248,6 +275,14 @@ public class PromoDecisionService {
             log.error("JSON serialization failed", e);
             return "{}";
         }
+    }
+
+    private void publishAudit(String actionType, long workspaceId, long userId,
+                               String entityType, long entityId) {
+        eventPublisher.publishEvent(new AuditEvent(
+                workspaceId, "USER", userId, actionType,
+                entityType, String.valueOf(entityId),
+                "SUCCESS", null, null, null));
     }
 
     private record PromoProductInfo(long id, long campaignId, long marketplaceOfferId,

@@ -1,0 +1,10 @@
+# Local environment: backend + frontend run natively on the host.
+# Nginx proxies to host.docker.internal, prometheus scrapes from host.
+services:
+  nginx:
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
+
+  prometheus:
+    volumes:
+      - ./prometheus/local.yml:/etc/prometheus/prometheus.yml:ro

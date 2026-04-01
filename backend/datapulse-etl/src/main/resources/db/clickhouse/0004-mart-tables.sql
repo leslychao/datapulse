@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS mart_inventory_analysis (
     source_platform              LowCardinality(String),
     product_id                   UInt64,
     seller_sku_id                UInt64,
-    warehouse_id                 Nullable(UInt32),
+    warehouse_id                 UInt32 DEFAULT 0,
     analysis_date                Date,
     available                    Int32,
     reserved                     Nullable(Int32),

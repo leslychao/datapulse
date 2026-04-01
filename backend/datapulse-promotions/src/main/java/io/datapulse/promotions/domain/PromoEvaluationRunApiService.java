@@ -45,10 +45,17 @@ public class PromoEvaluationRunApiService {
 
     @Transactional(readOnly = true)
     public Page<PromoEvaluationRunResponse> listRuns(long workspaceId, Long connectionId,
-                                                      Pageable pageable) {
-        Page<PromoEvaluationRunEntity> page = connectionId != null
-                ? runRepository.findAllByWorkspaceIdAndConnectionId(workspaceId, connectionId, pageable)
-                : runRepository.findAllByWorkspaceId(workspaceId, pageable);
+                                                      PromoRunStatus status, Pageable pageable) {
+        Page<PromoEvaluationRunEntity> page;
+
+        if (connectionId != null) {
+            page = runRepository.findAllByWorkspaceIdAndConnectionId(
+                    workspaceId, connectionId, pageable);
+        } else if (status != null) {
+            page = runRepository.findAllByWorkspaceIdAndStatus(workspaceId, status, pageable);
+        } else {
+            page = runRepository.findAllByWorkspaceId(workspaceId, pageable);
+        }
 
         return page.map(runMapper::toResponse);
     }

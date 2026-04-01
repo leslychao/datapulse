@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS fact_orders (
     total_amount     Decimal(18, 2),
     order_date       Date,
     status           LowCardinality(String),
-    fulfillment_type Nullable(LowCardinality(String)),
+    fulfillment_type LowCardinality(Nullable(String)),
     region           Nullable(String),
     job_execution_id UInt64,
     ver              UInt64
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS fact_returns (
     product_id        Nullable(UInt64),
     quantity          Int32,
     return_amount     Nullable(Decimal(18, 2)),
-    return_reason     Nullable(LowCardinality(String)),
+    return_reason     LowCardinality(Nullable(String)),
     return_date       Date,
     job_execution_id  UInt64,
     ver               UInt64

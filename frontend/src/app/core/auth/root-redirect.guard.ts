@@ -3,21 +3,26 @@ import { CanActivateFn, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
-import { UserApiService } from '@core/api/user-api.service';
 
 const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
 
 export const rootRedirectGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const userApi = inject(UserApiService);
 
   if (!authService.isAuthenticated()) {
-    authService.initLogin();
-    return false;
+    const ok = await firstValueFrom(authService.checkSession());
+    if (!ok) {
+      authService.login('/');
+      return false;
+    }
   }
 
-  const me = await firstValueFrom(userApi.getMe());
+  const me = authService.user();
+  if (!me) {
+    authService.login('/');
+    return false;
+  }
 
   if (me.needsOnboarding) {
     return router.createUrlTree(['/onboarding']);

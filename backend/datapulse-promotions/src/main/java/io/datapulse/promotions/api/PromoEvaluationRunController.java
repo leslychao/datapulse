@@ -2,6 +2,7 @@ package io.datapulse.promotions.api;
 
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.promotions.domain.PromoEvaluationRunApiService;
+import io.datapulse.promotions.domain.PromoRunStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -38,9 +39,10 @@ public class PromoEvaluationRunController {
     @GetMapping
     public Page<PromoEvaluationRunResponse> listRuns(
             @RequestParam(value = "connectionId", required = false) Long connectionId,
+            @RequestParam(value = "status", required = false) PromoRunStatus status,
             Pageable pageable) {
         return runApiService.listRuns(
-                workspaceContext.getWorkspaceId(), connectionId, pageable);
+                workspaceContext.getWorkspaceId(), connectionId, status, pageable);
     }
 
     @GetMapping("/{runId}")
