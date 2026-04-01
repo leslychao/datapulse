@@ -1,0 +1,277 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
+import { injectQuery } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
+import type { EChartsOption } from 'echarts';
+
+import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { AnalyticsFilter, InventoryByProduct } from '@core/models';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { ChartComponent } from '@shared/components/chart/chart.component';
+
+@Component({
+  selector: 'dp-inventory-overview-page',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe, ChartComponent],
+  template: `
+    <div class="flex h-full flex-col gap-4 p-4">
+      <!-- Filter bar -->
+      <div class="flex items-center gap-3">
+        <select
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          [value]="connectionId()"
+          (change)="onConnectionChange($event)"
+        >
+          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
+        </select>
+      </div>
+
+      <!-- KPI cards -->
+      <div class="grid grid-cols-3 gap-3">
+        <!-- Total SKUs -->
+        <div
+          class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4"
+        >
+          <p class="text-xs text-[var(--text-secondary)]">
+            {{ 'analytics.inventory.kpi.total_skus' | translate }}
+          </p>
+          @if (overviewQuery.isPending()) {
+            <div class="dp-shimmer mt-1 h-7 w-20 rounded"></div>
+          } @else {
+            <p class="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+              {{ overview()?.totalSkus?.toLocaleString('ru-RU') ?? '—' }}
+            </p>
+          }
+        </div>
+
+        <!-- Critical count -->
+        <div
+          class="rounded-[var(--radius-lg)] border bg-[var(--bg-primary)] p-4"
+          [class]="criticalCount() > 0
+            ? 'border-[var(--status-error)]'
+            : 'border-[var(--border-default)]'"
+        >
+          <p class="text-xs text-[var(--text-secondary)]">
+            {{ 'analytics.inventory.kpi.critical' | translate }}
+          </p>
+          @if (overviewQuery.isPending()) {
+            <div class="dp-shimmer mt-1 h-7 w-14 rounded"></div>
+          } @else {
+            <p
+              class="mt-1 text-2xl font-semibold"
+              [class]="criticalCount() > 0
+                ? 'text-[var(--status-error)]'
+                : 'text-[var(--text-primary)]'"
+            >
+              {{ criticalCount() }}
+            </p>
+          }
+        </div>
+
+        <!-- Frozen Capital -->
+        <div
+          class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4"
+        >
+          <p class="text-xs text-[var(--text-secondary)]">
+            {{ 'analytics.inventory.kpi.frozen_capital' | translate }}
+          </p>
+          @if (overviewQuery.isPending()) {
+            <div class="dp-shimmer mt-1 h-7 w-28 rounded"></div>
+          } @else {
+            <p class="mt-1 font-mono text-2xl font-semibold text-[var(--text-primary)]">
+              {{ formatMoney(overview()?.frozenCapital ?? null) }}
+            </p>
+          }
+        </div>
+      </div>
+
+      <!-- Risk distribution chart -->
+      <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
+        <p class="mb-2 text-sm font-medium text-[var(--text-primary)]">
+          {{ 'analytics.inventory.risk_distribution' | translate }}
+        </p>
+        <dp-chart
+          [options]="riskChartOptions()"
+          [loading]="overviewQuery.isPending()"
+          height="120px"
+        />
+      </div>
+
+      <!-- Top-10 critical products -->
+      <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
+        <p class="mb-3 text-sm font-medium text-[var(--text-primary)]">
+          {{ 'analytics.inventory.top_critical' | translate }}
+        </p>
+        @if (overviewQuery.isPending()) {
+          <div class="dp-shimmer h-48 w-full rounded"></div>
+        } @else if (topCritical().length === 0) {
+          <p class="py-6 text-center text-sm text-[var(--text-tertiary)]">
+            {{ 'analytics.inventory.no_critical' | translate }}
+          </p>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                  <th class="pb-2 pr-4 font-medium">SKU</th>
+                  <th class="pb-2 pr-4 font-medium">
+                    {{ 'analytics.inventory.col.product' | translate }}
+                  </th>
+                  <th class="pb-2 pr-4 text-right font-medium">
+                    {{ 'analytics.inventory.col.available' | translate }}
+                  </th>
+                  <th class="pb-2 pr-4 text-right font-medium">
+                    {{ 'analytics.inventory.col.days_of_cover' | translate }}
+                  </th>
+                  <th class="pb-2 font-medium">
+                    {{ 'analytics.inventory.col.risk' | translate }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of topCritical(); track item.sellerSkuId) {
+                  <tr class="border-b border-[var(--border-subtle)] last:border-0">
+                    <td class="py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]">
+                      {{ item.skuCode }}
+                    </td>
+                    <td class="max-w-[200px] truncate py-2 pr-4 text-[var(--text-primary)]">
+                      {{ item.productName }}
+                    </td>
+                    <td class="py-2 pr-4 text-right font-mono">
+                      {{ item.available }}
+                    </td>
+                    <td class="py-2 pr-4 text-right font-mono">
+                      {{ item.daysOfCover }}
+                    </td>
+                    <td class="py-2">
+                      <span class="inline-flex items-center gap-1">
+                        <span
+                          class="h-2 w-2 rounded-full"
+                          [class]="riskDotClass(item.stockOutRisk)"
+                        ></span>
+                        {{ riskLabel(item.stockOutRisk) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  `,
+})
+export class InventoryOverviewPageComponent {
+  private readonly analyticsApi = inject(AnalyticsApiService);
+  private readonly wsStore = inject(WorkspaceContextStore);
+
+  readonly connectionId = signal(0);
+
+  private readonly filter = computed<AnalyticsFilter>(() => {
+    const cid = this.connectionId();
+    return cid ? { connectionId: cid } : {};
+  });
+
+  readonly overviewQuery = injectQuery(() => ({
+    queryKey: ['inventory-overview', this.wsStore.currentWorkspaceId(), this.filter()],
+    queryFn: () =>
+      lastValueFrom(
+        this.analyticsApi.getInventoryOverview(
+          this.wsStore.currentWorkspaceId()!,
+          this.filter(),
+        ),
+      ),
+    enabled: !!this.wsStore.currentWorkspaceId(),
+    staleTime: 30_000,
+  }));
+
+  readonly overview = computed(() => this.overviewQuery.data() ?? null);
+
+  readonly criticalCount = computed(() => this.overview()?.criticalCount ?? 0);
+
+  readonly topCritical = computed<InventoryByProduct[]>(() =>
+    this.overview()?.topCritical ?? [],
+  );
+
+  readonly riskChartOptions = computed<EChartsOption>(() => {
+    const data = this.overview();
+    return {
+      grid: { left: 80, right: 40, top: 8, bottom: 8 },
+      xAxis: { type: 'value', show: false },
+      yAxis: {
+        type: 'category',
+        data: ['NORMAL', 'WARNING', 'CRITICAL'],
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          formatter: (v: string) => this.riskLabel(v),
+          color: 'var(--text-secondary)',
+          fontSize: 12,
+        },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: [
+            {
+              value: data?.normalCount ?? 0,
+              itemStyle: { color: 'var(--status-success)', borderRadius: [0, 4, 4, 0] },
+            },
+            {
+              value: data?.warningCount ?? 0,
+              itemStyle: { color: 'var(--status-warning)', borderRadius: [0, 4, 4, 0] },
+            },
+            {
+              value: data?.criticalCount ?? 0,
+              itemStyle: { color: 'var(--status-error)', borderRadius: [0, 4, 4, 0] },
+            },
+          ],
+          barWidth: 20,
+          label: {
+            show: true,
+            position: 'right',
+            color: 'var(--text-secondary)',
+            fontSize: 12,
+          },
+        },
+      ],
+      tooltip: { show: false },
+    };
+  });
+
+  onConnectionChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.connectionId.set(Number(value));
+  }
+
+  formatMoney(value: number | null): string {
+    if (value == null) return '—';
+    const abs = Math.abs(value);
+    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+    return value < 0 ? `−${formatted} ₽` : `${formatted} ₽`;
+  }
+
+  riskDotClass(risk: string): string {
+    switch (risk) {
+      case 'CRITICAL': return 'bg-[var(--status-error)]';
+      case 'WARNING': return 'bg-[var(--status-warning)]';
+      default: return 'bg-[var(--status-success)]';
+    }
+  }
+
+  riskLabel(risk: string): string {
+    switch (risk) {
+      case 'CRITICAL': return 'Критичный';
+      case 'WARNING': return 'Внимание';
+      default: return 'Норма';
+    }
+  }
+}

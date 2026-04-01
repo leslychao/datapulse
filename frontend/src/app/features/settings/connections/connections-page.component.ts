@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
@@ -12,18 +12,28 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { StatusBadgeComponent } from '@shared/components/status-badge.component';
 import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
+import { SpinnerComponent } from '@shared/layout/spinner.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
+import { StatusLabelPipe, StatusColorPipe } from '@shared/pipes/status-label.pipe';
 
 type FormStep = 'idle' | 'select-marketplace' | 'credentials';
 
 @Component({
   selector: 'dp-connections-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     LucideAngularModule,
     StatusBadgeComponent,
     MarketplaceBadgeComponent,
     SectionCardComponent,
+    SpinnerComponent,
+    EmptyStateComponent,
+    DateFormatPipe,
+    StatusLabelPipe,
+    StatusColorPipe,
   ],
   template: `
     <div class="max-w-4xl">
@@ -41,7 +51,6 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
         </button>
       </div>
 
-      <!-- Create form -->
       @if (formStep() !== 'idle') {
         <dp-section-card [title]="formStep() === 'select-marketplace' ? 'Выберите маркетплейс' : 'Данные подключения'" class="mb-6">
           @if (formStep() === 'select-marketplace') {
@@ -146,20 +155,16 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
         </dp-section-card>
       }
 
-      <!-- Connection list -->
       @if (connectionsQuery.isPending()) {
-        <div class="flex items-center gap-2 py-8 text-sm text-[var(--text-secondary)]">
-          <span class="dp-spinner inline-block h-4 w-4 rounded-full border-2 border-[var(--border-default)] border-t-[var(--accent-primary)]"></span>
-          Загрузка...
-        </div>
+        <dp-spinner message="Загрузка..." />
       }
 
       @if (connectionsQuery.data(); as connections) {
         @if (connections.length === 0) {
-          <div class="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)] py-12 text-center">
-            <p class="text-sm text-[var(--text-secondary)]">Нет подключений</p>
-            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">Нажмите «Подключить», чтобы добавить первый маркетплейс</p>
-          </div>
+          <dp-empty-state
+            message="Нет подключений"
+            hint="Нажмите «Подключить», чтобы добавить первый маркетплейс"
+          />
         } @else {
           <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
             <table class="w-full text-sm">
@@ -175,18 +180,18 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
               <tbody>
                 @for (conn of connections; track conn.id) {
                   <tr
-                    class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)] cursor-pointer"
+                    class="border-b border-[var(--border-subtle)] cursor-pointer transition-colors hover:bg-[var(--bg-secondary)]"
                     (click)="openDetail(conn)"
                   >
                     <td class="px-4 py-2.5">
-                      <dp-marketplace-badge [type]="$any(conn.marketplaceType)" />
+                      <dp-marketplace-badge [type]="conn.marketplaceType" />
                     </td>
                     <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ conn.name }}</td>
                     <td class="px-4 py-2.5">
-                      <dp-status-badge [label]="statusLabel(conn.status)" [color]="statusColor(conn.status)" />
+                      <dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" />
                     </td>
                     <td class="px-4 py-2.5 text-[var(--text-secondary)]">
-                      {{ conn.lastSuccessAt ? formatDate(conn.lastSuccessAt) : '—' }}
+                      {{ conn.lastSuccessAt | dpDateFormat }}
                     </td>
                     <td class="px-4 py-2.5 text-right">
                       <lucide-icon [img]="ExternalLinkIcon" [size]="14" class="text-[var(--text-tertiary)]" />
@@ -280,33 +285,5 @@ export class ConnectionsPageComponent {
     this.router.navigate([
       '/workspace', this.wsStore.currentWorkspaceId(), 'settings', 'connections', conn.id,
     ]);
-  }
-
-  statusLabel(status: string): string {
-    switch (status) {
-      case 'ACTIVE': return 'Активно';
-      case 'PENDING_VALIDATION': return 'Проверка';
-      case 'AUTH_FAILED': return 'Ошибка авторизации';
-      case 'DISABLED': return 'Отключено';
-      case 'ARCHIVED': return 'В архиве';
-      default: return status;
-    }
-  }
-
-  statusColor(status: string): 'success' | 'error' | 'warning' | 'info' | 'neutral' {
-    switch (status) {
-      case 'ACTIVE': return 'success';
-      case 'PENDING_VALIDATION': return 'info';
-      case 'AUTH_FAILED': return 'error';
-      case 'DISABLED': case 'ARCHIVED': return 'neutral';
-      default: return 'neutral';
-    }
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
   }
 }

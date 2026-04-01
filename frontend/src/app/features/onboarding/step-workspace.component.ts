@@ -1,4 +1,12 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  inject,
+  Input,
+  Output,
+  signal,
+} from '@angular/core';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
@@ -6,6 +14,7 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
 @Component({
   selector: 'dp-step-workspace',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule],
   template: `
     <div class="flex flex-col gap-6">

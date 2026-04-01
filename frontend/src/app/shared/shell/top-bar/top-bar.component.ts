@@ -1,4 +1,4 @@
-import { Component, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 
 import { WorkspaceSwitcherComponent } from './workspace-switcher.component';
 import { BreadcrumbsComponent } from './breadcrumbs.component';
@@ -9,6 +9,7 @@ import { UserMenuComponent } from './user-menu.component';
 @Component({
   selector: 'dp-top-bar',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     WorkspaceSwitcherComponent,
     BreadcrumbsComponent,

@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { RouterOutlet, ActivatedRoute } from '@angular/router';
 
 import { TopBarComponent } from './top-bar/top-bar.component';
@@ -9,6 +9,7 @@ import { BottomPanelComponent } from './bottom-panel/bottom-panel.component';
 import { StatusBarComponent } from './status-bar/status-bar.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
 import { ToastContainerComponent } from './toast/toast-container.component';
+import { OfferDetailPanelComponent } from '@features/grid/components/offer-detail/offer-detail-panel.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ShortcutService } from '@shared/services/shortcut.service';
@@ -17,6 +18,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
 @Component({
   selector: 'dp-shell',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterOutlet,
     TopBarComponent,
@@ -27,6 +29,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
     StatusBarComponent,
     CommandPaletteComponent,
     ToastContainerComponent,
+    OfferDetailPanelComponent,
   ],
   template: `
     <div class="grid h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
@@ -49,7 +52,11 @@ import { WebSocketService } from '@core/websocket/websocket.service';
 
       @if (detailPanel.isOpen()) {
         <dp-detail-panel style="grid-area: detail"
-                         class="border-l border-[var(--border-default)]" />
+                         class="border-l border-[var(--border-default)]">
+          @if (detailPanel.entityType() === 'offer') {
+            <dp-offer-detail-panel />
+          }
+        </dp-detail-panel>
       }
 
       <main style="grid-area: main" class="overflow-auto bg-[var(--bg-primary)]">

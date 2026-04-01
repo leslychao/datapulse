@@ -1,10 +1,10 @@
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, GridReadyEvent, GridApi } from 'ag-grid-community';
+import { ColDef } from 'ag-grid-community';
 import {
   LucideAngularModule,
   ArrowLeft,
@@ -16,7 +16,7 @@ import {
 } from 'lucide-angular';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
-import { CallLogEntry, MarketplaceType, SyncState } from '@core/models';
+import { CallLogEntry, SyncState } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { BreadcrumbService } from '@shared/services/breadcrumb.service';
@@ -24,10 +24,16 @@ import { StatusBadgeComponent } from '@shared/components/status-badge.component'
 import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
+import { SpinnerComponent } from '@shared/layout/spinner.component';
+import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
+import { StatusLabelPipe, StatusColorPipe } from '@shared/pipes/status-label.pipe';
+
+const dateFormatter = new DateFormatPipe();
 
 @Component({
   selector: 'dp-connection-detail-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     AgGridAngular,
@@ -36,10 +42,13 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
     MarketplaceBadgeComponent,
     SectionCardComponent,
     ConfirmationModalComponent,
+    SpinnerComponent,
+    DateFormatPipe,
+    StatusLabelPipe,
+    StatusColorPipe,
   ],
   template: `
     <div class="max-w-5xl">
-      <!-- Back button -->
       <button
         (click)="goBack()"
         class="mb-4 flex cursor-pointer items-center gap-1 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-primary)]"
@@ -49,21 +58,16 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       </button>
 
       @if (connectionQuery.isPending()) {
-        <div class="flex items-center gap-2 py-8 text-sm text-[var(--text-secondary)]">
-          <span class="dp-spinner inline-block h-4 w-4 rounded-full border-2 border-[var(--border-default)] border-t-[var(--accent-primary)]"></span>
-          Загрузка...
-        </div>
+        <dp-spinner message="Загрузка..." />
       }
 
       @if (connectionQuery.data(); as conn) {
-        <!-- Header -->
         <div class="mb-6 flex items-center gap-3">
-          <dp-marketplace-badge [type]="$any(conn.marketplaceType)" />
+          <dp-marketplace-badge [type]="conn.marketplaceType" />
           <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ conn.name }}</h1>
-          <dp-status-badge [label]="statusLabel(conn.status)" [color]="statusColor(conn.status)" />
+          <dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" />
         </div>
 
-        <!-- Info section -->
         <dp-section-card title="Информация" class="mb-6">
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
@@ -72,11 +76,11 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
             </div>
             <div>
               <span class="text-[var(--text-secondary)]">Статус</span>
-              <p class="mt-0.5"><dp-status-badge [label]="statusLabel(conn.status)" [color]="statusColor(conn.status)" /></p>
+              <p class="mt-0.5"><dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" /></p>
             </div>
             <div>
               <span class="text-[var(--text-secondary)]">Последняя успешная синхронизация</span>
-              <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.lastSuccessAt ? formatDate(conn.lastSuccessAt) : '—' }}</p>
+              <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.lastSuccessAt | dpDateFormat }}</p>
             </div>
             <div>
               <span class="text-[var(--text-secondary)]">Последняя ошибка</span>
@@ -85,7 +89,6 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           </div>
         </dp-section-card>
 
-        <!-- Credential rotation -->
         <dp-section-card title="Учётные данные" class="mb-6">
           @if (!showRotation()) {
             <div class="flex items-center justify-between">
@@ -149,7 +152,6 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           }
         </dp-section-card>
 
-        <!-- Sync State (AG Grid) -->
         <dp-section-card title="Синхронизация по доменам" class="mb-6">
           <div class="mb-2 flex items-center justify-between">
             <p class="text-sm text-[var(--text-secondary)]">Текущее состояние синхронизации по типам данных</p>
@@ -176,7 +178,6 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           }
         </dp-section-card>
 
-        <!-- Call Log (AG Grid) -->
         <dp-section-card title="Журнал API-вызовов" class="mb-6">
           @if (callLogQuery.data(); as callLogPage) {
             <ag-grid-angular
@@ -193,7 +194,6 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           }
         </dp-section-card>
 
-        <!-- Danger zone -->
         <dp-section-card title="Опасная зона" class="mb-6">
           <div class="space-y-3">
             @if (conn.status !== 'DISABLED' && conn.status !== 'ARCHIVED') {
@@ -389,13 +389,13 @@ export class ConnectionDetailPageComponent {
       headerName: 'Последняя синхронизация',
       field: 'lastSyncAt',
       flex: 2,
-      valueFormatter: (params) => params.value ? this.formatDate(params.value) : '—',
+      valueFormatter: (params) => dateFormatter.transform(params.value),
     },
     {
       headerName: 'Следующая',
       field: 'nextScheduledAt',
       flex: 2,
-      valueFormatter: (params) => params.value ? this.formatDate(params.value) : '—',
+      valueFormatter: (params) => dateFormatter.transform(params.value),
     },
   ];
 
@@ -404,7 +404,7 @@ export class ConnectionDetailPageComponent {
       headerName: 'Время',
       field: 'createdAt',
       flex: 2,
-      valueFormatter: (params) => this.formatDate(params.value),
+      valueFormatter: (params) => dateFormatter.transform(params.value),
     },
     { headerName: 'Метод', field: 'httpMethod', width: 80 },
     { headerName: 'Endpoint', field: 'endpoint', flex: 3 },
@@ -450,34 +450,5 @@ export class ConnectionDetailPageComponent {
 
   goBack(): void {
     this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'settings', 'connections']);
-  }
-
-  statusLabel(status: string): string {
-    switch (status) {
-      case 'ACTIVE': return 'Активно';
-      case 'PENDING_VALIDATION': return 'Проверка';
-      case 'AUTH_FAILED': return 'Ошибка авторизации';
-      case 'ERROR': return 'Ошибка';
-      case 'DISABLED': return 'Отключено';
-      case 'ARCHIVED': return 'В архиве';
-      default: return status;
-    }
-  }
-
-  statusColor(status: string): 'success' | 'error' | 'warning' | 'info' | 'neutral' {
-    switch (status) {
-      case 'ACTIVE': return 'success';
-      case 'PENDING_VALIDATION': return 'info';
-      case 'AUTH_FAILED': case 'ERROR': return 'error';
-      case 'DISABLED': case 'ARCHIVED': return 'neutral';
-      default: return 'neutral';
-    }
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
   }
 }

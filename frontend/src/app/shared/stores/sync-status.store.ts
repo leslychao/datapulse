@@ -1,13 +1,6 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 
-export type SyncHealth = 'OK' | 'STALE' | 'ERROR';
-
-export interface ConnectionSyncStatus {
-  connectionId: number;
-  connectionName: string;
-  lastSuccessAt: string | null;
-  status: SyncHealth;
-}
+import { ConnectionSyncStatus, SyncHealth } from '@core/models';
 
 export interface SyncStatusState {
   connections: ConnectionSyncStatus[];

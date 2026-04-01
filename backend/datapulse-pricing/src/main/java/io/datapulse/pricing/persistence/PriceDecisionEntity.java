@@ -13,6 +13,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -42,6 +44,7 @@ public class PriceDecisionEntity {
     @Column(name = "policy_version", nullable = false)
     private Integer policyVersion;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "policy_snapshot", columnDefinition = "jsonb")
     private String policySnapshot;
 
@@ -68,12 +71,15 @@ public class PriceDecisionEntity {
     @Column(name = "strategy_raw_price")
     private BigDecimal strategyRawPrice;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "signal_snapshot", columnDefinition = "jsonb")
     private String signalSnapshot;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "constraints_applied", columnDefinition = "jsonb")
     private String constraintsApplied;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "guards_evaluated", columnDefinition = "jsonb")
     private String guardsEvaluated;
 

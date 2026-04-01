@@ -1,9 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { LucideAngularModule, ChevronUp, ChevronDown } from 'lucide-angular';
 
 @Component({
   selector: 'dp-bottom-panel',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
     @if (isOpen()) {

@@ -11,6 +11,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -34,6 +36,7 @@ public class PricePolicyEntity extends BaseEntity {
     @Column(name = "strategy_type", nullable = false, length = 30)
     private PolicyType strategyType;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "strategy_params", nullable = false, columnDefinition = "jsonb")
     private String strategyParams;
 
@@ -49,6 +52,7 @@ public class PricePolicyEntity extends BaseEntity {
     @Column(name = "max_price")
     private BigDecimal maxPrice;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "guard_config", columnDefinition = "jsonb")
     private String guardConfig;
 

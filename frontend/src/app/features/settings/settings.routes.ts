@@ -39,6 +39,30 @@ const routes: Routes = [
           import('./general/general-page.component').then((m) => m.GeneralPageComponent),
         data: { breadcrumb: 'Общие' },
       },
+      {
+        path: 'cost-profiles',
+        loadComponent: () =>
+          import('./cost-profiles/cost-profiles-page.component').then(
+            (m) => m.CostProfilesPageComponent,
+          ),
+        data: { breadcrumb: 'Себестоимость' },
+      },
+      {
+        path: 'alert-rules',
+        loadComponent: () =>
+          import('./alert-rules/alert-rules-page.component').then(
+            (m) => m.AlertRulesPageComponent,
+          ),
+        data: { breadcrumb: 'Правила алертов' },
+      },
+      {
+        path: 'audit',
+        loadComponent: () =>
+          import('./audit-log/audit-log-page.component').then(
+            (m) => m.AuditLogPageComponent,
+          ),
+        data: { breadcrumb: 'Журнал аудита' },
+      },
     ],
   },
 ];

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ToastService, Toast } from './toast.service';
 
 const TYPE_STYLES: Record<Toast['type'], { bg: string; text: string; border: string }> = {
@@ -27,6 +27,7 @@ const TYPE_STYLES: Record<Toast['type'], { bg: string; text: string; border: str
 @Component({
   selector: 'dp-toast-container',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="fixed bottom-10 right-4 z-[9999] flex flex-col gap-2">
       @for (toast of toastService.toasts(); track toast.id) {

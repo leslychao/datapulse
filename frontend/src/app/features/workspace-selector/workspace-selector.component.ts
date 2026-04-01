@@ -1,4 +1,11 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 
 import { UserApiService } from '@core/api/user-api.service';
@@ -35,6 +42,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 @Component({
   selector: 'dp-workspace-selector',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MinimalTopBarComponent, CenteredContentComponent, StatusMessageComponent],
   template: `
     <div class="flex h-screen flex-col bg-[var(--bg-secondary)]">

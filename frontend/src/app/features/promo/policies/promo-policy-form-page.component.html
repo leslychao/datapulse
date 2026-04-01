@@ -1,0 +1,157 @@
+<div class="flex h-full flex-col">
+  <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+    <div class="flex items-center gap-2">
+      <button
+        (click)="navigateBack()"
+        class="cursor-pointer text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+      >
+        ← {{ 'promo.policies.title' | translate }}
+      </button>
+    </div>
+    <h2 class="text-base font-semibold text-[var(--text-primary)]">
+      {{ isEditMode() ? ('promo.form.edit_title' | translate) : ('promo.form.create_title' | translate) }}
+    </h2>
+  </div>
+
+  @if (isEditMode() && policyQuery.isPending()) {
+    <div class="flex flex-1 items-center justify-center">
+      <span
+        class="dp-spinner inline-block h-8 w-8 rounded-full border-2 border-[var(--border-default)]"
+        style="border-top-color: var(--accent-primary)"
+      ></span>
+    </div>
+  } @else {
+    <div class="flex-1 overflow-auto p-6">
+      <form [formGroup]="form" (ngSubmit)="submit()" class="mx-auto max-w-2xl space-y-8">
+
+        <!-- Section 1: Basic -->
+        <section>
+          <h3 class="mb-4 text-sm font-semibold text-[var(--text-primary)]">
+            {{ 'promo.form.section_basic' | translate }}
+          </h3>
+
+          <div class="mb-4">
+            <label class="mb-1 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+              {{ 'promo.form.name_label' | translate }}
+            </label>
+            <input
+              formControlName="name"
+              type="text"
+              placeholder="Стандартная промо-политика"
+              class="h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-default)]
+                     bg-[var(--bg-primary)] px-3 text-[length:var(--text-sm)] text-[var(--text-primary)]
+                     outline-none transition-colors placeholder:text-[var(--text-tertiary)]
+                     focus:border-[var(--accent-primary)]"
+              [class.border-[var(--status-error)]]="form.controls.name.invalid && form.controls.name.touched"
+            />
+            @if (form.controls.name.invalid && form.controls.name.touched) {
+              <p class="mt-1 text-[length:var(--text-xs)] text-[var(--status-error)]">
+                {{ 'promo.form.name_required' | translate }}
+              </p>
+            }
+          </div>
+
+          <div>
+            <label class="mb-2 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+              {{ 'promo.form.mode_label' | translate }}
+            </label>
+            <div class="grid grid-cols-4 gap-3">
+              @for (mode of modes; track mode.value) {
+                <button
+                  type="button"
+                  (click)="selectMode(mode.value)"
+                  class="cursor-pointer rounded-[var(--radius-md)] border p-3 text-left transition-colors"
+                  [class]="form.value.participationMode === mode.value
+                    ? 'border-[var(--accent-primary)] bg-[var(--bg-active)]'
+                    : 'border-[var(--border-default)] bg-[var(--bg-primary)] hover:border-[var(--accent-primary)]'"
+                >
+                  <span class="block text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
+                    {{ mode.title }}
+                  </span>
+                  <span class="mt-1 block text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+                    {{ mode.description }}
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 2: Thresholds -->
+        <section>
+          <h3 class="mb-4 text-sm font-semibold text-[var(--text-primary)]">
+            {{ 'promo.form.section_thresholds' | translate }}
+          </h3>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="mb-1 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ 'promo.form.min_margin_label' | translate }}
+              </label>
+              <input
+                formControlName="minMarginPct"
+                type="number"
+                step="0.1"
+                placeholder="10,0"
+                class="h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-default)]
+                       bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
+                       text-[var(--text-primary)] outline-none transition-colors
+                       focus:border-[var(--accent-primary)]"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ 'promo.form.min_stock_label' | translate }}
+              </label>
+              <input
+                formControlName="minStockDaysOfCover"
+                type="number"
+                step="1"
+                placeholder="7"
+                class="h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-default)]
+                       bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
+                       text-[var(--text-primary)] outline-none transition-colors
+                       focus:border-[var(--accent-primary)]"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ 'promo.form.max_discount_label' | translate }}
+              </label>
+              <input
+                formControlName="maxPromoDiscountPct"
+                type="number"
+                step="0.1"
+                placeholder="—"
+                class="h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-default)]
+                       bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
+                       text-[var(--text-primary)] outline-none transition-colors
+                       focus:border-[var(--accent-primary)]"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Sticky footer -->
+        <div class="flex items-center gap-3 border-t border-[var(--border-default)] pt-4">
+          <button
+            type="button"
+            (click)="navigateBack()"
+            class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+          >
+            {{ 'common.cancel' | translate }}
+          </button>
+          <button
+            type="submit"
+            [disabled]="form.invalid || saving()"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ 'common.save' | translate }}
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</div>

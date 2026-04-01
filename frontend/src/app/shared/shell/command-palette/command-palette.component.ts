@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   effect,
@@ -59,6 +60,7 @@ const STATIC_COMMANDS: { label: string; path: string }[] = [
 @Component({
   selector: 'dp-command-palette',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeyDown($event)' },
   template: `
     @if (isOpen()) {

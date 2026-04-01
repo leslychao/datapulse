@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@core/auth/auth.service';
@@ -11,6 +11,7 @@ type CallbackState = 'loading' | 'error';
 @Component({
   selector: 'dp-callback',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [StatusMessageComponent],
   template: `
     <div class="flex h-screen items-center justify-center bg-[var(--bg-primary)]">

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule, ChevronRight } from 'lucide-angular';
 
@@ -7,6 +7,7 @@ import { BreadcrumbService } from '@shared/services/breadcrumb.service';
 @Component({
   selector: 'dp-breadcrumbs',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, LucideAngularModule],
   template: `
     <nav class="flex items-center gap-1 overflow-hidden">

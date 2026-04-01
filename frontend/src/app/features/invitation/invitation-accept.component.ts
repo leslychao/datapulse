@@ -1,10 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { InvitationApiService, AcceptInvitationResponse } from '@core/api/invitation-api.service';
+import { InvitationApiService } from '@core/api/invitation-api.service';
 import { AuthService } from '@core/auth/auth.service';
-import { WorkspaceRole } from '@core/models';
+import { AcceptInvitationResponse, WorkspaceRole } from '@core/models';
 import { MinimalTopBarComponent } from '@shared/layout/minimal-top-bar.component';
 import { CenteredContentComponent } from '@shared/layout/centered-content.component';
 import { StatusMessageComponent } from '@shared/layout/status-message.component';
@@ -23,6 +23,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 @Component({
   selector: 'dp-invitation-accept',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MinimalTopBarComponent, CenteredContentComponent, StatusMessageComponent],
   template: `
     <div class="flex h-screen flex-col bg-[var(--bg-secondary)]">

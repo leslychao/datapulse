@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
   LucideAngularModule,
@@ -7,6 +7,7 @@ import {
   BarChart3,
   Tag,
   Gift,
+  PlayCircle,
   Settings,
 } from 'lucide-angular';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -20,6 +21,7 @@ interface NavItem {
 @Component({
   selector: 'dp-activity-bar',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive, LucideAngularModule],
   template: `
     <nav class="flex h-full w-12 flex-col items-center bg-[var(--bg-secondary)] py-3"
@@ -80,6 +82,7 @@ export class ActivityBarComponent {
     { icon: BarChart3, route: 'analytics', tooltip: 'Аналитика' },
     { icon: Tag, route: 'pricing', tooltip: 'Ценообразование' },
     { icon: Gift, route: 'promo', tooltip: 'Промо' },
+    { icon: PlayCircle, route: 'execution', tooltip: 'Действия' },
   ];
 
   readonly settingsItem: NavItem = {

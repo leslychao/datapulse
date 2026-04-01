@@ -12,6 +12,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -87,6 +89,7 @@ public class PromoEvaluationEntity {
     @Column(name = "evaluation_result", length = 30)
     private PromoEvaluationResult evaluationResult;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "signal_snapshot", columnDefinition = "jsonb")
     private String signalSnapshot;
 

@@ -3,18 +3,13 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '@env';
-import { CreateTenantRequest, CreateWorkspaceRequest, TenantDetail, WorkspaceDetail } from '@core/models';
-
-export interface WorkspaceSettingsResponse {
-  id: number;
-  name: string;
-  slug: string;
-  status: string;
-  createdAt: string;
-  tenantId: number;
-  tenantName: string;
-  tenantSlug: string;
-}
+import {
+  CreateTenantRequest,
+  CreateWorkspaceRequest,
+  TenantDetail,
+  WorkspaceDetail,
+  WorkspaceSettingsResponse,
+} from '@core/models';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceApiService {

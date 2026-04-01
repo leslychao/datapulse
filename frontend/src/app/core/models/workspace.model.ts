@@ -24,3 +24,14 @@ export interface CreateTenantRequest {
 export interface CreateWorkspaceRequest {
   name: string;
 }
+
+export interface WorkspaceSettingsResponse {
+  id: number;
+  name: string;
+  slug: string;
+  status: string;
+  createdAt: string;
+  tenantId: number;
+  tenantName: string;
+  tenantSlug: string;
+}

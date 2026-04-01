@@ -210,14 +210,13 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                   AND posting_id != ''
                 """.formatted(jobExecutionId);
 
-        String incrementalSql = FULL_MATERIALIZE_SQL.formatted(ver)
-                .replace(
-                        "GROUP BY posting_id, connection_id\n            ) pm",
-                        """
-                        GROUP BY posting_id, connection_id
-                        HAVING posting_id IN (%s)
-                    ) pm""".formatted(affectedPostingsQuery)
-                );
+        String incrementalSql =
+                FULL_MATERIALIZE_SQL.formatted(ver)
+                        .replace(
+                                "    GROUP BY posting_id, connection_id\n) pm",
+                                "    GROUP BY posting_id, connection_id\n"
+                                        + "    HAVING posting_id IN (%s)\n) pm"
+                                        .formatted(affectedPostingsQuery));
 
         jdbc.ch().execute(incrementalSql);
         log.info("Incremental mart_posting_pnl: jobExecutionId={}", jobExecutionId);

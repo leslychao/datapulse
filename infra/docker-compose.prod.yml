@@ -21,7 +21,7 @@ services:
       SPRING_MAIL_PORT: ${MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
       SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://${PROD_DOMAIN}/auth/realms/${KEYCLOAK_REALM:-datapulse}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://${PROD_DOMAIN}/realms/${KEYCLOAK_REALM:-datapulse}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/auth/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
       DATAPULSE_S3_ENDPOINT: http://minio:9000
       DATAPULSE_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-datapulse}
@@ -58,9 +58,9 @@ services:
 
   oauth2-proxy:
     environment:
-      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${PROD_DOMAIN}/auth/realms/${KEYCLOAK_REALM:-datapulse}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${PROD_DOMAIN}/realms/${KEYCLOAK_REALM:-datapulse}
       OAUTH2_PROXY_REDIRECT_URL: https://${PROD_DOMAIN}/oauth2/callback
-      OAUTH2_PROXY_LOGIN_URL: https://${PROD_DOMAIN}/auth/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/auth
+      OAUTH2_PROXY_LOGIN_URL: https://${PROD_DOMAIN}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/auth
       OAUTH2_PROXY_REDEEM_URL: http://keycloak:8080/auth/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/token
       OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak:8080/auth/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
       OAUTH2_PROXY_PROFILE_URL: http://keycloak:8080/auth/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo

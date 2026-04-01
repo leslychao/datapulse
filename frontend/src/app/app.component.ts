@@ -1,10 +1,11 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ViewportGuardComponent } from './shared/layout/viewport-guard.component';
 
 @Component({
   selector: 'dp-root',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, ViewportGuardComponent],
   template: `
     <dp-viewport-guard>

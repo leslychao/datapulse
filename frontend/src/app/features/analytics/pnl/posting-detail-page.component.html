@@ -1,0 +1,130 @@
+<div class="flex flex-col gap-4">
+  <!-- Back button -->
+  <button
+    (click)="goBack()"
+    class="flex w-fit items-center gap-1 text-[length:var(--text-sm)] text-[var(--accent-primary)]
+           transition-colors hover:text-[var(--accent-primary-hover)]"
+  >
+    ← {{ 'analytics.pnl.posting.back' | translate }}
+  </button>
+
+  @if (detailQuery.isPending()) {
+    <div class="dp-shimmer h-40 rounded-[var(--radius-md)]"></div>
+    <div class="dp-shimmer h-64 rounded-[var(--radius-md)]"></div>
+  }
+
+  @if (detailQuery.data(); as d) {
+    <!-- Summary header -->
+    <div class="rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-4 shadow-[var(--shadow-sm)]">
+      <div class="mb-3 flex items-center gap-3">
+        <h2 class="text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
+          {{ 'analytics.pnl.posting.title' | translate }} {{ d.postingId }}
+        </h2>
+        <span
+          class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[length:var(--text-xs)] font-medium"
+          [class]="platformBadge(d.sourcePlatform)"
+        >
+          {{ d.sourcePlatform }}
+        </span>
+      </div>
+      <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-[length:var(--text-sm)] lg:grid-cols-4">
+        <div>
+          <span class="text-[var(--text-secondary)]">{{ 'analytics.pnl.col.sku' | translate }}:</span>
+          <span class="ml-1 font-mono">{{ d.skuCode }}</span>
+        </div>
+        <div>
+          <span class="text-[var(--text-secondary)]">{{ 'analytics.pnl.col.product' | translate }}:</span>
+          <span class="ml-1">{{ d.productName }}</span>
+        </div>
+        <div>
+          <span class="text-[var(--text-secondary)]">{{ 'analytics.pnl.col.date' | translate }}:</span>
+          <span class="ml-1">{{ d.financeDate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- P&L summary strip -->
+    <div class="grid grid-cols-5 gap-3">
+      <div class="flex flex-col gap-0.5 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
+        <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'analytics.pnl.col.revenue' | translate }}
+        </span>
+        <span class="font-mono text-[length:var(--text-base)] font-semibold" [class]="moneyColorClass(d.revenueAmount)">
+          {{ formatMoney(d.revenueAmount) }}
+        </span>
+      </div>
+      <div class="flex flex-col gap-0.5 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
+        <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'analytics.pnl.kpi.total_costs' | translate }}
+        </span>
+        <span class="font-mono text-[length:var(--text-base)] font-semibold text-[var(--finance-negative)]">
+          {{ formatMoney(d.totalCostsAmount) }}
+        </span>
+      </div>
+      <div class="flex flex-col gap-0.5 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
+        <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'analytics.pnl.col.payout' | translate }}
+        </span>
+        <span class="font-mono text-[length:var(--text-base)] font-semibold" [class]="moneyColorClass(d.netPayout)">
+          {{ formatMoney(d.netPayout) }}
+        </span>
+      </div>
+      <div class="flex flex-col gap-0.5 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
+        <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'analytics.pnl.col.cogs' | translate }}
+        </span>
+        <span class="font-mono text-[length:var(--text-base)] font-semibold" [class]="moneyColorClass(d.netCogs)">
+          {{ formatMoney(d.netCogs) }}
+        </span>
+      </div>
+      <div class="flex flex-col gap-0.5 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
+        <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'analytics.pnl.col.residual' | translate }}
+        </span>
+        <span class="font-mono text-[length:var(--text-base)] font-semibold"
+              [class]="residualColorClass(d.reconciliationResidual)">
+          {{ formatMoney(d.reconciliationResidual) }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Entries table -->
+    <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
+      <table class="w-full text-left text-[length:var(--text-sm)]">
+        <thead class="bg-[var(--bg-secondary)] text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          <tr>
+            <th class="px-3 py-2 font-medium">{{ 'analytics.pnl.posting.entry_type' | translate }}</th>
+            @for (col of measureColumns; track col.field) {
+              <th class="px-3 py-2 font-medium text-right">{{ col.labelKey | translate }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of d.entries; track entry.entryId) {
+            <tr class="border-t border-[var(--border-subtle)]">
+              <td class="px-3 py-2 font-medium text-[var(--text-primary)]">{{ entry.entryType }}</td>
+              @for (col of measureColumns; track col.field) {
+                <td class="px-3 py-2 text-right font-mono" [class]="moneyColorClass(entryMeasure(entry, col.field))">
+                  {{ formatMoney(entryMeasure(entry, col.field)) }}
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+        <tfoot class="border-t-2 border-[var(--border-default)] bg-[var(--bg-secondary)]">
+          <tr>
+            <td class="px-3 py-2 font-semibold text-[var(--text-primary)]">
+              {{ 'analytics.pnl.posting.total' | translate }}
+            </td>
+            @for (col of measureColumns; track col.field) {
+              <td class="px-3 py-2 text-right font-mono font-semibold"
+                  [class]="moneyColorClass(totals()[col.field])">
+                {{ formatMoney(totals()[col.field]) }}
+              </td>
+            }
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  }
+</div>

@@ -1,11 +1,12 @@
 export type MarketplaceType = 'WB' | 'OZON';
 export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'DISABLED' | 'ARCHIVED';
+export type SyncHealth = 'OK' | 'STALE' | 'ERROR';
 
 export interface ConnectionSummary {
   id: number;
-  marketplaceType: string;
+  marketplaceType: MarketplaceType;
   name: string;
-  status: string;
+  status: ConnectionStatus;
   lastCheckAt: string | null;
   lastSuccessAt: string | null;
   lastErrorCode: string | null;
@@ -51,6 +52,13 @@ export interface SyncState {
   lastSuccessAt: string | null;
   nextScheduledAt: string | null;
   status: string;
+}
+
+export interface ConnectionSyncStatus {
+  connectionId: number;
+  connectionName: string;
+  lastSuccessAt: string | null;
+  status: SyncHealth;
 }
 
 export interface CallLogEntry {

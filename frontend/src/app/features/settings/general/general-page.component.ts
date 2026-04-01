@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -7,11 +7,14 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SectionCardComponent } from '@shared/components/section-card.component';
+import { SpinnerComponent } from '@shared/layout/spinner.component';
+import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'dp-general-page',
   standalone: true,
-  imports: [FormsModule, SectionCardComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, SectionCardComponent, SpinnerComponent, DateFormatPipe],
   template: `
     <div class="max-w-2xl">
       <div class="mb-6">
@@ -20,10 +23,7 @@ import { SectionCardComponent } from '@shared/components/section-card.component'
       </div>
 
       @if (workspaceQuery.isPending()) {
-        <div class="flex items-center gap-2 py-8 text-sm text-[var(--text-secondary)]">
-          <span class="dp-spinner inline-block h-4 w-4 rounded-full border-2 border-[var(--border-default)] border-t-[var(--accent-primary)]"></span>
-          Загрузка...
-        </div>
+        <dp-spinner message="Загрузка..." />
       }
 
       @if (workspaceQuery.data(); as ws) {
@@ -41,7 +41,7 @@ import { SectionCardComponent } from '@shared/components/section-card.component'
               </div>
               <div>
                 <span class="text-[var(--text-secondary)]">Создан</span>
-                <p class="mt-0.5 text-[var(--text-primary)]">{{ formatDate(ws.createdAt) }}</p>
+                <p class="mt-0.5 text-[var(--text-primary)]">{{ ws.createdAt | dpDateFormat:'short' }}</p>
               </div>
               <div>
                 <span class="text-[var(--text-secondary)]">Статус</span>
@@ -88,14 +88,10 @@ export class GeneralPageComponent {
 
   workspaceName = '';
 
-  private get wsId(): number {
-    return this.wsStore.currentWorkspaceId()!;
-  }
-
   readonly workspaceQuery = injectQuery(() => ({
     queryKey: ['workspace', this.wsStore.currentWorkspaceId()],
     queryFn: async () => {
-      const ws = await lastValueFrom(this.workspaceApi.getWorkspace(this.wsId));
+      const ws = await lastValueFrom(this.workspaceApi.getWorkspace(this.wsStore.currentWorkspaceId()!));
       this.workspaceName = ws.name;
       return ws;
     },
@@ -104,7 +100,7 @@ export class GeneralPageComponent {
 
   readonly updateMutation = injectMutation(() => ({
     mutationFn: () =>
-      lastValueFrom(this.workspaceApi.updateWorkspace(this.wsId, this.workspaceName.trim())),
+      lastValueFrom(this.workspaceApi.updateWorkspace(this.wsStore.currentWorkspaceId()!, this.workspaceName.trim())),
     onSuccess: (result) => {
       this.workspaceQuery.refetch();
       this.wsStore.setWorkspace(result.id, result.name);
@@ -116,11 +112,5 @@ export class GeneralPageComponent {
   saveName(): void {
     if (!this.workspaceName.trim()) return;
     this.updateMutation.mutate(undefined);
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    });
   }
 }

@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   ElementRef,
   HostListener,
@@ -13,6 +14,7 @@ import { DetailPanelService } from '@shared/services/detail-panel.service';
 @Component({
   selector: 'dp-detail-panel',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
     <div class="relative flex h-full flex-col bg-[var(--bg-primary)]"
@@ -26,24 +28,8 @@ import { DetailPanelService } from '@shared/services/detail-panel.service';
            (mousedown)="startResize($event)">
       </div>
 
-      <!-- Header -->
-      <div class="flex h-10 shrink-0 items-center justify-between border-b
-                  border-[var(--border-default)] px-3">
-        <span class="text-[13px] font-medium text-[var(--text-primary)]">
-          Детали
-        </span>
-        <button class="flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)]
-                       text-[var(--text-tertiary)] transition-colors
-                       duration-[var(--transition-fast)]
-                       hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-                (click)="panelService.close()"
-                aria-label="Закрыть панель">
-          <lucide-icon [img]="closeIcon" [size]="16" />
-        </button>
-      </div>
-
-      <!-- Content -->
-      <div class="flex-1 overflow-auto p-4">
+      <!-- Content (child provides its own header) -->
+      <div class="flex-1 overflow-auto">
         <ng-content />
       </div>
     </div>

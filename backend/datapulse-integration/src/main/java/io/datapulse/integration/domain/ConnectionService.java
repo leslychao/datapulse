@@ -81,8 +81,6 @@ public class ConnectionService {
         eventPublisher.publishEvent(new ConnectionCreatedEvent(
                 connection.getId(), workspaceId, marketplaceType.name(), userId));
 
-        validationService.validateAsync(connection.getId());
-
         List<MarketplaceSyncStateEntity> syncStates = List.of();
         return connectionMapper.toResponse(connection, syncStates);
     }
@@ -140,8 +138,6 @@ public class ConnectionService {
         eventPublisher.publishEvent(new CredentialRotatedEvent(connectionId, workspaceId, userId));
         eventPublisher.publishEvent(new ConnectionStatusChangedEvent(
                 connectionId, oldStatus, ConnectionStatus.PENDING_VALIDATION.name(), "credential_rotation"));
-
-        validationService.validateAsync(connectionId);
 
         List<MarketplaceSyncStateEntity> syncStates =
                 syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
@@ -227,8 +223,6 @@ public class ConnectionService {
         log.info("Connection re-enabled: connectionId={}, workspaceId={}", connectionId, workspaceId);
         eventPublisher.publishEvent(new ConnectionStatusChangedEvent(
                 connectionId, oldStatus, ConnectionStatus.PENDING_VALIDATION.name(), "admin_enable"));
-
-        validationService.validateAsync(connectionId);
     }
 
     @Transactional

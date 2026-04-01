@@ -10,6 +10,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -42,12 +44,15 @@ public class PromoPolicyEntity extends BaseEntity {
     @Column(name = "max_promo_discount_pct")
     private BigDecimal maxPromoDiscountPct;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "auto_participate_categories", columnDefinition = "jsonb")
     private String autoParticipateCategories;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "auto_decline_categories", columnDefinition = "jsonb")
     private String autoDeclineCategories;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evaluation_config", columnDefinition = "jsonb")
     private String evaluationConfig;
 

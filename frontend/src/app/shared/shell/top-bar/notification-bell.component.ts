@@ -1,4 +1,13 @@
-import { Component, computed, ElementRef, HostListener, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  HostListener,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { LucideAngularModule, Bell } from 'lucide-angular';
 import { DatePipe } from '@angular/common';
 
@@ -14,6 +23,7 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
 @Component({
   selector: 'dp-notification-bell',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule, DatePipe],
   template: `
     <div class="relative">

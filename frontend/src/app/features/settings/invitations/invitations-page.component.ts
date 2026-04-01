@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -11,16 +11,25 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { StatusBadgeComponent } from '@shared/components/status-badge.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
+import { SpinnerComponent } from '@shared/layout/spinner.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
+import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
 
 @Component({
   selector: 'dp-invitations-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     LucideAngularModule,
     SectionCardComponent,
     StatusBadgeComponent,
     ConfirmationModalComponent,
+    SpinnerComponent,
+    EmptyStateComponent,
+    DateFormatPipe,
+    RoleLabelPipe,
   ],
   template: `
     <div class="max-w-4xl">
@@ -29,7 +38,6 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
         <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">Пригласите участников в workspace</p>
       </div>
 
-      <!-- Invite form -->
       <dp-section-card title="Отправить приглашение" class="mb-6">
         <form (ngSubmit)="sendInvite()" class="flex items-end gap-3">
           <div class="flex-1">
@@ -51,7 +59,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
               class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             >
               @for (role of assignableRoles; track role.value) {
-                <option [value]="role.value">{{ role.label }}</option>
+                <option [value]="role.value">{{ role.value | dpRoleLabel }}</option>
               }
             </select>
           </div>
@@ -73,19 +81,13 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
         }
       </dp-section-card>
 
-      <!-- Invitations list -->
       @if (invitationsQuery.isPending()) {
-        <div class="flex items-center gap-2 py-8 text-sm text-[var(--text-secondary)]">
-          <span class="dp-spinner inline-block h-4 w-4 rounded-full border-2 border-[var(--border-default)] border-t-[var(--accent-primary)]"></span>
-          Загрузка...
-        </div>
+        <dp-spinner message="Загрузка..." />
       }
 
       @if (invitationsQuery.data(); as invitations) {
         @if (invitations.length === 0) {
-          <div class="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)] py-12 text-center">
-            <p class="text-sm text-[var(--text-secondary)]">Нет приглашений</p>
-          </div>
+          <dp-empty-state message="Нет приглашений" />
         } @else {
           <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
             <table class="w-full text-sm">
@@ -103,12 +105,12 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
                 @for (inv of invitations; track inv.id) {
                   <tr class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]">
                     <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ inv.email }}</td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ roleLabel(inv.role) }}</td>
+                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ inv.role | dpRoleLabel }}</td>
                     <td class="px-4 py-2.5">
                       <dp-status-badge [label]="invStatusLabel(inv.status)" [color]="invStatusColor(inv.status)" />
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ formatDate(inv.createdAt) }}</td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ formatDate(inv.expiresAt) }}</td>
+                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ inv.createdAt | dpDateFormat:'short' }}</td>
+                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ inv.expiresAt | dpDateFormat:'short' }}</td>
                     <td class="px-4 py-2.5 text-right">
                       @if (inv.status === 'PENDING') {
                         <div class="flex items-center justify-end gap-2">
@@ -168,26 +170,22 @@ export class InvitationsPageComponent {
   readonly invToCancel = signal<Invitation | null>(null);
 
   readonly assignableRoles = [
-    { value: 'ADMIN' as WorkspaceRole, label: 'Администратор' },
-    { value: 'PRICING_MANAGER' as WorkspaceRole, label: 'Менеджер цен' },
-    { value: 'OPERATOR' as WorkspaceRole, label: 'Оператор' },
-    { value: 'ANALYST' as WorkspaceRole, label: 'Аналитик' },
-    { value: 'VIEWER' as WorkspaceRole, label: 'Наблюдатель' },
+    { value: 'ADMIN' as WorkspaceRole },
+    { value: 'PRICING_MANAGER' as WorkspaceRole },
+    { value: 'OPERATOR' as WorkspaceRole },
+    { value: 'ANALYST' as WorkspaceRole },
+    { value: 'VIEWER' as WorkspaceRole },
   ];
-
-  private get wsId(): number {
-    return this.wsStore.currentWorkspaceId()!;
-  }
 
   readonly invitationsQuery = injectQuery(() => ({
     queryKey: ['invitations', this.wsStore.currentWorkspaceId()],
-    queryFn: () => lastValueFrom(this.invitationApi.listInvitations(this.wsId)),
+    queryFn: () => lastValueFrom(this.invitationApi.listInvitations(this.wsStore.currentWorkspaceId()!)),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
   readonly createMutation = injectMutation(() => ({
     mutationFn: () =>
-      lastValueFrom(this.invitationApi.createInvitation(this.wsId, {
+      lastValueFrom(this.invitationApi.createInvitation(this.wsStore.currentWorkspaceId()!, {
         email: this.inviteEmail.trim(),
         role: this.inviteRole,
       })),
@@ -200,7 +198,7 @@ export class InvitationsPageComponent {
 
   readonly resendMutation = injectMutation(() => ({
     mutationFn: (invitationId: number) =>
-      lastValueFrom(this.invitationApi.resendInvitation(this.wsId, invitationId)),
+      lastValueFrom(this.invitationApi.resendInvitation(this.wsStore.currentWorkspaceId()!, invitationId)),
     onSuccess: () => {
       this.invitationsQuery.refetch();
       this.toast.success('Приглашение отправлено повторно');
@@ -210,7 +208,7 @@ export class InvitationsPageComponent {
 
   readonly cancelMutation = injectMutation(() => ({
     mutationFn: (invitationId: number) =>
-      lastValueFrom(this.invitationApi.cancelInvitation(this.wsId, invitationId)),
+      lastValueFrom(this.invitationApi.cancelInvitation(this.wsStore.currentWorkspaceId()!, invitationId)),
     onSuccess: () => {
       this.invitationsQuery.refetch();
       this.showCancelModal.set(false);
@@ -239,17 +237,6 @@ export class InvitationsPageComponent {
     this.cancelMutation.mutate(inv.id);
   }
 
-  roleLabel(role: WorkspaceRole): string {
-    switch (role) {
-      case 'OWNER': return 'Владелец';
-      case 'ADMIN': return 'Администратор';
-      case 'PRICING_MANAGER': return 'Менеджер цен';
-      case 'OPERATOR': return 'Оператор';
-      case 'ANALYST': return 'Аналитик';
-      case 'VIEWER': return 'Наблюдатель';
-    }
-  }
-
   invStatusLabel(status: string): string {
     switch (status) {
       case 'PENDING': return 'Ожидает';
@@ -268,11 +255,5 @@ export class InvitationsPageComponent {
       case 'EXPIRED': return 'warning';
       default: return 'neutral';
     }
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    });
   }
 }

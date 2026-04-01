@@ -1,4 +1,13 @@
-import { Component, EventEmitter, Input, Output, OnDestroy, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  inject,
+  Input,
+  OnDestroy,
+  Output,
+  signal,
+} from '@angular/core';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
@@ -21,6 +30,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
 @Component({
   selector: 'dp-step-connection',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, SpinnerComponent],
   template: `
     <div class="flex flex-col gap-6">

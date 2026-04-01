@@ -3,13 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '@env';
-import { CreateInvitationRequest, Invitation } from '@core/models';
-
-export interface AcceptInvitationResponse {
-  workspaceId: number;
-  workspaceName: string;
-  role: string;
-}
+import { AcceptInvitationResponse, CreateInvitationRequest, Invitation } from '@core/models';
 
 @Injectable({ providedIn: 'root' })
 export class InvitationApiService {

@@ -1,9 +1,10 @@
-import { Component, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 import { LucideAngularModule, Search } from 'lucide-angular';
 
 @Component({
   selector: 'dp-search-trigger',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
     <button

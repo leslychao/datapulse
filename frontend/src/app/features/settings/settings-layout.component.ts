@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   LucideAngularModule,
@@ -7,6 +7,9 @@ import {
   Users,
   Mail,
   Settings,
+  Calculator,
+  BellRing,
+  ScrollText,
 } from 'lucide-angular';
 
 interface NavItem {
@@ -18,6 +21,7 @@ interface NavItem {
 @Component({
   selector: 'dp-settings-layout',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule],
   template: `
     <div class="flex h-full">
@@ -51,9 +55,12 @@ interface NavItem {
 })
 export class SettingsLayoutComponent {
   readonly navItems: NavItem[] = [
+    { path: 'general', label: 'Общие', icon: Settings },
     { path: 'connections', label: 'Подключения', icon: Plug },
+    { path: 'cost-profiles', label: 'Себестоимость', icon: Calculator },
     { path: 'team', label: 'Команда', icon: Users },
     { path: 'invitations', label: 'Приглашения', icon: Mail },
-    { path: 'general', label: 'Общие', icon: Settings },
+    { path: 'alert-rules', label: 'Правила алертов', icon: BellRing },
+    { path: 'audit', label: 'Журнал аудита', icon: ScrollText },
   ];
 }

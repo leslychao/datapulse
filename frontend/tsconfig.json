@@ -15,6 +15,7 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "ES2022",
+    "skipLibCheck": true,
     "lib": ["ES2022", "dom"],
     "baseUrl": ".",
     "paths": {

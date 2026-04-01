@@ -13,10 +13,10 @@ public interface IntegrationCallLogRepository extends JpaRepository<IntegrationC
     @Query("""
             SELECT l FROM IntegrationCallLogEntity l
             WHERE l.marketplaceConnectionId = :connectionId
-              AND (:from IS NULL OR l.createdAt >= :from)
-              AND (:to IS NULL OR l.createdAt <= :to)
-              AND (:endpoint IS NULL OR l.endpoint LIKE CONCAT('%', CAST(:endpoint AS string), '%'))
-              AND (:httpStatus IS NULL OR l.httpStatus = :httpStatus)
+              AND (CAST(:from AS TIMESTAMP) IS NULL OR l.createdAt >= :from)
+              AND (CAST(:to AS TIMESTAMP) IS NULL OR l.createdAt <= :to)
+              AND (CAST(:endpoint AS STRING) IS NULL OR l.endpoint LIKE CONCAT('%', CAST(:endpoint AS STRING), '%'))
+              AND (CAST(:httpStatus AS INTEGER) IS NULL OR l.httpStatus = :httpStatus)
             ORDER BY l.createdAt DESC
             """)
     Page<IntegrationCallLogEntity> findByFilters(

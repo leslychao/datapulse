@@ -1,0 +1,43 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+      - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:18080/realms/test
+          jwk-set-uri: http://localhost:18080/realms/test/protocol/openid-connect/certs
+
+datapulse:
+  s3:
+    endpoint: http://localhost:9000
+    bucket: test-bucket
+    access-key: test
+    secret-key: test
+  vault:
+    url: http://localhost:8200
+    token: test-token
+  clickhouse:
+    url: jdbc:ch://localhost:8123/default
+  integration:
+    wb:
+      base-url: http://localhost:9090
+    ozon:
+      base-url: http://localhost:9091
+
+logging:
+  level:
+    io.datapulse: DEBUG
+    org.hibernate.SQL: DEBUG

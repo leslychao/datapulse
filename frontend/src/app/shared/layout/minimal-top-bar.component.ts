@@ -1,8 +1,9 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 
 @Component({
   selector: 'dp-minimal-top-bar',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header
       class="flex h-10 shrink-0 items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-primary)] px-4"

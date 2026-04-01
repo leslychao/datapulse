@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule, X, Pin } from 'lucide-angular';
 
@@ -8,6 +8,7 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 @Component({
   selector: 'dp-tab-bar',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive, LucideAngularModule],
   template: `
     <div class="flex h-9 items-end gap-0 overflow-x-auto bg-[var(--bg-secondary)] px-1"

@@ -73,6 +73,11 @@ export const routes: Routes = [
         data: { breadcrumb: 'Промо' },
       },
       {
+        path: 'execution',
+        loadChildren: () => import('./features/execution/execution.routes'),
+        data: { breadcrumb: 'Исполнение' },
+      },
+      {
         path: 'settings',
         loadChildren: () => import('./features/settings/settings.routes'),
         data: { breadcrumb: 'Настройки' },

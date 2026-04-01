@@ -4,16 +4,9 @@ import { Subscription } from 'rxjs';
 
 import { environment } from '@env';
 import { NotificationApiService } from '@core/api/notification-api.service';
-import { AppNotification } from '@core/models';
+import { AppNotification, ConnectionSyncStatus } from '@core/models';
 import { SyncStatusStore } from '@shared/stores/sync-status.store';
 import { NotificationStore } from '@shared/stores/notification.store';
-
-interface SyncStatusMessage {
-  connectionId: number;
-  connectionName: string;
-  lastSuccessAt: string | null;
-  status: 'OK' | 'STALE' | 'ERROR';
-}
 
 const INITIAL_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30000;
@@ -100,7 +93,7 @@ export class WebSocketService {
       // TODO: dispatch to alert store when alert dashboard is implemented (Phase B)
     });
 
-    this.subscribeTo<SyncStatusMessage>(
+    this.subscribeTo<ConnectionSyncStatus>(
       `/topic/workspace/${workspaceId}/sync-status`,
       (msg) => {
         this.syncStore.updateConnection(msg.connectionId, {

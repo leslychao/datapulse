@@ -39,28 +39,52 @@ services:
       - sh
       - -c
       - |
-        set -e
         CERT_DIR="/etc/letsencrypt/live/$$DOMAIN"
-        if [ -f "$$CERT_DIR/fullchain.pem" ]; then
-          ISSUER=$$(openssl x509 -in "$$CERT_DIR/fullchain.pem" -noout -issuer 2>/dev/null || true)
-          if echo "$$ISSUER" | grep -qi "Let's Encrypt"; then
-            echo "Real Let's Encrypt certificate exists, renewing if needed..."
-            certbot renew
+        CERT_FILE="$$CERT_DIR/fullchain.pem"
+        KEY_FILE="$$CERT_DIR/privkey.pem"
+
+        is_le() { openssl x509 -in "$$CERT_FILE" -noout -issuer 2>/dev/null | grep -qi "Let's Encrypt"; }
+
+        # --- 1. LE certificate exists ---
+        if [ -f "$$CERT_FILE" ] && is_le; then
+          if openssl x509 -in "$$CERT_FILE" -noout -checkend 2592000 2>/dev/null; then
+            echo "LE certificate valid for >30 days, nothing to do."
             exit 0
           fi
-          echo "Removing non-LE certificate..."
-          rm -rf "$$CERT_DIR"
-          rm -f "/etc/letsencrypt/renewal/$$DOMAIN.conf"
+          echo "LE certificate expiring soon, attempting renewal..."
+          certbot renew && exit 0
+          echo "WARNING: renewal failed, but existing LE cert still usable."
+          exit 0
         fi
-        echo "Obtaining Let's Encrypt certificate for $$DOMAIN..."
-        certbot certonly \
+
+        # --- 2. No LE cert (either self-signed or missing) — try to obtain ---
+        echo "Attempting to obtain Let's Encrypt certificate..."
+        if certbot certonly \
           --standalone \
           --preferred-challenges http \
           -d "$$DOMAIN" \
           --email "$$CERTBOT_EMAIL" \
           --agree-tos \
-          --no-eff-email
-        echo "Certificate obtained successfully."
+          --no-eff-email; then
+          echo "LE certificate obtained successfully."
+          exit 0
+        fi
+
+        # --- 3. LE failed — use existing self-signed or generate new one ---
+        if [ -f "$$CERT_FILE" ]; then
+          echo "WARNING: LE failed, keeping existing certificate."
+          exit 0
+        fi
+
+        echo "WARNING: LE failed and no certificate exists."
+        echo "Generating self-signed fallback so nginx can start."
+        mkdir -p "$$CERT_DIR"
+        openssl req -x509 -nodes -days 7 \
+          -newkey rsa:2048 \
+          -keyout "$$KEY_FILE" \
+          -out "$$CERT_FILE" \
+          -subj "/CN=$$DOMAIN"
+        echo "Self-signed fallback created (7 days). Will be replaced with LE on next successful attempt."
 
   certbot:
     image: certbot/certbot

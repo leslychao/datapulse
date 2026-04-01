@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -7,13 +7,24 @@ import { MemberApiService } from '@core/api/member-api.service';
 import { Member, WorkspaceRole } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
-import { SectionCardComponent } from '@shared/components/section-card.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
+import { SpinnerComponent } from '@shared/layout/spinner.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
+import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
 
 @Component({
   selector: 'dp-team-page',
   standalone: true,
-  imports: [FormsModule, SectionCardComponent, ConfirmationModalComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    FormsModule,
+    ConfirmationModalComponent,
+    SpinnerComponent,
+    EmptyStateComponent,
+    DateFormatPipe,
+    RoleLabelPipe,
+  ],
   template: `
     <div class="max-w-4xl">
       <div class="mb-6">
@@ -22,17 +33,12 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       </div>
 
       @if (membersQuery.isPending()) {
-        <div class="flex items-center gap-2 py-8 text-sm text-[var(--text-secondary)]">
-          <span class="dp-spinner inline-block h-4 w-4 rounded-full border-2 border-[var(--border-default)] border-t-[var(--accent-primary)]"></span>
-          Загрузка...
-        </div>
+        <dp-spinner message="Загрузка..." />
       }
 
       @if (membersQuery.data(); as members) {
         @if (members.length === 0) {
-          <div class="rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)] py-12 text-center">
-            <p class="text-sm text-[var(--text-secondary)]">Нет участников</p>
-          </div>
+          <dp-empty-state message="Нет участников" />
         } @else {
           <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
             <table class="w-full text-sm">
@@ -52,7 +58,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
                     <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ m.email }}</td>
                     <td class="px-4 py-2.5">
                       @if (m.role === 'OWNER') {
-                        <span class="text-sm font-medium text-[var(--text-primary)]">{{ roleLabel(m.role) }}</span>
+                        <span class="text-sm font-medium text-[var(--text-primary)]">{{ m.role | dpRoleLabel }}</span>
                       } @else {
                         <select
                           [ngModel]="m.role"
@@ -61,13 +67,13 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
                           class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-50"
                         >
                           @for (role of assignableRoles; track role) {
-                            <option [value]="role">{{ roleLabel(role) }}</option>
+                            <option [value]="role">{{ role | dpRoleLabel }}</option>
                           }
                         </select>
                       }
                     </td>
                     <td class="px-4 py-2.5 text-[var(--text-secondary)]">
-                      {{ formatDate(m.createdAt) }}
+                      {{ m.createdAt | dpDateFormat:'short' }}
                     </td>
                     <td class="px-4 py-2.5 text-right">
                       @if (m.role !== 'OWNER') {
@@ -109,19 +115,15 @@ export class TeamPageComponent {
 
   readonly assignableRoles: WorkspaceRole[] = ['ADMIN', 'PRICING_MANAGER', 'OPERATOR', 'ANALYST', 'VIEWER'];
 
-  private get wsId(): number {
-    return this.wsStore.currentWorkspaceId()!;
-  }
-
   readonly membersQuery = injectQuery(() => ({
     queryKey: ['members', this.wsStore.currentWorkspaceId()],
-    queryFn: () => lastValueFrom(this.memberApi.listMembers(this.wsId)),
+    queryFn: () => lastValueFrom(this.memberApi.listMembers(this.wsStore.currentWorkspaceId()!)),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
   readonly roleChangeMutation = injectMutation(() => ({
     mutationFn: (vars: { userId: number; role: WorkspaceRole }) =>
-      lastValueFrom(this.memberApi.changeRole(this.wsId, vars.userId, { role: vars.role })),
+      lastValueFrom(this.memberApi.changeRole(this.wsStore.currentWorkspaceId()!, vars.userId, { role: vars.role })),
     onSuccess: () => {
       this.membersQuery.refetch();
       this.toast.success('Роль обновлена');
@@ -130,7 +132,8 @@ export class TeamPageComponent {
   }));
 
   readonly removeMutation = injectMutation(() => ({
-    mutationFn: (userId: number) => lastValueFrom(this.memberApi.removeMember(this.wsId, userId)),
+    mutationFn: (userId: number) =>
+      lastValueFrom(this.memberApi.removeMember(this.wsStore.currentWorkspaceId()!, userId)),
     onSuccess: () => {
       this.membersQuery.refetch();
       this.showRemoveModal.set(false);
@@ -152,22 +155,5 @@ export class TeamPageComponent {
     const member = this.memberToRemove();
     if (!member) return;
     this.removeMutation.mutate(member.userId);
-  }
-
-  roleLabel(role: WorkspaceRole): string {
-    switch (role) {
-      case 'OWNER': return 'Владелец';
-      case 'ADMIN': return 'Администратор';
-      case 'PRICING_MANAGER': return 'Менеджер цен';
-      case 'OPERATOR': return 'Оператор';
-      case 'ANALYST': return 'Аналитик';
-      case 'VIEWER': return 'Наблюдатель';
-    }
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    });
   }
 }

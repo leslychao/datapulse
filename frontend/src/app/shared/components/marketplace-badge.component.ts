@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import { MarketplaceType } from '@core/models';
 
@@ -10,20 +10,19 @@ const STYLES: Record<MarketplaceType, { bg: string; text: string; label: string 
 @Component({
   selector: 'dp-marketplace-badge',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <span
       class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold leading-4"
-      [style.background-color]="config.bg"
-      [style.color]="config.text"
+      [style.background-color]="config().bg"
+      [style.color]="config().text"
     >
-      {{ config.label }}
+      {{ config().label }}
     </span>
   `,
 })
 export class MarketplaceBadgeComponent {
-  @Input({ required: true }) type!: MarketplaceType;
+  readonly type = input.required<MarketplaceType>();
 
-  get config() {
-    return STYLES[this.type];
-  }
+  protected readonly config = computed(() => STYLES[this.type()]);
 }

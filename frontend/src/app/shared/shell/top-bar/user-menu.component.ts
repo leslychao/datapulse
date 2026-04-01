@@ -1,4 +1,12 @@
-import { Component, computed, ElementRef, HostListener, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  HostListener,
+  inject,
+  signal,
+} from '@angular/core';
 import { LucideAngularModule, ChevronDown, User, LogOut } from 'lucide-angular';
 
 import { AuthService } from '@core/auth/auth.service';
@@ -6,6 +14,7 @@ import { AuthService } from '@core/auth/auth.service';
 @Component({
   selector: 'dp-user-menu',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
     <div class="relative">

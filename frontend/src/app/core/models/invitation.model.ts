@@ -15,3 +15,9 @@ export interface CreateInvitationRequest {
   email: string;
   role: WorkspaceRole;
 }
+
+export interface AcceptInvitationResponse {
+  workspaceId: number;
+  workspaceName: string;
+  role: string;
+}

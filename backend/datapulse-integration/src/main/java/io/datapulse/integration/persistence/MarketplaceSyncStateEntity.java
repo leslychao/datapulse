@@ -6,6 +6,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 
@@ -30,6 +32,7 @@ public class MarketplaceSyncStateEntity extends BaseEntity {
     @Column(name = "next_scheduled_at")
     private OffsetDateTime nextScheduledAt;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "sync_cursor", columnDefinition = "jsonb")
     private String syncCursor;
 

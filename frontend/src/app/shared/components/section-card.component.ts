@@ -1,14 +1,15 @@
-import { Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 @Component({
   selector: 'dp-section-card',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
     <section class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]">
-      @if (title) {
+      @if (title()) {
         <div class="border-b border-[var(--border-default)] px-5 py-3">
-          <h3 class="text-sm font-semibold text-[var(--text-primary)]">{{ title }}</h3>
+          <h3 class="text-sm font-semibold text-[var(--text-primary)]">{{ title() }}</h3>
         </div>
       }
       <div class="px-5 py-4">
@@ -18,5 +19,5 @@ import { Component, Input } from '@angular/core';
   `,
 })
 export class SectionCardComponent {
-  @Input() title = '';
+  readonly title = input('');
 }

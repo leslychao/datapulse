@@ -1,8 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
-import { SyncStatusStore, SyncHealth } from '@shared/stores/sync-status.store';
+import { SyncHealth } from '@core/models';
+import { SyncStatusStore } from '@shared/stores/sync-status.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { AuthService } from '@core/auth/auth.service';
 
@@ -15,6 +16,7 @@ const HEALTH_COLORS: Record<SyncHealth, string> = {
 @Component({
   selector: 'dp-status-bar',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="grid h-6 items-center bg-[var(--bg-secondary)] px-3 text-[11px] text-[var(--text-tertiary)]"
          style="grid-template-columns: auto 1fr auto;">

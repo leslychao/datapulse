@@ -1,4 +1,12 @@
-import { Component, computed, ElementRef, HostListener, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  HostListener,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule, ChevronDown, Check } from 'lucide-angular';
 
@@ -8,6 +16,7 @@ import { WorkspaceDetail } from '@core/models';
 @Component({
   selector: 'dp-workspace-switcher',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule, RouterLink],
   template: `
     <div class="relative flex items-center">

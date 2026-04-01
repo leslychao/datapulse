@@ -1,0 +1,404 @@
+@if (actionQuery.isPending()) {
+  <div class="flex h-full items-center justify-center">
+    <span
+      class="dp-spinner inline-block h-8 w-8 rounded-full border-2 border-[var(--border-default)]"
+      style="border-top-color: var(--accent-primary)"
+    ></span>
+  </div>
+} @else if (actionQuery.isError()) {
+  <div class="flex h-full flex-col items-center justify-center gap-3">
+    <p class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.not_found' | translate }}</p>
+    <button
+      (click)="goBack()"
+      class="cursor-pointer text-sm text-[var(--accent-primary)] transition-colors hover:underline"
+    >
+      ← {{ 'execution.detail.back_to_list' | translate }}
+    </button>
+  </div>
+} @else {
+  @if (action(); as a) {
+  <div class="h-full overflow-auto">
+    <div class="mx-auto max-w-5xl px-6 py-6">
+
+      <!-- Header -->
+      <div class="mb-6 flex items-center gap-3">
+        <button
+          (click)="goBack()"
+          class="cursor-pointer rounded-[var(--radius-md)] p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+          [attr.aria-label]="'execution.detail.back_to_list' | translate"
+        >
+          <lucide-icon [img]="ArrowLeft" [size]="18" />
+        </button>
+        <div class="flex-1">
+          <h1 class="text-lg font-semibold text-[var(--text-primary)]">
+            {{ a.offerName }}
+            <span class="ml-2 text-sm font-normal text-[var(--text-secondary)]">{{ a.sku }}</span>
+          </h1>
+        </div>
+        <dp-status-badge [label]="statusLabel()" [color]="statusColor()" />
+      </div>
+
+      <!-- State Machine -->
+      <div class="mb-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5">
+        <div class="flex items-center justify-between">
+          @for (node of mainFlowNodes(); track node.status; let i = $index, last = $last) {
+            <div class="flex flex-col items-center gap-1.5">
+              <div
+                class="flex h-8 w-8 items-center justify-center rounded-full"
+                [class]="node.isCurrent
+                  ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--bg-secondary)]'
+                  : ''"
+                [style.background-color]="node.isCurrent
+                  ? 'var(--status-' + node.color + ')'
+                  : node.isPast
+                    ? 'var(--status-neutral)'
+                    : 'transparent'"
+                [style.border]="node.isFuture ? '2px solid var(--border-default)' : 'none'"
+                [attr.aria-label]="'Статус: ' + node.label + (node.isCurrent ? '. Текущий статус.' : '')"
+              >
+                @if (node.isPast || node.isCurrent) {
+                  <svg class="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <path d="M5 12l5 5L20 7" />
+                  </svg>
+                }
+              </div>
+              <span
+                class="text-center text-[11px]"
+                [class]="node.isCurrent
+                  ? 'font-semibold text-[var(--text-primary)]'
+                  : node.isPast
+                    ? 'text-[var(--text-secondary)]'
+                    : 'text-[var(--text-tertiary)]'"
+              >
+                {{ node.label }}
+              </span>
+            </div>
+
+            @if (!last) {
+              <div class="mx-1 mb-5 h-0.5 flex-1"
+                [style.background-color]="node.isPast ? 'var(--status-neutral)' : 'var(--border-default)'"
+                [style.border-top]="node.isFuture ? '1px dashed var(--border-default)' : 'none'"
+              ></div>
+            }
+          }
+        </div>
+      </div>
+
+      <!-- Two-column layout: Info + Actions -->
+      <div class="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+        <!-- Info card -->
+        <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-5 lg:col-span-2">
+          <h3 class="mb-4 text-sm font-semibold text-[var(--text-primary)]">{{ 'execution.detail.info_title' | translate }}</h3>
+          <div class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.offer' | translate }}</span>
+              <p class="font-medium text-[var(--text-primary)]">{{ a.offerName }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">SKU</span>
+              <p class="font-medium text-[var(--text-primary)]">{{ a.sku }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.connection' | translate }}</span>
+              <p class="font-medium text-[var(--text-primary)]">{{ a.connectionName }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.mode' | translate }}</span>
+              <p class="font-medium text-[var(--text-primary)]">{{ a.executionMode }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.target_price' | translate }}</span>
+              <p class="font-mono font-medium text-[var(--text-primary)]">{{ formatPrice(a.targetPrice) }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.current_price' | translate }}</span>
+              <p class="font-mono font-medium text-[var(--text-primary)]">{{ formatPrice(a.currentPriceAtCreation) }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.delta' | translate }}</span>
+              <p class="font-mono font-medium" [style.color]="deltaPctColor()">{{ deltaPctDisplay() }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.attempts' | translate }}</span>
+              <p class="font-mono font-medium text-[var(--text-primary)]">{{ a.attemptCount }}/{{ a.maxAttempts }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.created_at' | translate }}</span>
+              <p class="text-[var(--text-primary)]">{{ formatTimestamp(a.createdAt) }}</p>
+            </div>
+            <div>
+              <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.updated_at' | translate }}</span>
+              <p class="text-[var(--text-primary)]">{{ formatTimestamp(a.updatedAt) }}</p>
+            </div>
+            @if (a.approvedBy) {
+              <div>
+                <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.approved_by' | translate }}</span>
+                <p class="text-[var(--text-primary)]">{{ a.approvedBy }}</p>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Actions card -->
+        <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-5">
+          <h3 class="mb-4 text-sm font-semibold text-[var(--text-primary)]">{{ 'execution.detail.actions_title' | translate }}</h3>
+          <div class="flex flex-col gap-2">
+            @if (canApprove()) {
+              <button
+                (click)="approve()"
+                [disabled]="actionPending()"
+                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ 'execution.detail.btn_approve' | translate }}
+              </button>
+            }
+            @if (canReject()) {
+              <button
+                (click)="openReasonModal('reject')"
+                [disabled]="actionPending()"
+                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ 'execution.detail.btn_reject' | translate }}
+              </button>
+            }
+            @if (canHold()) {
+              <button
+                (click)="openReasonModal('cancel')"
+                [disabled]="actionPending()"
+                class="w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ 'execution.detail.btn_hold' | translate }}
+              </button>
+            }
+            @if (canResume()) {
+              <button
+                (click)="resume()"
+                [disabled]="actionPending()"
+                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ 'execution.detail.btn_resume' | translate }}
+              </button>
+            }
+            @if (canCancel()) {
+              <button
+                (click)="openReasonModal('cancel')"
+                [disabled]="actionPending()"
+                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ 'execution.detail.btn_cancel' | translate }}
+              </button>
+            }
+            @if (canRetry()) {
+              <button
+                (click)="openReasonModal('retry')"
+                [disabled]="actionPending()"
+                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {{ 'execution.detail.btn_retry' | translate }}
+              </button>
+            }
+            @if (!canApprove() && !canReject() && !canHold() && !canResume() && !canCancel() && !canRetry()) {
+              <p class="text-sm text-[var(--text-tertiary)]">{{ 'execution.detail.no_actions' | translate }}</p>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Hold / Cancel reason -->
+      @if (a.holdReason) {
+        <div class="mb-6 rounded-[var(--radius-lg)] border border-[var(--status-warning)] bg-[color-mix(in_srgb,var(--status-warning)_5%,var(--bg-primary))] p-4">
+          <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'execution.detail.hold_reason' | translate }}</p>
+          <p class="mt-1 text-sm text-[var(--text-secondary)]">{{ a.holdReason }}</p>
+        </div>
+      }
+      @if (a.cancelReason) {
+        <div class="mb-6 rounded-[var(--radius-lg)] border border-[var(--status-neutral)] bg-[var(--bg-secondary)] p-4">
+          <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'execution.detail.cancel_reason' | translate }}</p>
+          <p class="mt-1 text-sm text-[var(--text-secondary)]">{{ a.cancelReason }}</p>
+        </div>
+      }
+
+      <!-- Attempts table -->
+      <div class="mb-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)]">
+        <div class="border-b border-[var(--border-default)] px-5 py-3">
+          <h3 class="text-sm font-semibold text-[var(--text-primary)]">{{ 'execution.detail.attempts_title' | translate }}</h3>
+        </div>
+
+        @if (attempts().length === 0) {
+          <div class="px-5 py-8 text-center">
+            <p class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.no_attempts' | translate }}</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
+                  <th class="px-3 py-2 text-center font-medium text-[var(--text-secondary)]">#</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_started' | translate }}</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_completed' | translate }}</th>
+                  <th class="px-3 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_duration' | translate }}</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_outcome' | translate }}</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_classification' | translate }}</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_error' | translate }}</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Reconciliation</th>
+                  <th class="w-8 px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (att of attempts(); track att.attemptNumber) {
+                  <tr
+                    class="cursor-pointer border-b border-[var(--border-default)] transition-colors hover:bg-[var(--bg-secondary)]"
+                    (click)="toggleAttemptDetail(att.attemptNumber)"
+                  >
+                    <td class="px-3 py-2.5 text-center font-mono text-[var(--text-primary)]">{{ att.attemptNumber }}</td>
+                    <td class="px-3 py-2.5 text-[var(--text-primary)]">{{ formatTimestamp(att.startedAt) }}</td>
+                    <td class="px-3 py-2.5 text-[var(--text-primary)]">{{ formatTimestamp(att.completedAt) }}</td>
+                    <td class="px-3 py-2.5 text-right font-mono text-[var(--text-primary)]">{{ formatDuration(att.startedAt, att.completedAt) }}</td>
+                    <td class="px-3 py-2.5">
+                      <dp-status-badge [label]="outcomeLabel(att.outcome)" [color]="outcomeColor(att.outcome)" />
+                    </td>
+                    <td class="px-3 py-2.5 text-[var(--text-secondary)]">{{ att.errorClassification ?? '—' }}</td>
+                    <td class="max-w-[200px] truncate px-3 py-2.5 text-[var(--text-secondary)]" [title]="att.errorMessage ?? ''">
+                      {{ att.errorMessage ?? '—' }}
+                    </td>
+                    <td class="px-3 py-2.5 text-[var(--text-secondary)]">{{ att.reconciliationSource ?? '—' }}</td>
+                    <td class="px-3 py-2.5 text-[var(--text-tertiary)]">
+                      <lucide-icon
+                        [img]="expandedAttempt() === att.attemptNumber ? ChevronUp : ChevronDown"
+                        [size]="14"
+                      />
+                    </td>
+                  </tr>
+
+                  @if (expandedAttempt() === att.attemptNumber) {
+                    <tr>
+                      <td colspan="9" class="bg-[var(--bg-secondary)] px-5 py-4">
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          <div>
+                            <p class="mb-1.5 text-[11px] font-medium text-[var(--text-secondary)]">Provider request</p>
+                            <pre class="overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-[12px] text-[var(--text-primary)]">{{ att.providerRequest ?? '—' }}</pre>
+                          </div>
+                          <div>
+                            <p class="mb-1.5 text-[11px] font-medium text-[var(--text-secondary)]">Provider response</p>
+                            <pre class="overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-[12px] text-[var(--text-primary)]">{{ att.providerResponse ?? '—' }}</pre>
+                          </div>
+                        </div>
+                        @if (att.reconciliationSource) {
+                          <div class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
+                            <span>Источник: {{ att.reconciliationSource }}</span>
+                            @if (att.reconciliationReadAt) {
+                              <span>Проверка: {{ formatTimestamp(att.reconciliationReadAt) }}</span>
+                            }
+                            @if (att.actualPrice !== null) {
+                              <span>Фактическая цена: {{ formatPrice(att.actualPrice) }}</span>
+                            }
+                            @if (att.priceMatch !== null) {
+                              <span>Совпадение: {{ att.priceMatch ? '✓ Да' : '✗ Нет' }}</span>
+                            }
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <!-- State history -->
+      @if (a.stateHistory.length > 0) {
+        <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)]">
+          <div class="border-b border-[var(--border-default)] px-5 py-3">
+            <h3 class="text-sm font-semibold text-[var(--text-primary)]">{{ 'execution.detail.state_history' | translate }}</h3>
+          </div>
+          <div class="px-5 py-3">
+            @for (transition of a.stateHistory; track $index) {
+              <div class="flex items-start gap-3 py-2">
+                <div class="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--border-default)]"></div>
+                <div class="flex-1">
+                  <p class="text-sm text-[var(--text-primary)]">
+                    {{ transition.fromStatus }} → {{ transition.toStatus }}
+                    @if (transition.actor) {
+                      <span class="text-[var(--text-secondary)]"> · {{ transition.actor }}</span>
+                    }
+                  </p>
+                  @if (transition.reason) {
+                    <p class="mt-0.5 text-[11px] text-[var(--text-tertiary)]">{{ transition.reason }}</p>
+                  }
+                </div>
+                <span class="shrink-0 text-[11px] text-[var(--text-tertiary)]">{{ formatTimestamp(transition.timestamp) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+  }
+}
+
+<!-- Reject Modal -->
+<dp-form-modal
+  [title]="'execution.detail.reject_title' | translate"
+  [isOpen]="showRejectModal()"
+  [submitLabel]="'execution.detail.btn_reject' | translate"
+  [isPending]="actionPending()"
+  [submitDisabled]="reasonText().length < 5"
+  (submit)="submitReject()"
+  (close)="showRejectModal.set(false)"
+>
+  <div class="flex flex-col gap-2">
+    <label class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
+    <textarea
+      [ngModel]="reasonText()"
+      (ngModelChange)="reasonText.set($event)"
+      class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+      placeholder="Причина отклонения (минимум 5 символов)"
+    ></textarea>
+  </div>
+</dp-form-modal>
+
+<!-- Cancel Modal -->
+<dp-form-modal
+  [title]="'execution.detail.cancel_title' | translate"
+  [isOpen]="showCancelModal()"
+  [submitLabel]="'execution.detail.btn_cancel' | translate"
+  [isPending]="actionPending()"
+  [submitDisabled]="reasonText().length < 5"
+  (submit)="submitCancel()"
+  (close)="showCancelModal.set(false)"
+>
+  <div class="flex flex-col gap-2">
+    <label class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
+    <textarea
+      [ngModel]="reasonText()"
+      (ngModelChange)="reasonText.set($event)"
+      class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+      placeholder="Причина отмены (минимум 5 символов)"
+    ></textarea>
+  </div>
+</dp-form-modal>
+
+<!-- Retry Modal -->
+<dp-form-modal
+  [title]="'execution.detail.retry_title' | translate"
+  [isOpen]="showRetryModal()"
+  [submitLabel]="'execution.detail.btn_retry' | translate"
+  [isPending]="actionPending()"
+  [submitDisabled]="reasonText().length < 5"
+  (submit)="submitRetry()"
+  (close)="showRetryModal.set(false)"
+>
+  <div class="flex flex-col gap-2">
+    <label class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
+    <textarea
+      [ngModel]="reasonText()"
+      (ngModelChange)="reasonText.set($event)"
+      class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+      placeholder="Причина повтора (минимум 5 символов)"
+    ></textarea>
+  </div>
+</dp-form-modal>

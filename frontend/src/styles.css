@@ -30,18 +30,39 @@
   --status-info: #2563EB;
   --status-neutral: #6B7280;
 
+  /* Colors — semantic backgrounds */
+  --status-success-bg: #ECFDF5;
+  --status-warning-bg: #FFFBEB;
+  --status-error-bg: #FEF2F2;
+  --status-info-bg: #EFF6FF;
+  --status-neutral-bg: #F3F4F6;
+
   /* Colors — financial */
   --finance-positive: #059669;
   --finance-negative: #DC2626;
   --finance-zero: #6B7280;
 
+  /* Colors — marketplace */
+  --mp-wb: #6B21A8;
+  --mp-wb-bg: #F5F3FF;
+  --mp-ozon: #005BFF;
+  --mp-ozon-bg: #EFF6FF;
+
+  /* Colors — overlay */
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+
   /* Spacing */
+  --space-0-5: 2px;
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
 
   /* Typography */
   --text-xs: 11px;
@@ -55,14 +76,17 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --radius-full: 9999px;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
 }
 
 body {
@@ -111,4 +135,36 @@ body {
 
 .dp-spinner {
   animation: dp-spin 0.8s linear infinite;
+}
+
+/* Skeleton shimmer animation */
+@keyframes dp-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.dp-shimmer {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, #e5e7eb 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: dp-shimmer 1.5s ease infinite;
+}
+
+/* AG Grid theme overrides */
+.ag-theme-alpine {
+  --ag-background-color: var(--bg-primary);
+  --ag-header-background-color: var(--bg-secondary);
+  --ag-odd-row-background-color: transparent;
+  --ag-row-hover-color: var(--bg-tertiary);
+  --ag-selected-row-background-color: var(--bg-active);
+  --ag-border-color: var(--border-subtle);
+  --ag-header-foreground-color: var(--text-secondary);
+  --ag-foreground-color: var(--text-primary);
+  --ag-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --ag-font-size: var(--text-sm);
+  --ag-header-height: 36px;
+  --ag-row-height: 32px;
+  --ag-cell-horizontal-padding: 8px;
+  --ag-range-selection-border-color: var(--accent-primary);
+  --ag-checkbox-checked-color: var(--accent-primary);
+  --ag-input-focus-border-color: var(--accent-primary);
 }

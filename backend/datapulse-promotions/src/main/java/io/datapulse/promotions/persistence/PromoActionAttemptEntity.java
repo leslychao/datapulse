@@ -12,6 +12,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 
@@ -44,9 +46,11 @@ public class PromoActionAttemptEntity {
     @Column(name = "error_message")
     private String errorMessage;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "provider_request_summary", columnDefinition = "jsonb")
     private String providerRequestSummary;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "provider_response_summary", columnDefinition = "jsonb")
     private String providerResponseSummary;
 

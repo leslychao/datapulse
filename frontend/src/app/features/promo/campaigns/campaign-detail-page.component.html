@@ -1,0 +1,125 @@
+<div class="flex h-full flex-col">
+  <!-- Header -->
+  <div class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+    <div class="flex items-center gap-2">
+      <button
+        (click)="navigateBack()"
+        class="cursor-pointer text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+      >
+        ← {{ 'promo.campaigns.title' | translate }}
+      </button>
+    </div>
+
+    @if (campaign(); as c) {
+      <div class="mt-2 flex items-center gap-3">
+        @if (mpBadge(); as badge) {
+          <span
+            class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white"
+            [style.background]="badge.bg"
+          >
+            {{ badge.label }}
+          </span>
+        }
+        <h2 class="text-lg font-semibold text-[var(--text-primary)]">
+          {{ c.promoName }}
+        </h2>
+        <dp-status-badge
+          [label]="campaignStatusLabel()"
+          [color]="campaignStatusColor()"
+        />
+      </div>
+      <p class="mt-1 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        {{ c.promoType }} · {{ c.mechanic }} ·
+        {{ formatDate(c.dateFrom) }} — {{ c.dateTo ? formatDate(c.dateTo) : ('promo.campaigns.indefinite' | translate) }}
+      </p>
+    }
+
+    @if (isCampaignFrozenOrEnded()) {
+      <div class="mt-2 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        @if (campaign()?.status === 'FROZEN') {
+          {{ 'promo.campaigns.frozen_banner' | translate }}
+        } @else {
+          {{ 'promo.campaigns.ended_banner' | translate }}
+        }
+      </div>
+    }
+  </div>
+
+  <!-- KPI -->
+  @if (campaign(); as c) {
+    <div class="flex gap-3 px-4 pt-4">
+      <dp-kpi-card
+        [label]="'promo.detail.kpi.eligible' | translate"
+        [value]="c.eligibleCount"
+        [loading]="campaignQuery.isPending()"
+      />
+      <dp-kpi-card
+        [label]="'promo.detail.kpi.participating' | translate"
+        [value]="c.participatedCount"
+        [loading]="campaignQuery.isPending()"
+      />
+      <dp-kpi-card
+        [label]="'promo.detail.kpi.declined' | translate"
+        [value]="c.declinedCount"
+        [loading]="campaignQuery.isPending()"
+      />
+      <dp-kpi-card
+        [label]="'promo.detail.kpi.pending_review' | translate"
+        [value]="c.pendingReviewCount"
+        [loading]="campaignQuery.isPending()"
+      />
+      <dp-kpi-card
+        [label]="'promo.detail.kpi.succeeded_actions' | translate"
+        [value]="c.succeededActionsCount"
+        [loading]="campaignQuery.isPending()"
+      />
+      @if (c.failedActionsCount > 0) {
+        <dp-kpi-card
+          [label]="'promo.detail.kpi.failed_actions' | translate"
+          [value]="c.failedActionsCount"
+          [loading]="campaignQuery.isPending()"
+        />
+      }
+    </div>
+  }
+
+  <!-- Filters -->
+  <div class="px-4 pt-3">
+    <dp-filter-bar
+      [filters]="filterConfigs"
+      [values]="filterValues()"
+      (filtersChanged)="onFiltersChanged($event)"
+    />
+  </div>
+
+  <!-- Grid -->
+  <div class="flex-1 px-4 py-3">
+    @if (productsQuery.isError()) {
+      <dp-empty-state
+        [message]="'promo.detail.products_error' | translate"
+        [actionLabel]="'actions.retry' | translate"
+        (action)="productsQuery.refetch()"
+      />
+    } @else if (!productsQuery.isPending() && rows().length === 0) {
+      <dp-empty-state
+        [message]="hasActiveFilters()
+          ? ('promo.detail.empty_filtered' | translate)
+          : ('promo.detail.empty' | translate)"
+        [actionLabel]="hasActiveFilters()
+          ? ('filter_bar.reset_all' | translate)
+          : ''"
+        (action)="onFiltersChanged({})"
+      />
+    } @else {
+      <dp-data-grid
+        [columnDefs]="columnDefs"
+        [rowData]="rows()"
+        [loading]="productsQuery.isPending()"
+        [pagination]="true"
+        [pageSize]="50"
+        [getRowId]="getRowId"
+        [height]="'100%'"
+      />
+    }
+  </div>
+</div>

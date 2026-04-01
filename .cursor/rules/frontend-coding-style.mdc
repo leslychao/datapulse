@@ -1,0 +1,946 @@
+---
+description: Спецификация стиля написания Angular / TypeScript кода фронтенда — паттерны, идиомы, конвенции. Обязательна к соблюдению при генерации любого фронтенд-кода.
+alwaysApply: true
+---
+
+# Angular / TypeScript — Стиль написания кода
+
+## 0. Уровень качества кода
+
+Весь генерируемый фронтенд-код должен соответствовать уровню **senior Angular-разработчика**. Это означает:
+
+### Архитектурное мышление
+- Каждый компонент и сервис имеет **одну чётко выраженную ответственность**. Компонент отвечает за рендеринг + user interaction, сервис — за бизнес-логику или data access.
+- Зависимости направлены **к центру**: `features/` зависит от `shared/` и `core/`, но `core/` не зависит от `features/`.
+- Решения принимаются с учётом **будущих изменений**: standalone-компоненты, signal-based state, lazy loading по умолчанию.
+
+### Читаемость и выразительность
+- Код **самодокументирующийся**: имена компонентов, сервисов, интерфейсов и переменных полностью передают намерение.
+- Шаблоны читаются **сверху вниз**: логические блоки отделяются пустой строкой, Tailwind-классы упорядочены (layout → spacing → typography → colors → states).
+- **Нет «умного» кода** ради краткости. Простой `@if` / `@for` лучше сложной pipe-цепочки в шаблоне.
+
+### Надёжность
+- **Strict TypeScript**: `strict: true`, `strictTemplates: true`, `noImplicitReturns: true`, `noFallthroughCasesInSwitch: true`.
+- **Нет `any`**: ни в коде, ни в шаблонах (`$any()` запрещён). Используй конкретные типы, union types или `unknown` с type guard.
+- **Guard clauses** в начале методов, null-safe доступ через optional chaining (`?.`), nullish coalescing (`??`).
+
+### Производительность
+- **OnPush** как дефолт. Компоненты не перерендериваются без сигнала об изменении.
+- **Нет методов в шаблонах** для вычислений — используй `computed()` signal или pure pipe.
+- **`track`** обязателен в каждом `@for` — иначе Angular пересоздаёт DOM-элементы.
+
+### Что отличает senior-код от junior-кода
+
+| Junior | Senior |
+|---|---|
+| Работает → готово | Работает + типизировано + OnPush + доступно |
+| Один компонент на 500 строк | Декомпозиция: page → section → atom |
+| `any` повсюду | Конкретные интерфейсы и union types |
+| `subscribe()` с ручным unsubscribe | `injectQuery()` / `async` pipe / `takeUntilDestroyed()` |
+| CSS-классы inline хаотично | Tailwind + CSS variables, единообразная система |
+| Хардкод строк в шаблонах | `translate` pipe + `ru.json` |
+| Default ChangeDetection | OnPush + signals |
+
+---
+
+## 1. Стек и bootstrap
+
+### Технологический стек
+
+| Concern | Выбор |
+|---|---|
+| Framework | **Angular 19** (standalone components, signals) |
+| Language | **TypeScript** (strict mode) |
+| Build | **Angular CLI** (`@angular/build`, esbuild-based) |
+| Styling | **Tailwind CSS 4** + CSS custom properties |
+| Server state | **TanStack Query** (`@tanstack/angular-query-experimental`) |
+| UI state | **NgRx Signal Store** (`@ngrx/signals`) |
+| Grid | **AG Grid Community** (`ag-grid-angular`) |
+| Routing | **Angular Router** (lazy loading, guards) |
+| Icons | **Lucide Angular** (`lucide-angular`) |
+| i18n | **@ngx-translate/core** |
+| WebSocket | **@stomp/rx-stomp** |
+| Date | **date-fns** |
+| CDK | **@angular/cdk** (overlay, drag-drop, a11y) |
+
+### Bootstrap
+
+Приложение запускается через `bootstrapApplication(AppComponent, appConfig)` — **без NgModule**.
+
+`appConfig` определяет providers:
+- `provideRouter(routes, withComponentInputBinding())`
+- `provideHttpClient(withInterceptors([authInterceptor]))`
+- `provideAnimations()`
+- `provideAngularQuery(new QueryClient({ ... }))`
+- `importProvidersFrom(TranslateModule.forRoot({ ... }))`
+
+```typescript
+// ✅ app.config.ts — единая точка конфигурации
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideRouter(routes, withComponentInputBinding()),
+    provideHttpClient(withInterceptors([authInterceptor])),
+    provideAngularQuery(new QueryClient({
+      defaultOptions: {
+        queries: { staleTime: 30_000, retry: 1 },
+      },
+    })),
+    // ...
+  ],
+};
+```
+
+### Запрещено
+
+- `NgModule` — не используются. Всё через standalone components + providers.
+- `platformBrowserDynamic().bootstrapModule()` — устаревший подход.
+- SSR / Angular Universal — не используется, это SPA.
+
+---
+
+## 2. Структура проекта
+
+```
+src/app/
+├── core/                  — Singleton-сервисы, модели, guards, interceptors
+│   ├── api/               — HTTP transport (*ApiService)
+│   ├── auth/              — AuthService, guards, interceptor
+│   ├── models/            — TypeScript interfaces + type aliases
+│   └── websocket/         — WebSocketService
+│
+├── shared/                — Переиспользуемые компоненты, stores, services, pipes
+│   ├── components/        — Атомарные UI-компоненты (badge, modal, card)
+│   ├── stores/            — NgRx Signal Stores (workspace, notifications, tabs, sync)
+│   ├── services/          — UI-сервисы (detail panel, shortcuts, breadcrumbs)
+│   ├── shell/             — Application shell (top-bar, activity-bar, status-bar, toast)
+│   ├── layout/            — Layout-примитивы (viewport-guard, centered-content, spinner)
+│   └── pipes/             — Shared pure pipes
+│
+├── features/              — Бизнес-фичи (lazy-loaded)
+│   ├── grid/              — Операционный грид
+│   ├── analytics/         — P&L и аналитика
+│   ├── pricing/           — Ценообразование
+│   ├── promo/             — Промо-кампании
+│   ├── settings/          — Настройки (connections, team, invitations, general)
+│   ├── onboarding/        — Мастер первичной настройки
+│   ├── workspace-selector/ — Выбор workspace
+│   ├── callback/          — OAuth callback
+│   ├── invitation/        — Принятие приглашений
+│   └── not-found/         — 404
+│
+├── app.component.ts       — Root component (router-outlet + viewport guard)
+├── app.config.ts          — Application config (providers)
+└── app.routes.ts          — Root routes
+```
+
+### Path aliases (tsconfig.json)
+
+| Alias | Путь | Использование |
+|---|---|---|
+| `@core/*` | `src/app/core/*` | Модели, API-сервисы, auth |
+| `@shared/*` | `src/app/shared/*` | Shared-компоненты, stores, services |
+| `@features/*` | `src/app/features/*` | Между feature-модулями (редко) |
+| `@env` | `src/environments/environment` | Конфигурация окружения |
+
+### Направление зависимостей
+
+```
+features/ ──→ shared/ ──→ core/
+                ↑
+            (core/ не зависит от shared/ и features/)
+```
+
+- `core/` — **не зависит** от `shared/` и `features/`.
+- `shared/` — может зависеть от `core/` (модели, API).
+- `features/` — зависит от `core/` и `shared/`, **не** от других features.
+- Cross-feature зависимости — **запрещены**. Общее выносить в `shared/`.
+
+---
+
+## 3. Компоненты
+
+### Standalone only
+
+Все компоненты — **standalone**. `NgModule` не используются.
+
+```typescript
+@Component({
+  selector: 'dp-status-badge',
+  standalone: true,
+  imports: [TranslatePipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `...`,
+})
+export class StatusBadgeComponent { }
+```
+
+### ChangeDetection
+
+- **`OnPush`** — дефолт для всех компонентов.
+- `Default` — **запрещён**, кроме root `AppComponent` (где нет логики рендеринга).
+
+### Selector prefix
+
+- Все компоненты используют префикс **`dp-`**: `dp-status-badge`, `dp-shell`, `dp-connections-page`.
+- Настроено в `angular.json`: `"prefix": "dp"`.
+
+### Template style
+
+- **Inline template** (`template: \`...\``) — для компонентов ≤ 100 строк шаблона.
+- **External template** (`templateUrl`) — для компонентов > 100 строк шаблона.
+- **Inline styles** (`styles: [\`...\`]`) — для компонент-специфичных анимаций или CSS, которые нельзя выразить Tailwind-ом.
+- **Внешние стили** — не используются. Стилизация через Tailwind + CSS variables.
+
+### Inputs / Outputs
+
+**Signal-based inputs** (Angular 19) — предпочтительный стиль для новых компонентов:
+
+```typescript
+// ✅ Signal-based (предпочтительно)
+readonly label = input.required<string>();
+readonly color = input<StatusColor>('neutral');
+readonly clicked = output<void>();
+
+// ✅ Decorator-based (допускается в существующем коде)
+@Input({ required: true }) label = '';
+@Input() color: StatusColor = 'neutral';
+@Output() clicked = new EventEmitter<void>();
+```
+
+- Не смешивать стили в одном компоненте — если компонент уже на decorator-based, оставить как есть до рефакторинга.
+- `required: true` / `input.required<T>()` — для обязательных inputs.
+
+### Размеры
+
+| Элемент | Рекомендация | Жёсткий лимит |
+|---|---|---|
+| Файл компонента (TS + inline template) | ≤ 200 строк | 300 строк |
+| Template (inline) | ≤ 100 строк | 150 строк |
+| Метод | ≤ 25 строк | 40 строк |
+| Imports array | ≤ 10 элементов | 15 |
+
+При превышении — декомпозируй: extract child component, extract pipe, extract service.
+
+### Lifecycle hooks
+
+- `OnInit` — для инициализации, подписок через `subscribe()` с `takeUntilDestroyed()`.
+- `OnDestroy` — для cleanup (WebSocket disconnect, manual subscriptions).
+- `constructor` — только для `inject()` вызовов и простой инициализации.
+- **Предпочитай `inject()` function** вместо constructor injection:
+
+```typescript
+// ✅
+private readonly http = inject(HttpClient);
+private readonly router = inject(Router);
+
+// ❌
+constructor(private http: HttpClient, private router: Router) {}
+```
+
+---
+
+## 4. Сервисы
+
+### API-сервисы (`core/api/`)
+
+Чистый HTTP transport — **без бизнес-логики, без state**. Один сервис на бэкенд-ресурс.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class ConnectionApiService {
+  private readonly http = inject(HttpClient);
+  private readonly base = environment.apiUrl;
+
+  listConnections(): Observable<ConnectionSummary[]> {
+    return this.http.get<ConnectionSummary[]>(`${this.base}/connections`);
+  }
+
+  createConnection(req: CreateConnectionRequest): Observable<ConnectionDetail> {
+    return this.http.post<ConnectionDetail>(`${this.base}/connections`, req);
+  }
+}
+```
+
+**Правила для API-сервисов:**
+- `@Injectable({ providedIn: 'root' })` — всегда tree-shakeable singleton.
+- Зависимости через `inject()`: `inject(HttpClient)`.
+- Возвращают `Observable<T>` — не `Promise`. TanStack Query оборачивает через `lastValueFrom()`.
+- **Без `catchError`** — обработка ошибок в interceptor или в TanStack mutation `onError`.
+- **Без `tap` / side effects** — чистый transport.
+- Naming: `*ApiService` — `ConnectionApiService`, `MemberApiService`, `NotificationApiService`.
+- URL composition: `${this.base}/resource/${id}/sub-resource`.
+- Query params: через `HttpParams`.
+
+### UI-сервисы (`shared/services/`)
+
+Сервисы для UI-координации, без HTTP. Управляют UI-состоянием через signals.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class DetailPanelService {
+  readonly isOpen = signal(false);
+  readonly width = signal(400);
+  readonly currentEntity = signal<unknown>(null);
+
+  open(entity: unknown): void { ... }
+  close(): void { ... }
+}
+```
+
+### Auth-сервис (`core/auth/`)
+
+Singleton, управляет сессией, хранит user profile в signal.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private readonly http = inject(HttpClient);
+  private readonly _user = signal<UserProfile | null>(null);
+  readonly user = this._user.asReadonly();
+  readonly isAuthenticated = computed(() => this._user() !== null);
+}
+```
+
+**Паттерн:** private writable signal `_user` → public readonly signal `user`.
+
+### Naming
+
+| Тип | Суффикс | Пример |
+|---|---|---|
+| HTTP transport | `*ApiService` | `ConnectionApiService` |
+| UI state/coordination | `*Service` | `DetailPanelService`, `ToastService` |
+| Auth | `AuthService` | `AuthService` |
+| WebSocket | `WebSocketService` | `WebSocketService` |
+
+---
+
+## 5. State management
+
+Три уровня state management — каждый для своего типа данных:
+
+### TanStack Query → Server state (данные от бэкенда)
+
+Для любых данных, получаемых с API: списки, детали, пагинация.
+
+```typescript
+// В компоненте
+readonly connectionsQuery = injectQuery(() => ({
+  queryKey: ['connections'],
+  queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+}));
+
+readonly createMutation = injectMutation(() => ({
+  mutationFn: (req: CreateConnectionRequest) =>
+    lastValueFrom(this.connectionApi.createConnection(req)),
+  onSuccess: () => {
+    this.connectionsQuery.refetch();
+    this.toast.success('Подключение создано');
+  },
+  onError: () => this.toast.error('Не удалось создать подключение'),
+}));
+```
+
+**Правила:**
+- `queryKey` — массив строк и/или зависимых значений: `['members', this.wsStore.currentWorkspaceId()]`.
+- `queryFn` — оборачивает API-сервис через `lastValueFrom()`.
+- `enabled` — используй для условного выполнения: `enabled: !!this.wsStore.currentWorkspaceId()`.
+- `staleTime` — глобальный дефолт 30 секунд (в `appConfig`). Per-query override при необходимости.
+- `onSuccess` / `onError` — в каждой мутации. `onError` обязателен — показывать toast.
+
+### NgRx Signal Store → UI state (глобальный, shared между компонентами)
+
+Для состояния, не привязанного к конкретному API-запросу: workspace context, notifications, tabs, sync status.
+
+```typescript
+export const WorkspaceContextStore = signalStore(
+  { providedIn: 'root' },
+  withState(initialState),
+  withComputed((store) => ({
+    hasWorkspace: computed(() => store.currentWorkspaceId() !== null),
+  })),
+  withMethods((store) => ({
+    setWorkspace(id: number, name: string): void {
+      patchState(store, { currentWorkspaceId: id, currentWorkspaceName: name });
+    },
+  })),
+);
+```
+
+**Правила:**
+- `{ providedIn: 'root' }` — для global stores.
+- State interface — **отдельный export** выше store.
+- `initialState` — как const, отделён от store definition.
+- Мутации через `patchState()` — не через прямое присваивание.
+- Computed-свойства через `withComputed()`.
+- Naming: `*Store` — `WorkspaceContextStore`, `NotificationStore`, `TabStore`.
+
+### Angular signals → Local state (один компонент)
+
+Для локального UI-состояния: form step, selected item, modal visibility.
+
+```typescript
+readonly formStep = signal<FormStep>('idle');
+readonly selectedMarketplace = signal<MarketplaceType | null>(null);
+readonly showRemoveModal = signal(false);
+```
+
+**Когда что использовать:**
+
+| Данные | Инструмент | Почему |
+|---|---|---|
+| Список с бэкенда | TanStack Query | Cache, refetch, stale detection, loading/error states |
+| Текущий workspace | Signal Store | Shared между shell и features, persist to localStorage |
+| Tab state | Signal Store | Shared, persist to sessionStorage |
+| Notifications | Signal Store | Updated from WebSocket + REST, shared across components |
+| Шаг формы / modal open | `signal()` | Локальный, не shared |
+| Computed от сигнала | `computed()` | Derived state |
+
+---
+
+## 6. Routing
+
+### Lazy loading
+
+**Все routes** загружаются лениво через `loadComponent` или `loadChildren`:
+
+```typescript
+// loadComponent — для одиночных страниц
+{
+  path: 'workspaces',
+  canActivate: [authGuard],
+  loadComponent: () =>
+    import('./features/workspace-selector/workspace-selector.component').then(
+      (m) => m.WorkspaceSelectorComponent,
+    ),
+}
+
+// loadChildren — для feature-модулей с подроутами
+{
+  path: 'settings',
+  loadChildren: () => import('./features/settings/settings.routes'),
+  data: { breadcrumb: 'Настройки' },
+}
+```
+
+### Feature routes
+
+Каждый feature экспортирует `default routes` из `<feature>.routes.ts`:
+
+```typescript
+// settings.routes.ts
+const routes: Routes = [
+  {
+    path: '',
+    component: SettingsLayoutComponent,
+    children: [
+      { path: '', redirectTo: 'connections', pathMatch: 'full' },
+      {
+        path: 'connections',
+        loadComponent: () => import('./connections/connections-page.component')
+          .then((m) => m.ConnectionsPageComponent),
+        data: { breadcrumb: 'Подключения' },
+      },
+    ],
+  },
+];
+
+export default routes;
+```
+
+### Guards
+
+Guards как **functional** (`CanActivateFn`), не как class-based:
+
+```typescript
+export const authGuard: CanActivateFn = (_route, state) => {
+  const authService = inject(AuthService);
+  // ...
+};
+```
+
+**Guard chain в приложении:**
+- `authGuard` — проверка сессии, редирект на login.
+- `workspaceGuard` — проверка доступа к workspace.
+- `onboardingGuard` — редирект если уже есть workspace.
+- `rootRedirectGuard` — умный redirect с `/` (onboarding / single workspace / last workspace / selector).
+
+### `withComponentInputBinding()`
+
+Включен в `provideRouter` — route params автоматически биндятся в `@Input` / `input()` компонента.
+
+### Breadcrumbs
+
+`data: { breadcrumb: 'Название' }` — на каждом route, где нужна breadcrumb-навигация.
+
+---
+
+## 7. Формы
+
+### Template-driven — для простых форм
+
+Формы с 2-5 полями, без сложной валидации:
+
+```html
+<form (ngSubmit)="submitCreate()">
+  <input type="text" [(ngModel)]="formName" name="name" required />
+  <button type="submit" [disabled]="!isFormValid()">Сохранить</button>
+</form>
+```
+
+Используй `FormsModule` в `imports` компонента.
+
+### Reactive — для сложных форм
+
+Формы с dynamic fields, cross-field validation, массивами:
+
+```typescript
+readonly form = inject(FormBuilder).group({
+  name: ['', [Validators.required, Validators.minLength(3)]],
+  email: ['', [Validators.required, Validators.email]],
+});
+```
+
+### Валидация
+
+- Inline error messages — под каждым полем.
+- Validation on blur, не только на submit.
+- Error styling: red border (`border-[var(--status-error)]`) + error text (`text-[var(--status-error)]`).
+
+### ControlValueAccessor
+
+Для shared form controls (custom select, date picker) — реализовывать `ControlValueAccessor` для интеграции с Angular Forms.
+
+---
+
+## 8. i18n
+
+### Контракт frontend ↔ backend
+
+Бэкенд отправляет **message keys** (dot-separated строки). Фронтенд переводит через `@ngx-translate/core`.
+
+### Использование в шаблонах
+
+```html
+<!-- ✅ translate pipe -->
+{{ 'settings.connections.title' | translate }}
+
+<!-- ✅ с параметрами -->
+{{ 'pricing.guard.stale_data.stale' | translate:{ hours: 24, lastSync: syncDate } }}
+
+<!-- ❌ Хардкод строк (кроме layout-элементов) -->
+<h1>Подключения</h1>
+```
+
+### Файл переводов
+
+Единый файл: `frontend/src/locale/ru.json`. Ключи — dot-separated, английские:
+
+```json
+{
+  "settings.connections.title": "Подключения",
+  "settings.connections.empty": "Нет подключений",
+  "common.save": "Сохранить",
+  "common.cancel": "Отмена"
+}
+```
+
+### Формат ключей
+
+`module.component.element` — `settings.team.role_changed`, `pricing.guard.stale_data`.
+
+### Что НЕ требует i18n
+
+- Технические термины: SKU, P&L, COGS, FBO, FBS.
+- Названия маркетплейсов: Wildberries, Ozon.
+- Логи (`console.log`, `console.error`).
+- `aria-label` — допустимы строки без ключа, если контекст однозначен.
+
+### Текущее состояние
+
+На данный момент часть строк захардкожена в шаблонах (особенно в Settings pages). При рефакторинге — выносить в `ru.json` и заменять на `translate` pipe.
+
+---
+
+## 9. Стилизация
+
+### Tailwind CSS 4
+
+Основной инструмент стилизации — Tailwind utility classes. Импорт в `styles.css`:
+
+```css
+@import "tailwindcss";
+```
+
+### CSS custom properties (design tokens)
+
+Все визуальные токены определены в `:root` в `styles.css`. Компоненты используют их через Tailwind arbitrary values:
+
+```html
+<span class="text-[var(--text-primary)] bg-[var(--bg-secondary)] rounded-[var(--radius-md)]">
+```
+
+### Категории токенов
+
+| Категория | Примеры |
+|---|---|
+| Background | `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--bg-active` |
+| Border | `--border-default`, `--border-subtle` |
+| Text | `--text-primary`, `--text-secondary`, `--text-tertiary` |
+| Accent | `--accent-primary`, `--accent-primary-hover`, `--accent-subtle` |
+| Status | `--status-success`, `--status-warning`, `--status-error`, `--status-info`, `--status-neutral` |
+| Finance | `--finance-positive`, `--finance-negative`, `--finance-zero` |
+| Typography | `--text-xs` (11px), `--text-sm` (13px), `--text-base` (14px), `--text-lg` (16px) |
+| Radius | `--radius-sm` (4px), `--radius-md` (6px), `--radius-lg` (8px) |
+| Shadow | `--shadow-sm`, `--shadow-md` |
+
+### Правила стилизации
+
+- **Никогда** не используй raw цвета (`#2563EB`) в компонентах — только CSS variables.
+- **Tailwind arbitrary values** (`text-[var(--text-primary)]`) — основной способ использования токенов.
+- **Inline `[style]` binding** — для динамических значений (`[style.width.px]="panelWidth"`).
+- **Component-level `styles`** — только для `@keyframes` анимаций.
+- **Глобальные стили** (`styles.css`) — только для `:root` tokens, scrollbar, focus ring, spinner.
+- **CSS modules / SCSS — не используются.**
+
+### Шрифты
+
+| Назначение | Шрифт |
+|---|---|
+| UI chrome (всё) | Inter, system-ui, -apple-system, sans-serif |
+| Табличные данные, цены | JetBrains Mono (`.font-mono`) |
+
+### Порядок Tailwind-классов
+
+Layout → sizing → spacing → typography → colors → borders → effects → states:
+
+```html
+<!-- ✅ -->
+<button class="flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]">
+
+<!-- ❌ Хаотичный порядок -->
+<button class="text-white hover:bg-[var(--accent-primary-hover)] px-4 flex bg-[var(--accent-primary)] gap-1.5 items-center">
+```
+
+---
+
+## 10. Типизация
+
+### Интерфейсы (`core/models/`)
+
+Все доменные типы — в `core/models/`, сгруппированы по ресурсу:
+
+```typescript
+// connection.model.ts
+export type MarketplaceType = 'WB' | 'OZON';
+export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'DISABLED' | 'ARCHIVED';
+
+export interface ConnectionSummary {
+  id: number;
+  marketplaceType: string;
+  name: string;
+  status: string;
+  lastSuccessAt: string | null;
+}
+```
+
+Re-export через barrel `index.ts`:
+```typescript
+export * from './user.model';
+export * from './workspace.model';
+export * from './connection.model';
+```
+
+### Union types для статусов и ролей
+
+```typescript
+// ✅ Union type — exhaustive, IDE автоподсказки
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'PRICING_MANAGER' | 'OPERATOR' | 'ANALYST' | 'VIEWER';
+
+// ❌ enum — не используется для API-driven типов
+enum WorkspaceRole { OWNER, ADMIN, ... }
+```
+
+### Запрещено
+
+- `any` — нигде в коде. Если тип неизвестен — `unknown` + type guard.
+- `$any()` — в шаблонах. Если TypeScript жалуется — исправь тип, не подавляй ошибку.
+- `as any` — cast в `any` запрещён.
+- `// @ts-ignore` — запрещён. Исправь тип.
+- `Object`, `Function`, `String`, `Number`, `Boolean` — используй примитивные типы.
+
+### Допустимые исключения
+
+- `as MarketplaceType` — когда данные приходят как `string` из API и нужен narrowing (не `as any`).
+- `unknown` — для generic callbacks (WebSocket messages, event payloads), с последующим type guard.
+
+---
+
+## 11. Error handling
+
+### Глобальный interceptor
+
+`authInterceptor` перехватывает 401 → redirect to login. Остальные ошибки пробрасываются.
+
+### Мутации — `onError` обязателен
+
+Каждая TanStack мутация должна обрабатывать ошибку:
+
+```typescript
+readonly createMutation = injectMutation(() => ({
+  mutationFn: (req: CreateConnectionRequest) =>
+    lastValueFrom(this.connectionApi.createConnection(req)),
+  onSuccess: () => this.toast.success('Создано'),
+  onError: () => this.toast.error('Не удалось создать'),
+}));
+```
+
+### Toast для пользовательских ошибок
+
+```typescript
+this.toast.success('Роль обновлена');        // 3s auto-dismiss
+this.toast.error('Не удалось изменить роль'); // 3s auto-dismiss (TODO: 8s for errors)
+this.toast.info('Экспорт запущен');
+this.toast.warning('Данные устарели');
+```
+
+### Что НЕ делать
+
+- **Молчаливый catch** — пустой `catchError(() => of(null))` без toast/log.
+- **`console.error` как единственная обработка** — пользователь должен видеть feedback.
+- **alert()** — запрещён. Используй toast или modal.
+
+---
+
+## 12. Performance
+
+### OnPush
+
+Все компоненты — `ChangeDetectionStrategy.OnPush`. Angular проверяет template только при изменении input signals или event handler execution.
+
+### `track` в `@for`
+
+```html
+<!-- ✅ -->
+@for (conn of connections; track conn.id) { ... }
+
+<!-- ❌ Без track -->
+@for (conn of connections) { ... }
+```
+
+### Pipes вместо методов в шаблонах
+
+```html
+<!-- ❌ Метод вызывается при каждом change detection -->
+{{ formatDate(conn.lastSuccessAt) }}
+
+<!-- ✅ Pure pipe — кэшируется -->
+{{ conn.lastSuccessAt | dateFormat }}
+
+<!-- ✅ computed() signal — пересчитывается только при изменении зависимости -->
+{{ formattedDate() }}
+```
+
+Допустимое исключение: простые методы в `@if` / button `[disabled]`, которые вызываются редко (по клику, не на каждый tick).
+
+### `computed()` для derived state
+
+```typescript
+// ✅
+readonly isAuthenticated = computed(() => this._user() !== null);
+readonly hasUnread = computed(() => this.unreadCount() > 0);
+
+// ❌ Getter без мемоизации (пересчитывается при каждом обращении)
+get isAuthenticated(): boolean { return this._user() !== null; }
+```
+
+### Lazy loading
+
+Все feature routes — lazy loaded через `loadComponent` / `loadChildren`. Eagerly loaded только `AppComponent` и `ShellComponent`.
+
+---
+
+## 13. Accessibility
+
+### Базовые требования
+
+- **WCAG 2.1 AA** — контрастность текста, focusable elements, keyboard navigation.
+- **Focus ring** — глобальный `*:focus-visible` стиль: `outline: 2px solid var(--accent-primary)`.
+- **`aria-label`** — на icon-only buttons: `<button aria-label="Закрыть">`.
+- **`aria-live`** — на toast-контейнере: `aria-live="polite"` для анонсирования нотификаций.
+- **Semantic HTML** — `<button>` для действий, `<a>` для навигации, `<table>` для табличных данных.
+- **Color + text** — никогда не передавай информацию только цветом. Status badge = dot + label.
+
+### Keyboard navigation
+
+- `Escape` — закрыть modal / detail panel / command palette.
+- `Ctrl+K` — command palette.
+- `Tab` — навигация между interactive elements.
+- Grid rows — arrow keys (AG Grid built-in).
+
+### Модальные окна
+
+- Focus trap внутри модала.
+- `Escape` закрывает модал.
+- Focus возвращается на trigger element после закрытия.
+
+---
+
+## 14. Pipes
+
+### Когда создавать pipe
+
+- Форматирование повторяется в 2+ компонентах (дата, валюта, относительное время).
+- Нужен template-level кэш (pure pipe мемоизирует результат).
+
+### Правила
+
+- **Pure** — всегда. Impure pipes (`pure: false`) — **запрещены** (убивают производительность с OnPush).
+- **Standalone** — `standalone: true`.
+- **Naming**: `*Pipe` suffix в классе, `camelCase` pipe name. `DateFormatPipe` → `dateFormat`.
+- Расположение: `shared/pipes/`.
+
+```typescript
+@Pipe({
+  name: 'relativeTime',
+  standalone: true,
+  pure: true,
+})
+export class RelativeTimePipe implements PipeTransform {
+  transform(iso: string): string {
+    return formatDistanceToNow(new Date(iso), { locale: ru, addSuffix: true });
+  }
+}
+```
+
+---
+
+## 15. Тестирование
+
+### Unit-тесты
+
+- **Файлы**: `*.spec.ts` рядом с тестируемым файлом.
+- **Фреймворк**: Karma + Jasmine (Angular default).
+- **Naming**: `describe('ComponentName')` → `it('should do X when Y')`.
+
+### Что тестировать
+
+| Тип | Что проверять |
+|---|---|
+| Компоненты | Рендеринг, input-output binding, user interaction |
+| API-сервисы | HTTP-вызовы через `HttpTestingController` |
+| Guards | Redirect logic, auth check |
+| Pipes | Transform результаты |
+| Signal Stores | State transitions, computed values |
+
+### Что НЕ тестировать
+
+- Internal Angular-механику (DI, change detection).
+- Стили и CSS-классы (хрупкие тесты).
+- Third-party библиотеки (AG Grid internals, TanStack Query internals).
+
+---
+
+## 16. Naming conventions
+
+### Файлы
+
+| Тип | Паттерн | Пример |
+|---|---|---|
+| Component | `kebab-case.component.ts` | `connections-page.component.ts` |
+| Service | `kebab-case.service.ts` | `connection-api.service.ts` |
+| Guard | `kebab-case.guard.ts` | `auth.guard.ts` |
+| Interceptor | `kebab-case.interceptor.ts` | `auth.interceptor.ts` |
+| Model | `kebab-case.model.ts` | `connection.model.ts` |
+| Store | `kebab-case.store.ts` | `workspace-context.store.ts` |
+| Pipe | `kebab-case.pipe.ts` | `relative-time.pipe.ts` |
+| Routes | `kebab-case.routes.ts` | `settings.routes.ts` |
+| Test | `*.spec.ts` | `auth.service.spec.ts` |
+
+### Классы
+
+| Тип | Суффикс | Пример |
+|---|---|---|
+| Component | `*Component` | `ConnectionsPageComponent` |
+| Service (API) | `*ApiService` | `ConnectionApiService` |
+| Service (UI) | `*Service` | `ToastService`, `DetailPanelService` |
+| Guard | `*Guard` (functional: `*Guard` variable) | `authGuard` |
+| Store | `*Store` | `WorkspaceContextStore` |
+| Pipe | `*Pipe` | `RelativeTimePipe` |
+| Interceptor | `*Interceptor` (functional) | `authInterceptor` |
+
+### Selectors
+
+`dp-kebab-case` — с prefix `dp-`:
+
+| Тип | Selector |
+|---|---|
+| Page component | `dp-connections-page` |
+| Shared component | `dp-status-badge`, `dp-confirmation-modal` |
+| Shell component | `dp-shell`, `dp-top-bar`, `dp-activity-bar` |
+| Layout component | `dp-viewport-guard`, `dp-centered-content` |
+
+### Методы
+
+| Контекст | Паттерн |
+|---|---|
+| CRUD | `create*`, `update*`, `delete*`, `list*`, `get*` |
+| UI actions | `open*`, `close*`, `toggle*`, `start*`, `cancel*` |
+| Form | `submit*`, `reset*`, `isFormValid` |
+| Event handlers | `on*` в template → метод без prefix в TS: `(click)="startCreate()"` |
+| Formatters | `format*` — `formatDate`, `statusLabel`, `statusColor` |
+
+---
+
+## 17. Импорты
+
+### Path aliases — обязательны
+
+```typescript
+// ✅ Alias imports
+import { ConnectionApiService } from '@core/api/connection-api.service';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { environment } from '@env';
+
+// ❌ Relative paths через уровни
+import { ConnectionApiService } from '../../../core/api/connection-api.service';
+```
+
+### Относительные импорты
+
+Допускаются **только** внутри одного feature-модуля или одного пакета:
+
+```typescript
+// ✅ Внутри features/settings/
+import { SettingsLayoutComponent } from './settings-layout.component';
+```
+
+### Порядок импортов
+
+```
+1. Angular core (@angular/*)
+2. Third-party (rxjs, @tanstack/*, @ngrx/*, lucide-angular, etc.)
+3. Project aliases (@core/*, @shared/*, @env)
+4. Relative imports (./)
+```
+
+Каждая группа отделяется пустой строкой:
+
+```typescript
+import { Component, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
+
+import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
+import { LucideAngularModule, Plus } from 'lucide-angular';
+
+import { ConnectionApiService } from '@core/api/connection-api.service';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { ToastService } from '@shared/shell/toast/toast.service';
+```
+
+### Запрещено
+
+- **Wildcard imports** (`import * as _`) — кроме специфических случаев (Lucide icons).
+- **Unused imports** — удалять. IDE auto-optimize.
+- **Re-export chains** глубже одного уровня — barrel `index.ts` только в `core/models/`.
+- **Circular imports** — запрещены. Используй barrel file или restructure.

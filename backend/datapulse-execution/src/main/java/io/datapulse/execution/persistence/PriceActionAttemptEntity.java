@@ -14,6 +14,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -54,9 +56,11 @@ public class PriceActionAttemptEntity {
     @Column(name = "actor_user_id")
     private Long actorUserId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "provider_request_summary", columnDefinition = "jsonb")
     private String providerRequestSummary;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "provider_response_summary", columnDefinition = "jsonb")
     private String providerResponseSummary;
 
@@ -67,6 +71,7 @@ public class PriceActionAttemptEntity {
     @Column(name = "reconciliation_read_at")
     private OffsetDateTime reconciliationReadAt;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "reconciliation_snapshot", columnDefinition = "jsonb")
     private String reconciliationSnapshot;
 

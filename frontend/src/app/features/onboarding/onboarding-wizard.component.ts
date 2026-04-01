@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@core/auth/auth.service';
@@ -14,6 +14,7 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
 @Component({
   selector: 'dp-onboarding-wizard',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MinimalTopBarComponent,
     StepTenantComponent,

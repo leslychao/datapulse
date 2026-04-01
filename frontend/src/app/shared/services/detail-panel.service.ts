@@ -1,5 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 
+export type DetailPanelEntityType = 'connection' | 'offer';
+
 const MIN_WIDTH = 320;
 const MAX_VIEWPORT_RATIO = 0.5;
 
@@ -7,16 +9,19 @@ const MAX_VIEWPORT_RATIO = 0.5;
 export class DetailPanelService {
   readonly isOpen = signal(false);
   readonly width = signal(400);
-  readonly currentEntity = signal<unknown>(null);
+  readonly entityType = signal<DetailPanelEntityType | null>(null);
+  readonly entityId = signal<number | null>(null);
 
-  open(entity: unknown): void {
-    this.currentEntity.set(entity);
+  open(type: DetailPanelEntityType, id: number): void {
+    this.entityType.set(type);
+    this.entityId.set(id);
     this.isOpen.set(true);
   }
 
   close(): void {
     this.isOpen.set(false);
-    this.currentEntity.set(null);
+    this.entityType.set(null);
+    this.entityId.set(null);
   }
 
   toggle(): void {
