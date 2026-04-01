@@ -711,16 +711,18 @@ public @interface ValidDateRange {
 
 ## 31. Структура пакетов
 
+> Подробная спецификация — в правиле `package-structure.mdc`.
+
 ### Подход: модуль → слои внутри
 
 ```
-io.datapulse
-  └── <module>/                 — pricing, etl, execution, analytics, ...
-       ├── api/                 — контроллеры, request/response DTO
-       ├── domain/              — сервисы, бизнес-логика, доменные события
-       ├── persistence/         — репозитории, JPA-сущности, JDBC DAO, RowMapper-ы
-       ├── event/               — event listeners (если несколько) или в domain/
-       └── config/              — @Configuration, @ConfigurationProperties модуля
+io.datapulse.<module>/
+├── api/           — контроллеры, request/response DTO, MapStruct mappers
+├── domain/        — сервисы, бизнес-логика, доменные события, интерфейсы портов
+├── persistence/   — репозитории, JPA-сущности, JDBC DAO, RowMapper-ы, *Row
+├── adapter/       — реализации внешних API (по провайдеру: wb/, ozon/)
+├── config/        — @Configuration, @ConfigurationProperties модуля
+└── scheduling/    — @Scheduled задачи
 ```
 
 ### Правила
@@ -730,6 +732,8 @@ io.datapulse
 - **Circular dependencies** между модулями — **запрещены**. Если два модуля зависят друг от друга → вынести общее в shared-пакет или использовать events.
 - **Shared пакеты** (`io.datapulse.common`, `io.datapulse.platform`) — только для cross-cutting concerns: base entity, security context, exception hierarchy, common DTO.
 - Один модуль = один bounded context. Не разносить логику одного модуля по нескольким top-level пакетам.
+- **`@Scheduled` классы** — только в `scheduling/`, не в `domain/`.
+- **Адаптеры внешних API** — только в `adapter/<provider>/`, не в `domain/`. Интерфейсы (порты) остаются в `domain/`.
 
 ## 32. DTO дизайн и naming
 

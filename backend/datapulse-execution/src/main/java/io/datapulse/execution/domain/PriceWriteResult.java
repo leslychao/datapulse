@@ -1,4 +1,4 @@
-package io.datapulse.execution.domain.adapter;
+package io.datapulse.execution.domain;
 
 public record PriceWriteResult(
         WriteOutcome outcome,

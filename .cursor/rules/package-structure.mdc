@@ -1,0 +1,116 @@
+---
+description: Каноническая структура пакетов для Java-модулей. Определяет, какие слои существуют, что в каждом лежит, и куда размещать новый код.
+alwaysApply: true
+---
+
+# Структура пакетов — Package by Feature + Layered
+
+## Каноническая структура модуля
+
+```
+io.datapulse.<module>/
+├── api/                    ← Входящий адаптер (REST)
+│   ├── *Controller.java
+│   ├── *Request.java       ← Request DTO (records)
+│   ├── *Response.java      ← Response DTO (records)
+│   ├── *Filter.java        ← Query-параметры (records)
+│   └── *Mapper.java        ← MapStruct: entity ↔ DTO
+│
+├── domain/                 ← Ядро бизнес-логики
+│   ├── *Service.java       ← Сервисы
+│   ├── *Event.java         ← Domain events (records)
+│   ├── Enums               ← Enum-ы домена
+│   └── <subdomain>/        ← Подгруппы (strategy/, guard/, event/, source/)
+│
+├── persistence/            ← Исходящий адаптер (БД)
+│   ├── *Entity.java        ← JPA-сущности
+│   ├── *Repository.java    ← Spring Data / JDBC repos
+│   ├── *Row.java           ← JDBC read-модели
+│   └── *RowMapper.java     ← Для JDBC
+│
+├── adapter/                ← Исходящий адаптер (внешние API)
+│   ├── <provider>/         ← По провайдеру (wb/, ozon/)
+│   │   ├── *Adapter.java
+│   │   └── dto/            ← Provider-specific DTO
+│   └── util/               ← Общие утилиты адаптеров
+│
+├── config/                 ← Конфигурация модуля
+│   ├── *Config.java        ← @Configuration
+│   └── *Properties.java    ← @ConfigurationProperties
+│
+└── scheduling/             ← Планировщики (@Scheduled)
+    └── *Scheduler.java
+```
+
+## Правила размещения
+
+| Тип класса | Пакет | Пояснение |
+|---|---|---|
+| `@RestController` | `api/` | Принимает HTTP, делегирует в domain |
+| `*Request`, `*Response`, `*Filter` | `api/` | REST-контракт, видны только контроллеру и маппинговому слою |
+| `*Mapper` (MapStruct) | `api/` | Рядом с DTO, которые маппит |
+| `@Service` (бизнес-логика) | `domain/` | Ядро модуля, не зависит от api/ и persistence/ напрямую |
+| Domain events (records) | `domain/` или `domain/event/` | Events при 3+ listener-ах → подпакет `event/` |
+| Strategy / Guard / Source | `domain/<subdomain>/` | По Strategy+Registry паттерну |
+| `@Entity` (JPA) | `persistence/` | БД-сущности |
+| `*Repository` | `persistence/` | Доступ к данным |
+| `*Row` (JDBC read model) | `persistence/` | Проекции для read-запросов |
+| HTTP-адаптеры (внешние API) | `adapter/<provider>/` | Группировка по провайдеру, DTO рядом в `dto/` |
+| `@Configuration` | `config/` | Spring-конфигурация модуля |
+| `@ConfigurationProperties` | `config/` | Properties-классы |
+| `@Scheduled` / cron-задачи | `scheduling/` | Тонкие: try-catch + делегация в domain-сервис |
+
+## Направление зависимостей
+
+```
+api/ ──────→ domain/ ←────── persistence/
+                 ↑
+            adapter/
+```
+
+- `domain/` **не зависит** от `api/`, `persistence/`, `adapter/`
+- Все слои зависят от `domain/` (к центру)
+- `config/` и `scheduling/` — инфраструктура, зависят от `domain/`
+
+## Когда подпакет нужен, а когда нет
+
+| Подпакет | Появляется когда |
+|---|---|
+| `api/` | Модуль выставляет REST API |
+| `domain/` | **Всегда** |
+| `persistence/` | Модуль работает с БД |
+| `adapter/` | Интеграция с внешними API (маркетплейсы, email и т.д.) |
+| `config/` | Есть `@Configuration` или `@ConfigurationProperties` |
+| `scheduling/` | Есть `@Scheduled` задачи |
+| `domain/strategy/` | 3+ стратегий одного интерфейса |
+| `domain/guard/` | Guard-паттерн |
+| `domain/event/` | 3+ event listeners |
+| `domain/source/` | 3+ EventSource реализаций |
+
+## Где живут DTO
+
+| Тип DTO | Пакет | Почему |
+|---|---|---|
+| REST request/response | `api/` | Контракт HTTP API |
+| Query-фильтры | `api/` | Связаны с HTTP-запросом |
+| Внутренние DTO (между слоями) | `domain/` | Доменный контракт |
+| Domain events | `domain/` | Бизнес-событие |
+| Provider-specific DTO | `adapter/<provider>/dto/` | Привязаны к внешнему API |
+| JPA-сущности | `persistence/` | Привязаны к БД |
+| JDBC read-модели (`*Row`) | `persistence/` | Привязаны к SQL-проекции |
+
+## Исключения (не feature-модули)
+
+| Модуль | Структура | Причина |
+|---|---|---|
+| `datapulse-common` | `error/`, `exception/` | Cross-cutting: коды ошибок, базовые исключения |
+| `datapulse-platform` | `audit/`, `config/`, `outbox/`, `persistence/`, `security/`, `storage/`, `observability/` | Инфраструктурная подложка, не бизнес-домен |
+| `datapulse-api` | `config/`, `error/`, `execution/`, `outbox/`, `websocket/` | Composition root: wiring, consumers, global error handler |
+
+## Запрещено
+
+- `@Scheduled` классы в `domain/` — выносить в `scheduling/`
+- Адаптеры внешних API в `domain/` — выносить в `adapter/`
+- `@RestController` вне `api/`
+- `*Entity` / `*Repository` вне `persistence/`
+- Provider-DTO в `domain/` — только в `adapter/<provider>/dto/`

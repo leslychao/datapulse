@@ -1,9 +1,11 @@
-package io.datapulse.audit.domain.checker;
+package io.datapulse.audit.scheduling;
 
 import java.util.List;
 
 import io.datapulse.audit.api.AlertRuleResponse;
 import io.datapulse.audit.domain.AlertRuleType;
+import io.datapulse.audit.domain.checker.AlertChecker;
+import io.datapulse.audit.domain.checker.AlertCheckerRegistry;
 import io.datapulse.audit.persistence.AlertRuleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

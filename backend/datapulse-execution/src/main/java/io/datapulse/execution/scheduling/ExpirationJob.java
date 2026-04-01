@@ -1,4 +1,4 @@
-package io.datapulse.execution.domain;
+package io.datapulse.execution.scheduling;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

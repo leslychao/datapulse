@@ -1,7 +1,9 @@
-package io.datapulse.execution.domain.adapter;
+package io.datapulse.execution.adapter.ozon;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.datapulse.execution.domain.PriceReadAdapter;
+import io.datapulse.execution.domain.PriceReadResult;
 import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;

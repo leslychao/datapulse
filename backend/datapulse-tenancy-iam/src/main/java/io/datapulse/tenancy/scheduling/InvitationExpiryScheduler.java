@@ -1,5 +1,6 @@
-package io.datapulse.tenancy.domain;
+package io.datapulse.tenancy.scheduling;
 
+import io.datapulse.tenancy.domain.InvitationStatus;
 import io.datapulse.tenancy.persistence.WorkspaceInvitationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

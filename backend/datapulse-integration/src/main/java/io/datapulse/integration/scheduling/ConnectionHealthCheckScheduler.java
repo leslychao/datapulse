@@ -1,6 +1,11 @@
-package io.datapulse.integration.domain;
+package io.datapulse.integration.scheduling;
 
 import io.datapulse.integration.config.IntegrationProperties;
+import io.datapulse.integration.domain.ConnectionStatus;
+import io.datapulse.integration.domain.CredentialStore;
+import io.datapulse.integration.domain.HealthProbeResult;
+import io.datapulse.integration.domain.MarketplaceHealthProbe;
+import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.event.ConnectionHealthDegradedEvent;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;

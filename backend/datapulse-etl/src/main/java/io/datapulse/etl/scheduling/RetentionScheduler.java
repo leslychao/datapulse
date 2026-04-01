@@ -1,5 +1,6 @@
-package io.datapulse.etl.domain;
+package io.datapulse.etl.scheduling;
 
+import io.datapulse.etl.domain.RetentionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
