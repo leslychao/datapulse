@@ -107,14 +107,18 @@
       "redirectUris": [
         "http://localhost/oauth2/callback",
         "http://localhost:80/oauth2/callback",
+        "http://localhost:8880/oauth2/callback",
+        "https://mydatapulse.ru/oauth2/callback",
         "https://datapulse.example.com/oauth2/callback"
       ],
       "webOrigins": [
         "http://localhost",
+        "http://localhost:8880",
+        "https://mydatapulse.ru",
         "https://datapulse.example.com"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost/*##https://datapulse.example.com/*"
+        "post.logout.redirect.uris": "http://localhost/*##http://localhost:8880/*##https://mydatapulse.ru/*##https://datapulse.example.com/*"
       },
       "defaultClientScopes": ["openid", "email", "profile"],
       "protocolMappers": [
