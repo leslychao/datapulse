@@ -266,5 +266,14 @@
   "pricing.strategy.commission_missing": "Ставка комиссии недоступна — недостаточно данных.",
   "pricing.strategy.denominator_invalid": "Целевая маржа + расходы ≥ 100% — расчёт невозможен.",
   "pricing.strategy.current_price_missing": "Текущая цена недоступна.",
-  "pricing.strategy.no_change": "Изменение цены не требуется."
+  "pricing.strategy.no_change": "Изменение цены не требуется.",
+
+  "pricing.policy.not_found": "Ценовая политика не найдена.",
+  "pricing.policy.archived": "Невозможно изменить архивную политику.",
+  "pricing.policy.invalid_state": "Переход из состояния {{currentState}} в {{targetState}} невозможен.",
+  "pricing.assignment.duplicate": "Назначение с такими параметрами уже существует.",
+  "pricing.lock.already_exists": "На этот товар уже установлена блокировка цены.",
+  "pricing.run.already_in_progress": "Для этого подключения уже выполняется ценовой расчёт.",
+  "pricing.bulk.duplicate": "Запрос с такими параметрами уже обрабатывается.",
+  "pricing.bulk.too_large": "Максимум 500 товаров за одну операцию."
 }

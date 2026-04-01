@@ -194,12 +194,67 @@ public class PricingDataReadRepository {
                 });
     }
 
+    private static final String OFFERS_BY_IDS_ENRICHED = """
+            SELECT mo.id,
+                   mo.seller_sku_id,
+                   mo.category_id,
+                   mo.marketplace_connection_id,
+                   mo.status,
+                   mo.sku_code,
+                   mo.product_name,
+                   cpc.price AS current_price,
+                   cpc.discount_price,
+                   cp.cost_price AS cogs
+            FROM marketplace_offer mo
+            LEFT JOIN canonical_price_current cpc ON cpc.marketplace_offer_id = mo.id
+            LEFT JOIN cost_profile cp ON cp.seller_sku_id = mo.seller_sku_id AND cp.valid_to IS NULL
+            WHERE mo.id IN (:offerIds)
+              AND mo.workspace_id = :workspaceId
+            """;
+
+    public List<EnrichedOfferRow> findOffersByIds(List<Long> offerIds, long workspaceId) {
+        if (offerIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        var params = new MapSqlParameterSource("offerIds", offerIds)
+                .addValue("workspaceId", workspaceId);
+        return jdbc.query(OFFERS_BY_IDS_ENRICHED, params,
+                (rs, rowNum) -> new EnrichedOfferRow(
+                        rs.getLong("id"),
+                        rs.getLong("seller_sku_id"),
+                        rs.getObject("category_id", Long.class),
+                        rs.getLong("marketplace_connection_id"),
+                        rs.getString("status"),
+                        rs.getString("sku_code"),
+                        rs.getString("product_name"),
+                        resolveEffectivePrice(rs),
+                        rs.getBigDecimal("cogs")));
+    }
+
+    private BigDecimal resolveEffectivePrice(ResultSet rs) throws SQLException {
+        BigDecimal discountPrice = rs.getBigDecimal("discount_price");
+        return discountPrice != null ? discountPrice : rs.getBigDecimal("current_price");
+    }
+
     public record OfferRow(
             long id,
             long sellerSkuId,
             Long categoryId,
             long connectionId,
             String status
+    ) {
+    }
+
+    public record EnrichedOfferRow(
+            long id,
+            long sellerSkuId,
+            Long categoryId,
+            long connectionId,
+            String status,
+            String skuCode,
+            String productName,
+            BigDecimal currentPrice,
+            BigDecimal cogs
     ) {
     }
 }

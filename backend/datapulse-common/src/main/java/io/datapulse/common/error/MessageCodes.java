@@ -65,4 +65,14 @@ public final class MessageCodes {
     public static final String PRICING_DENOMINATOR_INVALID = "pricing.strategy.denominator_invalid";
     public static final String PRICING_CURRENT_PRICE_MISSING = "pricing.strategy.current_price_missing";
     public static final String PRICING_NO_CHANGE = "pricing.strategy.no_change";
+
+    // --- Pricing: Policy API ---
+    public static final String PRICING_POLICY_NOT_FOUND = "pricing.policy.not_found";
+    public static final String PRICING_POLICY_ARCHIVED = "pricing.policy.archived";
+    public static final String PRICING_POLICY_INVALID_STATE = "pricing.policy.invalid_state";
+    public static final String PRICING_ASSIGNMENT_DUPLICATE = "pricing.assignment.duplicate";
+    public static final String PRICING_LOCK_ALREADY_EXISTS = "pricing.lock.already_exists";
+    public static final String PRICING_RUN_ALREADY_IN_PROGRESS = "pricing.run.already_in_progress";
+    public static final String PRICING_BULK_DUPLICATE = "pricing.bulk.duplicate";
+    public static final String PRICING_BULK_TOO_LARGE = "pricing.bulk.too_large";
 }
