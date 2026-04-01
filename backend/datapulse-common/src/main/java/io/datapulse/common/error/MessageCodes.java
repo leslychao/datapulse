@@ -75,4 +75,13 @@ public final class MessageCodes {
     public static final String PRICING_RUN_ALREADY_IN_PROGRESS = "pricing.run.already_in_progress";
     public static final String PRICING_BULK_DUPLICATE = "pricing.bulk.duplicate";
     public static final String PRICING_BULK_TOO_LARGE = "pricing.bulk.too_large";
+
+    // --- Execution ---
+    public static final String EXECUTION_ACTION_NOT_FOUND = "execution.action.not_found";
+    public static final String EXECUTION_ACTION_INVALID_TRANSITION = "execution.action.invalid_transition";
+    public static final String EXECUTION_ACTION_CAS_CONFLICT = "execution.action.cas_conflict";
+    public static final String EXECUTION_ACTION_NOT_CANCELLABLE = "execution.action.not_cancellable";
+    public static final String EXECUTION_ACTION_ALREADY_ACTIVE = "execution.action.already_active";
+    public static final String EXECUTION_RECONCILIATION_FAILED = "execution.reconciliation.failed";
+    public static final String EXECUTION_RECONCILIATION_MISMATCH = "execution.reconciliation.mismatch";
 }

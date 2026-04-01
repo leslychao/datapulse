@@ -275,5 +275,13 @@
   "pricing.lock.already_exists": "На этот товар уже установлена блокировка цены.",
   "pricing.run.already_in_progress": "Для этого подключения уже выполняется ценовой расчёт.",
   "pricing.bulk.duplicate": "Запрос с такими параметрами уже обрабатывается.",
-  "pricing.bulk.too_large": "Максимум 500 товаров за одну операцию."
+  "pricing.bulk.too_large": "Максимум 500 товаров за одну операцию.",
+
+  "execution.action.not_found": "Действие не найдено.",
+  "execution.action.invalid_transition": "Переход из {{currentStatus}} в {{targetStatus}} невозможен для действия {{actionId}}.",
+  "execution.action.cas_conflict": "Конфликт: действие {{actionId}} уже изменено (ожидалось {{expected}}, цель {{target}}).",
+  "execution.action.not_cancellable": "Действие {{actionId}} нельзя отменить в статусе {{status}}.",
+  "execution.action.already_active": "Для этого оффера уже существует активное действие.",
+  "execution.reconciliation.failed": "Проверка применения цены не удалась.",
+  "execution.reconciliation.mismatch": "Расхождение: целевая цена не совпадает с фактической."
 }
