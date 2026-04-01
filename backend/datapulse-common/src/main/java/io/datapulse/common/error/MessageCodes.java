@@ -76,6 +76,7 @@ public final class MessageCodes {
     public static final String PRICING_RUN_ALREADY_IN_PROGRESS = "pricing.run.already_in_progress";
     public static final String PRICING_BULK_DUPLICATE = "pricing.bulk.duplicate";
     public static final String PRICING_BULK_TOO_LARGE = "pricing.bulk.too_large";
+    public static final String PRICING_AUTOMATION_BLOCKED = "pricing.automation.blocked";
 
     // --- Execution ---
     public static final String EXECUTION_ACTION_NOT_FOUND = "execution.action.not_found";

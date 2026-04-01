@@ -262,6 +262,7 @@
   "pricing.guard.frequency": "Цена изменена менее {{hours}} ч назад (последнее изменение: {{lastChangeAt}}).",
   "pricing.guard.volatility": "Слишком много разворотов цены: {{count}} за {{periodDays}} дн (макс. {{maxReversals}}).",
   "pricing.guard.promo_active": "Товар участвует в промо-акции — изменение цены заблокировано.",
+  "pricing.automation.blocked": "Автоматизация ценообразования заблокирована для этого подключения из-за активного предупреждения о качестве данных.",
 
   "pricing.strategy.cogs_missing": "Себестоимость не задана.",
   "pricing.strategy.commission_missing": "Ставка комиссии недоступна — недостаточно данных.",

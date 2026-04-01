@@ -756,6 +756,7 @@ deferred_action:
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
 | GET | `/api/simulation/comparison` | Any role | Simulated vs live comparison per connection. Filter: `?connectionId=...` |
+| GET | `/api/simulation/preview` | Any role | Decision-level simulation preview: simulated prices for a specific price decision. Filter: `?decisionId=...` |
 | DELETE | `/api/simulation/shadow-state` | PRICING_MANAGER, ADMIN, OWNER | Reset shadow-state for connection. Body: `{ connectionId }` |
 
 ## Связанные модули

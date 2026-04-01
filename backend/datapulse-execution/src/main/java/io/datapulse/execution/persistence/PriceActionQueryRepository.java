@@ -1,9 +1,8 @@
 package io.datapulse.execution.persistence;
 
-import io.datapulse.execution.api.PriceActionFilter;
-import io.datapulse.execution.api.PriceActionSummaryResponse;
 import io.datapulse.execution.domain.ActionExecutionMode;
 import io.datapulse.execution.domain.ActionStatus;
+import io.datapulse.execution.domain.PriceActionFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -43,9 +42,9 @@ public class PriceActionQueryRepository {
             SELECT COUNT(*) FROM price_action pa
             """;
 
-    public Page<PriceActionSummaryResponse> findAll(long workspaceId,
-                                                     PriceActionFilter filter,
-                                                     Pageable pageable) {
+    public Page<PriceActionSummaryRow> findAll(long workspaceId,
+                                                PriceActionFilter filter,
+                                                Pageable pageable) {
         var whereClause = new StringBuilder(" WHERE pa.workspace_id = :workspaceId");
         var params = new MapSqlParameterSource("workspaceId", workspaceId);
 
@@ -63,8 +62,8 @@ public class PriceActionQueryRepository {
         params.addValue("limit", pageable.getPageSize());
         params.addValue("offset", pageable.getOffset());
 
-        List<PriceActionSummaryResponse> content = jdbc.query(querySql, params, (rs, rowNum) ->
-                new PriceActionSummaryResponse(
+        List<PriceActionSummaryRow> content = jdbc.query(querySql, params, (rs, rowNum) ->
+                new PriceActionSummaryRow(
                         rs.getLong("id"),
                         rs.getLong("marketplace_offer_id"),
                         ActionExecutionMode.valueOf(rs.getString("execution_mode")),
@@ -132,7 +131,8 @@ public class PriceActionQueryRepository {
         for (int i = 0; i < orders.size(); i++) {
             Sort.Order order = orders.get(i);
             String column = SORT_COLUMNS.getOrDefault(order.getProperty(), "pa.created_at");
-            sb.append(column).append(" ").append(order.getDirection().name()).append(" NULLS LAST");
+            sb.append(column).append(" ").append(order.getDirection().name())
+                    .append(" NULLS LAST");
             if (i < orders.size() - 1) {
                 sb.append(", ");
             }

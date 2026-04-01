@@ -173,9 +173,11 @@ ACKNOWLEDGED → RESOLVED
 | Missing sync checker | 15 min | `job_execution` (expected vs actual) | MISSING_SYNC |
 | Residual anomaly checker | After each materialization | `mart_posting_pnl.reconciliation_residual` | RESIDUAL_ANOMALY |
 | Spike detection checker | After each materialization | Period-over-period changes in fact_finance measures | SPIKE_DETECTION |
-| Mismatch checker | After each sync | Cross-domain consistency | MISMATCH |
+| Mismatch checker | 30 min | Cross-domain consistency (PostgreSQL) | MISMATCH |
 
-Checkers запускаются в `datapulse-api`. Post-materialization checkers триггерятся через `ETL_SYNC_COMPLETED` event (fanout consumer в datapulse-api).
+Checkers запускаются в `datapulse-api`. STALE_DATA, MISSING_SYNC, MISMATCH — scheduled с `@SchedulerLock`. Post-materialization checkers (RESIDUAL_ANOMALY, SPIKE_DETECTION) триггерятся через `ETL_SYNC_COMPLETED` event (fanout consumer в datapulse-api).
+
+**Phase C/D note:** RESIDUAL_ANOMALY и SPIKE_DETECTION — стабы до появления ClickHouse DataSource. При реализации Analytics & P&L (Phase C/D) необходимо: (1) реализовать checker algorithms с ClickHouse queries, (2) создать event listener на `ETL_SYNC_COMPLETED` для вызова post-materialization checkers с workspace/connection контекстом из события.
 
 ### Checker algorithms
 
@@ -454,7 +456,10 @@ Single `datapulse-api` instance: in-memory `SimpleBrokerMessageHandler` (Spring 
 | `/api/alerts/{id}/acknowledge` | POST | OPEN → ACKNOWLEDGED |
 | `/api/alerts/{id}/resolve` | POST | ACKNOWLEDGED → RESOLVED |
 | `/api/alert-rules` | GET | Alert rules для workspace |
-| `/api/alert-rules/{id}` | PUT | Update rule (thresholds, enabled, severity) |
+| `/api/alert-rules/{id}` | GET | Detail rule (для формы редактирования) |
+| `/api/alert-rules/{id}` | PUT | Update rule (thresholds, enabled, severity, blocks_automation) |
+| `/api/alert-rules/{id}/activate` | POST | Enable rule (`enabled = true`) |
+| `/api/alert-rules/{id}/deactivate` | POST | Disable rule (`enabled = false`) |
 
 ### Reconnection fallback
 

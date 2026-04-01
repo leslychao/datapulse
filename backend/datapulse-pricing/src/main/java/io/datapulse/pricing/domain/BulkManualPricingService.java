@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
+import io.datapulse.platform.audit.AutomationBlockerChecker;
 import io.datapulse.pricing.api.BulkManualApplyResponse;
 import io.datapulse.pricing.api.BulkManualPreviewRequest;
 import io.datapulse.pricing.api.BulkManualPreviewRequest.PriceChange;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BulkManualPricingService {
 
+    private final AutomationBlockerChecker automationBlockerChecker;
     private final PricingDataReadRepository dataReadRepository;
     private final PricingRunRepository runRepository;
     private final PriceDecisionRepository decisionRepository;
@@ -79,6 +81,10 @@ public class BulkManualPricingService {
 
         Map<Long, EnrichedOfferRow> offers = loadOffers(request, workspaceId);
         Long connectionId = resolveConnectionId(offers);
+
+        if (automationBlockerChecker.isBlocked(workspaceId, connectionId)) {
+            throw BadRequestException.of(MessageCodes.PRICING_AUTOMATION_BLOCKED);
+        }
 
         PricingRunEntity run = createRun(workspaceId, connectionId, hash, request.changes().size());
         return processApply(request, offers, run, workspaceId);

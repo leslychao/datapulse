@@ -1,7 +1,4 @@
-package io.datapulse.execution.api;
-
-import io.datapulse.execution.domain.ActionExecutionMode;
-import io.datapulse.execution.domain.ActionStatus;
+package io.datapulse.execution.domain;
 
 import java.time.LocalDate;
 

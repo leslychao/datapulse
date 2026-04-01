@@ -88,7 +88,7 @@ public class PriceActionExecutor {
             return;
         }
 
-        actionService.casRetryFromExecuting(actionId);
+        actionService.casExecuteFromRetry(actionId);
 
         action = actionRepository.findById(actionId).orElse(null);
         if (action == null || action.getStatus() != ActionStatus.EXECUTING) {

@@ -3,25 +3,35 @@ package io.datapulse.execution.domain;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.execution.config.ExecutionProperties;
 import io.datapulse.execution.domain.event.ActionCompletedEvent;
 import io.datapulse.execution.domain.event.ActionCreatedEvent;
 import io.datapulse.execution.domain.event.ActionFailedEvent;
 import io.datapulse.execution.persistence.DeferredActionEntity;
 import io.datapulse.execution.persistence.DeferredActionRepository;
+import io.datapulse.execution.persistence.PriceActionAttemptEntity;
+import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionCasRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
+import io.datapulse.execution.persistence.PriceActionQueryRepository;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.execution.persistence.PriceActionSummaryRow;
+import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
+import io.datapulse.platform.security.WorkspaceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -30,16 +40,35 @@ import java.util.Map;
 public class ActionService {
 
     private static final String AGGREGATE_TYPE = "price_action";
-    private static final int DEFAULT_MAX_ATTEMPTS = 3;
-    private static final Duration MIN_BACKOFF = Duration.ofSeconds(5);
-    private static final Duration MAX_BACKOFF = Duration.ofMinutes(5);
-    private static final int BACKOFF_MULTIPLIER = 2;
+    private static final String ENTITY_TYPE = "price_action";
 
     private final PriceActionRepository actionRepository;
     private final PriceActionCasRepository casRepository;
+    private final PriceActionAttemptRepository attemptRepository;
+    private final PriceActionQueryRepository queryRepository;
     private final DeferredActionRepository deferredActionRepository;
     private final OutboxService outboxService;
+    private final ExecutionProperties properties;
+    private final WorkspaceContext workspaceContext;
     private final ApplicationEventPublisher eventPublisher;
+
+    @Transactional(readOnly = true)
+    public Page<PriceActionSummaryRow> listActions(long workspaceId,
+                                                    PriceActionFilter filter,
+                                                    Pageable pageable) {
+        return queryRepository.findAll(workspaceId, filter, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PriceActionEntity getAction(long actionId) {
+        return findActionOrThrow(actionId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PriceActionAttemptEntity> getAttempts(long actionId) {
+        findActionOrThrow(actionId);
+        return attemptRepository.findByPriceActionIdOrderByAttemptNumber(actionId);
+    }
 
     @Transactional
     public PriceActionEntity createAction(long workspaceId,
@@ -76,7 +105,7 @@ public class ActionService {
         action.setExecutionMode(executionMode);
         action.setTargetPrice(targetPrice);
         action.setCurrentPriceAtCreation(currentPrice);
-        action.setMaxAttempts(DEFAULT_MAX_ATTEMPTS);
+        action.setMaxAttempts(properties.getMaxAttempts());
         action.setApprovalTimeoutHours(approvalTimeoutHours);
 
         if (autoApprove) {
@@ -119,7 +148,26 @@ public class ActionService {
 
         scheduleExecution(action);
 
+        publishAudit("action.approve", actionId, "SUCCESS", null);
         log.info("Action approved: actionId={}, userId={}", actionId, userId);
+    }
+
+    @Transactional
+    public void casReject(long actionId, String cancelReason) {
+        var action = findActionOrThrow(actionId);
+
+        if (action.getStatus() != ActionStatus.PENDING_APPROVAL) {
+            throw ConflictException.of(MessageCodes.EXECUTION_ACTION_INVALID_TRANSITION,
+                    actionId, action.getStatus().name(), ActionStatus.CANCELLED.name());
+        }
+
+        int rows = casRepository.casCancel(actionId, ActionStatus.PENDING_APPROVAL, cancelReason);
+        if (rows == 0) {
+            throwCasConflict(actionId, action.getStatus(), ActionStatus.CANCELLED);
+        }
+
+        publishAudit("action.reject", actionId, "SUCCESS", cancelReason);
+        log.info("Action rejected: actionId={}, reason={}", actionId, cancelReason);
     }
 
     @Transactional
@@ -134,6 +182,7 @@ public class ActionService {
 
         scheduleExecution(action);
 
+        publishAudit("action.resume", actionId, "SUCCESS", null);
         log.info("Action resumed: actionId={}, userId={}", actionId, userId);
     }
 
@@ -147,6 +196,7 @@ public class ActionService {
             throwCasConflict(actionId, action.getStatus(), ActionStatus.ON_HOLD);
         }
 
+        publishAudit("action.hold", actionId, "SUCCESS", holdReason);
         log.info("Action put on hold: actionId={}, reason={}", actionId, holdReason);
     }
 
@@ -164,7 +214,32 @@ public class ActionService {
             throwCasConflict(actionId, action.getStatus(), ActionStatus.CANCELLED);
         }
 
+        publishAudit("action.cancel", actionId, "SUCCESS", cancelReason);
         log.info("Action cancelled: actionId={}, reason={}", actionId, cancelReason);
+    }
+
+    @Transactional
+    public void retryFailed(long actionId) {
+        var action = findActionOrThrow(actionId);
+
+        if (action.getStatus() != ActionStatus.FAILED) {
+            throw ConflictException.of(MessageCodes.EXECUTION_ACTION_INVALID_TRANSITION,
+                    actionId, action.getStatus().name(), "RETRY");
+        }
+
+        createAction(
+                action.getWorkspaceId(),
+                action.getMarketplaceOfferId(),
+                action.getPriceDecisionId(),
+                action.getExecutionMode(),
+                action.getTargetPrice(),
+                action.getCurrentPriceAtCreation(),
+                action.getApprovalTimeoutHours(),
+                true
+        );
+
+        publishAudit("action.retry", actionId, "SUCCESS", null);
+        log.info("Retry created for failed action: originalActionId={}", actionId);
     }
 
     @Transactional
@@ -176,8 +251,9 @@ public class ActionService {
     }
 
     @Transactional
-    public void casRetryFromExecuting(long actionId) {
-        int rows = casRepository.casTransition(actionId, ActionStatus.RETRY_SCHEDULED, ActionStatus.EXECUTING);
+    public void casExecuteFromRetry(long actionId) {
+        int rows = casRepository.casTransition(actionId,
+                ActionStatus.RETRY_SCHEDULED, ActionStatus.EXECUTING);
         if (rows == 0) {
             log.warn("CAS retry→executing conflict: actionId={}", actionId);
         }
@@ -307,9 +383,11 @@ public class ActionService {
     }
 
     private Duration calculateBackoff(int attemptCount) {
-        long delaySeconds = MIN_BACKOFF.toSeconds();
+        long delaySeconds = properties.getMinBackoff().toSeconds();
+        long maxSeconds = properties.getMaxBackoff().toSeconds();
+        int multiplier = properties.getBackoffMultiplier();
         for (int i = 1; i < attemptCount; i++) {
-            delaySeconds = Math.min(delaySeconds * BACKOFF_MULTIPLIER, MAX_BACKOFF.toSeconds());
+            delaySeconds = Math.min(delaySeconds * multiplier, maxSeconds);
         }
         return Duration.ofSeconds(delaySeconds);
     }
@@ -328,7 +406,27 @@ public class ActionService {
 
     private void throwCasConflict(long actionId, ActionStatus expected, ActionStatus target) {
         log.warn("CAS conflict: actionId={}, expected={}, target={}", actionId, expected, target);
+        publishAudit("action.cas_conflict", actionId, "CAS_CONFLICT",
+                "expected=%s, target=%s".formatted(expected, target));
         throw ConflictException.of(MessageCodes.EXECUTION_ACTION_CAS_CONFLICT,
                 actionId, expected.name(), target.name());
     }
+
+    private void publishAudit(String actionType, long actionId,
+                              String outcome, String details) {
+        long wsId = 0L;
+        Long userId = null;
+        try {
+            wsId = workspaceContext.getWorkspaceId();
+            userId = workspaceContext.getUserId();
+        } catch (Exception ignored) {
+        }
+
+        eventPublisher.publishEvent(new AuditEvent(
+                wsId, "USER", userId, actionType,
+                ENTITY_TYPE, String.valueOf(actionId),
+                outcome, details, null, null
+        ));
+    }
+
 }

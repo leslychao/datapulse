@@ -1,13 +1,11 @@
 package io.datapulse.execution.api;
 
-import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.execution.domain.ActionService;
+import io.datapulse.execution.domain.PriceActionFilter;
 import io.datapulse.execution.domain.ReconciliationService;
 import io.datapulse.execution.persistence.PriceActionAttemptEntity;
-import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
-import io.datapulse.execution.persistence.PriceActionQueryRepository;
-import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.execution.persistence.PriceActionSummaryRow;
 import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,26 +29,25 @@ public class PriceActionController {
 
     private final ActionService actionService;
     private final ReconciliationService reconciliationService;
-    private final PriceActionRepository actionRepository;
-    private final PriceActionAttemptRepository attemptRepository;
-    private final PriceActionQueryRepository queryRepository;
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
-    public Page<PriceActionSummaryResponse> list(PriceActionFilter filter, Pageable pageable) {
-        return queryRepository.findAll(workspaceContext.getWorkspaceId(), filter, pageable);
+    public Page<PriceActionSummaryResponse> list(PriceActionFilter filter,
+                                                  Pageable pageable) {
+        return actionService.listActions(
+                workspaceContext.getWorkspaceId(), filter, pageable)
+                .map(this::toSummaryResponse);
     }
 
     @GetMapping("/{actionId}")
     public PriceActionResponse get(@PathVariable("actionId") long actionId) {
-        PriceActionEntity action = findActionOrThrow(actionId);
-        return toResponse(action);
+        return toResponse(actionService.getAction(actionId));
     }
 
     @GetMapping("/{actionId}/attempts")
-    public List<PriceActionAttemptResponse> listAttempts(@PathVariable("actionId") long actionId) {
-        findActionOrThrow(actionId);
-        return attemptRepository.findByPriceActionIdOrderByAttemptNumber(actionId).stream()
+    public List<PriceActionAttemptResponse> listAttempts(
+            @PathVariable("actionId") long actionId) {
+        return actionService.getAttempts(actionId).stream()
                 .map(this::toAttemptResponse)
                 .toList();
     }
@@ -77,7 +74,7 @@ public class PriceActionController {
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void reject(@PathVariable("actionId") long actionId,
                         @Valid @RequestBody CancelRequest request) {
-        actionService.casCancel(actionId, request.cancelReason());
+        actionService.casReject(actionId, request.cancelReason());
     }
 
     @PostMapping("/{actionId}/hold")
@@ -104,32 +101,28 @@ public class PriceActionController {
     @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void retry(@PathVariable("actionId") long actionId,
                        @Valid @RequestBody RetryRequest request) {
-        PriceActionEntity action = findActionOrThrow(actionId);
-
-        actionService.createAction(
-                action.getWorkspaceId(),
-                action.getMarketplaceOfferId(),
-                action.getPriceDecisionId(),
-                action.getExecutionMode(),
-                action.getTargetPrice(),
-                action.getCurrentPriceAtCreation(),
-                action.getApprovalTimeoutHours(),
-                true
-        );
+        actionService.retryFailed(actionId);
     }
 
     @PostMapping("/{actionId}/reconcile")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public void reconcile(@PathVariable("actionId") long actionId,
                            @Valid @RequestBody ReconcileRequest request) {
-        boolean succeeded = request.outcome() == ReconcileRequest.ReconcileOutcome.SUCCEEDED;
+        boolean succeeded =
+                request.outcome() == ReconcileRequest.ReconcileOutcome.SUCCEEDED;
         reconciliationService.processManualReconciliation(
-                actionId, succeeded, request.manualOverrideReason(), workspaceContext.getUserId());
+                actionId, succeeded, request.manualOverrideReason(),
+                workspaceContext.getUserId());
     }
 
-    private PriceActionEntity findActionOrThrow(long actionId) {
-        return actionRepository.findById(actionId)
-                .orElseThrow(() -> NotFoundException.entity("price_action", actionId));
+    private PriceActionSummaryResponse toSummaryResponse(PriceActionSummaryRow row) {
+        return new PriceActionSummaryResponse(
+                row.id(), row.marketplaceOfferId(),
+                row.executionMode(), row.status(),
+                row.targetPrice(), row.currentPriceAtCreation(),
+                row.attemptCount(), row.maxAttempts(),
+                row.createdAt(), row.updatedAt()
+        );
     }
 
     private PriceActionResponse toResponse(PriceActionEntity e) {

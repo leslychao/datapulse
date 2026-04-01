@@ -6,6 +6,8 @@ import io.datapulse.execution.persistence.DeferredActionEntity;
 import io.datapulse.execution.persistence.DeferredActionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,14 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 
-/**
- * Processes deferred actions: when an in-flight action completes,
- * this job picks up deferred actions that are now eligible for creation.
- *
- * Also cleans up expired deferred actions.
- * Runs every 30 seconds per execution.md.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -28,6 +24,13 @@ public class DeferredActionProcessor {
 
     private final DeferredActionRepository deferredActionRepository;
     private final ActionService actionService;
+    private final NamedParameterJdbcTemplate jdbc;
+
+    private static final String DECISION_PRICES_SQL = """
+            SELECT target_price, current_price
+            FROM price_decision
+            WHERE id = :decisionId
+            """;
 
     @Scheduled(fixedDelayString = "PT30S")
     public void processDeferred() {
@@ -54,21 +57,38 @@ public class DeferredActionProcessor {
 
     @Transactional
     void createActionFromDeferred(DeferredActionEntity deferred) {
-        boolean autoApprove = deferred.getExecutionMode() == ActionExecutionMode.SIMULATED;
+        boolean autoApprove =
+                deferred.getExecutionMode() == ActionExecutionMode.SIMULATED;
+
+        var params = new MapSqlParameterSource("decisionId", deferred.getPriceDecisionId());
+        var prices = jdbc.query(DECISION_PRICES_SQL, params, (rs, rowNum) -> new BigDecimal[]{
+                rs.getBigDecimal("target_price"),
+                rs.getBigDecimal("current_price")
+        });
+
+        if (prices.isEmpty() || prices.get(0)[0] == null) {
+            log.warn("Price decision not found or no target_price: decisionId={}",
+                    deferred.getPriceDecisionId());
+            return;
+        }
+
+        BigDecimal targetPrice = prices.get(0)[0];
+        BigDecimal currentPrice = Objects.requireNonNullElse(prices.get(0)[1], BigDecimal.ZERO);
 
         actionService.createAction(
                 deferred.getWorkspaceId(),
                 deferred.getMarketplaceOfferId(),
                 deferred.getPriceDecisionId(),
                 deferred.getExecutionMode(),
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
+                targetPrice,
+                currentPrice,
                 24,
                 autoApprove
         );
     }
 
-    private void cleanupExpired() {
+    @Transactional
+    void cleanupExpired() {
         int deleted = deferredActionRepository.deleteExpired(OffsetDateTime.now());
         if (deleted > 0) {
             log.info("Cleaned up {} expired deferred actions", deleted);

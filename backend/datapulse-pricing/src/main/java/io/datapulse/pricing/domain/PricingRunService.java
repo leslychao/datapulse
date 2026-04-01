@@ -15,6 +15,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.datapulse.common.error.MessageCodes;
+import io.datapulse.platform.audit.AutomationBlockerChecker;
 import io.datapulse.pricing.domain.PricingConstraintResolver.ConstraintResolution;
 import io.datapulse.pricing.domain.guard.PricingGuardChain;
 import io.datapulse.pricing.domain.guard.PricingGuardChain.GuardChainResult;
@@ -48,6 +49,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class PricingRunService {
 
+    private final AutomationBlockerChecker automationBlockerChecker;
     private final PricingDataReadRepository dataReadRepository;
     private final PolicyResolver policyResolver;
     private final PricingSignalCollector signalCollector;
@@ -86,6 +88,15 @@ public class PricingRunService {
     }
 
     private RunCounters processConnection(PricingRunEntity run) {
+        if (automationBlockerChecker.isBlocked(run.getWorkspaceId(), run.getConnectionId())) {
+            log.warn("PricingRun {}: automation blocked for connection {} (blocking alert exists)",
+                    run.getId(), run.getConnectionId());
+            run.setErrorDetails(serializeJson(Map.of(
+                    "reason", MessageCodes.PRICING_AUTOMATION_BLOCKED,
+                    "connectionId", run.getConnectionId())));
+            return RunCounters.EMPTY;
+        }
+
         List<OfferRow> allOffers = dataReadRepository.findOffersByConnection(run.getConnectionId());
         run.setTotalOffers(allOffers.size());
 

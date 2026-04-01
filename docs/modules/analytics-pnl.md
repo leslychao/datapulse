@@ -349,6 +349,7 @@ Grain: одна строка per canonical_sale. Содержит quantity дл�
 | `quantity` | Int32 | canonical_sale.quantity | No | Количество (для COGS) |
 | `sale_amount` | Decimal(18,2) | canonical_sale.sale_amount | No | Сумма продажи |
 | `sale_date` | Date | canonical_sale.sale_date | No | Дата продажи |
+| `job_execution_id` | UInt64 | canonical_sale.job_execution_id | No | Data provenance |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```
@@ -378,6 +379,7 @@ Grain: одна строка per canonical_order.
 | `status` | LowCardinality(String) | canonical_order.status | No | Статус заказа |
 | `fulfillment_type` | LowCardinality(String) | canonical_order.fulfillment_type | Yes | FBO / FBS (nullable for orders without explicit type) |
 | `region` | String | canonical_order.region | Yes | Delivery region |
+| `job_execution_id` | UInt64 | canonical_order.job_execution_id | No | Data provenance |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```
@@ -402,6 +404,7 @@ Grain: одна строка per canonical_return.
 | `return_amount` | Decimal(18,2) | canonical_return.return_amount | Yes | Сумма возврата |
 | `return_reason` | LowCardinality(String) | canonical_return.return_reason | Yes | Причина возврата |
 | `return_date` | Date | canonical_return.return_date | No | Дата возврата |
+| `job_execution_id` | UInt64 | canonical_return.job_execution_id | No | Data provenance |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```
@@ -471,6 +474,62 @@ Grain: одна строка per cost_profile period (seller_sku × valid_from).
 ```
 ENGINE = ReplacingMergeTree(ver)
 ORDER BY (seller_sku_id, valid_from)
+```
+
+#### dim_advertising_campaign (Phase B extended)
+
+Grain: одна строка per advertising campaign. Pipeline exception: Raw → ClickHouse (DD-AD-1).
+
+| Column | Type | Source | Nullable | Notes |
+|--------|------|--------|----------|-------|
+| `connection_id` | UInt32 | connection.id | No | FK marketplace_connection |
+| `source_platform` | LowCardinality(String) | connection.marketplace_type | No | `'ozon'` / `'wb'` |
+| `campaign_id` | UInt64 | provider-specific campaign ID | No | Grain key |
+| `name` | String | campaign name | No | |
+| `campaign_type` | LowCardinality(String) | provider-specific type | No | |
+| `status` | LowCardinality(String) | campaign status | No | |
+| `placement` | String | placement type | Yes | |
+| `daily_budget` | Decimal(18,2) | daily budget | Yes | |
+| `start_time` | DateTime | campaign start | Yes | |
+| `end_time` | DateTime | campaign end | Yes | |
+| `created_at` | DateTime | campaign creation timestamp | Yes | |
+| `ver` | UInt64 | — | No | Materialization timestamp |
+
+```
+ENGINE = ReplacingMergeTree(ver)
+PARTITION BY source_platform
+ORDER BY (connection_id, source_platform, campaign_id)
+```
+
+#### fact_advertising (Phase B extended)
+
+Grain: одна строка per campaign × product (marketplace_sku) × day. Pipeline exception: Raw → ClickHouse (DD-AD-1).
+
+| Column | Type | Source | Nullable | Notes |
+|--------|------|--------|----------|-------|
+| `connection_id` | UInt32 | connection.id | No | FK marketplace_connection |
+| `source_platform` | LowCardinality(String) | connection.marketplace_type | No | `'ozon'` / `'wb'` |
+| `campaign_id` | UInt64 | campaign reference | No | FK dim_advertising_campaign |
+| `ad_date` | Date | statistics date | No | |
+| `marketplace_sku` | String | provider-specific SKU | No | |
+| `views` | UInt64 | impressions | No | |
+| `clicks` | UInt64 | clicks | No | |
+| `spend` | Decimal(18,2) | ad spend | No | |
+| `orders` | UInt32 | attributed orders | No | |
+| `ordered_units` | UInt32 | attributed units | No | |
+| `ordered_revenue` | Decimal(18,2) | attributed revenue | No | |
+| `canceled` | UInt32 | canceled attributed orders | No | |
+| `ctr` | Float32 | click-through rate | No | |
+| `cpc` | Decimal(18,2) | cost per click | No | |
+| `cr` | Float32 | conversion rate | No | |
+| `job_execution_id` | UInt64 | data provenance | No | |
+| `ver` | UInt64 | — | No | Materialization timestamp |
+| `materialized_at` | DateTime | — | No | |
+
+```
+ENGINE = ReplacingMergeTree(ver)
+PARTITION BY toYYYYMM(ad_date)
+ORDER BY (connection_id, source_platform, campaign_id, ad_date, marketplace_sku)
 ```
 
 #### mart_posting_pnl
