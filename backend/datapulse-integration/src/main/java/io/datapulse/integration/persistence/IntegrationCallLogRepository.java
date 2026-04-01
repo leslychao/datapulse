@@ -15,7 +15,7 @@ public interface IntegrationCallLogRepository extends JpaRepository<IntegrationC
             WHERE l.marketplaceConnectionId = :connectionId
               AND (:from IS NULL OR l.createdAt >= :from)
               AND (:to IS NULL OR l.createdAt <= :to)
-              AND (:endpoint IS NULL OR l.endpoint LIKE CONCAT('%', :endpoint, '%'))
+              AND (:endpoint IS NULL OR l.endpoint LIKE CONCAT('%', CAST(:endpoint AS string), '%'))
               AND (:httpStatus IS NULL OR l.httpStatus = :httpStatus)
             ORDER BY l.createdAt DESC
             """)

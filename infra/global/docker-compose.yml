@@ -1,0 +1,43 @@
+# Global reverse proxy: TLS termination (Let's Encrypt) + proxy to infra Nginx.
+#
+# First-time setup:
+#   1. Start nginx (HTTP-only mode for ACME challenge):
+#      docker compose up -d nginx
+#
+#   2. Obtain certificate:
+#      docker compose run --rm certbot certonly \
+#        --webroot --webroot-path=/var/www/certbot \
+#        -d mydatapulse.ru --email your@email.com --agree-tos
+#
+#   3. Uncomment ssl server block in nginx.conf, then reload:
+#      docker compose exec nginx nginx -s reload
+#
+# After that, certbot container auto-renews every 12 hours.
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: datapulse-global-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot-webroot:/var/www/certbot:ro
+      - certbot-certs:/etc/letsencrypt:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: datapulse-certbot
+    volumes:
+      - certbot-webroot:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    restart: unless-stopped
+
+volumes:
+  certbot-webroot:
+  certbot-certs:
