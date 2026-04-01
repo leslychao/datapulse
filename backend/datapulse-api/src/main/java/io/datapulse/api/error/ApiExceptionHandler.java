@@ -58,7 +58,7 @@ public class ApiExceptionHandler {
         Instant.now(),
         HttpStatus.BAD_REQUEST.value(),
         HttpStatus.BAD_REQUEST.getReasonPhrase(),
-        "Validation failed",
+        MessageCodes.VALIDATION_FAILED,
         MessageCodes.VALIDATION_FAILED,
         request.getRequestURI(),
         fieldErrors
@@ -75,7 +75,7 @@ public class ApiExceptionHandler {
         Instant.now(),
         HttpStatus.FORBIDDEN.value(),
         HttpStatus.FORBIDDEN.getReasonPhrase(),
-        "Access denied",
+        MessageCodes.ACCESS_DENIED,
         MessageCodes.ACCESS_DENIED,
         request.getRequestURI(),
         null
@@ -91,7 +91,7 @@ public class ApiExceptionHandler {
         Instant.now(),
         HttpStatus.INTERNAL_SERVER_ERROR.value(),
         HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-        "Internal server error",
+        MessageCodes.INTERNAL_ERROR,
         MessageCodes.INTERNAL_ERROR,
         request.getRequestURI(),
         null

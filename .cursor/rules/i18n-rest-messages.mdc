@@ -1,0 +1,54 @@
+---
+description: Все user-facing строки в REST-ответах бэкенда — через i18n message keys
+alwaysApply: true
+---
+
+# I18n для REST-сообщений
+
+Все строки, попадающие к пользователю через REST API, должны быть **message key** (machine-readable dot-separated строки). Фронтенд переводит их через `@ngx-translate` из `frontend/src/locale/ru.json`.
+
+## Контракт backend → frontend
+
+Бэкенд **никогда** не отправляет human-readable текст в REST-ответах. Вместо этого:
+
+1. **`ErrorResponse.message`** и **`ErrorResponse.messageKey`** — ключ из `MessageCodes`
+2. **`skip_reason`**, **guard reasons**, **strategy reasons** — ключи из `MessageCodes`
+3. **Параметрические сообщения** — key + `Map<String, Object> args` рядом в JSON для интерполяции
+
+## Где хранятся ключи
+
+| Что | Где |
+|-----|----|
+| Константы ключей | `io.datapulse.common.error.MessageCodes` |
+| Русские переводы | `frontend/src/locale/ru.json` |
+
+## Правила
+
+- **Новый user-facing ключ** → добавь в `MessageCodes` + `ru.json`
+- **Формат ключей**: `module.component.action` (dot-separated, lowercase), например `pricing.guard.stale_data.stale`
+- **Параметры**: в `ru.json` используй `{{paramName}}` для интерполяции. На бэкенде передавай `Map<String, Object> args` рядом с ключом
+- **`ApiExceptionHandler`**: поле `message` = `messageKey` (не hardcoded текст)
+- **Исключения** (`AppException`, `BadRequestException`, etc.): `messageKey` — ключ из `MessageCodes`, не человекочитаемая строка
+
+## Исключения (НЕ требуют i18n)
+
+- **Логи** (`log.info/warn/error`) — остаются на английском, не видны пользователю
+- **`explanation_summary`** в `price_decision` — структурированный audit trail с форматом из документации, хранится в БД
+- **Технические поля в JSONB** (`constraints_applied[].name`, `signal_snapshot`) — machine data, не user-facing
+- **Exception messages** (`new IllegalStateException("...")`) — для разработчиков, не для REST
+
+## Пример: guard с параметрами
+
+```java
+// ✅ Backend
+return GuardResult.block(guardName(), MessageCodes.PRICING_GUARD_STALE_DATA_STALE,
+        Map.of("hours", thresholdHours, "lastSync", syncAt.toString()));
+
+// ✅ ru.json
+"pricing.guard.stale_data.stale": "Данные старше {{hours}} ч (последняя синхронизация: {{lastSync}})."
+```
+
+```java
+// ❌ Hardcoded текст
+return GuardResult.block(guardName(), "Data older than 24 hours (last sync: " + syncAt + ")");
+```

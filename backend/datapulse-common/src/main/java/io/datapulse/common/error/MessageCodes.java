@@ -49,4 +49,20 @@ public final class MessageCodes {
     public static final String ALERT_EVENT_NOT_FOUND = "alert.event.not.found";
     public static final String ALERT_EVENT_INVALID_STATE = "alert.event.invalid.state";
     public static final String ALERT_RULE_NOT_FOUND = "alert.rule.not.found";
+
+    // --- Pricing: Guards ---
+    public static final String PRICING_GUARD_MANUAL_LOCK = "pricing.guard.manual_lock";
+    public static final String PRICING_GUARD_STALE_DATA_UNKNOWN = "pricing.guard.stale_data.unknown";
+    public static final String PRICING_GUARD_STALE_DATA_STALE = "pricing.guard.stale_data.stale";
+    public static final String PRICING_GUARD_STOCK_OUT = "pricing.guard.stock_out";
+    public static final String PRICING_GUARD_MARGIN_NEGATIVE = "pricing.guard.margin_negative";
+    public static final String PRICING_GUARD_FREQUENCY = "pricing.guard.frequency";
+    public static final String PRICING_GUARD_VOLATILITY = "pricing.guard.volatility";
+
+    // --- Pricing: Strategy skip/hold reasons ---
+    public static final String PRICING_COGS_MISSING = "pricing.strategy.cogs_missing";
+    public static final String PRICING_COMMISSION_MISSING = "pricing.strategy.commission_missing";
+    public static final String PRICING_DENOMINATOR_INVALID = "pricing.strategy.denominator_invalid";
+    public static final String PRICING_CURRENT_PRICE_MISSING = "pricing.strategy.current_price_missing";
+    public static final String PRICING_NO_CHANGE = "pricing.strategy.no_change";
 }

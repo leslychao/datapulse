@@ -1,0 +1,54 @@
+package io.datapulse.pricing.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record GuardConfig(
+        @JsonProperty("margin_guard_enabled") Boolean marginGuardEnabled,
+        @JsonProperty("frequency_guard_enabled") Boolean frequencyGuardEnabled,
+        @JsonProperty("frequency_guard_hours") Integer frequencyGuardHours,
+        @JsonProperty("volatility_guard_enabled") Boolean volatilityGuardEnabled,
+        @JsonProperty("volatility_guard_reversals") Integer volatilityGuardReversals,
+        @JsonProperty("volatility_guard_period_days") Integer volatilityGuardPeriodDays,
+        @JsonProperty("promo_guard_enabled") Boolean promoGuardEnabled,
+        @JsonProperty("stock_out_guard_enabled") Boolean stockOutGuardEnabled,
+        @JsonProperty("stale_data_guard_hours") Integer staleDataGuardHours
+) {
+
+    public static final GuardConfig DEFAULTS = new GuardConfig(
+            true, true, 24, true, 3, 7, true, true, 24
+    );
+
+    public boolean isMarginGuardEnabled() {
+        return marginGuardEnabled == null || marginGuardEnabled;
+    }
+
+    public boolean isFrequencyGuardEnabled() {
+        return frequencyGuardEnabled == null || frequencyGuardEnabled;
+    }
+
+    public int effectiveFrequencyGuardHours() {
+        return frequencyGuardHours != null ? frequencyGuardHours : 24;
+    }
+
+    public boolean isVolatilityGuardEnabled() {
+        return volatilityGuardEnabled == null || volatilityGuardEnabled;
+    }
+
+    public int effectiveVolatilityReversals() {
+        return volatilityGuardReversals != null ? volatilityGuardReversals : 3;
+    }
+
+    public int effectiveVolatilityPeriodDays() {
+        return volatilityGuardPeriodDays != null ? volatilityGuardPeriodDays : 7;
+    }
+
+    public boolean isStockOutGuardEnabled() {
+        return stockOutGuardEnabled == null || stockOutGuardEnabled;
+    }
+
+    public int effectiveStaleDataGuardHours() {
+        return staleDataGuardHours != null ? staleDataGuardHours : 24;
+    }
+}

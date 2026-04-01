@@ -234,5 +234,37 @@
   "time.hours_ago": "{count} ч назад",
   "time.days_ago": "{count} дн назад",
   "time.just_now": "только что",
-  "time.yesterday": "вчера"
+  "time.yesterday": "вчера",
+
+  "internal.error": "Внутренняя ошибка сервера. Попробуйте позже.",
+  "validation.failed": "Проверьте правильность заполнения полей.",
+  "access.denied": "У вас нет прав для этого действия.",
+  "entity.not.found": "Запрашиваемый объект не найден.",
+  "entity.duplicate": "Такой объект уже существует.",
+  "entity.invalid.state": "Операция недопустима в текущем состоянии.",
+  "workspace.not.found": "Рабочее пространство не найдено.",
+  "workspace.membership.required": "Вы не являетесь участником этого пространства.",
+  "workspace.header.missing": "Не указано рабочее пространство.",
+  "connection.not.found": "Подключение не найдено.",
+  "connection.duplicate": "Подключение с такими параметрами уже существует.",
+  "connection.invalid.state": "Подключение находится в недопустимом состоянии.",
+  "connection.marketplace.mismatch": "Маркетплейс подключения не совпадает.",
+  "credentials.invalid": "Неверные credentials. Проверьте данные и попробуйте снова.",
+  "api.rate.limited": "Слишком много запросов. Подождите и попробуйте снова.",
+  "operation.not.allowed": "Операция не разрешена.",
+  "user.deactivated": "Учётная запись деактивирована.",
+
+  "pricing.guard.manual_lock": "Ручная блокировка цены активна.",
+  "pricing.guard.stale_data.unknown": "Свежесть данных неизвестна — нет информации о синхронизации.",
+  "pricing.guard.stale_data.stale": "Данные старше {{hours}} ч (последняя синхронизация: {{lastSync}}).",
+  "pricing.guard.stock_out": "Доступный остаток: 0.",
+  "pricing.guard.margin_negative": "Отрицательная маржа: {{marginPct}}% (цена={{targetPrice}}, себестоимость={{cogs}}).",
+  "pricing.guard.frequency": "Цена изменена менее {{hours}} ч назад (последнее изменение: {{lastChangeAt}}).",
+  "pricing.guard.volatility": "Слишком много разворотов цены: {{count}} за {{periodDays}} дн (макс. {{maxReversals}}).",
+
+  "pricing.strategy.cogs_missing": "Себестоимость не задана.",
+  "pricing.strategy.commission_missing": "Ставка комиссии недоступна — недостаточно данных.",
+  "pricing.strategy.denominator_invalid": "Целевая маржа + расходы ≥ 100% — расчёт невозможен.",
+  "pricing.strategy.current_price_missing": "Текущая цена недоступна.",
+  "pricing.strategy.no_change": "Изменение цены не требуется."
 }
