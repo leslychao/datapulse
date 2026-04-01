@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="infra: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+  <configuration default="false" name="infra-prod: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
     <deployment type="docker-compose.yml">
       <settings>
         <option name="envFilePath" value="" />
         <option name="secondarySourceFiles">
           <list>
-            <option value="infra/docker-compose.local.yml" />
+            <option value="infra/docker-compose.prod.yml" />
           </list>
         </option>
         <option name="sourceFilePath" value="infra/docker-compose.yml" />

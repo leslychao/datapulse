@@ -7,6 +7,7 @@ import io.datapulse.execution.domain.PriceWriteResult;
 import io.datapulse.integration.config.IntegrationProperties;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
+import io.datapulse.integration.domain.ratelimit.OzonProductRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class OzonPriceWriteAdapter implements PriceWriteAdapter {
     private final WebClient.Builder webClientBuilder;
     private final IntegrationProperties integrationProperties;
     private final MarketplaceRateLimiter rateLimiter;
+    private final OzonProductRateLimiter productRateLimiter;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -42,6 +44,14 @@ public class OzonPriceWriteAdapter implements PriceWriteAdapter {
     @Override
     public PriceWriteResult setPrice(long connectionId, String marketplaceSku,
                                      BigDecimal targetPrice, Map<String, String> credentials) {
+        if (!productRateLimiter.canUpdate(connectionId, marketplaceSku)) {
+            log.info("Ozon per-product rate limit exhausted, deferring: connectionId={}, offerId={}",
+                    connectionId, marketplaceSku);
+            return PriceWriteResult.rejected(null, null,
+                    "OZON_PRODUCT_RATE_LIMITED",
+                    "Per-product rate limit exhausted (10 updates/hour)");
+        }
+
         String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
         String clientId = credentials.get("client_id");
         String apiKey = credentials.get("api_key");
@@ -73,7 +83,11 @@ public class OzonPriceWriteAdapter implements PriceWriteAdapter {
 
         rateLimiter.onResponse(connectionId, RateLimitGroup.OZON_PRICE_UPDATE, 200);
 
-        return parseOzonResponse(requestSummary, responseBody);
+        PriceWriteResult result = parseOzonResponse(requestSummary, responseBody);
+        if (result.outcome() == PriceWriteResult.WriteOutcome.CONFIRMED) {
+            productRateLimiter.recordUpdate(connectionId, marketplaceSku);
+        }
+        return result;
     }
 
     private PriceWriteResult parseOzonResponse(String requestSummary, String responseBody) {

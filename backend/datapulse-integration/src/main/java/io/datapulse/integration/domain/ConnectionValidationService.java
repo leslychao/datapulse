@@ -3,6 +3,7 @@ package io.datapulse.integration.domain;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.api.ValidateConnectionResponse;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
+import io.datapulse.integration.domain.event.CredentialAccessedEvent;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
@@ -107,8 +108,11 @@ public class ConnectionValidationService {
                 .orElseThrow(() -> NotFoundException.entity("SecretReference", connection.getSecretReferenceId()));
 
         Map<String, String> credentials = credentialStore.read(secretRef.getVaultPath(), secretRef.getVaultKey());
-        MarketplaceType marketplaceType = MarketplaceType.valueOf(connection.getMarketplaceType());
 
+        eventPublisher.publishEvent(new CredentialAccessedEvent(
+                connection.getId(), connection.getWorkspaceId(), "connection_validation"));
+
+        MarketplaceType marketplaceType = MarketplaceType.valueOf(connection.getMarketplaceType());
         return resolveProbe(marketplaceType).probe(credentials);
     }
 

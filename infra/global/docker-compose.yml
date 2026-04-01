@@ -1,51 +1,12 @@
 # Global reverse proxy: TLS termination (Let's Encrypt) + proxy to infra Nginx.
 #
-# First start:
+# First start (DNS must already point to this server):
 #   docker compose up -d
-#   (nginx starts with self-signed cert, init-certs creates it automatically)
-#
-# Obtain real certificate (DNS must point to this server):
-#   docker compose run --rm init
-#   docker compose restart nginx
+#   init-certs obtains a real Let's Encrypt certificate automatically.
 #
 # After that, certbot auto-renews every 12 hours.
 
 services:
-  init:
-    image: certbot/certbot
-    container_name: datapulse-global-init
-    volumes:
-      - certbot-webroot:/var/www/certbot
-      - certbot-certs:/etc/letsencrypt
-    environment:
-      DOMAIN: ${DOMAIN:-mydatapulse.ru}
-      CERTBOT_EMAIL: ${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in .env}
-    entrypoint:
-      - sh
-      - -c
-      - |
-        CERT_DIR="/etc/letsencrypt/live/$$DOMAIN"
-        if [ -f "$$CERT_DIR/fullchain.pem" ]; then
-          ISSUER=$$(openssl x509 -in "$$CERT_DIR/fullchain.pem" -noout -issuer 2>/dev/null || true)
-          if echo "$$ISSUER" | grep -qi "Let's Encrypt"; then
-            echo "Real certificate already exists. Renewing if needed..."
-            certbot renew
-            exit 0
-          fi
-          echo "Removing self-signed placeholder..."
-          rm -rf "$$CERT_DIR"
-          rm -f "/etc/letsencrypt/renewal/$$DOMAIN.conf"
-        fi
-        echo "Requesting Let's Encrypt certificate for $$DOMAIN..."
-        certbot certonly \
-          --webroot --webroot-path=/var/www/certbot \
-          -d "$$DOMAIN" \
-          --email "$$CERTBOT_EMAIL" \
-          --agree-tos \
-          --no-eff-email
-        echo "Done! Run: docker compose restart nginx"
-    profiles: ["init"]
-
   nginx:
     image: nginx:alpine
     container_name: datapulse-global-nginx
@@ -64,28 +25,42 @@ services:
         condition: service_completed_successfully
 
   init-certs:
-    image: alpine:3
+    image: certbot/certbot
     container_name: datapulse-init-certs
+    ports:
+      - "80:80"
     volumes:
+      - certbot-webroot:/var/www/certbot
       - certbot-certs:/etc/letsencrypt
     environment:
       DOMAIN: ${DOMAIN:-mydatapulse.ru}
+      CERTBOT_EMAIL: ${CERTBOT_EMAIL:?Set CERTBOT_EMAIL in .env}
     entrypoint:
       - sh
       - -c
       - |
+        set -e
         CERT_DIR="/etc/letsencrypt/live/$$DOMAIN"
         if [ -f "$$CERT_DIR/fullchain.pem" ]; then
-          echo "Certificate exists, skipping."
-          exit 0
+          ISSUER=$$(openssl x509 -in "$$CERT_DIR/fullchain.pem" -noout -issuer 2>/dev/null || true)
+          if echo "$$ISSUER" | grep -qi "Let's Encrypt"; then
+            echo "Real Let's Encrypt certificate exists, renewing if needed..."
+            certbot renew
+            exit 0
+          fi
+          echo "Removing non-LE certificate..."
+          rm -rf "$$CERT_DIR"
+          rm -f "/etc/letsencrypt/renewal/$$DOMAIN.conf"
         fi
-        apk add --no-cache openssl > /dev/null 2>&1
-        mkdir -p "$$CERT_DIR"
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-          -keyout "$$CERT_DIR/privkey.pem" \
-          -out "$$CERT_DIR/fullchain.pem" \
-          -subj "/CN=$$DOMAIN" 2>/dev/null
-        echo "Self-signed cert created. Run 'docker compose run --rm init' to get a real one."
+        echo "Obtaining Let's Encrypt certificate for $$DOMAIN..."
+        certbot certonly \
+          --standalone \
+          --preferred-challenges http \
+          -d "$$DOMAIN" \
+          --email "$$CERTBOT_EMAIL" \
+          --agree-tos \
+          --no-eff-email
+        echo "Certificate obtained successfully."
 
   certbot:
     image: certbot/certbot

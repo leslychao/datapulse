@@ -8,6 +8,7 @@ import io.datapulse.integration.domain.MarketplaceHealthProbe;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.event.ConnectionHealthDegradedEvent;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
+import io.datapulse.integration.domain.event.CredentialAccessedEvent;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
@@ -16,6 +17,7 @@ import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -47,6 +49,7 @@ public class ConnectionHealthCheckScheduler {
     private final ConcurrentHashMap<Long, AtomicInteger> failureCounts = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelayString = "${datapulse.integration.health-check.interval:PT15M}")
+    @SchedulerLock(name = "connectionHealthCheck", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
     public void checkActiveConnections() {
         List<MarketplaceConnectionEntity> activeConnections =
                 connectionRepository.findAllByStatus(ConnectionStatus.ACTIVE.name());
@@ -86,6 +89,8 @@ public class ConnectionHealthCheckScheduler {
                 return;
             }
             credentials = credentialStore.read(secretRef.getVaultPath(), secretRef.getVaultKey());
+            eventPublisher.publishEvent(new CredentialAccessedEvent(
+                    connection.getId(), connection.getWorkspaceId(), "health_check"));
         } catch (Exception e) {
             log.warn("Health-check skipped, Vault unavailable: connectionId={}", connection.getId());
             return;

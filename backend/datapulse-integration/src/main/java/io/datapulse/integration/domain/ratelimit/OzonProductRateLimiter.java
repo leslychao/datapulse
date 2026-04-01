@@ -31,9 +31,11 @@ public class OzonProductRateLimiter {
      * Checks whether the product can be updated without exceeding the per-product limit.
      * Returns true if the product has budget remaining.
      * When Redis is unavailable, returns true (no proactive check; rely on 429 + backoff).
+     *
+     * @param productIdentifier Ozon offer_id (string) or any unique per-product key
      */
-    public boolean canUpdate(long connectionId, long productId) {
-        String key = buildKey(connectionId, productId);
+    public boolean canUpdate(long connectionId, String productIdentifier) {
+        String key = buildKey(connectionId, productIdentifier);
         try {
             long windowStart = System.currentTimeMillis() - WINDOW_MS;
             Long count = redisTemplate.opsForZSet().count(key, windowStart, Double.POSITIVE_INFINITY);
@@ -41,17 +43,17 @@ public class OzonProductRateLimiter {
                 metricsFacade.incrementCounter(
                         "ozon_product_rate_limit_exhausted_total",
                         "connection_id", String.valueOf(connectionId),
-                        "product_id", String.valueOf(productId));
+                        "product_id", productIdentifier);
                 return false;
             }
             return true;
         } catch (RedisConnectionFailureException e) {
             log.warn("Redis unavailable for Ozon per-product rate check, allowing update: connectionId={}, productId={}",
-                    connectionId, productId);
+                    connectionId, productIdentifier);
             return true;
         } catch (Exception e) {
             log.error("Ozon per-product rate check failed, allowing update: connectionId={}, productId={}",
-                    connectionId, productId, e);
+                    connectionId, productIdentifier, e);
             return true;
         }
     }
@@ -60,8 +62,8 @@ public class OzonProductRateLimiter {
      * Records a successful price update for the product.
      * Cleans up expired entries and sets key TTL.
      */
-    public void recordUpdate(long connectionId, long productId) {
-        String key = buildKey(connectionId, productId);
+    public void recordUpdate(long connectionId, String productIdentifier) {
+        String key = buildKey(connectionId, productIdentifier);
         try {
             long now = System.currentTimeMillis();
             redisTemplate.opsForZSet().add(key, String.valueOf(now), now);
@@ -69,14 +71,14 @@ public class OzonProductRateLimiter {
             redisTemplate.expire(key, Duration.ofSeconds(TTL_SECONDS));
         } catch (RedisConnectionFailureException e) {
             log.warn("Redis unavailable for Ozon per-product rate record: connectionId={}, productId={}",
-                    connectionId, productId);
+                    connectionId, productIdentifier);
         } catch (Exception e) {
             log.error("Ozon per-product rate record failed: connectionId={}, productId={}",
-                    connectionId, productId, e);
+                    connectionId, productIdentifier, e);
         }
     }
 
-    private String buildKey(long connectionId, long productId) {
-        return KEY_PREFIX + connectionId + ":" + productId;
+    private String buildKey(long connectionId, String productIdentifier) {
+        return KEY_PREFIX + connectionId + ":" + productIdentifier;
     }
 }

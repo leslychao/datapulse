@@ -115,7 +115,7 @@ DISABLED → PENDING_VALIDATION (admin re-enable) → ACTIVE (validation success
 | Переход | Триггер | Последствия |
 |---------|---------|-------------|
 | → PENDING_VALIDATION | POST create connection | Credentials сохранены в Vault. Async validation запущена |
-| PENDING_VALIDATION → ACTIVE | Validation success | `marketplace_sync_state` записи создаются для каждого data_domain. `external_account_id` заполнен. `ConnectionStatusChangedEvent` публикуется — downstream listener (ETL) создаёт первый sync job |
+| PENDING_VALIDATION → ACTIVE | Validation success | `marketplace_sync_state` записи создаются для каждого data_domain. `external_account_id` заполнен. `ConnectionStatusChangedEvent` публикуется → `ConnectionActivationListener` (ETL) создаёт FULL_SYNC job через outbox |
 | PENDING_VALIDATION → AUTH_FAILED | Validation failure | `last_error_code` = причина. Sync не запускается |
 | ACTIVE → AUTH_FAILED | Health-check failure | Scheduled syncs paused для этого connection |
 | → DISABLED | Admin action | Все syncs stopped. Connection скрыт из active list |
@@ -124,24 +124,25 @@ DISABLED → PENDING_VALIDATION (admin re-enable) → ACTIVE (validation success
 
 ### Health-check
 
-- **Механизм:** scheduled job (каждые 15 мин) для всех ACTIVE connections.
+- **Механизм:** scheduled job (каждые 15 мин) для всех ACTIVE connections. `@Scheduled` + `@SchedulerLock(name = "connectionHealthCheck")` — гарантирует, что в кластере health-check запускается только на одном instance.
 - **Проверка:** lightweight API call (WB: `POST /content/v2/get/cards/list` с `limit=1`; Ozon: `POST /v3/product/list` с `limit=1`).
 - **Success:** обновить `last_check_at`, `last_success_at`.
-- **Failure:** обновить `last_check_at`, `last_error_at`, `last_error_code`. Если 3 consecutive failures → `status = AUTH_FAILED`, dispatch `ConnectionHealthDegraded` event (Spring ApplicationEvent, in-process; не outbox).
+- **Failure:** обновить `last_check_at`, `last_error_at`, `last_error_code`. Если 3 consecutive failures → `status = AUTH_FAILED`, dispatch `ConnectionHealthDegradedEvent` (Spring ApplicationEvent, in-process; не outbox).
 - **Config:** interval и failure threshold — `@ConfigurationProperties`.
 - **Архитектура:** интерфейс `MarketplaceHealthProbe` (Strategy pattern) с реализациями per marketplace (`WbHealthProbe`, `OzonHealthProbe`). Probes автоматически обнаруживаются через `List<MarketplaceHealthProbe>` injection.
+- **Audit:** при каждом чтении credentials из Vault публикуется `CredentialAccessedEvent` с `purpose = "health_check"`.
 - **Валидация credentials:** выделена в `ConnectionValidationService` — поддерживает sync (ручная проверка через API) и async (при создании и credential rotation) валидацию. Async validation использует dedicated thread pool `integrationExecutor`.
 
 ### Domain Events (Spring ApplicationEvent, in-process)
 
-| Event | Когда публикуется | Поля | Потребители |
-|-------|-------------------|------|-------------|
-| `ConnectionCreatedEvent` | Создание нового connection | connectionId, workspaceId, marketplaceType, userId | Audit |
-| `ConnectionStatusChangedEvent` | Любая смена статуса connection | connectionId, oldStatus, newStatus, trigger | ETL (trigger first sync при PV→ACTIVE), Audit, Notifications |
-| `ConnectionHealthDegradedEvent` | Health-check threshold reached | connectionId, workspaceId, marketplaceType, consecutiveFailures, lastErrorCode | Alerting |
-| `CredentialRotatedEvent` | Credential rotation (seller или performance) | connectionId, workspaceId, userId | Audit, cache eviction |
-| `CredentialAccessedEvent` | Чтение credentials из Vault | connectionId, workspaceId, purpose | Audit trail |
-| `SyncTriggeredEvent` | Ручной trigger sync через API | connectionId, workspaceId, userId, domains (nullable) | ETL (создание job_execution) |
+| Event | Когда публикуется | Поля | Потребители | Wired |
+|-------|-------------------|------|-------------|-------|
+| `ConnectionCreatedEvent` | Создание нового connection | connectionId, workspaceId, marketplaceType, userId | Audit | ⚠️ Listener для audit не реализован |
+| `ConnectionStatusChangedEvent` | Любая смена статуса connection | connectionId, oldStatus, newStatus, trigger | ETL (trigger first sync при PV→ACTIVE), Audit, Notifications | ✅ ETL: `ConnectionActivationListener` (PV→ACTIVE → FULL_SYNC). ⚠️ Audit, Notifications — listener-ы не реализованы |
+| `ConnectionHealthDegradedEvent` | Health-check threshold reached | connectionId, workspaceId, marketplaceType, consecutiveFailures, lastErrorCode | Alerting | ⚠️ Listener не реализован |
+| `CredentialRotatedEvent` | Credential rotation (seller или performance) | connectionId, workspaceId, userId | Audit, cache eviction | ⚠️ Listener не реализован |
+| `CredentialAccessedEvent` | Чтение credentials из Vault | connectionId, workspaceId, purpose | Audit trail | ✅ Публикуется из: `ConnectionValidationService`, `ConnectionHealthCheckScheduler`, ETL `CredentialResolver`, Execution `ExecutionCredentialResolver`. ⚠️ Listener для audit не реализован |
+| `SyncTriggeredEvent` | Ручной trigger sync через API | connectionId, workspaceId, userId, domains (nullable) | ETL (создание job_execution) | ✅ ETL: `SyncTriggeredListener` (→ MANUAL_SYNC job через outbox) |
 
 ### Разделение ответственности
 
@@ -297,12 +298,13 @@ connection_id × rate_limit_group → один token bucket
 
 Ozon ограничивает обновление цены **per product**: 10 updates/hour per product (confirmed-docs). Это **не** API-level лимит, а business-level — один запрос может содержать до 1000 products, но каждый product имеет индивидуальный счётчик.
 
-**Механизм:** per-product sliding window counter в Redis.
+**Механизм:** per-product sliding window counter в Redis. Реализация: `OzonProductRateLimiter`, подключён в `OzonPriceWriteAdapter`.
 
-- **Redis key:** `product_rate:{connection_id}:{product_id}` → sorted set, элементы = timestamp обновления.
-- **При формировании batch:** для каждого product проверить `ZCOUNT key (now - 1h) +inf`. Если ≥ 10 → исключить product из текущего batch, отложить на следующий цикл.
-- **После успешного обновления:** `ZADD key now now` + `ZREMRANGEBYSCORE key 0 (now - 1h)` (очистка старых записей).
+- **Redis key:** `product_rate:{connection_id}:{product_identifier}` → sorted set, элементы = timestamp обновления. `product_identifier` — строка (Ozon `offer_id`).
+- **Перед отправкой цены:** `canUpdate(connectionId, offerId)` проверяет `ZCOUNT key (now - 1h) +inf`. Если ≥ 10 → адаптер возвращает `REJECTED` с кодом `OZON_PRODUCT_RATE_LIMITED`, не обращаясь к API. Execution классифицирует как retriable и откладывает повтор.
+- **После успешного обновления:** `recordUpdate(connectionId, offerId)` — `ZADD key now now` + `ZREMRANGEBYSCORE key 0 (now - 1h)` (очистка старых записей).
 - **TTL:** 70 минут на ключ (1h + 10 min buffer).
+- **Redis unavailable:** `canUpdate` возвращает `true` (allow) — полагаемся на 429 + backoff от Ozon.
 
 **Важно:** это проактивная проверка. Если product всё же получил rejection от Ozon (per-product limit exceeded) — Execution классифицирует как `RETRIABLE_RATE_LIMIT` с backoff 10 min (см. [Execution](execution.md) §Классификация ошибок).
 
@@ -706,7 +708,7 @@ PUT /api/connections/{connectionId}/performance-credentials
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
 | GET | `/api/connections/{connectionId}/sync-state` | Any role | Sync state per domain: `[{ dataDomain, lastSyncAt, lastSuccessAt, nextScheduledAt, status }]` |
-| POST | `/api/connections/{connectionId}/sync` | ADMIN, OWNER | Trigger manual sync. Body (optional): `{ domains: ["CATALOG", "PRICES"] }` — если не передан или пустой, синхронизируются все domains. Публикует `SyncTriggeredEvent`; downstream listener (ETL) создаёт `job_execution` |
+| POST | `/api/connections/{connectionId}/sync` | ADMIN, OWNER | Trigger manual sync. Body (optional): `{ domains: ["CATALOG", "PRICES"] }` — если не передан или пустой, синхронизируются все domains. Публикует `SyncTriggeredEvent` → `SyncTriggeredListener` (ETL) создаёт MANUAL_SYNC job через outbox |
 
 ### Call log
 
@@ -857,8 +859,9 @@ WireMock матчит запросы по path pattern — один инстан
 | Ozon Performance token exchange + caching | §Ozon Performance OAuth2 | Phase B extended | Token endpoint, in-memory cache с TTL = expires_in − 300s |
 | Integration call log recording | §Observability для provider calls | Phase A | Таблица и entity существуют, но нет WebClient interceptor-а для автоматической записи каждого вызова |
 | Credential masking в логах | §Управление секретами | Phase A | Log filter для предотвращения утечки credential material |
-| `CredentialAccessedEvent` publishing | §Domain Events | Phase A | Event record определён, но нигде не публикуется. Реализовать для audit trail при `credentialStore.read()` |
 | Rate limit alert rules | §Rate limit observability | Phase A+ | Prometheus alert rules (метрики реализованы, rules — нет) |
+| `CredentialRotatedEvent` listener | §Domain Events | Phase A | Event публикуется при credential rotation, но listener для audit-записи и кросс-инстанс cache eviction не реализован |
+| `ConnectionHealthDegradedEvent` listener | §Domain Events | Phase A | Event публикуется health-check scheduler-ом, но listener для alerting не реализован |
 
 ## Связанные модули
 

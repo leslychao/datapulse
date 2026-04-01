@@ -1,10 +1,10 @@
 package io.datapulse.etl.scheduling;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import io.datapulse.etl.persistence.JobExecutionRepository;
-import io.datapulse.integration.domain.ConnectionStatus;
-import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
+import io.datapulse.integration.domain.event.SyncTriggeredEvent;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
@@ -16,38 +16,38 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ConnectionActivationListener {
+public class SyncTriggeredListener {
 
   private final JobExecutionRepository jobExecutionRepository;
   private final OutboxService outboxService;
 
   @EventListener
   @Transactional
-  public void onConnectionActivated(ConnectionStatusChangedEvent event) {
-    if (!ConnectionStatus.ACTIVE.name().equals(event.newStatus())) {
-      return;
-    }
-    if (!ConnectionStatus.PENDING_VALIDATION.name().equals(event.oldStatus())) {
-      return;
-    }
-
+  public void onSyncTriggered(SyncTriggeredEvent event) {
     Long connectionId = event.connectionId();
 
     if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
-      log.info("Active job already exists for activated connection, skipping FULL_SYNC: connectionId={}",
+      log.info("Active job already exists, skipping manual sync: connectionId={}",
           connectionId);
       return;
     }
 
-    long jobId = jobExecutionRepository.insert(connectionId, "FULL_SYNC");
+    long jobId = jobExecutionRepository.insert(connectionId, "MANUAL_SYNC");
+
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("jobExecutionId", jobId);
+    payload.put("connectionId", connectionId);
+    if (event.domains() != null && !event.domains().isEmpty()) {
+      payload.put("domains", event.domains());
+    }
 
     outboxService.createEvent(
         OutboxEventType.ETL_SYNC_EXECUTE,
         "job_execution",
         jobId,
-        Map.of("jobExecutionId", jobId, "connectionId", connectionId));
+        payload);
 
-    log.info("FULL_SYNC dispatched for activated connection: connectionId={}, jobExecutionId={}",
-        connectionId, jobId);
+    log.info("MANUAL_SYNC dispatched: connectionId={}, jobExecutionId={}, domains={}",
+        connectionId, jobId, event.domains());
   }
 }

@@ -5,12 +5,14 @@ import java.util.Map;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.domain.CredentialStore;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.integration.domain.event.CredentialAccessedEvent;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
@@ -26,6 +28,7 @@ public class CredentialResolver {
     private final MarketplaceConnectionRepository connectionRepository;
     private final SecretReferenceRepository secretReferenceRepository;
     private final CredentialStore credentialStore;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ResolvedCredentials resolve(long connectionId) {
         MarketplaceConnectionEntity connection = connectionRepository.findById(connectionId)
@@ -43,6 +46,9 @@ public class CredentialResolver {
 
         Map<String, String> credentials = credentialStore.read(
                 secretRef.getVaultPath(), secretRef.getVaultKey());
+
+        eventPublisher.publishEvent(new CredentialAccessedEvent(
+                connection.getId(), connection.getWorkspaceId(), "etl_sync"));
 
         MarketplaceType marketplace = MarketplaceType.valueOf(connection.getMarketplaceType());
 
