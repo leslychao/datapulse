@@ -58,10 +58,20 @@ public class PricePolicyService {
     }
 
     @Transactional(readOnly = true)
-    public List<PricePolicySummaryResponse> listPolicies(long workspaceId, PolicyStatus status) {
-        List<PricePolicyEntity> entities = status != null
-                ? policyRepository.findAllByWorkspaceIdAndStatus(workspaceId, status)
-                : policyRepository.findAllByWorkspaceId(workspaceId);
+    public List<PricePolicySummaryResponse> listPolicies(long workspaceId, PolicyStatus status,
+                                                         PolicyType strategyType) {
+        List<PricePolicyEntity> entities;
+
+        if (status != null && strategyType != null) {
+            entities = policyRepository.findAllByWorkspaceIdAndStatusAndStrategyType(
+                    workspaceId, status, strategyType);
+        } else if (status != null) {
+            entities = policyRepository.findAllByWorkspaceIdAndStatus(workspaceId, status);
+        } else if (strategyType != null) {
+            entities = policyRepository.findAllByWorkspaceIdAndStrategyType(workspaceId, strategyType);
+        } else {
+            entities = policyRepository.findAllByWorkspaceId(workspaceId);
+        }
 
         return policyMapper.toSummaries(entities);
     }
@@ -175,6 +185,11 @@ public class PricePolicyService {
     }
 
     private void validateStrategyParams(PolicyType strategyType, String strategyParamsJson) {
+        if (strategyType == PolicyType.MANUAL_OVERRIDE) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED, "strategyType",
+                    "MANUAL_OVERRIDE cannot be used for policies");
+        }
+
         if (strategyParamsJson == null || strategyParamsJson.isBlank()) {
             throw BadRequestException.of(MessageCodes.VALIDATION_FAILED, "strategyParams");
         }
@@ -183,6 +198,7 @@ public class PricePolicyService {
             switch (strategyType) {
                 case TARGET_MARGIN -> objectMapper.readValue(strategyParamsJson, TargetMarginParams.class);
                 case PRICE_CORRIDOR -> objectMapper.readValue(strategyParamsJson, PriceCorridorParams.class);
+                case MANUAL_OVERRIDE -> throw new IllegalStateException("unreachable");
             }
         } catch (JsonProcessingException e) {
             throw BadRequestException.of(MessageCodes.VALIDATION_FAILED, e, "strategyParams");

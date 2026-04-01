@@ -32,3 +32,6 @@ databaseChangeLog:
   - include:
       file: changes/0014-alert-event-indexes.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0015-pricing-bulk-nullable.sql
+      relativeToChangelogFile: true

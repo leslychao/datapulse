@@ -1,7 +1,6 @@
 package io.datapulse.pricing.persistence;
 
 import io.datapulse.pricing.api.PriceDecisionFilter;
-import io.datapulse.pricing.domain.DecisionType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +44,12 @@ public class PriceDecisionReadRepository {
                                Map<String, Object> params) {
         if (filter == null) {
             return;
+        }
+
+        if (filter.connectionId() != null) {
+            whereClause.append(" AND d.pricingRunId IN (SELECT r.id FROM PricingRunEntity r"
+                    + " WHERE r.connectionId = :connectionId)");
+            params.put("connectionId", filter.connectionId());
         }
 
         if (filter.pricingRunId() != null) {

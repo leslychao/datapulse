@@ -58,6 +58,7 @@ public final class MessageCodes {
     public static final String PRICING_GUARD_MARGIN_NEGATIVE = "pricing.guard.margin_negative";
     public static final String PRICING_GUARD_FREQUENCY = "pricing.guard.frequency";
     public static final String PRICING_GUARD_VOLATILITY = "pricing.guard.volatility";
+    public static final String PRICING_GUARD_PROMO_ACTIVE = "pricing.guard.promo_active";
 
     // --- Pricing: Strategy skip/hold reasons ---
     public static final String PRICING_COGS_MISSING = "pricing.strategy.cogs_missing";

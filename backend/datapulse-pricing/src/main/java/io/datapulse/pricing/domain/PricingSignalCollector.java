@@ -52,6 +52,7 @@ public class PricingSignalCollector {
                     null,
                     stock.get(offerId),
                     lockedIds.contains(offerId),
+                    false,
                     null,
                     null,
                     null,

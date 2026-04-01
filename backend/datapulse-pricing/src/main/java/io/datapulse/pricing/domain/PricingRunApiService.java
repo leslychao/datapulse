@@ -3,9 +3,11 @@ package io.datapulse.pricing.domain;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
 import io.datapulse.pricing.persistence.PricingRunEntity;
+import io.datapulse.pricing.persistence.PricingRunReadRepository;
 import io.datapulse.pricing.persistence.PricingRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,11 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PricingRunApiService {
 
     private final PricingRunRepository runRepository;
+    private final PricingRunReadRepository runReadRepository;
     private final PricingRunMapper runMapper;
 
     @Transactional
     public PricingRunResponse triggerManualRun(long connectionId, long workspaceId) {
-        boolean inProgress = runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS);
+        boolean inProgress = runRepository.existsByConnectionIdAndStatus(
+                connectionId, RunStatus.IN_PROGRESS);
         if (inProgress) {
             throw BadRequestException.of(MessageCodes.PRICING_RUN_ALREADY_IN_PROGRESS);
         }
@@ -43,11 +47,10 @@ public class PricingRunApiService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PricingRunResponse> listRuns(long workspaceId, Long connectionId, Pageable pageable) {
-        Page<PricingRunEntity> page = connectionId != null
-                ? runRepository.findAllByWorkspaceIdAndConnectionId(workspaceId, connectionId, pageable)
-                : runRepository.findAllByWorkspaceId(workspaceId, pageable);
-
+    public Page<PricingRunResponse> listRuns(long workspaceId, PricingRunFilter filter,
+                                             Pageable pageable) {
+        Page<PricingRunEntity> page = runReadRepository.findByFilter(
+                workspaceId, filter, pageable);
         return page.map(runMapper::toResponse);
     }
 

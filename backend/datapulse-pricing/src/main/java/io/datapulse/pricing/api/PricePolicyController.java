@@ -1,6 +1,7 @@
 package io.datapulse.pricing.api;
 
 import io.datapulse.pricing.domain.PolicyStatus;
+import io.datapulse.pricing.domain.PolicyType;
 import io.datapulse.pricing.domain.PricePolicyService;
 import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
@@ -38,8 +39,9 @@ public class PricePolicyController {
 
     @GetMapping
     public List<PricePolicySummaryResponse> listPolicies(
-            @RequestParam(value = "status", required = false) PolicyStatus status) {
-        return policyService.listPolicies(workspaceContext.getWorkspaceId(), status);
+            @RequestParam(value = "status", required = false) PolicyStatus status,
+            @RequestParam(value = "strategyType", required = false) PolicyType strategyType) {
+        return policyService.listPolicies(workspaceContext.getWorkspaceId(), status, strategyType);
     }
 
     @GetMapping("/{policyId}")

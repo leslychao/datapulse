@@ -44,6 +44,10 @@ public record GuardConfig(
         return volatilityGuardPeriodDays != null ? volatilityGuardPeriodDays : 7;
     }
 
+    public boolean isPromoGuardEnabled() {
+        return promoGuardEnabled == null || promoGuardEnabled;
+    }
+
     public boolean isStockOutGuardEnabled() {
         return stockOutGuardEnabled == null || stockOutGuardEnabled;
     }

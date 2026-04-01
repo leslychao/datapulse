@@ -14,6 +14,7 @@ public record PricingSignalSet(
         String productStatus,
         Integer availableStock,
         boolean manualLockActive,
+        boolean promoActive,
         BigDecimal avgCommissionPct,
         BigDecimal avgLogisticsPerUnit,
         BigDecimal returnRatePct,
