@@ -2,7 +2,7 @@
   <configuration default="false" name="DatapulseApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
     <module name="datapulse-api" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="io.datapulse.DatapulseApplication" />
-    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+    <option name="WORKING_DIRECTORY" value="file://$MODULE_WORKING_DIR$" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

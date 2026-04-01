@@ -24,7 +24,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
@@ -46,8 +45,13 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        Principal principal = request.getUserPrincipal();
-        if (!(principal instanceof JwtAuthenticationToken jwtAuth)) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        log.debug("WorkspaceContextFilter: path={}, authType={}, authName={}",
+            request.getRequestURI(),
+            authentication != null ? authentication.getClass().getSimpleName() : "null",
+            authentication != null ? authentication.getName() : "null");
+
+        if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -57,6 +61,7 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
         String name = resolveDisplayName(jwtAuth);
 
         AppUserEntity user = resolveOrProvisionUser(sub, email, name);
+        log.debug("WorkspaceContextFilter: resolved user id={}, email={}", user.getId(), user.getEmail());
 
         if (user.getStatus() == UserStatus.DEACTIVATED) {
             sendError(response, HttpStatus.FORBIDDEN, "user.deactivated");
