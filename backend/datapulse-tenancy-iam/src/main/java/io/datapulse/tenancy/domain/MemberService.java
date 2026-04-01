@@ -4,8 +4,10 @@ import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.tenancy.api.MemberResponse;
 import io.datapulse.tenancy.api.UpdateMemberRoleRequest;
+import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
+import io.datapulse.tenancy.persistence.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import java.util.List;
 public class MemberService {
 
     private final WorkspaceMemberRepository memberRepository;
+    private final WorkspaceRepository workspaceRepository;
     private final TenancyAuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
@@ -75,6 +78,39 @@ public class MemberService {
         memberRepository.save(member);
         auditPublisher.publish("member.remove", "workspace_member",
                 String.valueOf(targetUserId));
+    }
+
+    @Transactional
+    public void transferOwnership(Long workspaceId, Long currentOwnerId, Long newOwnerUserId) {
+        if (currentOwnerId.equals(newOwnerUserId)) {
+            throw BadRequestException.of("member.transfer.self");
+        }
+
+        WorkspaceMemberEntity currentOwnerMember = memberRepository
+                .findByWorkspace_IdAndUser_IdAndStatus(workspaceId, currentOwnerId, MemberStatus.ACTIVE)
+                .orElseThrow(() -> NotFoundException.entity("WorkspaceMember", currentOwnerId));
+
+        if (currentOwnerMember.getRole() != MemberRole.OWNER) {
+            throw BadRequestException.of("member.role.cannot.change.owner");
+        }
+
+        WorkspaceMemberEntity newOwnerMember = memberRepository
+                .findByWorkspace_IdAndUser_IdAndStatus(workspaceId, newOwnerUserId, MemberStatus.ACTIVE)
+                .orElseThrow(() -> NotFoundException.of("member.transfer.target.not.found"));
+
+        currentOwnerMember.setRole(MemberRole.ADMIN);
+        newOwnerMember.setRole(MemberRole.OWNER);
+        memberRepository.save(currentOwnerMember);
+        memberRepository.save(newOwnerMember);
+
+        WorkspaceEntity workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> NotFoundException.workspace(workspaceId));
+        workspace.setOwnerUserId(newOwnerUserId);
+        workspaceRepository.save(workspace);
+
+        auditPublisher.publish("workspace.transfer_ownership", "workspace",
+                String.valueOf(workspaceId),
+                "{\"from\":%d,\"to\":%d}".formatted(currentOwnerId, newOwnerUserId));
     }
 
     private MemberResponse toResponse(WorkspaceMemberEntity entity) {

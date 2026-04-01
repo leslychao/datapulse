@@ -1,5 +1,6 @@
 package io.datapulse.tenancy.domain;
 
+import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.tenancy.api.UpdateWorkspaceRequest;
 import io.datapulse.tenancy.api.WorkspaceListResponse;
@@ -55,6 +56,43 @@ public class WorkspaceService {
         workspaceRepository.save(ws);
         auditPublisher.publish("workspace.update", "workspace", String.valueOf(workspaceId));
         return toResponse(ws);
+    }
+
+    @Transactional
+    public void suspendWorkspace(Long workspaceId) {
+        WorkspaceEntity ws = findActiveWorkspace(workspaceId);
+        ws.setStatus(WorkspaceStatus.SUSPENDED);
+        workspaceRepository.save(ws);
+        auditPublisher.publish("workspace.suspend", "workspace", String.valueOf(workspaceId));
+    }
+
+    @Transactional
+    public void reactivateWorkspace(Long workspaceId) {
+        WorkspaceEntity ws = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> NotFoundException.workspace(workspaceId));
+        if (ws.getStatus() != WorkspaceStatus.SUSPENDED) {
+            throw BadRequestException.of("workspace.not.suspended");
+        }
+        ws.setStatus(WorkspaceStatus.ACTIVE);
+        workspaceRepository.save(ws);
+        auditPublisher.publish("workspace.reactivate", "workspace", String.valueOf(workspaceId));
+    }
+
+    @Transactional
+    public void archiveWorkspace(Long workspaceId) {
+        WorkspaceEntity ws = findActiveWorkspace(workspaceId);
+        ws.setStatus(WorkspaceStatus.ARCHIVED);
+        workspaceRepository.save(ws);
+        auditPublisher.publish("workspace.archive", "workspace", String.valueOf(workspaceId));
+    }
+
+    private WorkspaceEntity findActiveWorkspace(Long workspaceId) {
+        WorkspaceEntity ws = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> NotFoundException.workspace(workspaceId));
+        if (ws.getStatus() != WorkspaceStatus.ACTIVE) {
+            throw BadRequestException.of("workspace.not.active");
+        }
+        return ws;
     }
 
     private WorkspaceResponse toResponse(WorkspaceEntity ws) {

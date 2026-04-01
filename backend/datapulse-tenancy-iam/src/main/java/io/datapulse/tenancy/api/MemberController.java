@@ -49,4 +49,5 @@ public class MemberController {
                              @PathVariable("userId") Long userId) {
         memberService.removeMember(workspaceId, userId, workspaceContext.getUserId());
     }
+
 }

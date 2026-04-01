@@ -457,9 +457,7 @@ Audit records immutable: update и delete запрещены. Retention: не м
 
 ### Audit log
 
-| Method | Path | Roles | Описание |
-|--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/audit-log` | ADMIN, OWNER | Paginated audit log. Filters: `?actionType=...&from=...&to=...&userId=...` |
+> Endpoint реализован в модуле [Audit & Alerting](audit-alerting.md): `GET /api/audit-log` (workspace из `WorkspaceContext` / `X-Workspace-Id` header). Roles: ADMIN, OWNER. Filters: `?actionType=...&dateFrom=...&dateTo=...&actorUserId=...&entityType=...&entityId=...`
 
 ## Frontend: Workspace Context
 

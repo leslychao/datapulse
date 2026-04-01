@@ -65,6 +65,10 @@ public class OnboardingService {
         TenantEntity tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> NotFoundException.entity("Tenant", tenantId));
 
+        if (!tenant.getOwnerUserId().equals(ownerUserId)) {
+            throw BadRequestException.of("tenant.not.owner");
+        }
+
         String name = request.name().trim();
         String slug = generateUniqueSlug(name,
                 s -> workspaceRepository.existsByTenant_IdAndSlug(tenantId, s));

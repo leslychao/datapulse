@@ -6,7 +6,7 @@ RUN mvn clean package -DskipTests
 
 FROM quay.io/keycloak/keycloak:26.0 AS builder
 COPY --from=plugin-builder /build/target/*.jar /opt/keycloak/providers/
-RUN /opt/keycloak/bin/kc.sh build
+RUN /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true
 
 FROM quay.io/keycloak/keycloak:26.0
 COPY --from=builder /opt/keycloak/ /opt/keycloak/

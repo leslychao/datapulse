@@ -19,14 +19,42 @@ public final class MessageCodes {
     public static final String DUPLICATE_ENTITY = "entity.duplicate";
     public static final String INVALID_STATE = "entity.invalid.state";
 
+    // --- Tenant ---
+    public static final String TENANT_NOT_FOUND = "tenant.not.found";
+    public static final String TENANT_LIMIT_EXCEEDED = "tenant.limit.exceeded";
+    public static final String TENANT_NOT_OWNER = "tenant.not.owner";
+
     // --- Workspace / Connection shortcuts ---
     public static final String WORKSPACE_NOT_FOUND = "workspace.not.found";
     public static final String WORKSPACE_MEMBERSHIP_REQUIRED = "workspace.membership.required";
     public static final String WORKSPACE_HEADER_MISSING = "workspace.header.missing";
+    public static final String WORKSPACE_NOT_ACTIVE = "workspace.not.active";
+    public static final String WORKSPACE_NOT_SUSPENDED = "workspace.not.suspended";
+    public static final String WORKSPACE_ALREADY_ARCHIVED = "workspace.already.archived";
     public static final String CONNECTION_NOT_FOUND = "connection.not.found";
 
     // --- User ---
     public static final String USER_DEACTIVATED = "user.deactivated";
+
+    // --- Members ---
+    public static final String MEMBER_ROLE_CANNOT_CHANGE_OWNER = "member.role.cannot.change.owner";
+    public static final String MEMBER_ROLE_CANNOT_CHANGE_SELF = "member.role.cannot.change.self";
+    public static final String MEMBER_ROLE_CANNOT_ASSIGN_OWNER = "member.role.cannot.assign.owner";
+    public static final String MEMBER_CANNOT_REMOVE_OWNER = "member.cannot.remove.owner";
+    public static final String MEMBER_CANNOT_REMOVE_SELF = "member.cannot.remove.self";
+    public static final String MEMBER_NOT_FOUND = "member.not.found";
+    public static final String MEMBER_TARGET_NOT_FOUND = "member.transfer.target.not.found";
+    public static final String MEMBER_TRANSFER_SELF = "member.transfer.self";
+
+    // --- Invitations ---
+    public static final String INVITATION_CANNOT_ASSIGN_OWNER = "invitation.cannot.assign.owner";
+    public static final String INVITATION_ADMIN_CANNOT_INVITE_ADMIN = "invitation.admin.cannot.invite.admin";
+    public static final String INVITATION_USER_ALREADY_MEMBER = "invitation.user.already.member";
+    public static final String INVITATION_NOT_PENDING = "invitation.not.pending";
+    public static final String INVITATION_NOT_FOUND = "invitation.not.found";
+    public static final String INVITATION_ALREADY_ACCEPTED = "invitation.already.accepted";
+    public static final String INVITATION_EXPIRED = "invitation.expired";
+    public static final String INVITATION_ALREADY_MEMBER = "invitation.already.member";
 
     // --- Integration ---
     public static final String RATE_LIMITED = "api.rate.limited";

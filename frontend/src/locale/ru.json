@@ -254,6 +254,33 @@
   "operation.not.allowed": "Операция не разрешена.",
   "user.deactivated": "Учётная запись деактивирована.",
 
+  "tenant.not.found": "Организация не найдена.",
+  "tenant.limit.exceeded": "Достигнут лимит организаций (максимум {{limit}}).",
+  "tenant.not.owner": "Только владелец организации может выполнить это действие.",
+
+  "workspace.not.active": "Рабочее пространство не активно.",
+  "workspace.not.suspended": "Рабочее пространство не приостановлено.",
+  "workspace.already.archived": "Рабочее пространство уже архивировано.",
+
+  "member.role.cannot.change.owner": "Нельзя изменить роль владельца.",
+  "member.role.cannot.change.self": "Нельзя изменить собственную роль.",
+  "member.role.cannot.assign.owner": "Нельзя назначить роль владельца. Используйте передачу владения.",
+  "member.role.admin.cannot.assign.admin": "Администратор не может назначить роль администратора.",
+  "member.cannot.remove.owner": "Нельзя удалить владельца из пространства.",
+  "member.cannot.remove.self": "Нельзя удалить самого себя из пространства.",
+  "member.not.found": "Участник не найден.",
+  "member.transfer.target.not.found": "Целевой участник для передачи владения не найден.",
+  "member.transfer.self": "Нельзя передать владение самому себе.",
+
+  "invitation.cannot.assign.owner": "Нельзя пригласить с ролью владельца.",
+  "invitation.admin.cannot.invite.admin": "Администратор не может приглашать администраторов.",
+  "invitation.user.already.member": "Пользователь уже является участником этого пространства.",
+  "invitation.not.pending": "Приглашение не находится в ожидании.",
+  "invitation.not.found": "Приглашение не найдено.",
+  "invitation.already.accepted": "Приглашение уже принято.",
+  "invitation.expired": "Срок действия приглашения истёк.",
+  "invitation.already.member": "Вы уже являетесь участником этого пространства.",
+
   "pricing.guard.manual_lock": "Ручная блокировка цены активна.",
   "pricing.guard.stale_data.unknown": "Свежесть данных неизвестна — нет информации о синхронизации.",
   "pricing.guard.stale_data.stale": "Данные старше {{hours}} ч (последняя синхронизация: {{lastSync}}).",
