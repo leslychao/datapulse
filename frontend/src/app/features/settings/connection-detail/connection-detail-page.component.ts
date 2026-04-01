@@ -397,10 +397,10 @@ export class ConnectionDetailPageComponent {
       field: 'httpStatus',
       width: 80,
       cellStyle: (params) => {
-        if (!params.value) return {};
+        if (!params.value) return null;
         if (params.value >= 200 && params.value < 300) return { color: 'var(--status-success)' };
         if (params.value >= 400) return { color: 'var(--status-error)' };
-        return {};
+        return null;
       },
     },
     { headerName: 'Время (мс)', field: 'durationMs', width: 100 },

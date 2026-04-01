@@ -43,12 +43,12 @@ export class WebSocketService {
       heartbeatOutgoing: 10000,
       reconnectDelay: INITIAL_RECONNECT_DELAY_MS,
       beforeConnect: (client) => {
-        client.brokerURL = this.buildWsUrl();
+        client.stompClient.brokerURL = this.buildWsUrl();
         const delay = Math.min(
           INITIAL_RECONNECT_DELAY_MS * Math.pow(2, this.reconnectAttempts),
           MAX_RECONNECT_DELAY_MS,
         );
-        client.reconnectDelay = delay;
+        client.stompClient.reconnectDelay = delay;
         this.reconnectAttempts++;
       },
     };
