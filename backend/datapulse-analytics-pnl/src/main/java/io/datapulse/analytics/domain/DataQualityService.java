@@ -10,91 +10,70 @@ import io.datapulse.analytics.api.DataQualityStatusResponse.SyncFreshness;
 import io.datapulse.analytics.api.ReconciliationResponse;
 import io.datapulse.analytics.config.AnalyticsQueryProperties;
 import io.datapulse.analytics.persistence.DataQualityReadRepository;
+import io.datapulse.analytics.persistence.SyncStateReadRepository;
+import io.datapulse.analytics.persistence.SyncStateReadRepository.SyncFreshnessRow;
 import io.datapulse.analytics.persistence.WorkspaceConnectionRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class DataQualityService {
 
-    private final DataQualityReadRepository dataQualityReadRepository;
-    private final WorkspaceConnectionRepository connectionRepository;
-    private final NamedParameterJdbcTemplate pgJdbc;
-    private final AnalyticsQueryProperties properties;
+  private final DataQualityReadRepository dataQualityReadRepository;
+  private final SyncStateReadRepository syncStateReadRepository;
+  private final WorkspaceConnectionRepository connectionRepository;
+  private final AnalyticsQueryProperties properties;
 
-    private static final String SYNC_FRESHNESS_SQL = """
-            SELECT
-                mc.id AS connection_id,
-                mc.name AS connection_name,
-                mc.marketplace_type AS source_platform,
-                mss.data_domain,
-                mss.last_success_at
-            FROM marketplace_sync_state mss
-            JOIN marketplace_connection mc ON mss.marketplace_connection_id = mc.id
-            WHERE mc.workspace_id = :workspaceId
-              AND mc.status != 'ARCHIVED'
-            ORDER BY mc.id, mss.data_domain
-            """;
+  @Transactional(readOnly = true)
+  public DataQualityStatusResponse getStatus(long workspaceId) {
+    List<SyncFreshnessRow> rows = syncStateReadRepository.findSyncFreshness(workspaceId);
 
-    public DataQualityStatusResponse getStatus(long workspaceId) {
-        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+    var freshnessList = new ArrayList<SyncFreshness>();
+    var blockerList = new ArrayList<AutomationBlocker>();
+    OffsetDateTime now = OffsetDateTime.now();
+    var dqProps = properties.dataQuality();
 
-        var freshnessList = new ArrayList<SyncFreshness>();
-        var blockerList = new ArrayList<AutomationBlocker>();
-        OffsetDateTime now = OffsetDateTime.now();
+    for (SyncFreshnessRow row : rows) {
+      int thresholdHours = resolveThresholdHours(row.dataDomain(), dqProps);
+      boolean stale = row.lastSuccessAt() == null
+          || row.lastSuccessAt().plusHours(thresholdHours).isBefore(now);
 
-        var dqProps = properties.dataQuality();
+      freshnessList.add(new SyncFreshness(
+          row.connectionId(), row.connectionName(), row.sourcePlatform(),
+          row.dataDomain(), row.lastSuccessAt(), stale, thresholdHours));
 
-        pgJdbc.query(SYNC_FRESHNESS_SQL, params, (rs, rowNum) -> {
-            long connectionId = rs.getLong("connection_id");
-            String connectionName = rs.getString("connection_name");
-            String platform = rs.getString("source_platform");
-            String domain = rs.getString("data_domain");
-            OffsetDateTime lastSuccess = rs.getObject("last_success_at", OffsetDateTime.class);
-
-            int thresholdHours = resolveThresholdHours(domain, dqProps);
-            boolean stale = lastSuccess == null
-                    || lastSuccess.plusHours(thresholdHours).isBefore(now);
-
-            freshnessList.add(new SyncFreshness(
-                    connectionId, connectionName, platform, domain,
-                    lastSuccess, stale, thresholdHours));
-
-            if (stale && isBlockingDomain(domain)) {
-                blockerList.add(new AutomationBlocker(
-                        connectionId, connectionName, platform,
-                        "Stale %s data (>%dh)".formatted(domain, thresholdHours),
-                        true));
-            }
-
-            return null;
-        });
-
-        return new DataQualityStatusResponse(freshnessList, blockerList);
+      if (stale && isBlockingDomain(row.dataDomain())) {
+        blockerList.add(new AutomationBlocker(
+            row.connectionId(), row.connectionName(), row.sourcePlatform(),
+            "Stale %s data (>%dh)".formatted(row.dataDomain(), thresholdHours),
+            true));
+      }
     }
 
-    public List<ReconciliationResponse> getReconciliation(long workspaceId) {
-        List<Long> connectionIds = connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
-        if (connectionIds.isEmpty()) {
-            return List.of();
-        }
-        return dataQualityReadRepository.findReconciliation(
-                connectionIds, properties.dataQuality().residualAnomalyStdMultiplier());
-    }
+    return new DataQualityStatusResponse(freshnessList, blockerList);
+  }
 
-    private int resolveThresholdHours(String domain,
-                                       AnalyticsQueryProperties.DataQualityProperties dqProps) {
-        return switch (domain.toLowerCase()) {
-            case "finance" -> dqProps.staleFinanceThresholdHours();
-            case "advertising" -> dqProps.staleAdvertisingThresholdHours();
-            default -> dqProps.staleStateThresholdHours();
-        };
+  public List<ReconciliationResponse> getReconciliation(long workspaceId) {
+    List<Long> connectionIds = connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
+    if (connectionIds.isEmpty()) {
+      return List.of();
     }
+    return dataQualityReadRepository.findReconciliation(
+        connectionIds, properties.dataQuality().residualAnomalyStdMultiplier());
+  }
 
-    private boolean isBlockingDomain(String domain) {
-        return "finance".equalsIgnoreCase(domain);
-    }
+  private int resolveThresholdHours(String domain,
+      AnalyticsQueryProperties.DataQualityProperties dqProps) {
+    return switch (domain.toLowerCase()) {
+      case "finance" -> dqProps.staleFinanceThresholdHours();
+      case "advertising" -> dqProps.staleAdvertisingThresholdHours();
+      default -> dqProps.staleStateThresholdHours();
+    };
+  }
+
+  private boolean isBlockingDomain(String domain) {
+    return "finance".equalsIgnoreCase(domain);
+  }
 }

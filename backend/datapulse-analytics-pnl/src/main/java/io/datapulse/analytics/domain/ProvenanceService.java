@@ -8,20 +8,23 @@ import io.datapulse.platform.storage.RawStorageUrlProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProvenanceService {
 
     private final ProvenanceRepository provenanceRepository;
     private final RawStorageUrlProvider rawStorageUrlProvider;
 
+    @Transactional(readOnly = true)
     public ProvenanceEntryResponse getCanonicalEntry(long entryId, long workspaceId) {
         return provenanceRepository.findCanonicalEntry(entryId, workspaceId)
                 .orElseThrow(() -> NotFoundException.entity("canonical_finance_entry", entryId));
     }
 
+    @Transactional(readOnly = true)
     public ProvenanceRawResponse getRawUrl(long entryId, long workspaceId) {
         ProvenanceEntryResponse entry = getCanonicalEntry(entryId, workspaceId);
 
