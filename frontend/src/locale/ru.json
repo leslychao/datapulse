@@ -302,5 +302,9 @@
   "promo.product.not_found": "Промо-товар не найден.",
   "promo.product.not_eligible": "Товар не может участвовать в данной акции.",
   "promo.product.not_participating": "Товар не участвует в данной акции.",
-  "promo.campaign.frozen": "Срок подачи заявки на участие в акции истёк."
+  "promo.campaign.frozen": "Срок подачи заявки на участие в акции истёк.",
+
+  "grid.export.too_many_rows": "Слишком много строк для экспорта ({{count}}). Максимум: {{max}}. Сузьте фильтры.",
+  "saved_view.not_found": "Сохранённый вид не найден.",
+  "saved_view.system_readonly": "Системный вид нельзя изменить или удалить."
 }

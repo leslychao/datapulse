@@ -2,7 +2,6 @@ package io.datapulse.sellerops.persistence;
 
 import io.datapulse.sellerops.api.GridFilter;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -10,8 +9,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
@@ -174,7 +173,7 @@ public class GridPostgresReadRepository {
                 .addValue("offerId", offerId);
 
         List<GridRow> rows = jdbc.query(sql, params, this::mapGridRow);
-        return rows.isEmpty() ? null : rows.getFirst();
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private void appendFilters(GridFilter filter, StringBuilder where,
@@ -198,12 +197,12 @@ public class GridPostgresReadRepository {
             params.addValue("statuses", filter.status());
         }
 
-        if (StringUtils.isNotBlank(filter.skuCode())) {
+        if (StringUtils.hasText(filter.skuCode())) {
             where.append(" AND ss.sku_code ILIKE :skuCode");
             params.addValue("skuCode", "%%" + filter.skuCode().trim() + "%%");
         }
 
-        if (StringUtils.isNotBlank(filter.productName())) {
+        if (StringUtils.hasText(filter.productName())) {
             where.append(" AND mo.name ILIKE :productName");
             params.addValue("productName", "%%" + filter.productName().trim() + "%%");
         }
@@ -247,12 +246,12 @@ public class GridPostgresReadRepository {
             }
         }
 
-        if (StringUtils.isNotBlank(filter.lastDecision())) {
+        if (StringUtils.hasText(filter.lastDecision())) {
             where.append(" AND latest_pd.decision_type = :lastDecision");
             params.addValue("lastDecision", filter.lastDecision().trim());
         }
 
-        if (StringUtils.isNotBlank(filter.lastActionStatus())) {
+        if (StringUtils.hasText(filter.lastActionStatus())) {
             where.append(" AND latest_pa.status = :lastActionStatus");
             params.addValue("lastActionStatus", filter.lastActionStatus().trim());
         }
@@ -310,8 +309,4 @@ public class GridPostgresReadRepository {
         return rs.wasNull() ? null : val;
     }
 
-    private BigDecimal getBoxedDecimal(ResultSet rs, String column) throws SQLException {
-        BigDecimal val = rs.getBigDecimal(column);
-        return rs.wasNull() ? null : val;
-    }
 }

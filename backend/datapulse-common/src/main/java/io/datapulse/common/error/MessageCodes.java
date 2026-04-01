@@ -110,4 +110,9 @@ public final class MessageCodes {
     public static final String PROMO_PRODUCT_NOT_ELIGIBLE = "promo.product.not_eligible";
     public static final String PROMO_PRODUCT_NOT_PARTICIPATING = "promo.product.not_participating";
     public static final String PROMO_CAMPAIGN_FROZEN = "promo.campaign.frozen";
+
+    // --- Seller Operations ---
+    public static final String GRID_EXPORT_TOO_MANY_ROWS = "grid.export.too_many_rows";
+    public static final String SAVED_VIEW_NOT_FOUND = "saved_view.not_found";
+    public static final String SAVED_VIEW_SYSTEM_READONLY = "saved_view.system_readonly";
 }
