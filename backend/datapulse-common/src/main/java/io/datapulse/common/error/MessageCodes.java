@@ -115,4 +115,10 @@ public final class MessageCodes {
     public static final String GRID_EXPORT_TOO_MANY_ROWS = "grid.export.too_many_rows";
     public static final String SAVED_VIEW_NOT_FOUND = "saved_view.not_found";
     public static final String SAVED_VIEW_SYSTEM_READONLY = "saved_view.system_readonly";
+
+    // --- Seller Operations: Working Queues ---
+    public static final String QUEUE_NOT_FOUND = "queue.not_found";
+    public static final String QUEUE_ITEM_NOT_FOUND = "queue.item.not_found";
+    public static final String QUEUE_ITEM_INVALID_STATE = "queue.item.invalid_state";
+    public static final String QUEUE_DUPLICATE = "queue.duplicate";
 }

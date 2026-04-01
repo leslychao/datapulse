@@ -4,6 +4,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(GridProperties.class)
+@EnableConfigurationProperties({GridProperties.class, QueueProperties.class, MismatchProperties.class})
 public class SellerOpsConfig {
 }
