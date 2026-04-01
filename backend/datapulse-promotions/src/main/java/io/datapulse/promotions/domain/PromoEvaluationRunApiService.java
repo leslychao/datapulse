@@ -6,6 +6,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.promotions.api.PromoEvaluationRunMapper;
 import io.datapulse.promotions.api.PromoEvaluationRunResponse;
 import io.datapulse.promotions.persistence.PromoEvaluationRunEntity;
+import io.datapulse.promotions.persistence.PromoEvaluationRunQueryRepository;
 import io.datapulse.promotions.persistence.PromoEvaluationRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,12 +15,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PromoEvaluationRunApiService {
 
     private final PromoEvaluationRunRepository runRepository;
+    private final PromoEvaluationRunQueryRepository runQueryRepository;
     private final PromoEvaluationRunMapper runMapper;
 
     @Transactional
@@ -45,9 +49,17 @@ public class PromoEvaluationRunApiService {
 
     @Transactional(readOnly = true)
     public Page<PromoEvaluationRunResponse> listRuns(long workspaceId, Long connectionId,
-                                                      PromoRunStatus status, Pageable pageable) {
-        Page<PromoEvaluationRunEntity> page;
+                                                      PromoRunStatus status, LocalDate from,
+                                                      LocalDate to, Pageable pageable) {
+        boolean hasDateFilters = from != null || to != null;
 
+        if (hasDateFilters) {
+            return runQueryRepository.findFiltered(
+                    workspaceId, connectionId, status, from, to, pageable)
+                    .map(runMapper::toResponse);
+        }
+
+        Page<PromoEvaluationRunEntity> page;
         if (connectionId != null) {
             page = runRepository.findAllByWorkspaceIdAndConnectionId(
                     workspaceId, connectionId, pageable);

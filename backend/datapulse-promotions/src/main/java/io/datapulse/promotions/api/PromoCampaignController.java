@@ -5,12 +5,15 @@ import io.datapulse.promotions.domain.PromoCampaignService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping(value = "/api/promo/campaigns", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -24,9 +27,15 @@ public class PromoCampaignController {
     public Page<PromoCampaignSummaryResponse> listCampaigns(
             @RequestParam(value = "connectionId", required = false) Long connectionId,
             @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "marketplaceType", required = false) String marketplaceType,
+            @RequestParam(value = "from", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(value = "to", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Pageable pageable) {
         return campaignService.listCampaigns(
-                workspaceContext.getWorkspaceId(), connectionId, status, pageable);
+                workspaceContext.getWorkspaceId(), connectionId, status,
+                marketplaceType, from, to, pageable);
     }
 
     @GetMapping("/{campaignId}")
@@ -40,8 +49,9 @@ public class PromoCampaignController {
     public Page<PromoCampaignProductResponse> getCampaignProducts(
             @PathVariable("campaignId") Long campaignId,
             @RequestParam(value = "participationStatus", required = false) String participationStatus,
+            @RequestParam(value = "search", required = false) String search,
             Pageable pageable) {
         return campaignService.getCampaignProducts(
-                campaignId, participationStatus, pageable);
+                campaignId, participationStatus, search, pageable);
     }
 }

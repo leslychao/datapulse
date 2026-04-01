@@ -3,6 +3,7 @@ package io.datapulse.promotions.domain;
 import io.datapulse.promotions.api.PromoEvaluationMapper;
 import io.datapulse.promotions.api.PromoEvaluationResponse;
 import io.datapulse.promotions.persistence.PromoEvaluationEntity;
+import io.datapulse.promotions.persistence.PromoEvaluationQueryRepository;
 import io.datapulse.promotions.persistence.PromoEvaluationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,14 +16,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class PromoEvaluationApiService {
 
     private final PromoEvaluationRepository evaluationRepository;
+    private final PromoEvaluationQueryRepository evaluationQueryRepository;
     private final PromoEvaluationMapper evaluationMapper;
 
     @Transactional(readOnly = true)
     public Page<PromoEvaluationResponse> listEvaluations(long workspaceId, Long runId,
+                                                          Long campaignId, Long marketplaceOfferId,
                                                           PromoEvaluationResult evaluationResult,
                                                           Pageable pageable) {
-        Page<PromoEvaluationEntity> page;
+        boolean hasExtraFilters = campaignId != null || marketplaceOfferId != null;
 
+        if (hasExtraFilters || (runId != null && evaluationResult != null)) {
+            return evaluationQueryRepository.findFiltered(
+                    workspaceId, runId, campaignId, marketplaceOfferId,
+                    evaluationResult, pageable)
+                    .map(evaluationMapper::toResponse);
+        }
+
+        Page<PromoEvaluationEntity> page;
         if (runId != null) {
             page = evaluationRepository.findAllByPromoEvaluationRunId(runId, pageable);
         } else if (evaluationResult != null) {

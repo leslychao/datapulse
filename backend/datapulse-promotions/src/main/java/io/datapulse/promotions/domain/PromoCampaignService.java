@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 @Service
 @RequiredArgsConstructor
 public class PromoCampaignService {
@@ -19,8 +21,11 @@ public class PromoCampaignService {
 
     @Transactional(readOnly = true)
     public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
-                                                             String status, Pageable pageable) {
-        return campaignQueryRepository.listCampaigns(workspaceId, connectionId, status, pageable);
+                                                             String status, String marketplaceType,
+                                                             LocalDate from, LocalDate to,
+                                                             Pageable pageable) {
+        return campaignQueryRepository.listCampaigns(
+                workspaceId, connectionId, status, marketplaceType, from, to, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -32,8 +37,9 @@ public class PromoCampaignService {
     @Transactional(readOnly = true)
     public Page<PromoCampaignProductResponse> getCampaignProducts(long campaignId,
                                                                     String participationStatus,
+                                                                    String search,
                                                                     Pageable pageable) {
         return campaignQueryRepository.getCampaignProducts(
-                campaignId, participationStatus, pageable);
+                campaignId, participationStatus, search, pageable);
     }
 }

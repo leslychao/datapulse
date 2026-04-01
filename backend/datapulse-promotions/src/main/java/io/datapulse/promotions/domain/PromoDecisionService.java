@@ -75,9 +75,7 @@ public class PromoDecisionService {
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
 
         PromoPolicySnapshot snapshot = policy != null
-                ? buildSnapshot(policy)
-                : new PromoPolicySnapshot(null, 0, null, ParticipationMode.RECOMMENDATION,
-                BigDecimal.ZERO, 7, null, null, null, null);
+                ? PromoPolicySnapshot.from(policy) : PromoPolicySnapshot.empty();
 
         PromoDecisionEntity decision = new PromoDecisionEntity();
         decision.setWorkspaceId(workspaceId);
@@ -123,9 +121,7 @@ public class PromoDecisionService {
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
 
         PromoPolicySnapshot snapshot = policy != null
-                ? buildSnapshot(policy)
-                : new PromoPolicySnapshot(null, 0, null, ParticipationMode.RECOMMENDATION,
-                BigDecimal.ZERO, 7, null, null, null, null);
+                ? PromoPolicySnapshot.from(policy) : PromoPolicySnapshot.empty();
 
         PromoDecisionEntity decision = new PromoDecisionEntity();
         decision.setWorkspaceId(workspaceId);
@@ -160,9 +156,7 @@ public class PromoDecisionService {
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
 
         PromoPolicySnapshot snapshot = policy != null
-                ? buildSnapshot(policy)
-                : new PromoPolicySnapshot(null, 0, null, ParticipationMode.RECOMMENDATION,
-                BigDecimal.ZERO, 7, null, null, null, null);
+                ? PromoPolicySnapshot.from(policy) : PromoPolicySnapshot.empty();
 
         PromoDecisionEntity decision = new PromoDecisionEntity();
         decision.setWorkspaceId(workspaceId);
@@ -257,15 +251,6 @@ public class PromoDecisionService {
             log.warn("CAS conflict updating canonical_promo_product: id={}, expected={}, target={}",
                     promoProductId, expectedStatus, newStatus);
         }
-    }
-
-    private PromoPolicySnapshot buildSnapshot(PromoPolicyEntity policy) {
-        return new PromoPolicySnapshot(
-                policy.getId(), policy.getVersion(), policy.getName(),
-                policy.getParticipationMode(), policy.getMinMarginPct(),
-                policy.getMinStockDaysOfCover(), policy.getMaxPromoDiscountPct(),
-                policy.getAutoParticipateCategories(), policy.getAutoDeclineCategories(),
-                policy.getEvaluationConfig());
     }
 
     private String serializeJson(Object value) {

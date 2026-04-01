@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +32,9 @@ public class PromoCampaignQueryRepository {
             """;
 
     public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
-                                                             String status, Pageable pageable) {
+                                                             String status, String marketplaceType,
+                                                             LocalDate from, LocalDate to,
+                                                             Pageable pageable) {
         var where = new StringBuilder(BASE_SELECT);
         var params = new MapSqlParameterSource().addValue("workspaceId", workspaceId);
 
@@ -42,6 +45,18 @@ public class PromoCampaignQueryRepository {
         if (status != null) {
             where.append(" AND cpc.status = :status");
             params.addValue("status", status);
+        }
+        if (marketplaceType != null) {
+            where.append(" AND cpc.source_platform = :marketplaceType");
+            params.addValue("marketplaceType", marketplaceType);
+        }
+        if (from != null) {
+            where.append(" AND cpc.date_to >= :from");
+            params.addValue("from", from.atStartOfDay());
+        }
+        if (to != null) {
+            where.append(" AND cpc.date_from < :toExclusive");
+            params.addValue("toExclusive", to.plusDays(1).atStartOfDay());
         }
 
         var countSql = "SELECT count(*) FROM (" + where + ") sub";
@@ -124,6 +139,7 @@ public class PromoCampaignQueryRepository {
 
     public Page<PromoCampaignProductResponse> getCampaignProducts(long campaignId,
                                                                     String participationStatus,
+                                                                    String search,
                                                                     Pageable pageable) {
         var where = new StringBuilder("""
                 SELECT cpp.id, cpp.marketplace_offer_id, cpp.participation_status,
@@ -141,6 +157,10 @@ public class PromoCampaignQueryRepository {
         if (participationStatus != null) {
             where.append(" AND cpp.participation_status = :participationStatus");
             params.addValue("participationStatus", participationStatus);
+        }
+        if (search != null) {
+            where.append(" AND (mo.name ILIKE :search OR mo.marketplace_sku ILIKE :search)");
+            params.addValue("search", "%" + search + "%");
         }
 
         var countSql = "SELECT count(*) FROM (" + where + ") sub";

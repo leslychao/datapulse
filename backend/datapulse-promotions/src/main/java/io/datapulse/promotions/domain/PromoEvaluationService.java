@@ -26,17 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Orchestrates a promo evaluation run for a marketplace connection.
- * <p>
- * Pipeline:
- * 1. Load active/upcoming campaigns for connection
- * 2. Load ELIGIBLE/PARTICIPATING promo products
- * 3. Resolve effective promo_policy per offer
- * 4. Per-product: evaluate margin, stock, categories → decision → action scheduling
- * 5. Batch save evaluations, decisions, actions
- * 6. Update run counters and publish completion event
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -65,29 +54,18 @@ public class PromoEvaluationService {
         runRepository.save(run);
 
         try {
-            RunCounters counters = processEvaluation(run);
+            List<PromoProductRow> products = policyResolver.loadEligibleProducts(
+                    run.getConnectionId(), run.getWorkspaceId());
+            run.setTotalProducts(products.size());
+
+            run.setEligibleCount(products.size());
+            RunCounters counters = products.isEmpty()
+                    ? RunCounters.EMPTY : processProducts(run, products);
             completeRun(run, counters);
         } catch (Exception e) {
             log.error("PromoEvaluationRun {} failed: {}", runId, e.getMessage(), e);
             failRun(run, e);
         }
-    }
-
-    private RunCounters processEvaluation(PromoEvaluationRunEntity run) {
-        List<PromoProductRow> products = policyResolver.loadEligibleProducts(
-                run.getConnectionId(), run.getWorkspaceId());
-
-        run.setTotalProducts(products.size());
-
-        if (products.isEmpty()) {
-            log.info("PromoEvaluationRun {}: no eligible promo products for connection {}",
-                    run.getId(), run.getConnectionId());
-            return RunCounters.EMPTY;
-        }
-
-        run.setEligibleCount(products.size());
-
-        return processProducts(run, products);
     }
 
     private RunCounters processProducts(PromoEvaluationRunEntity run, List<PromoProductRow> products) {
@@ -143,13 +121,7 @@ public class PromoEvaluationService {
             }
         }
 
-        evaluationRepository.saveAll(evaluations);
-        if (!decisions.isEmpty()) {
-            decisionRepository.saveAll(decisions);
-        }
-        if (!actions.isEmpty()) {
-            saveActionsWithConflictHandling(actions);
-        }
+        persistBatchResults(evaluations, decisions, actions);
 
         if (skippedStableCount > 0) {
             log.debug("PromoEvaluationRun: skipped {} stable-state products", skippedStableCount);
@@ -165,25 +137,59 @@ public class PromoEvaluationService {
     private EvaluationOutcome evaluateSingleProduct(PromoEvaluationRunEntity run,
                                                      PromoProductRow product,
                                                      PromoPolicyEntity policy) {
-        PromoPolicySnapshot snapshot = buildSnapshot(policy);
+        PromoPolicySnapshot snapshot = PromoPolicySnapshot.from(policy);
         boolean isParticipating = "PARTICIPATING".equals(product.participationStatus());
 
-        BigDecimal promoPrice = product.requiredPrice();
-        BigDecimal regularPrice = product.currentPrice();
-        BigDecimal cogs = product.cogs();
+        PromoEvaluationEntity eval = buildBaseEvaluation(run, product, policy);
+        computeMarginMetrics(eval, product);
+        computeStockCoverage(eval, product, policy);
 
-        PromoEvaluationEntity eval = new PromoEvaluationEntity();
+        PromoEvaluationResult result = classifyResult(eval, policy);
+        eval.setEvaluationResult(result);
+
+        if (isParticipating && isStableState(product.promoProductId(), result, eval.getMarginAtPromoPrice())) {
+            eval.setSkipReason("stable_state");
+            return new EvaluationOutcome(eval, null, null, PromoDecisionType.PARTICIPATE);
+        }
+
+        PromoDecisionType decisionType = mapDecision(result, isParticipating, policy.getParticipationMode());
+
+        if (decisionType == null) {
+            return new EvaluationOutcome(eval, null, null, result == PromoEvaluationResult.PROFITABLE
+                    ? PromoDecisionType.PARTICIPATE : PromoDecisionType.DECLINE);
+        }
+
+        PromoDecisionEntity decision = buildDecision(run, product, policy, snapshot, eval, decisionType);
+        PromoActionEntity action = buildAction(
+                run, product, policy, decision, decisionType, isParticipating, result);
+
+        return new EvaluationOutcome(eval, decision, action, decisionType);
+    }
+
+    private PromoEvaluationEntity buildBaseEvaluation(PromoEvaluationRunEntity run,
+                                                       PromoProductRow product,
+                                                       PromoPolicyEntity policy) {
+        var eval = new PromoEvaluationEntity();
         eval.setWorkspaceId(run.getWorkspaceId());
         eval.setPromoEvaluationRunId(run.getId());
         eval.setCanonicalPromoProductId(product.promoProductId());
         eval.setPromoPolicyId(policy.getId());
         eval.setEvaluatedAt(OffsetDateTime.now());
         eval.setCurrentParticipationStatus(product.participationStatus());
-        eval.setPromoPrice(promoPrice);
-        eval.setRegularPrice(regularPrice);
-        eval.setCogs(cogs);
+        eval.setPromoPrice(product.requiredPrice());
+        eval.setRegularPrice(product.currentPrice());
+        eval.setCogs(product.cogs());
         eval.setStockAvailable(product.stockAvailable());
+        eval.setEffectiveCostRate(product.effectiveCostRate());
+        eval.setAvgDailyVelocity(product.avgDailyVelocity());
 
+        if (product.dateFrom() != null && product.dateTo() != null) {
+            long durationDays = ChronoUnit.DAYS.between(product.dateFrom(), product.dateTo());
+            eval.setExpectedPromoDurationDays((int) Math.max(durationDays, 1));
+        }
+
+        BigDecimal promoPrice = product.requiredPrice();
+        BigDecimal regularPrice = product.currentPrice();
         if (promoPrice != null && regularPrice != null && regularPrice.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal discountPct = regularPrice.subtract(promoPrice)
                     .divide(regularPrice, 4, RoundingMode.HALF_UP)
@@ -191,13 +197,14 @@ public class PromoEvaluationService {
             eval.setDiscountPct(discountPct);
         }
 
-        if (product.dateFrom() != null && product.dateTo() != null) {
-            long durationDays = ChronoUnit.DAYS.between(product.dateFrom(), product.dateTo());
-            eval.setExpectedPromoDurationDays((int) Math.max(durationDays, 1));
-        }
+        return eval;
+    }
 
+    private void computeMarginMetrics(PromoEvaluationEntity eval, PromoProductRow product) {
+        BigDecimal promoPrice = product.requiredPrice();
+        BigDecimal regularPrice = product.currentPrice();
+        BigDecimal cogs = product.cogs();
         BigDecimal effectiveCostRate = product.effectiveCostRate();
-        eval.setEffectiveCostRate(effectiveCostRate);
 
         if (promoPrice != null && cogs != null && promoPrice.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal marginAtPromo = promoPrice.subtract(cogs)
@@ -221,10 +228,11 @@ public class PromoEvaluationService {
             eval.setMarginDeltaPct(eval.getMarginAtPromoPrice().subtract(eval.getMarginAtRegularPrice())
                     .multiply(BigDecimal.valueOf(100)));
         }
+    }
 
+    private void computeStockCoverage(PromoEvaluationEntity eval, PromoProductRow product,
+                                       PromoPolicyEntity policy) {
         BigDecimal avgDailyVelocity = product.avgDailyVelocity();
-        eval.setAvgDailyVelocity(avgDailyVelocity);
-
         if (product.stockAvailable() != null && avgDailyVelocity != null
                 && avgDailyVelocity.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal daysCover = BigDecimal.valueOf(product.stockAvailable())
@@ -232,27 +240,6 @@ public class PromoEvaluationService {
             eval.setStockDaysOfCover(daysCover);
             eval.setStockSufficient(daysCover.intValue() >= policy.getMinStockDaysOfCover());
         }
-
-        PromoEvaluationResult result = classifyResult(eval, policy);
-        eval.setEvaluationResult(result);
-
-        if (isParticipating && isStableState(product.promoProductId(), result, eval.getMarginAtPromoPrice())) {
-            eval.setSkipReason("stable_state");
-            return new EvaluationOutcome(eval, null, null, PromoDecisionType.PARTICIPATE);
-        }
-
-        PromoDecisionType decisionType = mapDecision(result, isParticipating, policy.getParticipationMode());
-
-        if (decisionType == null) {
-            return new EvaluationOutcome(eval, null, null, result == PromoEvaluationResult.PROFITABLE
-                    ? PromoDecisionType.PARTICIPATE : PromoDecisionType.DECLINE);
-        }
-
-        PromoDecisionEntity decision = buildDecision(run, product, policy, snapshot, eval, decisionType);
-        PromoActionEntity action = buildAction(
-                run, product, policy, decision, decisionType, isParticipating, result);
-
-        return new EvaluationOutcome(eval, decision, action, decisionType);
     }
 
     private static final BigDecimal STABLE_STATE_THRESHOLD = new BigDecimal("0.01");
@@ -391,6 +378,9 @@ public class PromoEvaluationService {
     private PromoActionStatus resolveActionStatus(ParticipationMode mode,
                                                    PromoDecisionType decisionType,
                                                    PromoEvaluationResult evaluationResult) {
+        if (mode == ParticipationMode.SIMULATED) {
+            return PromoActionStatus.APPROVED;
+        }
         if (decisionType == PromoDecisionType.PENDING_REVIEW) {
             return PromoActionStatus.PENDING_APPROVAL;
         }
@@ -401,9 +391,22 @@ public class PromoEvaluationService {
         }
         return switch (mode) {
             case SEMI_AUTO -> PromoActionStatus.PENDING_APPROVAL;
-            case FULL_AUTO, SIMULATED -> PromoActionStatus.APPROVED;
+            case FULL_AUTO -> PromoActionStatus.APPROVED;
             case RECOMMENDATION -> throw new IllegalStateException("RECOMMENDATION should not create actions");
+            case SIMULATED -> throw new IllegalStateException("SIMULATED handled above");
         };
+    }
+
+    private void persistBatchResults(List<PromoEvaluationEntity> evaluations,
+                                       List<PromoDecisionEntity> decisions,
+                                       List<PromoActionEntity> actions) {
+        evaluationRepository.saveAll(evaluations);
+        if (!decisions.isEmpty()) {
+            decisionRepository.saveAll(decisions);
+        }
+        if (!actions.isEmpty()) {
+            saveActionsWithConflictHandling(actions);
+        }
     }
 
     private void saveActionsWithConflictHandling(List<PromoActionEntity> actions) {
@@ -459,15 +462,6 @@ public class PromoEvaluationService {
                 0, 0, 0, 0, PromoRunStatus.FAILED));
     }
 
-    private PromoPolicySnapshot buildSnapshot(PromoPolicyEntity policy) {
-        return new PromoPolicySnapshot(
-                policy.getId(), policy.getVersion(), policy.getName(),
-                policy.getParticipationMode(), policy.getMinMarginPct(),
-                policy.getMinStockDaysOfCover(), policy.getMaxPromoDiscountPct(),
-                policy.getAutoParticipateCategories(), policy.getAutoDeclineCategories(),
-                policy.getEvaluationConfig());
-    }
-
     private String buildExplanation(PromoEvaluationEntity eval, PromoDecisionType decisionType,
                                      PromoPolicyEntity policy) {
         var sb = new StringBuilder();
@@ -496,15 +490,4 @@ public class PromoEvaluationService {
         }
     }
 
-    private record RunCounters(int participateCount, int declineCount,
-                                int pendingReviewCount, int deactivateCount,
-                                PromoRunStatus status) {
-        static final RunCounters EMPTY = new RunCounters(0, 0, 0, 0, PromoRunStatus.COMPLETED);
-    }
-
-    private record EvaluationOutcome(PromoEvaluationEntity evaluation,
-                                      PromoDecisionEntity decision,
-                                      PromoActionEntity action,
-                                      PromoDecisionType decisionType) {
-    }
 }

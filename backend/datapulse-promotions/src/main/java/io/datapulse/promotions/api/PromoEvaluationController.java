@@ -23,9 +23,12 @@ public class PromoEvaluationController {
     @GetMapping
     public Page<PromoEvaluationResponse> listEvaluations(
             @RequestParam(value = "runId", required = false) Long runId,
+            @RequestParam(value = "campaignId", required = false) Long campaignId,
+            @RequestParam(value = "marketplaceOfferId", required = false) Long marketplaceOfferId,
             @RequestParam(value = "evaluationResult", required = false) PromoEvaluationResult evaluationResult,
             Pageable pageable) {
         return evaluationApiService.listEvaluations(
-                workspaceContext.getWorkspaceId(), runId, evaluationResult, pageable);
+                workspaceContext.getWorkspaceId(), runId, campaignId,
+                marketplaceOfferId, evaluationResult, pageable);
     }
 }

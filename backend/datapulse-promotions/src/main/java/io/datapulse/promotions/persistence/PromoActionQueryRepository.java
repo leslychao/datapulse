@@ -68,6 +68,8 @@ public class PromoActionQueryRepository {
                     entity.setExecutionMode(PromoExecutionMode.valueOf(rs.getString("execution_mode")));
                     entity.setFreezeAtSnapshot(rs.getObject("freeze_at_snapshot", OffsetDateTime.class));
                     entity.setCancelReason(rs.getString("cancel_reason"));
+                    entity.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
+                    entity.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));
                     return entity;
                 });
 

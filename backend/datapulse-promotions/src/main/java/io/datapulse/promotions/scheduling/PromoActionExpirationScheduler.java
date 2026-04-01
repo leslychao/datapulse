@@ -2,6 +2,7 @@ package io.datapulse.promotions.scheduling;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ public class PromoActionExpirationScheduler {
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   @Scheduled(fixedDelayString = "${datapulse.promo.expiration-check-interval-ms:60000}")
+  @SchedulerLock(name = "promoActionExpiration", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
   public void expireFrozenActions() {
     try {
       int expired = jdbcTemplate.update("""
@@ -35,6 +37,7 @@ public class PromoActionExpirationScheduler {
   }
 
   @Scheduled(fixedDelayString = "${datapulse.promo.stuck-check-interval-ms:300000}")
+  @SchedulerLock(name = "promoActionStuckDetector", lockAtMostFor = "PT5M", lockAtLeastFor = "PT1M")
   public void detectStuckActions() {
     try {
       int failedExecuting = jdbcTemplate.update("""
