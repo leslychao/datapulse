@@ -89,6 +89,10 @@ public final class MessageCodes {
     public static final String EXECUTION_STUCK_STATE_DETECTED = "execution.stuck_state.detected";
     public static final String EXECUTION_POISON_PILL = "execution.poison_pill.detected";
 
+    // --- Execution: Simulation ---
+    public static final String EXECUTION_SIMULATION_RESET_SUCCESS = "execution.simulation.reset_success";
+    public static final String EXECUTION_SIMULATION_NO_DATA = "execution.simulation.no_data";
+
     // --- Promotions: Policy ---
     public static final String PROMO_POLICY_NOT_FOUND = "promo.policy.not_found";
     public static final String PROMO_POLICY_ARCHIVED = "promo.policy.archived";

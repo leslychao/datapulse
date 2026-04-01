@@ -288,6 +288,8 @@
   "execution.reconciliation.invalid_outcome": "Недопустимый результат reconciliation.",
   "execution.stuck_state.detected": "Обнаружено застрявшее действие {{actionId}} в статусе {{status}}.",
   "execution.poison_pill.detected": "Обнаружено повреждённое сообщение в очереди обработки.",
+  "execution.simulation.reset_success": "Теневое состояние для подключения {{connectionId}} сброшено (удалено строк: {{deletedCount}}).",
+  "execution.simulation.no_data": "Нет данных симуляции для указанного подключения.",
 
   "promo.policy.not_found": "Промо-политика не найдена.",
   "promo.policy.archived": "Невозможно изменить архивную промо-политику.",
