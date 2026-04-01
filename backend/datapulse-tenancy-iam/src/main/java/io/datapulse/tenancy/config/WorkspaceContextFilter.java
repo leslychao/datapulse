@@ -23,6 +23,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import org.springframework.dao.DataIntegrityViolationException;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -102,10 +104,17 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private AppUserEntity resolveOrProvisionUser(String sub, String email, String name) {
-        return appUserRepository.findByExternalId(sub)
-                .orElseGet(() -> provisionUser(sub, email, name));
-    }
+  private AppUserEntity resolveOrProvisionUser(String sub, String email, String name) {
+    return appUserRepository.findByExternalId(sub)
+        .orElseGet(() -> {
+          try {
+            return provisionUser(sub, email, name);
+          } catch (DataIntegrityViolationException e) {
+            return appUserRepository.findByExternalId(sub)
+                .orElseThrow(() -> e);
+          }
+        });
+  }
 
     private AppUserEntity provisionUser(String sub, String email, String name) {
         log.info("Auto-provisioning user: externalId={}, email={}", sub, email);
