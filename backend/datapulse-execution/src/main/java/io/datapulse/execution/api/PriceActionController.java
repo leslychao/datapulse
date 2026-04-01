@@ -63,14 +63,16 @@ public class PriceActionController {
     }
 
     @PostMapping("/{actionId}/approve")
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void approve(@PathVariable("workspaceId") long workspaceId,
                         @PathVariable("actionId") long actionId) {
         actionService.casApprove(actionId, workspaceContext.getUserId());
     }
 
     @PostMapping("/bulk-approve")
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void bulkApprove(@PathVariable("workspaceId") long workspaceId,
                             @Valid @RequestBody BulkApproveRequest request) {
         for (long actionId : request.actionIds()) {
@@ -82,8 +84,23 @@ public class PriceActionController {
         }
     }
 
+    @PostMapping("/bulk-reject")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) "
+        + "and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    public void bulkReject(@PathVariable("workspaceId") long workspaceId,
+                           @Valid @RequestBody BulkRejectRequest request) {
+        for (long actionId : request.actionIds()) {
+            try {
+                actionService.casReject(actionId, request.cancelReason());
+            } catch (Exception e) {
+                // CAS conflicts and not-found are expected during bulk operations
+            }
+        }
+    }
+
     @PostMapping("/{actionId}/reject")
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void reject(@PathVariable("workspaceId") long workspaceId,
                         @PathVariable("actionId") long actionId,
                         @Valid @RequestBody CancelRequest request) {
@@ -91,7 +108,8 @@ public class PriceActionController {
     }
 
     @PostMapping("/{actionId}/hold")
-    @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void hold(@PathVariable("workspaceId") long workspaceId,
                       @PathVariable("actionId") long actionId,
                       @Valid @RequestBody HoldRequest request) {
@@ -99,14 +117,16 @@ public class PriceActionController {
     }
 
     @PostMapping("/{actionId}/resume")
-    @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void resume(@PathVariable("workspaceId") long workspaceId,
                         @PathVariable("actionId") long actionId) {
         actionService.casResume(actionId, workspaceContext.getUserId());
     }
 
     @PostMapping("/{actionId}/cancel")
-    @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void cancel(@PathVariable("workspaceId") long workspaceId,
                         @PathVariable("actionId") long actionId,
                         @Valid @RequestBody CancelRequest request) {
@@ -114,7 +134,8 @@ public class PriceActionController {
     }
 
     @PostMapping("/{actionId}/retry")
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void retry(@PathVariable("workspaceId") long workspaceId,
                        @PathVariable("actionId") long actionId,
                        @Valid @RequestBody RetryRequest request) {
@@ -122,7 +143,8 @@ public class PriceActionController {
     }
 
     @PostMapping("/{actionId}/reconcile")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public void reconcile(@PathVariable("workspaceId") long workspaceId,
                            @PathVariable("actionId") long actionId,
                            @Valid @RequestBody ReconcileRequest request) {

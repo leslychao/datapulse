@@ -43,6 +43,12 @@ public class SkuLookupRepository {
             WHERE pm.workspace_id = ?
             """;
 
+    private static final String FIND_ALL_OFFER_IDS_BY_CONNECTION = """
+            SELECT marketplace_sku, id
+            FROM marketplace_offer
+            WHERE marketplace_connection_id = ?
+            """;
+
     /**
      * Batch lookup: returns all seller_sku records for a workspace.
      *
@@ -56,6 +62,21 @@ public class SkuLookupRepository {
                         workspaceId)
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    /**
+     * Batch lookup: returns marketplace_sku → marketplace_offer.id for a connection.
+     * Used by stock/price sources to resolve marketplace_offer_id before upsert.
+     */
+    public Map<String, Long> findAllOfferIdsByConnection(long connectionId) {
+        return jdbc.query(FIND_ALL_OFFER_IDS_BY_CONNECTION,
+                        (rs, rowNum) -> Map.entry(
+                                rs.getString("marketplace_sku"),
+                                rs.getLong("id")),
+                        connectionId)
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (existing, replacement) -> existing));
     }
 
     /**

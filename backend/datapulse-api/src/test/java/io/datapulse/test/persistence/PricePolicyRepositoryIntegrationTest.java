@@ -9,6 +9,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.datapulse.test.builder.TestConnectionBuilder;
 import io.datapulse.test.builder.TestSecretReferenceBuilder;
 
+import io.datapulse.etl.persistence.JobExecutionRepository;
+import io.datapulse.etl.persistence.canonical.MarketplaceOfferEntity;
+import io.datapulse.etl.persistence.canonical.ProductMasterEntity;
+import io.datapulse.etl.persistence.canonical.SellerSkuEntity;
 import io.datapulse.pricing.domain.PolicyStatus;
 import io.datapulse.pricing.domain.PolicyType;
 import io.datapulse.pricing.persistence.PriceDecisionEntity;
@@ -25,6 +29,7 @@ import io.datapulse.integration.persistence.SecretReferenceRepository;
 import io.datapulse.pricing.domain.DecisionType;
 import io.datapulse.pricing.domain.RunStatus;
 import io.datapulse.pricing.domain.RunTriggerType;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,15 +64,24 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
   @Autowired
   private MarketplaceConnectionRepository connectionRepository;
 
+  @Autowired
+  private JobExecutionRepository jobExecutionRepository;
+
+  @Autowired
+  private EntityManager em;
+
   private Long workspaceId;
   private Long connectionId;
+  private Long userId;
+  private Long marketplaceOfferId;
 
   @BeforeEach
   void setUp() {
     var user = appUserRepository.save(aUser().build());
-    var tenant = tenantRepository.save(aTenant().withOwnerUserId(user.getId()).build());
+    userId = user.getId();
+    var tenant = tenantRepository.save(aTenant().withOwnerUserId(userId).build());
     var ws = workspaceRepository.save(
-        aWorkspace().withTenant(tenant).withOwnerUserId(user.getId()).build());
+        aWorkspace().withTenant(tenant).withOwnerUserId(userId).build());
     workspaceId = ws.getId();
 
     var secret = secretRefRepository.save(
@@ -76,6 +90,33 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
         TestConnectionBuilder.aConnection().withWorkspaceId(workspaceId)
             .withSecretReferenceId(secret.getId()).build());
     connectionId = conn.getId();
+
+    long jobId = jobExecutionRepository.insert(connectionId, "FULL_SYNC");
+
+    var pm = new ProductMasterEntity();
+    pm.setWorkspaceId(workspaceId);
+    pm.setExternalCode("test-code");
+    pm.setName("Test Product");
+    pm.setJobExecutionId(jobId);
+    em.persist(pm);
+
+    var sku = new SellerSkuEntity();
+    sku.setProductMasterId(pm.getId());
+    sku.setSkuCode("test-sku");
+    sku.setJobExecutionId(jobId);
+    em.persist(sku);
+
+    var offer = new MarketplaceOfferEntity();
+    offer.setSellerSkuId(sku.getId());
+    offer.setMarketplaceConnectionId(connectionId);
+    offer.setMarketplaceSku("test-msku");
+    offer.setName("Test Offer");
+    offer.setStatus("ACTIVE");
+    offer.setJobExecutionId(jobId);
+    em.persist(offer);
+    em.flush();
+
+    marketplaceOfferId = offer.getId();
   }
 
   @Nested
@@ -85,9 +126,11 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void should_save_and_findByWorkspaceId() {
       policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId).withName("P1").build());
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
+              .withName("P1").build());
       policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId).withName("P2").build());
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
+              .withName("P2").build());
 
       var found = policyRepository.findAllByWorkspaceId(workspaceId);
       assertThat(found).hasSize(2);
@@ -96,10 +139,10 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void should_filterByStatus() {
       policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId)
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
               .withStatus(PolicyStatus.ACTIVE).build());
       policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId)
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
               .withStatus(PolicyStatus.DRAFT).build());
 
       assertThat(policyRepository.findAllByWorkspaceIdAndStatus(
@@ -109,10 +152,10 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void should_filterByStrategyType() {
       policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId)
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
               .withStrategyType(PolicyType.TARGET_MARGIN).build());
       policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId)
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
               .withStrategyType(PolicyType.PRICE_CORRIDOR).build());
 
       assertThat(policyRepository.findAllByWorkspaceIdAndStrategyType(
@@ -122,7 +165,7 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void should_findByIdAndWorkspaceId() {
       var saved = policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId).build());
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId).build());
 
       assertThat(policyRepository.findByIdAndWorkspaceId(saved.getId(), workspaceId))
           .isPresent();
@@ -133,7 +176,7 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void should_supportActivateAndArchiveTransitions() {
       var policy = policyRepository.save(
-          aPricePolicy().withWorkspaceId(workspaceId)
+          aPricePolicy().withWorkspaceId(workspaceId).withCreatedBy(userId)
               .withStatus(PolicyStatus.DRAFT).build());
 
       policy.setStatus(PolicyStatus.ACTIVE);
@@ -168,7 +211,7 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
       var run = createRun();
       var d1 = createDecision(run.getId());
 
-      var latest = decisionRepository.findLatestByOffer(1L, PageRequest.of(0, 1));
+      var latest = decisionRepository.findLatestByOffer(marketplaceOfferId, PageRequest.of(0, 1));
       assertThat(latest).hasSize(1);
       assertThat(latest.get(0).getId()).isEqualTo(d1.getId());
     }
@@ -187,7 +230,7 @@ class PricePolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
       var d = new PriceDecisionEntity();
       d.setWorkspaceId(workspaceId);
       d.setPricingRunId(runId);
-      d.setMarketplaceOfferId(1L);
+      d.setMarketplaceOfferId(marketplaceOfferId);
       d.setPolicyVersion(1);
       d.setDecisionType(DecisionType.CHANGE);
       d.setStrategyType(PolicyType.TARGET_MARGIN);

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { LucideAngularModule, Plus, Upload, Download } from 'lucide-angular';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { CostProfileApiService } from '@core/api/cost-profile-api.service';
 import { CostProfile, CostProfileImportResult } from '@core/models';
@@ -20,6 +21,7 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
   imports: [
     FormsModule,
     LucideAngularModule,
+    TranslatePipe,
     SpinnerComponent,
     EmptyStateComponent,
     FormModalComponent,
@@ -30,8 +32,8 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
     <div class="max-w-5xl">
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">Себестоимость</h1>
-          <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">Управление себестоимостью товаров (COGS)</p>
+          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.cost_profiles.title' | translate }}</h1>
+          <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.cost_profiles.subtitle' | translate }}</p>
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -39,13 +41,13 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
             class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
           >
             <lucide-icon [img]="PlusIcon" [size]="16" />
-            Добавить
+            {{ 'settings.cost_profiles.add' | translate }}
           </button>
           <label
             class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
           >
             <lucide-icon [img]="UploadIcon" [size]="16" />
-            Импорт CSV
+            {{ 'settings.cost_profiles.import_csv' | translate }}
             <input type="file" accept=".csv" class="hidden" (change)="onFileSelected($event)" />
           </label>
           <button
@@ -54,7 +56,7 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
             class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
           >
             <lucide-icon [img]="DownloadIcon" [size]="16" />
-            Экспорт CSV
+            {{ 'settings.cost_profiles.export_csv' | translate }}
           </button>
         </div>
       </div>
@@ -64,30 +66,30 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
           type="text"
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearch()"
-          placeholder="Поиск по SKU или названию..."
+          [placeholder]="'settings.cost_profiles.search_placeholder' | translate"
           class="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
         />
       </div>
 
       @if (profilesQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (profilesQuery.data(); as profiles) {
         @if (profiles.length === 0) {
           <dp-empty-state
-            message="Нет данных о себестоимости"
-            hint="Добавьте вручную или импортируйте CSV"
+            [message]="'settings.cost_profiles.empty' | translate"
+            [hint]="'settings.cost_profiles.empty_hint' | translate"
           />
         } @else {
           <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">SKU</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Название товара</th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">Себестоимость</th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">Обновлено</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_sku' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_product_name' | translate }}</th>
+                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_cost_price' | translate }}</th>
+                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_updated_at' | translate }}</th>
                   <th class="w-20 px-4 py-2"></th>
                 </tr>
               </thead>
@@ -114,9 +116,8 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
                           (dblclick)="startInlineEdit(cp)"
                           class="cursor-pointer font-mono text-[var(--text-primary)]"
                           [class.text-[var(--text-tertiary)]]="cp.costPrice == null"
-                          title="Двойной клик для редактирования"
                         >
-                          {{ cp.costPrice != null ? (cp.costPrice + ' ₽') : '— (не задана)' }}
+                          {{ cp.costPrice != null ? (cp.costPrice + ' ₽') : ('settings.cost_profiles.not_set' | translate) }}
                         </span>
                       }
                     </td>
@@ -128,7 +129,7 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
                         (click)="confirmDelete(cp)"
                         class="cursor-pointer text-sm text-[var(--status-error)] transition-colors hover:underline"
                       >
-                        Удалить
+                        {{ 'actions.delete' | translate }}
                       </button>
                     </td>
                   </tr>
@@ -139,11 +140,10 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
         }
       }
 
-      <!-- Add Modal -->
       <dp-form-modal
-        title="Добавить себестоимость"
+        [title]="'settings.cost_profiles.add_title' | translate"
         [isOpen]="showAddModal()"
-        submitLabel="Добавить"
+        [submitLabel]="'settings.cost_profiles.add' | translate"
         [isPending]="createMutation.isPending()"
         [submitDisabled]="!isAddFormValid()"
         (submit)="submitAdd()"
@@ -151,16 +151,16 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
       >
         <div class="space-y-4">
           <div>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]">SKU ID</label>
+            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.cost_profiles.sku_label' | translate }}</label>
             <input
               type="number"
               [(ngModel)]="addForm.sellerSkuId"
-              placeholder="ID товара"
+              placeholder="ID"
               class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
           <div>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]">Себестоимость (₽)</label>
+            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.cost_profiles.cost_label' | translate }}</label>
             <input
               type="number"
               [(ngModel)]="addForm.costPrice"
@@ -171,7 +171,7 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
             />
           </div>
           <div>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]">Действует с</label>
+            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.cost_profiles.valid_from_label' | translate }}</label>
             <input
               type="date"
               [(ngModel)]="addForm.validFrom"
@@ -181,26 +181,25 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
         </div>
       </dp-form-modal>
 
-      <!-- Import Result Modal -->
       <dp-form-modal
-        title="Результат импорта"
+        [title]="'settings.cost_profiles.import_result_title' | translate"
         [isOpen]="showImportResult()"
-        submitLabel="Закрыть"
-        [cancelLabel]="''"
+        [submitLabel]="'actions.close' | translate"
+        cancelLabel=""
         (submit)="showImportResult.set(false)"
         (close)="showImportResult.set(false)"
       >
         @if (importResult(); as result) {
           <div class="space-y-3">
-            <p class="text-sm text-[var(--status-success)]">✓ Импортировано: {{ result.imported }}</p>
+            <p class="text-sm text-[var(--status-success)]">✓ {{ 'settings.cost_profiles.import_imported' | translate }}: {{ result.imported }}</p>
             @if (result.skipped > 0) {
-              <p class="text-sm text-[var(--status-warning)]">⚠ Пропущено: {{ result.skipped }}</p>
+              <p class="text-sm text-[var(--status-warning)]">⚠ {{ 'settings.cost_profiles.import_skipped' | translate }}: {{ result.skipped }}</p>
             }
             @if (result.errors.length > 0) {
-              <p class="text-sm text-[var(--status-error)]">✕ Ошибки: {{ result.errors.length }}</p>
+              <p class="text-sm text-[var(--status-error)]">✕ {{ 'settings.cost_profiles.import_errors' | translate }}: {{ result.errors.length }}</p>
               <ul class="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
                 @for (err of result.errors; track err.row) {
-                  <li>• Строка {{ err.row }}: {{ err.message }}</li>
+                  <li>• {{ 'settings.cost_profiles.import_error_row' | translate }}: {{ err.row }} — {{ err.message }}</li>
                 }
               </ul>
             }
@@ -208,12 +207,11 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
         }
       </dp-form-modal>
 
-      <!-- Delete Confirmation -->
       <dp-confirmation-modal
         [open]="showDeleteModal()"
-        title="Удалить запись себестоимости"
-        [message]="'Удалить себестоимость для ' + (profileToDelete()?.skuCode || '') + '?'"
-        confirmLabel="Удалить"
+        [title]="'settings.cost_profiles.delete_title' | translate"
+        [message]="translate.instant('settings.cost_profiles.delete_message', { sku: profileToDelete()?.skuCode || '' })"
+        [confirmLabel]="'actions.delete' | translate"
         [danger]="true"
         (confirmed)="doDelete()"
         (cancelled)="showDeleteModal.set(false)"
@@ -228,6 +226,7 @@ export class CostProfilesPageComponent {
 
   private readonly costProfileApi = inject(CostProfileApiService);
   private readonly toast = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   readonly showAddModal = signal(false);
   readonly showDeleteModal = signal(false);
@@ -258,9 +257,9 @@ export class CostProfilesPageComponent {
     onSuccess: () => {
       this.profilesQuery.refetch();
       this.closeAddModal();
-      this.toast.success('Себестоимость добавлена');
+      this.toast.success(this.translate.instant('settings.cost_profiles.added'));
     },
-    onError: () => this.toast.error('Не удалось добавить себестоимость'),
+    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.error_add')),
   }));
 
   readonly updateMutation = injectMutation(() => ({
@@ -275,11 +274,11 @@ export class CostProfilesPageComponent {
     onSuccess: () => {
       this.profilesQuery.refetch();
       this.editingId.set(null);
-      this.toast.success('Себестоимость обновлена');
+      this.toast.success(this.translate.instant('settings.cost_profiles.updated'));
     },
     onError: () => {
       this.editingId.set(null);
-      this.toast.error('Не удалось сохранить');
+      this.toast.error(this.translate.instant('settings.cost_profiles.error_save'));
     },
   }));
 
@@ -288,9 +287,9 @@ export class CostProfilesPageComponent {
     onSuccess: () => {
       this.profilesQuery.refetch();
       this.showDeleteModal.set(false);
-      this.toast.success('Запись удалена');
+      this.toast.success(this.translate.instant('settings.cost_profiles.deleted'));
     },
-    onError: () => this.toast.error('Не удалось удалить'),
+    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.error_delete')),
   }));
 
   readonly importMutation = injectMutation(() => ({
@@ -300,7 +299,7 @@ export class CostProfilesPageComponent {
       this.importResult.set(result);
       this.showImportResult.set(true);
     },
-    onError: () => this.toast.error('Импорт не удался. Проверьте формат файла.'),
+    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.import_failed')),
   }));
 
   readonly exportMutation = injectMutation(() => ({
@@ -312,9 +311,9 @@ export class CostProfilesPageComponent {
       a.download = 'cost-profiles.csv';
       a.click();
       URL.revokeObjectURL(url);
-      this.toast.success('Экспорт завершён');
+      this.toast.success(this.translate.instant('settings.cost_profiles.export_done'));
     },
-    onError: () => this.toast.error('Не удалось подготовить экспорт'),
+    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.error_export')),
   }));
 
   onSearch(): void {
@@ -381,7 +380,7 @@ export class CostProfilesPageComponent {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      this.toast.error('Максимальный размер файла: 5 МБ');
+      this.toast.error(this.translate.instant('settings.cost_profiles.file_too_large'));
       return;
     }
 
@@ -390,7 +389,7 @@ export class CostProfilesPageComponent {
   }
 
   exportCsv(): void {
-    this.toast.info('Подготовка экспорта...');
+    this.toast.info(this.translate.instant('settings.cost_profiles.export_preparing'));
     this.exportMutation.mutate(undefined as never);
   }
 

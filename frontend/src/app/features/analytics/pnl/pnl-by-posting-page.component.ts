@@ -11,6 +11,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { formatMoney } from '@shared/utils/format.utils';
 
 function currentMonth(): string {
   const d = new Date();
@@ -226,11 +227,7 @@ export class PnlByPostingPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    const sign = value < 0 ? '−' : '';
-    return `${sign}${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   residualColorClass(value: number): string {

@@ -5,13 +5,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReturnsByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { formatMoney, formatPercent } from '@shared/utils/format.utils';
 
 function currentMonth(): string {
   const d = new Date();
@@ -170,7 +171,7 @@ function currentMonth(): string {
             <button
               (click)="selectedProduct.set(null)"
               class="cursor-pointer rounded-[var(--radius-sm)] p-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-              aria-label="Закрыть"
+              [attr.aria-label]="'common.close' | translate"
             >
               ✕
             </button>
@@ -188,25 +189,25 @@ function currentMonth(): string {
               </h4>
               <div class="grid grid-cols-2 gap-3">
                 <div class="rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <div class="text-[11px] text-[var(--text-tertiary)]">Возвраты</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.returns.detail.returns_count' | translate }}</div>
                   <div class="font-mono text-lg font-bold text-[var(--text-primary)]">
                     {{ selectedProduct()!.returnCount }}
                   </div>
                 </div>
                 <div class="rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <div class="text-[11px] text-[var(--text-tertiary)]">Кол-во</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.returns.detail.quantity' | translate }}</div>
                   <div class="font-mono text-lg font-bold text-[var(--text-primary)]">
                     {{ selectedProduct()!.returnQuantity }}
                   </div>
                 </div>
                 <div class="rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <div class="text-[11px] text-[var(--text-tertiary)]">% возвратов</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.returns.detail.return_rate_pct' | translate }}</div>
                   <div class="font-mono text-lg font-bold" [class]="returnRateClass(selectedProduct()!.returnRatePct)">
                     {{ formatPct(selectedProduct()!.returnRatePct) }}
                   </div>
                 </div>
                 <div class="rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <div class="text-[11px] text-[var(--text-tertiary)]">Причина</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.returns.detail.reason' | translate }}</div>
                   <div class="text-sm text-[var(--text-primary)]">
                     {{ selectedProduct()!.topReturnReason }}
                   </div>
@@ -221,21 +222,21 @@ function currentMonth(): string {
               </h4>
               <div class="space-y-2">
                 <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <span class="text-sm text-[var(--text-secondary)]">Возврат средств</span>
+                  <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.refund_amount' | translate }}</span>
                   <span class="font-mono text-sm text-[var(--status-error)]">
                     {{ formatMoney(selectedProduct()!.financialRefundAmount) }}
                   </span>
                 </div>
                 <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <span class="text-sm text-[var(--text-secondary)]">Штрафы</span>
+                  <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.penalties_amount' | translate }}</span>
                   <span class="font-mono text-sm text-[var(--status-error)]">
                     {{ formatMoney(selectedProduct()!.penaltiesAmount) }}
                   </span>
                 </div>
                 <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <span class="text-sm text-[var(--text-secondary)]">Продажи</span>
+                  <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.sales' | translate }}</span>
                   <span class="font-mono text-sm text-[var(--text-primary)]">
-                    {{ selectedProduct()!.saleCount }} / {{ selectedProduct()!.saleQuantity }} шт
+                    {{ selectedProduct()!.saleCount }} / {{ selectedProduct()!.saleQuantity }} {{ 'common.pcs' | translate }}
                   </span>
                 </div>
               </div>
@@ -249,6 +250,7 @@ function currentMonth(): string {
 export class ReturnsByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
   readonly search = signal('');
@@ -322,14 +324,10 @@ export class ReturnsByProductPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    return value < 0 ? `−${formatted} ₽` : `${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   formatPct(value: number | null): string {
-    if (value == null) return '—';
-    return value.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    return formatPercent(value);
   }
 }

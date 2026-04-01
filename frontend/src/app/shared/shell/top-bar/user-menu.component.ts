@@ -20,6 +20,7 @@ import { AuthService } from '@core/auth/auth.service';
     <div class="relative">
       <button
         (click)="toggle()"
+        aria-label="Меню пользователя"
         class="flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] p-0.5 transition-colors hover:bg-[var(--bg-tertiary)]"
       >
         <span

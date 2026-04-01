@@ -1,25 +1,9 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 import { AgGridAngular } from 'ag-grid-angular';
+import { ColDef, GetRowIdParams, GridReadyEvent, RowClickedEvent, SelectionChangedEvent, SortChangedEvent, PaginationChangedEvent } from 'ag-grid-community';
 
-const AG_GRID_LOCALE_RU: Record<string, string> = {
-  page: 'Страница',
-  of: 'из',
-  to: 'по',
-  next: 'Вперёд',
-  previous: 'Назад',
-  loadingOoo: 'Загрузка...',
-  noRowsToShow: 'Нет данных для отображения',
-  filterOoo: 'Фильтр...',
-  equals: 'Равно',
-  notEqual: 'Не равно',
-  contains: 'Содержит',
-  notContains: 'Не содержит',
-  startsWith: 'Начинается с',
-  endsWith: 'Заканчивается на',
-  pageSizeSelectorLabel: 'Строк на странице:',
-  ariaFilterInput: 'Фильтр',
-};
+import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
 @Component({
   selector: 'dp-data-grid',
@@ -56,42 +40,46 @@ const AG_GRID_LOCALE_RU: Record<string, string> = {
     </div>
   `,
 })
-export class DataGridComponent {
-  readonly columnDefs = input<any[]>([]);
-  readonly rowData = input<any[]>([]);
+export class DataGridComponent<T = unknown> {
+  readonly columnDefs = input<ColDef<T>[]>([]);
+  readonly rowData = input<T[]>([]);
   readonly loading = input(false);
   readonly pagination = input(true);
-  readonly pageSize = input(25);
+  readonly pageSize = input(50);
   readonly rowSelection = input<'single' | 'multiple' | undefined>(undefined);
-  readonly getRowId = input<((params: any) => string) | undefined>(undefined);
+  readonly getRowId = input<((params: GetRowIdParams<T>) => string) | undefined>(undefined);
   readonly height = input('500px');
+  readonly totalRows = input(0);
+  readonly density = input<'compact' | 'comfortable' | 'normal'>('normal');
+  readonly selectable = input(false);
 
-  readonly rowClicked = output<any>();
-  readonly selectionChanged = output<any[]>();
+  readonly rowClicked = output<T>();
+  readonly cellDoubleClicked = output<T>();
+  readonly selectionChanged = output<T[]>();
   readonly sortChanged = output<{ column: string; direction: string }>();
   readonly pageChanged = output<{ page: number; pageSize: number }>();
 
   protected readonly localeText = AG_GRID_LOCALE_RU;
 
-  onRowClicked(event: any): void {
-    this.rowClicked.emit(event.data);
+  onRowClicked(event: RowClickedEvent<T>): void {
+    if (event.data) this.rowClicked.emit(event.data);
   }
 
-  onSelectionChanged(event: any): void {
+  onSelectionChanged(event: SelectionChangedEvent<T>): void {
     const rows = event.api.getSelectedRows();
     this.selectionChanged.emit(rows);
   }
 
-  onSortChanged(event: any): void {
+  onSortChanged(event: SortChangedEvent<T>): void {
     const sortModel = event.api.getColumnState()
-      ?.filter((c: any) => c.sort)
-      .map((c: any) => ({ column: c.colId, direction: c.sort }));
+      ?.filter((c) => c.sort)
+      .map((c) => ({ column: c.colId ?? '', direction: c.sort ?? '' }));
     if (sortModel?.length) {
       this.sortChanged.emit(sortModel[0]);
     }
   }
 
-  onPageChanged(event: any): void {
+  onPageChanged(event: PaginationChangedEvent<T>): void {
     const api = event.api;
     this.pageChanged.emit({
       page: api.paginationGetCurrentPage(),

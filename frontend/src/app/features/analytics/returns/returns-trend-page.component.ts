@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -25,10 +25,10 @@ function defaultDateTo(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
-  { value: 'DAILY', label: 'День' },
-  { value: 'WEEKLY', label: 'Неделя' },
-  { value: 'MONTHLY', label: 'Месяц' },
+const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
+  { value: 'DAILY', labelKey: 'analytics.returns.granularity.daily' },
+  { value: 'WEEKLY', labelKey: 'analytics.returns.granularity.weekly' },
+  { value: 'MONTHLY', labelKey: 'analytics.returns.granularity.monthly' },
 ];
 
 @Component({
@@ -69,7 +69,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
               ? 'bg-[var(--accent-primary)] text-white'
               : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'"
           >
-            {{ opt.label }}
+            {{ opt.labelKey | translate }}
           </button>
         }
       </div>
@@ -93,6 +93,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
 export class ReturnsTrendPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly dateFrom = signal(defaultDateFrom());
   readonly dateTo = signal(defaultDateTo());
@@ -127,7 +128,7 @@ export class ReturnsTrendPageComponent {
         axisPointer: { type: 'cross' },
       },
       legend: {
-        data: ['% возвратов', 'Кол-во'],
+        data: [this.t.instant('analytics.returns.chart.return_rate'), this.t.instant('analytics.returns.chart.quantity')],
         bottom: 0,
         textStyle: { color: 'var(--text-secondary)', fontSize: 12 },
       },
@@ -142,7 +143,7 @@ export class ReturnsTrendPageComponent {
       yAxis: [
         {
           type: 'value',
-          name: '% возвратов',
+          name: this.t.instant('analytics.returns.chart.return_rate'),
           position: 'left',
           axisLabel: {
             formatter: '{value}%',
@@ -153,7 +154,7 @@ export class ReturnsTrendPageComponent {
         },
         {
           type: 'value',
-          name: 'Кол-во',
+          name: this.t.instant('analytics.returns.chart.quantity'),
           position: 'right',
           axisLabel: { color: 'var(--text-tertiary)', fontSize: 11 },
           splitLine: { show: false },
@@ -161,7 +162,7 @@ export class ReturnsTrendPageComponent {
       ],
       series: [
         {
-          name: '% возвратов',
+          name: this.t.instant('analytics.returns.chart.return_rate'),
           type: 'line',
           yAxisIndex: 0,
           data: data.map((d) => d.returnRatePct),
@@ -178,7 +179,7 @@ export class ReturnsTrendPageComponent {
           },
         },
         {
-          name: 'Кол-во',
+          name: this.t.instant('analytics.returns.chart.quantity'),
           type: 'bar',
           yAxisIndex: 1,
           data: data.map((d) => d.returnQuantity),

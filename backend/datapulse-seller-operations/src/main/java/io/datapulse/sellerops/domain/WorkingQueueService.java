@@ -4,6 +4,8 @@ import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.sellerops.api.CreateQueueRequest;
+import io.datapulse.sellerops.api.PreviewCountRequest;
+import io.datapulse.sellerops.api.PreviewCountResponse;
 import io.datapulse.sellerops.api.QueueItemResponse;
 import io.datapulse.sellerops.api.QueueSummaryResponse;
 import io.datapulse.sellerops.api.UpdateQueueRequest;
@@ -29,6 +31,18 @@ public class WorkingQueueService {
   private final WorkingQueueDefinitionRepository definitionRepository;
   private final WorkingQueueAssignmentRepository assignmentRepository;
   private final QueueItemSummaryJdbcRepository summaryRepository;
+  private final QueueAutoPopulationService autoPopulationService;
+
+  @Transactional(readOnly = true)
+  public QueueSummaryResponse getQueue(long workspaceId, long queueId) {
+    return toQueueSummary(findQueueOrThrow(workspaceId, queueId));
+  }
+
+  @Transactional(readOnly = true)
+  public PreviewCountResponse previewCount(long workspaceId, PreviewCountRequest request) {
+    long count = autoPopulationService.countByCriteria(workspaceId, request.autoCriteria());
+    return new PreviewCountResponse(count);
+  }
 
   @Transactional(readOnly = true)
   public List<QueueSummaryResponse> listQueues(long workspaceId) {

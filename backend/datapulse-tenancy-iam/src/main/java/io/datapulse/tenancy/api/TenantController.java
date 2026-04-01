@@ -25,6 +25,7 @@ public class TenantController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     public TenantResponse createTenant(@Valid @RequestBody CreateTenantRequest request) {
         return onboardingService.createTenant(request, workspaceContext.getUserId());
     }
@@ -37,6 +38,7 @@ public class TenantController {
 
     @PostMapping("/{tenantId}/workspaces")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
     public WorkspaceListResponse createWorkspace(@PathVariable("tenantId") Long tenantId,
                                                  @Valid @RequestBody CreateWorkspaceRequest request) {
         return onboardingService.createWorkspace(tenantId, request, workspaceContext.getUserId());

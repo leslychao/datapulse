@@ -52,6 +52,11 @@ public class TestPricePolicyBuilder {
     return this;
   }
 
+  public TestPricePolicyBuilder withCreatedBy(Long createdBy) {
+    this.createdBy = createdBy;
+    return this;
+  }
+
   public PricePolicyEntity build() {
     var entity = new PricePolicyEntity();
     entity.setWorkspaceId(workspaceId);

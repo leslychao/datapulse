@@ -155,6 +155,7 @@ public class CanonicalEntityMapper {
         entity.setReturnReason(norm.returnReason());
         entity.setQuantity(norm.quantity());
         entity.setStatus(norm.status());
+        entity.setCurrency(norm.currency() != null ? norm.currency() : "RUB");
         entity.setJobExecutionId(ctx.jobExecutionId());
         return entity;
     }

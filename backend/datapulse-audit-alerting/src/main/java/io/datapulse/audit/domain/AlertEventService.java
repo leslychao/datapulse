@@ -29,6 +29,12 @@ public class AlertEventService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
+    public AlertEventResponse getAlert(long id, long workspaceId) {
+        return alertEventRepository.findById(id, workspaceId)
+                .orElseThrow(() -> NotFoundException.of(MessageCodes.ALERT_EVENT_NOT_FOUND, id));
+    }
+
+    @Transactional(readOnly = true)
     public AlertSummaryResponse getSummary(long workspaceId) {
         return alertEventRepository.getSummary(workspaceId);
     }

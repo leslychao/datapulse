@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -14,6 +14,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { AnalyticsFilter, InventoryByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { formatMoney } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-stock-history-page',
@@ -120,6 +121,7 @@ import { ChartComponent } from '@shared/components/chart/chart.component';
 export class StockHistoryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly productId = signal<number | null>(null);
   readonly dateFrom = signal('');
@@ -190,14 +192,14 @@ export class StockHistoryPageComponent {
         textStyle: { color: 'var(--text-primary)', fontSize: 12 },
       },
       legend: {
-        data: ['Доступно', 'В резерве'],
+        data: [this.t.instant('analytics.inventory.chart.available'), this.t.instant('analytics.inventory.chart.reserved')],
         top: 0,
         right: 0,
         textStyle: { color: 'var(--text-secondary)', fontSize: 12 },
       },
       series: [
         {
-          name: 'Доступно',
+          name: this.t.instant('analytics.inventory.chart.available'),
           type: 'line',
           step: 'end',
           data: availableData,
@@ -216,7 +218,7 @@ export class StockHistoryPageComponent {
           symbol: 'none',
         },
         {
-          name: 'В резерве',
+          name: this.t.instant('analytics.inventory.chart.reserved'),
           type: 'line',
           step: 'end',
           data: reservedData,
@@ -242,10 +244,7 @@ export class StockHistoryPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    return value < 0 ? `−${formatted} ₽` : `${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   riskDotClass(risk: string): string {
@@ -257,10 +256,6 @@ export class StockHistoryPageComponent {
   }
 
   riskLabel(risk: string): string {
-    switch (risk) {
-      case 'CRITICAL': return 'Критичный';
-      case 'WARNING': return 'Внимание';
-      default: return 'Норма';
-    }
+    return this.t.instant(`analytics.inventory.risk.${risk.toLowerCase()}`);
   }
 }

@@ -4,7 +4,6 @@ import io.datapulse.execution.domain.SimulationComparisonService;
 import io.datapulse.execution.domain.SimulationComparisonService.SimulationComparisonReport;
 import io.datapulse.execution.domain.SimulationService;
 import io.datapulse.execution.persistence.SimulationComparisonRepository.SimulationComparisonRow;
-import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,24 +21,28 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/simulation", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/workspaces/{workspaceId}/simulation",
+    produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class SimulationController {
 
     private final SimulationComparisonService comparisonService;
     private final SimulationService simulationService;
-    private final WorkspaceContext workspaceContext;
 
     @GetMapping("/comparison")
-    public SimulationComparisonResponse comparison(@RequestParam("connectionId") long connectionId) {
-        long workspaceId = workspaceContext.getWorkspaceId();
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public SimulationComparisonResponse comparison(
+            @PathVariable("workspaceId") long workspaceId,
+            @RequestParam("connectionId") long connectionId) {
         SimulationComparisonReport report = comparisonService.buildReport(workspaceId, connectionId);
         return toResponse(report);
     }
 
     @GetMapping("/preview")
-    public List<SimulationComparisonItemResponse> preview(@RequestParam("decisionId") long decisionId) {
-        long workspaceId = workspaceContext.getWorkspaceId();
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public List<SimulationComparisonItemResponse> preview(
+            @PathVariable("workspaceId") long workspaceId,
+            @RequestParam("decisionId") long decisionId) {
         return comparisonService.previewByDecision(workspaceId, decisionId).stream()
                 .map(this::toItemResponse)
                 .toList();
@@ -46,9 +50,11 @@ public class SimulationController {
 
     @DeleteMapping("/shadow-state")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-    public void resetShadowState(@Valid @RequestBody ResetShadowStateRequest request) {
-        long workspaceId = workspaceContext.getWorkspaceId();
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    public void resetShadowState(
+            @PathVariable("workspaceId") long workspaceId,
+            @Valid @RequestBody ResetShadowStateRequest request) {
         simulationService.resetShadowState(workspaceId, request.connectionId());
     }
 

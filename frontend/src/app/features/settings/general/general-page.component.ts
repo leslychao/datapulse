@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -14,47 +15,47 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
   selector: 'dp-general-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, SectionCardComponent, SpinnerComponent, DateFormatPipe],
+  imports: [FormsModule, TranslatePipe, SectionCardComponent, SpinnerComponent, DateFormatPipe],
   template: `
     <div class="max-w-2xl">
       <div class="mb-6">
-        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">Общие настройки</h1>
-        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">Основная информация о workspace</p>
+        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.general.title' | translate }}</h1>
+        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.general.subtitle' | translate }}</p>
       </div>
 
       @if (workspaceQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (workspaceQuery.data(); as ws) {
         <div class="space-y-5">
-        <dp-section-card title="Информация">
+        <dp-section-card [title]="'settings.general.info_title' | translate">
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span class="text-[var(--text-secondary)]">Slug</span>
+                <span class="text-[var(--text-secondary)]">{{ 'settings.general.slug' | translate }}</span>
                 <p class="mt-0.5 font-mono text-[var(--text-primary)]">{{ ws.slug }}</p>
               </div>
               <div>
-                <span class="text-[var(--text-secondary)]">Организация</span>
+                <span class="text-[var(--text-secondary)]">{{ 'settings.general.organization' | translate }}</span>
                 <p class="mt-0.5 text-[var(--text-primary)]">{{ ws.tenantName }}</p>
               </div>
               <div>
-                <span class="text-[var(--text-secondary)]">Создан</span>
+                <span class="text-[var(--text-secondary)]">{{ 'settings.general.created' | translate }}</span>
                 <p class="mt-0.5 text-[var(--text-primary)]">{{ ws.createdAt | dpDateFormat:'short' }}</p>
               </div>
               <div>
-                <span class="text-[var(--text-secondary)]">Статус</span>
+                <span class="text-[var(--text-secondary)]">{{ 'settings.general.status' | translate }}</span>
                 <p class="mt-0.5 text-[var(--text-primary)]">{{ ws.status }}</p>
               </div>
             </div>
           </div>
         </dp-section-card>
 
-        <dp-section-card title="Название workspace">
+        <dp-section-card [title]="'settings.general.name_section' | translate">
           <form (ngSubmit)="saveName()" class="flex items-end gap-3">
             <div class="flex-1">
-              <label class="mb-1 block text-sm text-[var(--text-secondary)]">Название</label>
+              <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.general.name_label' | translate }}</label>
               <input
                 type="text"
                 [(ngModel)]="workspaceName"
@@ -69,9 +70,9 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
               class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               @if (updateMutation.isPending()) {
-                Сохранение...
+                {{ 'settings.general.saving' | translate }}
               } @else {
-                Сохранить
+                {{ 'actions.save' | translate }}
               }
             </button>
           </form>
@@ -85,6 +86,7 @@ export class GeneralPageComponent {
   private readonly workspaceApi = inject(WorkspaceApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   workspaceName = '';
 
@@ -104,9 +106,9 @@ export class GeneralPageComponent {
     onSuccess: (result) => {
       this.workspaceQuery.refetch();
       this.wsStore.setWorkspace(result.id, result.name);
-      this.toast.success('Название обновлено');
+      this.toast.success(this.translate.instant('settings.general.name_updated'));
     },
-    onError: () => this.toast.error('Не удалось обновить название'),
+    onError: () => this.toast.error(this.translate.instant('settings.general.name_update_error')),
   }));
 
   saveName(): void {

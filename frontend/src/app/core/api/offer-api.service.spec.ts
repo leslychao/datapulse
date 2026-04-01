@@ -73,27 +73,27 @@ describe('OfferApiService', () => {
   });
 
   it('approveAction should POST to correct URL', () => {
-    service.approveAction(42).subscribe();
+    service.approveAction(1, 42).subscribe();
 
-    const req = httpMock.expectOne(`${base}/actions/42/approve`);
+    const req = httpMock.expectOne(`${base}/workspaces/1/actions/42/approve`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({});
     req.flush(null);
   });
 
   it('rejectAction should POST with cancelReason body', () => {
-    service.rejectAction(42, 'Too expensive').subscribe();
+    service.rejectAction(1, 42, 'Too expensive').subscribe();
 
-    const req = httpMock.expectOne(`${base}/actions/42/reject`);
+    const req = httpMock.expectOne(`${base}/workspaces/1/actions/42/reject`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ cancelReason: 'Too expensive' });
     req.flush(null);
   });
 
   it('resumeAction should POST to correct URL', () => {
-    service.resumeAction(42).subscribe();
+    service.resumeAction(1, 42).subscribe();
 
-    const req = httpMock.expectOne(`${base}/actions/42/resume`);
+    const req = httpMock.expectOne(`${base}/workspaces/1/actions/42/resume`);
     expect(req.request.method).toBe('POST');
     req.flush(null);
   });

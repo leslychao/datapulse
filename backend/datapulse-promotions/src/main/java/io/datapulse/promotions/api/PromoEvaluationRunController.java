@@ -31,7 +31,8 @@ public class PromoEvaluationRunController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public PromoEvaluationRunResponse triggerRun(
             @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody TriggerPromoEvaluationRunRequest request) {

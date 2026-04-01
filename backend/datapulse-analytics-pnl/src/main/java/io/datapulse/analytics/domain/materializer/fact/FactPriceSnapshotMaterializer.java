@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -114,10 +113,9 @@ public class FactPriceSnapshotMaterializer implements AnalyticsMaterializer {
 
             ps.setString(6, (String) row.get("currency"));
 
-            OffsetDateTime capturedAt = (OffsetDateTime) row.get("captured_at");
-            Timestamp ts = Timestamp.from(capturedAt.toInstant());
+            Timestamp ts = (Timestamp) row.get("captured_at");
             ps.setTimestamp(7, ts);
-            ps.setDate(8, Date.valueOf(capturedAt.toLocalDate()));
+            ps.setDate(8, Date.valueOf(ts.toLocalDateTime().toLocalDate()));
             ps.setLong(9, ver);
         });
     }

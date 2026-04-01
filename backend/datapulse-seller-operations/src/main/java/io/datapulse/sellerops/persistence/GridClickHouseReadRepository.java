@@ -55,7 +55,7 @@ public class GridClickHouseReadRepository {
                     ON ff.seller_sku_id = dp.seller_sku_id
                     AND ff.connection_id = dp.connection_id
                 WHERE dp.product_id IN (:offerIds)
-                  AND ff.entry_date >= today() - 30
+                  AND ff.finance_date >= today() - 30
                 GROUP BY dp.product_id
             ) fin ON inv.product_id = fin.product_id
             LEFT JOIN (
@@ -71,8 +71,8 @@ public class GridClickHouseReadRepository {
                 SELECT product_id, return_rate_pct
                 FROM mart_returns_analysis FINAL
                 WHERE product_id IN (:offerIds)
-                  AND analysis_date = (
-                      SELECT max(analysis_date) FROM mart_returns_analysis FINAL
+                  AND period = (
+                      SELECT max(period) FROM mart_returns_analysis FINAL
                       WHERE product_id IN (:offerIds)
                   )
             ) ret ON inv.product_id = ret.product_id
@@ -116,14 +116,14 @@ public class GridClickHouseReadRepository {
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_30d_total
                 FROM fact_finance FINAL ff
                 WHERE ff.connection_id IN (:connectionIds)
-                  AND ff.entry_date >= today() - 30
+                  AND ff.finance_date >= today() - 30
             ) cur
             CROSS JOIN (
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_prev_30d
                 FROM fact_finance FINAL ff
                 WHERE ff.connection_id IN (:connectionIds)
-                  AND ff.entry_date >= today() - 60
-                  AND ff.entry_date < today() - 30
+                  AND ff.finance_date >= today() - 60
+                  AND ff.finance_date < today() - 30
             ) prev
             """;
 

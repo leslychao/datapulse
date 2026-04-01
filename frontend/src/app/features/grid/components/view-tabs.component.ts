@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { LucideAngularModule, Plus, Lock } from 'lucide-angular';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ViewApiService } from '@core/api/view-api.service';
 import { GridView } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { GridStore } from '@shared/stores/grid.store';
+import { ToastService } from '@shared/shell/toast/toast.service';
 import { FormModalComponent } from '@shared/components/form-modal.component';
 
 @Component({
@@ -73,6 +74,8 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
 export class ViewTabsComponent {
   private readonly viewApi = inject(ViewApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   protected readonly gridStore = inject(GridStore);
 
   protected readonly PlusIcon = Plus;
@@ -100,6 +103,7 @@ export class ViewTabsComponent {
       this.newViewName.set('');
       this.viewsQuery.refetch();
     },
+    onError: () => this.toast.error(this.translate.instant('common.error')),
   }));
 
   selectView(view: GridView): void {

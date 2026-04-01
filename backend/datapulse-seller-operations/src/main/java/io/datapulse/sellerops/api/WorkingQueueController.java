@@ -40,6 +40,22 @@ public class WorkingQueueController {
         return queueService.listQueues(workspaceId);
     }
 
+    @GetMapping("/{queueId}")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public QueueSummaryResponse getQueue(
+            @PathVariable("workspaceId") Long workspaceId,
+            @PathVariable("queueId") Long queueId) {
+        return queueService.getQueue(workspaceId, queueId);
+    }
+
+    @PostMapping("/preview-count")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PreviewCountResponse previewCount(
+            @PathVariable("workspaceId") Long workspaceId,
+            @RequestBody PreviewCountRequest request) {
+        return queueService.previewCount(workspaceId, request);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")

@@ -15,6 +15,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 
 import { ActionApiService } from '@core/api/action-api.service';
+import { formatMoney, formatRelativeTime } from '@shared/utils/format.utils';
 import { ActionFilter, ActionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -386,7 +387,7 @@ export class ActionsListPageComponent {
 
   private readonly bulkApproveMutation = injectMutation(() => ({
     mutationFn: (actionIds: number[]) =>
-      lastValueFrom(this.actionApi.bulkApprove({ actionIds })),
+      lastValueFrom(this.actionApi.bulkApprove(this.wsStore.currentWorkspaceId()!, { actionIds })),
     onSuccess: (result: any) => {
       this.showBulkApproveModal.set(false);
       this.selectedRows.set([]);
@@ -439,20 +440,10 @@ export class ActionsListPageComponent {
   }
 
   private formatPrice(value: number | null): string {
-    if (value === null || value === undefined) return '—';
-    return Math.floor(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + '\u00A0₽';
+    return formatMoney(value, 0);
   }
 
   private formatRelativeTime(iso: string | null): string {
-    if (!iso) return '—';
-    const diff = Date.now() - new Date(iso).getTime();
-    const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) return 'только что';
-    if (minutes < 60) return `${minutes} мин назад`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} ч назад`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'вчера';
-    return `${days} дн назад`;
+    return formatRelativeTime(iso);
   }
 }

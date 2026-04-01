@@ -2,8 +2,8 @@ package io.datapulse.analytics.domain.materializer.fact;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -134,8 +134,8 @@ public class FactReturnsMaterializer implements AnalyticsMaterializer {
 
             ps.setString(9, (String) row.get("return_reason"));
 
-            OffsetDateTime returnDate = (OffsetDateTime) row.get("return_date");
-            ps.setDate(10, Date.valueOf(returnDate.toLocalDate()));
+            Timestamp returnDate = (Timestamp) row.get("return_date");
+            ps.setDate(10, Date.valueOf(returnDate.toLocalDateTime().toLocalDate()));
 
             ps.setLong(11, ((Number) row.get("job_execution_id")).longValue());
             ps.setLong(12, ver);

@@ -23,6 +23,14 @@ public class PromoDecisionController {
 
     private final PromoDecisionService decisionService;
 
+    @GetMapping("/{decisionId}")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PromoDecisionResponse getDecision(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("decisionId") long decisionId) {
+        return decisionService.getDecision(decisionId, workspaceId);
+    }
+
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoDecisionResponse> listDecisions(

@@ -16,6 +16,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { formatRelativeTime } from '@shared/utils/format.utils';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import {
   PricingRunSummary,
@@ -413,15 +414,6 @@ export class RunsListPageComponent {
   }
 
   private formatRelativeTime(iso: string | null): string {
-    if (!iso) return '—';
-    const diff = Date.now() - new Date(iso).getTime();
-    const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) return 'только что';
-    if (minutes < 60) return `${minutes} мин назад`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} ч назад`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'вчера';
-    return `${days} дн назад`;
+    return formatRelativeTime(iso);
   }
 }

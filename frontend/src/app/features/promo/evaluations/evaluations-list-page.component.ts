@@ -10,6 +10,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
+import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import { EvaluationResult, PromoEvaluationFilter } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
@@ -186,14 +187,14 @@ export class EvaluationsListPageComponent {
       width: 100,
       cellClass: 'font-mono text-right',
       sortable: true,
-      valueFormatter: (params: any) => this.formatMoney(params.value),
+      valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
       headerName: 'Обычная цена',
       field: 'regularPrice',
       width: 110,
       cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => this.formatMoney(params.value),
+      valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
       headerName: 'Скидка',
@@ -267,7 +268,7 @@ export class EvaluationsListPageComponent {
       width: 130,
       sortable: true,
       sort: 'desc',
-      valueFormatter: (params: any) => this.formatDateTime(params.value),
+      valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
     },
   ];
 
@@ -328,16 +329,4 @@ export class EvaluationsListPageComponent {
     this.currentPage.set(0);
   }
 
-  private formatMoney(val: number | null): string {
-    if (val == null) return '—';
-    return val.toLocaleString('ru-RU') + ' ₽';
-  }
-
-  private formatDateTime(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) +
-      ', ' +
-      d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  }
 }

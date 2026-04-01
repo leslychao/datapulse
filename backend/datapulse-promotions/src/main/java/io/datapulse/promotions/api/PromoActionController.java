@@ -42,7 +42,8 @@ public class PromoActionController {
 
     @PostMapping("/{actionId}/approve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void approveAction(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("actionId") Long actionId) {
@@ -51,7 +52,8 @@ public class PromoActionController {
 
     @PostMapping("/{actionId}/reject")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void rejectAction(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("actionId") Long actionId,
@@ -61,7 +63,8 @@ public class PromoActionController {
 
     @PostMapping("/{actionId}/cancel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void cancelAction(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("actionId") Long actionId,
@@ -70,7 +73,8 @@ public class PromoActionController {
     }
 
     @PostMapping("/bulk-approve")
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public BulkPromoActionResponse bulkApprove(
             @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody BulkPromoActionRequest request) {
@@ -78,7 +82,8 @@ public class PromoActionController {
     }
 
     @PostMapping("/bulk-reject")
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public BulkPromoActionResponse bulkReject(
             @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody BulkRejectPromoActionRequest request) {

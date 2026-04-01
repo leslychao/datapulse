@@ -37,6 +37,12 @@ public class PromoActionService {
     private final ApplicationEventPublisher eventPublisher;
     private final WorkspaceContext workspaceContext;
 
+    // TODO: implement promo action execution (marketplace API call, status transitions, retry)
+    @Transactional
+    public void executeAction(long actionId) {
+        throw new UnsupportedOperationException("PromoActionService.executeAction not implemented yet");
+    }
+
     @Transactional(readOnly = true)
     public Page<PromoActionResponse> listActions(long workspaceId, Long campaignId,
                                                   PromoActionStatus status, PromoActionType actionType,

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { LucideAngularModule, Plus, ExternalLink, RefreshCw } from 'lucide-angular';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { ConnectionSummary, CreateConnectionRequest, MarketplaceType } from '@core/models';
@@ -26,6 +27,7 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
   imports: [
     FormsModule,
     LucideAngularModule,
+    TranslatePipe,
     StatusBadgeComponent,
     MarketplaceBadgeComponent,
     SectionCardComponent,
@@ -39,20 +41,22 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
     <div class="max-w-4xl">
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">Подключения</h1>
-          <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">Управляйте подключениями к маркетплейсам</p>
+          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.connections.title' | translate }}</h1>
+          <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.connections.subtitle' | translate }}</p>
         </div>
         <button
           (click)="startCreate()"
           class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
         >
           <lucide-icon [img]="PlusIcon" [size]="16" />
-          Подключить
+          {{ 'settings.connections.connect' | translate }}
         </button>
       </div>
 
       @if (formStep() !== 'idle') {
-        <dp-section-card [title]="formStep() === 'select-marketplace' ? 'Выберите маркетплейс' : 'Данные подключения'" class="mb-6">
+        <dp-section-card [title]="formStep() === 'select-marketplace'
+          ? ('settings.connections.select_marketplace' | translate)
+          : ('settings.connections.credentials_title' | translate)" class="mb-6">
           @if (formStep() === 'select-marketplace') {
             <div class="flex gap-3">
               @for (mp of marketplaces; track mp.type) {
@@ -67,7 +71,7 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
               <button
                 (click)="cancelCreate()"
                 class="ml-auto cursor-pointer px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >Отмена</button>
+              >{{ 'actions.cancel' | translate }}</button>
             </div>
           }
 
@@ -79,26 +83,26 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
               </div>
 
               <div>
-                <label class="mb-1 block text-sm text-[var(--text-secondary)]">Название подключения</label>
+                <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.name_label' | translate }}</label>
                 <input
                   type="text"
                   [(ngModel)]="formName"
                   name="name"
                   required
-                  placeholder="Мой магазин"
+                  [placeholder]="'settings.connections.name_placeholder' | translate"
                   class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               @if (selectedMarketplace() === 'WB') {
                 <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">API-токен</label>
+                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.wb_token_label' | translate }}</label>
                   <input
                     type="password"
                     [(ngModel)]="wbToken"
                     name="wbToken"
                     required
-                    placeholder="Вставьте токен из личного кабинета WB"
+                    [placeholder]="'settings.connections.wb_token_placeholder' | translate"
                     class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
@@ -106,31 +110,31 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
 
               @if (selectedMarketplace() === 'OZON') {
                 <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">Client ID</label>
+                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.ozon_client_id_label' | translate }}</label>
                   <input
                     type="text"
                     [(ngModel)]="ozonClientId"
                     name="ozonClientId"
                     required
-                    placeholder="Числовой Client ID"
+                    [placeholder]="'settings.connections.ozon_client_id_placeholder' | translate"
                     class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
                 <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">API Key</label>
+                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.ozon_api_key_label' | translate }}</label>
                   <input
                     type="password"
                     [(ngModel)]="ozonApiKey"
                     name="ozonApiKey"
                     required
-                    placeholder="API Key из личного кабинета Ozon"
+                    [placeholder]="'settings.connections.ozon_api_key_placeholder' | translate"
                     class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               }
 
               @if (createMutation.error()) {
-                <p class="text-sm text-[var(--status-error)]">Ошибка: не удалось создать подключение. Проверьте данные.</p>
+                <p class="text-sm text-[var(--status-error)]">{{ 'settings.connections.create_error_message' | translate }}</p>
               }
 
               <div class="flex gap-3 pt-2">
@@ -142,13 +146,13 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
                   @if (createMutation.isPending()) {
                     <span class="dp-spinner mr-1 inline-block h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white"></span>
                   }
-                  Подключить
+                  {{ 'settings.connections.connect' | translate }}
                 </button>
                 <button
                   type="button"
                   (click)="cancelCreate()"
                   class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-                >Отмена</button>
+                >{{ 'actions.cancel' | translate }}</button>
               </div>
             </form>
           }
@@ -156,24 +160,24 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
       }
 
       @if (connectionsQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (connectionsQuery.data(); as connections) {
         @if (connections.length === 0) {
           <dp-empty-state
-            message="Нет подключений"
-            hint="Нажмите «Подключить», чтобы добавить первый маркетплейс"
+            [message]="'settings.connections.empty' | translate"
+            [hint]="'settings.connections.empty_hint' | translate"
           />
         } @else {
           <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Маркетплейс</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Название</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Статус</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Последняя синхронизация</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_marketplace' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_name' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_status' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_last_sync' | translate }}</th>
                   <th class="px-4 py-2"></th>
                 </tr>
               </thead>
@@ -215,6 +219,7 @@ export class ConnectionsPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly formStep = signal<FormStep>('idle');
   readonly selectedMarketplace = signal<MarketplaceType | null>(null);
@@ -239,8 +244,9 @@ export class ConnectionsPageComponent {
     onSuccess: () => {
       this.connectionsQuery.refetch();
       this.cancelCreate();
-      this.toast.success('Подключение создано. Проверка учётных данных запущена.');
+      this.toast.success(this.translate.instant('settings.connections.created'));
     },
+    onError: () => this.toast.error(this.translate.instant('settings.connections.create_error')),
   }));
 
   startCreate(): void {

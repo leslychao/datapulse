@@ -10,6 +10,9 @@ import io.datapulse.pricing.persistence.ManualPriceLockEntity;
 import io.datapulse.pricing.persistence.ManualPriceLockRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,16 +51,18 @@ public class ManualPriceLockService {
     }
 
     @Transactional(readOnly = true)
-    public List<ManualLockResponse> listActiveLocks(long workspaceId, Long marketplaceOfferId) {
+    public Page<ManualLockResponse> listActiveLocks(
+        long workspaceId, Long marketplaceOfferId, Pageable pageable) {
         if (marketplaceOfferId != null) {
-            return lockRepository.findActiveLock(marketplaceOfferId)
-                    .map(lockMapper::toResponse)
-                    .map(List::of)
-                    .orElse(List.of());
+            List<ManualLockResponse> content = lockRepository.findActiveLock(marketplaceOfferId)
+                .map(lockMapper::toResponse)
+                .map(List::of)
+                .orElse(List.of());
+            return new PageImpl<>(content, pageable, content.size());
         }
 
-        List<ManualPriceLockEntity> locks = lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(workspaceId);
-        return lockMapper.toResponses(locks);
+        return lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(workspaceId, pageable)
+            .map(lockMapper::toResponse);
     }
 
     @Transactional

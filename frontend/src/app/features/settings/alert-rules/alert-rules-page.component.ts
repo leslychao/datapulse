@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AlertRuleApiService } from '@core/api/alert-rule-api.service';
 import { AlertRule, AlertRuleType, AlertSeverity } from '@core/models';
@@ -9,26 +10,6 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
-
-const RULE_TYPE_LABELS: Record<AlertRuleType, string> = {
-  STALE_DATA: 'Устаревшие данные',
-  MISSING_SYNC: 'Пропуск синхронизации',
-  RESIDUAL_ANOMALY: 'Аномалия reconciliation',
-  SPIKE_DETECTION: 'Всплеск метрик',
-  MISMATCH: 'Расхождения данных',
-  ACTION_FAILED: 'Ошибка действия',
-  STUCK_STATE: 'Застрявшее состояние',
-  RECONCILIATION_FAILED: 'Ошибка reconciliation',
-  POISON_PILL: 'Poison pill',
-  PROMO_MISMATCH: 'Расхождение промо',
-  ACTION_DEFERRED: 'Отложенное действие',
-};
-
-const SEVERITY_LABELS: Record<AlertSeverity, string> = {
-  INFO: 'Инфо',
-  WARNING: 'Внимание',
-  CRITICAL: 'Критический',
-};
 
 const SEVERITY_COLORS: Record<AlertSeverity, StatusColor> = {
   INFO: 'info',
@@ -38,7 +19,7 @@ const SEVERITY_COLORS: Record<AlertSeverity, StatusColor> = {
 
 interface ConfigFieldDef {
   key: string;
-  label: string;
+  labelKey: string;
   min?: number;
   max?: number;
   step?: number;
@@ -46,30 +27,30 @@ interface ConfigFieldDef {
 
 const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
   STALE_DATA: [
-    { key: 'finance_stale_hours', label: 'Порог устаревания финансов (часы)', min: 1 },
-    { key: 'state_stale_hours', label: 'Порог устаревания каталога/цен/остатков (часы)', min: 1 },
+    { key: 'finance_stale_hours', labelKey: 'settings.alert_rules.config.finance_stale_hours', min: 1 },
+    { key: 'state_stale_hours', labelKey: 'settings.alert_rules.config.state_stale_hours', min: 1 },
   ],
   MISSING_SYNC: [
-    { key: 'expected_interval_minutes', label: 'Ожидаемый интервал синхронизации (мин)', min: 1 },
-    { key: 'tolerance_factor', label: 'Множитель допуска', min: 1, step: 0.1 },
+    { key: 'expected_interval_minutes', labelKey: 'settings.alert_rules.config.expected_interval_minutes', min: 1 },
+    { key: 'tolerance_factor', labelKey: 'settings.alert_rules.config.tolerance_factor', min: 1, step: 0.1 },
   ],
   RESIDUAL_ANOMALY: [
-    { key: 'sigma_threshold', label: 'Порог отклонения (σ)', min: 0.5, max: 10, step: 0.1 },
-    { key: 'min_absolute_threshold', label: 'Минимальная сумма аномалии (₽)', min: 0 },
+    { key: 'sigma_threshold', labelKey: 'settings.alert_rules.config.sigma_threshold', min: 0.5, max: 10, step: 0.1 },
+    { key: 'min_absolute_threshold', labelKey: 'settings.alert_rules.config.min_absolute_threshold', min: 0 },
   ],
   SPIKE_DETECTION: [
-    { key: 'spike_ratio_threshold', label: 'Порог всплеска (множитель)', min: 1, max: 100, step: 0.1 },
-    { key: 'min_baseline_days', label: 'Минимум дней для baseline', min: 1, max: 90 },
+    { key: 'spike_ratio_threshold', labelKey: 'settings.alert_rules.config.spike_ratio_threshold', min: 1, max: 100, step: 0.1 },
+    { key: 'min_baseline_days', labelKey: 'settings.alert_rules.config.min_baseline_days', min: 1, max: 90 },
   ],
   MISMATCH: [
-    { key: 'max_orphan_count', label: 'Максимум расхождений без алерта', min: 0 },
+    { key: 'max_orphan_count', labelKey: 'settings.alert_rules.config.max_orphan_count', min: 0 },
   ],
-  ACTION_FAILED: [{ key: 'consecutive_failures', label: 'Подряд ошибок', min: 1 }],
-  STUCK_STATE: [{ key: 'stuck_hours', label: 'Часов в застрявшем статусе', min: 1 }],
-  RECONCILIATION_FAILED: [{ key: 'retry_exhausted', label: 'Исчерпаны повторы', min: 0, max: 1 }],
-  POISON_PILL: [{ key: 'enabled', label: 'Включено', min: 0, max: 1 }],
-  PROMO_MISMATCH: [{ key: 'max_delta_pct', label: 'Макс. Δ%', min: 0, max: 100, step: 0.1 }],
-  ACTION_DEFERRED: [{ key: 'defer_hours', label: 'Часов отложено', min: 1 }],
+  ACTION_FAILED: [{ key: 'consecutive_failures', labelKey: 'settings.alert_rules.config.consecutive_failures', min: 1 }],
+  STUCK_STATE: [{ key: 'stuck_hours', labelKey: 'settings.alert_rules.config.stuck_hours', min: 1 }],
+  RECONCILIATION_FAILED: [{ key: 'retry_exhausted', labelKey: 'settings.alert_rules.config.retry_exhausted', min: 0, max: 1 }],
+  POISON_PILL: [{ key: 'enabled', labelKey: 'settings.alert_rules.config.enabled_flag', min: 0, max: 1 }],
+  PROMO_MISMATCH: [{ key: 'max_delta_pct', labelKey: 'settings.alert_rules.config.max_delta_pct', min: 0, max: 100, step: 0.1 }],
+  ACTION_DEFERRED: [{ key: 'defer_hours', labelKey: 'settings.alert_rules.config.defer_hours', min: 1 }],
 };
 
 @Component({
@@ -78,6 +59,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    TranslatePipe,
     SpinnerComponent,
     StatusBadgeComponent,
     DateFormatPipe,
@@ -85,12 +67,12 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
   template: `
     <div class="max-w-5xl">
       <div class="mb-6">
-        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">Правила алертов</h1>
-        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">Настройка бизнес-алертов и порогов срабатывания</p>
+        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.alert_rules.title' | translate }}</h1>
+        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.alert_rules.subtitle' | translate }}</p>
       </div>
 
       @if (rulesQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (rulesQuery.data(); as rules) {
@@ -98,11 +80,11 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Название</th>
-                <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Тип</th>
-                <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">Критичность</th>
-                <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">Статус</th>
-                <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">Последнее</th>
+                <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_name' | translate }}</th>
+                <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_type' | translate }}</th>
+                <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_severity' | translate }}</th>
+                <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_status' | translate }}</th>
+                <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_last_triggered' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -125,7 +107,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
                         ? 'bg-[var(--status-success)]/15 text-[var(--status-success)]'
                         : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'"
                     >
-                      {{ rule.enabled ? 'Вкл' : 'Выкл' }}
+                      {{ rule.enabled ? ('settings.alert_rules.enabled' | translate) : ('settings.alert_rules.disabled' | translate) }}
                     </button>
                   </td>
                   <td class="px-4 py-2.5 text-right text-[var(--text-secondary)]">
@@ -138,7 +120,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
                     <td colspan="5" class="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-6 py-5">
                       <div class="max-w-lg space-y-4">
                         <div>
-                          <label class="mb-1 block text-sm font-medium text-[var(--text-secondary)]">Критичность</label>
+                          <label class="mb-1 block text-sm font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.severity_label' | translate }}</label>
                           <select
                             [ngModel]="editForm().severity"
                             (ngModelChange)="updateEditField('severity', $event)"
@@ -160,20 +142,20 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
                             />
                             <div class="peer h-5 w-9 rounded-full bg-[var(--bg-tertiary)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-[var(--accent-primary)] peer-checked:after:translate-x-full"></div>
                           </label>
-                          <span class="text-sm text-[var(--text-primary)]">Блокирует автоматизацию</span>
+                          <span class="text-sm text-[var(--text-primary)]">{{ 'settings.alert_rules.blocks_automation' | translate }}</span>
                         </div>
 
                         @if (editForm().blocksAutomation) {
                           <p class="rounded-[var(--radius-sm)] bg-[var(--status-warning)]/10 px-3 py-2 text-xs text-[var(--status-warning)]">
-                            ⚠ При срабатывании этого правила автоматическое ценообразование и промо будут приостановлены.
+                            ⚠ {{ 'settings.alert_rules.blocks_automation_warning' | translate }}
                           </p>
                         }
 
                         <div class="space-y-3">
-                          <h4 class="text-sm font-medium text-[var(--text-primary)]">Параметры</h4>
+                          <h4 class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.alert_rules.parameters' | translate }}</h4>
                           @for (field of configFields(rule.ruleType); track field.key) {
                             <div>
-                              <label class="mb-1 block text-xs text-[var(--text-secondary)]">{{ field.label }}</label>
+                              <label class="mb-1 block text-xs text-[var(--text-secondary)]">{{ field.labelKey | translate }}</label>
                               <input
                                 type="number"
                                 [ngModel]="editForm().config[field.key]"
@@ -196,13 +178,13 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
                             @if (saveMutation.isPending()) {
                               <span class="dp-spinner mr-1 inline-block h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white"></span>
                             }
-                            Сохранить
+                            {{ 'actions.save' | translate }}
                           </button>
                           <button
                             (click)="expandedRuleId.set(null)"
                             class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
                           >
-                            Отмена
+                            {{ 'actions.cancel' | translate }}
                           </button>
                         </div>
                       </div>
@@ -214,7 +196,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
           </table>
         </div>
 
-        <p class="mt-3 text-xs text-[var(--text-tertiary)]">Нажмите на правило для настройки</p>
+        <p class="mt-3 text-xs text-[var(--text-tertiary)]">{{ 'settings.alert_rules.click_to_edit' | translate }}</p>
       }
     </div>
   `,
@@ -222,6 +204,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
 export class AlertRulesPageComponent {
   private readonly alertRuleApi = inject(AlertRuleApiService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly expandedRuleId = signal<number | null>(null);
   readonly editForm = signal<{
@@ -243,9 +226,9 @@ export class AlertRulesPageComponent {
     onSuccess: () => {
       this.rulesQuery.refetch();
       this.expandedRuleId.set(null);
-      this.toast.success('Правило обновлено');
+      this.toast.success(this.translate.instant('settings.alert_rules.saved'));
     },
-    onError: () => this.toast.error('Не удалось сохранить'),
+    onError: () => this.toast.error(this.translate.instant('settings.alert_rules.error_save')),
   }));
 
   readonly toggleMutation = injectMutation(() => ({
@@ -253,17 +236,17 @@ export class AlertRulesPageComponent {
       lastValueFrom(this.alertRuleApi.toggleEnabled(vars.id, vars.enabled)),
     onSuccess: () => {
       this.rulesQuery.refetch();
-      this.toast.success('Статус правила обновлён');
+      this.toast.success(this.translate.instant('settings.alert_rules.toggled'));
     },
-    onError: () => this.toast.error('Не удалось изменить статус правила'),
+    onError: () => this.toast.error(this.translate.instant('settings.alert_rules.error_toggle')),
   }));
 
   ruleTypeLabel(type: AlertRuleType): string {
-    return RULE_TYPE_LABELS[type] ?? type;
+    return this.translate.instant(`settings.alert_rules.type.${type}`);
   }
 
   severityLabel(severity: AlertSeverity): string {
-    return SEVERITY_LABELS[severity] ?? severity;
+    return this.translate.instant(`settings.alert_rules.severity.${severity}`);
   }
 
   severityColor(severity: AlertSeverity): StatusColor {

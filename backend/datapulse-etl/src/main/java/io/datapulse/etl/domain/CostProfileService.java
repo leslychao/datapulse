@@ -20,6 +20,7 @@ import io.datapulse.etl.api.BulkImportResponse.BulkImportError;
 import io.datapulse.etl.api.CostProfileFilter;
 import io.datapulse.etl.api.CostProfileResponse;
 import io.datapulse.etl.api.CreateCostProfileRequest;
+import io.datapulse.etl.api.UpdateCostProfileRequest;
 import io.datapulse.etl.domain.CostProfileCsvParser.CsvRow;
 import io.datapulse.etl.domain.CostProfileCsvParser.ParseResult;
 import io.datapulse.etl.persistence.canonical.CostProfileEntity;
@@ -133,6 +134,22 @@ public class CostProfileService {
                 imported, skipped, errors.size(), userId);
 
         return new BulkImportResponse(imported, skipped, errors);
+    }
+
+    @Transactional
+    public CostProfileResponse updateProfile(long id, UpdateCostProfileRequest request,
+                                             long workspaceId) {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+
+    @Transactional
+    public void deleteProfile(long id, long workspaceId) {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportCsv(long workspaceId) {
+        throw new UnsupportedOperationException("Not yet implemented");
     }
 
     @Transactional(readOnly = true)

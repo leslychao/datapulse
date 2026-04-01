@@ -11,6 +11,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
+import { formatDateTime } from '@shared/utils/format.utils';
 import {
   CampaignStatus,
   PromoCampaignFilter,
@@ -323,9 +324,7 @@ export class CampaignListPageComponent {
   }
 
   private formatDate(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatDateTime(iso, 'date');
   }
 
   private formatNumber(val: number | null): string {

@@ -5,6 +5,7 @@ import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.sellerops.api.MismatchFilter;
 import io.datapulse.sellerops.api.MismatchResponse;
+import io.datapulse.sellerops.api.MismatchSummaryResponse;
 import io.datapulse.sellerops.persistence.MismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.MismatchRow;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,20 @@ import java.util.List;
 public class MismatchService {
 
   private final MismatchJdbcRepository mismatchRepository;
+
+  @Transactional(readOnly = true)
+  public MismatchSummaryResponse getSummary(long workspaceId) {
+    var counts = mismatchRepository.countByStatus(workspaceId);
+    return new MismatchSummaryResponse(
+        counts.total(), counts.open(), counts.acknowledged(), counts.resolved());
+  }
+
+  @Transactional(readOnly = true)
+  public MismatchResponse getMismatch(long workspaceId, long mismatchId) {
+    return mismatchRepository.findById(mismatchId, workspaceId)
+        .map(this::toResponse)
+        .orElseThrow(() -> NotFoundException.entity("mismatch", mismatchId));
+  }
 
   @Transactional(readOnly = true)
   public Page<MismatchResponse> listMismatches(long workspaceId,

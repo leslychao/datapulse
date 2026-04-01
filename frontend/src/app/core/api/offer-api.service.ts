@@ -176,32 +176,46 @@ export class OfferApiService {
     );
   }
 
-  approveAction(actionId: number): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/approve`, {});
+  approveAction(workspaceId: number, actionId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/approve`, {},
+    );
   }
 
-  rejectAction(actionId: number, cancelReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/reject`, { cancelReason });
+  rejectAction(workspaceId: number, actionId: number, cancelReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/reject`, { cancelReason },
+    );
   }
 
-  holdAction(actionId: number, holdReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/hold`, { holdReason });
+  holdAction(workspaceId: number, actionId: number, holdReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/hold`, { holdReason },
+    );
   }
 
-  resumeAction(actionId: number): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/resume`, {});
+  resumeAction(workspaceId: number, actionId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/resume`, {},
+    );
   }
 
-  cancelAction(actionId: number, cancelReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/cancel`, { cancelReason });
+  cancelAction(workspaceId: number, actionId: number, cancelReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/cancel`, { cancelReason },
+    );
   }
 
-  bulkApprove(req: BulkActionRequest): Observable<BulkActionResponse> {
-    return this.http.post<BulkActionResponse>(`${this.base}/actions/bulk-approve`, req);
+  bulkApprove(workspaceId: number, req: BulkActionRequest): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(
+      `${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, req,
+    );
   }
 
-  bulkReject(req: BulkActionRequest): Observable<BulkActionResponse> {
-    return this.http.post<BulkActionResponse>(`${this.base}/actions/bulk-reject`, req);
+  bulkReject(workspaceId: number, req: BulkActionRequest): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(
+      `${this.base}/workspaces/${workspaceId}/actions/bulk-reject`, req,
+    );
   }
 
   bulkManualPreview(workspaceId: number, req: BulkManualPreviewRequest): Observable<BulkManualPreviewResponse> {

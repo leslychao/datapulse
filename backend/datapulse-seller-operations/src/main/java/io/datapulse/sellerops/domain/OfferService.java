@@ -1,6 +1,8 @@
 package io.datapulse.sellerops.domain;
 
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.sellerops.api.ActionHistoryResponse;
+import io.datapulse.sellerops.api.LockOfferRequest;
 import io.datapulse.sellerops.api.OfferDetailResponse;
 import io.datapulse.sellerops.api.OfferDetailResponse.ActionInfo;
 import io.datapulse.sellerops.api.OfferDetailResponse.DecisionInfo;
@@ -14,6 +16,8 @@ import io.datapulse.sellerops.persistence.OfferDetailJdbcRepository;
 import io.datapulse.sellerops.persistence.OfferDetailRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +45,22 @@ public class OfferService {
     ClickHouseEnrichment ch = enrichment.get(offerId);
 
     return toResponse(row, ch);
+  }
+
+  @Transactional
+  public void lockOffer(long workspaceId, long offerId, LockOfferRequest request) {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  @Transactional
+  public void unlockOffer(long workspaceId, long offerId) {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  @Transactional(readOnly = true)
+  public Page<ActionHistoryResponse> getActionHistory(long workspaceId, long offerId,
+                                                      Pageable pageable) {
+    throw new UnsupportedOperationException("Not yet implemented");
   }
 
   private OfferDetailResponse toResponse(OfferDetailRow row, ClickHouseEnrichment ch) {

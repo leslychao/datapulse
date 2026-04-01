@@ -6,23 +6,24 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { PnlByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { formatMoney } from '@shared/utils/format.utils';
 
 function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-const COGS_STATUS_LABEL: Record<string, string> = {
-  OK: 'OK',
-  NO_COST_PROFILE: 'Нет себестоимости',
-  NO_SALES: 'Нет продаж',
+const COGS_STATUS_KEY: Record<string, string> = {
+  OK: 'analytics.pnl.cogs_status.OK',
+  NO_COST_PROFILE: 'analytics.pnl.cogs_status.NO_COST_PROFILE',
+  NO_SALES: 'analytics.pnl.cogs_status.NO_SALES',
 };
 
 const COGS_STATUS_COLOR: Record<string, string> = {
@@ -170,6 +171,7 @@ export class PnlByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
   readonly search = signal('');
@@ -225,11 +227,7 @@ export class PnlByProductPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    const sign = value < 0 ? '−' : '';
-    return `${sign}${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   moneyColorClass(value: number): string {
@@ -245,7 +243,8 @@ export class PnlByProductPageComponent {
   }
 
   cogsStatusLabel(status: string): string {
-    return COGS_STATUS_LABEL[status] ?? status;
+    const key = COGS_STATUS_KEY[status];
+    return key ? this.t.instant(key) : status;
   }
 
   cogsStatusColor(status: string): string {

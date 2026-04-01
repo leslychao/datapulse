@@ -151,7 +151,8 @@ export class OfferActionHistoryTabComponent {
   });
 
   readonly approveMutation = injectMutation(() => ({
-    mutationFn: (actionId: number) => lastValueFrom(this.offerApi.approveAction(actionId)),
+    mutationFn: (actionId: number) =>
+      lastValueFrom(this.offerApi.approveAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
       this.toast.success('Действие одобрено');
       this.invalidateQueries();
@@ -160,7 +161,8 @@ export class OfferActionHistoryTabComponent {
   }));
 
   readonly rejectMutation = injectMutation(() => ({
-    mutationFn: (actionId: number) => lastValueFrom(this.offerApi.rejectAction(actionId, '')),
+    mutationFn: (actionId: number) =>
+      lastValueFrom(this.offerApi.rejectAction(this.wsStore.currentWorkspaceId()!, actionId, '')),
     onSuccess: () => {
       this.toast.success('Действие отклонено');
       this.invalidateQueries();
@@ -169,7 +171,8 @@ export class OfferActionHistoryTabComponent {
   }));
 
   readonly resumeMutation = injectMutation(() => ({
-    mutationFn: (actionId: number) => lastValueFrom(this.offerApi.resumeAction(actionId)),
+    mutationFn: (actionId: number) =>
+      lastValueFrom(this.offerApi.resumeAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
       this.toast.success('Действие возобновлено');
       this.invalidateQueries();

@@ -12,6 +12,7 @@ import { injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -404,19 +405,11 @@ export class RunDetailPageComponent {
   }
 
   private formatPrice(value: number | null): string {
-    if (value === null || value === undefined) return '—';
-    return Math.floor(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + '\u00A0₽';
+    return formatMoney(value, 0);
   }
 
   private formatTimestamp(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-    const day = d.getDate();
-    const month = months[d.getMonth()];
-    const hours = d.getHours().toString().padStart(2, '0');
-    const mins = d.getMinutes().toString().padStart(2, '0');
-    return `${day} ${month}, ${hours}:${mins}`;
+    return formatDateTime(iso, 'full');
   }
 
   private formatDuration(start: string | null, end: string | null): string {

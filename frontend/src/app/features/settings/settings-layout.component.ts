@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { TranslateService } from '@ngx-translate/core';
 import {
   LucideAngularModule,
   LucideIconData,
@@ -14,7 +15,7 @@ import {
 
 interface NavItem {
   path: string;
-  label: string;
+  labelKey: string;
   icon: LucideIconData;
 }
 
@@ -27,7 +28,7 @@ interface NavItem {
     <div class="flex h-full">
       <nav class="w-52 shrink-0 border-r border-[var(--border-default)] bg-[var(--bg-secondary)] py-3 px-2">
         <h2 class="px-3 pb-2 text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-          Настройки
+          {{ t('settings.nav.title') }}
         </h2>
         @for (item of navItems; track item.path) {
           <a [routerLink]="item.path"
@@ -35,7 +36,7 @@ interface NavItem {
              class="nav-item flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-1.5 text-[var(--text-sm)]
                     text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors duration-[var(--transition-fast)]">
             <lucide-icon [img]="item.icon" [size]="16" />
-            {{ item.label }}
+            {{ t(item.labelKey) }}
           </a>
         }
       </nav>
@@ -54,13 +55,19 @@ interface NavItem {
   `],
 })
 export class SettingsLayoutComponent {
+  private readonly translate = inject(TranslateService);
+
   readonly navItems: NavItem[] = [
-    { path: 'general', label: 'Общие', icon: Settings },
-    { path: 'connections', label: 'Подключения', icon: Plug },
-    { path: 'cost-profiles', label: 'Себестоимость', icon: Calculator },
-    { path: 'team', label: 'Команда', icon: Users },
-    { path: 'invitations', label: 'Приглашения', icon: Mail },
-    { path: 'alert-rules', label: 'Правила алертов', icon: BellRing },
-    { path: 'audit', label: 'Журнал аудита', icon: ScrollText },
+    { path: 'general', labelKey: 'settings.nav.general', icon: Settings },
+    { path: 'connections', labelKey: 'settings.nav.connections', icon: Plug },
+    { path: 'cost-profiles', labelKey: 'settings.nav.cost_profiles', icon: Calculator },
+    { path: 'team', labelKey: 'settings.nav.team', icon: Users },
+    { path: 'invitations', labelKey: 'settings.nav.invitations', icon: Mail },
+    { path: 'alert-rules', labelKey: 'settings.nav.alert_rules', icon: BellRing },
+    { path: 'audit', labelKey: 'settings.nav.audit_log', icon: ScrollText },
   ];
+
+  t(key: string): string {
+    return this.translate.instant(key);
+  }
 }

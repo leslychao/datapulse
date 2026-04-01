@@ -4,7 +4,7 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -12,12 +12,12 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ConnectionDataQuality, SyncDomainStatus } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
-const DOMAIN_LABELS: Record<string, string> = {
-  finance: 'Финансы',
-  orders: 'Заказы',
-  stock: 'Остатки',
-  catalog: 'Каталог',
-  advertising: 'Реклама',
+const DOMAIN_LABEL_KEYS: Record<string, string> = {
+  finance: 'analytics.data_quality.domain.finance',
+  orders: 'analytics.data_quality.domain.orders',
+  stock: 'analytics.data_quality.domain.stock',
+  catalog: 'analytics.data_quality.domain.catalog',
+  advertising: 'analytics.data_quality.domain.advertising',
 };
 
 @Component({
@@ -65,7 +65,9 @@ const DOMAIN_LABELS: Record<string, string> = {
                     ? 'bg-[color-mix(in_srgb,var(--status-warning)_12%,transparent)] text-[var(--status-warning)]'
                     : 'bg-[color-mix(in_srgb,var(--status-success)_12%,transparent)] text-[var(--status-success)]'"
                 >
-                  {{ conn.automationBlocked ? '⚠ BLOCKED' : '✅ Active' }}
+                  {{ conn.automationBlocked
+                    ? ('analytics.data_quality.automation_blocked' | translate)
+                    : ('analytics.data_quality.automation_active' | translate) }}
                 </span>
               </div>
 
@@ -128,6 +130,7 @@ const DOMAIN_LABELS: Record<string, string> = {
 export class DataQualityStatusPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly statusQuery = injectQuery(() => ({
     queryKey: ['data-quality-status', this.wsStore.currentWorkspaceId()],
@@ -146,7 +149,8 @@ export class DataQualityStatusPageComponent {
   );
 
   domainLabel(domain: string): string {
-    return DOMAIN_LABELS[domain] ?? domain;
+    const key = DOMAIN_LABEL_KEYS[domain];
+    return key ? this.t.instant(key) : domain;
   }
 
   syncStatusDotClass(status: SyncDomainStatus): string {
@@ -158,10 +162,6 @@ export class DataQualityStatusPageComponent {
   }
 
   syncStatusLabel(status: SyncDomainStatus): string {
-    switch (status) {
-      case 'FRESH': return 'Актуально';
-      case 'STALE': return 'Устарело';
-      case 'OVERDUE': return 'Просрочено';
-    }
+    return this.t.instant(`analytics.data_quality.sync_status.${status}`);
   }
 }

@@ -25,7 +25,8 @@ public class PromoProductController {
 
     @PostMapping("/{promoProductId}/participate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void participate(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("promoProductId") Long promoProductId,
@@ -39,7 +40,8 @@ public class PromoProductController {
 
     @PostMapping("/{promoProductId}/decline")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void decline(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("promoProductId") Long promoProductId,
@@ -53,7 +55,8 @@ public class PromoProductController {
 
     @PostMapping("/{promoProductId}/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void deactivate(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("promoProductId") Long promoProductId,

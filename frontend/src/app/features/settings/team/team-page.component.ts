@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { MemberApiService } from '@core/api/member-api.service';
 import { Member, WorkspaceRole } from '@core/models';
@@ -19,6 +20,7 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    TranslatePipe,
     ConfirmationModalComponent,
     SpinnerComponent,
     EmptyStateComponent,
@@ -28,26 +30,26 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
   template: `
     <div class="max-w-4xl">
       <div class="mb-6">
-        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">Команда</h1>
-        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">Участники workspace и их роли</p>
+        <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.team.title' | translate }}</h1>
+        <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.team.subtitle' | translate }}</p>
       </div>
 
       @if (membersQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (membersQuery.data(); as members) {
         @if (members.length === 0) {
-          <dp-empty-state message="Нет участников" />
+          <dp-empty-state [message]="'settings.team.empty' | translate" />
         } @else {
           <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Имя</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Email</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Роль</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">Дата добавления</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_name' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_email' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_role' | translate }}</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_joined' | translate }}</th>
                   <th class="px-4 py-2"></th>
                 </tr>
               </thead>
@@ -81,7 +83,7 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
                           (click)="confirmRemove(m)"
                           class="cursor-pointer text-sm text-[var(--status-error)] transition-colors hover:underline"
                         >
-                          Удалить
+                          {{ 'actions.delete' | translate }}
                         </button>
                       }
                     </td>
@@ -95,9 +97,9 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
 
       <dp-confirmation-modal
         [open]="showRemoveModal()"
-        title="Удалить участника"
-        [message]="'Вы уверены, что хотите удалить ' + (memberToRemove()?.name || '') + ' из workspace?'"
-        confirmLabel="Удалить"
+        [title]="'settings.team.remove_title' | translate"
+        [message]="translate.instant('settings.team.remove_message', { name: memberToRemove()?.name || '' })"
+        [confirmLabel]="'actions.delete' | translate"
         [danger]="true"
         (confirmed)="doRemove()"
         (cancelled)="showRemoveModal.set(false)"
@@ -109,6 +111,7 @@ export class TeamPageComponent {
   private readonly memberApi = inject(MemberApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   readonly showRemoveModal = signal(false);
   readonly memberToRemove = signal<Member | null>(null);
@@ -126,9 +129,9 @@ export class TeamPageComponent {
       lastValueFrom(this.memberApi.changeRole(this.wsStore.currentWorkspaceId()!, vars.userId, { role: vars.role })),
     onSuccess: () => {
       this.membersQuery.refetch();
-      this.toast.success('Роль обновлена');
+      this.toast.success(this.translate.instant('settings.team.role_updated'));
     },
-    onError: () => this.toast.error('Не удалось изменить роль'),
+    onError: () => this.toast.error(this.translate.instant('settings.team.role_update_error')),
   }));
 
   readonly removeMutation = injectMutation(() => ({
@@ -137,9 +140,9 @@ export class TeamPageComponent {
     onSuccess: () => {
       this.membersQuery.refetch();
       this.showRemoveModal.set(false);
-      this.toast.success('Участник удалён');
+      this.toast.success(this.translate.instant('settings.team.member_removed'));
     },
-    onError: () => this.toast.error('Не удалось удалить участника'),
+    onError: () => this.toast.error(this.translate.instant('settings.team.member_remove_error')),
   }));
 
   changeRole(member: Member, newRole: WorkspaceRole): void {

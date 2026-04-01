@@ -13,6 +13,7 @@ import { lastValueFrom } from 'rxjs';
 import { LucideAngularModule, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-angular';
 
 import { ActionApiService } from '@core/api/action-api.service';
+import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import { ActionDetail, ActionAttempt } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -196,35 +197,35 @@ export class ActionDetailPageComponent {
   }
 
   readonly approveMutation = this.createMutation(
-    (id) => this.actionApi.approveAction(id),
+    (id) => this.actionApi.approveAction(this.wsStore.currentWorkspaceId()!, id),
     'Действие одобрено',
   );
 
   readonly rejectMutation = this.createMutation(
-    (id, reason) => this.actionApi.rejectAction(id, reason!),
+    (id, reason) => this.actionApi.rejectAction(this.wsStore.currentWorkspaceId()!, id, reason!),
     'Действие отклонено',
     true,
   );
 
   readonly holdMutation = this.createMutation(
-    (id, reason) => this.actionApi.holdAction(id, reason!),
+    (id, reason) => this.actionApi.holdAction(this.wsStore.currentWorkspaceId()!, id, reason!),
     'Действие приостановлено',
     true,
   );
 
   readonly resumeMutation = this.createMutation(
-    (id) => this.actionApi.resumeAction(id),
+    (id) => this.actionApi.resumeAction(this.wsStore.currentWorkspaceId()!, id),
     'Действие возобновлено',
   );
 
   readonly cancelMutation = this.createMutation(
-    (id, reason) => this.actionApi.cancelAction(id, reason!),
+    (id, reason) => this.actionApi.cancelAction(this.wsStore.currentWorkspaceId()!, id, reason!),
     'Действие отменено',
     true,
   );
 
   readonly retryMutation = this.createMutation(
-    (id, reason) => this.actionApi.retryAction(id, reason!),
+    (id, reason) => this.actionApi.retryAction(this.wsStore.currentWorkspaceId()!, id, reason!),
     'Повторное действие создано',
     true,
   );
@@ -271,14 +272,7 @@ export class ActionDetailPageComponent {
   }
 
   formatTimestamp(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const day = d.getDate();
-    const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-    const month = months[d.getMonth()];
-    const hours = d.getHours().toString().padStart(2, '0');
-    const mins = d.getMinutes().toString().padStart(2, '0');
-    return `${day} ${month}, ${hours}:${mins}`;
+    return formatDateTime(iso, 'full');
   }
 
   formatDuration(start: string | null, end: string | null): string {
@@ -289,8 +283,7 @@ export class ActionDetailPageComponent {
   }
 
   formatPrice(value: number | null): string {
-    if (value === null || value === undefined) return '—';
-    return Math.floor(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + '\u00A0₽';
+    return formatMoney(value, 0);
   }
 
   outcomeLabel(outcome: string): string {

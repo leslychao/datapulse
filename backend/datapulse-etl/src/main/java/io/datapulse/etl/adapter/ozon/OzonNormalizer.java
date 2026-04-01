@@ -239,6 +239,14 @@ public class OzonNormalizer {
 
     public NormalizedReturnItem normalizeReturn(OzonReturnItem item) {
         OffsetDateTime returnDate = OzonTimestampParser.parseIso8601(item.returnDate());
+        if (returnDate == null) {
+            returnDate = OzonTimestampParser.parseIso8601(item.acceptedFromCustomerMoment());
+        }
+        if (returnDate == null) {
+            returnDate = OffsetDateTime.now();
+            log.warn("Return has no date, using now(): returnId={}", item.id());
+        }
+
         BigDecimal returnAmount = BigDecimal.ZERO;
         String currency = null;
         String sellerSku = null;
@@ -251,6 +259,9 @@ public class OzonNormalizer {
                 returnAmount = parseBigDecimal(item.product().price().price());
                 currency = item.product().price().currencyCode();
             }
+        }
+        if (currency == null) {
+            currency = "RUB";
         }
 
         return new NormalizedReturnItem(
@@ -282,6 +293,11 @@ public class OzonNormalizer {
             return;
         }
         for (var node : nodes) {
+            if (node.categoryName() == null || node.categoryName().isBlank()) {
+                log.debug("Skipping category node with blank name: id={}", node.descriptionCategoryId());
+                flattenRecursive(node.children(), parentId, result);
+                continue;
+            }
             String id = String.valueOf(node.descriptionCategoryId());
             result.add(new NormalizedCategory(
                     id,

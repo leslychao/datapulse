@@ -1,6 +1,7 @@
 import { Injectable, inject, signal, NgZone } from '@angular/core';
 import { RxStomp, RxStompConfig } from '@stomp/rx-stomp';
 import { Subscription } from 'rxjs';
+import { QueryClient } from '@tanstack/angular-query-experimental';
 
 import { environment } from '@env';
 import { NotificationApiService } from '@core/api/notification-api.service';
@@ -17,6 +18,7 @@ export class WebSocketService {
   private readonly syncStore = inject(SyncStatusStore);
   private readonly notificationStore = inject(NotificationStore);
   private readonly notificationApi = inject(NotificationApiService);
+  private readonly queryClient = inject(QueryClient);
   private rxStomp: RxStomp | null = null;
   private subscriptions: Subscription[] = [];
   private reconnectAttempts = 0;
@@ -89,29 +91,90 @@ export class WebSocketService {
   }
 
   subscribeToWorkspace(workspaceId: number): void {
-    this.subscribeTo(`/topic/workspace/${workspaceId}/alerts`, (_msg) => {
-      // TODO: dispatch to alert store when alert dashboard is implemented (Phase B)
-    });
+    const ws = `/topic/workspace/${workspaceId}`;
 
-    this.subscribeTo<ConnectionSyncStatus>(
-      `/topic/workspace/${workspaceId}/sync-status`,
-      (msg) => {
-        this.syncStore.updateConnection(msg.connectionId, {
-          connectionName: msg.connectionName,
-          lastSuccessAt: msg.lastSuccessAt,
-          status: msg.status,
-        });
-        this.syncStore.setLastUpdated(new Date().toISOString());
-      },
-    );
-
-    this.subscribeTo(`/topic/workspace/${workspaceId}/actions`, (_msg) => {
-      // TODO: dispatch to action store when execution module is implemented (Phase D)
+    this.subscribeTo<ConnectionSyncStatus>(`${ws}/sync-status`, (msg) => {
+      this.syncStore.updateConnection(msg.connectionId, {
+        connectionName: msg.connectionName,
+        lastSuccessAt: msg.lastSuccessAt,
+        status: msg.status,
+      });
+      this.syncStore.setLastUpdated(new Date().toISOString());
     });
 
     this.subscribeTo<AppNotification>(`/user/queue/notifications`, (msg) => {
       this.notificationStore.addNotification(msg);
       this.lastMessageTimestamp = new Date().toISOString();
+    });
+
+    this.subscribeTo(`${ws}/alerts`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      this.queryClient.invalidateQueries({ queryKey: ['alerts', 'blocker'] });
+    });
+
+    this.subscribeTo(`${ws}/actions`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['actions'] });
+    });
+
+    this.subscribeTo(`${ws}/grid-updates`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['offers'] });
+    });
+
+    this.subscribeTo(`${ws}/action-updates`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['offers'] });
+      this.queryClient.invalidateQueries({ queryKey: ['offer-detail'] });
+      this.queryClient.invalidateQueries({ queryKey: ['action-history'] });
+    });
+
+    this.subscribeTo(`${ws}/kpi-updates`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['grid-kpi'] });
+    });
+
+    this.subscribeTo(`${ws}/pricing-runs`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['pricing-runs'] });
+    });
+
+    this.subscribeTo(`${ws}/pricing-decisions`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['pricing-decisions'] });
+    });
+
+    this.subscribeTo(`${ws}/mismatches`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['mismatches'] });
+      this.queryClient.invalidateQueries({ queryKey: ['mismatches', 'summary'] });
+    });
+
+    this.subscribeTo(`${ws}/promo-campaigns`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaigns'] });
+    });
+
+    this.subscribeTo(`${ws}/promo-actions`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['promo-actions'] });
+    });
+
+    this.subscribeTo(`${ws}/promo-evaluations`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['promo-evaluations'] });
+    });
+
+    this.subscribeTo(`${ws}/promo-decisions`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['promo-decisions'] });
+    });
+
+    this.subscribeTo(`${ws}/queues`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['queues'] });
+    });
+
+    this.subscribeTo(`${ws}/queue-items`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['queue-items'] });
+    });
+
+    this.subscribeTo(`${ws}/analytics-updates`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    });
+
+    this.subscribeTo(`${ws}/sync-completed`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['sync-status'] });
+      this.queryClient.invalidateQueries({ queryKey: ['offers'] });
+      this.queryClient.invalidateQueries({ queryKey: ['analytics'] });
     });
   }
 

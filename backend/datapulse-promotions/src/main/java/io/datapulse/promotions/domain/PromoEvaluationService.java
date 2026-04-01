@@ -39,6 +39,12 @@ public class PromoEvaluationService {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
 
+    // TODO: implement full evaluate flow (create run, load products, delegate to executeRun)
+    @Transactional
+    public void evaluate(long connectionId, long workspaceId) {
+        throw new UnsupportedOperationException("PromoEvaluationService.evaluate not implemented yet");
+    }
+
     @Transactional
     public void executeRun(long runId) {
         PromoEvaluationRunEntity run = runRepository.findById(runId)

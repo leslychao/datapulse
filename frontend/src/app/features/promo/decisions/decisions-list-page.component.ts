@@ -10,6 +10,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
+import { formatDateTime } from '@shared/utils/format.utils';
 import {
   ParticipationMode,
   PromoDecisionFilter,
@@ -240,7 +241,7 @@ export class DecisionsListPageComponent {
       width: 130,
       sortable: true,
       sort: 'desc',
-      valueFormatter: (params: any) => this.formatDateTime(params.value),
+      valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
     },
   ];
 
@@ -297,11 +298,4 @@ export class DecisionsListPageComponent {
     this.currentPage.set(0);
   }
 
-  private formatDateTime(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) +
-      ', ' +
-      d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  }
 }

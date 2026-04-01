@@ -29,6 +29,7 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
     <div class="relative">
       <button
         (click)="toggle()"
+        aria-label="Уведомления"
         class="relative flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
       >
         <lucide-icon [img]="Bell" [size]="18" />

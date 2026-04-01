@@ -37,6 +37,11 @@ public class TestPromoPolicyBuilder {
     return this;
   }
 
+  public TestPromoPolicyBuilder withCreatedBy(Long createdBy) {
+    this.createdBy = createdBy;
+    return this;
+  }
+
   public PromoPolicyEntity build() {
     var entity = new PromoPolicyEntity();
     entity.setWorkspaceId(workspaceId);

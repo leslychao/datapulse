@@ -10,6 +10,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import {
@@ -308,22 +309,10 @@ export class DecisionsListPageComponent {
   }
 
   private formatPrice(value: number | null): string {
-    if (value === null || value === undefined) return '—';
-    return (
-      Math.floor(value)
-        .toString()
-        .replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + '\u00A0₽'
-    );
+    return formatMoney(value, 0);
   }
 
   private formatTimestamp(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, '0');
-    const mins = String(d.getMinutes()).padStart(2, '0');
-    return `${day}.${month}.${year} ${hours}:${mins}`;
+    return formatDateTime(iso, 'full');
   }
 }

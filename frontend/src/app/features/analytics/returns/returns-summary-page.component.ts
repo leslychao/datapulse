@@ -13,6 +13,7 @@ import type { EChartsOption } from 'echarts';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { formatMoney, formatPercent } from '@shared/utils/format.utils';
 
 function currentMonth(): string {
   const d = new Date();
@@ -205,21 +206,17 @@ export class ReturnsSummaryPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    return value < 0 ? `−${formatted} ₽` : `${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   formatPct(value: number | null): string {
-    if (value == null) return '—';
-    return value.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    return formatPercent(value);
   }
 
   formatDeltaText(value: number): string {
-    if (value > 0) return `↑ ${this.formatPct(value)}`;
-    if (value < 0) return `↓ ${this.formatPct(Math.abs(value))}`;
-    return `→ ${this.formatPct(0)}`;
+    if (value > 0) return `↑ ${formatPercent(value)}`;
+    if (value < 0) return `↓ ${formatPercent(Math.abs(value))}`;
+    return `→ ${formatPercent(0)}`;
   }
 
   deltaColorClass(value: number): string {

@@ -60,31 +60,53 @@ export class ActionApiService {
     );
   }
 
-  approveAction(actionId: number): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/approve`, {});
+  approveAction(workspaceId: number, actionId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/approve`, {},
+    );
   }
 
-  rejectAction(actionId: number, cancelReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/reject`, { cancelReason });
+  rejectAction(workspaceId: number, actionId: number, cancelReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/reject`, { cancelReason },
+    );
   }
 
-  holdAction(actionId: number, holdReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/hold`, { holdReason });
+  holdAction(workspaceId: number, actionId: number, holdReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/hold`, { holdReason },
+    );
   }
 
-  resumeAction(actionId: number): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/resume`, {});
+  resumeAction(workspaceId: number, actionId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/resume`, {},
+    );
   }
 
-  cancelAction(actionId: number, cancelReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/cancel`, { cancelReason });
+  cancelAction(workspaceId: number, actionId: number, cancelReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/cancel`, { cancelReason },
+    );
   }
 
-  retryAction(actionId: number, retryReason: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/actions/${actionId}/retry`, { retryReason });
+  retryAction(workspaceId: number, actionId: number, retryReason: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/retry`, { retryReason },
+    );
   }
 
-  bulkApprove(req: BulkApproveRequest): Observable<BulkApproveResponse> {
-    return this.http.post<BulkApproveResponse>(`${this.base}/actions/bulk-approve`, req);
+  bulkApprove(workspaceId: number, req: BulkApproveRequest): Observable<BulkApproveResponse> {
+    return this.http.post<BulkApproveResponse>(
+      `${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, req,
+    );
+  }
+
+  getSimulationComparison(): Observable<any> {
+    return this.http.get(`${this.base}/simulation/comparison`);
+  }
+
+  resetShadowState(): Observable<void> {
+    return this.http.delete<void>(`${this.base}/simulation/shadow-state`);
   }
 }

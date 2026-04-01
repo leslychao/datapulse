@@ -116,6 +116,28 @@ public class MismatchJdbcRepository {
     return jdbc.update(sql, params);
   }
 
+  public MismatchStatusCounts countByStatus(long workspaceId) {
+    String sql = """
+        SELECT
+            COUNT(*)                                        AS total,
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN')      AS open,
+            COUNT(*) FILTER (WHERE ae.status = 'ACKNOWLEDGED') AS acknowledged,
+            COUNT(*) FILTER (WHERE ae.status = 'RESOLVED')  AS resolved
+        """ + FROM_JOINS
+        + " WHERE ae.workspace_id = :workspaceId AND " + MISMATCH_CONDITION;
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
+    return jdbc.queryForObject(sql, params, (rs, rowNum) ->
+        new MismatchStatusCounts(
+            rs.getLong("total"),
+            rs.getLong("open"),
+            rs.getLong("acknowledged"),
+            rs.getLong("resolved")
+        ));
+  }
+
+  public record MismatchStatusCounts(long total, long open, long acknowledged, long resolved) {
+  }
+
   private void appendFilters(MismatchFilter filter, StringBuilder where,
                              MapSqlParameterSource params) {
     if (filter == null) {

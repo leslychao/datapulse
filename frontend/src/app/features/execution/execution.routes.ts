@@ -18,6 +18,14 @@ const routes: Routes = [
       ),
     data: { breadcrumb: 'Детали действия' },
   },
+  {
+    path: 'simulation',
+    loadComponent: () =>
+      import('./simulation-page.component').then(
+        (m) => m.SimulationPageComponent,
+      ),
+    data: { breadcrumb: 'Симуляция' },
+  },
 ];
 
 export default routes;

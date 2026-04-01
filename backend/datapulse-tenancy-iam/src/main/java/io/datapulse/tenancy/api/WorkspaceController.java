@@ -29,6 +29,7 @@ public class WorkspaceController {
   private final WorkspaceContext workspaceContext;
 
   @GetMapping
+  @PreAuthorize("isAuthenticated()")
   public List<WorkspaceListResponse> listWorkspaces() {
     return workspaceService.listWorkspaces(workspaceContext.getUserId());
   }

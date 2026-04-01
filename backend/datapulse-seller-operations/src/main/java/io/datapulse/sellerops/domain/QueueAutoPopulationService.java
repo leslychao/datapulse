@@ -41,6 +41,24 @@ public class QueueAutoPopulationService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public long countByCriteria(long workspaceId, Map<String, Object> criteria) {
+        if (criteria == null || criteria.isEmpty()) {
+            return 0;
+        }
+        if (!(criteria.get("entity_type") instanceof String entityType)) {
+            return 0;
+        }
+        if (!(criteria.get("match_rules") instanceof List<?> rawRules) || rawRules.isEmpty()) {
+            return 0;
+        }
+        List<MatchRule> matchRules = parseMatchRules(rawRules);
+        if (matchRules.isEmpty()) {
+            return 0;
+        }
+        return evaluateCriteria(workspaceId, entityType, matchRules).size();
+    }
+
     private void populateQueue(WorkingQueueDefinitionEntity queue) {
         Map<String, Object> criteria = queue.getAutoCriteria();
         if (criteria == null || criteria.isEmpty()) {

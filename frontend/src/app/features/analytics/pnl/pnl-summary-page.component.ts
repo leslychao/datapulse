@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -17,6 +17,7 @@ import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
+import { formatMoney } from '@shared/utils/format.utils';
 
 function currentMonth(): string {
   const d = new Date();
@@ -112,6 +113,7 @@ interface KpiItem {
 export class PnlSummaryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
   readonly shimmerCards = Array.from({ length: 6 });
@@ -162,7 +164,7 @@ export class PnlSummaryPageComponent {
       yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
       series: [
         {
-          name: 'Выручка',
+          name: this.t.instant('analytics.pnl.chart.revenue'),
           type: 'line',
           data: points.map((p) => p.revenueAmount),
           smooth: true,
@@ -170,7 +172,7 @@ export class PnlSummaryPageComponent {
           areaStyle: { color: 'rgba(5,150,105,0.08)' },
         },
         {
-          name: 'Затраты',
+          name: this.t.instant('analytics.pnl.chart.costs'),
           type: 'line',
           data: points.map((p) => p.totalCostsAmount),
           smooth: true,
@@ -178,7 +180,7 @@ export class PnlSummaryPageComponent {
           areaStyle: { color: 'rgba(220,38,38,0.08)' },
         },
         {
-          name: 'P&L',
+          name: this.t.instant('analytics.pnl.chart.pnl'),
           type: 'line',
           data: points.map((p) => p.fullPnl),
           smooth: true,
@@ -209,18 +211,14 @@ export class PnlSummaryPageComponent {
     };
   });
 
-  formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    const sign = value < 0 ? '−' : '';
-    return `${sign}${formatted} ₽`;
+  fmtMoney(value: number | null): string {
+    return formatMoney(value, 0);
   }
 
   private buildKpi(labelKey: string, value: number, deltaPct: number | null): KpiItem {
     return {
       labelKey,
-      formattedValue: this.formatMoney(value),
+      formattedValue: this.fmtMoney(value),
       deltaPct,
       direction: this.trendDir(deltaPct),
     };

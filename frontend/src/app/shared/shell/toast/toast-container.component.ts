@@ -29,7 +29,7 @@ const TYPE_STYLES: Record<Toast['type'], { bg: string; text: string; border: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="fixed bottom-10 right-4 z-[9999] flex flex-col gap-2">
+    <div class="fixed bottom-10 right-4 z-[9999] flex flex-col gap-2" aria-live="polite" role="status">
       @for (toast of toastService.toasts(); track toast.id) {
         <div
           class="flex items-center gap-3 rounded-[var(--radius-md)] border px-4 py-2.5 text-sm shadow-[var(--shadow-md)] animate-[slideInRight_200ms_ease]"

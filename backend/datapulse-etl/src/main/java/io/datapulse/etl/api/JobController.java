@@ -27,6 +27,7 @@ public class JobController {
     private final WorkspaceContext workspaceContext;
 
     @GetMapping("/connections/{connectionId}/jobs")
+    @PreAuthorize("isAuthenticated()")
     public Page<JobExecutionResponse> listJobs(@PathVariable("connectionId") Long connectionId,
                                                JobFilter filter,
                                                Pageable pageable) {
@@ -35,6 +36,7 @@ public class JobController {
     }
 
     @GetMapping("/jobs/{jobId}")
+    @PreAuthorize("isAuthenticated()")
     public JobExecutionResponse getJob(@PathVariable("jobId") Long jobId) {
         return jobMonitoringService.getJob(jobId, workspaceContext.getWorkspaceId());
     }

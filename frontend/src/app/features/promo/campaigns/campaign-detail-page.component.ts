@@ -16,6 +16,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
+import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import {
   CampaignStatus,
   EvaluationResult,
@@ -192,7 +193,7 @@ export class CampaignDetailPageComponent {
       width: 110,
       cellClass: 'font-mono text-right',
       sortable: true,
-      valueFormatter: (params: any) => this.formatMoney(params.value),
+      valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
       headerName: 'Текущая цена',
@@ -200,7 +201,7 @@ export class CampaignDetailPageComponent {
       width: 110,
       cellClass: 'font-mono text-right',
       sortable: true,
-      valueFormatter: (params: any) => this.formatMoney(params.value),
+      valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
       headerName: 'Скидка',
@@ -439,14 +440,7 @@ export class CampaignDetailPageComponent {
   }
 
   formatDate(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
-  private formatMoney(val: number | null): string {
-    if (val == null) return '—';
-    return val.toLocaleString('ru-RU') + ' ₽';
+    return formatDateTime(iso, 'date');
   }
 
   private formatNumber(val: number | null): string {

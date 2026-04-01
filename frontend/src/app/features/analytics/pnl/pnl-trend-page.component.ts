@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -14,6 +14,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { Granularity, PnlTrendPoint } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { formatMoney } from '@shared/utils/format.utils';
 
 function daysAgo(n: number): string {
   const d = new Date();
@@ -126,6 +127,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
 export class PnlTrendPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly dateFrom = signal(daysAgo(90));
   readonly dateTo = signal(daysAgo(0));
@@ -169,7 +171,7 @@ export class PnlTrendPageComponent {
       },
       series: [
         {
-          name: 'Выручка',
+          name: this.t.instant('analytics.pnl.chart.revenue'),
           type: 'line',
           data: points.map((p) => p.revenueAmount),
           smooth: true,
@@ -178,7 +180,7 @@ export class PnlTrendPageComponent {
           areaStyle: { color: 'rgba(5,150,105,0.1)' },
         },
         {
-          name: 'Затраты',
+          name: this.t.instant('analytics.pnl.chart.costs'),
           type: 'line',
           data: points.map((p) => p.totalCostsAmount),
           smooth: true,
@@ -186,7 +188,7 @@ export class PnlTrendPageComponent {
           lineStyle: { width: 2, type: 'dashed' },
         },
         {
-          name: 'P&L',
+          name: this.t.instant('analytics.pnl.chart.pnl'),
           type: 'line',
           data: points.map((p) => p.fullPnl),
           smooth: true,
@@ -208,11 +210,7 @@ export class PnlTrendPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    const sign = value < 0 ? '−' : '';
-    return `${sign}${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   moneyColorClass(value: number): string {

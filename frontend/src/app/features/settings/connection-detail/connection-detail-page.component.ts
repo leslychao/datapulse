@@ -14,6 +14,7 @@ import {
   Power,
   PowerOff,
 } from 'lucide-angular';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { CallLogEntry, SyncState } from '@core/models';
@@ -27,8 +28,8 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 import { StatusLabelPipe, StatusColorPipe } from '@shared/pipes/status-label.pipe';
-
-const dateFormatter = new DateFormatPipe();
+import { formatDateTime } from '@shared/utils/format.utils';
+import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
 @Component({
   selector: 'dp-connection-detail-page',
@@ -38,6 +39,7 @@ const dateFormatter = new DateFormatPipe();
     FormsModule,
     AgGridAngular,
     LucideAngularModule,
+    TranslatePipe,
     StatusBadgeComponent,
     MarketplaceBadgeComponent,
     SectionCardComponent,
@@ -54,11 +56,11 @@ const dateFormatter = new DateFormatPipe();
         class="mb-4 flex cursor-pointer items-center gap-1 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-primary)]"
       >
         <lucide-icon [img]="ArrowLeftIcon" [size]="14" />
-        Назад к подключениям
+        {{ 'settings.connection_detail.back' | translate }}
       </button>
 
       @if (connectionQuery.isPending()) {
-        <dp-spinner message="Загрузка..." />
+        <dp-spinner [message]="'common.loading' | translate" />
       }
 
       @if (connectionQuery.data(); as conn) {
@@ -68,44 +70,44 @@ const dateFormatter = new DateFormatPipe();
           <dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" />
         </div>
 
-        <dp-section-card title="Информация" class="mb-6">
+        <dp-section-card [title]="'settings.connection_detail.info_title' | translate" class="mb-6">
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span class="text-[var(--text-secondary)]">Маркетплейс</span>
+              <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.marketplace' | translate }}</span>
               <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.marketplaceType === 'WB' ? 'Wildberries' : 'Ozon' }}</p>
             </div>
             <div>
-              <span class="text-[var(--text-secondary)]">Статус</span>
+              <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.status' | translate }}</span>
               <p class="mt-0.5"><dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" /></p>
             </div>
             <div>
-              <span class="text-[var(--text-secondary)]">Последняя успешная синхронизация</span>
+              <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.last_success_sync' | translate }}</span>
               <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.lastSuccessAt | dpDateFormat }}</p>
             </div>
             <div>
-              <span class="text-[var(--text-secondary)]">Последняя ошибка</span>
+              <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.last_error' | translate }}</span>
               <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.lastErrorCode || '—' }}</p>
             </div>
           </div>
         </dp-section-card>
 
-        <dp-section-card title="Учётные данные" class="mb-6">
+        <dp-section-card [title]="'settings.connection_detail.credentials_title' | translate" class="mb-6">
           @if (!showRotation()) {
             <div class="flex items-center justify-between">
-              <p class="text-sm text-[var(--text-secondary)]">Обновите учётные данные, если токен/ключ был перевыпущен в личном кабинете маркетплейса.</p>
+              <p class="text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.credentials_hint' | translate }}</p>
               <button
                 (click)="showRotation.set(true)"
                 class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
               >
                 <lucide-icon [img]="ShieldIcon" [size]="14" />
-                Обновить
+                {{ 'settings.connection_detail.update_credentials' | translate }}
               </button>
             </div>
           } @else {
             <form (ngSubmit)="submitRotation()" class="max-w-md space-y-4">
               @if (conn.marketplaceType === 'WB') {
                 <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">Новый API-токен</label>
+                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_token_label' | translate }}</label>
                   <input
                     type="password"
                     [(ngModel)]="newWbToken"
@@ -116,7 +118,7 @@ const dateFormatter = new DateFormatPipe();
                 </div>
               } @else {
                 <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">Новый Client ID</label>
+                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_client_id_label' | translate }}</label>
                   <input
                     type="text"
                     [(ngModel)]="newOzonClientId"
@@ -126,7 +128,7 @@ const dateFormatter = new DateFormatPipe();
                   />
                 </div>
                 <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">Новый API Key</label>
+                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_api_key_label' | translate }}</label>
                   <input
                     type="password"
                     [(ngModel)]="newOzonApiKey"
@@ -141,27 +143,27 @@ const dateFormatter = new DateFormatPipe();
                   type="submit"
                   [disabled]="!isRotationValid() || rotateMutation.isPending()"
                   class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                >Сохранить</button>
+                >{{ 'actions.save' | translate }}</button>
                 <button
                   type="button"
                   (click)="cancelRotation()"
                   class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-                >Отмена</button>
+                >{{ 'actions.cancel' | translate }}</button>
               </div>
             </form>
           }
         </dp-section-card>
 
-        <dp-section-card title="Синхронизация по доменам" class="mb-6">
+        <dp-section-card [title]="'settings.connection_detail.sync_domains_title' | translate" class="mb-6">
           <div class="mb-2 flex items-center justify-between">
-            <p class="text-sm text-[var(--text-secondary)]">Текущее состояние синхронизации по типам данных</p>
+            <p class="text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.sync_domains_hint' | translate }}</p>
             <button
               (click)="triggerSyncMutation.mutate(undefined)"
               [disabled]="triggerSyncMutation.isPending() || conn.status !== 'ACTIVE'"
               class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon [img]="RefreshIcon" [size]="14" [class.dp-spinner]="triggerSyncMutation.isPending()" />
-              Запустить синхронизацию
+              {{ 'settings.connection_detail.trigger_sync' | translate }}
             </button>
           </div>
           @if (syncStateQuery.data(); as syncStates) {
@@ -174,11 +176,12 @@ const dateFormatter = new DateFormatPipe();
               [defaultColDef]="defaultColDef"
               [animateRows]="true"
               [suppressCellFocus]="true"
+              [localeText]="AG_GRID_LOCALE_RU"
             />
           }
         </dp-section-card>
 
-        <dp-section-card title="Журнал API-вызовов" class="mb-6">
+        <dp-section-card [title]="'settings.connection_detail.call_log_title' | translate" class="mb-6">
           @if (callLogQuery.data(); as callLogPage) {
             <ag-grid-angular
               class="ag-theme-alpine"
@@ -190,17 +193,18 @@ const dateFormatter = new DateFormatPipe();
               [suppressCellFocus]="true"
               [pagination]="true"
               [paginationPageSize]="20"
+              [localeText]="AG_GRID_LOCALE_RU"
             />
           }
         </dp-section-card>
 
-        <dp-section-card title="Опасная зона" class="mb-6">
+        <dp-section-card [title]="'settings.connection_detail.danger_zone' | translate" class="mb-6">
           <div class="space-y-3">
             @if (conn.status !== 'DISABLED' && conn.status !== 'ARCHIVED') {
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-medium text-[var(--text-primary)]">Отключить подключение</p>
-                  <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">Синхронизация данных будет приостановлена</p>
+                  <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.connection_detail.disable_title' | translate }}</p>
+                  <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.disable_hint' | translate }}</p>
                 </div>
                 <button
                   (click)="disableMutation.mutate(undefined)"
@@ -208,15 +212,15 @@ const dateFormatter = new DateFormatPipe();
                   class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-warning)] px-3 py-1.5 text-sm text-[var(--status-warning)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)]"
                 >
                   <lucide-icon [img]="PowerOffIcon" [size]="14" />
-                  Отключить
+                  {{ 'settings.connection_detail.disable_btn' | translate }}
                 </button>
               </div>
             }
             @if (conn.status === 'DISABLED') {
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-medium text-[var(--text-primary)]">Включить подключение</p>
-                  <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">Синхронизация будет возобновлена после ревалидации</p>
+                  <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.connection_detail.enable_title' | translate }}</p>
+                  <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.enable_hint' | translate }}</p>
                 </div>
                 <button
                   (click)="enableMutation.mutate(undefined)"
@@ -224,21 +228,21 @@ const dateFormatter = new DateFormatPipe();
                   class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-success)] px-3 py-1.5 text-sm text-[var(--status-success)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-success)_8%,transparent)]"
                 >
                   <lucide-icon [img]="PowerIcon" [size]="14" />
-                  Включить
+                  {{ 'settings.connection_detail.enable_btn' | translate }}
                 </button>
               </div>
             }
             <div class="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
               <div>
-                <p class="text-sm font-medium text-[var(--status-error)]">Удалить подключение</p>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">Это действие необратимо. Все данные синхронизации будут потеряны.</p>
+                <p class="text-sm font-medium text-[var(--status-error)]">{{ 'settings.connection_detail.delete_title' | translate }}</p>
+                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.delete_hint' | translate }}</p>
               </div>
               <button
                 (click)="showDeleteModal.set(true)"
                 class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-error)] px-3 py-1.5 text-sm text-[var(--status-error)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)]"
               >
                 <lucide-icon [img]="Trash2Icon" [size]="14" />
-                Удалить
+                {{ 'actions.delete' | translate }}
               </button>
             </div>
           </div>
@@ -248,9 +252,9 @@ const dateFormatter = new DateFormatPipe();
       @if (connectionQuery.data(); as conn) {
         <dp-confirmation-modal
           [open]="showDeleteModal()"
-          title="Удалить подключение"
-          [message]="'Вы уверены, что хотите удалить подключение «' + conn.name + '»? Это действие необратимо.'"
-          confirmLabel="Удалить"
+          [title]="'settings.connection_detail.delete_modal_title' | translate"
+          [message]="translate.instant('settings.connection_detail.delete_modal_message', { name: conn.name })"
+          [confirmLabel]="'actions.delete' | translate"
           [danger]="true"
           [typeToConfirm]="conn.name"
           (confirmed)="deleteMutation.mutate(undefined); showDeleteModal.set(false)"
@@ -268,6 +272,7 @@ export class ConnectionDetailPageComponent {
   protected readonly PowerIcon = Power;
   protected readonly PowerOffIcon = PowerOff;
   protected readonly Math = Math;
+  protected readonly AG_GRID_LOCALE_RU = AG_GRID_LOCALE_RU;
 
   readonly connectionId = input.required<string>();
 
@@ -276,6 +281,7 @@ export class ConnectionDetailPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly breadcrumbs = inject(BreadcrumbService);
+  protected readonly translate = inject(TranslateService);
 
   constructor() {
     effect(() => {
@@ -284,8 +290,8 @@ export class ConnectionDetailPageComponent {
       const wsId = this.wsStore.currentWorkspaceId();
       const base = `/workspace/${wsId}/settings`;
       this.breadcrumbs.setSegments([
-        { label: 'Настройки', route: base },
-        { label: 'Подключения', route: `${base}/connections` },
+        { label: this.translate.instant('settings.nav.title'), route: base },
+        { label: this.translate.instant('settings.nav.connections'), route: `${base}/connections` },
         { label: conn.name, route: null },
       ]);
     });
@@ -328,43 +334,45 @@ export class ConnectionDetailPageComponent {
     onSuccess: () => {
       this.connectionQuery.refetch();
       this.cancelRotation();
-      this.toast.success('Учётные данные обновлены. Запущена проверка.');
+      this.toast.success(this.translate.instant('settings.connection_detail.credentials_updated'));
     },
-    onError: () => this.toast.error('Не удалось обновить учётные данные'),
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.credentials_update_error')),
   }));
 
   readonly triggerSyncMutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.connectionApi.triggerSync(this.connId)),
     onSuccess: () => {
-      this.toast.success('Синхронизация запущена');
+      this.toast.success(this.translate.instant('settings.connection_detail.sync_started'));
       this.syncStateQuery.refetch();
     },
-    onError: () => this.toast.error('Не удалось запустить синхронизацию'),
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.sync_start_error')),
   }));
 
   readonly disableMutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.connectionApi.disableConnection(this.connId)),
     onSuccess: () => {
       this.connectionQuery.refetch();
-      this.toast.info('Подключение отключено');
+      this.toast.info(this.translate.instant('settings.connection_detail.disabled'));
     },
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.disable_error')),
   }));
 
   readonly enableMutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.connectionApi.enableConnection(this.connId)),
     onSuccess: () => {
       this.connectionQuery.refetch();
-      this.toast.success('Подключение активировано. Запущена проверка.');
+      this.toast.success(this.translate.instant('settings.connection_detail.enabled'));
     },
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.enable_error')),
   }));
 
   readonly deleteMutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.connectionApi.archiveConnection(this.connId)),
     onSuccess: () => {
-      this.toast.success('Подключение удалено');
+      this.toast.success(this.translate.instant('settings.connection_detail.deleted'));
       this.goBack();
     },
-    onError: () => this.toast.error('Не удалось удалить подключение'),
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.delete_error')),
   }));
 
   readonly defaultColDef: ColDef = {
@@ -374,9 +382,9 @@ export class ConnectionDetailPageComponent {
   };
 
   readonly syncColDefs: ColDef<SyncState>[] = [
-    { headerName: 'Домен', field: 'dataDomain', flex: 2 },
+    { headerName: this.translate.instant('settings.connection_detail.col_domain'), field: 'dataDomain', flex: 2 },
     {
-      headerName: 'Статус',
+      headerName: this.translate.instant('settings.connection_detail.col_status'),
       field: 'status',
       flex: 1,
       cellStyle: (params) => {
@@ -386,30 +394,30 @@ export class ConnectionDetailPageComponent {
       },
     },
     {
-      headerName: 'Последняя синхронизация',
+      headerName: this.translate.instant('settings.connection_detail.col_last_sync'),
       field: 'lastSyncAt',
       flex: 2,
-      valueFormatter: (params) => dateFormatter.transform(params.value),
+      valueFormatter: (params) => formatDateTime(params.value),
     },
     {
-      headerName: 'Следующая',
+      headerName: this.translate.instant('settings.connection_detail.col_next_sync'),
       field: 'nextScheduledAt',
       flex: 2,
-      valueFormatter: (params) => dateFormatter.transform(params.value),
+      valueFormatter: (params) => formatDateTime(params.value),
     },
   ];
 
   readonly callLogColDefs: ColDef<CallLogEntry>[] = [
     {
-      headerName: 'Время',
+      headerName: this.translate.instant('settings.connection_detail.col_time'),
       field: 'createdAt',
       flex: 2,
-      valueFormatter: (params) => dateFormatter.transform(params.value),
+      valueFormatter: (params) => formatDateTime(params.value),
     },
-    { headerName: 'Метод', field: 'httpMethod', width: 80 },
+    { headerName: this.translate.instant('settings.connection_detail.col_method'), field: 'httpMethod', width: 80 },
     { headerName: 'Endpoint', field: 'endpoint', flex: 3 },
     {
-      headerName: 'Статус',
+      headerName: this.translate.instant('settings.connection_detail.col_http_status'),
       field: 'httpStatus',
       width: 80,
       cellStyle: (params) => {
@@ -419,10 +427,10 @@ export class ConnectionDetailPageComponent {
         return null;
       },
     },
-    { headerName: 'Время (мс)', field: 'durationMs', width: 100 },
+    { headerName: this.translate.instant('settings.connection_detail.col_duration'), field: 'durationMs', width: 100 },
     { headerName: 'Retry', field: 'retryAttempt', width: 70 },
     {
-      headerName: 'Ошибка',
+      headerName: this.translate.instant('settings.connection_detail.col_error'),
       field: 'errorDetails',
       flex: 2,
       valueFormatter: (params) => params.value || '—',

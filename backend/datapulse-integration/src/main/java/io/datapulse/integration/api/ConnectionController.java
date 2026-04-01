@@ -39,11 +39,13 @@ public class ConnectionController {
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public List<ConnectionSummaryResponse> listConnections() {
         return connectionService.listConnections(workspaceContext.getWorkspaceId());
     }
 
     @GetMapping("/{connectionId}")
+    @PreAuthorize("isAuthenticated()")
     public ConnectionResponse getConnection(@PathVariable("connectionId") Long connectionId) {
         return connectionService.getConnection(connectionId, workspaceContext.getWorkspaceId());
     }
@@ -100,6 +102,7 @@ public class ConnectionController {
     }
 
     @GetMapping("/{connectionId}/sync-state")
+    @PreAuthorize("isAuthenticated()")
     public List<SyncStateResponse> getSyncStates(@PathVariable("connectionId") Long connectionId) {
         return connectionService.getSyncStates(connectionId, workspaceContext.getWorkspaceId());
     }

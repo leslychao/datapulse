@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnDestroy, OnInit, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet, ActivatedRoute } from '@angular/router';
 
 import { TopBarComponent } from './top-bar/top-bar.component';
@@ -94,6 +95,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly shortcuts = inject(ShortcutService);
   private readonly webSocket = inject(WebSocketService);
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
     this.shortcuts.init();
@@ -104,7 +106,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.route.params.subscribe((params) => {
+    this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const wsId = Number(params['workspaceId']);
       if (!isNaN(wsId) && wsId > 0) {
         this.workspaceStore.setWorkspace(wsId, '');

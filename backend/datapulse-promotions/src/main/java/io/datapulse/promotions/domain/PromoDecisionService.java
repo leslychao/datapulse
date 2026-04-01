@@ -42,6 +42,13 @@ public class PromoDecisionService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
+    public PromoDecisionResponse getDecision(long decisionId, long workspaceId) {
+        return decisionRepository.findByIdAndWorkspaceId(decisionId, workspaceId)
+                .map(decisionMapper::toResponse)
+                .orElseThrow(() -> NotFoundException.entity("promo_decision", decisionId));
+    }
+
+    @Transactional(readOnly = true)
     public Page<PromoDecisionResponse> listDecisions(long workspaceId, PromoDecisionType decisionType,
                                                       Long campaignId, java.time.LocalDate from,
                                                       java.time.LocalDate to, Pageable pageable) {

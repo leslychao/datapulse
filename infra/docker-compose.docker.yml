@@ -8,29 +8,45 @@ services:
       - "8081"
     environment:
       SPRING_PROFILES_ACTIVE: local
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datapulse}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-datapulse}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-datapulse}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
-      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
-      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
-      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-datapulse}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
-      DATAPULSE_S3_ENDPOINT: http://minio:9000
-      DATAPULSE_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-datapulse}
-      DATAPULSE_S3_SECRET_KEY: ${S3_SECRET_KEY}
-      DATAPULSE_VAULT_URI: http://vault:8200
-      DATAPULSE_VAULT_TOKEN: ${VAULT_TOKEN}
-      DATAPULSE_CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/${CH_DATABASE:-datapulse}
-      DATAPULSE_CLICKHOUSE_USERNAME: ${CH_USERNAME:-default}
-      DATAPULSE_CLICKHOUSE_PASSWORD: ${CH_PASSWORD}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -XX:+UseG1GC}
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-datapulse}
+      POSTGRES_USER: ${POSTGRES_USER:-datapulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_SCHEMA: ${DB_SCHEMA:-datapulse}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-datapulse}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@datapulse.io}
+      INVITATION_BASE_URL: ${INVITATION_BASE_URL:-http://localhost/invitation/accept}
+      KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-datapulse}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
+      S3_HOST: minio
+      S3_PORT: 9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-datapulse}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_RAW_BUCKET: ${S3_RAW_BUCKET:-datapulse-raw}
+      VAULT_HOST: vault
+      VAULT_PORT: 8200
+      VAULT_TOKEN: ${VAULT_TOKEN}
+      VAULT_BASE_PATH: ${VAULT_BASE_PATH:-secret/data/datapulse}
+      CH_HOST: clickhouse
+      CH_PORT: 8123
+      CH_DATABASE: ${CH_DATABASE:-datapulse}
+      CH_USERNAME: ${CH_USERNAME:-default}
+      CH_PASSWORD: ${CH_PASSWORD}
+      CH_MIGRATION_ENABLED: ${CH_MIGRATION_ENABLED:-true}
+      OUTBOX_ENABLED: ${OUTBOX_ENABLED:-true}
+      OUTBOX_RUNTIME: ${OUTBOX_RUNTIME:-ALL}
     depends_on:
       postgres:
         condition: service_healthy

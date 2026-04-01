@@ -9,6 +9,7 @@ import { LucideAngularModule, Search } from 'lucide-angular';
   template: `
     <button
       (click)="searchRequested.emit()"
+      aria-label="Поиск"
       class="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2 py-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
     >
       <lucide-icon [img]="Search" [size]="16" />

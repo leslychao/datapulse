@@ -1,17 +1,7 @@
-import { Pipe, PipeTransform } from '@angular/core';
-
-import { ConnectionStatus } from '@core/models';
+import { inject, Pipe, PipeTransform } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 
 type StatusColor = 'success' | 'error' | 'warning' | 'info' | 'neutral';
-
-const LABELS: Record<string, string> = {
-  ACTIVE: 'Активно',
-  PENDING_VALIDATION: 'Проверка',
-  AUTH_FAILED: 'Ошибка авторизации',
-  ERROR: 'Ошибка',
-  DISABLED: 'Отключено',
-  ARCHIVED: 'В архиве',
-};
 
 const COLORS: Record<string, StatusColor> = {
   ACTIVE: 'success',
@@ -20,6 +10,20 @@ const COLORS: Record<string, StatusColor> = {
   ERROR: 'error',
   DISABLED: 'neutral',
   ARCHIVED: 'neutral',
+  OPEN: 'error',
+  ACKNOWLEDGED: 'warning',
+  RESOLVED: 'success',
+  AUTO_RESOLVED: 'success',
+  PENDING_APPROVAL: 'warning',
+  APPROVED: 'info',
+  EXECUTING: 'info',
+  CONFIRMED: 'success',
+  FAILED: 'error',
+  EXPIRED: 'neutral',
+  CANCELLED: 'neutral',
+  RECONCILIATION_PENDING: 'warning',
+  DRAFT: 'neutral',
+  PAUSED: 'warning',
 };
 
 @Pipe({
@@ -28,8 +32,10 @@ const COLORS: Record<string, StatusColor> = {
   pure: true,
 })
 export class StatusLabelPipe implements PipeTransform {
-  transform(status: ConnectionStatus | string): string {
-    return LABELS[status] ?? status;
+  private readonly translate = inject(TranslateService);
+
+  transform(status: string): string {
+    return this.translate.instant(`status.${status.toLowerCase()}`);
   }
 }
 
@@ -39,7 +45,7 @@ export class StatusLabelPipe implements PipeTransform {
   pure: true,
 })
 export class StatusColorPipe implements PipeTransform {
-  transform(status: ConnectionStatus | string): StatusColor {
+  transform(status: string): StatusColor {
     return COLORS[status] ?? 'neutral';
   }
 }

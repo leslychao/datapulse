@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -14,6 +14,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReconciliationConnection } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { formatMoney, formatPercent } from '@shared/utils/format.utils';
 
 function currentMonth(): string {
   const d = new Date();
@@ -29,11 +30,11 @@ const STATUS_COLORS: Record<ReconStatus, string> = {
   CALIBRATION: 'var(--status-info)',
 };
 
-const STATUS_LABELS: Record<ReconStatus, string> = {
-  NORMAL: 'Норма',
-  ANOMALY: 'Аномалия',
-  INSUFFICIENT_DATA: 'Мало данных',
-  CALIBRATION: 'Калибровка',
+const STATUS_LABEL_KEYS: Record<ReconStatus, string> = {
+  NORMAL: 'analytics.reconciliation.status.NORMAL',
+  ANOMALY: 'analytics.reconciliation.status.ANOMALY',
+  INSUFFICIENT_DATA: 'analytics.reconciliation.status.INSUFFICIENT_DATA',
+  CALIBRATION: 'analytics.reconciliation.status.CALIBRATION',
 };
 
 const CONNECTION_PALETTE = [
@@ -150,6 +151,7 @@ const CONNECTION_PALETTE = [
 export class ReconciliationPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
 

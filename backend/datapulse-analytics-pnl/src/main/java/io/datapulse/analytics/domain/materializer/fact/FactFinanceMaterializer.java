@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -125,8 +124,8 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
                 ps.setNull(7, java.sql.Types.INTEGER);
             }
 
-            OffsetDateTime entryDate = (OffsetDateTime) row.get("entry_date");
-            ps.setDate(8, Date.valueOf(entryDate.toLocalDate()));
+            Timestamp entryDate = (Timestamp) row.get("entry_date");
+            ps.setDate(8, Date.valueOf(entryDate.toLocalDateTime().toLocalDate()));
             ps.setString(9, (String) row.get("entry_type"));
             ps.setString(10, (String) row.get("attribution_level"));
 

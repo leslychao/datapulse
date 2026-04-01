@@ -35,13 +35,19 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
+    "@angular-eslint/builder": "^19.8.1",
+    "@angular-eslint/eslint-plugin": "^19.8.1",
+    "@angular-eslint/eslint-plugin-template": "^19.8.1",
+    "@angular-eslint/template-parser": "^19.8.1",
     "@angular/build": "^19.0.0",
     "@angular/cli": "^19.0.0",
     "@angular/compiler-cli": "^19.0.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.0.0",
+    "angular-eslint": "^19.8.1",
     "postcss": "^8.4.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "~5.6.0"
+    "typescript": "~5.6.0",
+    "typescript-eslint": "^8.58.0"
   }
 }

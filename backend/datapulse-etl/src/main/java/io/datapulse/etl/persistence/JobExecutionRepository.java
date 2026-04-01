@@ -165,6 +165,7 @@ public class JobExecutionRepository {
         if (to != null) {
             sb.append(" AND created_at <= :to");
         }
+        sb.append('\n');
         return sb.toString();
     }
 

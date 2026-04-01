@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -16,6 +16,7 @@ import {
   StockOutRisk,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { formatMoney } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-inventory-by-product-page',
@@ -279,6 +280,7 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 export class InventoryByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly t = inject(TranslateService);
 
   readonly connectionId = signal(0);
   readonly riskFilter = signal<StockOutRisk | ''>('');
@@ -353,10 +355,7 @@ export class InventoryByProductPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    return value < 0 ? `−${formatted} ₽` : `${formatted} ₽`;
+    return formatMoney(value, 0);
   }
 
   riskDotClass(risk: string): string {
@@ -368,10 +367,6 @@ export class InventoryByProductPageComponent {
   }
 
   riskLabel(risk: string): string {
-    switch (risk) {
-      case 'CRITICAL': return 'Критичный';
-      case 'WARNING': return 'Внимание';
-      default: return 'Норма';
-    }
+    return this.t.instant(`analytics.inventory.risk.${risk.toLowerCase()}`);
   }
 }

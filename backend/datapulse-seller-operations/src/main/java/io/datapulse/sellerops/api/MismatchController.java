@@ -25,6 +25,21 @@ public class MismatchController {
   private final MismatchService mismatchService;
   private final WorkspaceContext workspaceContext;
 
+  @GetMapping("/summary")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public MismatchSummaryResponse getSummary(
+      @PathVariable("workspaceId") Long workspaceId) {
+    return mismatchService.getSummary(workspaceId);
+  }
+
+  @GetMapping("/{mismatchId}")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public MismatchResponse getMismatch(
+      @PathVariable("workspaceId") Long workspaceId,
+      @PathVariable("mismatchId") Long mismatchId) {
+    return mismatchService.getMismatch(workspaceId, mismatchId);
+  }
+
   @GetMapping
   @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public Page<MismatchResponse> listMismatches(

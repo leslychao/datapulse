@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -11,9 +11,12 @@ import { FormsModule } from '@angular/forms';
       <div class="fixed inset-0 z-[9000] flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40" (click)="onCancel()"></div>
         <div
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="'confirm-modal-title'"
           class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)] animate-[fadeIn_150ms_ease]"
         >
-          <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ title() }}</h3>
+          <h3 id="confirm-modal-title" class="text-base font-semibold text-[var(--text-primary)]">{{ title() }}</h3>
           <p class="mt-2 text-sm text-[var(--text-secondary)] whitespace-pre-line">{{ message() }}</p>
 
           @if (typeToConfirm()) {
@@ -59,6 +62,11 @@ import { FormsModule } from '@angular/forms';
   `],
 })
 export class ConfirmationModalComponent {
+  @HostListener('keydown.escape')
+  protected onEscape(): void {
+    if (this.open()) this.onCancel();
+  }
+
   readonly open = input(false);
   readonly title = input('');
   readonly message = input('');

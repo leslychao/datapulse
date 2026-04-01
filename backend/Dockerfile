@@ -20,5 +20,9 @@ RUN mvn clean package -DskipTests -pl datapulse-api -am
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=builder /build/datapulse-api/target/*.jar app.jar
-EXPOSE 8081
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENV SERVER_PORT=8081
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+
+EXPOSE ${SERVER_PORT}
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

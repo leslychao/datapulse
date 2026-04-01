@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: ${SERVER_PORT:8081}
 
 spring:
   config:
@@ -16,16 +16,16 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        default_schema: datapulse
+        default_schema: ${DB_SCHEMA:datapulse}
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
-    default-schema: datapulse
+    default-schema: ${DB_SCHEMA:datapulse}
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:${KEYCLOAK_PORT:8080}/realms/${KEYCLOAK_REALM:datapulse}
-          jwk-set-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8080}/realms/${KEYCLOAK_REALM:datapulse}/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8080}/realms/${KEYCLOAK_REALM:datapulse}}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8080}/realms/${KEYCLOAK_REALM:datapulse}/protocol/openid-connect/certs}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -49,28 +49,28 @@ datapulse:
     endpoint: http://${S3_HOST:localhost}:${S3_PORT:9010}
     access-key: ${S3_ACCESS_KEY:datapulse}
     secret-key: ${S3_SECRET_KEY:}
-    raw-bucket: datapulse-raw
+    raw-bucket: ${S3_RAW_BUCKET:datapulse-raw}
   etl:
     retention:
-      finance-months: 12
-      flow-months: 6
-      state-keep-count: 3
-      cron: "0 0 3 * * ?"
+      finance-months: ${ETL_RETENTION_FINANCE_MONTHS:12}
+      flow-months: ${ETL_RETENTION_FLOW_MONTHS:6}
+      state-keep-count: ${ETL_RETENTION_STATE_KEEP_COUNT:3}
+      cron: ${ETL_RETENTION_CRON:0 0 3 * * ?}
     temp-dir: ${DATAPULSE_ETL_TEMP_DIR:${java.io.tmpdir}/datapulse-raw}
-    sync-poll-interval: PT1M
+    sync-poll-interval: ${ETL_SYNC_POLL_INTERVAL:PT1M}
     ingest:
-      canonical-batch-size: 500
-      clickhouse-batch-size: 5000
-      job-timeout: PT2H
-      max-job-retries: 3
-      min-retry-backoff: PT5M
-      max-retry-backoff: PT30M
-      retry-backoff-multiplier: 2
+      canonical-batch-size: ${ETL_CANONICAL_BATCH_SIZE:500}
+      clickhouse-batch-size: ${ETL_CLICKHOUSE_BATCH_SIZE:5000}
+      job-timeout: ${ETL_JOB_TIMEOUT:PT2H}
+      max-job-retries: ${ETL_MAX_JOB_RETRIES:3}
+      min-retry-backoff: ${ETL_MIN_RETRY_BACKOFF:PT5M}
+      max-retry-backoff: ${ETL_MAX_RETRY_BACKOFF:PT30M}
+      retry-backoff-multiplier: ${ETL_RETRY_BACKOFF_MULTIPLIER:2}
   vault:
     uri: http://${VAULT_HOST:localhost}:${VAULT_PORT:8200}
     token: ${VAULT_TOKEN:}
-    credential-cache-ttl: 1h
-    base-path: secret/data/datapulse
+    credential-cache-ttl: ${VAULT_CREDENTIAL_CACHE_TTL:1h}
+    base-path: ${VAULT_BASE_PATH:secret/data/datapulse}
   integration:
     wildberries:
       content-base-url: ${WB_CONTENT_BASE_URL:https://content-api.wildberries.ru}
@@ -84,48 +84,51 @@ datapulse:
       seller-base-url: ${OZON_SELLER_BASE_URL:https://api-seller.ozon.ru}
       performance-base-url: ${OZON_PERFORMANCE_BASE_URL:https://api-performance.ozon.ru}
     health-check:
-      interval: PT15M
-      failure-threshold: 3
+      interval: ${HEALTH_CHECK_INTERVAL:PT15M}
+      failure-threshold: ${HEALTH_CHECK_FAILURE_THRESHOLD:3}
   clickhouse:
     url: jdbc:clickhouse://${CH_HOST:localhost}:${CH_PORT:8123}/${CH_DATABASE:datapulse}
     username: ${CH_USERNAME:default}
     password: ${CH_PASSWORD:}
     migration:
-      enabled: true
+      enabled: ${CH_MIGRATION_ENABLED:true}
   alerting:
-    stale-data-interval: PT5M
-    missing-sync-interval: PT15M
-    mismatch-interval: PT30M
+    stale-data-interval: ${ALERTING_STALE_DATA_INTERVAL:PT5M}
+    missing-sync-interval: ${ALERTING_MISSING_SYNC_INTERVAL:PT15M}
+    mismatch-interval: ${ALERTING_MISMATCH_INTERVAL:PT30M}
   execution:
-    max-attempts: 3
-    min-backoff: PT5S
-    max-backoff: PT5M
-    backoff-multiplier: 2
-    approval-timeout-hours: 24
+    max-attempts: ${EXECUTION_MAX_ATTEMPTS:3}
+    min-backoff: ${EXECUTION_MIN_BACKOFF:PT5S}
+    max-backoff: ${EXECUTION_MAX_BACKOFF:PT5M}
+    backoff-multiplier: ${EXECUTION_BACKOFF_MULTIPLIER:2}
+    approval-timeout-hours: ${EXECUTION_APPROVAL_TIMEOUT_HOURS:24}
     reconciliation:
-      initial-delay: PT30S
-      backoff-multiplier: 2
-      max-attempts: 3
-      timeout: PT10M
+      initial-delay: ${EXECUTION_RECON_INITIAL_DELAY:PT30S}
+      backoff-multiplier: ${EXECUTION_RECON_BACKOFF_MULTIPLIER:2}
+      max-attempts: ${EXECUTION_RECON_MAX_ATTEMPTS:3}
+      timeout: ${EXECUTION_RECON_TIMEOUT:PT10M}
     stuck-state:
-      interval: PT5M
-      executing-ttl: PT5M
-      retry-scheduled-grace: PT5M
-      reconciliation-pending-ttl: PT10M
-      scheduled-ttl: PT5M
+      interval: ${EXECUTION_STUCK_INTERVAL:PT5M}
+      executing-ttl: ${EXECUTION_STUCK_EXECUTING_TTL:PT5M}
+      retry-scheduled-grace: ${EXECUTION_STUCK_RETRY_GRACE:PT5M}
+      reconciliation-pending-ttl: ${EXECUTION_STUCK_RECON_PENDING_TTL:PT10M}
+      scheduled-ttl: ${EXECUTION_STUCK_SCHEDULED_TTL:PT5M}
   outbox:
-    enabled: true
-    runtime: ALL
-    poll-interval: PT1S
-    batch-size: 50
-    max-retry-count: 5
-    retry-backoff: PT30S
+    enabled: ${OUTBOX_ENABLED:true}
+    runtime: ${OUTBOX_RUNTIME:ALL}
+    poll-interval: ${OUTBOX_POLL_INTERVAL:PT1S}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
+    max-retry-count: ${OUTBOX_MAX_RETRY_COUNT:5}
+    retry-backoff: ${OUTBOX_RETRY_BACKOFF:PT30S}
+  mail:
+    from: ${MAIL_FROM:noreply@datapulse.io}
+    invitation-base-url: ${INVITATION_BASE_URL:http://localhost:4200/invitation/accept}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,prometheus,metrics}
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when-authorized}

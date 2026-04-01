@@ -3,7 +3,6 @@ package io.datapulse.analytics.domain.materializer.fact;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -112,10 +111,9 @@ public class FactInventorySnapshotMaterializer implements AnalyticsMaterializer 
                 ps.setNull(6, java.sql.Types.INTEGER);
             }
 
-            OffsetDateTime capturedAt = (OffsetDateTime) row.get("captured_at");
-            Timestamp ts = Timestamp.from(capturedAt.toInstant());
+            Timestamp ts = (Timestamp) row.get("captured_at");
             ps.setTimestamp(7, ts);
-            ps.setDate(8, Date.valueOf(capturedAt.toLocalDate()));
+            ps.setDate(8, Date.valueOf(ts.toLocalDateTime().toLocalDate()));
             ps.setLong(9, ver);
         });
     }

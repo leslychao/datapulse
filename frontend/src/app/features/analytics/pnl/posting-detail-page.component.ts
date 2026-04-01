@@ -13,6 +13,7 @@ import { lastValueFrom } from 'rxjs';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { PostingEntry } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { formatMoney } from '@shared/utils/format.utils';
 
 interface MeasureColumn {
   labelKey: string;
@@ -78,11 +79,8 @@ export class PostingDetailPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value == null || value === 0) return '—';
-    const abs = Math.abs(value);
-    const formatted = abs.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-    const sign = value < 0 ? '−' : '';
-    return `${sign}${formatted} ₽`;
+    if (value === 0) return '—';
+    return formatMoney(value, 0);
   }
 
   moneyColorClass(value: number): string {
