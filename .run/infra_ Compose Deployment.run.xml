@@ -3,6 +3,11 @@
     <deployment type="docker-compose.yml">
       <settings>
         <option name="envFilePath" value="" />
+        <option name="secondarySourceFiles">
+          <list>
+            <option value="infra/docker-compose.local.yml" />
+          </list>
+        </option>
         <option name="sourceFilePath" value="infra/docker-compose.yml" />
       </settings>
     </deployment>
