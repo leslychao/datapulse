@@ -92,6 +92,23 @@ datapulse:
     stale-data-interval: PT5M
     missing-sync-interval: PT15M
     mismatch-interval: PT30M
+  execution:
+    max-attempts: 3
+    min-backoff: PT5S
+    max-backoff: PT5M
+    backoff-multiplier: 2
+    approval-timeout-hours: 24
+    reconciliation:
+      initial-delay: PT30S
+      backoff-multiplier: 2
+      max-attempts: 3
+      timeout: PT10M
+    stuck-state:
+      interval: PT5M
+      executing-ttl: PT5M
+      retry-scheduled-grace: PT5M
+      reconciliation-pending-ttl: PT10M
+      scheduled-ttl: PT5M
   outbox:
     enabled: true
     runtime: ALL

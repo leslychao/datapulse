@@ -282,6 +282,10 @@
   "execution.action.cas_conflict": "Конфликт: действие {{actionId}} уже изменено (ожидалось {{expected}}, цель {{target}}).",
   "execution.action.not_cancellable": "Действие {{actionId}} нельзя отменить в статусе {{status}}.",
   "execution.action.already_active": "Для этого оффера уже существует активное действие.",
+  "execution.action.not_retriable": "Действие {{actionId}} нельзя повторить в статусе {{status}}.",
   "execution.reconciliation.failed": "Проверка применения цены не удалась.",
-  "execution.reconciliation.mismatch": "Расхождение: целевая цена не совпадает с фактической."
+  "execution.reconciliation.mismatch": "Расхождение: целевая цена не совпадает с фактической.",
+  "execution.reconciliation.invalid_outcome": "Недопустимый результат reconciliation.",
+  "execution.stuck_state.detected": "Обнаружено застрявшее действие {{actionId}} в статусе {{status}}.",
+  "execution.poison_pill.detected": "Обнаружено повреждённое сообщение в очереди обработки."
 }

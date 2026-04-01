@@ -19,7 +19,7 @@ public class ExplanationBuilder {
     private static final DecimalFormat PRICE_FORMAT;
 
     static {
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.of("ru"));
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("ru"));
         symbols.setGroupingSeparator(' ');
         symbols.setDecimalSeparator('.');
         PRICE_FORMAT = new DecimalFormat("#,##0", symbols);

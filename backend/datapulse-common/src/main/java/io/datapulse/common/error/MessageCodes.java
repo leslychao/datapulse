@@ -82,6 +82,10 @@ public final class MessageCodes {
     public static final String EXECUTION_ACTION_CAS_CONFLICT = "execution.action.cas_conflict";
     public static final String EXECUTION_ACTION_NOT_CANCELLABLE = "execution.action.not_cancellable";
     public static final String EXECUTION_ACTION_ALREADY_ACTIVE = "execution.action.already_active";
+    public static final String EXECUTION_ACTION_NOT_RETRIABLE = "execution.action.not_retriable";
     public static final String EXECUTION_RECONCILIATION_FAILED = "execution.reconciliation.failed";
     public static final String EXECUTION_RECONCILIATION_MISMATCH = "execution.reconciliation.mismatch";
+    public static final String EXECUTION_RECONCILIATION_INVALID_OUTCOME = "execution.reconciliation.invalid_outcome";
+    public static final String EXECUTION_STUCK_STATE_DETECTED = "execution.stuck_state.detected";
+    public static final String EXECUTION_POISON_PILL = "execution.poison_pill.detected";
 }
