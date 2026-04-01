@@ -22,7 +22,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   const headers: Record<string, string> = {};
 
-  const skipWorkspace = WORKSPACE_HEADER_SKIP_PATHS.some((path) => req.url.startsWith(path));
+  const urlPath = req.url.split('?')[0];
+  const skipWorkspace = WORKSPACE_HEADER_SKIP_PATHS.some(
+    (path) => urlPath === path
+  );
   if (!skipWorkspace && workspaceStore) {
     const workspaceId = workspaceStore.currentWorkspaceId();
     if (workspaceId) {

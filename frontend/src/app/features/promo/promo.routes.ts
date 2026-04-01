@@ -6,6 +6,7 @@ const routes: Routes = [
     path: 'campaigns',
     loadComponent: () =>
       import('./promo-layout.component').then((m) => m.PromoLayoutComponent),
+    data: { breadcrumb: 'Кампании' },
   },
 ];
 

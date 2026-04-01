@@ -80,7 +80,7 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
               Выберите рабочее пространство
             </h1>
 
-            <div class="grid justify-center gap-4" style="grid-template-columns: repeat(auto-fill, 280px);">
+            <div class="grid justify-center gap-4" style="grid-template-columns: repeat(auto-fit, 280px);">
               @for (ws of workspaces(); track ws.id) {
                 <button
                   (click)="onSelectWorkspace(ws)"

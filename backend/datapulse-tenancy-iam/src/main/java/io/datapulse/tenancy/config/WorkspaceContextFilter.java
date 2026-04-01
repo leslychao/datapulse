@@ -118,7 +118,7 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
         AppUserEntity saved = appUserRepository.save(user);
 
         eventPublisher.publishEvent(new AuditEvent(
-                0L, "SYSTEM", saved.getId(), "user.provision",
+                null, "SYSTEM", saved.getId(), "user.provision",
                 "app_user", String.valueOf(saved.getId()),
                 "SUCCESS", null, null, null));
 

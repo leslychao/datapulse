@@ -6,6 +6,7 @@ const routes: Routes = [
     path: 'policies',
     loadComponent: () =>
       import('./pricing-layout.component').then((m) => m.PricingLayoutComponent),
+    data: { breadcrumb: 'Политики' },
   },
 ];
 

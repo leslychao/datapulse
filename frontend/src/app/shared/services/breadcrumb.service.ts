@@ -30,14 +30,14 @@ export class BreadcrumbService {
     let url = '';
 
     while (route) {
-      if (route.snapshot.data['breadcrumb']) {
-        const pathSegments = route.snapshot.url.map((seg) => seg.path);
-        if (pathSegments.length > 0) {
-          url += '/' + pathSegments.join('/');
-        }
+      const pathSegments = route.snapshot.url.map((seg) => seg.path);
+      if (pathSegments.length > 0) {
+        url += '/' + pathSegments.join('/');
+      }
+      if (route.snapshot.data['breadcrumb'] && pathSegments.length > 0) {
         segments.push({
           label: route.snapshot.data['breadcrumb'] as string,
-          route: url || null,
+          route: url,
         });
       }
       route = route.firstChild;

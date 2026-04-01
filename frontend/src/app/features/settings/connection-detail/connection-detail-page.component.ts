@@ -1,4 +1,4 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
@@ -19,6 +19,7 @@ import { ConnectionApiService } from '@core/api/connection-api.service';
 import { CallLogEntry, MarketplaceType, SyncState } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { BreadcrumbService } from '@shared/services/breadcrumb.service';
 import { StatusBadgeComponent } from '@shared/components/status-badge.component';
 import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
@@ -274,6 +275,21 @@ export class ConnectionDetailPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly breadcrumbs = inject(BreadcrumbService);
+
+  constructor() {
+    effect(() => {
+      const conn = this.connectionQuery.data();
+      if (!conn) return;
+      const wsId = this.wsStore.currentWorkspaceId();
+      const base = `/workspace/${wsId}/settings`;
+      this.breadcrumbs.setSegments([
+        { label: 'Настройки', route: base },
+        { label: 'Подключения', route: `${base}/connections` },
+        { label: conn.name, route: null },
+      ]);
+    });
+  }
 
   readonly showRotation = signal(false);
   readonly showDeleteModal = signal(false);

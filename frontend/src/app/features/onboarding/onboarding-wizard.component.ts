@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@core/auth/auth.service';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { MinimalTopBarComponent } from '@shared/layout/minimal-top-bar.component';
 
 import { StepTenantComponent } from './step-tenant.component';
@@ -136,6 +137,7 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
 export class OnboardingWizardComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly workspaceStore = inject(WorkspaceContextStore);
 
   protected readonly currentStep = signal(1);
   protected readonly tenantId = signal<number | null>(null);
@@ -165,6 +167,7 @@ export class OnboardingWizardComponent {
     this.workspaceId.set(event.workspaceId);
     this.workspaceName.set(event.workspaceName);
     this.workspaceData.set({ id: event.workspaceId, name: event.workspaceName });
+    this.workspaceStore.setWorkspace(event.workspaceId, event.workspaceName);
     this.currentStep.set(3);
   }
 

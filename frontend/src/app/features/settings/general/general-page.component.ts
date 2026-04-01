@@ -27,7 +27,8 @@ import { SectionCardComponent } from '@shared/components/section-card.component'
       }
 
       @if (workspaceQuery.data(); as ws) {
-        <dp-section-card title="Информация" class="mb-6">
+        <div class="space-y-5">
+        <dp-section-card title="Информация">
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -75,6 +76,7 @@ import { SectionCardComponent } from '@shared/components/section-card.component'
             </button>
           </form>
         </dp-section-card>
+        </div>
       }
     </div>
   `,

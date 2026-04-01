@@ -8,6 +8,7 @@ const routes: Routes = [
       import('./analytics-layout.component').then(
         (m) => m.AnalyticsLayoutComponent,
       ),
+    data: { breadcrumb: 'P&L' },
   },
 ];
 

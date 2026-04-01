@@ -3,6 +3,7 @@ import { Component, Input } from '@angular/core';
 @Component({
   selector: 'dp-section-card',
   standalone: true,
+  host: { class: 'block' },
   template: `
     <section class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]">
       @if (title) {

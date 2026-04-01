@@ -40,7 +40,7 @@ public class AuditLogRepository {
             "entityType", "entity_type"
     );
 
-    public void insert(long workspaceId, String actorType, Long actorUserId,
+    public void insert(Long workspaceId, String actorType, Long actorUserId,
                         String actionType, String entityType, String entityId,
                         String outcome, String details, String ipAddress,
                         String correlationId) {

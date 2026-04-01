@@ -35,7 +35,7 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
           Далее
         </button>
       } @else {
-        <form (ngSubmit)="onSubmit()" class="flex flex-col gap-4">
+        <form (submit)="$event.preventDefault(); onSubmit()" class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
             <label for="workspaceName" class="text-sm font-medium text-[var(--text-primary)]">
               Название пространства

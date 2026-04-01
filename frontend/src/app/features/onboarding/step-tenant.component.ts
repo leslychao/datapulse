@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
@@ -30,7 +30,7 @@ import { WorkspaceApiService } from '@core/api/workspace-api.service';
           Далее
         </button>
       } @else {
-        <form (ngSubmit)="onSubmit()" class="flex flex-col gap-4">
+        <form (submit)="$event.preventDefault(); onSubmit()" class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
             <label for="tenantName" class="text-sm font-medium text-[var(--text-primary)]">
               Название организации

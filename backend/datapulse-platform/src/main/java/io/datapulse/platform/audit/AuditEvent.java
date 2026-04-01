@@ -4,6 +4,7 @@ package io.datapulse.platform.audit;
  * Domain event published by source modules when a significant action occurs.
  * Consumed by AuditEventListener (in datapulse-audit-alerting) which persists to audit_log.
  *
+ * @param workspaceId   nullable — NULL for cross-workspace events (tenant.create, user.provision)
  * @param actorType     USER, SYSTEM, or SCHEDULER
  * @param actorUserId   nullable — NULL for SYSTEM / SCHEDULER actors
  * @param actionType    dot-separated key, e.g. "workspace.create", "member.invite"
@@ -15,7 +16,7 @@ package io.datapulse.platform.audit;
  * @param correlationId request correlation UUID (nullable)
  */
 public record AuditEvent(
-        long workspaceId,
+        Long workspaceId,
         String actorType,
         Long actorUserId,
         String actionType,
