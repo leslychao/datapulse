@@ -17,3 +17,6 @@ databaseChangeLog:
   - include:
       file: changes/0009-audit-alerting-tables.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0010-pricing-tables.sql
+      relativeToChangelogFile: true
