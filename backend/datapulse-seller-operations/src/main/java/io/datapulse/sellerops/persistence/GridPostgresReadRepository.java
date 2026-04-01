@@ -153,27 +153,20 @@ public class GridPostgresReadRepository {
         return new PageImpl<>(content, pageable, total);
     }
 
-    public List<GridRow> findAllForExport(long workspaceId, GridFilter filter) {
+    public List<GridRow> findBatchForExport(long workspaceId, GridFilter filter,
+                                            int batchSize, int offset) {
         var where = new StringBuilder(" WHERE mc.workspace_id = :workspaceId");
         var params = new MapSqlParameterSource("workspaceId", workspaceId);
 
         appendFilters(filter, where, params);
 
         String orderBy = " ORDER BY ss.sku_code ASC NULLS LAST";
-        String sql = BASE_SELECT + FROM_JOINS + where + orderBy;
+        String sql = BASE_SELECT + FROM_JOINS + where + orderBy
+            + " LIMIT :limit OFFSET :offset";
+        params.addValue("limit", batchSize);
+        params.addValue("offset", offset);
 
         return jdbc.query(sql, params, this::mapGridRow);
-    }
-
-    public GridRow findOfferById(long workspaceId, long offerId) {
-        var sql = BASE_SELECT + FROM_JOINS
-                + " WHERE mc.workspace_id = :workspaceId AND mo.id = :offerId";
-        var params = new MapSqlParameterSource()
-                .addValue("workspaceId", workspaceId)
-                .addValue("offerId", offerId);
-
-        List<GridRow> rows = jdbc.query(sql, params, this::mapGridRow);
-        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private void appendFilters(GridFilter filter, StringBuilder where,

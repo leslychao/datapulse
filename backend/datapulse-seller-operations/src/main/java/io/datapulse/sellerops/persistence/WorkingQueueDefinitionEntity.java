@@ -32,4 +32,7 @@ public class WorkingQueueDefinitionEntity extends BaseEntity {
 
     @Column(nullable = false)
     private boolean enabled;
+
+    @Column(name = "is_system", nullable = false)
+    private boolean system;
 }

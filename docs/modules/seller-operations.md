@@ -187,6 +187,7 @@ working_queue_definition:
   queue_type            VARCHAR(30) NOT NULL                      -- ATTENTION, DECISION, PROCESSING
   auto_criteria         JSONB                                     -- auto-population filter (nullable — manual-only queue)
   enabled               BOOLEAN NOT NULL DEFAULT true
+  is_system             BOOLEAN NOT NULL DEFAULT false            -- системная очередь (не удаляется пользователем)
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 
@@ -301,7 +302,7 @@ ORDER BY price_decision.created_at DESC
 
 ### REST API
 
-`GET /api/workspace/{workspaceId}/offers/{offerId}/price-journal?page=0&size=20`
+`GET /api/workspaces/{workspaceId}/offers/{offerId}/price-journal?page=0&size=20`
 
 ## Promo Journal
 
@@ -390,8 +391,8 @@ ACTIVE → ACKNOWLEDGED → RESOLVED
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspace/{workspaceId}/grid` | GET | Paginated grid с фильтрами и сортировкой |
-| `/api/workspace/{workspaceId}/grid/export` | GET | CSV export (streaming, `Content-Disposition: attachment`) |
+| `/api/workspaces/{workspaceId}/grid` | GET | Paginated grid с фильтрами и сортировкой |
+| `/api/workspaces/{workspaceId}/grid/export` | GET | CSV export (streaming, `Content-Disposition: attachment`) |
 
 **Query parameters для grid:**
 
@@ -478,7 +479,7 @@ ACTIVE → ACKNOWLEDGED → RESOLVED
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspace/{workspaceId}/offers/{offerId}` | GET | Composite detail для offer (Detail Panel) |
+| `/api/workspaces/{workspaceId}/offers/{offerId}` | GET | Composite detail для offer (Detail Panel) |
 
 **Offer detail response:**
 
@@ -542,10 +543,10 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspace/{workspaceId}/views` | GET | Список saved views текущего пользователя |
-| `/api/workspace/{workspaceId}/views` | POST | Создать saved view |
-| `/api/workspace/{workspaceId}/views/{viewId}` | PUT | Обновить saved view |
-| `/api/workspace/{workspaceId}/views/{viewId}` | DELETE | Удалить saved view |
+| `/api/workspaces/{workspaceId}/views` | GET | Список saved views текущего пользователя |
+| `/api/workspaces/{workspaceId}/views` | POST | Создать saved view |
+| `/api/workspaces/{workspaceId}/views/{viewId}` | PUT | Обновить saved view |
+| `/api/workspaces/{workspaceId}/views/{viewId}` | DELETE | Удалить saved view |
 
 **Create/Update request body (POST / PUT):**
 
@@ -592,11 +593,14 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspace/{workspaceId}/queues` | GET | Список очередей с count per queue |
-| `/api/workspace/{workspaceId}/queues/{queueId}/items` | GET | Paginated items в очереди |
-| `/api/workspace/{workspaceId}/queues/{queueId}/items/{itemId}/claim` | POST | Взять item в работу (assign to current user) |
-| `/api/workspace/{workspaceId}/queues/{queueId}/items/{itemId}/done` | POST | Отметить item как done |
-| `/api/workspace/{workspaceId}/queues/{queueId}/items/{itemId}/dismiss` | POST | Отклонить item |
+| `/api/workspaces/{workspaceId}/queues` | GET | Список очередей с count per queue |
+| `/api/workspaces/{workspaceId}/queues` | POST | Создать очередь |
+| `/api/workspaces/{workspaceId}/queues/{queueId}` | PUT | Обновить очередь (name, auto_criteria, enabled) |
+| `/api/workspaces/{workspaceId}/queues/{queueId}` | DELETE | Удалить очередь (каскадно удаляет assignments) |
+| `/api/workspaces/{workspaceId}/queues/{queueId}/items` | GET | Paginated items в очереди. Filters: `?status=PENDING&assignedToMe=true` |
+| `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/claim` | POST | Взять item в работу (assign to current user) |
+| `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/done` | POST | Отметить item как done |
+| `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/dismiss` | POST | Отклонить item |
 
 **Queue list response (GET /queues):**
 
@@ -657,8 +661,8 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspace/{workspaceId}/offers/{offerId}/price-journal` | GET | Price journal для offer (paginated) |
-| `/api/workspace/{workspaceId}/offers/{offerId}/promo-journal` | GET | Promo journal для offer (paginated) |
+| `/api/workspaces/{workspaceId}/offers/{offerId}/price-journal` | GET | Price journal для offer (paginated) |
+| `/api/workspaces/{workspaceId}/offers/{offerId}/promo-journal` | GET | Promo journal для offer (paginated) |
 
 **Journal query parameters:**
 
@@ -675,9 +679,9 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspace/{workspaceId}/mismatches` | GET | Active mismatches (paginated). Filters: `?type=PRICE&connectionId=...&severity=...` |
-| `/api/workspace/{workspaceId}/mismatches/{mismatchId}/acknowledge` | POST | Acknowledge mismatch (оператор подтверждает осведомлённость) |
-| `/api/workspace/{workspaceId}/mismatches/{mismatchId}/resolve` | POST | Resolve mismatch. Body: `{ resolution, note }` |
+| `/api/workspaces/{workspaceId}/mismatches` | GET | Active mismatches (paginated). Filters: `?type=PRICE&connectionId=...&severity=...` |
+| `/api/workspaces/{workspaceId}/mismatches/{mismatchId}/acknowledge` | POST | Acknowledge mismatch (оператор подтверждает осведомлённость) |
+| `/api/workspaces/{workspaceId}/mismatches/{mismatchId}/resolve` | POST | Resolve mismatch. Body: `{ resolution, note }` |
 
 **Mismatch list response:**
 
@@ -712,12 +716,12 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 
 | Endpoint | Method | Описание | Delegated to |
 |----------|--------|----------|--------------|
-| `/api/workspace/{workspaceId}/actions/{actionId}/approve` | POST | Одобрить price action | [Execution](execution.md) |
-| `/api/workspace/{workspaceId}/actions/{actionId}/hold` | POST | Поставить on hold | [Execution](execution.md) |
-| `/api/workspace/{workspaceId}/actions/{actionId}/cancel` | POST | Отменить action | [Execution](execution.md) |
-| `/api/workspace/{workspaceId}/offers/{offerId}/lock` | POST | Ручная блокировка цены | [Pricing](pricing.md) |
-| `/api/workspace/{workspaceId}/offers/{offerId}/unlock` | POST | Снять блокировку | [Pricing](pricing.md) |
-| `/api/workspace/{workspaceId}/pricing/runs` | POST | Запустить pricing run | [Pricing](pricing.md) |
+| `/api/workspaces/{workspaceId}/actions/{actionId}/approve` | POST | Одобрить price action | [Execution](execution.md) |
+| `/api/workspaces/{workspaceId}/actions/{actionId}/hold` | POST | Поставить on hold | [Execution](execution.md) |
+| `/api/workspaces/{workspaceId}/actions/{actionId}/cancel` | POST | Отменить action | [Execution](execution.md) |
+| `/api/workspaces/{workspaceId}/offers/{offerId}/lock` | POST | Ручная блокировка цены | [Pricing](pricing.md) |
+| `/api/workspaces/{workspaceId}/offers/{offerId}/unlock` | POST | Снять блокировку | [Pricing](pricing.md) |
+| `/api/workspaces/{workspaceId}/pricing/runs` | POST | Запустить pricing run | [Pricing](pricing.md) |
 
 ## Модель данных
 
@@ -848,7 +852,7 @@ Draft **не** persisted на сервере. `beforeunload` warning при не
 ### Streaming
 
 ```
-GET /api/workspace/{workspaceId}/grid/export?[filters]
+GET /api/workspaces/{workspaceId}/grid/export?[filters]
 → Content-Type: text/csv
 → Content-Disposition: attachment; filename="datapulse-export-{date}.csv"
 → Transfer-Encoding: chunked

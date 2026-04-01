@@ -10,9 +10,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -47,16 +49,37 @@ public class WorkingQueueController {
         return queueService.createQueue(workspaceId, request);
     }
 
+    @PutMapping("/{queueId}")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public QueueSummaryResponse updateQueue(
+            @PathVariable("workspaceId") Long workspaceId,
+            @PathVariable("queueId") Long queueId,
+            @Valid @RequestBody UpdateQueueRequest request) {
+        return queueService.updateQueue(workspaceId, queueId, request);
+    }
+
+    @DeleteMapping("/{queueId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public void deleteQueue(
+            @PathVariable("workspaceId") Long workspaceId,
+            @PathVariable("queueId") Long queueId) {
+        queueService.deleteQueue(workspaceId, queueId);
+    }
+
     @GetMapping("/{queueId}/items")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<QueueItemResponse> listItems(
             @PathVariable("workspaceId") Long workspaceId,
             @PathVariable("queueId") Long queueId,
             @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "assignedToMe", required = false) Boolean assignedToMe,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
         int clampedSize = Math.min(size, queueProperties.getMaxPageSize());
-        return queueService.listItems(workspaceId, queueId, status,
+        Long userId = Boolean.TRUE.equals(assignedToMe)
+                ? workspaceContext.getUserId() : null;
+        return queueService.listItems(workspaceId, queueId, status, userId,
                 PageRequest.of(page, clampedSize));
     }
 

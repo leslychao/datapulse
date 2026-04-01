@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,18 +41,21 @@ public class QueueAutoPopulationService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private void populateQueue(WorkingQueueDefinitionEntity queue) {
         Map<String, Object> criteria = queue.getAutoCriteria();
         if (criteria == null || criteria.isEmpty()) {
             return;
         }
 
-        String entityType = (String) criteria.get("entity_type");
-        List<Map<String, Object>> matchRules =
-                (List<Map<String, Object>>) criteria.get("match_rules");
+        if (!(criteria.get("entity_type") instanceof String entityType)) {
+            return;
+        }
+        if (!(criteria.get("match_rules") instanceof List<?> rawRules) || rawRules.isEmpty()) {
+            return;
+        }
 
-        if (entityType == null || matchRules == null || matchRules.isEmpty()) {
+        List<MatchRule> matchRules = parseMatchRules(rawRules);
+        if (matchRules.isEmpty()) {
             return;
         }
 
@@ -84,7 +88,7 @@ public class QueueAutoPopulationService {
     }
 
     private Set<Long> evaluateCriteria(long workspaceId, String entityType,
-                                        List<Map<String, Object>> matchRules) {
+                                        List<MatchRule> matchRules) {
         return switch (entityType) {
             case "price_action" -> evaluatePriceActionCriteria(workspaceId, matchRules);
             case "marketplace_offer" -> evaluateOfferCriteria(workspaceId, matchRules);
@@ -96,21 +100,17 @@ public class QueueAutoPopulationService {
     }
 
     private Set<Long> evaluatePriceActionCriteria(long workspaceId,
-                                                   List<Map<String, Object>> matchRules) {
+                                                   List<MatchRule> matchRules) {
         var where = new StringBuilder(" WHERE pa.workspace_id = :workspaceId");
         var params = new MapSqlParameterSource("workspaceId", workspaceId);
 
         for (int i = 0; i < matchRules.size(); i++) {
-            Map<String, Object> rule = matchRules.get(i);
-            String field = (String) rule.get("field");
-            String op = (String) rule.get("op");
-            Object value = rule.get("value");
-
-            String sqlField = mapPriceActionField(field);
+            MatchRule rule = matchRules.get(i);
+            String sqlField = mapPriceActionField(rule.field);
             if (sqlField == null) {
                 continue;
             }
-            appendCondition(where, params, sqlField, op, value, "pa_" + i);
+            appendCondition(where, params, sqlField, rule.op, rule.value, "pa_" + i);
         }
 
         String sql = "SELECT pa.id FROM price_action pa" + where;
@@ -119,23 +119,19 @@ public class QueueAutoPopulationService {
     }
 
     private Set<Long> evaluateOfferCriteria(long workspaceId,
-                                             List<Map<String, Object>> matchRules) {
+                                             List<MatchRule> matchRules) {
         var where = new StringBuilder("""
                  WHERE mc.workspace_id = :workspaceId
                 """);
         var params = new MapSqlParameterSource("workspaceId", workspaceId);
 
         for (int i = 0; i < matchRules.size(); i++) {
-            Map<String, Object> rule = matchRules.get(i);
-            String field = (String) rule.get("field");
-            String op = (String) rule.get("op");
-            Object value = rule.get("value");
-
-            String sqlField = mapOfferField(field);
+            MatchRule rule = matchRules.get(i);
+            String sqlField = mapOfferField(rule.field);
             if (sqlField == null) {
                 continue;
             }
-            appendCondition(where, params, sqlField, op, value, "mo_" + i);
+            appendCondition(where, params, sqlField, rule.op, rule.value, "mo_" + i);
         }
 
         String sql = """
@@ -216,4 +212,29 @@ public class QueueAutoPopulationService {
             default -> log.warn("Unsupported auto-criteria operator: op={}", op);
         }
     }
+
+    private List<MatchRule> parseMatchRules(List<?> rawRules) {
+        List<MatchRule> result = new ArrayList<>(rawRules.size());
+        for (Object rawRule : rawRules) {
+            if (rawRule instanceof Map<?, ?> ruleMap) {
+                var rule = toMatchRule(ruleMap);
+                if (rule != null) {
+                    result.add(rule);
+                }
+            }
+        }
+        return result;
+    }
+
+    private MatchRule toMatchRule(Map<?, ?> raw) {
+        if (!(raw.get("field") instanceof String field)) {
+            return null;
+        }
+        if (!(raw.get("op") instanceof String op)) {
+            return null;
+        }
+        return new MatchRule(field, op, raw.get("value"));
+    }
+
+    private record MatchRule(String field, String op, Object value) {}
 }

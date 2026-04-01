@@ -111,14 +111,6 @@ public class GridController {
         exportService.exportCsv(workspaceId, filter, response.getOutputStream());
     }
 
-    @GetMapping("/offers/{offerId}")
-    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public OfferDetailResponse getOfferDetail(
-            @PathVariable("workspaceId") Long workspaceId,
-            @PathVariable("offerId") Long offerId) {
-        return gridService.getOfferDetail(workspaceId, offerId);
-    }
-
     private Sort buildSort(String column, String direction) {
         if (column == null || !gridService.isSortableColumn(column)) {
             return Sort.unsorted();
@@ -128,22 +120,21 @@ public class GridController {
         return Sort.by(dir, column);
     }
 
-    @SuppressWarnings("unchecked")
     private GridFilter buildFilterFromView(SavedViewEntity view) {
         Map<String, Object> f = view.getFilters();
         return new GridFilter(
-                (List<String>) f.get("marketplace_type"),
+                safeStringList(f.get("marketplace_type")),
                 safeLongList(f.get("connection_id")),
-                (List<String>) f.get("status"),
-                (String) f.get("sku_code"),
-                (String) f.get("product_name"),
+                safeStringList(f.get("status")),
+                f.get("sku_code") instanceof String s ? s : null,
+                f.get("product_name") instanceof String s ? s : null,
                 safeLongList(f.get("category_id")),
                 toBigDecimal(f.get("margin_min")),
                 toBigDecimal(f.get("margin_max")),
-                (Boolean) f.get("has_manual_lock"),
-                (Boolean) f.get("has_active_promo"),
-                (String) f.get("last_decision"),
-                (String) f.get("last_action_status"),
+                f.get("has_manual_lock") instanceof Boolean b ? b : null,
+                f.get("has_active_promo") instanceof Boolean b ? b : null,
+                f.get("last_decision") instanceof String s ? s : null,
+                f.get("last_action_status") instanceof String s ? s : null,
                 null
         );
     }
@@ -157,7 +148,16 @@ public class GridController {
         return Sort.by(dir, view.getSortColumn());
     }
 
-    @SuppressWarnings("unchecked")
+    private List<String> safeStringList(Object value) {
+        if (value instanceof List<?> list) {
+            return list.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .toList();
+        }
+        return null;
+    }
+
     private List<Long> safeLongList(Object value) {
         if (value == null) {
             return null;

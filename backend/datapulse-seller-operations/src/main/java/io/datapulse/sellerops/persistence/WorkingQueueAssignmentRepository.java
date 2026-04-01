@@ -18,6 +18,13 @@ public interface WorkingQueueAssignmentRepository extends JpaRepository<WorkingQ
     Page<WorkingQueueAssignmentEntity> findByQueueDefinitionId(
             long queueDefinitionId, Pageable pageable);
 
+    Page<WorkingQueueAssignmentEntity> findByQueueDefinitionIdAndAssignedToUserId(
+            long queueDefinitionId, long assignedToUserId, Pageable pageable);
+
+    Page<WorkingQueueAssignmentEntity> findByQueueDefinitionIdAndStatusInAndAssignedToUserId(
+            long queueDefinitionId, List<String> statuses, long assignedToUserId,
+            Pageable pageable);
+
     Optional<WorkingQueueAssignmentEntity> findByIdAndQueueDefinitionId(long id, long queueDefinitionId);
 
     @Query("""

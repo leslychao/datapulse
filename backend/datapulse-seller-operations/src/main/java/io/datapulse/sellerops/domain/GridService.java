@@ -1,9 +1,7 @@
 package io.datapulse.sellerops.domain;
 
-import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.sellerops.api.GridFilter;
 import io.datapulse.sellerops.api.GridRowResponse;
-import io.datapulse.sellerops.api.OfferDetailResponse;
 import io.datapulse.sellerops.config.GridProperties;
 import io.datapulse.sellerops.persistence.ClickHouseEnrichment;
 import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
@@ -17,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -49,20 +48,6 @@ public class GridService {
                 .toList();
 
         return new PageImpl<>(enrichedRows, pageable, pgPage.getTotalElements());
-    }
-
-    @Transactional(readOnly = true)
-    public OfferDetailResponse getOfferDetail(long workspaceId, long offerId) {
-        GridRow row = pgRepository.findOfferById(workspaceId, offerId);
-        if (row == null) {
-            throw NotFoundException.entity("marketplace_offer", offerId);
-        }
-
-        Map<Long, ClickHouseEnrichment> enrichment =
-                fetchEnrichmentSafely(List.of(offerId));
-        ClickHouseEnrichment ch = enrichment.get(offerId);
-
-        return toOfferDetailResponse(row, ch);
     }
 
     public boolean isSortableColumn(String column) {
@@ -111,39 +96,11 @@ public class GridService {
         );
     }
 
-    private OfferDetailResponse toOfferDetailResponse(GridRow row, ClickHouseEnrichment ch) {
-        return new OfferDetailResponse(
-                row.getOfferId(),
-                row.getSkuCode(),
-                row.getProductName(),
-                row.getMarketplaceType(),
-                row.getConnectionName(),
-                row.getStatus(),
-                row.getCategory(),
-                row.getCurrentPrice(),
-                row.getDiscountPrice(),
-                row.getCostPrice(),
-                row.getMarginPct(),
-                row.getAvailableStock(),
-                ch != null ? ch.getDaysOfCover() : null,
-                ch != null ? ch.getStockRisk() : null,
-                ch != null ? ch.getRevenue30d() : null,
-                ch != null ? ch.getNetPnl30d() : null,
-                ch != null ? ch.getVelocity14d() : null,
-                ch != null ? ch.getReturnRatePct() : null,
-                null, null, null, null, null,
-                row.getSimulatedPrice(),
-                row.getSimulatedDeltaPct(),
-                row.getLastSyncAt(),
-                computeFreshness(row.getLastSyncAt())
-        );
-    }
-
     private String computeFreshness(OffsetDateTime lastSyncAt) {
         if (lastSyncAt == null) {
             return DataFreshness.STALE.name();
         }
-        long hoursSinceSync = java.time.Duration.between(lastSyncAt, OffsetDateTime.now()).toHours();
+        long hoursSinceSync = Duration.between(lastSyncAt, OffsetDateTime.now()).toHours();
         return hoursSinceSync > gridProperties.getFreshnessThresholdHours()
                 ? DataFreshness.STALE.name()
                 : DataFreshness.FRESH.name();

@@ -1,0 +1,60 @@
+package io.datapulse.sellerops.api;
+
+import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.sellerops.domain.MismatchService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(value = "/api/workspaces/{workspaceId}/mismatches",
+    produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
+public class MismatchController {
+
+  private final MismatchService mismatchService;
+  private final WorkspaceContext workspaceContext;
+
+  @GetMapping
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public Page<MismatchResponse> listMismatches(
+      @PathVariable("workspaceId") Long workspaceId,
+      @RequestParam(value = "type", required = false) String type,
+      @RequestParam(value = "connectionId", required = false) Long connectionId,
+      @RequestParam(value = "severity", required = false) String severity,
+      @RequestParam(value = "page", defaultValue = "0") int page,
+      @RequestParam(value = "size", defaultValue = "20") int size) {
+    var filter = new MismatchFilter(type, connectionId, severity);
+    return mismatchService.listMismatches(
+        workspaceId, filter, PageRequest.of(page, Math.min(size, 100)));
+  }
+
+  @PostMapping("/{mismatchId}/acknowledge")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public MismatchResponse acknowledge(
+      @PathVariable("workspaceId") Long workspaceId,
+      @PathVariable("mismatchId") Long mismatchId) {
+    return mismatchService.acknowledge(
+        workspaceId, mismatchId, workspaceContext.getUserId());
+  }
+
+  @PostMapping("/{mismatchId}/resolve")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public MismatchResponse resolve(
+      @PathVariable("workspaceId") Long workspaceId,
+      @PathVariable("mismatchId") Long mismatchId,
+      @Valid @RequestBody ResolveMismatchRequest request) {
+    return mismatchService.resolve(
+        workspaceId, mismatchId, request.resolution(), request.note());
+  }
+}

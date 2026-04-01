@@ -127,4 +127,5 @@ public final class MessageCodes {
     public static final String QUEUE_ITEM_NOT_FOUND = "queue.item.not_found";
     public static final String QUEUE_ITEM_INVALID_STATE = "queue.item.invalid_state";
     public static final String QUEUE_DUPLICATE = "queue.duplicate";
+    public static final String QUEUE_SYSTEM_IMMUTABLE = "queue.system.immutable";
 }
