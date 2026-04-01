@@ -5,7 +5,6 @@ import { Observable } from 'rxjs';
 import { environment } from '@env';
 import {
   ActionHistoryEntry,
-  BulkActionRequest,
   BulkActionResponse,
   BulkManualPreviewRequest,
   BulkManualPreviewResponse,
@@ -173,48 +172,6 @@ export class OfferApiService {
   unlockOffer(workspaceId: number, offerId: number): Observable<void> {
     return this.http.post<void>(
       `${this.base}/workspaces/${workspaceId}/offers/${offerId}/unlock`, {},
-    );
-  }
-
-  approveAction(workspaceId: number, actionId: number): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/approve`, {},
-    );
-  }
-
-  rejectAction(workspaceId: number, actionId: number, cancelReason: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/reject`, { cancelReason },
-    );
-  }
-
-  holdAction(workspaceId: number, actionId: number, holdReason: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/hold`, { holdReason },
-    );
-  }
-
-  resumeAction(workspaceId: number, actionId: number): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/resume`, {},
-    );
-  }
-
-  cancelAction(workspaceId: number, actionId: number, cancelReason: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/cancel`, { cancelReason },
-    );
-  }
-
-  bulkApprove(workspaceId: number, req: BulkActionRequest): Observable<BulkActionResponse> {
-    return this.http.post<BulkActionResponse>(
-      `${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, req,
-    );
-  }
-
-  bulkReject(workspaceId: number, req: BulkActionRequest): Observable<BulkActionResponse> {
-    return this.http.post<BulkActionResponse>(
-      `${this.base}/workspaces/${workspaceId}/actions/bulk-reject`, req,
     );
   }
 

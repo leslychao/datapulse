@@ -24,6 +24,14 @@ const COLORS: Record<string, StatusColor> = {
   RECONCILIATION_PENDING: 'warning',
   DRAFT: 'neutral',
   PAUSED: 'warning',
+  PENDING: 'info',
+  IN_PROGRESS: 'info',
+  COMPLETED: 'success',
+  COMPLETED_WITH_ERRORS: 'warning',
+  RETRY_SCHEDULED: 'warning',
+  STALE: 'neutral',
+  CAPTURED: 'info',
+  PROCESSED: 'success',
 };
 
 @Pipe({

@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
@@ -41,20 +41,11 @@ const ACTION_STATUS_COLOR: Record<string, StatusColor> = {
   SUPERSEDED: 'neutral',
 };
 
-const ACTION_STATUS_LABEL: Record<string, string> = {
-  PENDING_APPROVAL: 'Ожидает',
-  APPROVED: 'Одобрено',
-  ON_HOLD: 'Приостановлено',
-  SCHEDULED: 'Запланировано',
-  EXECUTING: 'Выполняется',
-  RECONCILIATION_PENDING: 'Проверка',
-  RETRY_SCHEDULED: 'Повтор',
-  SUCCEEDED: 'Выполнено',
-  FAILED: 'Ошибка',
-  EXPIRED: 'Истекло',
-  CANCELLED: 'Отменено',
-  SUPERSEDED: 'Заменено',
-};
+const ACTION_STATUSES = [
+  'PENDING_APPROVAL', 'APPROVED', 'ON_HOLD', 'SCHEDULED', 'EXECUTING',
+  'RECONCILIATION_PENDING', 'RETRY_SCHEDULED', 'SUCCEEDED', 'FAILED',
+  'EXPIRED', 'CANCELLED', 'SUPERSEDED',
+] as const;
 
 @Component({
   selector: 'dp-actions-list-page',
@@ -173,6 +164,7 @@ export class ActionsListPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly translate = inject(TranslateService);
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly selectedRows = signal<ActionSummary[]>([]);
@@ -183,21 +175,32 @@ export class ActionsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: 'Статус',
+      label: this.translate.instant('execution.filter.status'),
       type: 'multi-select',
-      options: Object.entries(ACTION_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+      options: ACTION_STATUSES.map(value => ({
+        value,
+        label: this.translate.instant(`grid.action_status.${value}`),
+      })),
     },
     {
       key: 'executionMode',
-      label: 'Режим',
+      label: this.translate.instant('execution.filter.execution_mode'),
       type: 'select',
-      options: [
-        { value: 'LIVE', label: 'LIVE' },
-        { value: 'SIMULATED', label: 'Симуляция' },
-      ],
+      options: (['LIVE', 'SIMULATED'] as const).map(value => ({
+        value,
+        label: this.translate.instant(`pricing.decisions.execution_mode.${value}`),
+      })),
     },
-    { key: 'search', label: 'Поиск оффера', type: 'text' },
-    { key: 'period', label: 'Период', type: 'date-range' },
+    {
+      key: 'search',
+      label: this.translate.instant('execution.filter.search'),
+      type: 'text',
+    },
+    {
+      key: 'period',
+      label: this.translate.instant('execution.filter.period'),
+      type: 'date-range',
+    },
   ];
 
   readonly columnDefs = [
@@ -210,7 +213,7 @@ export class ActionsListPageComponent {
       suppressMovable: true,
     },
     {
-      headerName: 'Оффер',
+      headerName: this.translate.instant('execution.col.offer'),
       field: 'offerName',
       minWidth: 250,
       pinned: 'left' as const,
@@ -224,7 +227,7 @@ export class ActionsListPageComponent {
       },
     },
     {
-      headerName: 'Целевая цена',
+      headerName: this.translate.instant('execution.col.target_price'),
       field: 'targetPrice',
       width: 110,
       sortable: true,
@@ -232,7 +235,7 @@ export class ActionsListPageComponent {
       valueFormatter: (params: any) => this.formatPrice(params.value),
     },
     {
-      headerName: 'Текущая цена',
+      headerName: this.translate.instant('execution.col.current_price'),
       field: 'currentPriceAtCreation',
       width: 110,
       sortable: true,
@@ -240,7 +243,7 @@ export class ActionsListPageComponent {
       valueFormatter: (params: any) => this.formatPrice(params.value),
     },
     {
-      headerName: 'Δ цены',
+      headerName: this.translate.instant('execution.col.price_delta'),
       field: 'priceDeltaPct',
       width: 80,
       sortable: true,
@@ -255,13 +258,13 @@ export class ActionsListPageComponent {
       },
     },
     {
-      headerName: 'Статус',
+      headerName: this.translate.instant('execution.col.status'),
       field: 'status',
       width: 140,
       sortable: true,
       cellRenderer: (params: any) => {
         const st = params.value as string;
-        const label = ACTION_STATUS_LABEL[st] ?? st;
+        const label = this.translate.instant(`grid.action_status.${st}`);
         const color = ACTION_STATUS_COLOR[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -272,7 +275,7 @@ export class ActionsListPageComponent {
       },
     },
     {
-      headerName: 'Режим',
+      headerName: this.translate.instant('execution.col.execution_mode'),
       field: 'executionMode',
       width: 80,
       sortable: true,
@@ -284,7 +287,7 @@ export class ActionsListPageComponent {
       },
     },
     {
-      headerName: 'Попытки',
+      headerName: this.translate.instant('execution.col.attempts'),
       field: 'attemptCount',
       width: 70,
       sortable: true,
@@ -295,7 +298,7 @@ export class ActionsListPageComponent {
       },
     },
     {
-      headerName: 'Создано',
+      headerName: this.translate.instant('execution.col.created_at'),
       field: 'createdAt',
       width: 120,
       sortable: true,
@@ -369,18 +372,22 @@ export class ActionsListPageComponent {
     const eligible = this.pendingSelected().length;
     const skipped = total - eligible;
     if (eligible === 0) {
-      return 'Среди выбранных нет действий, ожидающих одобрения.';
+      return this.translate.instant('execution.bulk.no_eligible');
     }
-    let msg = `Одобрить ${eligible} действий?`;
+    let msg = this.translate.instant('execution.bulk.approve_confirm', { count: eligible });
     if (skipped > 0) {
-      msg += `\nИз выбранных ${total} строк, ${eligible} находятся в статусе «Ожидает» и будут одобрены. Остальные ${skipped} будут пропущены.`;
+      msg += '\n' + this.translate.instant('execution.bulk.approve_partial', {
+        total, eligible, skipped,
+      });
     }
     return msg;
   });
 
   readonly bulkApproveLabel = computed(() => {
     const count = this.pendingSelected().length;
-    return count > 0 ? `Одобрить ${count}` : 'Одобрить';
+    return count > 0
+      ? this.translate.instant('execution.bulk.approve_count', { count })
+      : this.translate.instant('execution.bulk.approve');
   });
 
   readonly getRowId = (params: any) => String(params.data.id);
@@ -394,16 +401,20 @@ export class ActionsListPageComponent {
       this.queryClient.invalidateQueries({ queryKey: ['actions'] });
       const failed = result.skipped + result.errored;
       if (failed === 0) {
-        this.toast.success(`Одобрено: ${result.processed} действий`);
+        this.toast.success(
+          this.translate.instant('execution.bulk.approve_success', { count: result.processed }),
+        );
       } else {
         this.toast.warning(
-          `Одобрено: ${result.processed} из ${result.processed + failed}. ${failed} действий были изменены другим пользователем.`,
+          this.translate.instant('execution.bulk.approve_partial_success', {
+            processed: result.processed, total: result.processed + failed, failed,
+          }),
         );
       }
     },
     onError: () => {
       this.showBulkApproveModal.set(false);
-      this.toast.error('Не удалось одобрить действия. Попробуйте позже.');
+      this.toast.error(this.translate.instant('execution.bulk.approve_error'));
     },
   }));
 
@@ -425,7 +436,7 @@ export class ActionsListPageComponent {
     if (this.pendingSelected().length > 0) {
       this.showBulkApproveModal.set(true);
     } else {
-      this.toast.warning('Среди выбранных нет действий, ожидающих одобрения.');
+      this.toast.warning(this.translate.instant('execution.bulk.no_eligible'));
     }
   }
 

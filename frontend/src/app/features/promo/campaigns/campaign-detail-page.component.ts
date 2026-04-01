@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
@@ -141,6 +141,7 @@ export class CampaignDetailPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly translate = inject(TranslateService);
 
   readonly campaignId = input.required<string>();
 
@@ -279,14 +280,14 @@ export class CampaignDetailPageComponent {
           p.participationStatus === 'DECLINED' ||
           p.participationStatus === 'AUTO_DECLINED'
         ) {
-          btns += `<button class="action-btn" data-action="participate" title="Участвовать">✓</button>`;
+          btns += `<button class="action-btn" data-action="participate" title="${this.translate.instant('actions.participate')}">✓</button>`;
         }
         if (p.participationStatus === 'ELIGIBLE' && !p.actionId) {
-          btns += `<button class="action-btn" data-action="decline" title="Отклонить">✗</button>`;
+          btns += `<button class="action-btn" data-action="decline" title="${this.translate.instant('actions.reject')}">✗</button>`;
         }
         if (p.actionStatus === 'PENDING_APPROVAL') {
-          btns += `<button class="action-btn" data-action="approve" title="Одобрить">✓</button>`;
-          btns += `<button class="action-btn" data-action="reject" title="Отклонить">✗</button>`;
+          btns += `<button class="action-btn" data-action="approve" title="${this.translate.instant('actions.approve')}">✓</button>`;
+          btns += `<button class="action-btn" data-action="reject" title="${this.translate.instant('actions.reject')}">✗</button>`;
         }
         return btns ? `<div class="flex items-center gap-1">${btns}</div>` : '';
       },

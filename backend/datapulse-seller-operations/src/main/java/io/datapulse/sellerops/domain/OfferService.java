@@ -1,6 +1,9 @@
 package io.datapulse.sellerops.domain;
 
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.pricing.api.CreateManualLockRequest;
+import io.datapulse.pricing.domain.ManualPriceLockService;
 import io.datapulse.sellerops.api.ActionHistoryResponse;
 import io.datapulse.sellerops.api.LockOfferRequest;
 import io.datapulse.sellerops.api.OfferDetailResponse;
@@ -10,6 +13,8 @@ import io.datapulse.sellerops.api.OfferDetailResponse.LockInfo;
 import io.datapulse.sellerops.api.OfferDetailResponse.PolicyInfo;
 import io.datapulse.sellerops.api.OfferDetailResponse.PromoInfo;
 import io.datapulse.sellerops.config.GridProperties;
+import io.datapulse.sellerops.persistence.ActionHistoryJdbcRepository;
+import io.datapulse.sellerops.persistence.ActionHistoryRow;
 import io.datapulse.sellerops.persistence.ClickHouseEnrichment;
 import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
 import io.datapulse.sellerops.persistence.OfferDetailJdbcRepository;
@@ -33,6 +38,9 @@ public class OfferService {
 
   private final OfferDetailJdbcRepository detailRepository;
   private final GridClickHouseReadRepository chRepository;
+  private final ActionHistoryJdbcRepository actionHistoryRepository;
+  private final ManualPriceLockService lockService;
+  private final WorkspaceContext workspaceContext;
   private final GridProperties gridProperties;
 
   @Transactional(readOnly = true)
@@ -49,18 +57,29 @@ public class OfferService {
 
   @Transactional
   public void lockOffer(long workspaceId, long offerId, LockOfferRequest request) {
-    throw new UnsupportedOperationException("Not yet implemented");
+    OffsetDateTime expiresAt = request.durationHours() != null
+        ? OffsetDateTime.now().plusHours(request.durationHours())
+        : null;
+
+    var lockRequest = new CreateManualLockRequest(
+        offerId,
+        request.lockedPrice(),
+        request.reason(),
+        expiresAt);
+
+    lockService.createLock(lockRequest, workspaceId, workspaceContext.getUserId());
   }
 
   @Transactional
   public void unlockOffer(long workspaceId, long offerId) {
-    throw new UnsupportedOperationException("Not yet implemented");
+    lockService.unlockByOfferId(offerId, workspaceId, workspaceContext.getUserId());
   }
 
   @Transactional(readOnly = true)
   public Page<ActionHistoryResponse> getActionHistory(long workspaceId, long offerId,
                                                       Pageable pageable) {
-    throw new UnsupportedOperationException("Not yet implemented");
+    return actionHistoryRepository.findByOfferId(workspaceId, offerId, pageable)
+        .map(this::toActionHistoryResponse);
   }
 
   private OfferDetailResponse toResponse(OfferDetailRow row, ClickHouseEnrichment ch) {
@@ -145,6 +164,28 @@ public class OfferService {
     return hoursSinceSync > gridProperties.getFreshnessThresholdHours()
         ? DataFreshness.STALE.name()
         : DataFreshness.FRESH.name();
+  }
+
+  private ActionHistoryResponse toActionHistoryResponse(ActionHistoryRow row) {
+    String reason = row.getCancelReason();
+    if (reason == null) {
+      reason = row.getHoldReason();
+    }
+    if (reason == null) {
+      reason = row.getManualOverrideReason();
+    }
+
+    return new ActionHistoryResponse(
+        row.getActionId(),
+        row.getCreatedAt(),
+        "PRICE_CHANGE",
+        row.getStatus(),
+        row.getTargetPrice(),
+        row.getActualPrice(),
+        row.getExecutionMode(),
+        reason,
+        null
+    );
   }
 
   private Map<Long, ClickHouseEnrichment> fetchEnrichmentSafely(List<Long> offerIds) {

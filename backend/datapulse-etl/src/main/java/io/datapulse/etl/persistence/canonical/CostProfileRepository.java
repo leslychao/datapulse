@@ -1,5 +1,6 @@
 package io.datapulse.etl.persistence.canonical;
 
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -7,6 +8,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -68,6 +70,31 @@ public class CostProfileRepository {
               AND pm.workspace_id = :workspaceId
             """;
 
+    private static final String FIND_BY_ID_AND_WORKSPACE = """
+            SELECT cp.id, cp.seller_sku_id, ss.sku_code, cp.cost_price, cp.currency,
+                   cp.valid_from, cp.valid_to, cp.updated_by_user_id,
+                   cp.created_at, cp.updated_at
+            FROM cost_profile cp
+            JOIN seller_sku ss ON cp.seller_sku_id = ss.id
+            JOIN product_master pm ON ss.product_master_id = pm.id
+            WHERE cp.id = :id
+              AND pm.workspace_id = :workspaceId
+            """;
+
+    private static final String UPDATE_PROFILE = """
+            UPDATE cost_profile
+            SET cost_price = :costPrice,
+                currency = :currency,
+                valid_from = :validFrom,
+                updated_by_user_id = :updatedByUserId,
+                updated_at = now()
+            WHERE id = :id
+            """;
+
+    private static final String DELETE_BY_ID = """
+            DELETE FROM cost_profile WHERE id = :id
+            """;
+
     public void closeCurrentVersion(long sellerSkuId, LocalDate newValidFrom) {
         jdbc.update(CLOSE_CURRENT_VERSION, Map.of(
                 "sellerSkuId", sellerSkuId,
@@ -94,6 +121,26 @@ public class CostProfileRepository {
         for (CostProfileEntity entity : entities) {
             createVersion(entity);
         }
+    }
+
+    public Optional<CostProfileRow> findByIdAndWorkspaceId(long id, long workspaceId) {
+        var rows = jdbc.query(FIND_BY_ID_AND_WORKSPACE,
+                Map.of("id", id, "workspaceId", workspaceId), this::mapRow);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    public void updateProfile(long id, BigDecimal costPrice, String currency,
+                              LocalDate validFrom, long updatedByUserId) {
+        jdbc.update(UPDATE_PROFILE, Map.of(
+                "id", id,
+                "costPrice", costPrice,
+                "currency", currency,
+                "validFrom", Date.valueOf(validFrom),
+                "updatedByUserId", updatedByUserId));
+    }
+
+    public void deleteById(long id) {
+        jdbc.update(DELETE_BY_ID, Map.of("id", id));
     }
 
     public List<CostProfileEntity> findCurrentBySku(long sellerSkuId) {

@@ -9,6 +9,7 @@ import {
   ActionSummary,
   BulkActionResponse,
   BulkApproveRequest,
+  BulkRejectRequest,
   Page,
 } from '@core/models';
 
@@ -99,6 +100,12 @@ export class ActionApiService {
   bulkApprove(workspaceId: number, req: BulkApproveRequest): Observable<BulkActionResponse> {
     return this.http.post<BulkActionResponse>(
       `${this.base}/workspaces/${workspaceId}/actions/bulk-approve`, req,
+    );
+  }
+
+  bulkReject(workspaceId: number, req: BulkRejectRequest): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(
+      `${this.base}/workspaces/${workspaceId}/actions/bulk-reject`, req,
     );
   }
 

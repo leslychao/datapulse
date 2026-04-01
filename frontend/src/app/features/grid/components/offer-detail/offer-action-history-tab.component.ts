@@ -3,6 +3,7 @@ import { injectQuery, injectMutation, injectQueryClient } from '@tanstack/angula
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { ActionApiService } from '@core/api/action-api.service';
 import { OfferApiService } from '@core/api/offer-api.service';
 import { ActionHistoryEntry } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -130,6 +131,7 @@ export class OfferActionHistoryTabComponent {
   readonly offerId = input.required<number>();
 
   private readonly offerApi = inject(OfferApiService);
+  private readonly actionApi = inject(ActionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
@@ -153,7 +155,7 @@ export class OfferActionHistoryTabComponent {
 
   readonly approveMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
-      lastValueFrom(this.offerApi.approveAction(this.wsStore.currentWorkspaceId()!, actionId)),
+      lastValueFrom(this.actionApi.approveAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
       this.toast.success(this.translate.instant('detail.action_history.approve_success'));
       this.invalidateQueries();
@@ -163,7 +165,7 @@ export class OfferActionHistoryTabComponent {
 
   readonly rejectMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
-      lastValueFrom(this.offerApi.rejectAction(this.wsStore.currentWorkspaceId()!, actionId, '')),
+      lastValueFrom(this.actionApi.rejectAction(this.wsStore.currentWorkspaceId()!, actionId, '')),
     onSuccess: () => {
       this.toast.success(this.translate.instant('detail.action_history.reject_success'));
       this.invalidateQueries();
@@ -173,7 +175,7 @@ export class OfferActionHistoryTabComponent {
 
   readonly resumeMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
-      lastValueFrom(this.offerApi.resumeAction(this.wsStore.currentWorkspaceId()!, actionId)),
+      lastValueFrom(this.actionApi.resumeAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
       this.toast.success(this.translate.instant('detail.action_history.resume_success'));
       this.invalidateQueries();

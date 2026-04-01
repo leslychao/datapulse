@@ -24,6 +24,7 @@ import {
   CircleCheck,
 } from 'lucide-angular';
 
+import { ActionApiService } from '@core/api/action-api.service';
 import { MismatchApiService } from '@core/api/mismatch-api.service';
 import { MarketplaceType, MismatchDetail, MismatchStatus } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -154,6 +155,7 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
 })
 export class MismatchDetailPanelComponent {
   private readonly api = inject(MismatchApiService);
+  private readonly actionApi = inject(ActionApiService);
   private readonly ws = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
@@ -195,7 +197,7 @@ export class MismatchDetailPanelComponent {
     mutationFn: () => {
       const id = this.detailQuery.data()?.relatedActionId;
       if (id == null) throw new Error('no action');
-      return lastValueFrom(this.api.retry(this.ws.currentWorkspaceId()!, id));
+      return lastValueFrom(this.actionApi.retryAction(this.ws.currentWorkspaceId()!, id, 'mismatch investigation'));
     },
     onSuccess: () => {
       this.toast.success(this.translate.instant('mismatches.toast.retry'));

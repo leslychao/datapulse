@@ -192,32 +192,32 @@ export class LocksPageComponent {
   formExpiresAt = '';
 
   readonly filterConfigs: FilterConfig[] = [
-    { key: 'search', label: 'Поиск оффера', type: 'text' },
+    { key: 'search', label: this.translate.instant('pricing.locks.filter.search'), type: 'text' },
   ];
 
   readonly columnDefs = [
     {
-      headerName: 'Оффер',
+      headerName: this.translate.instant('pricing.locks.col.offer'),
       field: 'offerName',
       minWidth: 250,
       flex: 1,
       sortable: true,
     },
     {
-      headerName: 'SKU',
+      headerName: this.translate.instant('pricing.locks.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
       cellClass: 'font-mono',
     },
     {
-      headerName: 'Подключение',
+      headerName: this.translate.instant('pricing.locks.col.connection'),
       field: 'connectionName',
       width: 160,
       sortable: true,
     },
     {
-      headerName: 'Цена',
+      headerName: this.translate.instant('pricing.locks.col.price'),
       field: 'lockedPrice',
       width: 120,
       sortable: true,
@@ -225,7 +225,7 @@ export class LocksPageComponent {
       valueFormatter: (params: any) => this.formatPrice(params.value),
     },
     {
-      headerName: 'Причина',
+      headerName: this.translate.instant('pricing.locks.col.reason'),
       field: 'reason',
       minWidth: 200,
       flex: 1,
@@ -233,13 +233,13 @@ export class LocksPageComponent {
       valueFormatter: (params: any) => params.value ?? '—',
     },
     {
-      headerName: 'Кем заблокировано',
+      headerName: this.translate.instant('pricing.locks.col.locked_by'),
       field: 'lockedByName',
       width: 140,
       sortable: true,
     },
     {
-      headerName: 'Заблокировано',
+      headerName: this.translate.instant('pricing.locks.col.locked_at'),
       field: 'lockedAt',
       width: 140,
       sortable: true,
@@ -247,37 +247,41 @@ export class LocksPageComponent {
       valueFormatter: (params: any) => this.formatTimestamp(params.value),
     },
     {
-      headerName: 'Истекает',
+      headerName: this.translate.instant('pricing.locks.col.expires_at'),
       field: 'expiresAt',
       width: 140,
       sortable: true,
       valueFormatter: (params: any) =>
-        params.value ? this.formatTimestamp(params.value) : 'Бессрочно',
+        params.value
+          ? this.formatTimestamp(params.value)
+          : this.translate.instant('pricing.locks.indefinite'),
     },
     {
-      headerName: 'Осталось',
+      headerName: this.translate.instant('pricing.locks.col.remaining'),
       field: 'expiresAt',
       colId: 'timeRemaining',
       width: 120,
       sortable: false,
       cellRenderer: (params: any) => {
         if (!params.data?.expiresAt) {
-          return `<span class="text-[var(--text-secondary)]">Бессрочно</span>`;
+          return `<span class="text-[var(--text-secondary)]">${this.translate.instant('pricing.locks.indefinite')}</span>`;
         }
         const remaining =
           new Date(params.data.expiresAt).getTime() - Date.now();
         if (remaining <= 0) {
-          return `<span style="color: var(--status-error)">Истекло</span>`;
+          return `<span style="color: var(--status-error)">${this.translate.instant('pricing.locks.expired')}</span>`;
         }
         const hours = Math.floor(remaining / 3_600_000);
         const days = Math.floor(hours / 24);
         const remHours = hours % 24;
         const color =
           hours < 24 ? 'color: var(--status-error)' : '';
+        const dUnit = this.translate.instant('common.time.day_short');
+        const hUnit = this.translate.instant('common.time.hour_short');
         if (days > 0) {
-          return `<span style="${color}">${days} дн ${remHours} ч</span>`;
+          return `<span style="${color}">${days} ${dUnit} ${remHours} ${hUnit}</span>`;
         }
-        return `<span style="${color}">${hours} ч</span>`;
+        return `<span style="${color}">${hours} ${hUnit}</span>`;
       },
     },
     {
@@ -287,7 +291,7 @@ export class LocksPageComponent {
       sortable: false,
       suppressMovable: true,
       cellRenderer: () =>
-        `<button class="action-btn" data-action="unlock" title="Разблокировать">🔓</button>`,
+        `<button class="action-btn" data-action="unlock" title="${this.translate.instant('actions.unlock')}">🔓</button>`,
       onCellClicked: (params: any) => {
         const target = params.event?.target as HTMLElement;
         const action = target
@@ -335,7 +339,9 @@ export class LocksPageComponent {
   readonly unlockMessage = computed(() => {
     const lock = this.unlockTarget();
     return lock
-      ? `Разблокировать цену для «${lock.offerName}» (${lock.sellerSku})?`
+      ? this.translate.instant('pricing.locks.unlock_message', {
+          offer: lock.offerName, sku: lock.sellerSku,
+        })
       : '';
   });
 

@@ -43,8 +43,4 @@ export class MismatchApiService {
   resolve(workspaceId: number, mismatchId: number, body: { resolution: string; note: string }): Observable<void> {
     return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/mismatches/${mismatchId}/resolve`, body);
   }
-
-  retry(workspaceId: number, actionId: number): Observable<void> {
-    return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/actions/${actionId}/retry`, { retryReason: 'mismatch investigation' });
-  }
 }

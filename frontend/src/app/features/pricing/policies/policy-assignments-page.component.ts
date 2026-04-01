@@ -28,12 +28,6 @@ import { DataGridComponent } from '@shared/components/data-grid/data-grid.compon
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 
-const SCOPE_TYPE_LABEL: Record<string, string> = {
-  CONNECTION: 'Подключение',
-  CATEGORY: 'Категория',
-  SKU: 'Товар',
-};
-
 const SCOPE_TYPE_COLOR: Record<string, string> = {
   CONNECTION: 'info',
   CATEGORY: 'warning',
@@ -222,13 +216,13 @@ export class PolicyAssignmentsPageComponent {
 
   readonly columnDefs = [
     {
-      headerName: 'Область',
+      headerName: this.translate.instant('pricing.assignments.col.scope'),
       field: 'scopeType',
       width: 150,
       sortable: true,
       cellRenderer: (params: any) => {
         const val = params.value as string;
-        const label = SCOPE_TYPE_LABEL[val] ?? val;
+        const label = this.translate.instant(`pricing.assignments.scope.${val}`);
         const color = SCOPE_TYPE_COLOR[val] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -239,14 +233,14 @@ export class PolicyAssignmentsPageComponent {
       },
     },
     {
-      headerName: 'Подключение',
+      headerName: this.translate.instant('pricing.assignments.col.connection'),
       field: 'connectionName',
       minWidth: 200,
       flex: 1,
       sortable: true,
     },
     {
-      headerName: 'Цель',
+      headerName: this.translate.instant('pricing.assignments.col.target'),
       field: 'target',
       minWidth: 250,
       flex: 1,
@@ -268,7 +262,7 @@ export class PolicyAssignmentsPageComponent {
       sortable: false,
       suppressMovable: true,
       cellRenderer: () =>
-        `<button class="action-btn" data-action="delete" title="Удалить">🗑</button>`,
+        `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">🗑</button>`,
       onCellClicked: (params: any) => {
         const target = params.event?.target as HTMLElement;
         const action = target

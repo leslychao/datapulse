@@ -29,21 +29,6 @@ const RUN_STATUS_COLOR: Record<string, string> = {
   FAILED: 'error',
 };
 
-const RUN_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Ожидает',
-  IN_PROGRESS: 'Выполняется',
-  COMPLETED: 'Завершён',
-  COMPLETED_WITH_ERRORS: 'С ошибками',
-  FAILED: 'Ошибка',
-};
-
-const TRIGGER_LABEL: Record<string, string> = {
-  POST_SYNC: 'После синхр.',
-  MANUAL: 'Ручной',
-  SCHEDULED: 'По расписанию',
-  POLICY_CHANGE: 'Изм. политики',
-};
-
 const TRIGGER_COLOR: Record<string, string> = {
   POST_SYNC: 'var(--accent-primary)',
   MANUAL: 'var(--status-info)',
@@ -55,17 +40,6 @@ const DECISION_COLOR: Record<string, string> = {
   CHANGE: 'success',
   SKIP: 'warning',
   HOLD: 'neutral',
-};
-
-const DECISION_LABEL: Record<string, string> = {
-  CHANGE: 'Изменение',
-  SKIP: 'Пропуск',
-  HOLD: 'Ожидание',
-};
-
-const STRATEGY_LABEL: Record<string, string> = {
-  TARGET_MARGIN: 'Целевая маржа',
-  PRICE_CORRIDOR: 'Ценовой коридор',
 };
 
 @Component({
@@ -224,6 +198,7 @@ export class RunDetailPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly translate = inject(TranslateService);
 
   readonly decisionFilterValues = signal<Record<string, any>>({});
   readonly decisionPage = signal(0);
@@ -242,8 +217,14 @@ export class RunDetailPageComponent {
   }));
 
   readonly run = computed(() => this.runQuery.data() ?? null);
-  readonly statusLabel = computed(() => RUN_STATUS_LABEL[this.run()?.status ?? ''] ?? '');
-  readonly triggerLabel = computed(() => TRIGGER_LABEL[this.run()?.triggerType ?? ''] ?? '');
+  readonly statusLabel = computed(() => {
+    const status = this.run()?.status;
+    return status ? this.translate.instant(`pricing.runs.status.${status}`) : '';
+  });
+  readonly triggerLabel = computed(() => {
+    const trigger = this.run()?.triggerType;
+    return trigger ? this.translate.instant(`pricing.runs.trigger.${trigger}`) : '';
+  });
 
   readonly statusCssVar = computed(() => {
     const color = RUN_STATUS_COLOR[this.run()?.status ?? ''] ?? 'neutral';
@@ -259,7 +240,7 @@ export class RunDetailPageComponent {
     if (!r) return '';
     const started = this.formatTimestamp(r.startedAt);
     const duration = this.formatDuration(r.startedAt, r.completedAt);
-    if (r.status === 'IN_PROGRESS') return `Начат ${started}`;
+    if (r.status === 'IN_PROGRESS') return this.translate.instant('pricing.runs.detail.started', { time: started });
     if (r.completedAt) return `${started} · ${duration}`;
     return started;
   });
@@ -292,35 +273,38 @@ export class RunDetailPageComponent {
   readonly decisionFilterConfigs: FilterConfig[] = [
     {
       key: 'decisionType',
-      label: 'Тип решения',
+      label: this.translate.instant('pricing.runs.detail.filter.decision_type'),
       type: 'multi-select',
-      options: Object.entries(DECISION_LABEL).map(([value, label]) => ({ value, label })),
+      options: (['CHANGE', 'SKIP', 'HOLD'] as const).map(value => ({
+        value,
+        label: this.translate.instant(`pricing.decisions.type.${value}`),
+      })),
     },
   ];
 
   readonly decisionColumnDefs = [
     {
-      headerName: 'Оффер',
+      headerName: this.translate.instant('pricing.runs.detail.col.offer'),
       field: 'offerName',
       minWidth: 200,
       flex: 1,
       sortable: true,
     },
     {
-      headerName: 'Артикул',
+      headerName: this.translate.instant('pricing.runs.detail.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
       cellClass: 'font-mono text-[length:var(--text-sm)]',
     },
     {
-      headerName: 'Решение',
+      headerName: this.translate.instant('pricing.runs.detail.col.decision'),
       field: 'decisionType',
       width: 120,
       sortable: true,
       cellRenderer: (params: any) => {
         const dt = params.value as string;
-        const label = DECISION_LABEL[dt] ?? dt;
+        const label = this.translate.instant(`pricing.decisions.type.${dt}`);
         const color = DECISION_COLOR[dt] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -331,7 +315,7 @@ export class RunDetailPageComponent {
       },
     },
     {
-      headerName: 'Текущая цена',
+      headerName: this.translate.instant('pricing.runs.detail.col.current_price'),
       field: 'currentPrice',
       width: 120,
       sortable: true,
@@ -340,7 +324,7 @@ export class RunDetailPageComponent {
       valueFormatter: (params: any) => this.formatPrice(params.value),
     },
     {
-      headerName: 'Целевая цена',
+      headerName: this.translate.instant('pricing.runs.detail.col.target_price'),
       field: 'targetPrice',
       width: 120,
       sortable: true,
@@ -349,7 +333,7 @@ export class RunDetailPageComponent {
       valueFormatter: (params: any) => this.formatPrice(params.value),
     },
     {
-      headerName: 'Δ цены',
+      headerName: this.translate.instant('pricing.runs.detail.col.price_delta'),
       field: 'changePct',
       width: 90,
       sortable: true,
@@ -364,31 +348,34 @@ export class RunDetailPageComponent {
       },
     },
     {
-      headerName: 'Политика',
+      headerName: this.translate.instant('pricing.runs.detail.col.policy'),
       field: 'policyName',
       width: 160,
       sortable: true,
     },
     {
-      headerName: 'Стратегия',
+      headerName: this.translate.instant('pricing.runs.detail.col.strategy'),
       field: 'strategyType',
       width: 140,
       sortable: true,
       cellRenderer: (params: any) => {
         const st = params.value as string;
-        const label = STRATEGY_LABEL[st] ?? st;
+        const label = this.translate.instant(`pricing.policies.strategy.${st}`);
         return `<span class="inline-flex items-center rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
           ${label}
         </span>`;
       },
     },
     {
-      headerName: 'Причина пропуска',
+      headerName: this.translate.instant('pricing.runs.detail.col.skip_reason'),
       field: 'skipReason',
       width: 200,
       sortable: false,
       cellClass: 'text-[length:var(--text-sm)] text-[color:var(--text-tertiary)]',
-      valueFormatter: (params: any) => params.value ?? '—',
+      valueFormatter: (params: any) => {
+        if (!params.value) return '—';
+        return this.translate.instant(params.value);
+      },
     },
   ];
 
@@ -418,9 +405,11 @@ export class RunDetailPageComponent {
     const ms = endMs - new Date(start).getTime();
     if (ms < 0) return '—';
     const totalSec = Math.floor(ms / 1000);
-    if (totalSec < 60) return `${totalSec} сек`;
+    const secUnit = this.translate.instant('common.time.sec');
+    if (totalSec < 60) return `${totalSec} ${secUnit}`;
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
-    return sec > 0 ? `${min} мин ${sec} сек` : `${min} мин`;
+    const minUnit = this.translate.instant('common.time.min');
+    return sec > 0 ? `${min} ${minUnit} ${sec} ${secUnit}` : `${min} ${minUnit}`;
   }
 }

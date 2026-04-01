@@ -174,10 +174,6 @@ export interface ActionHistoryEntry {
   initiatedBy: string | null;
 }
 
-export interface BulkActionRequest {
-  actionIds: number[];
-}
-
 export interface BulkActionResponse {
   processed: number;
   skipped: number;

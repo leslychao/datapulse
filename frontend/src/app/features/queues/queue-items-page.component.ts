@@ -27,6 +27,7 @@ import {
 import { LucideAngularModule, CheckCircle2 } from 'lucide-angular';
 import { lastValueFrom } from 'rxjs';
 
+import { ActionApiService } from '@core/api/action-api.service';
 import { QueueApiService } from '@core/api/queue-api.service';
 import {
   Queue,
@@ -55,6 +56,7 @@ export class QueueItemsPageComponent {
   };
 
   private readonly queueApi = inject(QueueApiService);
+  private readonly actionApi = inject(ActionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly queueStore = inject(QueueStore);
   private readonly toast = inject(ToastService);
@@ -161,7 +163,7 @@ export class QueueItemsPageComponent {
   readonly bulkApproveMutation = injectMutation(() => ({
     mutationFn: (ids: number[]) => {
       const ws = this.workspaceId()!;
-      return lastValueFrom(this.queueApi.bulkApprove(ws, ids));
+      return lastValueFrom(this.actionApi.bulkApprove(ws, { actionIds: ids }));
     },
     onSuccess: () => this.afterBulk(),
     onError: () =>
@@ -172,7 +174,7 @@ export class QueueItemsPageComponent {
     mutationFn: (payload: { ids: number[]; reason: string }) => {
       const ws = this.workspaceId()!;
       return lastValueFrom(
-        this.queueApi.bulkReject(ws, payload.ids, payload.reason),
+        this.actionApi.bulkReject(ws, { actionIds: payload.ids, cancelReason: payload.reason }),
       );
     },
     onSuccess: () => this.afterBulk(),

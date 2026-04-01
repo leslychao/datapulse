@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
@@ -132,6 +132,7 @@ export class PromoPolicyListPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly translate = inject(TranslateService);
 
   readonly filterValues = signal<Record<string, any>>({
     status: ['DRAFT', 'ACTIVE', 'PAUSED'],
@@ -252,15 +253,15 @@ export class PromoPolicyListPageComponent {
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const p = params.data as PromoPolicySummary;
-        let buttons = `<button class="action-btn" data-action="edit" title="Редактировать">✏</button>`;
+        let buttons = `<button class="action-btn" data-action="edit" title="${this.translate.instant('actions.edit')}">✏</button>`;
         if (p.status === 'DRAFT' || p.status === 'PAUSED') {
-          buttons += `<button class="action-btn" data-action="activate" title="Активировать">▶</button>`;
+          buttons += `<button class="action-btn" data-action="activate" title="${this.translate.instant('actions.activate')}">▶</button>`;
         }
         if (p.status === 'ACTIVE') {
-          buttons += `<button class="action-btn" data-action="pause" title="Приостановить">⏸</button>`;
+          buttons += `<button class="action-btn" data-action="pause" title="${this.translate.instant('actions.pause')}">⏸</button>`;
         }
         if (p.status !== 'ARCHIVED') {
-          buttons += `<button class="action-btn" data-action="archive" title="Архивировать">📦</button>`;
+          buttons += `<button class="action-btn" data-action="archive" title="${this.translate.instant('actions.archive')}">📦</button>`;
         }
         return `<div class="flex items-center gap-1">${buttons}</div>`;
       },

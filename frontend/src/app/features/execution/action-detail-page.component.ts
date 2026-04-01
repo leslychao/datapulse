@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { LucideAngularModule, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-angular';
@@ -36,21 +36,6 @@ const STATUS_COLOR: Record<string, StatusColor> = {
   SUPERSEDED: 'neutral',
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING_APPROVAL: 'Ожидает',
-  APPROVED: 'Одобрено',
-  ON_HOLD: 'Приостановлено',
-  SCHEDULED: 'Запланировано',
-  EXECUTING: 'Выполняется',
-  RECONCILIATION_PENDING: 'Проверка',
-  RETRY_SCHEDULED: 'Повтор',
-  SUCCEEDED: 'Выполнено',
-  FAILED: 'Ошибка',
-  EXPIRED: 'Истекло',
-  CANCELLED: 'Отменено',
-  SUPERSEDED: 'Заменено',
-};
-
 const MAIN_FLOW = [
   'PENDING_APPROVAL',
   'APPROVED',
@@ -65,13 +50,6 @@ const OUTCOME_COLOR: Record<string, StatusColor> = {
   RETRY: 'warning',
   FAILURE: 'error',
   INDETERMINATE: 'warning',
-};
-
-const OUTCOME_LABEL: Record<string, string> = {
-  SUCCESS: 'Успех',
-  RETRY: 'Повтор',
-  FAILURE: 'Ошибка',
-  INDETERMINATE: 'Неопред.',
 };
 
 @Component({
@@ -95,6 +73,7 @@ export class ActionDetailPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly translate = inject(TranslateService);
 
   protected readonly ArrowLeft = ArrowLeft;
   protected readonly ChevronDown = ChevronDown;
@@ -123,7 +102,9 @@ export class ActionDetailPageComponent {
   readonly action = computed(() => this.actionQuery.data() ?? null);
   readonly status = computed(() => this.action()?.status ?? '');
 
-  readonly statusLabel = computed(() => STATUS_LABEL[this.status()] ?? this.status());
+  readonly statusLabel = computed(() =>
+    this.translate.instant(`grid.action_status.${this.status()}`) || this.status(),
+  );
   readonly statusColor = computed(() => STATUS_COLOR[this.status()] ?? 'neutral');
 
   readonly deltaPctDisplay = computed(() => {
@@ -162,7 +143,7 @@ export class ActionDetailPageComponent {
       const isFuture = !isCurrent && !isPast;
       return {
         status: s,
-        label: STATUS_LABEL[s] ?? s,
+        label: this.translate.instant(`grid.action_status.${s}`),
         color: STATUS_COLOR[s] ?? 'neutral',
         isCurrent,
         isPast,
@@ -190,7 +171,7 @@ export class ActionDetailPageComponent {
       },
       onError: () => {
         this.actionPending.set(false);
-        this.toast.error('Не удалось выполнить операцию. Попробуйте позже.');
+        this.toast.error(this.translate.instant('execution.detail.action_error'));
         this.resetModals();
       },
     }));
@@ -198,35 +179,35 @@ export class ActionDetailPageComponent {
 
   readonly approveMutation = this.createMutation(
     (id) => this.actionApi.approveAction(this.wsStore.currentWorkspaceId()!, id),
-    'Действие одобрено',
+    this.translate.instant('execution.detail.toast.approved'),
   );
 
   readonly rejectMutation = this.createMutation(
     (id, reason) => this.actionApi.rejectAction(this.wsStore.currentWorkspaceId()!, id, reason!),
-    'Действие отклонено',
+    this.translate.instant('execution.detail.toast.rejected'),
     true,
   );
 
   readonly holdMutation = this.createMutation(
     (id, reason) => this.actionApi.holdAction(this.wsStore.currentWorkspaceId()!, id, reason!),
-    'Действие приостановлено',
+    this.translate.instant('execution.detail.toast.held'),
     true,
   );
 
   readonly resumeMutation = this.createMutation(
     (id) => this.actionApi.resumeAction(this.wsStore.currentWorkspaceId()!, id),
-    'Действие возобновлено',
+    this.translate.instant('execution.detail.toast.resumed'),
   );
 
   readonly cancelMutation = this.createMutation(
     (id, reason) => this.actionApi.cancelAction(this.wsStore.currentWorkspaceId()!, id, reason!),
-    'Действие отменено',
+    this.translate.instant('execution.detail.toast.cancelled'),
     true,
   );
 
   readonly retryMutation = this.createMutation(
     (id, reason) => this.actionApi.retryAction(this.wsStore.currentWorkspaceId()!, id, reason!),
-    'Повторное действие создано',
+    this.translate.instant('execution.detail.toast.retried'),
     true,
   );
 
@@ -278,8 +259,8 @@ export class ActionDetailPageComponent {
   formatDuration(start: string | null, end: string | null): string {
     if (!start || !end) return '—';
     const ms = new Date(end).getTime() - new Date(start).getTime();
-    if (ms < 1000) return `${ms} мс`;
-    return `${(ms / 1000).toFixed(1).replace('.', ',')} сек`;
+    if (ms < 1000) return `${ms} ${this.translate.instant('common.time.ms')}`;
+    return `${(ms / 1000).toFixed(1).replace('.', ',')} ${this.translate.instant('common.time.sec')}`;
   }
 
   formatPrice(value: number | null): string {
@@ -287,7 +268,7 @@ export class ActionDetailPageComponent {
   }
 
   outcomeLabel(outcome: string): string {
-    return OUTCOME_LABEL[outcome] ?? outcome;
+    return this.translate.instant(`execution.detail.outcome.${outcome}`);
   }
 
   outcomeColor(outcome: string): StatusColor {

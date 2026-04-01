@@ -108,6 +108,10 @@ public final class MessageCodes {
     public static final String PRICING_BULK_TOO_LARGE = "pricing.bulk.too_large";
     public static final String PRICING_AUTOMATION_BLOCKED = "pricing.automation.blocked";
 
+    // --- Pricing: Impact Preview ---
+    public static final String PRICING_PREVIEW_OFFER_INACTIVE = "pricing.preview.offer_inactive";
+    public static final String PRICING_PREVIEW_MANUAL_OVERRIDE = "pricing.preview.manual_override";
+
     // --- Execution ---
     public static final String EXECUTION_ACTION_NOT_FOUND = "execution.action.not_found";
     public static final String EXECUTION_ACTION_INVALID_TRANSITION = "execution.action.invalid_transition";

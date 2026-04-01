@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
@@ -155,6 +155,7 @@ export class PromoPolicyAssignmentsPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly translate = inject(TranslateService);
 
   readonly policyId = input.required<string>();
 
@@ -195,7 +196,7 @@ export class PromoPolicyAssignmentsPageComponent {
       field: '_delete',
       width: 60,
       sortable: false,
-      cellRenderer: () => `<button class="action-btn" data-action="delete" title="Удалить">🗑</button>`,
+      cellRenderer: () => `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">🗑</button>`,
       onCellClicked: (params: any) => {
         const target = params.event?.target as HTMLElement;
         if (target?.closest('[data-action="delete"]') && params.data) {

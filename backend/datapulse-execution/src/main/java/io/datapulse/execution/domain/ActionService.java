@@ -235,16 +235,20 @@ public class ActionService {
     @Transactional
     public void casCancel(long actionId, String cancelReason) {
         var action = findActionOrThrow(actionId);
+        ActionStatus prevStatus = action.getStatus();
 
-        if (!action.getStatus().isCancellable()) {
+        if (!prevStatus.isCancellable()) {
             throw ConflictException.of(MessageCodes.EXECUTION_ACTION_NOT_CANCELLABLE,
-                    actionId, action.getStatus().name());
+                    actionId, prevStatus.name());
         }
 
-        int rows = casRepository.casCancel(actionId, action.getStatus(), cancelReason);
+        int rows = casRepository.casCancel(actionId, prevStatus, cancelReason);
         if (rows == 0) {
-            throwCasConflict(actionId, action.getStatus(), ActionStatus.CANCELLED);
+            throwCasConflict(actionId, prevStatus, ActionStatus.CANCELLED);
         }
+
+        recordTransition(actionId, prevStatus, ActionStatus.CANCELLED,
+            resolveCurrentUserId(), cancelReason);
 
         publishAudit("action.cancel", actionId, "SUCCESS", cancelReason);
         log.info("Action cancelled: actionId={}, reason={}", actionId, cancelReason);
@@ -279,6 +283,9 @@ public class ActionService {
         int rows = casRepository.casTransition(actionId, ActionStatus.SCHEDULED, ActionStatus.EXECUTING);
         if (rows == 0) {
             log.debug("CAS claim skipped: actionId={} (already claimed or superseded)", actionId);
+        } else {
+            recordTransition(actionId, ActionStatus.SCHEDULED,
+                ActionStatus.EXECUTING, null, null);
         }
     }
 
@@ -288,6 +295,9 @@ public class ActionService {
                 ActionStatus.RETRY_SCHEDULED, ActionStatus.EXECUTING);
         if (rows == 0) {
             log.warn("CAS retry→executing conflict: actionId={}", actionId);
+        } else {
+            recordTransition(actionId, ActionStatus.RETRY_SCHEDULED,
+                ActionStatus.EXECUTING, null, null);
         }
     }
 
@@ -303,6 +313,8 @@ public class ActionService {
         if (rows == 0) {
             throwCasConflict(actionId, expectedStatus, ActionStatus.SUCCEEDED);
         }
+
+        recordTransition(actionId, expectedStatus, ActionStatus.SUCCEEDED, null, null);
 
         eventPublisher.publishEvent(new ActionCompletedEvent(
                 actionId, action.getWorkspaceId(), action.getMarketplaceOfferId(),
@@ -323,6 +335,9 @@ public class ActionService {
         if (rows == 0) {
             throwCasConflict(actionId, expectedStatus, ActionStatus.FAILED);
         }
+
+        recordTransition(actionId, expectedStatus, ActionStatus.FAILED,
+            null, lastErrorMessage);
 
         eventPublisher.publishEvent(new ActionFailedEvent(
                 actionId, action.getWorkspaceId(), action.getMarketplaceOfferId(),
@@ -345,6 +360,9 @@ public class ActionService {
             return;
         }
 
+        recordTransition(actionId, ActionStatus.EXECUTING,
+            ActionStatus.RETRY_SCHEDULED, null, null);
+
         outboxService.createEvent(
                 OutboxEventType.PRICE_ACTION_RETRY,
                 AGGREGATE_TYPE,
@@ -365,6 +383,9 @@ public class ActionService {
             return;
         }
 
+        recordTransition(actionId, ActionStatus.EXECUTING,
+            ActionStatus.RECONCILIATION_PENDING, null, null);
+
         outboxService.createEvent(
                 OutboxEventType.RECONCILIATION_CHECK,
                 AGGREGATE_TYPE,
@@ -381,6 +402,9 @@ public class ActionService {
             log.warn("CAS schedule conflict: actionId={}", action.getId());
             return;
         }
+
+        recordTransition(action.getId(), ActionStatus.APPROVED,
+            ActionStatus.SCHEDULED, null, null);
 
         outboxService.createEvent(
                 OutboxEventType.PRICE_ACTION_EXECUTE,
@@ -442,6 +466,26 @@ public class ActionService {
                 "expected=%s, target=%s".formatted(expected, target));
         throw ConflictException.of(MessageCodes.EXECUTION_ACTION_CAS_CONFLICT,
                 actionId, expected.name(), target.name());
+    }
+
+    private void recordTransition(long actionId, ActionStatus fromStatus,
+                                   ActionStatus toStatus, Long actorUserId,
+                                   String reason) {
+        var transition = new PriceActionStateTransitionEntity();
+        transition.setPriceActionId(actionId);
+        transition.setFromStatus(fromStatus);
+        transition.setToStatus(toStatus);
+        transition.setActorUserId(actorUserId);
+        transition.setReason(reason);
+        stateTransitionRepository.save(transition);
+    }
+
+    private Long resolveCurrentUserId() {
+        try {
+            return workspaceContext.getUserId();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void publishAudit(String actionType, long actionId,

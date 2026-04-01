@@ -6,8 +6,9 @@ import io.datapulse.execution.domain.ActionService;
 import io.datapulse.execution.domain.PriceActionFilter;
 import io.datapulse.execution.domain.ReconciliationService;
 import io.datapulse.execution.persistence.PriceActionAttemptEntity;
-import io.datapulse.execution.persistence.PriceActionEntity;
+import io.datapulse.execution.persistence.PriceActionDetailRow;
 import io.datapulse.execution.persistence.PriceActionSummaryRow;
+import io.datapulse.execution.persistence.PriceActionTransitionRow;
 import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -51,10 +52,13 @@ public class PriceActionController {
 
     @GetMapping("/{actionId}")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public PriceActionResponse get(
+    public PriceActionDetailResponse get(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("actionId") long actionId) {
-        return toResponse(actionService.getAction(actionId));
+        var detail = actionService.getActionDetailRow(actionId);
+        var attempts = actionService.getAttempts(actionId);
+        var transitions = actionService.getTransitions(actionId);
+        return toDetailResponse(detail, attempts, transitions);
     }
 
     @GetMapping("/{actionId}/attempts")
@@ -206,18 +210,63 @@ public class PriceActionController {
         );
     }
 
-    private PriceActionResponse toResponse(PriceActionEntity e) {
-        return new PriceActionResponse(
-                e.getId(), e.getWorkspaceId(), e.getMarketplaceOfferId(),
-                e.getPriceDecisionId(), e.getExecutionMode(), e.getStatus(),
-                e.getTargetPrice(), e.getCurrentPriceAtCreation(),
-                e.getApprovedByUserId(), e.getApprovedAt(),
-                e.getHoldReason(), e.getCancelReason(),
-                e.getSupersededByActionId(), e.getReconciliationSource(),
-                e.getManualOverrideReason(),
-                e.getAttemptCount(), e.getMaxAttempts(),
-                e.getApprovalTimeoutHours(), e.getNextAttemptAt(),
-                e.getCreatedAt(), e.getUpdatedAt()
+    private PriceActionDetailResponse toDetailResponse(
+        PriceActionDetailRow row,
+        List<PriceActionAttemptEntity> attempts,
+        List<PriceActionTransitionRow> transitions) {
+
+        BigDecimal deltaPct = null;
+        if (row.currentPriceAtCreation() != null
+            && row.currentPriceAtCreation().compareTo(BigDecimal.ZERO) != 0
+            && row.targetPrice() != null) {
+            deltaPct = row.targetPrice()
+                .subtract(row.currentPriceAtCreation())
+                .multiply(BigDecimal.valueOf(100))
+                .divide(row.currentPriceAtCreation(), 2, RoundingMode.HALF_UP);
+        }
+
+        String lastErrorMessage = attempts.stream()
+            .filter(a -> a.getErrorMessage() != null)
+            .reduce((first, second) -> second)
+            .map(PriceActionAttemptEntity::getErrorMessage)
+            .orElse(null);
+
+        List<PriceActionAttemptResponse> attemptResponses = attempts.stream()
+            .map(this::toAttemptResponse)
+            .toList();
+
+        List<PriceActionStateTransitionResponse> transitionResponses = transitions.stream()
+            .map(t -> new PriceActionStateTransitionResponse(
+                t.fromStatus(), t.toStatus(), t.createdAt(),
+                t.actorName(), t.reason()))
+            .toList();
+
+        return new PriceActionDetailResponse(
+            row.id(),
+            "SET_PRICE",
+            row.offerName(),
+            row.marketplaceOfferId(),
+            row.sku(),
+            row.marketplace(),
+            row.connectionName(),
+            row.status(),
+            row.executionMode(),
+            row.targetPrice(),
+            row.currentPriceAtCreation(),
+            deltaPct,
+            row.attemptCount(),
+            row.maxAttempts(),
+            row.createdAt(),
+            row.updatedAt(),
+            null,
+            row.approvedByName(),
+            row.approvedAt(),
+            row.holdReason(),
+            row.cancelReason(),
+            lastErrorMessage,
+            row.supersededByActionId(),
+            attemptResponses,
+            transitionResponses
         );
     }
 

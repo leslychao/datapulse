@@ -61,7 +61,7 @@ public class CostProfileController {
         @PathVariable("id") long id,
         @Valid @RequestBody UpdateCostProfileRequest request) {
         return costProfileService.updateProfile(
-            id, request, workspaceContext.getWorkspaceId());
+            id, request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
     }
 
     @DeleteMapping("/{id}")

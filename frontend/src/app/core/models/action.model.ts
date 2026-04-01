@@ -87,3 +87,8 @@ export interface ActionFilter {
 export interface BulkApproveRequest {
   actionIds: number[];
 }
+
+export interface BulkRejectRequest {
+  actionIds: number[];
+  cancelReason?: string;
+}

@@ -4,7 +4,7 @@ import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { LucideAngularModule, Check, X, Pause, Lock, Unlock } from 'lucide-angular';
 
-import { OfferApiService } from '@core/api/offer-api.service';
+import { ActionApiService } from '@core/api/action-api.service';
 import { GridStore } from '@shared/stores/grid.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -103,7 +103,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
 })
 export class BulkActionsBarComponent {
   protected readonly gridStore = inject(GridStore);
-  private readonly offerApi = inject(OfferApiService);
+  private readonly actionApi = inject(ActionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   private readonly queryClient = injectQueryClient();
@@ -122,7 +122,7 @@ export class BulkActionsBarComponent {
 
   readonly bulkApproveMutation = injectMutation(() => ({
     mutationFn: (ids: number[]) =>
-      lastValueFrom(this.offerApi.bulkApprove(this.wsStore.currentWorkspaceId()!, { actionIds: ids })),
+      lastValueFrom(this.actionApi.bulkApprove(this.wsStore.currentWorkspaceId()!, { actionIds: ids })),
     onSuccess: (res) => {
       this.showApproveModal.set(false);
       this.gridStore.clearSelection();
@@ -144,7 +144,7 @@ export class BulkActionsBarComponent {
 
   readonly bulkRejectMutation = injectMutation(() => ({
     mutationFn: (ids: number[]) =>
-      lastValueFrom(this.offerApi.bulkReject(this.wsStore.currentWorkspaceId()!, { actionIds: ids })),
+      lastValueFrom(this.actionApi.bulkReject(this.wsStore.currentWorkspaceId()!, { actionIds: ids })),
     onSuccess: (res) => {
       this.showRejectModal.set(false);
       this.gridStore.clearSelection();

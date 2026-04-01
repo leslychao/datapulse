@@ -1,6 +1,7 @@
 package io.datapulse.pricing.api;
 
 import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.pricing.domain.ImpactPreviewService;
 import io.datapulse.pricing.domain.PolicyStatus;
 import io.datapulse.pricing.domain.PolicyType;
 import io.datapulse.pricing.domain.PricePolicyService;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PricePolicyController {
 
     private final PricePolicyService policyService;
+    private final ImpactPreviewService impactPreviewService;
     private final WorkspaceContext workspaceContext;
 
     @PostMapping
@@ -103,5 +105,14 @@ public class PricePolicyController {
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId) {
         policyService.archivePolicy(policyId, workspaceId);
+    }
+
+    @PostMapping("/{policyId}/preview")
+    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    public ImpactPreviewResponse previewPolicy(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            Pageable pageable) {
+        return impactPreviewService.preview(policyId, workspaceId, pageable);
     }
 }

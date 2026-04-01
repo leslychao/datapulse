@@ -11,6 +11,7 @@ import {
   Calculator,
   BellRing,
   ScrollText,
+  RefreshCw,
 } from 'lucide-angular';
 
 interface NavItem {
@@ -63,6 +64,7 @@ export class SettingsLayoutComponent {
     { path: 'cost-profiles', labelKey: 'settings.nav.cost_profiles', icon: Calculator },
     { path: 'team', labelKey: 'settings.nav.team', icon: Users },
     { path: 'invitations', labelKey: 'settings.nav.invitations', icon: Mail },
+    { path: 'jobs', labelKey: 'settings.nav.jobs', icon: RefreshCw },
     { path: 'alert-rules', labelKey: 'settings.nav.alert_rules', icon: BellRing },
     { path: 'audit', labelKey: 'settings.nav.audit_log', icon: ScrollText },
   ];

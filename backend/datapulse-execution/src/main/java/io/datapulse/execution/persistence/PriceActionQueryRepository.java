@@ -187,7 +187,7 @@ public class PriceActionQueryRepository {
                 rs.getObject("created_at", OffsetDateTime.class),
                 rs.getObject("updated_at", OffsetDateTime.class)
             ));
-        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
     public List<PriceActionTransitionRow> findTransitions(long actionId) {

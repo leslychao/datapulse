@@ -241,7 +241,7 @@
                   <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_outcome' | translate }}</th>
                   <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_classification' | translate }}</th>
                   <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_error' | translate }}</th>
-                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">Reconciliation</th>
+                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'execution.detail.col_reconciliation' | translate }}</th>
                   <th class="w-8 px-3 py-2"></th>
                 </tr>
               </thead>
@@ -286,15 +286,15 @@
                         </div>
                         @if (att.reconciliationSource) {
                           <div class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
-                            <span>Источник: {{ att.reconciliationSource }}</span>
+                            <span>{{ 'execution.detail.recon_source' | translate }}: {{ att.reconciliationSource }}</span>
                             @if (att.reconciliationReadAt) {
-                              <span>Проверка: {{ formatTimestamp(att.reconciliationReadAt) }}</span>
+                              <span>{{ 'execution.detail.recon_check' | translate }}: {{ formatTimestamp(att.reconciliationReadAt) }}</span>
                             }
                             @if (att.actualPrice !== null) {
-                              <span>Фактическая цена: {{ formatPrice(att.actualPrice) }}</span>
+                              <span>{{ 'execution.detail.recon_actual_price' | translate }}: {{ formatPrice(att.actualPrice) }}</span>
                             }
                             @if (att.priceMatch !== null) {
-                              <span>Совпадение: {{ att.priceMatch ? '✓ Да' : '✗ Нет' }}</span>
+                              <span>{{ 'execution.detail.recon_match' | translate }}: {{ att.priceMatch ? ('common.yes' | translate) : ('common.no' | translate) }}</span>
                             }
                           </div>
                         }
@@ -356,7 +356,7 @@
       [ngModel]="reasonText()"
       (ngModelChange)="reasonText.set($event)"
       class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-      placeholder="Причина отклонения (минимум 5 символов)"
+      [placeholder]="'execution.detail.reject_placeholder' | translate"
     ></textarea>
   </div>
 </dp-form-modal>
@@ -377,7 +377,7 @@
       [ngModel]="reasonText()"
       (ngModelChange)="reasonText.set($event)"
       class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-      placeholder="Причина отмены (минимум 5 символов)"
+      [placeholder]="'execution.detail.cancel_placeholder' | translate"
     ></textarea>
   </div>
 </dp-form-modal>
@@ -398,7 +398,7 @@
       [ngModel]="reasonText()"
       (ngModelChange)="reasonText.set($event)"
       class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-      placeholder="Причина повтора (минимум 5 символов)"
+      [placeholder]="'execution.detail.retry_placeholder' | translate"
     ></textarea>
   </div>
 </dp-form-modal>

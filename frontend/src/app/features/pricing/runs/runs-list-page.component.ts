@@ -29,6 +29,14 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 
+const RUN_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Ожидание',
+  IN_PROGRESS: 'Выполняется',
+  COMPLETED: 'Завершён',
+  COMPLETED_WITH_ERRORS: 'Завершён с ошибками',
+  FAILED: 'Ошибка',
+};
+
 const RUN_STATUS_COLOR: Record<string, string> = {
   PENDING: 'info',
   IN_PROGRESS: 'info',
@@ -37,19 +45,11 @@ const RUN_STATUS_COLOR: Record<string, string> = {
   FAILED: 'error',
 };
 
-const RUN_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Ожидает',
-  IN_PROGRESS: 'Выполняется',
-  COMPLETED: 'Завершён',
-  COMPLETED_WITH_ERRORS: 'С ошибками',
-  FAILED: 'Ошибка',
-};
-
 const TRIGGER_LABEL: Record<string, string> = {
-  POST_SYNC: 'После синхр.',
-  MANUAL: 'Ручной',
+  POST_SYNC: 'После синхронизации',
+  MANUAL: 'Вручную',
   SCHEDULED: 'По расписанию',
-  POLICY_CHANGE: 'Изм. политики',
+  POLICY_CHANGE: 'Изменение политики',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {
@@ -200,17 +200,27 @@ export class RunsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: 'Статус',
+      label: this.translate.instant('pricing.runs.filter.status'),
       type: 'multi-select',
-      options: Object.entries(RUN_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+      options: (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED'] as const).map(value => ({
+        value,
+        label: this.translate.instant(`pricing.runs.status.${value}`),
+      })),
     },
     {
       key: 'triggerType',
-      label: 'Триггер',
+      label: this.translate.instant('pricing.runs.filter.trigger'),
       type: 'multi-select',
-      options: Object.entries(TRIGGER_LABEL).map(([value, label]) => ({ value, label })),
+      options: (['POST_SYNC', 'MANUAL', 'SCHEDULED', 'POLICY_CHANGE'] as const).map(value => ({
+        value,
+        label: this.translate.instant(`pricing.runs.trigger.${value}`),
+      })),
     },
-    { key: 'period', label: 'Период', type: 'date-range' },
+    {
+      key: 'period',
+      label: this.translate.instant('pricing.runs.filter.period'),
+      type: 'date-range',
+    },
   ];
 
   readonly columnDefs = [
@@ -222,13 +232,13 @@ export class RunsListPageComponent {
       cellClass: 'font-mono text-right',
     },
     {
-      headerName: 'Триггер',
+      headerName: this.translate.instant('pricing.runs.col.trigger'),
       field: 'triggerType',
       width: 130,
       sortable: true,
       cellRenderer: (params: any) => {
         const t = params.value as string;
-        const label = TRIGGER_LABEL[t] ?? t;
+        const label = this.translate.instant(`pricing.runs.trigger.${t}`);
         const color = TRIGGER_COLOR[t] ?? 'var(--text-secondary)';
         return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
                   style="background-color: color-mix(in srgb, ${color} 12%, transparent); color: ${color}">
@@ -237,20 +247,20 @@ export class RunsListPageComponent {
       },
     },
     {
-      headerName: 'Подключение',
+      headerName: this.translate.instant('pricing.runs.col.connection'),
       field: 'connectionName',
       minWidth: 160,
       flex: 1,
       sortable: true,
     },
     {
-      headerName: 'Статус',
+      headerName: this.translate.instant('pricing.runs.col.status'),
       field: 'status',
       width: 140,
       sortable: true,
       cellRenderer: (params: any) => {
         const st = params.value as string;
-        const label = RUN_STATUS_LABEL[st] ?? st;
+        const label = this.translate.instant(`pricing.runs.status.${st}`);
         const color = RUN_STATUS_COLOR[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         const dotHtml = st === 'IN_PROGRESS'
@@ -264,21 +274,21 @@ export class RunsListPageComponent {
       },
     },
     {
-      headerName: 'Всего',
+      headerName: this.translate.instant('pricing.runs.col.total'),
       field: 'totalOffers',
       width: 80,
       sortable: true,
       cellClass: 'font-mono text-right',
     },
     {
-      headerName: 'Подходит',
+      headerName: this.translate.instant('pricing.runs.col.eligible'),
       field: 'eligibleCount',
       width: 90,
       sortable: true,
       cellClass: 'font-mono text-right',
     },
     {
-      headerName: 'Изменение',
+      headerName: this.translate.instant('pricing.runs.col.change'),
       field: 'changeCount',
       width: 100,
       sortable: true,
@@ -286,7 +296,7 @@ export class RunsListPageComponent {
       cellStyle: () => ({ color: 'var(--status-success)' }),
     },
     {
-      headerName: 'Пропуск',
+      headerName: this.translate.instant('pricing.runs.col.skip'),
       field: 'skipCount',
       width: 90,
       sortable: true,
@@ -294,7 +304,7 @@ export class RunsListPageComponent {
       cellStyle: () => ({ color: 'var(--status-warning)' }),
     },
     {
-      headerName: 'Ожидание',
+      headerName: this.translate.instant('pricing.runs.col.hold'),
       field: 'holdCount',
       width: 90,
       sortable: true,
@@ -302,7 +312,7 @@ export class RunsListPageComponent {
       cellStyle: () => ({ color: 'var(--text-tertiary)' }),
     },
     {
-      headerName: 'Длительность',
+      headerName: this.translate.instant('pricing.runs.col.duration'),
       field: 'startedAt',
       width: 110,
       sortable: false,
@@ -313,7 +323,7 @@ export class RunsListPageComponent {
       },
     },
     {
-      headerName: 'Создан',
+      headerName: this.translate.instant('pricing.runs.col.created_at'),
       field: 'createdAt',
       width: 120,
       sortable: true,
@@ -408,10 +418,12 @@ export class RunsListPageComponent {
     const ms = endMs - new Date(start).getTime();
     if (ms < 0) return '—';
     const totalSec = Math.floor(ms / 1000);
-    if (totalSec < 60) return `${totalSec} сек`;
+    const secUnit = this.translate.instant('common.time.sec');
+    if (totalSec < 60) return `${totalSec} ${secUnit}`;
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
-    return sec > 0 ? `${min} мин ${sec} сек` : `${min} мин`;
+    const minUnit = this.translate.instant('common.time.min');
+    return sec > 0 ? `${min} ${minUnit} ${sec} ${secUnit}` : `${min} ${minUnit}`;
   }
 
   private formatRelativeTime(iso: string | null): string {

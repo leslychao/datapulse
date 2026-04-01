@@ -5,13 +5,13 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
-import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
+import { PricingDecisionFilter } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import {
   FilterBarComponent,
@@ -24,22 +24,6 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
   CHANGE: 'success',
   SKIP: 'warning',
   HOLD: 'neutral',
-};
-
-const DECISION_TYPE_LABEL: Record<string, string> = {
-  CHANGE: 'Изменение',
-  SKIP: 'Пропуск',
-  HOLD: 'Ожидание',
-};
-
-const STRATEGY_TYPE_LABEL: Record<string, string> = {
-  TARGET_MARGIN: 'Целевая маржа',
-  PRICE_CORRIDOR: 'Ценовой коридор',
-};
-
-const EXECUTION_MODE_LABEL: Record<string, string> = {
-  LIVE: 'LIVE',
-  SIMULATED: 'Симуляция',
 };
 
 @Component({
@@ -95,6 +79,7 @@ const EXECUTION_MODE_LABEL: Record<string, string> = {
 export class DecisionsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly translate = inject(TranslateService);
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
@@ -103,23 +88,27 @@ export class DecisionsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'decisionType',
-      label: 'Тип решения',
+      label: this.translate.instant('pricing.decisions.filter.decision_type'),
       type: 'multi-select',
-      options: Object.entries(DECISION_TYPE_LABEL).map(([value, label]) => ({
+      options: (['CHANGE', 'SKIP', 'HOLD'] as const).map(value => ({
         value,
-        label,
+        label: this.translate.instant(`pricing.decisions.type.${value}`),
       })),
     },
     {
       key: 'executionMode',
-      label: 'Режим',
+      label: this.translate.instant('pricing.decisions.filter.execution_mode'),
       type: 'select',
-      options: Object.entries(EXECUTION_MODE_LABEL).map(([value, label]) => ({
+      options: (['LIVE', 'SIMULATED'] as const).map(value => ({
         value,
-        label,
+        label: this.translate.instant(`pricing.decisions.execution_mode.${value}`),
       })),
     },
-    { key: 'period', label: 'Период', type: 'date-range' },
+    {
+      key: 'period',
+      label: this.translate.instant('pricing.decisions.filter.period'),
+      type: 'date-range',
+    },
   ];
 
   readonly columnDefs = [
@@ -131,33 +120,33 @@ export class DecisionsListPageComponent {
       cellClass: 'font-mono',
     },
     {
-      headerName: 'Оффер',
+      headerName: this.translate.instant('pricing.decisions.col.offer'),
       field: 'offerName',
       minWidth: 220,
       flex: 1,
       sortable: true,
     },
     {
-      headerName: 'SKU',
+      headerName: this.translate.instant('pricing.decisions.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
       cellClass: 'font-mono',
     },
     {
-      headerName: 'Подключение',
+      headerName: this.translate.instant('pricing.decisions.col.connection'),
       field: 'connectionName',
       width: 160,
       sortable: true,
     },
     {
-      headerName: 'Решение',
+      headerName: this.translate.instant('pricing.decisions.col.decision'),
       field: 'decisionType',
       width: 130,
       sortable: true,
       cellRenderer: (params: any) => {
         const val = params.value as string;
-        const label = DECISION_TYPE_LABEL[val] ?? val;
+        const label = this.translate.instant(`pricing.decisions.type.${val}`);
         const color = DECISION_TYPE_COLOR[val] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -168,7 +157,7 @@ export class DecisionsListPageComponent {
       },
     },
     {
-      headerName: 'Было',
+      headerName: this.translate.instant('pricing.decisions.col.current_price'),
       field: 'currentPrice',
       width: 110,
       sortable: true,
@@ -176,7 +165,7 @@ export class DecisionsListPageComponent {
       valueFormatter: (params: any) => this.formatPrice(params.value),
     },
     {
-      headerName: 'Стало',
+      headerName: this.translate.instant('pricing.decisions.col.target_price'),
       field: 'targetPrice',
       width: 110,
       sortable: true,
@@ -201,23 +190,25 @@ export class DecisionsListPageComponent {
       },
     },
     {
-      headerName: 'Политика',
+      headerName: this.translate.instant('pricing.decisions.col.policy'),
       field: 'policyName',
       width: 160,
       sortable: true,
     },
     {
-      headerName: 'Стратегия',
+      headerName: this.translate.instant('pricing.decisions.col.strategy'),
       field: 'strategyType',
       width: 150,
       sortable: true,
       cellRenderer: (params: any) => {
-        const label = STRATEGY_TYPE_LABEL[params.value] ?? params.value;
+        const label = this.translate.instant(
+          `pricing.policies.strategy.${params.value}`,
+        );
         return `<span class="inline-flex items-center rounded-full bg-[var(--bg-tertiary)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">${label}</span>`;
       },
     },
     {
-      headerName: 'Режим',
+      headerName: this.translate.instant('pricing.decisions.col.execution_mode'),
       field: 'executionMode',
       width: 100,
       sortable: true,
@@ -229,7 +220,7 @@ export class DecisionsListPageComponent {
       },
     },
     {
-      headerName: 'Прогон',
+      headerName: this.translate.instant('pricing.decisions.col.run'),
       field: 'pricingRunId',
       width: 80,
       sortable: true,
@@ -240,15 +231,18 @@ export class DecisionsListPageComponent {
       },
     },
     {
-      headerName: 'Причина пропуска',
+      headerName: this.translate.instant('pricing.decisions.col.skip_reason'),
       field: 'skipReason',
       minWidth: 200,
       flex: 1,
       sortable: false,
-      valueFormatter: (params: any) => params.value ?? '—',
+      valueFormatter: (params: any) => {
+        if (!params.value) return '—';
+        return this.translate.instant(params.value);
+      },
     },
     {
-      headerName: 'Дата',
+      headerName: this.translate.instant('pricing.decisions.col.date'),
       field: 'createdAt',
       width: 140,
       sortable: true,

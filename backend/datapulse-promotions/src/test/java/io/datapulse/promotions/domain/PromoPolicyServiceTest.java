@@ -320,8 +320,7 @@ class PromoPolicyServiceTest {
         entity.getId(), entity.getName(), entity.getStatus(),
         entity.getParticipationMode(), entity.getMinMarginPct(),
         entity.getMinStockDaysOfCover(), entity.getMaxPromoDiscountPct(),
-        entity.getAutoParticipateCategories(), entity.getAutoDeclineCategories(),
-        entity.getEvaluationConfig(), entity.getVersion(),
+        null, null, null, entity.getVersion(),
         entity.getCreatedBy(), null, null);
   }
 }

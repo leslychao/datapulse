@@ -138,13 +138,32 @@ public class CostProfileService {
 
     @Transactional
     public CostProfileResponse updateProfile(long id, UpdateCostProfileRequest request,
-                                             long workspaceId) {
-        throw new UnsupportedOperationException("Not yet implemented");
+                                             long workspaceId, long userId) {
+        validateCurrency(request.currency());
+
+        costProfileRepository.findByIdAndWorkspaceId(id, workspaceId)
+                .orElseThrow(() -> NotFoundException.of(MessageCodes.COST_PROFILE_NOT_FOUND, id));
+
+        costProfileRepository.updateProfile(id, request.costPrice(), request.currency(),
+                request.validFrom(), userId);
+
+        CostProfileRow updated = costProfileRepository.findByIdAndWorkspaceId(id, workspaceId)
+                .orElseThrow(() -> NotFoundException.of(MessageCodes.COST_PROFILE_NOT_FOUND, id));
+
+        log.info("Cost profile updated: id={}, costPrice={}, validFrom={}, userId={}",
+                id, request.costPrice(), request.validFrom(), userId);
+
+        return toResponse(updated);
     }
 
     @Transactional
     public void deleteProfile(long id, long workspaceId) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        costProfileRepository.findByIdAndWorkspaceId(id, workspaceId)
+                .orElseThrow(() -> NotFoundException.of(MessageCodes.COST_PROFILE_NOT_FOUND, id));
+
+        costProfileRepository.deleteById(id);
+
+        log.info("Cost profile deleted: id={}", id);
     }
 
     @Transactional(readOnly = true)
