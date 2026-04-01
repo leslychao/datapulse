@@ -1,7 +1,7 @@
 package io.datapulse.audit.domain;
 
 import io.datapulse.audit.domain.event.AlertEventCreatedEvent;
-import io.datapulse.audit.domain.event.AlertTriggeredEvent;
+import io.datapulse.platform.audit.AlertTriggeredEvent;
 import io.datapulse.audit.persistence.AlertEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

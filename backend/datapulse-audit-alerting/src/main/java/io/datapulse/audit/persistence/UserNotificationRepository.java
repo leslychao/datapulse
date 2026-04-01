@@ -1,5 +1,7 @@
 package io.datapulse.audit.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -123,7 +125,7 @@ public class UserNotificationRepository {
         return jdbc.queryForList(sql, params, Long.class);
     }
 
-    private NotificationResponse mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    private NotificationResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new NotificationResponse(
                 rs.getLong("id"),
                 rs.getLong("workspace_id"),

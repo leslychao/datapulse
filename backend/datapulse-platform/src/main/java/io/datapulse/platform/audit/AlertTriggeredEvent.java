@@ -1,10 +1,13 @@
-package io.datapulse.audit.domain.event;
+package io.datapulse.platform.audit;
 
 /**
  * Domain event published by modules for event-driven alerts
  * (action failed, stuck state, reconciliation mismatch, etc.).
- * Consumed by {@code AlertEventListener} which persists it to {@code alert_event}
- * with {@code alert_rule_id = NULL}.
+ * Consumed by {@code AlertEventListener} (in datapulse-audit-alerting)
+ * which persists it to {@code alert_event} with {@code alert_rule_id = NULL}.
+ *
+ * <p>Lives in datapulse-platform so source modules can publish alerts
+ * without depending on datapulse-audit-alerting.
  *
  * @param connectionId     nullable — NULL for workspace-wide alerts
  * @param severity         INFO, WARNING, or CRITICAL

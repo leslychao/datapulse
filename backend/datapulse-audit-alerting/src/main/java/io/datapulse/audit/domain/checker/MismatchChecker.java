@@ -1,6 +1,7 @@
 package io.datapulse.audit.domain.checker;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +39,31 @@ public class MismatchChecker implements AlertChecker {
             GROUP BY mc.id
             """;
 
+    private static final String ORDER_ORPHANS_QUERY = """
+            SELECT mc.id AS connection_id, COUNT(*) AS orphan_count
+            FROM canonical_order co
+            JOIN marketplace_connection mc ON mc.id = co.connection_id
+            WHERE mc.workspace_id = :workspaceId
+              AND NOT EXISTS (
+                  SELECT 1 FROM marketplace_offer mo WHERE mo.id = co.offer_id
+              )
+            GROUP BY mc.id
+            """;
+
+    private static final String FINANCE_ORPHANS_QUERY = """
+            SELECT mc.id AS connection_id, COUNT(*) AS orphan_count
+            FROM canonical_finance_entry cfe
+            JOIN marketplace_connection mc ON mc.id = cfe.connection_id
+            WHERE mc.workspace_id = :workspaceId
+              AND NOT EXISTS (
+                  SELECT 1 FROM canonical_sale cs WHERE cs.id = cfe.sale_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM canonical_order co WHERE co.id = cfe.order_id
+              )
+            GROUP BY mc.id
+            """;
+
     @Override
     public String ruleType() {
         return AlertRuleType.MISMATCH.name();
@@ -48,9 +74,11 @@ public class MismatchChecker implements AlertChecker {
         Map<String, Object> config = parseConfig(rule.config());
         int maxOrphanCount = getInt(config, "max_orphan_count", 5);
 
-        Map<Long, List<String>> violations = new java.util.HashMap<>();
+        Map<Long, List<String>> violations = new HashMap<>();
 
         runCheck(rule.workspaceId(), PRICE_COVERAGE_QUERY, maxOrphanCount, "price_coverage", violations);
+        runCheck(rule.workspaceId(), ORDER_ORPHANS_QUERY, maxOrphanCount, "order_orphans", violations);
+        runCheck(rule.workspaceId(), FINANCE_ORPHANS_QUERY, maxOrphanCount, "finance_orphans", violations);
 
         for (var entry : violations.entrySet()) {
             long connectionId = entry.getKey();

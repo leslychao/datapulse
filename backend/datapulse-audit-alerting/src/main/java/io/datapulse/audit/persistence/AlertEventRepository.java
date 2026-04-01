@@ -1,5 +1,7 @@
 package io.datapulse.audit.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -200,7 +202,7 @@ public class AlertEventRepository {
         return sb.toString();
     }
 
-    private AlertEventResponse mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    private AlertEventResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new AlertEventResponse(
                 rs.getLong("id"),
                 rs.getObject("alert_rule_id", Long.class),

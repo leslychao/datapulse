@@ -2,6 +2,7 @@ package io.datapulse.audit.domain.checker;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,7 +52,7 @@ public class MissingSyncChecker implements AlertChecker {
         List<Map<String, Object>> rows = jdbc.queryForList(LAST_SYNC_QUERY, params);
 
         Map<Long, List<Map<String, Object>>> byConnection = rows.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
+                .collect(Collectors.groupingBy(
                         row -> ((Number) row.get("connection_id")).longValue()));
 
         for (var entry : byConnection.entrySet()) {

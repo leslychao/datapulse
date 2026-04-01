@@ -2,7 +2,7 @@ package io.datapulse.sellerops.domain;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.datapulse.audit.domain.event.AlertTriggeredEvent;
+import io.datapulse.platform.audit.AlertTriggeredEvent;
 import io.datapulse.sellerops.config.MismatchProperties;
 import io.datapulse.sellerops.persistence.PriceMismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.PriceMismatchJdbcRepository.PriceMismatchCandidate;

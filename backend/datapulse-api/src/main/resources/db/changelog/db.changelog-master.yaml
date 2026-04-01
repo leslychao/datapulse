@@ -29,3 +29,6 @@ databaseChangeLog:
   - include:
       file: changes/0013-seller-operations-tables.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0014-alert-event-indexes.sql
+      relativeToChangelogFile: true

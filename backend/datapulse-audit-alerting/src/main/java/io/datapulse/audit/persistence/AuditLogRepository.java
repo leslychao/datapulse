@@ -1,5 +1,7 @@
 package io.datapulse.audit.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -130,7 +132,7 @@ public class AuditLogRepository {
         return sb.toString();
     }
 
-    private AuditLogResponse mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    private AuditLogResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new AuditLogResponse(
                 rs.getLong("id"),
                 rs.getLong("workspace_id"),

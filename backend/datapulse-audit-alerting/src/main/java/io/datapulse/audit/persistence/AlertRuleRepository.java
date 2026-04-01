@@ -1,5 +1,7 @@
 package io.datapulse.audit.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -84,7 +86,7 @@ public class AlertRuleRepository {
         return jdbc.update(UPDATE_ENABLED, params);
     }
 
-    private AlertRuleResponse mapRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    private AlertRuleResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new AlertRuleResponse(
                 rs.getLong("id"),
                 rs.getLong("workspace_id"),
