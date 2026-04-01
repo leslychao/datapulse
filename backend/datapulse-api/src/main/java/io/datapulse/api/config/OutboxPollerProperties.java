@@ -1,4 +1,4 @@
-package io.datapulse.api.outbox;
+package io.datapulse.api.config;
 
 import io.datapulse.platform.outbox.OutboxRuntime;
 import java.time.Duration;

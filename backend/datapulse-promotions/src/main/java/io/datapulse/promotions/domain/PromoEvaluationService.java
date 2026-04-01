@@ -11,6 +11,7 @@ import io.datapulse.promotions.persistence.PromoEvaluationRepository;
 import io.datapulse.promotions.persistence.PromoEvaluationRunEntity;
 import io.datapulse.promotions.persistence.PromoEvaluationRunRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
+import io.datapulse.promotions.persistence.PromoProductRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

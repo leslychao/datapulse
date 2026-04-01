@@ -4,6 +4,7 @@ import io.datapulse.promotions.persistence.PromoPolicyAssignmentEntity;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
 import io.datapulse.promotions.persistence.PromoPolicyRepository;
+import io.datapulse.promotions.persistence.PromoProductRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;

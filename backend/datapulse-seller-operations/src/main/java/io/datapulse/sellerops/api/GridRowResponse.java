@@ -1,0 +1,35 @@
+package io.datapulse.sellerops.api;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+
+public record GridRowResponse(
+        long offerId,
+        String skuCode,
+        String productName,
+        String marketplaceType,
+        String connectionName,
+        String status,
+        String category,
+        BigDecimal currentPrice,
+        BigDecimal discountPrice,
+        BigDecimal costPrice,
+        BigDecimal marginPct,
+        Integer availableStock,
+        BigDecimal daysOfCover,
+        String stockRisk,
+        BigDecimal revenue30d,
+        BigDecimal netPnl30d,
+        BigDecimal velocity14d,
+        BigDecimal returnRatePct,
+        String activePolicy,
+        String lastDecision,
+        String lastActionStatus,
+        String promoStatus,
+        boolean manualLock,
+        BigDecimal simulatedPrice,
+        BigDecimal simulatedDeltaPct,
+        OffsetDateTime lastSyncAt,
+        String dataFreshness
+) {
+}

@@ -26,3 +26,6 @@ databaseChangeLog:
   - include:
       file: changes/0012-promotions-tables.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0013-seller-operations-tables.sql
+      relativeToChangelogFile: true

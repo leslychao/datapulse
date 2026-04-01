@@ -1,4 +1,4 @@
-package io.datapulse.etl.domain;
+package io.datapulse.etl.adapter.s3;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -14,6 +14,9 @@ import java.util.HexFormat;
 
 import io.datapulse.etl.config.EtlProperties;
 import io.datapulse.etl.config.S3Properties;
+import io.datapulse.etl.domain.CaptureContext;
+import io.datapulse.etl.domain.CaptureRequest;
+import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.persistence.JobItemRepository;
 import io.datapulse.etl.persistence.JobItemRow;
 import io.minio.MinioClient;

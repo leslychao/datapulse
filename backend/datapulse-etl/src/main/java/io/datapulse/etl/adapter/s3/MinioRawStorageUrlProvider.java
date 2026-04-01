@@ -1,4 +1,4 @@
-package io.datapulse.etl.domain;
+package io.datapulse.etl.adapter.s3;
 
 import java.util.concurrent.TimeUnit;
 

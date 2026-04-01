@@ -1,4 +1,4 @@
-package io.datapulse.etl.materializer;
+package io.datapulse.etl.domain.materializer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +32,6 @@ public class ClickHouseMaterializer {
      * @param recordCount    number of canonical records to materialize
      */
     public void materialize(long jobExecutionId, String eventType, int recordCount) {
-        // Phase A: materialization is a no-op. ClickHouse schema and fact table
-        // INSERT logic will be implemented as part of Phase B analytics work.
         log.debug("Materialization stub: jobExecutionId={}, eventType={}, recordCount={}",
                 jobExecutionId, eventType, recordCount);
     }

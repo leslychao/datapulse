@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.PageCaptureResult;
-import io.datapulse.etl.domain.S3RawStorage;
+import io.datapulse.etl.adapter.s3.S3RawStorage;
 import io.datapulse.etl.domain.cursor.CursorExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

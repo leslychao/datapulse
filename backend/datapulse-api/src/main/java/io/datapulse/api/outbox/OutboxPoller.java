@@ -1,5 +1,6 @@
 package io.datapulse.api.outbox;
 
+import io.datapulse.api.config.OutboxPollerProperties;
 import io.datapulse.platform.outbox.OutboxEvent;
 import io.datapulse.platform.outbox.OutboxEventPollerRepository;
 import io.datapulse.platform.outbox.OutboxEventType;

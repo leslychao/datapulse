@@ -10,7 +10,7 @@ import java.util.Map;
 
 import io.datapulse.analytics.config.AnalyticsProperties;
 import io.datapulse.analytics.domain.AnalyticsMaterializer;
-import io.datapulse.analytics.domain.MaterializationJdbc;
+import io.datapulse.analytics.persistence.MaterializationJdbc;
 import io.datapulse.analytics.domain.MaterializationPhase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package io.datapulse.analytics.domain;
+package io.datapulse.analytics.persistence;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;

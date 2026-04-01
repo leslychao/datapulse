@@ -1,4 +1,4 @@
-package io.datapulse.promotions.domain;
+package io.datapulse.promotions.persistence;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
