@@ -88,6 +88,10 @@ datapulse:
     password: ${CH_PASSWORD:}
     migration:
       enabled: true
+  alerting:
+    stale-data-interval: PT5M
+    missing-sync-interval: PT15M
+    mismatch-interval: PT30M
   outbox:
     enabled: true
     runtime: ALL
