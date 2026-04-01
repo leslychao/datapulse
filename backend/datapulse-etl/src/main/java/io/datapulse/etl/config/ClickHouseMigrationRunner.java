@@ -128,7 +128,17 @@ public class ClickHouseMigrationRunner implements ApplicationRunner {
         log.info("Applying ClickHouse migration: script={}", scriptName);
 
         try {
-            clickhouseJdbcTemplate.execute(content);
+            for (String raw : content.split(";")) {
+                String statement = raw.strip();
+                if (statement.isEmpty()) {
+                    continue;
+                }
+                boolean hasExecutableContent = statement.lines()
+                        .anyMatch(line -> !line.isBlank() && !line.stripLeading().startsWith("--"));
+                if (hasExecutableContent) {
+                    clickhouseJdbcTemplate.execute(statement);
+                }
+            }
         } catch (Exception e) {
             log.error("ClickHouse migration failed: script={}", scriptName, e);
             throw new IllegalStateException(
