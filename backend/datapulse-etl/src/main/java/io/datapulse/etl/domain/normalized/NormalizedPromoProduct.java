@@ -9,6 +9,7 @@ public record NormalizedPromoProduct(
         BigDecimal requiredPrice,
         BigDecimal currentPrice,
         BigDecimal maxPromoPrice,
+        BigDecimal maxDiscountPct,
         String addMode,
         Integer minStockRequired,
         Integer stockAvailable

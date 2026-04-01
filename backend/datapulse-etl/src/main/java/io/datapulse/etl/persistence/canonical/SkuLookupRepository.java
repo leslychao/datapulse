@@ -1,6 +1,8 @@
 package io.datapulse.etl.persistence.canonical;
 
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -33,6 +35,28 @@ public class SkuLookupRepository {
               AND pm.external_code = ?
             LIMIT 1
             """;
+
+    private static final String FIND_ALL_BY_WORKSPACE = """
+            SELECT ss.sku_code, ss.id
+            FROM seller_sku ss
+            JOIN product_master pm ON pm.id = ss.product_master_id
+            WHERE pm.workspace_id = ?
+            """;
+
+    /**
+     * Batch lookup: returns all seller_sku records for a workspace.
+     *
+     * @return Map of sku_code → seller_sku.id
+     */
+    public Map<String, Long> findAllByWorkspace(long workspaceId) {
+        return jdbc.query(FIND_ALL_BY_WORKSPACE,
+                        (rs, rowNum) -> Map.entry(
+                                rs.getString("sku_code"),
+                                rs.getLong("id")),
+                        workspaceId)
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
 
     /**
      * Primary lookup via marketplace_offer. Works for both WB (nm_id) and Ozon (items[].sku).

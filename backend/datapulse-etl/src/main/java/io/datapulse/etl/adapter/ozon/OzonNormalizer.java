@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -26,6 +27,7 @@ import io.datapulse.etl.domain.normalized.NormalizedPriceItem;
 import io.datapulse.etl.domain.normalized.NormalizedPromoCampaign;
 import io.datapulse.etl.domain.normalized.NormalizedPromoProduct;
 import io.datapulse.etl.domain.normalized.NormalizedReturnItem;
+import io.datapulse.etl.domain.normalized.NormalizedSaleItem;
 import io.datapulse.etl.domain.normalized.NormalizedStockItem;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -164,6 +166,47 @@ public class OzonNormalizer {
         );
     }
 
+    private static final Set<String> DELIVERED_STATUSES = Set.of(
+            "delivered", "client_arbitration", "arbitration");
+
+    public boolean isDeliveredPosting(String status) {
+        return status != null && DELIVERED_STATUSES.contains(status.toLowerCase());
+    }
+
+    public NormalizedSaleItem normalizeFboSale(OzonFboPosting posting,
+                                               OzonFboPosting.OzonPostingProduct product) {
+        OffsetDateTime saleDate = OzonTimestampParser.parseIso8601(posting.createdAt());
+        BigDecimal pricePerUnit = parseBigDecimal(product.price());
+        BigDecimal saleAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
+
+        return new NormalizedSaleItem(
+                posting.postingNumber() + "-" + product.sku(),
+                product.offerId(),
+                product.quantity(),
+                saleAmount,
+                null,
+                product.currencyCode(),
+                saleDate
+        );
+    }
+
+    public NormalizedSaleItem normalizeFbsSale(OzonFbsPosting posting,
+                                               OzonFboPosting.OzonPostingProduct product) {
+        OffsetDateTime saleDate = OzonTimestampParser.parseIso8601(posting.createdAt());
+        BigDecimal pricePerUnit = parseBigDecimal(product.price());
+        BigDecimal saleAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
+
+        return new NormalizedSaleItem(
+                posting.postingNumber() + "-" + product.sku(),
+                product.offerId(),
+                product.quantity(),
+                saleAmount,
+                null,
+                product.currencyCode(),
+                saleDate
+        );
+    }
+
     public NormalizedReturnItem normalizeReturn(OzonReturnItem item) {
         OffsetDateTime returnDate = OzonTimestampParser.parseIso8601(item.returnDate());
         BigDecimal returnAmount = BigDecimal.ZERO;
@@ -240,6 +283,7 @@ public class OzonNormalizer {
                 dateFrom,
                 dateTo,
                 freezeAt,
+                null,
                 dto.description(),
                 mechanic,
                 dto.isParticipating(),
@@ -262,6 +306,7 @@ public class OzonNormalizer {
                 requiredPrice,
                 currentPrice,
                 maxPromoPrice,
+                null,
                 dto.addMode(),
                 dto.minStock(),
                 dto.stock()

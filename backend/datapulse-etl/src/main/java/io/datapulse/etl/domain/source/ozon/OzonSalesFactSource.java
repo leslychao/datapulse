@@ -21,6 +21,7 @@ import io.datapulse.etl.domain.SubSourceResult;
 import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalOrderUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalReturnUpsertRepository;
+import io.datapulse.etl.persistence.canonical.CanonicalSaleUpsertRepository;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -34,6 +35,7 @@ public class OzonSalesFactSource implements EventSource {
     private final OzonReturnsReadAdapter returnsAdapter;
     private final OzonNormalizer normalizer;
     private final CanonicalOrderUpsertRepository orderRepo;
+    private final CanonicalSaleUpsertRepository saleRepo;
     private final CanonicalReturnUpsertRepository returnRepo;
     private final CanonicalEntityMapper mapper;
     private final SubSourceRunner subSourceRunner;
@@ -60,19 +62,13 @@ public class OzonSalesFactSource implements EventSource {
         List<CaptureResult> fboPages = fboAdapter.captureAllPages(fboCtx, clientId, apiKey, since, to);
         results.add(subSourceRunner.processPages(
                 "OzonFboOrdersReadAdapter", fboPages, OzonFboPosting.class,
-                batch -> batch.forEach(posting ->
-                        posting.products().forEach(product ->
-                                orderRepo.batchUpsert(List.of(
-                                        mapper.toOrder(normalizer.normalizeFboPosting(posting, product), ctx)))))));
+                batch -> processFboBatch(batch, ctx)));
 
         var fbsCtx = CaptureContextFactory.build(ctx, eventType(), "OzonFbsOrdersReadAdapter");
         List<CaptureResult> fbsPages = fbsAdapter.captureAllPages(fbsCtx, clientId, apiKey, since, to);
         results.add(subSourceRunner.processPages(
                 "OzonFbsOrdersReadAdapter", fbsPages, OzonFbsPosting.class,
-                batch -> batch.forEach(posting ->
-                        posting.products().forEach(product ->
-                                orderRepo.batchUpsert(List.of(
-                                        mapper.toOrder(normalizer.normalizeFbsPosting(posting, product), ctx)))))));
+                batch -> processFbsBatch(batch, ctx)));
 
         var returnsCtx = CaptureContextFactory.build(ctx, eventType(), "OzonReturnsReadAdapter");
         List<CaptureResult> returnsPages = returnsAdapter.captureAllPages(returnsCtx, clientId, apiKey, since, to);
@@ -83,5 +79,45 @@ public class OzonSalesFactSource implements EventSource {
                         .toList())));
 
         return results;
+    }
+
+    private void processFboBatch(List<OzonFboPosting> batch, IngestContext ctx) {
+        List<io.datapulse.etl.persistence.canonical.CanonicalOrderEntity> orders = new ArrayList<>();
+        List<io.datapulse.etl.persistence.canonical.CanonicalSaleEntity> sales = new ArrayList<>();
+
+        for (OzonFboPosting posting : batch) {
+            for (var product : posting.products()) {
+                orders.add(mapper.toOrder(normalizer.normalizeFboPosting(posting, product), ctx));
+                if (normalizer.isDeliveredPosting(posting.status())) {
+                    sales.add(mapper.toSale(normalizer.normalizeFboSale(posting, product), ctx));
+                }
+            }
+        }
+        if (!orders.isEmpty()) {
+            orderRepo.batchUpsert(orders);
+        }
+        if (!sales.isEmpty()) {
+            saleRepo.batchUpsert(sales);
+        }
+    }
+
+    private void processFbsBatch(List<OzonFbsPosting> batch, IngestContext ctx) {
+        List<io.datapulse.etl.persistence.canonical.CanonicalOrderEntity> orders = new ArrayList<>();
+        List<io.datapulse.etl.persistence.canonical.CanonicalSaleEntity> sales = new ArrayList<>();
+
+        for (OzonFbsPosting posting : batch) {
+            for (var product : posting.products()) {
+                orders.add(mapper.toOrder(normalizer.normalizeFbsPosting(posting, product), ctx));
+                if (normalizer.isDeliveredPosting(posting.status())) {
+                    sales.add(mapper.toSale(normalizer.normalizeFbsSale(posting, product), ctx));
+                }
+            }
+        }
+        if (!orders.isEmpty()) {
+            orderRepo.batchUpsert(orders);
+        }
+        if (!sales.isEmpty()) {
+            saleRepo.batchUpsert(sales);
+        }
     }
 }

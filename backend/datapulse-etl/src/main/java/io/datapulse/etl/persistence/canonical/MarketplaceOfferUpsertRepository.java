@@ -10,9 +10,9 @@ import lombok.RequiredArgsConstructor;
 /**
  * Batch upsert for marketplace_offer table.
  *
- * <p><b>Not yet wired</b> into any EventSource. Will be used when
- * product hierarchy resolution (product_master → seller_sku → marketplace_offer)
- * is connected to the PRODUCT_DICT pipeline.</p>
+ * <p>Used by {@code WbProductDictSource} and {@code OzonProductDictSource}
+ * as the third step of the product hierarchy upsert:
+ * product_master → seller_sku → marketplace_offer.</p>
  */
 @Repository
 @RequiredArgsConstructor

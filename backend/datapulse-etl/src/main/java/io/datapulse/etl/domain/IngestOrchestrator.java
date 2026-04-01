@@ -40,6 +40,7 @@ public class IngestOrchestrator {
     private final DagExecutor dagExecutor;
     private final OutboxService outboxService;
     private final IngestResultReporter resultReporter;
+    private final StaleCampaignDetector staleCampaignDetector;
     private final IngestProperties ingestProperties;
     private final TransactionTemplate transactionTemplate;
 
@@ -140,6 +141,10 @@ public class IngestOrchestrator {
                     || finalStatus == JobExecutionStatus.COMPLETED_WITH_ERRORS) {
                 resultReporter.updateSyncStateSuccess(job.getConnectionId());
                 resultReporter.publishCompletionEvent(job, results);
+
+                if (isPromoSyncCompleted(results)) {
+                    staleCampaignDetector.detectAndPublish(job.getConnectionId());
+                }
             }
         });
 
@@ -199,6 +204,11 @@ public class IngestOrchestrator {
                 .anyMatch(r -> r.isFailed() && !r.subSourceResults().isEmpty()
                         && r.subSourceResults().stream()
                         .anyMatch(s -> s.status() == EventResultStatus.FAILED));
+    }
+
+    private boolean isPromoSyncCompleted(Map<EtlEventType, EventResult> results) {
+        EventResult promoResult = results.get(EtlEventType.PROMO_SYNC);
+        return promoResult != null && promoResult.isSuccess();
     }
 
     private String escapeJson(String value) {

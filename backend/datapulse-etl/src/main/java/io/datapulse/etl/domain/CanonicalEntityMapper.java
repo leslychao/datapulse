@@ -22,7 +22,9 @@ import io.datapulse.etl.persistence.canonical.CanonicalReturnEntity;
 import io.datapulse.etl.persistence.canonical.CanonicalSaleEntity;
 import io.datapulse.etl.persistence.canonical.CanonicalStockCurrentEntity;
 import io.datapulse.etl.persistence.canonical.CategoryEntity;
+import io.datapulse.etl.persistence.canonical.MarketplaceOfferEntity;
 import io.datapulse.etl.persistence.canonical.ProductMasterEntity;
+import io.datapulse.etl.persistence.canonical.SellerSkuEntity;
 import io.datapulse.etl.persistence.canonical.WarehouseEntity;
 import org.springframework.stereotype.Service;
 
@@ -67,6 +69,33 @@ public class CanonicalEntityMapper {
         return entity;
     }
 
+    public SellerSkuEntity toSellerSku(NormalizedCatalogItem norm,
+                                      long productMasterId,
+                                      IngestContext ctx) {
+        var entity = new SellerSkuEntity();
+        entity.setProductMasterId(productMasterId);
+        entity.setSkuCode(norm.sellerSku());
+        entity.setBarcode(norm.barcode());
+        entity.setJobExecutionId(ctx.jobExecutionId());
+        return entity;
+    }
+
+    public MarketplaceOfferEntity toMarketplaceOffer(NormalizedCatalogItem norm,
+                                                     long sellerSkuId,
+                                                     Long categoryId,
+                                                     IngestContext ctx) {
+        var entity = new MarketplaceOfferEntity();
+        entity.setSellerSkuId(sellerSkuId);
+        entity.setMarketplaceConnectionId(ctx.connectionId());
+        entity.setMarketplaceSku(norm.marketplaceSku());
+        entity.setMarketplaceSkuAlt(norm.marketplaceSkuAlt());
+        entity.setName(norm.name());
+        entity.setCategoryId(categoryId);
+        entity.setStatus(norm.status() != null ? norm.status() : "ACTIVE");
+        entity.setJobExecutionId(ctx.jobExecutionId());
+        return entity;
+    }
+
     public CanonicalPriceCurrentEntity toPrice(NormalizedPriceItem norm, IngestContext ctx) {
         var entity = new CanonicalPriceCurrentEntity();
         entity.setPrice(norm.price());
@@ -93,8 +122,11 @@ public class CanonicalEntityMapper {
         entity.setOrderDate(norm.orderDate());
         entity.setQuantity(norm.quantity());
         entity.setPricePerUnit(norm.pricePerUnit());
+        entity.setTotalAmount(norm.totalAmount());
         entity.setCurrency(norm.currency());
         entity.setStatus(norm.status());
+        entity.setFulfillmentType(norm.fulfillmentType());
+        entity.setRegion(norm.region());
         entity.setJobExecutionId(ctx.jobExecutionId());
         return entity;
     }
@@ -107,6 +139,7 @@ public class CanonicalEntityMapper {
         entity.setSaleDate(norm.saleDate());
         entity.setSaleAmount(norm.saleAmount());
         entity.setCommission(norm.commission());
+        entity.setQuantity(norm.quantity());
         entity.setJobExecutionId(ctx.jobExecutionId());
         return entity;
     }
@@ -119,6 +152,8 @@ public class CanonicalEntityMapper {
         entity.setReturnDate(norm.returnDate());
         entity.setReturnAmount(norm.returnAmount());
         entity.setReturnReason(norm.returnReason());
+        entity.setQuantity(norm.quantity());
+        entity.setStatus(norm.status());
         entity.setJobExecutionId(ctx.jobExecutionId());
         return entity;
     }
@@ -176,6 +211,7 @@ public class CanonicalEntityMapper {
         entity.setDateFrom(norm.dateFrom());
         entity.setDateTo(norm.dateTo());
         entity.setFreezeAt(norm.freezeAt());
+        entity.setParticipationDeadline(norm.participationDeadline());
         entity.setDescription(norm.description());
         entity.setMechanic(norm.mechanic());
         entity.setIsParticipating(norm.isParticipating());
@@ -196,6 +232,7 @@ public class CanonicalEntityMapper {
         entity.setRequiredPrice(norm.requiredPrice());
         entity.setCurrentPrice(norm.currentPrice());
         entity.setMaxPromoPrice(norm.maxPromoPrice());
+        entity.setMaxDiscountPct(norm.maxDiscountPct());
         entity.setAddMode(norm.addMode());
         entity.setMinStockRequired(norm.minStockRequired());
         entity.setStockAvailable(norm.stockAvailable());

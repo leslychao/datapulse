@@ -1,6 +1,7 @@
 package io.datapulse.etl.persistence.canonical;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.List;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,8 +12,8 @@ import lombok.RequiredArgsConstructor;
 /**
  * Batch upsert for canonical_promo_campaign table.
  *
- * <p><b>Not yet wired</b> into any EventSource. Will be used when
- * PROMO_SYNC EventSource implementations are connected.</p>
+ * <p>Used by {@code WbPromoSyncSource} and {@code OzonPromoSyncSource}
+ * during PROMO_SYNC event processing.</p>
  */
 @Repository
 @RequiredArgsConstructor
@@ -58,6 +59,20 @@ public class CanonicalPromoCampaignUpsertRepository {
                    EXCLUDED.participation_deadline, EXCLUDED.description,
                    EXCLUDED.mechanic, EXCLUDED.is_participating)
             """;
+
+    private static final String MARK_STALE = """
+            UPDATE canonical_promo_campaign
+            SET status = 'ENDED', updated_at = NOW()
+            WHERE connection_id = ?
+              AND status IN ('UPCOMING', 'ACTIVE')
+              AND synced_at < NOW() - CAST(? AS interval)
+            RETURNING id
+            """;
+
+    public List<Long> markStaleCampaigns(long connectionId, Duration threshold) {
+        String interval = "%d seconds".formatted(threshold.toSeconds());
+        return jdbc.queryForList(MARK_STALE, Long.class, connectionId, interval);
+    }
 
     public void batchUpsert(List<CanonicalPromoCampaignEntity> entities) {
         jdbc.batchUpdate(UPSERT, entities, DEFAULT_BATCH_SIZE,

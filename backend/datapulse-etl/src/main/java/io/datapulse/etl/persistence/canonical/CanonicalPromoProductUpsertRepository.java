@@ -11,8 +11,8 @@ import lombok.RequiredArgsConstructor;
 /**
  * Batch upsert for canonical_promo_product table.
  *
- * <p><b>Not yet wired</b> into any EventSource. Will be used when
- * PROMO_SYNC EventSource implementations are connected.</p>
+ * <p>Used by {@code WbPromoSyncSource} and {@code OzonPromoSyncSource}
+ * during PROMO_SYNC event processing for per-product promo data.</p>
  */
 @Repository
 @RequiredArgsConstructor

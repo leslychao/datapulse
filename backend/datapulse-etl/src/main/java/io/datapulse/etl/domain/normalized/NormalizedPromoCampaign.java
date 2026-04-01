@@ -10,6 +10,7 @@ public record NormalizedPromoCampaign(
         OffsetDateTime dateFrom,
         OffsetDateTime dateTo,
         OffsetDateTime freezeAt,
+        OffsetDateTime participationDeadline,
         String description,
         String mechanic,
         Boolean isParticipating,

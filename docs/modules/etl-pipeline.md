@@ -1429,6 +1429,8 @@ Summary of gaps between this document (target design) and the current codebase.
 |------|-------|
 | `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
 | `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Phase B |
+| Post-sync outbox events | `IngestResultReporter.publishCompletionEvent()` publishes `ETL_SYNC_COMPLETED` via outbox. Consumer routing via RabbitMQ topic exchange |
+| Stale campaign detection | `StaleCampaignDetector` marks campaigns with `synced_at` older than threshold as ENDED and publishes `ETL_PROMO_CAMPAIGN_STALE` outbox event |
 
 ### Not yet implemented
 
@@ -1436,7 +1438,6 @@ Summary of gaps between this document (target design) and the current codebase.
 |------|-------|
 | `ADVERTISING_FACT` full implementation | v2→v3 migration (F-1/F-2), Ozon OAuth2 (F-3), DTO expansion (F-4). Phase B |
 | ClickHouse materialization | `ClickHouseMaterializer` is a stub. ClickHouse schema (`0001-initial.sql`) created but not populated |
-| Post-sync outbox events | Described in doc; not implemented |
 
 ## Связанные модули
 
