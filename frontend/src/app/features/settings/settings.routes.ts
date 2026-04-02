@@ -6,7 +6,7 @@ const routes: Routes = [
     path: '',
     component: SettingsLayoutComponent,
     children: [
-      { path: '', redirectTo: 'connections', pathMatch: 'full' },
+      { path: '', redirectTo: 'general', pathMatch: 'full' },
       {
         path: 'connections',
         loadComponent: () =>

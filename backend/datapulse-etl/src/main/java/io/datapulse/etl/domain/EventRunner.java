@@ -23,17 +23,23 @@ public class EventRunner {
     /**
      * Executes a single ETL event for the given context.
      * Looks up the appropriate {@link EventSource} and delegates.
+     * If no source is registered for the marketplace/event combination
+     * (e.g. SUPPLY_FACT on Ozon), the event is gracefully skipped.
      */
     public EventResult run(EtlEventType eventType, IngestContext context) {
         log.info("Event started: eventType={}, connectionId={}, jobExecutionId={}",
                 eventType, context.connectionId(), context.jobExecutionId());
 
         try {
-            EventSource source = registry.resolve(context.marketplace(), eventType)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "No EventSource registered for %s/%s".formatted(context.marketplace(), eventType)));
+            var source = registry.resolve(context.marketplace(), eventType);
+            if (source.isEmpty()) {
+                log.info("No EventSource registered for {}/{}, skipping: connectionId={}",
+                        context.marketplace(), eventType, context.connectionId());
+                return EventResult.skipped(eventType,
+                        "No source for %s/%s".formatted(context.marketplace(), eventType));
+            }
 
-            List<SubSourceResult> results = source.execute(context);
+            List<SubSourceResult> results = source.get().execute(context);
 
             EventResult result = EventResult.fromSubSources(eventType, results);
 

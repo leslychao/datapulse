@@ -940,6 +940,40 @@ deferred_action:
 | GET | `/api/workspaces/{workspaceId}/simulation/preview` | Any role | Decision-level simulation preview: simulated prices for a specific price decision. Filter: `?decisionId=...` |
 | DELETE | `/api/workspaces/{workspaceId}/simulation/shadow-state` | PRICING_MANAGER, ADMIN, OWNER | Reset shadow-state for connection. Body: `{ connectionId }` |
 
+## Observability и alerting
+
+### Метрики (Micrometer → Grafana)
+
+| Метрика | Теги | Описание |
+|---------|------|----------|
+| `execution.outcome` | `result`, `mode`, `reason` | Результат execution attempt: `succeeded` (SIMULATED), `reconciliation_pending` (LIVE confirmed/uncertain), `retry_scheduled`, `failed` |
+| `execution.reconciliation.outcome` | `result` | Результат deferred reconciliation: `succeeded`, `retry`, `failed` |
+| `execution.stuck_detector.runs` | — | Количество запусков stuck detector |
+| `execution.stuck_detector.escalated` | `status` | Количество escalated actions по статусу |
+| `execution.expiration_job.runs` | — | Количество запусков expiration job |
+
+### Рекомендуемые Grafana alert rules
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| `execution.reconciliation_failed` | `rate(execution.reconciliation.outcome{result="failed"}[5m]) > 0` | HIGH |
+| `execution.stuck_escalations` | `rate(execution.stuck_detector.escalated[5m]) > 0` | MEDIUM |
+| `execution.high_failure_rate` | `rate(execution.outcome{result="failed"}[15m]) / rate(execution.outcome[15m]) > 0.1` | HIGH |
+
+## Operational prerequisites
+
+### WB API token scope
+
+Текущий production WB token имеет **read-only scope**. Для LIVE execution необходим токен с разрешением **«Цены и скидки → Запись»**. Без этого разрешения write adapter получит HTTP 403 от WB API.
+
+**Действие:** перегенерировать токен в [ЛК Wildberries](https://seller.wildberries.ru) → Настройки → Доступ к API → добавить scope «Цены и скидки (Запись)». Обновить `WB_API_TOKEN` в environment variables.
+
+### RabbitMQ queue migration
+
+При обновлении с версии, где `price.reconciliation.wait` queue имела фиксированный TTL, на версию с per-message TTL: RabbitMQ не позволяет изменять свойства queue на лету. Варианты:
+- **Dev/staging:** удалить queue через management UI, приложение пересоздаст при старте
+- **Production:** создать RabbitMQ policy `reconciliation-wait-no-ttl` с `message-ttl: undefined`, применить к queue `price.reconciliation.wait`
+
 ## Связанные модули
 
 - [Pricing](pricing.md) — создаёт actions из decisions

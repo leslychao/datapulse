@@ -196,6 +196,41 @@ public class MismatchJdbcRepository {
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
   }
 
+  public int autoResolveCleared(long workspaceId) {
+    String sql = """
+        UPDATE alert_event
+        SET status = 'AUTO_RESOLVED',
+            resolved_at = NOW(),
+            resolved_reason = 'AUTO_RESOLVED'
+        WHERE workspace_id = :workspaceId
+          AND status = 'OPEN'
+          AND details->>'mismatch_type' IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM canonical_price_current cpc
+              JOIN marketplace_offer mo ON mo.id = cpc.marketplace_offer_id
+              JOIN marketplace_connection mc ON mc.id = mo.marketplace_connection_id
+              JOIN LATERAL (
+                  SELECT pa.target_price
+                  FROM price_action pa
+                  WHERE pa.marketplace_offer_id = mo.id
+                    AND pa.status = 'SUCCEEDED'
+                    AND pa.execution_mode = 'LIVE'
+                  ORDER BY pa.created_at DESC
+                  LIMIT 1
+              ) latest_pa ON true
+              WHERE mo.id = (alert_event.details->>'offer_id')::bigint
+                AND mc.workspace_id = :workspaceId
+                AND alert_event.details->>'mismatch_type' = 'PRICE'
+                AND ABS(cpc.price - latest_pa.target_price)
+                    / NULLIF(latest_pa.target_price, 0) * 100 > 1
+          )
+          AND details->>'mismatch_type' = 'PRICE'
+        """;
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
+    return jdbc.update(sql, params);
+  }
+
   public record MismatchStatusCounts(long total, long open, long acknowledged, long resolved) {
   }
 

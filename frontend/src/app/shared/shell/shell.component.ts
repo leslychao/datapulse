@@ -14,6 +14,7 @@ import { OfferDetailPanelComponent } from '@features/grid/components/offer-detai
 import { AlertDetailPanelComponent } from '@features/alerts/alert-detail-panel.component';
 import { PolicyDetailPanelComponent } from '@features/pricing/policies/policy-detail-panel.component';
 import { DecisionDetailPanelComponent } from '@features/pricing/decisions/decision-detail-panel.component';
+import { ActionDetailPanelComponent } from '@features/execution/action-detail-panel.component';
 import { AutomationBlockerBannerComponent } from './automation-blocker-banner.component';
 import { ConnectionLostBannerComponent } from './connection-lost-banner.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -39,6 +40,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
     AlertDetailPanelComponent,
     PolicyDetailPanelComponent,
     DecisionDetailPanelComponent,
+    ActionDetailPanelComponent,
     AutomationBlockerBannerComponent,
     ConnectionLostBannerComponent,
   ],
@@ -74,6 +76,9 @@ import { WebSocketService } from '@core/websocket/websocket.service';
           }
           @if (detailPanel.entityType() === 'pricing-decision') {
             <dp-decision-detail-panel />
+          }
+          @if (detailPanel.entityType() === 'action') {
+            <dp-action-detail-panel />
           }
         </dp-detail-panel>
       }

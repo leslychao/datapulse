@@ -4,8 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.platform.audit.AlertTriggeredEvent;
 import io.datapulse.sellerops.config.MismatchProperties;
+import io.datapulse.sellerops.persistence.FinanceMismatchJdbcRepository;
+import io.datapulse.sellerops.persistence.FinanceMismatchJdbcRepository.FinanceGapCandidate;
+import io.datapulse.sellerops.persistence.MismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.PriceMismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.PriceMismatchJdbcRepository.PriceMismatchCandidate;
+import io.datapulse.sellerops.persistence.PromoMismatchJdbcRepository;
+import io.datapulse.sellerops.persistence.PromoMismatchJdbcRepository.PromoMismatchCandidate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,38 +27,123 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MismatchMonitorService {
 
-    private final PriceMismatchJdbcRepository mismatchRepository;
+    private final PriceMismatchJdbcRepository priceMismatchRepository;
+    private final PromoMismatchJdbcRepository promoMismatchRepository;
+    private final FinanceMismatchJdbcRepository financeMismatchRepository;
+    private final MismatchJdbcRepository mismatchJdbcRepository;
     private final MismatchProperties mismatchProperties;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
+    public void checkAllMismatches(long workspaceId) {
+        try {
+            checkPriceMismatches(workspaceId);
+        } catch (Exception e) {
+            log.error("Price mismatch check failed: workspaceId={}, error={}",
+                    workspaceId, e.getMessage(), e);
+        }
+
+        try {
+            checkPromoMismatches(workspaceId);
+        } catch (Exception e) {
+            log.error("Promo mismatch check failed: workspaceId={}, error={}",
+                    workspaceId, e.getMessage(), e);
+        }
+
+        try {
+            checkFinanceMismatches(workspaceId);
+        } catch (Exception e) {
+            log.error("Finance mismatch check failed: workspaceId={}, error={}",
+                    workspaceId, e.getMessage(), e);
+        }
+
+        try {
+            autoResolveClearedMismatches(workspaceId);
+        } catch (Exception e) {
+            log.error("Mismatch auto-resolution failed: workspaceId={}, error={}",
+                    workspaceId, e.getMessage(), e);
+        }
+    }
+
     @Transactional(readOnly = true)
     public void checkPriceMismatches(long workspaceId) {
-        List<PriceMismatchCandidate> mismatches = mismatchRepository.findPriceMismatches(
+        List<PriceMismatchCandidate> mismatches = priceMismatchRepository.findPriceMismatches(
                 workspaceId, mismatchProperties.getPriceWarningThresholdPct());
 
         for (PriceMismatchCandidate mismatch : mismatches) {
             BigDecimal deltaPct = computeDeltaPct(mismatch.currentPrice(), mismatch.expectedPrice());
-            String severity = determineSeverity(deltaPct);
+            String severity = determinePriceSeverity(deltaPct);
 
-            String details = buildDetailsJson(mismatch, deltaPct);
-            String title = "Price mismatch: %s (%s)".formatted(
-                    mismatch.skuCode(), mismatch.offerName());
-
-            eventPublisher.publishEvent(new AlertTriggeredEvent(
+            publishMismatch(
                     mismatch.workspaceId(),
                     mismatch.connectionId(),
                     severity,
-                    title,
-                    details,
-                    false
-            ));
+                    "Price mismatch: %s (%s)".formatted(mismatch.skuCode(), mismatch.offerName()),
+                    buildPriceDetailsJson(mismatch, deltaPct)
+            );
         }
 
         if (!mismatches.isEmpty()) {
             log.info("Price mismatch check completed: workspaceId={}, mismatchesFound={}",
                     workspaceId, mismatches.size());
         }
+    }
+
+    @Transactional(readOnly = true)
+    public void checkPromoMismatches(long workspaceId) {
+        List<PromoMismatchCandidate> mismatches =
+                promoMismatchRepository.findPromoMismatches(workspaceId);
+
+        for (PromoMismatchCandidate mismatch : mismatches) {
+            publishMismatch(
+                    mismatch.workspaceId(),
+                    mismatch.connectionId(),
+                    MismatchSeverity.WARNING.name(),
+                    "Promo mismatch: %s (%s)".formatted(mismatch.skuCode(), mismatch.offerName()),
+                    buildPromoDetailsJson(mismatch)
+            );
+        }
+
+        if (!mismatches.isEmpty()) {
+            log.info("Promo mismatch check completed: workspaceId={}, mismatchesFound={}",
+                    workspaceId, mismatches.size());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void checkFinanceMismatches(long workspaceId) {
+        List<FinanceGapCandidate> gaps = financeMismatchRepository.findFinanceGaps(
+                workspaceId, mismatchProperties.getFinanceGapHoursThreshold());
+
+        for (FinanceGapCandidate gap : gaps) {
+            publishMismatch(
+                    gap.workspaceId(),
+                    gap.connectionId(),
+                    MismatchSeverity.CRITICAL.name(),
+                    "Finance gap: %s (%s)".formatted(gap.connectionName(), gap.marketplaceType()),
+                    buildFinanceDetailsJson(gap)
+            );
+        }
+
+        if (!gaps.isEmpty()) {
+            log.info("Finance mismatch check completed: workspaceId={}, gapsFound={}",
+                    workspaceId, gaps.size());
+        }
+    }
+
+    @Transactional
+    public void autoResolveClearedMismatches(long workspaceId) {
+        int resolved = mismatchJdbcRepository.autoResolveCleared(workspaceId);
+        if (resolved > 0) {
+            log.info("Auto-resolved cleared mismatches: workspaceId={}, count={}",
+                    workspaceId, resolved);
+        }
+    }
+
+    private void publishMismatch(long workspaceId, long connectionId,
+                                  String severity, String title, String details) {
+        eventPublisher.publishEvent(new AlertTriggeredEvent(
+                workspaceId, connectionId, severity, title, details, false));
     }
 
     private BigDecimal computeDeltaPct(BigDecimal actual, BigDecimal expected) {
@@ -67,26 +157,54 @@ public class MismatchMonitorService {
                 .abs();
     }
 
-    private String determineSeverity(BigDecimal deltaPct) {
+    private String determinePriceSeverity(BigDecimal deltaPct) {
         if (deltaPct.compareTo(mismatchProperties.getPriceCriticalThresholdPct()) > 0) {
             return MismatchSeverity.CRITICAL.name();
         }
         return MismatchSeverity.WARNING.name();
     }
 
-    private String buildDetailsJson(PriceMismatchCandidate mismatch, BigDecimal deltaPct) {
+    private String buildPriceDetailsJson(PriceMismatchCandidate mismatch, BigDecimal deltaPct) {
+        return toJson(Map.of(
+                "mismatch_type", MismatchType.PRICE.name(),
+                "offer_id", mismatch.offerId(),
+                "offer_name", mismatch.offerName(),
+                "sku_code", mismatch.skuCode(),
+                "expected_value", mismatch.expectedPrice().toPlainString(),
+                "actual_value", mismatch.currentPrice().toPlainString(),
+                "delta_pct", deltaPct.toPlainString()
+        ));
+    }
+
+    private String buildPromoDetailsJson(PromoMismatchCandidate mismatch) {
+        return toJson(Map.of(
+                "mismatch_type", MismatchType.PROMO_PARTICIPATION.name(),
+                "offer_id", mismatch.offerId(),
+                "offer_name", mismatch.offerName(),
+                "sku_code", mismatch.skuCode(),
+                "expected_value", mismatch.actionOutcome(),
+                "actual_value", mismatch.canonicalStatus(),
+                "delta_pct", "0"
+        ));
+    }
+
+    private String buildFinanceDetailsJson(FinanceGapCandidate gap) {
+        return toJson(Map.of(
+                "mismatch_type", MismatchType.FINANCE_GAP.name(),
+                "connection_name", gap.connectionName(),
+                "marketplace_type", gap.marketplaceType(),
+                "expected_value", "finance data present",
+                "actual_value", gap.lastFinanceDate() != null
+                        ? "last entry: " + gap.lastFinanceDate() : "no data",
+                "delta_pct", "0"
+        ));
+    }
+
+    private String toJson(Map<String, Object> data) {
         try {
-            return objectMapper.writeValueAsString(Map.of(
-                    "mismatch_type", MismatchType.PRICE.name(),
-                    "offer_id", mismatch.offerId(),
-                    "offer_name", mismatch.offerName(),
-                    "sku_code", mismatch.skuCode(),
-                    "expected_value", mismatch.expectedPrice().toPlainString(),
-                    "actual_value", mismatch.currentPrice().toPlainString(),
-                    "delta_pct", deltaPct.toPlainString()
-            ));
+            return objectMapper.writeValueAsString(data);
         } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize mismatch details: offerId={}", mismatch.offerId(), e);
+            log.warn("Failed to serialize mismatch details", e);
             return "{}";
         }
     }

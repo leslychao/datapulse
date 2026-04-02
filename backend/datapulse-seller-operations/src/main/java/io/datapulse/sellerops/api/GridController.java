@@ -62,6 +62,7 @@ public class GridController {
             @RequestParam(value = "has_active_promo", required = false) Boolean hasActivePromo,
             @RequestParam(value = "last_decision", required = false) String lastDecision,
             @RequestParam(value = "last_action_status", required = false) String lastActionStatus,
+            @RequestParam(value = "stock_risk", required = false) String stockRisk,
             @RequestParam(value = "view_id", required = false) Long viewId) {
 
         int clampedSize = Math.min(size, gridProperties.getMaxPageSize());
@@ -77,7 +78,7 @@ public class GridController {
             filter = new GridFilter(
                     marketplaceType, connectionId, status, skuCode, productName,
                     categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
-                    lastDecision, lastActionStatus, null
+                    lastDecision, lastActionStatus, null, stockRisk
             );
             pageSort = buildSort(sort, direction);
         }
@@ -105,7 +106,7 @@ public class GridController {
         GridFilter filter = new GridFilter(
                 marketplaceType, connectionId, status, skuCode, productName,
                 categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
-                null, null, null
+                null, null, null, null
         );
 
         String filename = "datapulse-export-"

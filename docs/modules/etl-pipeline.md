@@ -1243,7 +1243,7 @@ minio:
 | Версионирование | SCD2: `valid_from`, `valid_to` (`NULL` = текущая версия). При создании новой версии: (1) UPDATE текущую запись `SET valid_to = new.valid_from - 1 day WHERE seller_sku_id = ? AND valid_to IS NULL`, (2) INSERT новую запись `(seller_sku_id, cost_price, valid_from, valid_to = NULL)`. При повторном INSERT с тем же `valid_from`: UPSERT — обновить `cost_price` если отличается, иначе no-op. |
 | При отсутствии | Pricing: eligibility SKIP («Себестоимость не задана»). P&L: COGS = 0 (explicit, помечено в UI). |
 | Validation | `cost_price > 0`, `currency = RUB`. |
-| API | CRUD через datapulse-api: `POST /api/cost-profiles`, `PUT`, bulk import CSV. |
+| API | Full CRUD через datapulse-api: `GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `bulk-import` (CSV), `bulk-update`, `export` (CSV), `{sellerSkuId}/history`. |
 | Permission | ADMIN, PRICING_MANAGER. |
 
 ## Canonical finance resolution rules
@@ -1403,7 +1403,11 @@ ETL jobs запускаются через Integration API (`POST /api/connectio
 |--------|------|-------|----------|
 | GET | `/api/cost-profiles` | Any role | Список cost profiles (current versions). Filter: `?sellerSkuId=...&search=...`. Paginated |
 | POST | `/api/cost-profiles` | ADMIN, PRICING_MANAGER | Создать/обновить cost profile. Body: `{ sellerSkuId, costPrice, currency, validFrom }`. SCD2: закрывает предыдущую версию |
+| PUT | `/api/cost-profiles/{id}` | ADMIN, PRICING_MANAGER | Обновить существующий cost profile. Body: `{ costPrice, currency, validFrom }`. SCD2: закрывает предыдущую версию и создаёт новую |
+| DELETE | `/api/cost-profiles/{id}` | ADMIN, PRICING_MANAGER | Удалить cost profile. Returns 204 No Content |
 | POST | `/api/cost-profiles/bulk-import` | ADMIN, PRICING_MANAGER | CSV import. Body: multipart file. Format: `sku_code,cost_price,currency,valid_from`. Response: `{ imported, skipped, errors[] }` |
+| POST | `/api/cost-profiles/bulk-update` | ADMIN, PRICING_MANAGER | Массовое обновление cost profiles. Body: `{ items: [{ sellerSkuId, costPrice, currency, validFrom }] }`. Response: `{ updated, skipped, errors[] }` |
+| GET | `/api/cost-profiles/export` | ADMIN, PRICING_MANAGER | Экспорт cost profiles в CSV. Returns `application/octet-stream` с `Content-Disposition: attachment` |
 | GET | `/api/cost-profiles/{sellerSkuId}/history` | Any role | SCD2 history для SKU: все версии с valid_from/valid_to |
 
 ## Error handling contract

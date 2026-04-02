@@ -133,6 +133,7 @@ public class WbNormalizer {
      * DD-8: Composite row model — single WB row maps to single NormalizedFinanceItem with 12 measures.
      * DD-9: Dual-format timestamp parsing.
      * DD-17: sale_dt fallback to rr_dt.
+     * DD-19: WB v5 P&L fields mapped to canonical measures.
      *
      * <p>For WB_RETURN entries, revenue goes to refund_amount (negative = debit to seller)
      * and revenue_amount stays zero. For all other types, revenue populates revenue_amount.</p>
@@ -146,9 +147,16 @@ public class WbNormalizer {
         BigDecimal revenueAmount = isReturn ? BigDecimal.ZERO : retailPrice;
         BigDecimal refundAmount = isReturn ? retailPrice.negate() : BigDecimal.ZERO;
 
-        BigDecimal marketingCost = negate(safe(row.cashbackAmount()))
-                .add(negate(safe(row.sellerPromoDiscount())))
-                .add(negate(safe(row.loyaltyDiscount())));
+        BigDecimal marketplaceCommission = negate(safe(row.ppvzSalesCommission()))
+                .add(safe(row.cashbackCommissionChange()));
+
+        BigDecimal marketingCost = negate(safe(row.sellerPromoDiscount()));
+
+        BigDecimal otherCharges = negate(safe(row.deduction()))
+                .add(negate(safe(row.cashbackAmount())))
+                .add(negate(safe(row.cashbackDiscount())))
+                .add(negate(safe(row.loyaltyDiscount())))
+                .add(negate(safe(row.installmentCofinancingAmount())));
 
         String warehouseExternalId = row.ppvzOfficeId() != null
                 ? String.valueOf(row.ppvzOfficeId())
@@ -163,14 +171,14 @@ public class WbNormalizer {
                 String.valueOf(row.nmId()),
                 warehouseExternalId,
                 revenueAmount,
-                negate(safe(row.ppvzSalesCommission())),
+                marketplaceCommission,
                 negate(safe(row.acquiringFee())),
                 negate(safe(row.deliveryRub())).add(negate(safe(row.rebillLogisticCost()))),
                 negate(safe(row.storageFee())),
                 negate(safe(row.penalty())),
                 negate(safe(row.acceptance())),
                 marketingCost,
-                negate(safe(row.deduction())),
+                otherCharges,
                 safe(row.additionalPayment()),
                 refundAmount,
                 safe(row.ppvzForPay()),

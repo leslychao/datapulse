@@ -40,4 +40,8 @@ export class AlertApiService {
   resolve(id: number): Observable<void> {
     return this.http.post<void>(`${this.base}/alerts/${id}/resolve`, null);
   }
+
+  createAlert(body: { sourceType: string; sourceId: number; severity: string; message: string }): Observable<void> {
+    return this.http.post<void>(`${this.base}/alerts`, body);
+  }
 }

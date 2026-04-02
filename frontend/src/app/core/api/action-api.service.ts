@@ -7,8 +7,10 @@ import {
   ActionDetail,
   ActionFilter,
   ActionSummary,
+  ActionsKpi,
   BulkActionResponse,
   BulkApproveRequest,
+  BulkCancelRequest,
   BulkRejectRequest,
   Page,
   ReconcileRequest,
@@ -111,9 +113,48 @@ export class ActionApiService {
     );
   }
 
-  getSimulationComparison(workspaceId: number, connectionId: number): Observable<any> {
-    const params = new HttpParams().set('connectionId', connectionId);
+  bulkCancel(workspaceId: number, req: BulkCancelRequest): Observable<BulkActionResponse> {
+    return this.http.post<BulkActionResponse>(
+      `${this.base}/workspaces/${workspaceId}/actions/bulk-cancel`, req,
+    );
+  }
+
+  getActionsKpi(workspaceId: number): Observable<ActionsKpi> {
+    return this.http.get<ActionsKpi>(
+      `${this.base}/workspaces/${workspaceId}/actions/kpi`,
+    );
+  }
+
+  exportActions(workspaceId: number, filter: ActionFilter): Observable<Blob> {
+    let params = new HttpParams().set('format', 'csv');
+    if (filter.connectionId) params = params.set('connectionId', filter.connectionId);
+    if (filter.status?.length) params = params.set('status', filter.status.join(','));
+    if (filter.executionMode) params = params.set('executionMode', filter.executionMode);
+    if (filter.search) params = params.set('search', filter.search);
+    if (filter.from) params = params.set('from', filter.from);
+    if (filter.to) params = params.set('to', filter.to);
     return this.http.get(
+      `${this.base}/workspaces/${workspaceId}/actions/export`,
+      { params, responseType: 'blob' },
+    );
+  }
+
+  reconcileAction(
+    workspaceId: number,
+    actionId: number,
+    req: ReconcileRequest,
+  ): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/actions/${actionId}/reconcile`, req,
+    );
+  }
+
+  getSimulationComparison(
+    workspaceId: number,
+    connectionId: number,
+  ): Observable<SimulationComparison> {
+    const params = new HttpParams().set('connectionId', connectionId);
+    return this.http.get<SimulationComparison>(
       `${this.base}/workspaces/${workspaceId}/simulation/comparison`,
       { params },
     );

@@ -79,6 +79,99 @@ public class GridClickHouseReadRepository {
             SETTINGS final = 1
             """;
 
+    private static final java.util.Set<String> CH_SORT_COLUMNS = java.util.Set.of(
+            "revenue30d", "netPnl30d", "velocity14d",
+            "returnRatePct", "daysOfCover", "stockRisk"
+    );
+
+    private static final java.util.Map<String, String> CH_SORT_COLUMN_MAP = java.util.Map.of(
+            "revenue30d", "fin.revenue_30d",
+            "netPnl30d", "fin.net_pnl_30d",
+            "velocity14d", "sales.velocity_14d",
+            "returnRatePct", "ret.return_rate_pct",
+            "daysOfCover", "inv.days_of_cover",
+            "stockRisk", "inv.stock_out_risk"
+    );
+
+    public boolean isChSortColumn(String column) {
+        return CH_SORT_COLUMNS.contains(column);
+    }
+
+    public List<Long> findSortedOfferIds(List<Long> connectionIds, String sortColumn,
+                                          String direction, int limit) {
+        String chColumn = CH_SORT_COLUMN_MAP.get(sortColumn);
+        if (chColumn == null || connectionIds == null || connectionIds.isEmpty()) {
+            return List.of();
+        }
+
+        String sql = """
+                SELECT inv.product_id AS offer_id
+                FROM mart_inventory_analysis inv
+                LEFT JOIN (
+                    SELECT dp.product_id,
+                           sum(ff.revenue_amount) AS revenue_30d,
+                           sumIf(ff.net_payout,
+                                 ff.attribution_level IN ('POSTING','PRODUCT')) AS net_pnl_30d
+                    FROM fact_finance ff
+                    JOIN dim_product dp ON ff.seller_sku_id = dp.seller_sku_id
+                        AND ff.connection_id = dp.connection_id
+                    WHERE dp.connection_id IN (:connectionIds)
+                      AND ff.finance_date >= today() - 30
+                    GROUP BY dp.product_id
+                ) fin ON inv.product_id = fin.product_id
+                LEFT JOIN (
+                    SELECT product_id, toDecimal64(sum(quantity),2)/14 AS velocity_14d
+                    FROM fact_sales
+                    WHERE connection_id IN (:connectionIds) AND sale_date >= today()-14
+                    GROUP BY product_id
+                ) sales ON inv.product_id = sales.product_id
+                LEFT JOIN (
+                    SELECT product_id, return_rate_pct
+                    FROM mart_returns_analysis
+                    WHERE connection_id IN (:connectionIds)
+                      AND period = (SELECT max(period) FROM mart_returns_analysis
+                                    WHERE connection_id IN (:connectionIds))
+                ) ret ON inv.product_id = ret.product_id
+                WHERE inv.connection_id IN (:connectionIds)
+                  AND inv.analysis_date = (SELECT max(analysis_date)
+                                           FROM mart_inventory_analysis
+                                           WHERE connection_id IN (:connectionIds))
+                ORDER BY %s %s NULLS LAST
+                LIMIT :limit
+                SETTINGS final = 1
+                """.formatted(chColumn, direction);
+
+        var params = new MapSqlParameterSource()
+                .addValue("connectionIds", connectionIds)
+                .addValue("limit", limit);
+
+        return ch.queryForList(sql, params, Long.class);
+    }
+
+    public List<Long> findOfferIdsByStockRisk(List<Long> connectionIds, String stockRisk) {
+        if (connectionIds == null || connectionIds.isEmpty()) {
+            return List.of();
+        }
+
+        String sql = """
+                SELECT product_id
+                FROM mart_inventory_analysis
+                WHERE connection_id IN (:connectionIds)
+                  AND stock_out_risk = :stockRisk
+                  AND analysis_date = (SELECT max(analysis_date)
+                                       FROM mart_inventory_analysis
+                                       WHERE connection_id IN (:connectionIds))
+                LIMIT 10000
+                SETTINGS final = 1
+                """;
+
+        var params = new MapSqlParameterSource()
+                .addValue("connectionIds", connectionIds)
+                .addValue("stockRisk", stockRisk);
+
+        return ch.queryForList(sql, params, Long.class);
+    }
+
     public Map<Long, ClickHouseEnrichment> findEnrichment(List<Long> offerIds) {
         if (offerIds == null || offerIds.isEmpty()) {
             return Collections.emptyMap();

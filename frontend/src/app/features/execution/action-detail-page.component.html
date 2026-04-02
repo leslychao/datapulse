@@ -39,10 +39,11 @@
       </div>
 
       <!-- State Machine -->
-      <div class="mb-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5">
-        <div class="flex items-center justify-between">
+      <div class="mb-6 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5">
+        <div class="flex items-start justify-between" style="min-width: 600px">
           @for (node of mainFlowNodes(); track node.status; let i = $index, last = $last) {
             <div class="flex flex-col items-center gap-1.5">
+              <!-- Main node -->
               <div
                 class="flex h-8 w-8 items-center justify-center rounded-full"
                 [class]="node.isCurrent
@@ -54,7 +55,7 @@
                     ? 'var(--status-neutral)'
                     : 'transparent'"
                 [style.border]="node.isFuture ? '2px solid var(--border-default)' : 'none'"
-                [attr.aria-label]="'Статус: ' + node.label + (node.isCurrent ? '. Текущий статус.' : '')"
+                [attr.aria-label]="'Статус: ' + node.label + '. Шаг ' + node.stepNum + ' из ' + node.totalSteps + (node.isCurrent ? '. Текущий статус.' : '')"
               >
                 @if (node.isPast || node.isCurrent) {
                   <svg class="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -72,12 +73,37 @@
               >
                 {{ node.label }}
               </span>
+
+              <!-- Branch states -->
+              @if (node.branches.length > 0) {
+                <div class="mt-1 flex flex-col items-center gap-1">
+                  @for (branch of node.branches; track branch.status) {
+                    <div class="flex items-center gap-1">
+                      <div class="h-3 border-l border-dashed border-[var(--border-default)]"></div>
+                      <div
+                        class="flex h-5 w-5 items-center justify-center rounded-full"
+                        [style.background-color]="branch.isCurrent
+                          ? 'var(--status-' + branch.color + ')'
+                          : branch.isVisited
+                            ? 'var(--status-neutral)'
+                            : 'transparent'"
+                        [style.border]="!branch.isCurrent && !branch.isVisited ? '1.5px dashed var(--border-default)' : 'none'"
+                        [class]="branch.isCurrent ? 'ring-1 ring-[var(--accent-primary)] ring-offset-1 ring-offset-[var(--bg-secondary)]' : ''"
+                      ></div>
+                      <span class="text-[10px]"
+                        [class]="branch.isCurrent ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'">
+                        {{ branch.label }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
             </div>
 
             @if (!last) {
-              <div class="mx-1 mb-5 h-0.5 flex-1"
-                [style.background-color]="node.isPast ? 'var(--status-neutral)' : 'var(--border-default)'"
-                [style.border-top]="node.isFuture ? '1px dashed var(--border-default)' : 'none'"
+              <div class="mx-1 mt-4 h-0.5 flex-1"
+                [style.background-color]="node.isPast ? 'var(--status-neutral)' : 'transparent'"
+                [style.border-top]="!node.isPast ? '1px dashed var(--border-default)' : 'none'"
               ></div>
             }
           }
@@ -137,6 +163,11 @@
                 <p class="text-[var(--text-primary)]">{{ a.approvedBy }}</p>
               </div>
             }
+            @if (a.supersedingActionId) {
+              <div>
+                <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.status_context.SUPERSEDED' | translate:{ id: a.supersedingActionId } }}</span>
+              </div>
+            }
           </div>
         </div>
 
@@ -144,66 +175,102 @@
         <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-5">
           <h3 class="mb-4 text-sm font-semibold text-[var(--text-primary)]">{{ 'execution.detail.actions_title' | translate }}</h3>
           <div class="flex flex-col gap-2">
-            @if (canApprove()) {
-              <button
-                (click)="approve()"
-                [disabled]="actionPending()"
-                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {{ 'execution.detail.btn_approve' | translate }}
-              </button>
-            }
-            @if (canReject()) {
-              <button
-                (click)="openReasonModal('reject')"
-                [disabled]="actionPending()"
-                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {{ 'execution.detail.btn_reject' | translate }}
-              </button>
-            }
-            @if (canHold()) {
-              <button
-                (click)="openReasonModal('cancel')"
-                [disabled]="actionPending()"
-                class="w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {{ 'execution.detail.btn_hold' | translate }}
-              </button>
-            }
-            @if (canResume()) {
-              <button
-                (click)="resume()"
-                [disabled]="actionPending()"
-                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {{ 'execution.detail.btn_resume' | translate }}
-              </button>
-            }
-            @if (canCancel()) {
-              <button
-                (click)="openReasonModal('cancel')"
-                [disabled]="actionPending()"
-                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {{ 'execution.detail.btn_cancel' | translate }}
-              </button>
-            }
-            @if (canRetry()) {
-              <button
-                (click)="openReasonModal('retry')"
-                [disabled]="actionPending()"
-                class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {{ 'execution.detail.btn_retry' | translate }}
-              </button>
-            }
-            @if (!canApprove() && !canReject() && !canHold() && !canResume() && !canCancel() && !canRetry()) {
-              <p class="text-sm text-[var(--text-tertiary)]">{{ 'execution.detail.no_actions' | translate }}</p>
+            @if (isReadOnlyRole()) {
+              <p class="text-sm text-[var(--text-tertiary)]">{{ 'execution.detail.no_permission' | translate }}</p>
+            } @else {
+              @if (canApprove()) {
+                <button
+                  (click)="approve()"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_approve' | translate }}
+                </button>
+              }
+              @if (canReject()) {
+                <button
+                  (click)="openReasonModal('reject')"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_reject' | translate }}
+                </button>
+              }
+              @if (canHold()) {
+                <button
+                  (click)="openHoldInline()"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_hold' | translate }}
+                </button>
+              }
+              @if (canResume()) {
+                <button
+                  (click)="resume()"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_resume' | translate }}
+                </button>
+              }
+              @if (canCancel()) {
+                <button
+                  (click)="openReasonModal('cancel')"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_cancel' | translate }}
+                </button>
+              }
+              @if (canRetry()) {
+                <button
+                  (click)="openReasonModal('retry')"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_retry' | translate }}
+                </button>
+              }
+              @if (canReconcile()) {
+                <button
+                  (click)="openReconcileModal()"
+                  [disabled]="actionPending()"
+                  class="w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {{ 'execution.detail.btn_reconcile' | translate }}
+                </button>
+              }
+              @if (!hasAnyAction() && !isReadOnlyRole()) {
+                <p class="text-sm text-[var(--text-tertiary)]">{{ 'execution.detail.no_actions' | translate }}</p>
+              }
             }
           </div>
         </div>
       </div>
+
+      <!-- Inline Hold form -->
+      @if (holdInline()) {
+        <div class="mb-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
+          <p class="mb-2 text-sm font-medium text-[var(--text-primary)]">{{ 'execution.detail.btn_hold' | translate }}</p>
+          <textarea
+            [ngModel]="reasonText()"
+            (ngModelChange)="reasonText.set($event)"
+            class="mb-2 w-full min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+            [placeholder]="'execution.detail.hold_placeholder' | translate"
+          ></textarea>
+          <div class="flex gap-2">
+            <button (click)="submitHold()" [disabled]="reasonText().length < 5 || actionPending()"
+                    class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+              {{ 'execution.detail.btn_hold' | translate }}
+            </button>
+            <button (click)="holdInline.set(false); reasonText.set('')"
+                    class="cursor-pointer rounded-[var(--radius-md)] px-4 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]">
+              {{ 'actions.cancel' | translate }}
+            </button>
+          </div>
+        </div>
+      }
 
       <!-- Hold / Cancel reason -->
       @if (a.holdReason) {
@@ -277,11 +344,11 @@
                         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                           <div>
                             <p class="mb-1.5 text-[11px] font-medium text-[var(--text-secondary)]">Provider request</p>
-                            <pre class="overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-[12px] text-[var(--text-primary)]">{{ att.providerRequest ?? '—' }}</pre>
+                            <pre class="overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-[12px] leading-relaxed text-[var(--text-primary)]">{{ formatJson(att.providerRequest) }}</pre>
                           </div>
                           <div>
                             <p class="mb-1.5 text-[11px] font-medium text-[var(--text-secondary)]">Provider response</p>
-                            <pre class="overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-[12px] text-[var(--text-primary)]">{{ att.providerResponse ?? '—' }}</pre>
+                            <pre class="overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-3 font-mono text-[12px] leading-relaxed text-[var(--text-primary)]">{{ formatJson(att.providerResponse) }}</pre>
                           </div>
                         </div>
                         @if (att.reconciliationSource) {
@@ -372,6 +439,11 @@
   (close)="showCancelModal.set(false)"
 >
   <div class="flex flex-col gap-2">
+    @if (isCancelDestructive()) {
+      <div class="mb-2 rounded-[var(--radius-md)] border border-[var(--status-warning)] bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)] p-3 text-sm text-[var(--text-primary)]">
+        {{ 'execution.detail.cancel_destructive_warning' | translate }}
+      </div>
+    }
     <label class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
     <textarea
       [ngModel]="reasonText()"
@@ -400,5 +472,61 @@
       class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
       [placeholder]="'execution.detail.retry_placeholder' | translate"
     ></textarea>
+  </div>
+</dp-form-modal>
+
+<!-- Reconcile Modal with type-to-confirm -->
+<dp-form-modal
+  [title]="'execution.detail.reconcile_title' | translate"
+  [isOpen]="showReconcileModal()"
+  [submitLabel]="'execution.detail.btn_reconcile' | translate"
+  [isPending]="actionPending()"
+  [submitDisabled]="reconcileReason().length < 10 || reconcileConfirmText() !== ('execution.detail.reconcile_confirm_word' | translate)"
+  (submit)="submitReconcile()"
+  (close)="showReconcileModal.set(false)"
+>
+  <div class="flex flex-col gap-3">
+    <div class="rounded-[var(--radius-md)] border border-[var(--status-warning)] bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)] p-3 text-sm text-[var(--text-primary)]">
+      {{ 'execution.detail.reconcile_warning' | translate }}
+    </div>
+
+    <div>
+      <label class="mb-1.5 block text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reconcile_outcome_label' | translate }}</label>
+      <div class="flex flex-col gap-2">
+        <label class="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-primary)]">
+          <input type="radio" name="outcome" value="SUCCEEDED"
+                 [checked]="reconcileOutcome() === 'SUCCEEDED'"
+                 (change)="reconcileOutcome.set('SUCCEEDED')"
+                 class="accent-[var(--accent-primary)]" />
+          {{ 'execution.detail.reconcile_outcome_succeeded' | translate }}
+        </label>
+        <label class="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-primary)]">
+          <input type="radio" name="outcome" value="FAILED"
+                 [checked]="reconcileOutcome() === 'FAILED'"
+                 (change)="reconcileOutcome.set('FAILED')"
+                 class="accent-[var(--accent-primary)]" />
+          {{ 'execution.detail.reconcile_outcome_failed' | translate }}
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reconcile_reason_label' | translate }} *</label>
+      <textarea
+        [ngModel]="reconcileReason()"
+        (ngModelChange)="reconcileReason.set($event)"
+        class="w-full min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        [placeholder]="'execution.detail.reconcile_reason_placeholder' | translate"
+      ></textarea>
+      <p class="mt-0.5 text-[11px] text-[var(--text-tertiary)]">{{ 'execution.detail.reconcile_reason_placeholder' | translate }}</p>
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reconcile_confirm_hint' | translate }}</label>
+      <input type="text"
+             [ngModel]="reconcileConfirmText()"
+             (ngModelChange)="reconcileConfirmText.set($event)"
+             class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]" />
+    </div>
   </div>
 </dp-form-modal>

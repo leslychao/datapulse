@@ -2,8 +2,6 @@ package io.datapulse.sellerops.domain;
 
 import io.datapulse.sellerops.api.GridFilter;
 import io.datapulse.sellerops.config.GridProperties;
-import io.datapulse.sellerops.persistence.ClickHouseEnrichment;
-import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
 import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
 import io.datapulse.sellerops.persistence.GridRow;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +15,6 @@ import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -25,7 +22,6 @@ import java.util.Map;
 public class GridExportService {
 
   private final GridPostgresReadRepository pgRepository;
-  private final GridClickHouseReadRepository chRepository;
   private final GridProperties gridProperties;
 
   private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
@@ -33,10 +29,8 @@ public class GridExportService {
   private static final String CSV_HEADER = String.join(";",
       "Артикул", "Название", "Маркетплейс", "Подключение", "Статус",
       "Категория", "Цена", "Цена со скидкой", "Себестоимость",
-      "Маржа %", "Остаток", "Дней до stock-out", "Риск stock-out",
-      "Выручка 30д", "P&L 30д", "Продажи/день 14д", "Возвраты %",
-      "Политика", "Решение", "Статус действия", "Промо",
-      "Блокировка", "Синхронизация"
+      "Маржа %", "Остаток", "Политика", "Решение", "Статус действия",
+      "Промо", "Блокировка", "Синхронизация"
   );
 
   private static final int BATCH_SIZE = 500;
@@ -67,13 +61,8 @@ public class GridExportService {
           break;
         }
 
-        List<Long> offerIds = batch.stream()
-            .map(GridRow::getOfferId).toList();
-        Map<Long, ClickHouseEnrichment> enrichment =
-            fetchEnrichmentSafely(offerIds);
-
         for (GridRow row : batch) {
-          writer.println(toCsvLine(row, enrichment.get(row.getOfferId())));
+          writer.println(toCsvLine(row));
         }
         writer.flush();
 
@@ -91,7 +80,7 @@ public class GridExportService {
     }
   }
 
-  private String toCsvLine(GridRow row, ClickHouseEnrichment ch) {
+  private String toCsvLine(GridRow row) {
     return String.join(";",
         esc(row.getSkuCode()),
         esc(row.getProductName()),
@@ -105,12 +94,6 @@ public class GridExportService {
         fmtDecimal(row.getMarginPct()),
         row.getAvailableStock() != null
             ? String.valueOf(row.getAvailableStock()) : "",
-        ch != null ? fmtDecimal(ch.getDaysOfCover()) : "",
-        ch != null ? esc(ch.getStockRisk()) : "",
-        ch != null ? fmtDecimal(ch.getRevenue30d()) : "",
-        ch != null ? fmtDecimal(ch.getNetPnl30d()) : "",
-        ch != null ? fmtDecimal(ch.getVelocity14d()) : "",
-        ch != null ? fmtDecimal(ch.getReturnRatePct()) : "",
         esc(row.getActivePolicy()),
         esc(row.getLastDecision()),
         esc(row.getLastActionStatus()),
@@ -134,14 +117,4 @@ public class GridExportService {
     return val != null ? val.toPlainString() : "";
   }
 
-  private Map<Long, ClickHouseEnrichment> fetchEnrichmentSafely(
-      List<Long> offerIds) {
-    try {
-      return chRepository.findEnrichment(offerIds);
-    } catch (Exception e) {
-      log.warn("ClickHouse enrichment failed for export, "
-          + "continuing without analytics: error={}", e.getMessage());
-      return Map.of();
-    }
-  }
 }

@@ -2,30 +2,26 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   input,
+  OnDestroy,
+  OnInit,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AgGridAngular } from 'ag-grid-angular';
-import {
-  ColDef,
-  GridApi,
-  GridReadyEvent,
-  ICellRendererParams,
-  SelectionChangedEvent,
-} from 'ag-grid-community';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { ColDef, GridApi, GridReadyEvent, SelectionChangedEvent } from 'ag-grid-community';
 import {
   injectMutation,
   injectQuery,
   QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { LucideAngularModule, CheckCircle2 } from 'lucide-angular';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, Subject } from 'rxjs';
+import { debounceTime, takeUntil } from 'rxjs/operators';
 
 import { ActionApiService } from '@core/api/action-api.service';
 import { QueueApiService } from '@core/api/queue-api.service';
@@ -34,11 +30,46 @@ import {
   QueueFilter,
   QueueItem,
   QueueItemStatus,
-  QueueType,
+  SystemQueueCode,
 } from '@core/models';
+import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { QueueStore } from '@shared/stores/queue.store';
+import { DetailPanelService } from '@shared/services/detail-panel.service';
+import { ShortcutService } from '@shared/services/shortcut.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import {
+  formatMoney,
+  formatPercent,
+  formatDateTime,
+  financeColor,
+} from '@shared/utils/format.utils';
+
+type QueueContext = SystemQueueCode | 'CUSTOM';
+
+const QUEUE_DESCRIPTIONS: Record<SystemQueueCode, string> = {
+  PENDING_APPROVAL: 'queues.desc.pending_approval',
+  EXECUTION_ERRORS: 'queues.desc.execution_errors',
+  MISMATCHES: 'queues.desc.mismatches',
+  NO_COST: 'queues.desc.no_cost',
+  CRITICAL_STOCK: 'queues.desc.critical_stock',
+  RECENT_DECISIONS: 'queues.desc.recent_decisions',
+};
+
+const DEFAULT_SORT: Record<SystemQueueCode, { field: string; dir: 'ASC' | 'DESC' }> = {
+  PENDING_APPROVAL: { field: 'created_at', dir: 'ASC' },
+  EXECUTION_ERRORS: { field: 'updated_at', dir: 'DESC' },
+  MISMATCHES: { field: 'severity', dir: 'DESC' },
+  NO_COST: { field: 'revenue_30d', dir: 'DESC' },
+  CRITICAL_STOCK: { field: 'days_of_cover', dir: 'ASC' },
+  RECENT_DECISIONS: { field: 'created_at', dir: 'DESC' },
+};
+
+const DOT_COLORS: Record<string, string> = {
+  ATTENTION: 'bg-[var(--status-error)]',
+  DECISION: 'bg-[var(--status-warning)]',
+  PROCESSING: 'bg-[var(--status-info)]',
+};
 
 @Component({
   selector: 'dp-queue-items-page',
@@ -47,14 +78,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
   imports: [AgGridAngular, TranslatePipe, FormsModule, LucideAngularModule],
   templateUrl: './queue-items-page.component.html',
 })
-export class QueueItemsPageComponent {
-  readonly defaultColDef: ColDef<QueueItem> = {
-    flex: 1,
-    minWidth: 96,
-    sortable: false,
-    resizable: true,
-  };
-
+export class QueueItemsPageComponent implements OnInit, OnDestroy {
   private readonly queueApi = inject(QueueApiService);
   private readonly actionApi = inject(ActionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
@@ -62,32 +86,42 @@ export class QueueItemsPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
+  private readonly detailPanel = inject(DetailPanelService);
+  private readonly shortcuts = inject(ShortcutService);
+  protected readonly rbac = inject(RbacService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly queueId = input.required<string>();
   readonly checkIcon = CheckCircle2;
 
-  readonly statusOptions: QueueItemStatus[] = [
-    'PENDING',
-    'IN_PROGRESS',
-    'DONE',
-    'DISMISSED',
-  ];
-
+  readonly statusOptions: QueueItemStatus[] = ['PENDING', 'IN_PROGRESS', 'DONE', 'DISMISSED'];
   readonly pageSizeOptions = [20, 50, 100] as const;
 
-  readonly pageIndex = signal(0);
-  readonly pageSize = signal(20);
+  readonly searchInput$ = new Subject<string>();
+  private readonly destroy$ = new Subject<void>();
+
+  readonly pageIndex = this.queueStore.pageIndex;
+  readonly pageSize = this.queueStore.pageSize;
   readonly statusFilter = signal<QueueItemStatus | ''>('');
+  readonly marketplaceFilter = signal<string[]>([]);
   readonly assignedToMe = signal(false);
   readonly searchQuery = signal('');
 
   readonly selectedRows = signal<QueueItem[]>([]);
   readonly bulkRejectOpen = signal(false);
   readonly bulkRejectReason = signal('');
+  readonly inlineRejectItemId = signal<number | null>(null);
+  readonly inlineRejectReason = signal('');
 
   readonly queueIdNum = computed(() => Number(this.queueId()));
-
   readonly workspaceId = computed(() => this.wsStore.currentWorkspaceId());
+
+  readonly defaultColDef: ColDef<QueueItem> = {
+    flex: 1,
+    minWidth: 80,
+    sortable: true,
+    resizable: true,
+  };
 
   readonly queueQuery = injectQuery(() => {
     const ws = this.workspaceId();
@@ -99,33 +133,102 @@ export class QueueItemsPageComponent {
     };
   });
 
+  readonly queueContext = computed<QueueContext>(() => {
+    const q = this.queueQuery.data();
+    return q?.systemCode ?? 'CUSTOM';
+  });
+
+  readonly queueDescription = computed(() => {
+    const ctx = this.queueContext();
+    if (ctx === 'CUSTOM') return '';
+    const key = QUEUE_DESCRIPTIONS[ctx];
+    return key ? this.translate.instant(key) : '';
+  });
+
+  readonly sortConfig = computed(() => {
+    const ctx = this.queueContext();
+    if (ctx === 'CUSTOM') return { field: 'created_at', dir: 'DESC' as const };
+    return DEFAULT_SORT[ctx];
+  });
+
   readonly itemsQuery = injectQuery(() => {
     const ws = this.workspaceId();
     const qid = this.queueIdNum();
     const page = this.pageIndex();
     const size = this.pageSize();
-    const st = this.statusFilter();
-    const me = this.assignedToMe();
-    const q = this.searchQuery().trim();
-    const filter: QueueFilter = {};
-    if (st) {
-      filter.status = [st];
-    }
-    if (me) {
-      filter.assignedToMe = true;
-    }
-    if (q) {
-      filter.query = q;
-    }
+    const sort = this.sortConfig();
+    const filter = this.buildFilter();
     return {
-      queryKey: ['queueItems', ws, qid, page, size, filter] as const,
+      queryKey: ['queueItems', ws, qid, page, size, filter, sort] as const,
       queryFn: () =>
         lastValueFrom(
-          this.queueApi.listItems(ws!, qid, filter, page, size, 'created_at', 'ASC'),
+          this.queueApi.listItems(ws!, qid, filter, page, size, sort.field, sort.dir),
         ),
       enabled: ws != null && ws > 0 && Number.isFinite(qid) && qid > 0,
     };
   });
+
+  // --- Mutations ---
+
+  readonly approveMutation = injectMutation(() => ({
+    mutationFn: (actionId: number) => {
+      const ws = this.workspaceId()!;
+      return lastValueFrom(this.actionApi.approveAction(ws, actionId));
+    },
+    onSuccess: () => {
+      this.afterMutation();
+      this.toast.success(this.translate.instant('queues.toast.approved'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
+  }));
+
+  readonly rejectMutation = injectMutation(() => ({
+    mutationFn: (payload: { actionId: number; reason: string }) => {
+      const ws = this.workspaceId()!;
+      return lastValueFrom(this.actionApi.rejectAction(ws, payload.actionId, payload.reason));
+    },
+    onSuccess: () => {
+      this.afterMutation();
+      this.toast.success(this.translate.instant('queues.toast.rejected'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
+  }));
+
+  readonly holdMutation = injectMutation(() => ({
+    mutationFn: (payload: { actionId: number; reason: string }) => {
+      const ws = this.workspaceId()!;
+      return lastValueFrom(this.actionApi.holdAction(ws, payload.actionId, payload.reason));
+    },
+    onSuccess: () => {
+      this.afterMutation();
+      this.toast.success(this.translate.instant('queues.toast.held'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
+  }));
+
+  readonly retryMutation = injectMutation(() => ({
+    mutationFn: (actionId: number) => {
+      const ws = this.workspaceId()!;
+      return lastValueFrom(this.actionApi.retryAction(ws, actionId, ''));
+    },
+    onSuccess: () => {
+      this.afterMutation();
+      this.toast.success(this.translate.instant('queues.toast.retried'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
+  }));
+
+  readonly cancelMutation = injectMutation(() => ({
+    mutationFn: (payload: { actionId: number; reason: string }) => {
+      const ws = this.workspaceId()!;
+      return lastValueFrom(this.actionApi.cancelAction(ws, payload.actionId, payload.reason));
+    },
+    onSuccess: () => {
+      this.afterMutation();
+      this.toast.success(this.translate.instant('queues.toast.cancelled'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
+  }));
 
   readonly claimMutation = injectMutation(() => ({
     mutationFn: (itemId: number) => {
@@ -134,8 +237,7 @@ export class QueueItemsPageComponent {
       return lastValueFrom(this.queueApi.claimItem(ws, qid, itemId));
     },
     onSuccess: () => this.afterMutation(),
-    onError: () =>
-      this.toast.error(this.translate.instant('queues.page.action_error')),
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
   }));
 
   readonly completeMutation = injectMutation(() => ({
@@ -145,8 +247,7 @@ export class QueueItemsPageComponent {
       return lastValueFrom(this.queueApi.completeItem(ws, qid, itemId));
     },
     onSuccess: () => this.afterMutation(),
-    onError: () =>
-      this.toast.error(this.translate.instant('queues.page.action_error')),
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
   }));
 
   readonly dismissMutation = injectMutation(() => ({
@@ -156,8 +257,7 @@ export class QueueItemsPageComponent {
       return lastValueFrom(this.queueApi.dismissItem(ws, qid, itemId));
     },
     onSuccess: () => this.afterMutation(),
-    onError: () =>
-      this.toast.error(this.translate.instant('queues.page.action_error')),
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
   }));
 
   readonly bulkApproveMutation = injectMutation(() => ({
@@ -165,9 +265,11 @@ export class QueueItemsPageComponent {
       const ws = this.workspaceId()!;
       return lastValueFrom(this.actionApi.bulkApprove(ws, { actionIds: ids }));
     },
-    onSuccess: () => this.afterBulk(),
-    onError: () =>
-      this.toast.error(this.translate.instant('queues.page.action_error')),
+    onSuccess: () => {
+      this.afterBulk();
+      this.toast.success(this.translate.instant('queues.toast.bulk_approved'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
   }));
 
   readonly bulkRejectMutation = injectMutation(() => ({
@@ -177,24 +279,20 @@ export class QueueItemsPageComponent {
         this.actionApi.bulkReject(ws, { actionIds: payload.ids, cancelReason: payload.reason }),
       );
     },
-    onSuccess: () => this.afterBulk(),
-    onError: () =>
-      this.toast.error(this.translate.instant('queues.page.action_error')),
+    onSuccess: () => {
+      this.afterBulk();
+      this.toast.success(this.translate.instant('queues.toast.bulk_rejected'));
+    },
+    onError: () => this.toast.error(this.translate.instant('queues.toast.action_error')),
   }));
 
-  readonly columnDefs = computed(() =>
-    this.buildColumnDefs(this.queueQuery.data()?.queueType ?? 'ATTENTION'),
-  );
+  // --- Computed ---
 
+  readonly columnDefs = computed(() => this.buildColumnDefs(this.queueContext()));
   readonly rowData = computed(() => this.itemsQuery.data()?.content ?? []);
-
-  readonly totalElements = computed(
-    () => this.itemsQuery.data()?.totalElements ?? 0,
-  );
-
-  readonly totalPages = computed(() =>
-    Math.max(1, this.itemsQuery.data()?.totalPages ?? 1),
-  );
+  readonly totalElements = computed(() => this.itemsQuery.data()?.totalElements ?? 0);
+  readonly totalPages = computed(() => Math.max(1, this.itemsQuery.data()?.totalPages ?? 1));
+  readonly dotColor = computed(() => DOT_COLORS[this.queueQuery.data()?.queueType ?? ''] ?? '');
 
   readonly selectedPriceActionIds = computed(() =>
     this.selectedRows()
@@ -202,8 +300,12 @@ export class QueueItemsPageComponent {
       .map((r) => r.entityId),
   );
 
-  readonly showDecisionBulk = computed(
-    () => this.queueQuery.data()?.queueType === 'DECISION',
+  readonly showApprovalBulk = computed(
+    () => this.queueContext() === 'PENDING_APPROVAL' && this.selectedPriceActionIds().length > 0,
+  );
+
+  readonly showRetryBulk = computed(
+    () => this.queueContext() === 'EXECUTION_ERRORS' && this.selectedPriceActionIds().length > 0,
   );
 
   private gridApi: GridApi<QueueItem> | null = null;
@@ -213,83 +315,137 @@ export class QueueItemsPageComponent {
       const id = this.queueIdNum();
       if (Number.isFinite(id) && id > 0) {
         this.queueStore.selectQueue(id);
+        this.detailPanel.close();
       }
     });
   }
+
+  ngOnInit(): void {
+    this.searchInput$
+      .pipe(debounceTime(300), takeUntil(this.destroy$))
+      .subscribe((value) => {
+        this.searchQuery.set(value);
+        this.queueStore.setPage(0);
+      });
+
+    this.registerShortcuts();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  // --- Grid events ---
 
   onGridReady(event: GridReadyEvent<QueueItem>): void {
     this.gridApi = event.api;
   }
 
   onSelectionChanged(event: SelectionChangedEvent<QueueItem>): void {
-    this.selectedRows.set(event.api.getSelectedRows());
+    const rows = event.api.getSelectedRows();
+    this.selectedRows.set(rows);
+    this.queueStore.setSelectedItemIds(new Set(rows.map((r) => r.itemId)));
+  }
+
+  onRowClicked(item: QueueItem): void {
+    this.detailPanel.open('action', item.entityId);
   }
 
   getRowId = (params: { data?: QueueItem }): string =>
     params.data ? String(params.data.itemId) : '';
 
+  // --- Filter handlers ---
+
   onStatusChange(value: string): void {
     this.statusFilter.set(value as QueueItemStatus | '');
-    this.pageIndex.set(0);
+    this.queueStore.setPage(0);
+  }
+
+  onMarketplaceChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const values = Array.from(select.selectedOptions).map((o) => o.value);
+    this.marketplaceFilter.set(values);
+    this.queueStore.setPage(0);
   }
 
   onAssignedToggle(): void {
     this.assignedToMe.update((v) => !v);
-    this.pageIndex.set(0);
+    this.queueStore.setPage(0);
   }
 
-  applySearch(value: string): void {
-    this.searchQuery.set(value);
-    this.pageIndex.set(0);
+  onSearchInput(event: Event): void {
+    this.searchInput$.next((event.target as HTMLInputElement).value);
   }
+
+  resetFilters(): void {
+    this.statusFilter.set('');
+    this.marketplaceFilter.set([]);
+    this.assignedToMe.set(false);
+    this.searchQuery.set('');
+    this.queueStore.resetFilters();
+  }
+
+  // --- Pagination ---
 
   setPageSize(n: number): void {
-    this.pageSize.set(n);
-    this.pageIndex.set(0);
+    this.queueStore.setPageSize(n);
   }
 
   prevPage(): void {
-    this.pageIndex.update((p) => Math.max(0, p - 1));
+    this.queueStore.setPage(Math.max(0, this.pageIndex() - 1));
   }
 
   nextPage(): void {
-    const max = (this.itemsQuery.data()?.totalPages ?? 1) - 1;
-    this.pageIndex.update((p) => Math.min(max, p + 1));
+    const max = this.totalPages() - 1;
+    this.queueStore.setPage(Math.min(max, this.pageIndex() + 1));
   }
 
-  clearSelection(): void {
-    this.gridApi?.deselectAll();
-    this.selectedRows.set([]);
-  }
-
-  claim(item: QueueItem): void {
-    this.claimMutation.mutate(item.itemId);
-  }
-
-  complete(item: QueueItem): void {
-    this.completeMutation.mutate(item.itemId);
-  }
-
-  dismiss(item: QueueItem): void {
-    this.dismissMutation.mutate(item.itemId);
-  }
+  // --- Single actions ---
 
   approveOne(item: QueueItem): void {
-    const id = this.actionIdForBulk(item);
-    if (id != null) {
-      this.bulkApproveMutation.mutate([id]);
+    if (item.entityType === 'price_action') {
+      this.approveMutation.mutate(item.entityId);
     }
   }
 
-  rejectOne(item: QueueItem): void {
-    const id = this.actionIdForBulk(item);
-    if (id != null) {
-      this.bulkRejectMutation.mutate({
-        ids: [id],
-        reason: this.translate.instant('queues.page.reject_default_reason'),
-      });
+  openInlineReject(item: QueueItem): void {
+    this.inlineRejectItemId.set(item.entityId);
+    this.inlineRejectReason.set('');
+  }
+
+  confirmInlineReject(): void {
+    const reason = this.inlineRejectReason().trim();
+    const id = this.inlineRejectItemId();
+    if (!reason || !id) return;
+    this.rejectMutation.mutate({ actionId: id, reason });
+    this.inlineRejectItemId.set(null);
+  }
+
+  cancelInlineReject(): void {
+    this.inlineRejectItemId.set(null);
+    this.inlineRejectReason.set('');
+  }
+
+  holdOne(item: QueueItem): void {
+    if (item.entityType === 'price_action') {
+      this.holdMutation.mutate({ actionId: item.entityId, reason: '' });
     }
   }
+
+  retryOne(item: QueueItem): void {
+    if (item.entityType === 'price_action') {
+      this.retryMutation.mutate(item.entityId);
+    }
+  }
+
+  cancelOne(item: QueueItem): void {
+    if (item.entityType === 'price_action') {
+      this.cancelMutation.mutate({ actionId: item.entityId, reason: '' });
+    }
+  }
+
+  // --- Bulk actions ---
 
   bulkApprove(): void {
     const ids = this.selectedPriceActionIds();
@@ -304,9 +460,7 @@ export class QueueItemsPageComponent {
 
   confirmBulkReject(): void {
     const reason = this.bulkRejectReason().trim();
-    if (!reason) {
-      return;
-    }
+    if (!reason) return;
     const ids = this.selectedPriceActionIds();
     if (ids.length > 0) {
       this.bulkRejectMutation.mutate({ ids, reason });
@@ -320,122 +474,338 @@ export class QueueItemsPageComponent {
     this.bulkRejectReason.set('');
   }
 
-  private actionIdForBulk(item: QueueItem): number | null {
-    return item.entityType === 'price_action' ? item.entityId : null;
+  clearSelection(): void {
+    this.gridApi?.deselectAll();
+    this.selectedRows.set([]);
+    this.queueStore.clearSelection();
+  }
+
+  // --- Private ---
+
+  private buildFilter(): QueueFilter {
+    const filter: QueueFilter = {};
+    const st = this.statusFilter();
+    if (st) filter.status = [st];
+    if (this.assignedToMe()) filter.assignedToMe = true;
+    const mp = this.marketplaceFilter();
+    if (mp.length) filter.marketplaceType = mp;
+    const q = this.searchQuery().trim();
+    if (q) filter.query = q;
+    return filter;
   }
 
   private afterMutation(): void {
     void this.queryClient.invalidateQueries({ queryKey: ['queueItems'] });
     void this.queryClient.invalidateQueries({ queryKey: ['queues'] });
     void this.queryClient.invalidateQueries({ queryKey: ['queue'] });
-    this.clearSelection();
-    this.toast.success(this.translate.instant('queues.page.action_ok'));
   }
 
   private afterBulk(): void {
-    void this.queryClient.invalidateQueries({ queryKey: ['queueItems'] });
-    void this.queryClient.invalidateQueries({ queryKey: ['queues'] });
-    void this.queryClient.invalidateQueries({ queryKey: ['queue'] });
+    this.afterMutation();
     this.clearSelection();
-    this.toast.success(this.translate.instant('queues.page.bulk_ok'));
   }
 
-  private buildColumnDefs(queueType: QueueType): ColDef<QueueItem>[] {
-    const base: ColDef<QueueItem>[] = [
-      {
-        field: 'status',
-        headerName: this.translate.instant('queues.grid.status'),
-        minWidth: 120,
-        valueFormatter: (p) => {
-          const v = p.value;
-          return v
-            ? this.translate.instant(`queues.item_status.${String(v)}`)
-            : '';
-        },
-      },
-      {
-        field: 'entityType',
-        headerName: this.translate.instant('queues.grid.entity_type'),
-        minWidth: 140,
-      },
-      {
-        field: 'entityId',
-        headerName: this.translate.instant('queues.grid.entity_id'),
-        maxWidth: 110,
-      },
-      ...this.summaryColumns(queueType),
-      {
-        field: 'createdAt',
-        headerName: this.translate.instant('queues.grid.created'),
-        minWidth: 160,
-        valueFormatter: (p) =>
-          p.value ? format(new Date(String(p.value)), 'PPp', { locale: ru }) : '',
-      },
-      {
-        colId: 'actions',
-        headerName: this.translate.instant('queues.grid.actions'),
-        sortable: false,
-        filter: false,
-        pinned: 'right' as const,
-        flex: 0,
-        width: this.actionColumnWidth(queueType),
-        cellRenderer: (params: ICellRendererParams<QueueItem>) => {
-          return this.renderActions(params, queueType);
-        },
-      },
-    ];
-    return base;
+  private registerShortcuts(): void {
+    this.shortcuts.register('ctrl+enter', () => {
+      if (this.queueContext() === 'PENDING_APPROVAL' && this.selectedPriceActionIds().length > 0) {
+        this.bulkApprove();
+      }
+    }, 'queues');
+    this.shortcuts.register('ctrl+shift+enter', () => {
+      if (this.queueContext() === 'PENDING_APPROVAL' && this.selectedPriceActionIds().length > 0) {
+        this.openBulkReject();
+      }
+    }, 'queues');
+    this.shortcuts.register('escape', () => {
+      if (this.bulkRejectOpen()) {
+        this.cancelBulkReject();
+      } else if (this.inlineRejectItemId()) {
+        this.cancelInlineReject();
+      } else {
+        this.detailPanel.close();
+      }
+    }, 'queues');
   }
 
-  private actionColumnWidth(queueType: QueueType): number {
-    switch (queueType) {
-      case 'DECISION':
-        return 200;
-      case 'PROCESSING':
-        return 180;
-      default:
-        return 220;
-    }
-  }
+  // --- Column Definitions ---
 
-  private summaryColumns(queueType: QueueType): ColDef<QueueItem>[] {
-    const keys =
-      queueType === 'ATTENTION'
-        ? ['offerName', 'skuCode', 'offerStatus', 'marketplaceType']
-        : queueType === 'DECISION'
-          ? ['offerName', 'skuCode', 'actionStatus']
-          : ['offerName', 'skuCode', 'actionStatus', 'lastError'];
-    return keys.map((key) => ({
-      colId: `sum_${key}`,
-      headerName: key,
+  private buildColumnDefs(ctx: QueueContext): ColDef<QueueItem>[] {
+    const checkboxCol: ColDef<QueueItem> = {
+      headerCheckboxSelection: true,
+      checkboxSelection: true,
+      width: 40,
+      pinned: 'left',
       sortable: false,
-      valueGetter: (p) => {
-        const v = p.data?.entitySummary[key];
-        return v == null ? '' : String(v);
-      },
-    }));
+      suppressMovable: true,
+    };
+
+    const skuCol: ColDef<QueueItem> = {
+      colId: 'sku_code',
+      headerName: this.translate.instant('queues.grid.sku'),
+      pinned: 'left',
+      width: 120,
+      cellClass: 'font-mono',
+      valueGetter: (p) => this.summary(p.data, 'skuCode'),
+    };
+
+    const productCol: ColDef<QueueItem> = {
+      colId: 'product_name',
+      headerName: this.translate.instant('queues.grid.product'),
+      minWidth: 200,
+      flex: 2,
+      valueGetter: (p) => this.summary(p.data, 'offerName'),
+    };
+
+    const mpCol: ColDef<QueueItem> = {
+      colId: 'marketplace',
+      headerName: this.translate.instant('queues.grid.marketplace'),
+      width: 60,
+      valueGetter: (p) => this.summary(p.data, 'marketplaceType'),
+    };
+
+    const currentPriceCol: ColDef<QueueItem> = {
+      colId: 'current_price',
+      headerName: this.translate.instant('queues.grid.current_price'),
+      width: 110,
+      cellClass: 'font-mono text-right',
+      valueGetter: (p) => this.summaryNum(p.data, 'currentPrice'),
+      valueFormatter: (p) => formatMoney(p.value as number | null),
+    };
+
+    const costCol: ColDef<QueueItem> = {
+      colId: 'cost_price',
+      headerName: this.translate.instant('queues.grid.cost_price'),
+      width: 110,
+      cellClass: 'font-mono text-right',
+      valueGetter: (p) => this.summaryNum(p.data, 'costPrice'),
+      valueFormatter: (p) => formatMoney(p.value as number | null),
+    };
+
+    const marginCol: ColDef<QueueItem> = {
+      colId: 'margin_pct',
+      headerName: this.translate.instant('queues.grid.margin'),
+      width: 80,
+      cellClass: 'font-mono text-right',
+      valueGetter: (p) => this.summaryNum(p.data, 'marginPct'),
+      valueFormatter: (p) => formatPercent(p.value as number | null),
+      cellStyle: (p) => ({ color: financeColor(p.value as number | null) }),
+    };
+
+    const createdCol: ColDef<QueueItem> = {
+      colId: 'created_at',
+      headerName: this.translate.instant('queues.grid.created'),
+      width: 140,
+      valueGetter: (p) => p.data?.createdAt,
+      valueFormatter: (p) => formatDateTime(p.value as string | null, 'full'),
+    };
+
+    const actionsCol: ColDef<QueueItem> = {
+      colId: 'actions',
+      headerName: '',
+      sortable: false,
+      filter: false,
+      pinned: 'right',
+      flex: 0,
+      width: this.actionColumnWidth(ctx),
+      cellRenderer: (params: { data?: QueueItem }) =>
+        params.data ? this.renderActions(params.data, ctx) : '',
+    };
+
+    const common = [checkboxCol, skuCol, productCol, mpCol, currentPriceCol];
+
+    switch (ctx) {
+      case 'PENDING_APPROVAL':
+        return [
+          ...common,
+          this.col('target_price', 'queues.grid.target_price', 110, (d) =>
+            formatMoney(this.summaryNum(d, 'targetPrice')),
+          ),
+          this.priceDeltaCol(),
+          marginCol,
+          this.col('policy', 'queues.grid.policy', 160, (d) => this.summary(d, 'policyName')),
+          this.col('mode', 'queues.grid.mode', 80, (d) => this.summary(d, 'executionMode')),
+          createdCol,
+          actionsCol,
+        ];
+
+      case 'EXECUTION_ERRORS':
+        return [
+          ...common,
+          this.statusBadgeCol('actionStatus', 'queues.grid.action_status'),
+          this.col('last_error', 'queues.grid.last_error', 200, (d) => this.summary(d, 'lastError')),
+          this.col('attempts', 'queues.grid.attempts', 80, (d) => {
+            const cur = this.summaryNum(d, 'attemptCount');
+            const max = this.summaryNum(d, 'maxAttempts');
+            return cur != null && max != null ? `${cur}/${max}` : '—';
+          }),
+          createdCol,
+          actionsCol,
+        ];
+
+      case 'MISMATCHES':
+        return [
+          ...common,
+          this.col('mismatch_type', 'queues.grid.mismatch_type', 100, (d) => this.summary(d, 'mismatchType')),
+          this.col('expected', 'queues.grid.expected', 100, (d) => this.summary(d, 'expectedValue')),
+          this.col('actual', 'queues.grid.actual', 100, (d) => this.summary(d, 'actualValue')),
+          this.priceDeltaCol('deltaPct'),
+          this.severityCol(),
+          this.col('detected', 'queues.grid.detected', 140, (d) =>
+            formatDateTime(this.summary(d, 'detectedAt'), 'full'),
+          ),
+          actionsCol,
+        ];
+
+      case 'NO_COST':
+        return [
+          ...common,
+          this.col('stock', 'queues.grid.stock', 80, (d) => String(this.summaryNum(d, 'availableStock') ?? '—')),
+          this.col('revenue', 'queues.grid.revenue_30d', 110, (d) =>
+            formatMoney(this.summaryNum(d, 'revenue30d')),
+          ),
+          this.col('velocity', 'queues.grid.velocity', 80, (d) => {
+            const v = this.summaryNum(d, 'velocity14d');
+            return v != null ? v.toFixed(1) : '—';
+          }),
+          actionsCol,
+        ];
+
+      case 'CRITICAL_STOCK':
+        return [
+          ...common,
+          this.col('stock', 'queues.grid.stock', 80, (d) => String(this.summaryNum(d, 'availableStock') ?? '—')),
+          this.col('days_cover', 'queues.grid.days_cover', 90, (d) => {
+            const v = this.summaryNum(d, 'daysOfCover');
+            return v != null ? v.toFixed(1) : '—';
+          }),
+          this.col('velocity', 'queues.grid.velocity', 80, (d) => {
+            const v = this.summaryNum(d, 'velocity14d');
+            return v != null ? v.toFixed(1) : '—';
+          }),
+          this.col('risk', 'queues.grid.risk', 90, (d) => this.summary(d, 'stockRisk')),
+          actionsCol,
+        ];
+
+      case 'RECENT_DECISIONS':
+        return [
+          ...common,
+          this.col('decision_type', 'queues.grid.decision_type', 90, (d) => this.summary(d, 'decisionType')),
+          this.col('target_price', 'queues.grid.target_price', 110, (d) =>
+            formatMoney(this.summaryNum(d, 'targetPrice')),
+          ),
+          this.priceDeltaCol(),
+          this.statusBadgeCol('actionStatus', 'queues.grid.action_status'),
+          this.col('policy', 'queues.grid.policy', 160, (d) => this.summary(d, 'policyName')),
+          createdCol,
+          actionsCol,
+        ];
+
+      default:
+        return [
+          ...common, costCol, marginCol, createdCol, actionsCol,
+        ];
+    }
   }
 
-  private renderActions(
-    params: ICellRendererParams<QueueItem>,
-    queueType: QueueType,
-  ): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.className = 'flex flex-wrap gap-1 py-1';
+  private col(
+    id: string,
+    headerKey: string,
+    width: number,
+    formatter: (data: QueueItem | undefined) => string,
+  ): ColDef<QueueItem> {
+    return {
+      colId: id,
+      headerName: this.translate.instant(headerKey),
+      width,
+      valueGetter: (p) => formatter(p.data),
+    };
+  }
 
-    const item = params.data;
-    if (!item) {
-      return wrap;
+  private priceDeltaCol(summaryKey = 'priceChangePct'): ColDef<QueueItem> {
+    return {
+      colId: 'price_change_pct',
+      headerName: this.translate.instant('queues.grid.delta_pct'),
+      width: 80,
+      cellClass: 'font-mono text-right',
+      valueGetter: (p) => this.summaryNum(p.data, summaryKey),
+      cellRenderer: (params: { value: number | null }) => {
+        const v = params.value;
+        if (v === null || v === undefined) return '—';
+        const abs = Math.abs(v).toFixed(1).replace('.', ',');
+        if (v > 0) return `<span style="color: var(--finance-positive)">↑ ${abs}%</span>`;
+        if (v < 0) return `<span style="color: var(--finance-negative)">↓ ${abs}%</span>`;
+        return `<span style="color: var(--finance-zero)">→ 0%</span>`;
+      },
+    };
+  }
+
+  private statusBadgeCol(summaryKey: string, headerKey: string): ColDef<QueueItem> {
+    const statusColors: Record<string, string> = {
+      SUCCEEDED: 'success', APPROVED: 'success', SCHEDULED: 'info',
+      PENDING_APPROVAL: 'warning', ON_HOLD: 'warning', IN_PROGRESS: 'info',
+      FAILED: 'error', CANCELLED: 'neutral', REJECTED: 'error',
+    };
+    return {
+      colId: summaryKey,
+      headerName: this.translate.instant(headerKey),
+      width: 140,
+      valueGetter: (p) => this.summary(p.data, summaryKey),
+      cellRenderer: (params: { value: string | null }) => {
+        const st = params.value;
+        if (!st) return '';
+        const color = statusColors[st] ?? 'neutral';
+        const cssVar = `var(--status-${color})`;
+        const label = this.translate.instant(`grid.action_status.${st}`);
+        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
+          ${label}
+        </span>`;
+      },
+    };
+  }
+
+  private severityCol(): ColDef<QueueItem> {
+    return {
+      colId: 'severity',
+      headerName: this.translate.instant('queues.grid.severity'),
+      width: 100,
+      valueGetter: (p) => this.summary(p.data, 'severity'),
+      cellRenderer: (params: { value: string | null }) => {
+        const v = params.value;
+        if (!v) return '';
+        const color = v === 'CRITICAL' ? 'error' : v === 'WARNING' ? 'warning' : 'neutral';
+        const cssVar = `var(--status-${color})`;
+        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+          ${v}
+        </span>`;
+      },
+    };
+  }
+
+  private actionColumnWidth(ctx: QueueContext): number {
+    switch (ctx) {
+      case 'PENDING_APPROVAL': return 200;
+      case 'EXECUTION_ERRORS': return 160;
+      case 'MISMATCHES': return 160;
+      default: return 120;
     }
+  }
 
-    const addBtn = (labelKey: string, onClick: () => void, variant: 'primary' | 'ghost' = 'ghost') => {
+  private renderActions(item: QueueItem, ctx: QueueContext): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'flex flex-wrap items-center gap-1 py-1';
+
+    const addBtn = (
+      labelKey: string,
+      onClick: () => void,
+      variant: 'primary' | 'danger' | 'ghost' = 'ghost',
+    ) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = this.translate.instant(labelKey);
-      b.className =
-        variant === 'primary'
-          ? 'rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-2 py-1 text-[11px] font-medium text-white hover:bg-[var(--accent-primary-hover)]'
-          : 'rounded-[var(--radius-md)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]';
+      b.className = this.actionBtnClass(variant);
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         onClick();
@@ -443,22 +813,76 @@ export class QueueItemsPageComponent {
       wrap.appendChild(b);
     };
 
-    if (queueType === 'DECISION' && item.entityType === 'price_action') {
-      addBtn('queues.actions.approve', () => this.approveOne(item), 'primary');
-      addBtn('queues.actions.reject', () => this.rejectOne(item));
-      return wrap;
-    }
+    switch (ctx) {
+      case 'PENDING_APPROVAL':
+        if (this.rbac.canApproveActions()) {
+          addBtn('queues.actions.approve', () => this.approveOne(item), 'primary');
+          addBtn('queues.actions.reject', () => this.openInlineReject(item), 'danger');
+        }
+        if (this.rbac.canOperateActions()) {
+          addBtn('queues.actions.hold', () => this.holdOne(item));
+        }
+        break;
 
-    if (queueType === 'PROCESSING') {
-      addBtn('queues.actions.retry', () => this.claim(item), 'primary');
-      addBtn('queues.actions.cancel', () => this.dismiss(item));
-      return wrap;
-    }
+      case 'EXECUTION_ERRORS':
+        if (this.rbac.canApproveActions()) {
+          addBtn('queues.actions.retry', () => this.retryOne(item), 'primary');
+        }
+        if (this.rbac.canOperateActions()) {
+          addBtn('queues.actions.cancel', () => this.cancelOne(item), 'danger');
+        }
+        break;
 
-    addBtn('queues.actions.claim', () => this.claim(item), 'primary');
-    addBtn('queues.actions.done', () => this.complete(item));
-    addBtn('queues.actions.dismiss', () => this.dismiss(item));
+      case 'MISMATCHES':
+        if (this.rbac.canOperateActions()) {
+          addBtn('queues.actions.acknowledge', () => this.claimMutation.mutate(item.itemId), 'primary');
+        }
+        break;
+
+      case 'NO_COST':
+        if (this.rbac.canOperateActions()) {
+          addBtn('queues.actions.set_cost', () => this.detailPanel.open('offer', item.entityId), 'primary');
+        }
+        break;
+
+      case 'CRITICAL_STOCK':
+      case 'RECENT_DECISIONS':
+        addBtn('queues.actions.open_detail', () => this.detailPanel.open('action', item.entityId));
+        break;
+
+      default:
+        if (this.rbac.canOperateActions()) {
+          addBtn('queues.actions.claim', () => this.claimMutation.mutate(item.itemId), 'primary');
+          addBtn('queues.actions.done', () => this.completeMutation.mutate(item.itemId));
+          addBtn('queues.actions.dismiss', () => this.dismissMutation.mutate(item.itemId));
+        }
+        break;
+    }
 
     return wrap;
+  }
+
+  private actionBtnClass(variant: 'primary' | 'danger' | 'ghost'): string {
+    const base = 'rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-medium transition-colors';
+    switch (variant) {
+      case 'primary':
+        return `${base} bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]`;
+      case 'danger':
+        return `${base} bg-[var(--status-error)] text-white hover:opacity-90`;
+      case 'ghost':
+        return `${base} text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]`;
+    }
+  }
+
+  private summary(data: QueueItem | undefined, key: string): string {
+    const v = data?.entitySummary?.[key];
+    return v != null ? String(v) : '';
+  }
+
+  private summaryNum(data: QueueItem | undefined, key: string): number | null {
+    const v = data?.entitySummary?.[key];
+    if (v === null || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
   }
 }

@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,15 +26,15 @@ public class QueueAutoPopulationService {
     private final WorkingQueueDefinitionRepository definitionRepository;
     private final WorkingQueueAssignmentRepository assignmentRepository;
     private final NamedParameterJdbcTemplate jdbc;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public void populateAllQueues() {
         List<WorkingQueueDefinitionEntity> queues =
                 definitionRepository.findAllEnabledWithAutoCriteria();
 
         for (WorkingQueueDefinitionEntity queue : queues) {
             try {
-                populateQueue(queue);
+                transactionTemplate.executeWithoutResult(status -> populateQueue(queue));
             } catch (Exception e) {
                 log.error("Auto-population failed: queueId={}, name={}, workspaceId={}, error={}",
                         queue.getId(), queue.getName(), queue.getWorkspaceId(), e.getMessage(), e);

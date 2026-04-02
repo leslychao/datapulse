@@ -93,6 +93,18 @@ export interface BulkRejectRequest {
   cancelReason?: string;
 }
 
+export interface BulkCancelRequest {
+  actionIds: number[];
+  cancelReason: string;
+}
+
+export interface ActionsKpi {
+  total: number;
+  pending: number;
+  executing: number;
+  failed: number;
+}
+
 export interface ReconcileRequest {
   outcome: 'SUCCEEDED' | 'FAILED';
   manualOverrideReason: string;

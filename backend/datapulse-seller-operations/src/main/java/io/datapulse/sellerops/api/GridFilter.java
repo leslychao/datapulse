@@ -16,6 +16,7 @@ public record GridFilter(
         Boolean hasActivePromo,
         String lastDecision,
         String lastActionStatus,
-        Long viewId
+        Long viewId,
+        String stockRisk
 ) {
 }

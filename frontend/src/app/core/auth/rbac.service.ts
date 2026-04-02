@@ -44,6 +44,26 @@ const PROMO_OPERATE_ROLES = new Set<WorkspaceRole>([
   'OPERATOR', 'PRICING_MANAGER', 'ADMIN', 'OWNER',
 ]);
 
+const MISMATCH_OPERATE_ROLES = new Set<WorkspaceRole>([
+  'OPERATOR', 'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
+const MISMATCH_IGNORE_ROLES = new Set<WorkspaceRole>([
+  'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
+const SETTINGS_ADMIN_ROLES = new Set<WorkspaceRole>([
+  'ADMIN', 'OWNER',
+]);
+
+const COST_EDIT_ROLES = new Set<WorkspaceRole>([
+  'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
+const ALERT_VIEW_ROLES = new Set<WorkspaceRole>([
+  'OPERATOR', 'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
 @Injectable({ providedIn: 'root' })
 export class RbacService {
   private readonly auth = inject(AuthService);
@@ -96,6 +116,32 @@ export class RbacService {
   readonly canOperatePromo = computed(
     () => hasRole(this.currentRole(), PROMO_OPERATE_ROLES),
   );
+
+  readonly canOperateMismatches = computed(
+    () => hasRole(this.currentRole(), MISMATCH_OPERATE_ROLES),
+  );
+
+  readonly canIgnoreMismatches = computed(
+    () => hasRole(this.currentRole(), MISMATCH_IGNORE_ROLES),
+  );
+
+  readonly isAdmin = computed(
+    () => hasRole(this.currentRole(), SETTINGS_ADMIN_ROLES),
+  );
+
+  readonly isOwner = computed(
+    () => this.currentRole() === 'OWNER',
+  );
+
+  readonly canEditCostProfiles = computed(
+    () => hasRole(this.currentRole(), COST_EDIT_ROLES),
+  );
+
+  readonly canViewAlertRules = computed(
+    () => hasRole(this.currentRole(), ALERT_VIEW_ROLES),
+  );
+
+  readonly currentUserId = computed(() => this.auth.user()?.id ?? null);
 }
 
 function hasRole(

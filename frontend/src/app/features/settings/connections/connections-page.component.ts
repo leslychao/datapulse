@@ -7,6 +7,7 @@ import { LucideAngularModule, Plus, ExternalLink, RefreshCw } from 'lucide-angul
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { ConnectionSummary, CreateConnectionRequest, MarketplaceType } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -44,13 +45,15 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
           <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.connections.title' | translate }}</h1>
           <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.connections.subtitle' | translate }}</p>
         </div>
-        <button
-          (click)="startCreate()"
-          class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-        >
-          <lucide-icon [img]="PlusIcon" [size]="16" />
-          {{ 'settings.connections.connect' | translate }}
-        </button>
+        @if (rbac.isAdmin()) {
+          <button
+            (click)="startCreate()"
+            class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+          >
+            <lucide-icon [img]="PlusIcon" [size]="16" />
+            {{ 'settings.connections.connect' | translate }}
+          </button>
+        }
       </div>
 
       @if (formStep() !== 'idle') {
@@ -97,14 +100,14 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
               @if (selectedMarketplace() === 'WB') {
                 <div>
                   <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.wb_token_label' | translate }}</label>
-                  <input
-                    type="password"
+                  <textarea
                     [(ngModel)]="wbToken"
                     name="wbToken"
                     required
+                    rows="3"
                     [placeholder]="'settings.connections.wb_token_placeholder' | translate"
                     class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
+                  ></textarea>
                 </div>
               }
 
@@ -215,6 +218,7 @@ export class ConnectionsPageComponent {
   protected readonly ExternalLinkIcon = ExternalLink;
   protected readonly RefreshIcon = RefreshCw;
 
+  protected readonly rbac = inject(RbacService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);

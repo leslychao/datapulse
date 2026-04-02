@@ -43,4 +43,8 @@ export class MismatchApiService {
   resolve(workspaceId: number, mismatchId: number, body: { resolution: string; note: string }): Observable<void> {
     return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/mismatches/${mismatchId}/resolve`, body);
   }
+
+  bulkIgnore(workspaceId: number, ids: number[], reason: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/mismatches/bulk-ignore`, { ids, reason });
+  }
 }

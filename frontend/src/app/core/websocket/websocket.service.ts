@@ -126,6 +126,7 @@ export class WebSocketService {
     this.subscribeTo(`${ws}/actions`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['actions'] });
       this.queryClient.invalidateQueries({ queryKey: ['action'] });
+      this.queryClient.invalidateQueries({ queryKey: ['actions-kpi'] });
     });
 
     this.subscribeTo(`${ws}/grid-updates`, () => {
@@ -152,7 +153,8 @@ export class WebSocketService {
 
     this.subscribeTo(`${ws}/mismatches`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['mismatches'] });
-      this.queryClient.invalidateQueries({ queryKey: ['mismatches', 'summary'] });
+      this.queryClient.invalidateQueries({ queryKey: ['mismatch-summary'] });
+      this.queryClient.invalidateQueries({ queryKey: ['mismatch-detail'] });
     });
 
     this.subscribeTo(`${ws}/promo-campaigns`, () => {
@@ -182,10 +184,11 @@ export class WebSocketService {
 
     this.subscribeTo(`${ws}/queues`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['queues'] });
+      this.queryClient.invalidateQueries({ queryKey: ['queue'] });
     });
 
     this.subscribeTo(`${ws}/queue-items`, () => {
-      this.queryClient.invalidateQueries({ queryKey: ['queue-items'] });
+      this.queryClient.invalidateQueries({ queryKey: ['queueItems'] });
     });
 
     this.subscribeTo(`${ws}/analytics-updates`, () => {

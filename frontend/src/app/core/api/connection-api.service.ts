@@ -27,6 +27,10 @@ export class ConnectionApiService {
     return this.http.get<ConnectionDetail>(`${this.base}/connections/${id}`);
   }
 
+  updateConnectionName(id: number, name: string): Observable<ConnectionDetail> {
+    return this.http.put<ConnectionDetail>(`${this.base}/connections/${id}`, { name });
+  }
+
   listConnections(): Observable<ConnectionSummary[]> {
     return this.http.get<ConnectionSummary[]>(`${this.base}/connections`);
   }
@@ -57,8 +61,9 @@ export class ConnectionApiService {
     return this.http.get<SyncState[]>(`${this.base}/connections/${connectionId}/sync-state`);
   }
 
-  triggerSync(connectionId: number): Observable<void> {
-    return this.http.post<void>(`${this.base}/connections/${connectionId}/sync`, {});
+  triggerSync(connectionId: number, domains?: string[]): Observable<void> {
+    const body = domains?.length ? { domains } : {};
+    return this.http.post<void>(`${this.base}/connections/${connectionId}/sync`, body);
   }
 
   getCallLog(connectionId: number, filter: CallLogFilter, page: number, size: number): Observable<Page<CallLogEntry>> {

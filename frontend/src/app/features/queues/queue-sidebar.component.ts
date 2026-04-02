@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
@@ -6,11 +6,18 @@ import { LucideAngularModule, Check, Plus } from 'lucide-angular';
 import { lastValueFrom } from 'rxjs';
 
 import { QueueApiService } from '@core/api/queue-api.service';
-import { Queue } from '@core/models';
+import { Queue, QueueType } from '@core/models';
+import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { QueueStore } from '@shared/stores/queue.store';
 
 import { QueueBuilderModalComponent } from './queue-builder-modal.component';
+
+const DOT_COLORS: Record<QueueType, string> = {
+  ATTENTION: 'bg-[var(--status-error)]',
+  DECISION: 'bg-[var(--status-warning)]',
+  PROCESSING: 'bg-[var(--status-info)]',
+};
 
 @Component({
   selector: 'dp-queue-sidebar',
@@ -35,10 +42,13 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
               <a
                 [routerLink]="['/workspace', workspaceId(), 'queues', q.queueId]"
                 routerLinkActive="dp-queue-nav-active"
-                class="dp-queue-nav-item flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                class="dp-queue-nav-item flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2 text-sm text-[var(--text-primary)]"
                 (click)="onSelect(q)"
               >
-                <span class="h-2 w-2 shrink-0 rounded-full" [class]="dotClass(q)"></span>
+                <span
+                  class="h-1.5 w-1.5 shrink-0 rounded-full"
+                  [class]="dotColor(q.queueType)"
+                ></span>
                 <span class="min-w-0 flex-1 truncate">{{ q.name }}</span>
                 @if (q.totalActiveCount === 0) {
                   <lucide-icon [img]="checkIcon" [size]="14" class="text-[var(--status-success)]" />
@@ -60,14 +70,16 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
           <span class="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
             {{ 'queues.sidebar.custom' | translate }}
           </span>
-          <button
-            type="button"
-            class="flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)]"
-            [attr.aria-label]="'queues.sidebar.new_queue' | translate"
-            (click)="builderOpen.set(true)"
-          >
-            <lucide-icon [img]="plusIcon" [size]="14" />
-          </button>
+          @if (rbac.canOperateActions()) {
+            <button
+              type="button"
+              class="flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)]"
+              [attr.aria-label]="'queues.sidebar.new_queue' | translate"
+              (click)="builderOpen.set(true)"
+            >
+              <lucide-icon [img]="plusIcon" [size]="14" />
+            </button>
+          }
         </div>
         <ul class="mt-2 space-y-0.5">
           @for (q of customQueues(); track q.queueId) {
@@ -75,10 +87,12 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
               <a
                 [routerLink]="['/workspace', workspaceId(), 'queues', q.queueId]"
                 routerLinkActive="dp-queue-nav-active"
-                class="dp-queue-nav-item flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                class="dp-queue-nav-item flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-2 text-sm text-[var(--text-primary)]"
                 (click)="onSelect(q)"
               >
-                <span class="h-2 w-2 shrink-0 rounded-full" [class]="dotClass(q)"></span>
+                <span
+                  class="h-1.5 w-1.5 shrink-0 rounded-full border border-[var(--text-tertiary)]"
+                ></span>
                 <span class="min-w-0 flex-1 truncate">{{ q.name }}</span>
                 @if (q.totalActiveCount === 0) {
                   <lucide-icon [img]="checkIcon" [size]="14" class="text-[var(--status-success)]" />
@@ -95,6 +109,19 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
         </ul>
       </div>
 
+      @if (rbac.canOperateActions()) {
+        <div class="border-t border-[var(--border-default)] px-3 py-2">
+          <button
+            type="button"
+            class="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+            (click)="builderOpen.set(true)"
+          >
+            <lucide-icon [img]="plusIcon" [size]="14" />
+            {{ 'queues.sidebar.new_queue' | translate }}
+          </button>
+        </div>
+      }
+
       <dp-queue-builder-modal
         [open]="builderOpen()"
         (openChange)="builderOpen.set($event)"
@@ -106,7 +133,7 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
     `
       :host ::ng-deep .dp-queue-nav-active {
         background-color: var(--bg-active);
-        box-shadow: inset 3px 0 0 var(--accent-primary);
+        box-shadow: inset 2px 0 0 var(--accent-primary);
       }
       .dp-queue-nav-item:not(.dp-queue-nav-active):hover {
         background-color: var(--bg-tertiary);
@@ -119,6 +146,7 @@ export class QueueSidebarComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly queueStore = inject(QueueStore);
   private readonly router = inject(Router);
+  protected readonly rbac = inject(RbacService);
 
   readonly plusIcon = Plus;
   readonly checkIcon = Check;
@@ -136,25 +164,16 @@ export class QueueSidebarComponent {
     };
   });
 
-  systemQueues(): Queue[] {
-    return (this.queuesQuery.data() ?? []).filter((q) => q.isSystem === true);
-  }
+  readonly systemQueues = computed(() =>
+    (this.queuesQuery.data() ?? []).filter((q) => q.isSystem === true),
+  );
 
-  customQueues(): Queue[] {
-    return (this.queuesQuery.data() ?? []).filter((q) => q.isSystem !== true);
-  }
+  readonly customQueues = computed(() =>
+    (this.queuesQuery.data() ?? []).filter((q) => q.isSystem !== true),
+  );
 
-  dotClass(q: Queue): string {
-    switch (q.queueType) {
-      case 'ATTENTION':
-        return 'bg-[var(--status-warning)]';
-      case 'DECISION':
-        return 'bg-[var(--status-info)]';
-      case 'PROCESSING':
-        return 'bg-[var(--accent-primary)]';
-      default:
-        return 'bg-[var(--text-tertiary)]';
-    }
+  dotColor(type: QueueType): string {
+    return DOT_COLORS[type] ?? 'bg-[var(--text-tertiary)]';
   }
 
   onSelect(q: Queue): void {

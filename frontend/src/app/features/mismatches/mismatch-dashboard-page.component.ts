@@ -16,6 +16,7 @@ import {
   GridApi,
   GridReadyEvent,
   ICellRendererParams,
+  RowClassParams,
   RowClickedEvent,
   SelectionChangedEvent,
   SortChangedEvent,
@@ -28,6 +29,8 @@ import {
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { formatDistanceToNow } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 import { LucideAngularModule, Activity, AlertTriangle, Clock, CheckCircle } from 'lucide-angular';
 
@@ -40,13 +43,15 @@ import {
   MismatchStatus,
   MismatchType,
 } from '@core/models';
+import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { MismatchDetailPanelComponent } from './mismatch-detail-panel.component';
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 50;
+const PAGE_SIZES = [50, 100, 200] as const;
 
 const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'info' | 'neutral'> = {
   ACTIVE: 'warning',
@@ -55,6 +60,15 @@ const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'info' | 'n
   AUTO_RESOLVED: 'success',
   IGNORED: 'neutral',
 };
+
+const TYPE_COLORS: Record<MismatchType, { bg: string; text: string }> = {
+  PRICE: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  STOCK: { bg: 'bg-amber-100', text: 'text-amber-700' },
+  PROMO: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  FINANCE: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+};
+
+const TERMINAL_STATUSES: MismatchStatus[] = ['RESOLVED', 'AUTO_RESOLVED', 'IGNORED'];
 
 @Component({
   selector: 'dp-mismatch-dashboard-page',
@@ -77,14 +91,16 @@ export class MismatchDashboardPageComponent {
   private readonly ws = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
+  private readonly queryClient = inject(QueryClient);
+  protected readonly rbac = inject(RbacService);
 
   protected readonly ActivityIcon = Activity;
   protected readonly AlertTriangleIcon = AlertTriangle;
   protected readonly ClockIcon = Clock;
   protected readonly CheckCircleIcon = CheckCircle;
-  private readonly toast = inject(ToastService);
-  private readonly translate = inject(TranslateService);
-  private readonly queryClient = inject(QueryClient);
+  protected readonly pageSizes = PAGE_SIZES;
 
   private gridApi: GridApi<Mismatch> | null = null;
 
@@ -109,9 +125,13 @@ export class MismatchDashboardPageComponent {
   readonly searchQuery = signal('');
 
   readonly currentPage = signal(0);
+  readonly pageSize = signal<number>(DEFAULT_PAGE_SIZE);
   readonly sortParam = signal('detectedAt,desc');
 
   readonly selectedRows = signal<Mismatch[]>([]);
+
+  readonly showBulkIgnoreModal = signal(false);
+  readonly bulkIgnoreReason = signal('');
 
   readonly typeOptions: MismatchType[] = ['PRICE', 'STOCK', 'PROMO', 'FINANCE'];
   readonly statusOptions: MismatchStatus[] = [
@@ -161,6 +181,7 @@ export class MismatchDashboardPageComponent {
       this.ws.currentWorkspaceId(),
       this.mismatchFilter(),
       this.currentPage(),
+      this.pageSize(),
       this.sortParam(),
     ],
     queryFn: () =>
@@ -169,7 +190,7 @@ export class MismatchDashboardPageComponent {
           this.ws.currentWorkspaceId()!,
           this.mismatchFilter(),
           this.currentPage(),
-          PAGE_SIZE,
+          this.pageSize(),
           this.sortParam(),
         ),
       ),
@@ -187,6 +208,17 @@ export class MismatchDashboardPageComponent {
     return v.toFixed(1).replace('.', ',');
   });
 
+  readonly hasActiveFilters = computed(
+    () =>
+      this.connectionId() != null ||
+      this.filterTypes().length > 0 ||
+      JSON.stringify(this.filterStatuses()) !== JSON.stringify(['ACTIVE']) ||
+      this.filterSeverities().length > 0 ||
+      this.periodFrom().trim() !== '' ||
+      this.periodTo().trim() !== '' ||
+      this.searchQuery().trim() !== '',
+  );
+
   readonly columnDefs!: ColDef<Mismatch>[];
   readonly defaultColDef: ColDef<Mismatch> = {
     resizable: true,
@@ -196,15 +228,35 @@ export class MismatchDashboardPageComponent {
   readonly getRowId = (params: GetRowIdParams<Mismatch>) =>
     String(params.data?.mismatchId ?? '');
 
+  readonly getRowClass = (params: RowClassParams<Mismatch>): string | undefined => {
+    if (params.data?.severity === 'CRITICAL') {
+      return 'dp-critical-row';
+    }
+    return undefined;
+  };
+
   readonly bulkAckMutation = injectMutation(() => ({
     mutationFn: async (ids: number[]) => {
-      const ws = this.ws.currentWorkspaceId()!;
+      const wsId = this.ws.currentWorkspaceId()!;
       for (const id of ids) {
-        await lastValueFrom(this.api.acknowledge(ws, id));
+        await lastValueFrom(this.api.acknowledge(wsId, id));
       }
     },
     onSuccess: () => {
       this.toast.success(this.translate.instant('mismatches.toast.bulk_ack'));
+      this.clearGridSelection();
+      this.invalidateList();
+    },
+    onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
+  }));
+
+  readonly bulkIgnoreMutation = injectMutation(() => ({
+    mutationFn: (payload: { ids: number[]; reason: string }) =>
+      lastValueFrom(this.api.bulkIgnore(this.ws.currentWorkspaceId()!, payload.ids, payload.reason)),
+    onSuccess: (_: void, vars: { ids: number[]; reason: string }) => {
+      this.toast.success(this.translate.instant('mismatches.toast.bulk_ignore', { count: vars.ids.length }));
+      this.showBulkIgnoreModal.set(false);
+      this.bulkIgnoreReason.set('');
       this.clearGridSelection();
       this.invalidateList();
     },
@@ -227,21 +279,21 @@ export class MismatchDashboardPageComponent {
         headerName: tr.instant('mismatches.grid.offer'),
         colId: 'offerName',
         field: 'offerName',
-        minWidth: 220,
+        minWidth: 240,
         pinned: 'left' as const,
         sortable: true,
         cellRenderer: (p: ICellRendererParams<Mismatch>) => {
           const d = p.data;
           if (!d) return '';
-          return `<div class="leading-tight py-1"><div class="font-medium">${escapeHtml(d.offerName)}</div><div class="text-[11px] text-[var(--text-secondary)]">${escapeHtml(d.skuCode)}</div></div>`;
+          return `<div class="leading-tight py-1"><div class="font-medium">${escapeHtml(d.offerName)}</div><div class="font-mono text-[11px] text-[var(--text-secondary)]">${escapeHtml(d.skuCode)}</div></div>`;
         },
       },
       {
         headerName: 'MP',
         colId: 'marketplaceType',
         field: 'marketplaceType',
-        width: 72,
-        sortable: true,
+        width: 80,
+        sortable: false,
         cellRenderer: (p: ICellRendererParams<Mismatch>) => {
           const t = p.data?.marketplaceType;
           if (t === 'OZON') {
@@ -259,40 +311,60 @@ export class MismatchDashboardPageComponent {
         cellRenderer: (p: ICellRendererParams<Mismatch>) => {
           const v = p.data?.type;
           if (!v) return '';
-          return `<span class="rounded-full bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent-primary)]">${escapeHtml(v)}</span>`;
+          const c = TYPE_COLORS[v] ?? TYPE_COLORS.PRICE;
+          const label = tr.instant(`mismatches.type.${v}`);
+          return `<span class="inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${c.bg} ${c.text}">${escapeHtml(label)}</span>`;
         },
       },
       {
         headerName: tr.instant('mismatches.grid.expected'),
+        colId: 'expectedValue',
         field: 'expectedValue',
-        width: 110,
+        width: 120,
         sortable: true,
         cellClass: 'font-mono text-xs',
+        type: 'rightAligned',
       },
       {
         headerName: tr.instant('mismatches.grid.actual'),
+        colId: 'actualValue',
         field: 'actualValue',
-        width: 110,
+        width: 120,
         sortable: true,
-        cellClass: 'font-mono text-xs',
+        type: 'rightAligned',
+        cellRenderer: (p: ICellRendererParams<Mismatch>) => {
+          const d = p.data;
+          if (!d) return '';
+          const diff = d.expectedValue !== d.actualValue;
+          const cls = diff
+            ? 'font-mono text-xs bg-[color-mix(in_srgb,var(--status-error)_12%,transparent)]'
+            : 'font-mono text-xs';
+          return `<span class="${cls}">${escapeHtml(d.actualValue)}</span>`;
+        },
       },
       {
         headerName: tr.instant('mismatches.grid.delta'),
         colId: 'deltaPct',
         field: 'deltaPct',
-        width: 88,
+        width: 70,
         sortable: true,
         cellClass: 'font-mono text-xs',
+        type: 'rightAligned',
         valueFormatter: (p: ValueFormatterParams<Mismatch>) => formatDelta(p.value),
       },
       {
         headerName: tr.instant('mismatches.grid.detected'),
         colId: 'detectedAt',
         field: 'detectedAt',
-        width: 140,
+        width: 120,
         sortable: true,
-        valueFormatter: (p: ValueFormatterParams<Mismatch>) =>
-          p.value ? new Date(p.value as string).toLocaleString('ru-RU') : '—',
+        cellRenderer: (p: ICellRendererParams<Mismatch>) => {
+          const v = p.data?.detectedAt;
+          if (!v) return '—';
+          const abs = new Date(v).toLocaleString('ru-RU');
+          const rel = formatDistanceToNow(new Date(v), { locale: ru, addSuffix: true });
+          return `<span title="${escapeHtml(abs)}">${escapeHtml(rel)}</span>`;
+        },
       },
       {
         headerName: tr.instant('mismatches.grid.status'),
@@ -313,12 +385,34 @@ export class MismatchDashboardPageComponent {
         headerName: tr.instant('mismatches.grid.resolution'),
         colId: 'resolution',
         field: 'resolution',
-        width: 120,
+        width: 140,
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<Mismatch>) => {
           const r = p.value as string | null;
           if (!r) return '—';
           return tr.instant(`mismatches.resolution.${r}`);
+        },
+      },
+      {
+        headerName: tr.instant('mismatches.grid.connection'),
+        colId: 'connectionName',
+        field: 'connectionName',
+        width: 160,
+        sortable: false,
+        hide: true,
+      },
+      {
+        headerName: tr.instant('mismatches.grid.severity'),
+        colId: 'severity',
+        field: 'severity',
+        width: 90,
+        sortable: true,
+        hide: true,
+        cellRenderer: (p: ICellRendererParams<Mismatch>) => {
+          const sev = p.data?.severity;
+          if (!sev) return '';
+          const color = sev === 'CRITICAL' ? 'var(--status-error)' : 'var(--status-warning)';
+          return `<span style="color:${color}">⚠</span>`;
         },
       },
     ];
@@ -357,16 +451,14 @@ export class MismatchDashboardPageComponent {
     const c = sorted[0];
     const colId = c.colId ?? 'detectedAt';
     const fieldMap: Record<string, string> = {
-      selection: 'mismatchId',
       offerName: 'offerName',
-      marketplaceType: 'marketplaceType',
       type: 'type',
       expectedValue: 'expectedValue',
       actualValue: 'actualValue',
       deltaPct: 'deltaPct',
       detectedAt: 'detectedAt',
       status: 'status',
-      resolution: 'resolution',
+      severity: 'severity',
     };
     const apiField = fieldMap[colId] ?? 'detectedAt';
     const dir = c.sort === 'asc' ? 'asc' : 'desc';
@@ -424,6 +516,11 @@ export class MismatchDashboardPageComponent {
     this.applyFilters();
   }
 
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(0);
+  }
+
   prevPage(): void {
     if (this.currentPage() > 0) {
       this.currentPage.update((p) => p - 1);
@@ -442,20 +539,25 @@ export class MismatchDashboardPageComponent {
     this.bulkAckMutation.mutate(ids);
   }
 
-  clearBulkSelection(): void {
-    this.clearGridSelection();
+  openBulkIgnoreModal(): void {
+    this.bulkIgnoreReason.set('');
+    this.showBulkIgnoreModal.set(true);
   }
 
-  hasActiveFilters(): boolean {
-    return (
-      this.connectionId() != null ||
-      this.filterTypes().length > 0 ||
-      JSON.stringify(this.filterStatuses()) !== JSON.stringify(['ACTIVE']) ||
-      this.filterSeverities().length > 0 ||
-      this.periodFrom().trim() !== '' ||
-      this.periodTo().trim() !== '' ||
-      this.searchQuery().trim() !== ''
-    );
+  confirmBulkIgnore(): void {
+    const ids = this.selectedRows().map((r) => r.mismatchId);
+    const reason = this.bulkIgnoreReason().trim();
+    if (ids.length === 0 || !reason) return;
+    this.bulkIgnoreMutation.mutate({ ids, reason });
+  }
+
+  cancelBulkIgnore(): void {
+    this.showBulkIgnoreModal.set(false);
+    this.bulkIgnoreReason.set('');
+  }
+
+  clearBulkSelection(): void {
+    this.clearGridSelection();
   }
 
   private clearGridSelection(): void {

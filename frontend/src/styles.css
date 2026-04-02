@@ -155,6 +155,16 @@ router-outlet + * {
   animation: dp-shimmer 1.5s ease infinite;
 }
 
+/* Background flash for WS updates */
+@keyframes dp-flash {
+  0% { background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.dp-flash {
+  animation: dp-flash 1s ease-out;
+}
+
 /* Custom tooltip */
 .dp-tooltip {
   visibility: hidden;

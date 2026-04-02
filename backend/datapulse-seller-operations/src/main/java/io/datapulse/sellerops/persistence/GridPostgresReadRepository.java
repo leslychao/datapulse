@@ -23,13 +23,21 @@ public class GridPostgresReadRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    private static final Map<String, String> SORT_WHITELIST = Map.of(
-            "skuCode", "ss.sku_code",
-            "productName", "mo.name",
-            "currentPrice", "cpc.price",
-            "marginPct", "(cpc.price - cp.cost_price) / NULLIF(cpc.price, 0)",
-            "availableStock", "stock_agg.total_available",
-            "lastSyncAt", "mss.last_success_at"
+    private static final Map<String, String> SORT_WHITELIST = Map.ofEntries(
+            Map.entry("skuCode", "ss.sku_code"),
+            Map.entry("productName", "mo.name"),
+            Map.entry("marketplaceType", "mc.marketplace_type"),
+            Map.entry("connectionName", "mc.name"),
+            Map.entry("status", "mo.status"),
+            Map.entry("category", "cat.name"),
+            Map.entry("currentPrice", "cpc.price"),
+            Map.entry("discountPrice", "cpc.discount_price"),
+            Map.entry("costPrice", "cp.cost_price"),
+            Map.entry("marginPct", "(cpc.price - cp.cost_price) / NULLIF(cpc.price, 0)"),
+            Map.entry("availableStock", "stock_agg.total_available"),
+            Map.entry("lastDecision", "latest_pd.decision_type"),
+            Map.entry("lastActionStatus", "latest_pa.status"),
+            Map.entry("lastSyncAt", "mss.last_success_at")
     );
 
     private static final String BASE_SELECT = """

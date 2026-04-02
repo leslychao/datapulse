@@ -1,7 +1,23 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  output,
+} from '@angular/core';
 
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, GetRowIdParams, RowClickedEvent, SelectionChangedEvent, SortChangedEvent, PaginationChangedEvent } from 'ag-grid-community';
+import {
+  CellContextMenuEvent,
+  ColDef,
+  GetRowIdParams,
+  GridApi,
+  RowClickedEvent,
+  RowDoubleClickedEvent,
+  RowDataUpdatedEvent,
+  SelectionChangedEvent,
+  SortChangedEvent,
+  PaginationChangedEvent,
+} from 'ag-grid-community';
 
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
@@ -21,6 +37,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
         </div>
       } @else {
         <ag-grid-angular
+          #agGrid
           class="ag-theme-alpine h-full w-full"
           [columnDefs]="columnDefs()"
           [rowData]="rowData()"
@@ -32,9 +49,13 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           [animateRows]="false"
           [localeText]="localeText"
           (rowClicked)="onRowClicked($event)"
+          (rowDoubleClicked)="onRowDoubleClicked($event)"
           (selectionChanged)="onSelectionChanged($event)"
           (sortChanged)="onSortChanged($event)"
           (paginationChanged)="onPageChanged($event)"
+          (rowDataUpdated)="onRowDataUpdated($event)"
+          (cellContextMenu)="onCellContextMenu($event)"
+          [suppressContextMenu]="true"
         ></ag-grid-angular>
       }
     </div>
@@ -53,16 +74,26 @@ export class DataGridComponent {
   readonly density = input<'compact' | 'comfortable' | 'normal'>('normal');
   readonly selectable = input(false);
 
+  readonly enableFlash = input(false);
+  readonly contextMenuEnabled = input(false);
+
   readonly rowClicked = output<any>();
   readonly cellDoubleClicked = output<any>();
   readonly selectionChanged = output<any[]>();
   readonly sortChanged = output<{ column: string; direction: string }>();
   readonly pageChanged = output<{ page: number; pageSize: number }>();
+  readonly contextMenu = output<{ event: MouseEvent; data: any }>();
 
   protected readonly localeText = AG_GRID_LOCALE_RU;
+  private previousRowIds = new Set<string>();
+  private gridApi: GridApi | null = null;
 
   onRowClicked(event: RowClickedEvent<any>): void {
     if (event.data) this.rowClicked.emit(event.data);
+  }
+
+  onRowDoubleClicked(event: RowDoubleClickedEvent<any>): void {
+    if (event.data) this.cellDoubleClicked.emit(event.data);
   }
 
   onSelectionChanged(event: SelectionChangedEvent<any>): void {
@@ -85,5 +116,34 @@ export class DataGridComponent {
       page: api.paginationGetCurrentPage(),
       pageSize: api.paginationGetPageSize(),
     });
+  }
+
+  onCellContextMenu(event: CellContextMenuEvent<any>): void {
+    if (!this.contextMenuEnabled()) return;
+    const mouseEvent = event.event as MouseEvent;
+    mouseEvent.preventDefault();
+    if (event.data) {
+      this.contextMenu.emit({ event: mouseEvent, data: event.data });
+    }
+  }
+
+  onRowDataUpdated(event: RowDataUpdatedEvent<any>): void {
+    if (!this.enableFlash() || !this.getRowId()) return;
+    this.gridApi = event.api;
+    const currentIds = new Set<string>();
+    event.api.forEachNode((node) => {
+      if (node.data) {
+        const id = this.getRowId()!({ data: node.data } as any);
+        currentIds.add(id);
+        if (!this.previousRowIds.has(id)) {
+          const el = document.querySelector(`[row-id="${id}"]`);
+          if (el) {
+            el.classList.add('dp-flash');
+            setTimeout(() => el.classList.remove('dp-flash'), 1100);
+          }
+        }
+      }
+    });
+    this.previousRowIds = currentIds;
   }
 }
