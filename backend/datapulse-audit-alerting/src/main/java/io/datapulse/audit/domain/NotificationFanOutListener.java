@@ -13,6 +13,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Performs notification fan-out: when an alert event is created or resolved,
@@ -27,8 +29,12 @@ public class NotificationFanOutListener {
     private final NotificationService notificationService;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * AFTER_COMMIT: {@code user_notification} FK requires {@code alert_event} row visible
+     * (publisher often runs inside an open transaction; async fan-out must not race commit).
+     */
     @Async("notificationExecutor")
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAlertCreated(AlertEventCreatedEvent event) {
         try {

@@ -413,6 +413,7 @@ FBO endpoint fully verified.
 | Type          | Offset-based (`offset` + `limit`)                  | confirmed  |
 | FBO filter    | `since`, `to` (date range, ISO 8601 UTC), `dir`    | confirmed  |
 | `with` params | `analytics_data`, `financial_data` (boolean flags) | confirmed  |
+| Loop guard    | Observed (2026-04-03): successive pages may return **byte-identical** JSON while `offset` increases — treat as end of pagination (same pattern as non-advancing `last_id` on cursor endpoints) | confirmed |
 
 
 ### Identifier Semantics

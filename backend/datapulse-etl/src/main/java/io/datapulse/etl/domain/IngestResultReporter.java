@@ -50,7 +50,19 @@ public class IngestResultReporter {
         publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
     }
 
-    public void updateSyncStateSuccess(long connectionId) {
+    /**
+     * Terminal ingest success only: persists IDLE sync state, inserts {@code ETL_SYNC_COMPLETED} outbox row,
+     * then publishes {@link SyncStatusPushReason#ETL_JOB_COMPLETED}. Keeps UI invalidation aligned with
+     * completion fan-out; do not call without the outbox write.
+     */
+    public void recordSuccessfulTerminalSync(
+            JobExecutionRow job, long workspaceId, Map<EtlEventType, EventResult> results) {
+        applySuccessfulSyncState(job.getConnectionId());
+        writeCompletionOutboxEvent(job, workspaceId, results);
+        publishSyncHealthInvalidated(job.getConnectionId(), SyncStatusPushReason.ETL_JOB_COMPLETED);
+    }
+
+    private void applySuccessfulSyncState(long connectionId) {
         List<MarketplaceSyncStateEntity> states =
                 syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
         OffsetDateTime now = OffsetDateTime.now();
@@ -61,7 +73,6 @@ public class IngestResultReporter {
             state.setErrorMessage(null);
         }
         syncStateRepository.saveAll(states);
-        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.ETL_JOB_COMPLETED);
     }
 
     public void updateSyncStateError(long connectionId, String errorMessage) {
@@ -81,7 +92,8 @@ public class IngestResultReporter {
         publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
     }
 
-    public void publishCompletionEvent(JobExecutionRow job, Map<EtlEventType, EventResult> results) {
+    private void writeCompletionOutboxEvent(
+            JobExecutionRow job, long workspaceId, Map<EtlEventType, EventResult> results) {
         List<String> completedDomains = results.entrySet().stream()
                 .filter(e -> e.getValue().isSuccess())
                 .map(e -> e.getKey().name())
@@ -92,6 +104,7 @@ public class IngestResultReporter {
                 .toList();
 
         Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("workspaceId", workspaceId);
         payload.put("connectionId", job.getConnectionId());
         payload.put("jobExecutionId", job.getId());
         payload.put("syncScope", job.getEventType());

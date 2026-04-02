@@ -133,6 +133,7 @@ export class WebSocketService {
         status: c.status,
       });
       this.syncStore.setLastUpdated(new Date().toISOString());
+      this.queryClient.invalidateQueries({ queryKey: ['connection-sync-state'] });
       if (msg.reason === 'ETL_JOB_COMPLETED') {
         this.queryClient.invalidateQueries({ queryKey: ['sync-status'] });
         this.queryClient.invalidateQueries({ queryKey: ['offers'] });

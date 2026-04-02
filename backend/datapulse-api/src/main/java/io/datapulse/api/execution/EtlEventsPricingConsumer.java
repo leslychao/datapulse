@@ -21,6 +21,7 @@ public class EtlEventsPricingConsumer {
 
   private final StalePromoCampaignHandler stalePromoCampaignHandler;
   private final PricingRunApiService pricingRunApiService;
+  private final EtlSyncCompletedWorkspaceResolver workspaceResolver;
   private final ObjectMapper objectMapper;
 
   @RabbitListener(queues = RabbitTopologyConfig.ETL_EVENTS_PRICING_QUEUE)
@@ -44,11 +45,13 @@ public class EtlEventsPricingConsumer {
         message.getBody(), new TypeReference<>() {});
 
     Long connectionId = toLong(payload.get("connectionId"));
-    Long workspaceId = toLong(payload.get("workspaceId"));
+    Long workspaceId = workspaceResolver.resolveWorkspaceId(payload);
     Long jobExecutionId = toLong(payload.get("jobExecutionId"));
 
     if (connectionId == null || workspaceId == null || jobExecutionId == null) {
-      log.warn("ETL_SYNC_COMPLETED missing required fields, skipping pricing trigger");
+      log.warn(
+          "ETL_SYNC_COMPLETED missing required fields (connectionId, resolvable workspaceId,"
+              + " jobExecutionId), skipping pricing trigger");
       return;
     }
 

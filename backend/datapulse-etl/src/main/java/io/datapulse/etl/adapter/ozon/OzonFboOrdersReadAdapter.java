@@ -36,6 +36,7 @@ public class OzonFboOrdersReadAdapter {
         long offset = 0;
         int pageNumber = 0;
         boolean hasMore = true;
+        String previousSha256 = null;
 
         while (hasMore) {
             long currentOffset = offset;
@@ -53,12 +54,23 @@ public class OzonFboOrdersReadAdapter {
 
             PageCaptureResult page = pageCapture.capture(
                     body, context, pageNumber, NoCursorExtractor.INSTANCE);
-            results.add(page.captureResult());
+            var captured = page.captureResult();
 
+            if (OzonOffsetPaging.isRepeatedOffsetPage(previousSha256, captured.contentSha256())) {
+                log.warn(
+                        "Ozon FBO postings: stopping pagination, identical response to previous page"
+                                + " (offset={}, connectionId={})",
+                        currentOffset,
+                        context.connectionId());
+                break;
+            }
+
+            results.add(captured);
+            previousSha256 = captured.contentSha256();
             offset += PAGE_LIMIT;
             pageNumber++;
 
-            if (page.captureResult().byteSize() < 200) {
+            if (captured.byteSize() < 200) {
                 hasMore = false;
             }
         }

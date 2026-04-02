@@ -1518,7 +1518,7 @@ Summary of gaps between this document (target design) and the current codebase.
 |------|-------|
 | `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
 | `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Phase B |
-| Post-sync outbox events | `IngestResultReporter.publishCompletionEvent()` publishes `ETL_SYNC_COMPLETED` via outbox. Consumer routing via RabbitMQ topic exchange |
+| Post-sync outbox events | `IngestResultReporter.recordSuccessfulTerminalSync()` writes `ETL_SYNC_COMPLETED` to outbox (with sync state IDLE) in one transactional step. Consumer routing via RabbitMQ |
 | Stale campaign detection | `StaleCampaignDetector` marks campaigns with `synced_at` older than threshold as ENDED and publishes `ETL_PROMO_CAMPAIGN_STALE` outbox event |
 
 ### Not yet implemented
