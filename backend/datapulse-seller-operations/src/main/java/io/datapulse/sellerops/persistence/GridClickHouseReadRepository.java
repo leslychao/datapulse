@@ -189,12 +189,10 @@ public class GridClickHouseReadRepository {
             SELECT
                 inv.critical_stock_count,
                 cur.revenue_30d_total,
-                CASE
-                    WHEN prev.revenue_prev_30d IS NOT NULL AND prev.revenue_prev_30d > 0
-                    THEN round((cur.revenue_30d_total - prev.revenue_prev_30d)
-                               / prev.revenue_prev_30d * 100, 2)
-                    ELSE NULL
-                END AS revenue_30d_trend
+                if(prev.revenue_prev_30d > 0,
+                   round((cur.revenue_30d_total - prev.revenue_prev_30d)
+                         / prev.revenue_prev_30d * 100, 2),
+                   NULL) AS revenue_30d_trend
             FROM (
                 SELECT countDistinct(product_id) AS critical_stock_count
                 FROM mart_inventory_analysis

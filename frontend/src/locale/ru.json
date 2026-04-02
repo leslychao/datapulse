@@ -1349,6 +1349,7 @@
   "settings.connection_detail.credentials_updated": "Учётные данные обновлены",
   "settings.connection_detail.credentials_update_error": "Не удалось обновить учётные данные",
   "settings.connection_detail.sync_started": "Синхронизация запущена",
+  "settings.connection_detail.sync_already_running": "Синхронизация уже выполняется. Дождитесь завершения текущей.",
   "settings.connection_detail.sync_start_error": "Не удалось запустить синхронизацию",
   "settings.connection_detail.disabled": "Подключение отключено",
   "settings.connection_detail.disable_error": "Не удалось отключить подключение",
@@ -1356,6 +1357,10 @@
   "settings.connection_detail.enable_error": "Не удалось включить подключение",
   "settings.connection_detail.deleted": "Подключение архивировано",
   "settings.connection_detail.delete_error": "Не удалось архивировать подключение",
+  "settings.connection_detail.sync_domain_btn": "Синхронизировать",
+  "settings.connection_detail.created_at": "Дата создания",
+  "settings.connection_detail.name_updated": "Название обновлено",
+  "settings.connection_detail.name_update_error": "Не удалось обновить название",
 
   "settings.team.title": "Команда",
   "settings.team.subtitle": "Участники рабочего пространства",

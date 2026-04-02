@@ -69,7 +69,10 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                 formControlName="name"
                 type="text"
                 [placeholder]="'onboarding.connection.name_placeholder' | translate"
-                class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                class="rounded-[var(--radius-md)] border bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                [class]="form().get('name')?.touched && form().get('name')?.invalid
+                  ? 'border-[var(--status-error)]'
+                  : 'border-[var(--border-default)]'"
               />
             </div>
 
@@ -81,7 +84,10 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                     formControlName="apiToken"
                     rows="3"
                     [placeholder]="'onboarding.connection.wb_token_placeholder' | translate"
-                    class="w-full resize-none rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 pr-10 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                    class="w-full resize-none rounded-[var(--radius-md)] border bg-[var(--bg-primary)] px-3 py-2 pr-10 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                    [class]="form().get('apiToken')?.touched && form().get('apiToken')?.invalid
+                      ? 'border-[var(--status-error)]'
+                      : 'border-[var(--border-default)]'"
                     [style.webkitTextSecurity]="showToken() ? 'none' : 'disc'"
                   ></textarea>
                   <button
@@ -114,7 +120,10 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                   formControlName="clientId"
                   type="text"
                   [placeholder]="'onboarding.connection.ozon_client_placeholder' | translate"
-                  class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                  class="rounded-[var(--radius-md)] border bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                  [class]="form().get('clientId')?.touched && form().get('clientId')?.invalid
+                    ? 'border-[var(--status-error)]'
+                    : 'border-[var(--border-default)]'"
                 />
                 <span class="text-xs text-[var(--text-tertiary)]">{{ 'onboarding.connection.ozon_client_hint' | translate }}</span>
               </div>
@@ -125,7 +134,10 @@ const SUCCESS_REDIRECT_DELAY = 2000;
                   formControlName="apiKey"
                   [type]="showToken() ? 'text' : 'password'"
                   [placeholder]="'onboarding.connection.ozon_key_placeholder' | translate"
-                  class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                  class="rounded-[var(--radius-md)] border bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+                  [class]="form().get('apiKey')?.touched && form().get('apiKey')?.invalid
+                    ? 'border-[var(--status-error)]'
+                    : 'border-[var(--border-default)]'"
                 />
                 <button
                   type="button"
@@ -237,7 +249,10 @@ export class StepConnectionComponent implements OnDestroy {
     if (!marketplace) return;
 
     const currentForm = this.form();
-    if (currentForm.invalid) return;
+    if (currentForm.invalid) {
+      currentForm.markAllAsTouched();
+      return;
+    }
 
     this.validationState.set('submitting');
     this.updateCanSubmit();

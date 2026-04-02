@@ -15,7 +15,7 @@ public class WebClientConfig {
 
     private static final int MAX_IN_MEMORY_SIZE = 16 * 1024 * 1024;
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
-    private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(60);
 
     @Bean
     public WebClient.Builder webClientBuilder() {

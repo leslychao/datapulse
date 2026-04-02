@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, NgZone, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
@@ -328,6 +328,7 @@ export class ConnectionDetailPageComponent {
   private readonly breadcrumbs = inject(BreadcrumbService);
   protected readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
+  private readonly zone = inject(NgZone);
 
   private readonly isPendingValidation = signal(false);
 
@@ -473,7 +474,7 @@ export class ConnectionDetailPageComponent {
     },
     {
       headerName: '',
-      width: 100,
+      width: 140,
       cellRenderer: (params: ICellRendererParams<SyncState>) => {
         if (!this.rbac.isAdmin()) return '';
         const domain = params.data?.dataDomain;
@@ -481,7 +482,7 @@ export class ConnectionDetailPageComponent {
         const btn = document.createElement('button');
         btn.className = 'cursor-pointer text-xs text-[var(--accent-primary)] hover:underline';
         btn.textContent = this.translate.instant('settings.connection_detail.sync_domain_btn');
-        btn.addEventListener('click', () => this.triggerSyncDomain(domain));
+        btn.addEventListener('click', () => this.zone.run(() => this.triggerSyncDomain(domain)));
         return btn;
       },
       sortable: false,
@@ -557,11 +558,24 @@ export class ConnectionDetailPageComponent {
   }
 
   triggerSyncAll(): void {
+    if (this.hasActiveSyncing()) {
+      this.toast.info(this.translate.instant('settings.connection_detail.sync_already_running'));
+      return;
+    }
     this.triggerSyncMutation.mutate(undefined);
   }
 
   triggerSyncDomain(domain: string): void {
+    if (this.hasActiveSyncing()) {
+      this.toast.info(this.translate.instant('settings.connection_detail.sync_already_running'));
+      return;
+    }
     this.triggerSyncMutation.mutate([domain]);
+  }
+
+  private hasActiveSyncing(): boolean {
+    const states = this.syncStateQuery.data();
+    return states?.some(s => s.status === 'SYNCING') ?? false;
   }
 
   goBack(): void {

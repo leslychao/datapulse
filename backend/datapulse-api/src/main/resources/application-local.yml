@@ -16,6 +16,11 @@ spring:
   jpa:
     show-sql: true
 
+management:
+  health:
+    mail:
+      enabled: false
+
 logging:
   level:
     io.datapulse: DEBUG
