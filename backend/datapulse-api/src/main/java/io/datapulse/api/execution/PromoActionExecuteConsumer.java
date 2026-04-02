@@ -39,8 +39,9 @@ public class PromoActionExecuteConsumer {
       log.info("Processing promo action execution: actionId={}", actionId);
       promoActionService.executeAction(actionId);
     } catch (Exception e) {
-      log.error("Poison pill detected in promo.execution queue: messageId={}, error={}",
-          message.getMessageProperties().getMessageId(), e.getMessage(), e);
+      log.error("Poison pill detected in promo.execution queue: messageId={}, payload={}, error={}",
+          message.getMessageProperties().getMessageId(),
+          new String(message.getBody()), e.getMessage(), e);
     }
   }
 }

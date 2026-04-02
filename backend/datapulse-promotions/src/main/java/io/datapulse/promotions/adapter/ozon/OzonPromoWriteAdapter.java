@@ -78,7 +78,8 @@ public class OzonPromoWriteAdapter {
 
       return parseResponse(responseBody);
     } catch (Exception e) {
-      log.error("Ozon promo write failed: path={}, error={}", path, e.getMessage());
+      log.error("Ozon promo write failed: path={}, request={}, error={}",
+          path, body.toString(), e.getMessage(), e);
       throw e;
     }
   }
@@ -108,7 +109,8 @@ public class OzonPromoWriteAdapter {
 
       return new PromoWriteResult(acceptedIds, rejected, responseBody);
     } catch (Exception e) {
-      log.error("Failed to parse Ozon promo write response: {}", e.getMessage());
+      log.error("Failed to parse Ozon promo write response: response={}, error={}",
+          responseBody, e.getMessage(), e);
       return new PromoWriteResult(List.of(), List.of(), responseBody);
     }
   }

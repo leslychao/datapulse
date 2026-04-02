@@ -131,7 +131,7 @@ public class PromoEvaluationService {
                 }
             } catch (Exception e) {
                 log.warn("Error evaluating promo product: promoProductId={}, error={}",
-                        product.promoProductId(), e.getMessage());
+                        product.promoProductId(), e.getMessage(), e);
                 errorCount++;
 
                 PromoEvaluationEntity errorEval = buildErrorEvaluation(run, product, e.getMessage());
@@ -432,8 +432,9 @@ public class PromoEvaluationService {
             try {
                 actionRepository.save(action);
             } catch (Exception e) {
-                log.warn("Failed to save promo action (likely duplicate): campaignId={}, offerId={}, error={}",
-                        action.getCanonicalPromoCampaignId(), action.getMarketplaceOfferId(), e.getMessage());
+                log.warn("Failed to save promo action (likely duplicate): campaignId={}, offerId={}, type={}, error={}",
+                        action.getCanonicalPromoCampaignId(), action.getMarketplaceOfferId(),
+                        action.getActionType(), e.getMessage(), e);
             }
         }
     }

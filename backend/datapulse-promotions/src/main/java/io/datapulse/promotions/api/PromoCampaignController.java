@@ -54,10 +54,14 @@ public class PromoCampaignController {
     public Page<PromoCampaignProductResponse> getCampaignProducts(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("campaignId") Long campaignId,
-            @RequestParam(value = "participationStatus", required = false) String participationStatus,
+            @RequestParam(value = "participationStatus", required = false) List<String> participationStatus,
+            @RequestParam(value = "evaluationResult", required = false) List<String> evaluationResult,
+            @RequestParam(value = "decisionType", required = false) List<String> decisionType,
+            @RequestParam(value = "actionStatus", required = false) List<String> actionStatus,
             @RequestParam(value = "search", required = false) String search,
             Pageable pageable) {
         return campaignService.getCampaignProducts(
-                campaignId, participationStatus, search, pageable);
+                campaignId, participationStatus, evaluationResult,
+                decisionType, actionStatus, search, pageable);
     }
 }

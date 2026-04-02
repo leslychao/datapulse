@@ -261,8 +261,9 @@ public class PromoActionService {
           creds.ozonClientId(),
           creds.ozonApiKey());
     } catch (Exception e) {
-      log.error("Failed to load action context: actionId={}, error={}",
-          action.getId(), e.getMessage());
+      log.error("Failed to load action context: actionId={}, campaignId={}, offerId={}, error={}",
+          action.getId(), action.getCanonicalPromoCampaignId(),
+          action.getMarketplaceOfferId(), e.getMessage(), e);
       return null;
     }
   }
@@ -281,6 +282,8 @@ public class PromoActionService {
           "target_promo_price", action.getTargetPromoPrice() != null
               ? action.getTargetPromoPrice().toString() : "null"));
     } catch (Exception e) {
+      log.warn("Failed to serialize request summary: actionId={}, error={}",
+          action.getId(), e.getMessage(), e);
       return "{}";
     }
   }
@@ -472,11 +475,18 @@ public class PromoActionService {
     Long userId = null;
     try {
       userId = workspaceContext.getUserId();
-    } catch (Exception ignored) {
+    } catch (Exception e) {
+      log.warn("Failed to resolve userId for audit: actionId={}, error={}",
+          actionId, e.getMessage());
     }
-    eventPublisher.publishEvent(new AuditEvent(
-        workspaceId, "USER", userId, actionType,
-        ENTITY_TYPE, String.valueOf(actionId),
-        outcome, null, null, null));
+    try {
+      eventPublisher.publishEvent(new AuditEvent(
+          workspaceId, "USER", userId, actionType,
+          ENTITY_TYPE, String.valueOf(actionId),
+          outcome, null, null, null));
+    } catch (Exception e) {
+      log.error("Failed to publish audit event: actionType={}, actionId={}, error={}",
+          actionType, actionId, e.getMessage(), e);
+    }
   }
 }

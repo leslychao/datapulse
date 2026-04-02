@@ -146,35 +146,85 @@ public class PromoCampaignQueryRepository {
         });
     }
 
-    public Page<PromoCampaignProductResponse> getCampaignProducts(long campaignId,
-                                                                    String participationStatus,
-                                                                    String search,
-                                                                    Pageable pageable) {
+    public Page<PromoCampaignProductResponse> getCampaignProducts(
+            long campaignId,
+            Collection<String> participationStatuses,
+            Collection<String> evaluationResults,
+            Collection<String> decisionTypes,
+            Collection<String> actionStatuses,
+            String search,
+            Pageable pageable) {
+
         var where = new StringBuilder("""
                 SELECT cpp.id, cpp.marketplace_offer_id, cpp.participation_status,
                        cpp.required_price, cpp.current_price, cpp.max_promo_price,
                        cpp.max_discount_pct, cpp.stock_available, cpp.add_mode,
                        cpp.participation_decision_source,
-                       mo.name AS offer_name, mo.marketplace_sku
+                       mo.name AS offer_name, mo.marketplace_sku,
+                       ss.sku_code AS seller_sku_code,
+                       latest_eval.discount_pct,
+                       latest_eval.margin_at_promo_price,
+                       latest_eval.stock_days_of_cover,
+                       latest_eval.evaluation_result,
+                       latest_dec.decision_type,
+                       active_action.status AS action_status,
+                       active_action.id AS action_id
                 FROM canonical_promo_product cpp
                 JOIN marketplace_offer mo ON cpp.marketplace_offer_id = mo.id
+                LEFT JOIN seller_sku ss ON mo.seller_sku_id = ss.id
+                LEFT JOIN LATERAL (
+                    SELECT pe.discount_pct, pe.margin_at_promo_price,
+                           pe.stock_days_of_cover, pe.evaluation_result
+                    FROM promo_evaluation pe
+                    WHERE pe.canonical_promo_product_id = cpp.id
+                    ORDER BY pe.created_at DESC LIMIT 1
+                ) latest_eval ON true
+                LEFT JOIN LATERAL (
+                    SELECT pd.decision_type
+                    FROM promo_decision pd
+                    WHERE pd.canonical_promo_product_id = cpp.id
+                    ORDER BY pd.created_at DESC LIMIT 1
+                ) latest_dec ON true
+                LEFT JOIN LATERAL (
+                    SELECT pa.id, pa.status
+                    FROM promo_action pa
+                    JOIN promo_decision pd2 ON pa.promo_decision_id = pd2.id
+                    WHERE pd2.canonical_promo_product_id = cpp.id
+                      AND pa.canonical_promo_campaign_id = cpp.canonical_promo_campaign_id
+                      AND pa.status NOT IN ('SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED')
+                    ORDER BY pa.created_at DESC LIMIT 1
+                ) active_action ON true
                 WHERE cpp.canonical_promo_campaign_id = :campaignId
                 """);
 
         var params = new MapSqlParameterSource().addValue("campaignId", campaignId);
 
-        if (participationStatus != null) {
-            where.append(" AND cpp.participation_status = :participationStatus");
-            params.addValue("participationStatus", participationStatus);
+        if (participationStatuses != null && !participationStatuses.isEmpty()) {
+            where.append(" AND cpp.participation_status IN (:participationStatuses)");
+            params.addValue("participationStatuses", participationStatuses);
+        }
+        if (evaluationResults != null && !evaluationResults.isEmpty()) {
+            where.append(" AND latest_eval.evaluation_result IN (:evaluationResults)");
+            params.addValue("evaluationResults", evaluationResults);
+        }
+        if (decisionTypes != null && !decisionTypes.isEmpty()) {
+            where.append(" AND latest_dec.decision_type IN (:decisionTypes)");
+            params.addValue("decisionTypes", decisionTypes);
+        }
+        if (actionStatuses != null && !actionStatuses.isEmpty()) {
+            where.append(" AND active_action.status IN (:actionStatuses)");
+            params.addValue("actionStatuses", actionStatuses);
         }
         if (search != null) {
-            where.append(" AND (mo.name ILIKE :search OR mo.marketplace_sku ILIKE :search)");
+            where.append(
+                " AND (mo.name ILIKE :search OR mo.marketplace_sku ILIKE :search"
+                + " OR ss.sku_code ILIKE :search)");
             params.addValue("search", "%" + search + "%");
         }
 
         var countSql = "SELECT count(*) FROM (" + where + ") sub";
-        int total = Optional.ofNullable(jdbcTemplate.queryForObject(countSql, params, Integer.class))
-                .orElse(0);
+        int total = Optional.ofNullable(
+                jdbcTemplate.queryForObject(countSql, params, Integer.class)).orElse(0);
 
         where.append(" ORDER BY mo.name LIMIT :limit OFFSET :offset");
         params.addValue("limit", pageable.getPageSize());
@@ -193,7 +243,15 @@ public class PromoCampaignQueryRepository {
                         rs.getString("add_mode"),
                         rs.getString("participation_decision_source"),
                         rs.getString("offer_name"),
-                        rs.getString("marketplace_sku")
+                        rs.getString("marketplace_sku"),
+                        rs.getString("seller_sku_code"),
+                        rs.getBigDecimal("discount_pct"),
+                        rs.getBigDecimal("margin_at_promo_price"),
+                        rs.getBigDecimal("stock_days_of_cover"),
+                        rs.getString("evaluation_result"),
+                        rs.getString("decision_type"),
+                        rs.getString("action_status"),
+                        rs.getObject("action_id", Long.class)
                 ));
 
         return new PageImpl<>(content, pageable, total);

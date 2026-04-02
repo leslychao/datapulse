@@ -67,16 +67,21 @@ public class PromoDecisionService {
         return page.map(decisionMapper::toResponse);
     }
 
+    private static final java.util.Set<String> PARTICIPABLE_STATUSES =
+            java.util.Set.of("ELIGIBLE", "DECLINED", "AUTO_DECLINED");
+
     @Transactional
     public void manualParticipate(long promoProductId, BigDecimal targetPromoPrice,
                                    long workspaceId, long userId) {
         PromoProductInfo info = loadPromoProduct(promoProductId);
 
-        if (!"ELIGIBLE".equals(info.participationStatus())) {
+        if (!PARTICIPABLE_STATUSES.contains(info.participationStatus())) {
             throw BadRequestException.of(MessageCodes.PROMO_PRODUCT_NOT_ELIGIBLE);
         }
 
         ensureCampaignNotFrozen(info.campaignId());
+
+        cancelActiveActions(promoProductId, info.campaignId());
 
         PromoPolicyEntity policy = policyResolver.resolvePolicy(
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
@@ -110,10 +115,15 @@ public class PromoDecisionService {
         action.setFreezeAtSnapshot(info.freezeAt());
         actionRepository.save(action);
 
+        if (!"ELIGIBLE".equals(info.participationStatus())) {
+            updateParticipationStatus(
+                    promoProductId, info.participationStatus(), "ELIGIBLE", "MANUAL");
+        }
+
         publishAudit("promo.participate", workspaceId, userId,
                 "canonical_promo_product", promoProductId);
-        log.info("Manual participate: promoProductId={}, actionId={}, userId={}",
-                promoProductId, action.getId(), userId);
+        log.info("Manual participate: promoProductId={}, prevStatus={}, actionId={}, userId={}",
+                promoProductId, info.participationStatus(), action.getId(), userId);
     }
 
     @Transactional
@@ -193,6 +203,27 @@ public class PromoDecisionService {
                 "canonical_promo_product", promoProductId);
         log.info("Manual deactivate: promoProductId={}, actionId={}, userId={}",
                 promoProductId, action.getId(), userId);
+    }
+
+    private void cancelActiveActions(long promoProductId, long campaignId) {
+        var params = new MapSqlParameterSource()
+                .addValue("campaignId", campaignId)
+                .addValue("promoProductId", promoProductId);
+
+        int cancelled = jdbcTemplate.update("""
+                UPDATE promo_action pa
+                SET status = 'CANCELLED', cancel_reason = 'Superseded by manual action', updated_at = NOW()
+                FROM promo_decision pd
+                WHERE pa.promo_decision_id = pd.id
+                  AND pd.canonical_promo_product_id = :promoProductId
+                  AND pa.canonical_promo_campaign_id = :campaignId
+                  AND pa.status IN ('PENDING_APPROVAL', 'APPROVED')
+                """, params);
+
+        if (cancelled > 0) {
+            log.info("Cancelled {} active promo actions for promoProductId={}, campaignId={}",
+                    cancelled, promoProductId, campaignId);
+        }
     }
 
     private PromoProductInfo loadPromoProduct(long promoProductId) {

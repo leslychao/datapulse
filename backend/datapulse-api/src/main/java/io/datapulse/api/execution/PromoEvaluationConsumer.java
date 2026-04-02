@@ -41,8 +41,9 @@ public class PromoEvaluationConsumer {
           connectionId, workspaceId);
       promoEvaluationService.evaluate(connectionId, workspaceId);
     } catch (Exception e) {
-      log.error("Poison pill detected in promo.evaluation queue: messageId={}, error={}",
-          message.getMessageProperties().getMessageId(), e.getMessage(), e);
+      log.error("Poison pill detected in promo.evaluation queue: messageId={}, payload={}, error={}",
+          message.getMessageProperties().getMessageId(),
+          new String(message.getBody()), e.getMessage(), e);
     }
   }
 }

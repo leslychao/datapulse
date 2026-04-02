@@ -37,11 +37,16 @@ public class PromoCampaignService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PromoCampaignProductResponse> getCampaignProducts(long campaignId,
-                                                                    String participationStatus,
-                                                                    String search,
-                                                                    Pageable pageable) {
+    public Page<PromoCampaignProductResponse> getCampaignProducts(
+            long campaignId,
+            List<String> participationStatuses,
+            List<String> evaluationResults,
+            List<String> decisionTypes,
+            List<String> actionStatuses,
+            String search,
+            Pageable pageable) {
         return campaignQueryRepository.getCampaignProducts(
-                campaignId, participationStatus, search, pageable);
+                campaignId, participationStatuses, evaluationResults,
+                decisionTypes, actionStatuses, search, pageable);
     }
 }

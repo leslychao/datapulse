@@ -13,7 +13,15 @@ public record PromoCampaignProductResponse(
         Integer stockAvailable,
         String addMode,
         String participationDecisionSource,
-        String offerName,
-        String marketplaceSku
+        String productName,
+        String marketplaceSku,
+        String sellerSkuCode,
+        BigDecimal discountPct,
+        BigDecimal marginAtPromoPrice,
+        BigDecimal stockDaysOfCover,
+        String evaluationResult,
+        String decisionType,
+        String actionStatus,
+        Long actionId
 ) {
 }
