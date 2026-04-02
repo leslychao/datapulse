@@ -10,7 +10,7 @@ import { MinimalTopBarComponent } from '@shared/layout/minimal-top-bar.component
 import { CenteredContentComponent } from '@shared/layout/centered-content.component';
 import { StatusMessageComponent } from '@shared/layout/status-message.component';
 
-type InvitationState = 'loading' | 'success' | 'expired' | 'alreadyAccepted' | 'notFound' | 'invalidLink' | 'serverError';
+type InvitationState = 'loading' | 'success' | 'expired' | 'alreadyAccepted' | 'notFound' | 'invalidLink' | 'serverError' | 'networkError';
 
 @Component({
   selector: 'dp-invitation-accept',
@@ -89,6 +89,16 @@ type InvitationState = 'loading' | 'success' | 'expired' | 'alreadyAccepted' | '
               (actionClick)="onRetry()"
             />
           }
+
+          @case ('networkError') {
+            <dp-status-message
+              icon="error"
+              [title]="'invitation.network_error_title' | translate"
+              [description]="'invitation.network_error_description' | translate"
+              [actionLabel]="'actions.retry' | translate"
+              (actionClick)="onRetry()"
+            />
+          }
         }
       </dp-centered-content>
     </div>
@@ -151,15 +161,18 @@ export class InvitationAcceptComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         switch (err.status) {
+          case 0:
+            this.state.set('networkError');
+            break;
+          case 404:
+            this.state.set('notFound');
+            break;
           case 409:
             this.result = err.error as AcceptInvitationResponse;
             this.state.set('alreadyAccepted');
             break;
           case 410:
             this.state.set('expired');
-            break;
-          case 404:
-            this.state.set('notFound');
             break;
           default:
             this.state.set('serverError');

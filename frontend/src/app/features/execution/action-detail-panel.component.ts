@@ -36,13 +36,13 @@ const OUTCOME_COLOR: Record<string, StatusColor> = {
         <span class="dp-spinner inline-block h-6 w-6 rounded-full border-2 border-[var(--border-default)]"
               style="border-top-color: var(--accent-primary)"></span>
       </div>
-    } @else if (action(); as a) {
+    } @else if (action()) {
       <div class="flex flex-col gap-4 p-4">
         <!-- Header -->
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-sm font-semibold text-[var(--text-primary)]">{{ a.offerName }}</h3>
-            <span class="text-[11px] text-[var(--text-secondary)]">{{ a.sku }}</span>
+            <h3 class="text-sm font-semibold text-[var(--text-primary)]">{{ action()!.offerName }}</h3>
+            <span class="text-[11px] text-[var(--text-secondary)]">{{ action()!.sku }}</span>
           </div>
           <div class="flex items-center gap-2">
             <dp-status-badge [label]="statusLabel()" [color]="statusColor()" />
@@ -58,19 +58,19 @@ const OUTCOME_COLOR: Record<string, StatusColor> = {
         <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
           <div>
             <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.target_price' | translate }}</span>
-            <p class="font-mono font-medium text-[var(--text-primary)]">{{ formatPrice(a.targetPrice) }}</p>
+            <p class="font-mono font-medium text-[var(--text-primary)]">{{ formatPrice(action()!.targetPrice) }}</p>
           </div>
           <div>
             <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.current_price' | translate }}</span>
-            <p class="font-mono font-medium text-[var(--text-primary)]">{{ formatPrice(a.currentPriceAtCreation) }}</p>
+            <p class="font-mono font-medium text-[var(--text-primary)]">{{ formatPrice(action()!.currentPriceAtCreation) }}</p>
           </div>
           <div>
             <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.connection' | translate }}</span>
-            <p class="text-[var(--text-primary)]">{{ a.connectionName }}</p>
+            <p class="text-[var(--text-primary)]">{{ action()!.connectionName }}</p>
           </div>
           <div>
             <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.attempts' | translate }}</span>
-            <p class="font-mono text-[var(--text-primary)]">{{ a.attemptCount }}/{{ a.maxAttempts }}</p>
+            <p class="font-mono text-[var(--text-primary)]">{{ action()!.attemptCount }}/{{ action()!.maxAttempts }}</p>
           </div>
         </div>
 
@@ -147,12 +147,12 @@ const OUTCOME_COLOR: Record<string, StatusColor> = {
         }
 
         <!-- Attempts compact -->
-        @if (a.attempts.length > 0) {
+        @if (action()!.attempts.length > 0) {
           <div>
             <h4 class="mb-2 text-[11px] font-semibold uppercase text-[var(--text-tertiary)]">
               {{ 'execution.detail.attempts_title' | translate }}
             </h4>
-            @for (att of a.attempts; track att.attemptNumber) {
+            @for (att of action()!.attempts; track att.attemptNumber) {
               <div class="flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-[13px] hover:bg-[var(--bg-secondary)]"
                    (click)="toggleAttempt(att.attemptNumber)">
                 <span class="font-mono text-[var(--text-tertiary)]">#{{ att.attemptNumber }}</span>

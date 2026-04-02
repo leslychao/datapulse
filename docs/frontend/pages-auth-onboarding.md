@@ -61,63 +61,61 @@ User opens any route
 
 Datapulse делегирует аутентификацию Keycloak. Собственной формы логина нет — SPA перенаправляет пользователя на Keycloak-hosted страницу, стилизованную под Datapulse.
 
-### 1.2 Конфигурация Keycloak
+### 1.2 Архитектура аутентификации
+
+> **Фактическая реализация** (proxy-based auth): SPA не управляет токенами напрямую. Reverse proxy (oauth2-proxy / Keycloak Gatekeeper) обрабатывает OAuth2 flow, устанавливает httpOnly session cookie, и проксирует API-запросы с аутентификацией.
 
 | Параметр | Значение | Источник |
 |----------|----------|----------|
 | Realm | `datapulse` | tenancy-iam.md |
-| Client ID | `datapulse-spa` | public client, PKCE |
-| Flow | Authorization Code + PKCE | angular-oauth2-oidc |
-| Access token lifetime | 5 мин | Keycloak config |
-| Refresh token lifetime | 30 мин | Keycloak config |
+| Client ID | `datapulse-spa` | public client |
+| Flow | Authorization Code (через reverse proxy) | Keycloak config |
+| Session cookie | httpOnly, Secure, SameSite=Lax | Reverse proxy |
 | Session idle timeout | 30 мин | Keycloak config |
-| Response type | `code` | PKCE standard |
 
 ### 1.3 Login Flow
 
 ```
 ┌──────────────────┐         ┌──────────────────┐         ┌──────────────────┐
-│    User opens     │         │     Keycloak      │         │   Datapulse SPA   │
-│   datapulse.app   │         │   login page      │         │   /callback       │
+│    User opens     │         │   Reverse Proxy   │         │   Datapulse SPA   │
+│   datapulse.app   │         │  + Keycloak login  │         │   /callback       │
 │                  │────1───►│                  │         │                  │
 │                  │         │  (Datapulse brand) │────2───►│                  │
-│                  │         │                  │         │  Store tokens     │
-│                  │         │                  │         │  GET /api/users/me│
+│                  │         │  Sets session cookie│        │  GET /api/users/me│
 │                  │         │                  │         │  Route decision   │
 └──────────────────┘         └──────────────────┘         └──────────────────┘
 ```
 
-1. SPA проверяет наличие valid access token в memory. Если нет — `OAuthService.initCodeFlow()` перенаправляет на Keycloak login page.
-2. Пользователь вводит email + пароль (или SSO). Keycloak redirect → `/callback?code=...&state=...`.
-3. SPA обменивает `code` на token pair (access + refresh) через PKCE. Токены хранятся в memory (не localStorage — XSS protection). Refresh token — в memory для silent renew.
+1. SPA вызывает `GET /api/users/me`. Если 401 (нет session cookie) — `AuthService.login()` перенаправляет на login URL reverse proxy (`environment.oauth2.loginUrl`) с `?rd=<returnUrl>`.
+2. Reverse proxy перенаправляет на Keycloak. После ввода credentials Keycloak redirect → proxy → proxy устанавливает session cookie → redirect на `/callback`.
+3. `/callback` компонент вызывает `AuthService.checkSession()` (`GET /api/users/me`) → маршрутизация по логике Auth Guard.
 
-### 1.4 Token Storage
+### 1.4 Token / Session Storage
 
 | Что | Где | Почему |
 |-----|-----|--------|
-| Access token | In-memory (OAuthService) | XSS protection: не в localStorage/sessionStorage |
-| Refresh token | In-memory (OAuthService) | То же |
-| PKCE code verifier | SessionStorage (temporary) | Нужен между redirect'ами, удаляется после обмена |
-| Last workspace ID | localStorage | Persistence между сессиями (не чувствительные данные) |
+| Session (access/refresh tokens) | httpOnly cookie (reverse proxy) | XSS protection: JS не имеет доступа к токенам |
+| User profile | In-memory signal (`AuthService._user`) | Кешируется после `checkSession()`, доступен всем guards |
+| Last workspace ID | localStorage (`dp_last_workspace_id`) | Persistence между сессиями (не чувствительные данные) |
 
-### 1.5 Silent Token Refresh
+> **Примечание:** SPA не хранит и не управляет access/refresh tokens. Interceptor не добавляет `Authorization: Bearer` header — прокси автоматически добавляет аутентификацию к upstream-запросам.
+
+### 1.5 Session Renewal
 
 | Параметр | Значение |
 |----------|----------|
-| Механизм | `angular-oauth2-oidc` silent refresh (iframe-based или refresh_token grant) |
-| Когда обновлять | За 60 секунд до истечения access token (token lifetime 5 мин → refresh на 4-й минуте) |
-| Retry при ошибке refresh | 1 retry через 5 секунд |
-| Если refresh token истёк | Redirect на Keycloak login (полная ре-аутентификация) |
-| Если refresh прошёл | Новые токены подставляются бесшовно, пользователь продолжает работу |
+| Механизм | Reverse proxy автоматически обновляет session cookie используя Keycloak refresh token |
+| Прозрачность | SPA не участвует в refresh — cookie обновляется прокси |
+| Если refresh token истёк | Следующий API-вызов → 401 → SPA redirect на login |
 
-### 1.6 Token Expiry Mid-Session
+### 1.6 Session Expiry Mid-Session
 
 | Сценарий | Поведение |
 |----------|-----------|
-| Access token истёк, refresh token жив | Silent refresh в фоне. Запросы, попавшие на expired token (401), ставятся в очередь и повторяются после refresh |
-| Оба токена истекли | Persistent banner (жёлтый): «Сессия истекла. Необходимо войти заново.» + кнопка «Войти» → redirect на Keycloak |
-| 401 от API при valid token | Toast (error): «Ошибка авторизации. Попробуйте войти заново.» Не auto-redirect (может быть permission issue, не token issue) |
-| Session idle timeout (30 мин без активности) | Keycloak invalidates session. Следующий API-вызов → 401 → refresh fails → banner + redirect |
+| Session cookie expired, refresh token жив | Reverse proxy обновляет cookie прозрачно. SPA не видит прерывания |
+| Session полностью истекла | API-вызов → 401 → `authInterceptor` вызывает `AuthService.login()` → redirect на Keycloak login |
+| 401 от API при active session | Interceptor выполняет redirect на login. TODO: различать expired session vs permission issue |
+| Session idle timeout (30 мин без активности) | Keycloak invalidates session. Следующий API-вызов → 401 → redirect |
 
 ### 1.7 Keycloak Login Page Branding
 
@@ -150,9 +148,9 @@ Keycloak hosted-страницы стилизованы через custom Keyclo
 | Свойство | Значение |
 |----------|----------|
 | Триггер | User menu (Top Bar) → «Выйти» |
-| Действие | `OAuthService.logOut()` → redirect на Keycloak logout endpoint → redirect обратно на Datapulse (→ Keycloak login) |
+| Действие | `AuthService.logout()` → redirect на reverse proxy logout URL (`environment.oauth2.logoutUrl?rd=/`) → proxy invalidates session cookie → Keycloak logout → redirect обратно на `/` (→ login) |
 | Подтверждение | Нет (non-destructive action) |
-| Очистка | In-memory tokens cleared. localStorage `lastWorkspaceId` сохраняется |
+| Очистка | Session cookie removed by proxy. In-memory `_user` signal cleared (page reload). localStorage `dp_last_workspace_id` сохраняется |
 
 ---
 
@@ -940,10 +938,10 @@ User clicks invitation link in email
 
 | Аспект | Описание |
 |--------|----------|
-| Authorization header | `Bearer {access_token}` на все запросы к `/api/**` |
-| X-Workspace-Id header | Добавляется из `WorkspaceContextService.currentWorkspaceId` (signal). Не добавляется на workspace-independent endpoints (`/api/users/me`, `/api/tenants`, `/api/workspaces`, `/api/invitations/accept`) |
-| 401 handling | Queue failed request → attempt token refresh → replay queued requests with new token. If refresh fails → redirect Keycloak |
-| 403 handling | Toast: «У вас нет прав для этого действия.» Не redirect |
+| Authorization header | Не добавляется SPA — reverse proxy автоматически добавляет аутентификацию |
+| X-Workspace-Id header | Добавляется из `WorkspaceContextStore.currentWorkspaceId` (signal). Не добавляется на workspace-independent endpoints (`/api/users/me`, `/api/tenants`, `/api/workspaces`, `/api/invitations/accept`) |
+| 401 handling | `AuthService.login()` → redirect на Keycloak (через reverse proxy login URL) |
+| 403 handling | Toast: «У вас нет прав для этого действия.» (`auth.forbidden`). Не redirect |
 
 ---
 

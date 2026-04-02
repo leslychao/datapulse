@@ -1,14 +1,17 @@
 package io.datapulse.analytics.domain.materializer.mart;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.datapulse.analytics.domain.MaterializationPhase;
 import io.datapulse.analytics.persistence.MaterializationJdbc;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -46,14 +49,19 @@ class MartReturnsAnalysisMaterializerTest {
   class Full {
 
     @Test
-    @DisplayName("should truncate and execute insert with return rate calculation")
-    void should_truncateAndInsert_when_fullRun() {
+    @DisplayName("should use fullMaterializeWithSwap and execute insert with return rate")
+    void should_useSwapAndInsert_when_fullRun() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(50L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
-      verify(chTemplate).execute("TRUNCATE TABLE mart_returns_analysis");
+      verify(jdbc).fullMaterializeWithSwap(eq("mart_returns_analysis"), any());
     }
 
     @Test
@@ -61,14 +69,19 @@ class MartReturnsAnalysisMaterializerTest {
     void should_containReturnRate_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
@@ -81,14 +94,19 @@ class MartReturnsAnalysisMaterializerTest {
     void should_joinThreeFactTables_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
@@ -102,14 +120,19 @@ class MartReturnsAnalysisMaterializerTest {
     void should_extractTopReason_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
@@ -123,14 +146,19 @@ class MartReturnsAnalysisMaterializerTest {
   class Incremental {
 
     @Test
-    @DisplayName("should delegate to full materialization")
+    @DisplayName("should delegate to full materialization via fullMaterializeWithSwap")
     void should_delegateToFull_when_incrementalRun() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeIncremental(99L);
 
-      verify(chTemplate).execute("TRUNCATE TABLE mart_returns_analysis");
+      verify(jdbc).fullMaterializeWithSwap(eq("mart_returns_analysis"), any());
     }
   }
 }

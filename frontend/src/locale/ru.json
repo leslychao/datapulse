@@ -25,6 +25,7 @@
   "workspace_selector.members_few": "{count} участника",
   "workspace_selector.members_many": "{count} участников",
   "workspace_selector.suspended": "Приостановлено",
+  "workspace_selector.no_access": "У вас нет доступа к этому пространству.",
 
   "workspace_switcher.title": "Рабочие пространства",
   "workspace_switcher.manage": "Управление рабочими пространствами",
@@ -359,6 +360,7 @@
   "actions.archive": "Архивировать",
   "actions.unlock": "Разблокировать",
   "actions.next": "Далее",
+  "actions.back": "Назад",
   "actions.go_home": "На главную",
 
   "errors.server": "Ошибка сервера. Попробуйте ещё раз позже.",
@@ -505,7 +507,6 @@
   "execution.simulation.kpi.shadow_margin": "Shadow маржа",
   "execution.simulation.kpi.delta": "Дельта",
   "execution.simulation.kpi.affected": "Затронуто товаров",
-  "execution.simulation.margin_impact": "Влияние на маржу",
   "execution.simulation.reset_title": "Сбросить shadow state",
   "execution.simulation.reset_message": "Все данные симуляции будут удалены. Это действие необратимо.",
   "execution.simulation.reset_confirm_word": "СБРОСИТЬ",
@@ -880,6 +881,10 @@
   "queues.type.DECISION": "Ожидает решения",
   "queues.type.PROCESSING": "В обработке",
 
+  "queues.toolbar.columns": "Настроить колонки",
+  "queues.toolbar.density": "Плотность строк",
+  "queues.toolbar.export": "Экспорт",
+
   "queues.desc.pending_approval": "Ценовые действия, ожидающие вашего подтверждения",
   "queues.desc.execution_errors": "Действия, завершившиеся с ошибкой",
   "queues.desc.mismatches": "Обнаруженные расхождения между ожидаемыми и фактическими данными",
@@ -938,12 +943,6 @@
 
   "queues.page.load_error": "Не удалось загрузить очередь.",
   "queues.page.items_error": "Не удалось загрузить элементы.",
-  "queues.desc.pending_approval": "Ценовые действия, ожидающие вашего подтверждения",
-  "queues.desc.execution_errors": "Действия, завершившиеся с ошибкой",
-  "queues.desc.mismatches": "Обнаруженные расхождения между ожидаемыми и фактическими данными",
-  "queues.desc.no_cost": "Товары без заданной себестоимости — не участвуют в авторасчёте цен",
-  "queues.desc.critical_stock": "Товары с критически низким уровнем запасов",
-  "queues.desc.recent_decisions": "Ценовые решения за последние 24 часа",
   "queues.page.empty": "Всё обработано — нет задач в очереди.",
   "queues.page.empty_filters": "Нет элементов, соответствующих фильтрам.",
   "queues.page.rows_per_page": "Строк",
@@ -964,6 +963,11 @@
   "queues.toast.bulk_acknowledged": "Массовое подтверждение выполнено",
   "queues.toast.action_error": "Не удалось выполнить действие",
   "queues.toast.cas_conflict": "Действие уже обработано другим пользователем. Обновляем…",
+
+  "queues.context_menu.open_detail": "Открыть деталь",
+  "queues.context_menu.open_new_tab": "Открыть в новой вкладке",
+  "queues.context_menu.copy_sku": "Скопировать артикул",
+  "queues.context_menu.copied": "Скопировано",
 
   "queues.filters.status": "Статус",
   "queues.filters.status_all": "Все",
@@ -1028,6 +1032,9 @@
   "queues.inline_reject.label": "Причина отклонения:",
   "queues.inline_reject.placeholder": "Введите причину…",
 
+  "queues.inline_hold.label": "Причина приостановки:",
+  "queues.inline_hold.placeholder": "Укажите причину (необязательно)…",
+
   "queues.inline_cost.label": "Себестоимость:",
   "queues.inline_cost.placeholder": "0,00",
   "queues.inline_cost.save": "Сохранить",
@@ -1039,6 +1046,9 @@
   "queues.bulk.cancel": "Отменить выбранные",
   "queues.bulk.acknowledge": "Подтвердить выбранные",
   "queues.bulk.export": "Экспорт",
+  "queues.bulk.approve_title": "Одобрить {{count}} действий?",
+  "queues.bulk.approve_subtitle": "Будет одобрено {{count}} ценовых изменений:",
+  "queues.bulk.approve_confirm": "Одобрить {{count}} действий",
   "queues.bulk.reject_title": "Отклонить действия",
   "queues.bulk.reject_subtitle": "Укажите причину отклонения {{count}} действий:",
   "queues.bulk.reject_placeholder": "Причина обязательна",
@@ -2274,7 +2284,7 @@
   "analytics.inventory.chart.reserved": "В резерве",
 
   "analytics.inventory.stock_history.title": "История остатков",
-  "analytics.inventory.stock_history.select_product": "Введите ID товара для просмотра истории",
+  "analytics.inventory.stock_history.select_product": "Выберите товар",
   "analytics.inventory.stock_history.current_available": "Текущий остаток",
 
   "analytics.returns.kpi.return_rate": "Доля возвратов",
@@ -2595,6 +2605,7 @@
   "common.time.day_short": "дн",
   "common.yes": "Да",
   "common.no": "Нет",
+  "common.export_csv": "Экспорт CSV",
   "common.type_to_confirm": "Введите {{word}} для подтверждения:",
 
   "confirmation.type_to_confirm": "Введите {{value}} для подтверждения:",

@@ -33,9 +33,10 @@
     <label class="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
       {{ 'queues.filters.status' | translate }}
       <select
+        #statusSelect
         class="border-none bg-transparent text-xs text-[var(--text-primary)] outline-none"
         [value]="statusFilter()"
-        (change)="onStatusChange((($event.target) as HTMLSelectElement).value)"
+        (change)="onStatusChange(statusSelect.value)"
       >
         <option value="">{{ 'queues.filters.status_all' | translate }}</option>
         @for (st of statusOptions; track st) {
@@ -134,7 +135,7 @@
     }
 
     <!-- Search -->
-    <div class="ml-auto flex items-center">
+    <div class="ml-auto flex items-center gap-1.5">
       <input
         #searchInput
         type="search"
@@ -143,6 +144,33 @@
         [value]="searchQuery()"
         (input)="onSearchInput($event)"
       />
+
+      <!-- Toolbar action buttons -->
+      <button
+        type="button"
+        class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        [attr.aria-label]="'queues.toolbar.columns' | translate"
+        (click)="toggleColumnPanel()"
+      >
+        <lucide-icon [img]="columnsIcon" [size]="15" />
+      </button>
+
+      <button
+        type="button"
+        class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        [attr.aria-label]="'queues.toolbar.density' | translate"
+        (click)="toggleDensity()"
+      >
+        <lucide-icon [img]="compactMode() ? densityComfortIcon : densityCompactIcon" [size]="15" />
+      </button>
+
+      <button
+        type="button"
+        class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        [attr.aria-label]="'queues.toolbar.export' | translate"
+      >
+        <lucide-icon [img]="downloadIcon" [size]="15" />
+      </button>
     </div>
 
     <!-- Reset -->
@@ -193,10 +221,28 @@
         }
       </div>
     } @else {
-      @if (itemsQuery.isPending()) {
-        <div class="absolute left-0 right-0 top-0 z-10 h-0.5 overflow-hidden bg-[var(--bg-tertiary)]">
-          <div class="h-full w-1/3 animate-[shimmer_1s_infinite] bg-[var(--accent-primary)]"></div>
+      @if (itemsQuery.isPending() && !rowData().length) {
+        <!-- Full skeleton on first load -->
+        <div class="space-y-2 py-2">
+          <div class="flex gap-3">
+            @for (w of [40, 120, 200, 60, 100, 100, 80, 160, 120]; track w) {
+              <div class="h-8 animate-pulse rounded bg-[var(--bg-tertiary)]" [style.width.px]="w"></div>
+            }
+          </div>
+          @for (i of [1, 2, 3, 4, 5, 6, 7, 8]; track i) {
+            <div class="flex gap-3">
+              @for (w of [40, 120, 200, 60, 100, 100, 80, 160, 120]; track w) {
+                <div class="h-7 animate-pulse rounded bg-[var(--bg-secondary)]" [style.width.px]="w"></div>
+              }
+            </div>
+          }
         </div>
+      } @else {
+        @if (itemsQuery.isPending()) {
+          <div class="absolute left-0 right-0 top-0 z-10 h-0.5 overflow-hidden bg-[var(--bg-tertiary)]">
+            <div class="h-full w-1/3 animate-[shimmer_1s_infinite] bg-[var(--accent-primary)]"></div>
+          </div>
+        }
       }
       <div class="h-[min(560px,calc(100vh-260px))] w-full min-h-[320px]">
         <ag-grid-angular
@@ -214,7 +260,8 @@
           [loading]="itemsQuery.isPending()"
           (gridReady)="onGridReady($event)"
           (selectionChanged)="onSelectionChanged($event)"
-          (rowClicked)="onRowClicked($event.data)"
+          (rowClicked)="$event.data && onRowClicked($event.data)"
+          (cellContextMenu)="onCellContextMenu({ event: $event.event ?? null, data: $event.data })"
         />
       </div>
     }
@@ -229,11 +276,12 @@
         {{ 'queues.inline_reject.label' | translate }}
       </span>
       <input
+        #inlineRejectInput
         type="text"
         class="min-w-[240px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
         [placeholder]="'queues.inline_reject.placeholder' | translate"
         [value]="inlineRejectReason()"
-        (input)="inlineRejectReason.set((($event.target) as HTMLInputElement).value)"
+        (input)="inlineRejectReason.set(inlineRejectInput.value)"
         (keyup.enter)="confirmInlineReject()"
         (keyup.escape)="cancelInlineReject()"
       />
@@ -254,6 +302,41 @@
     </div>
   }
 
+  <!-- Inline hold form -->
+  @if (inlineHoldItemId()) {
+    <div
+      class="flex flex-wrap items-center gap-2 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+    >
+      <span class="text-sm text-[var(--text-secondary)]">
+        {{ 'queues.inline_hold.label' | translate }}
+      </span>
+      <input
+        #inlineHoldInput
+        type="text"
+        class="min-w-[240px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
+        [placeholder]="'queues.inline_hold.placeholder' | translate"
+        [value]="inlineHoldReason()"
+        (input)="inlineHoldReason.set(inlineHoldInput.value)"
+        (keyup.enter)="confirmInlineHold()"
+        (keyup.escape)="cancelInlineHold()"
+      />
+      <button
+        type="button"
+        class="rounded-[var(--radius-md)] bg-[var(--status-warning)] px-3 py-1.5 text-sm font-medium text-white"
+        (click)="confirmInlineHold()"
+      >
+        {{ 'queues.actions.hold' | translate }}
+      </button>
+      <button
+        type="button"
+        class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+        (click)="cancelInlineHold()"
+      >
+        {{ 'actions.cancel' | translate }}
+      </button>
+    </div>
+  }
+
   <!-- Inline cost editor (NO_COST queue) -->
   @if (inlineCostItemId()) {
     <div
@@ -263,13 +346,14 @@
         {{ 'queues.inline_cost.label' | translate }}
       </span>
       <input
+        #inlineCostInput
         type="number"
         step="0.01"
         min="0"
         class="w-36 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 font-mono text-sm text-[var(--text-primary)]"
         [placeholder]="'queues.inline_cost.placeholder' | translate"
         [value]="inlineCostValue()"
-        (input)="inlineCostValue.set((($event.target) as HTMLInputElement).value)"
+        (input)="inlineCostValue.set(inlineCostInput.value)"
         (keyup.enter)="confirmInlineCost()"
         (keyup.escape)="cancelInlineCost()"
       />
@@ -390,9 +474,10 @@
         <div class="flex items-center gap-1.5">
           <span>{{ 'queues.page.rows_per_page' | translate }}</span>
           <select
+            #pageSizeSelect
             class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1"
             [value]="pageSize()"
-            (change)="setPageSize(+(($event.target) as HTMLSelectElement).value)"
+            (change)="setPageSize(+pageSizeSelect.value)"
           >
             @for (n of pageSizeOptions; track n) {
               <option [value]="n">{{ n }}</option>
@@ -430,6 +515,118 @@
   }
 </div>
 
+<!-- Context menu -->
+@if (contextMenu(); as ctx) {
+  <div class="fixed inset-0 z-[9000]" (click)="closeContextMenu()" (contextmenu)="closeContextMenu()"></div>
+  <div
+    class="fixed z-[9001] min-w-[180px] rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] py-1 shadow-[var(--shadow-md)]"
+    [style.left.px]="ctx.x"
+    [style.top.px]="ctx.y"
+  >
+    <button
+      type="button"
+      class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+      (click)="ctxOpenDetail()"
+    >
+      {{ 'queues.context_menu.open_detail' | translate }}
+    </button>
+    <button
+      type="button"
+      class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+      (click)="ctxOpenNewTab()"
+    >
+      {{ 'queues.context_menu.open_new_tab' | translate }}
+    </button>
+    <button
+      type="button"
+      class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+      (click)="ctxCopySku()"
+    >
+      {{ 'queues.context_menu.copy_sku' | translate }}
+    </button>
+    <div class="my-1 border-t border-[var(--border-subtle)]"></div>
+    @if (queueContext() === 'PENDING_APPROVAL' && rbac.canApproveActions()) {
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+        (click)="ctxApprove()"
+      >
+        {{ 'queues.actions.approve' | translate }}
+      </button>
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--status-error)] hover:bg-[var(--bg-tertiary)]"
+        (click)="ctxReject()"
+      >
+        {{ 'queues.actions.reject' | translate }}
+      </button>
+    }
+    @if (queueContext() === 'EXECUTION_ERRORS' && rbac.canApproveActions()) {
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+        (click)="ctxRetry()"
+      >
+        {{ 'queues.actions.retry' | translate }}
+      </button>
+    }
+  </div>
+}
+
+<!-- Bulk approve modal -->
+@if (bulkApproveOpen()) {
+  <div class="fixed inset-0 z-[8500] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="cancelBulkApprove()"></div>
+    <div
+      class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-5 shadow-[var(--shadow-md)]"
+    >
+      <h3 class="text-base font-semibold text-[var(--text-primary)]">
+        {{ 'queues.bulk.approve_title' | translate: { count: selectedPriceActionIds().length } }}
+      </h3>
+      <p class="mt-1 text-sm text-[var(--text-secondary)]">
+        {{ 'queues.bulk.approve_subtitle' | translate: { count: selectedPriceActionIds().length } }}
+      </p>
+      <ul class="mt-3 max-h-48 space-y-1 overflow-y-auto text-sm">
+        @for (item of bulkApproveItems(); track item.sku) {
+          <li class="flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] px-3 py-1.5">
+            <span class="font-mono text-xs text-[var(--text-secondary)]">{{ item.sku }}</span>
+            @if (item.current !== null && item.target !== null) {
+              <span class="ml-auto font-mono text-xs">
+                {{ item.current | number:'1.0-0' }} → {{ item.target | number:'1.0-0' }}
+              </span>
+              @if (item.delta !== null) {
+                <span
+                  class="font-mono text-xs"
+                  [style.color]="item.delta! > 0 ? 'var(--finance-positive)' : item.delta! < 0 ? 'var(--finance-negative)' : 'var(--finance-zero)'"
+                >
+                  ({{ item.delta! > 0 ? '+' : '' }}{{ item.delta | number:'1.1-1' }}%)
+                </span>
+              }
+            }
+          </li>
+        }
+      </ul>
+      <div class="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+          (click)="cancelBulkApprove()"
+        >
+          {{ 'actions.cancel' | translate }}
+        </button>
+        <button
+          type="button"
+          class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)]"
+          (click)="confirmBulkApprove()"
+          [disabled]="bulkApproveMutation.isPending()"
+        >
+          {{ 'queues.bulk.approve_confirm' | translate: { count: selectedPriceActionIds().length } }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
 <!-- Bulk reject modal -->
 @if (bulkRejectOpen()) {
   <div class="fixed inset-0 z-[8500] flex items-center justify-center p-4">
@@ -444,10 +641,11 @@
         {{ 'queues.bulk.reject_subtitle' | translate: { count: selectedPriceActionIds().length } }}
       </p>
       <textarea
+        #bulkRejectTextarea
         rows="3"
         class="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]"
         [value]="bulkRejectReason()"
-        (input)="bulkRejectReason.set((($event.target) as HTMLTextAreaElement).value)"
+        (input)="bulkRejectReason.set(bulkRejectTextarea.value)"
         [placeholder]="'queues.bulk.reject_placeholder' | translate"
       ></textarea>
       <div class="mt-4 flex justify-end gap-2">

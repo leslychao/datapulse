@@ -1,17 +1,17 @@
 package io.datapulse.analytics.domain.materializer.dim;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import io.datapulse.analytics.config.AnalyticsProperties;
 import io.datapulse.analytics.domain.MaterializationPhase;
@@ -71,17 +71,21 @@ class DimProductMaterializerTest {
   class Full {
 
     @Test
-    @DisplayName("should truncate CH table before materialization")
-    void should_truncateFirst_when_fullRun() {
-      when(jdbc.ch()).thenReturn(chTemplate);
+    @DisplayName("should use fullMaterializeWithSwap for dim_product")
+    void should_useSwap_when_fullRun() {
       when(jdbc.pg()).thenReturn(pgTemplate);
       when(properties.batchSize()).thenReturn(5000);
       when(pgTemplate.queryForList(anyString(), any(Map.class)))
           .thenReturn(List.of());
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
-      verify(chTemplate).execute("TRUNCATE TABLE dim_product");
+      verify(jdbc).fullMaterializeWithSwap(eq("dim_product"), any());
     }
 
     @Test
@@ -96,6 +100,11 @@ class DimProductMaterializerTest {
       when(pgTemplate.queryForList(anyString(), any(Map.class)))
           .thenReturn(List.of(row))
           .thenReturn(List.of());
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 

@@ -36,13 +36,16 @@ import { formatMoney } from '@shared/utils/format.utils';
             <option [value]="conn.id">{{ conn.name }}</option>
           }
         </select>
-        <input
-          type="number"
-          class="w-40 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
-          [placeholder]="'analytics.inventory.filter.product_id' | translate"
+        <select
+          class="w-64 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
           [value]="productId() ?? ''"
-          (input)="onProductIdInput($event)"
-        />
+          (change)="onProductSelect($event)"
+        >
+          <option value="">{{ 'analytics.inventory.stock_history.select_product' | translate }}</option>
+          @for (p of productsQuery.data() ?? []; track p.sellerSkuId) {
+            <option [value]="p.sellerSkuId">{{ p.skuCode }} — {{ p.productName }}</option>
+          }
+        </select>
 
         <input
           type="date"
@@ -143,6 +146,20 @@ export class StockHistoryPageComponent {
   readonly connectionsQuery = injectQuery(() => ({
     queryKey: ['connections'],
     queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+  }));
+
+  readonly productsQuery = injectQuery(() => ({
+    queryKey: ['analytics', 'stock-history-products', this.wsStore.currentWorkspaceId()],
+    queryFn: () =>
+      lastValueFrom(
+        this.analyticsApi.listInventoryByProduct(
+          this.wsStore.currentWorkspaceId()!,
+          {},
+          0,
+          200,
+        ),
+      ).then((page) => page.content),
+    enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
   private readonly historyFilter = computed<AnalyticsFilter>(() => {
@@ -254,9 +271,9 @@ export class StockHistoryPageComponent {
     this.connectionId.set(Number((event.target as HTMLSelectElement).value));
   }
 
-  onProductIdInput(event: Event): void {
-    const raw = (event.target as HTMLInputElement).value;
-    this.productId.set(raw ? Number(raw) : null);
+  onProductSelect(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.productId.set(value ? Number(value) : null);
   }
 
   onDateFromChange(event: Event): void {

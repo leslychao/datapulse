@@ -26,7 +26,7 @@ import { formatMoney } from '@shared/utils/format.utils';
   selector: 'dp-inventory-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DataGridComponent],
+  imports: [TranslatePipe, DataGridComponent, LucideAngularModule],
   template: `
     <div class="flex h-full">
       <!-- Main content -->
@@ -59,6 +59,13 @@ import { formatMoney } from '@shared/utils/format.utils';
             [value]="searchTerm()"
             (input)="onSearchInput($event)"
           />
+          <button
+            (click)="exportCsv()"
+            class="ml-auto flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+          >
+            <lucide-icon [img]="downloadIcon" size="14" />
+            <span>{{ 'common.export_csv' | translate }}</span>
+          </button>
         </div>
 
         <div class="flex-1 py-2">
@@ -70,6 +77,7 @@ import { formatMoney } from '@shared/utils/format.utils';
             [pageSize]="25"
             height="calc(100vh - 320px)"
             (rowClicked)="selectProduct($event)"
+            (gridReady)="onGridReady($event)"
           />
 
           @if (gridRows().length > 0) {
@@ -215,6 +223,9 @@ export class InventoryByProductPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
+  readonly downloadIcon = Download;
+  private gridApi: GridApi | null = null;
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.selectedProduct.set(null);
@@ -321,6 +332,14 @@ export class InventoryByProductPageComponent {
       cellClass: 'font-mono',
     },
   ]);
+
+  onGridReady(api: GridApi): void {
+    this.gridApi = api;
+  }
+
+  exportCsv(): void {
+    this.gridApi?.exportDataAsCsv({ fileName: 'inventory-by-product.csv' });
+  }
 
   onConnectionChange(event: Event): void {
     this.connectionId.set(Number((event.target as HTMLSelectElement).value));

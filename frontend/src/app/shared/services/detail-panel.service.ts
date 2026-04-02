@@ -6,7 +6,9 @@ export type DetailPanelEntityType =
   | 'alert'
   | 'policy'
   | 'pricing-decision'
-  | 'action';
+  | 'action'
+  | 'promo-evaluation'
+  | 'promo-decision';
 
 const MIN_WIDTH = 320;
 const MAX_VIEWPORT_RATIO = 0.5;

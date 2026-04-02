@@ -109,7 +109,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
 
             @if (selectedMarketplace() === 'OZON') {
               <div class="flex flex-col gap-1.5">
-                <label class="text-sm font-medium text-[var(--text-primary)]">Client ID</label>
+                <label class="text-sm font-medium text-[var(--text-primary)]">{{ 'onboarding.connection.client_id_label' | translate }}</label>
                 <input
                   formControlName="clientId"
                   type="text"
@@ -120,7 +120,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-sm font-medium text-[var(--text-primary)]">API Key</label>
+                <label class="text-sm font-medium text-[var(--text-primary)]">{{ 'onboarding.connection.api_key_label' | translate }}</label>
                 <input
                   formControlName="apiKey"
                   [type]="showToken() ? 'text' : 'password'"

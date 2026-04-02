@@ -21,7 +21,7 @@ import { ActionApiService } from '@core/api/action-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { WebSocketService } from '@core/websocket/websocket.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
-import { ReconcileRequest } from '@core/models';
+import { ActionDetail, ReconcileRequest } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { BreadcrumbService } from '@shared/services/breadcrumb.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -73,7 +73,7 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
   readonly actionId = input.required<string>();
 
   private readonly actionApi = inject(ActionApiService);
-  private readonly wsStore = inject(WorkspaceContextStore);
+  protected readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
@@ -117,8 +117,6 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
   readonly reconcileConfirmText = signal('');
 
   private readonly numericId = computed(() => Number(this.actionId()));
-  private readonly isTerminal = computed(() => TERMINAL_STATES.has(this.status()));
-
   readonly actionQuery = injectQuery(() => ({
     queryKey: ['action', this.numericId()],
     queryFn: () =>
@@ -127,11 +125,14 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
       ),
     enabled: !!this.wsStore.currentWorkspaceId() && !isNaN(this.numericId()),
     staleTime: 10_000,
-    refetchInterval: this.isTerminal() ? false : 15_000,
+    refetchInterval: (query: { state: { data?: ActionDetail } }) => {
+      const data = query.state.data;
+      return data && TERMINAL_STATES.has(data.status) ? false : 15_000;
+    },
   }));
 
-  readonly action = computed(() => this.actionQuery.data() ?? null);
-  readonly status = computed(() => this.action()?.status ?? '');
+  readonly action = computed<ActionDetail | null>(() => this.actionQuery.data() ?? null);
+  readonly status = computed<string>(() => this.action()?.status ?? '');
 
   readonly statusLabel = computed(() =>
     this.translate.instant(`grid.action_status.${this.status()}`) || this.status(),

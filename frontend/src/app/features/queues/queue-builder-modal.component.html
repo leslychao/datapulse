@@ -81,13 +81,13 @@
                     formControlName="op"
                     class="w-20 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
                   >
-                    @for (o of operatorsFor(rule.controls.field.value); track o) {
+                    @for (o of operatorsFor('' + rule.controls.field.value); track o) {
                       <option [value]="o">{{ 'queues.builder.op.' + o | translate }}</option>
                     }
                   </select>
 
                   <!-- Value -->
-                  @if (optionsFor(rule.controls.field.value); as opts) {
+                  @if (optionsFor('' + rule.controls.field.value); as opts) {
                     <select
                       formControlName="value"
                       class="min-w-[120px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"

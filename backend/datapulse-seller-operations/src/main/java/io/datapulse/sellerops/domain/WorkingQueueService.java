@@ -76,9 +76,9 @@ public class WorkingQueueService {
     return toItemResponse(assignment, null);
   }
 
-  @Transactional
-    private static final int MAX_CUSTOM_QUEUES_PER_WORKSPACE = 20;
+  private static final int MAX_CUSTOM_QUEUES_PER_WORKSPACE = 20;
 
+  @Transactional
   public QueueSummaryResponse createQueue(long workspaceId, CreateQueueRequest request) {
     if (definitionRepository.existsByWorkspaceIdAndName(workspaceId, request.name())) {
       throw BadRequestException.of(

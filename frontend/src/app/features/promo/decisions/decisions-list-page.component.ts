@@ -168,7 +168,7 @@ export class DecisionsListPageComponent {
     {
       key: 'decidedBy',
       label: 'promo.decisions.filter.decided_by',
-      type: 'single-select',
+      type: 'select',
       options: [
         { value: 'all', label: 'promo.decisions.filter.decided_by_all' },
         { value: 'auto', label: 'promo.decisions.filter.decided_by_auto' },
@@ -331,11 +331,7 @@ export class DecisionsListPageComponent {
   }
 
   onRowClicked(row: any): void {
-    this.detailPanel.open({
-      type: 'promo-decision',
-      title: row.productName,
-      data: row,
-    });
+    this.detailPanel.open('promo-decision', row.id);
   }
 
   private badgeCell(

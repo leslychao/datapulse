@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.datapulse.integration.config.IntegrationProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -24,7 +25,8 @@ public class OzonPromoWriteAdapter {
   private static final String DEACTIVATE_PATH = "/v1/actions/products/deactivate";
   private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
-  private final WebClient ozonSellerWebClient;
+  private final WebClient.Builder webClientBuilder;
+  private final IntegrationProperties integrationProperties;
   private final ObjectMapper objectMapper;
 
   public PromoWriteResult activateProducts(String clientId, String apiKey,
@@ -60,9 +62,11 @@ public class OzonPromoWriteAdapter {
 
   private PromoWriteResult executeWrite(String clientId, String apiKey,
                                          String path, ObjectNode body) {
+    String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
     try {
-      String responseBody = ozonSellerWebClient.post()
-          .uri(path)
+      String responseBody = webClientBuilder.build()
+          .post()
+          .uri(baseUrl + path)
           .header("Client-Id", clientId)
           .header("Api-Key", apiKey)
           .contentType(MediaType.APPLICATION_JSON)

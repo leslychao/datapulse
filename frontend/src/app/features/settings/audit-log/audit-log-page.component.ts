@@ -270,7 +270,8 @@ export class AuditLogPageComponent {
       label: 'settings.audit_log.filter.period',
       type: 'date-range',
     },
-  ];
+    ];
+  });
 
   protected readonly hasActiveFilters = computed(() => {
     const vals = this.filterValues();

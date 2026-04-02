@@ -810,8 +810,11 @@ export class MismatchDashboardPageComponent implements OnInit {
   private applyPulseAnimation(evt: MismatchWsEvent): void {
     if (!this.gridApi) return;
     const rowNode = this.gridApi.getRowNode(String(evt.mismatchId));
-    if (!rowNode?.rowElement) return;
-    const el = rowNode.rowElement as HTMLElement;
+    if (!rowNode) return;
+    const el = document.querySelector<HTMLElement>(
+      `[row-id="${rowNode.id}"]`,
+    );
+    if (!el) return;
     const cssClass = evt.eventType === 'MISMATCH_DETECTED'
       ? 'dp-pulse-new'
       : evt.eventType === 'MISMATCH_RESOLVED'

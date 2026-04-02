@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { AuthService } from '@core/auth/auth.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -20,6 +21,7 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
     StepTenantComponent,
     StepWorkspaceComponent,
     StepConnectionComponent,
+    TranslatePipe,
   ],
   template: `
     <div class="flex h-screen flex-col bg-[var(--bg-secondary)]">
@@ -50,21 +52,18 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
               <div class="flex items-center gap-2">
                 <!-- Circle -->
                 @if (currentStep() > step.num) {
-                  <!-- Completed -->
-                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-primary)]">
-                    <svg class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <div class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-primary)]">
+                    <svg class="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                 } @else if (currentStep() === step.num) {
-                  <!-- Current -->
-                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-primary)]">
-                    <span class="text-sm font-semibold text-white">{{ step.num }}</span>
+                  <div class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-primary)]">
+                    <span class="text-xs font-semibold text-white">{{ step.num }}</span>
                   </div>
                 } @else {
-                  <!-- Upcoming -->
-                  <div class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--border-default)]">
-                    <span class="text-sm text-[var(--text-secondary)]">{{ step.num }}</span>
+                  <div class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--border-default)]">
+                    <span class="text-xs text-[var(--text-secondary)]">{{ step.num }}</span>
                   </div>
                 }
 
@@ -74,7 +73,7 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
                   [class]="currentStep() === step.num
                     ? 'font-semibold text-[var(--text-primary)]'
                     : 'text-[var(--text-secondary)]'"
-                >{{ step.label }}</span>
+                >{{ step.labelKey | translate }}</span>
               </div>
             }
           </div>
@@ -114,7 +113,7 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
                   (click)="onBack()"
                   class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
                 >
-                  Назад
+                  {{ 'actions.back' | translate }}
                 </button>
               }
             </div>
@@ -125,7 +124,7 @@ const LAST_WORKSPACE_KEY = 'dp_last_workspace_id';
                   (click)="onSkipConnection()"
                   class="cursor-pointer px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
                 >
-                  Настроить позже
+                  {{ 'onboarding.skip' | translate }}
                 </button>
               }
             </div>
@@ -147,9 +146,9 @@ export class OnboardingWizardComponent {
   protected readonly workspaceName = signal('');
 
   protected readonly steps = [
-    { num: 1, label: 'Организация' },
-    { num: 2, label: 'Пространство' },
-    { num: 3, label: 'Подключение' },
+    { num: 1, labelKey: 'onboarding.step_tenant' },
+    { num: 2, labelKey: 'onboarding.step_workspace' },
+    { num: 3, labelKey: 'onboarding.step_connection' },
   ];
 
   protected readonly activityBarIcons = [1, 2, 3, 4, 5];

@@ -182,14 +182,14 @@ export class SimulationPageComponent {
     if (!sim) return {};
     const breakdown = sim.perConnectionBreakdown;
     return {
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'value' },
+      tooltip: { trigger: 'axis' as const },
+      xAxis: { type: 'value' as const },
       yAxis: {
-        type: 'category',
+        type: 'category' as const,
         data: breakdown.map(b => b.connectionName),
       },
       series: [{
-        type: 'bar',
+        type: 'bar' as const,
         data: breakdown.map(b => ({
           value: b.marginImpact,
           itemStyle: {
@@ -200,7 +200,7 @@ export class SimulationPageComponent {
         })),
         label: {
           show: true,
-          position: 'right',
+          position: 'right' as const,
           formatter: (p: any) => {
             const v = p.value;
             return `${v >= 0 ? '+' : ''}${v.toLocaleString('ru-RU')}₽`;
@@ -216,14 +216,14 @@ export class SimulationPageComponent {
     if (!sim) return {};
     const dist = sim.deltaDistribution;
     return {
-      tooltip: { trigger: 'axis' },
+      tooltip: { trigger: 'axis' as const },
       xAxis: {
-        type: 'category',
+        type: 'category' as const,
         data: dist.map(d => d.bucket),
       },
-      yAxis: { type: 'value' },
+      yAxis: { type: 'value' as const },
       series: [{
-        type: 'bar',
+        type: 'bar' as const,
         data: dist.map(d => d.count),
         itemStyle: { color: 'var(--accent-primary)', borderRadius: [4, 4, 0, 0] },
       }],

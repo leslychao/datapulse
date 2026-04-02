@@ -9,7 +9,8 @@ import {
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { ColDef } from 'ag-grid-community';
+import { ColDef, GridApi } from 'ag-grid-community';
+import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReturnsByProduct } from '@core/models';
@@ -25,7 +26,7 @@ import {
   selector: 'dp-returns-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DataGridComponent],
+  imports: [TranslatePipe, DataGridComponent, LucideAngularModule],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
@@ -47,6 +48,13 @@ import {
                  px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none focus:border-[var(--accent-primary)]"
         />
+        <button
+          (click)="exportCsv()"
+          class="ml-auto flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+        >
+          <lucide-icon [img]="downloadIcon" size="14" />
+          <span>{{ 'common.export_csv' | translate }}</span>
+        </button>
       </div>
 
       <div class="flex-1">
@@ -58,6 +66,7 @@ import {
           [pageSize]="50"
           height="calc(100vh - 320px)"
           (rowClicked)="onRowClicked($event)"
+          (gridReady)="onGridReady($event)"
         />
       </div>
 
@@ -186,6 +195,9 @@ export class ReturnsByProductPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
+  readonly downloadIcon = Download;
+  private gridApi: GridApi | null = null;
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.selectedProduct.set(null);
@@ -286,6 +298,14 @@ export class ReturnsByProductPageComponent {
       headerName: this.t.instant('analytics.returns.col.reason'),
     },
   ]);
+
+  onGridReady(api: GridApi): void {
+    this.gridApi = api;
+  }
+
+  exportCsv(): void {
+    this.gridApi?.exportDataAsCsv({ fileName: 'returns-by-product.csv' });
+  }
 
   onPeriodChange(event: Event): void {
     this.period.set((event.target as HTMLInputElement).value);

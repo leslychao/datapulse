@@ -22,8 +22,8 @@ import {
   injectQuery,
   QueryClient,
 } from '@tanstack/angular-query-experimental';
-import { LucideAngularModule, CheckCircle2 } from 'lucide-angular';
-import { lastValueFrom, Subject } from 'rxjs';
+import { LucideAngularModule, CheckCircle2, Columns3, Download, AlignJustify, AlignCenter } from 'lucide-angular';
+import { lastValueFrom, Subject, Subscription } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
 
 import { ActionApiService } from '@core/api/action-api.service';
@@ -41,6 +41,7 @@ import { QueueStore } from '@shared/stores/queue.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ShortcutService } from '@shared/services/shortcut.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { WebSocketService } from '@core/websocket/websocket.service';
 import {
   formatMoney,
   formatPercent,
@@ -92,10 +93,17 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   private readonly queryClient = inject(QueryClient);
   private readonly detailPanel = inject(DetailPanelService);
   private readonly shortcuts = inject(ShortcutService);
+  private readonly ws = inject(WebSocketService);
   protected readonly rbac = inject(RbacService);
 
   readonly queueId = input.required<string>();
   readonly checkIcon = CheckCircle2;
+  readonly columnsIcon = Columns3;
+  readonly downloadIcon = Download;
+  readonly densityCompactIcon = AlignJustify;
+  readonly densityComfortIcon = AlignCenter;
+
+  readonly compactMode = signal(true);
 
   readonly statusOptions: QueueItemStatus[] = ['PENDING', 'IN_PROGRESS', 'DONE', 'DISMISSED'];
   readonly pageSizeOptions = [20, 50, 100] as const;
@@ -121,12 +129,22 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   readonly pageInputValue = signal('');
 
   readonly selectedRows = signal<QueueItem[]>([]);
+  readonly bulkApproveOpen = signal(false);
   readonly bulkRejectOpen = signal(false);
   readonly bulkRejectReason = signal('');
   readonly inlineRejectItemId = signal<number | null>(null);
   readonly inlineRejectReason = signal('');
+  readonly pendingActionIds = signal<Set<number>>(new Set());
+  readonly inlineHoldItemId = signal<number | null>(null);
+  readonly inlineHoldReason = signal('');
   readonly inlineCostItemId = signal<number | null>(null);
   readonly inlineCostValue = signal('');
+
+  readonly contextMenu = signal<{
+    x: number;
+    y: number;
+    item: QueueItem;
+  } | null>(null);
 
   readonly queueIdNum = computed(() => Number(this.queueId()));
   readonly workspaceId = computed(() => this.wsStore.currentWorkspaceId());
@@ -190,11 +208,15 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
       const ws = this.workspaceId()!;
       return lastValueFrom(this.actionApi.approveAction(ws, actionId));
     },
-    onSuccess: () => {
+    onSuccess: (_data: void, actionId: number) => {
+      this.clearPending(actionId);
       this.afterMutation();
       this.toast.success(this.translate.instant('queues.toast.approved'));
     },
-    onError: (err: unknown) => this.handleActionError(err),
+    onError: (err: unknown, actionId: number) => {
+      this.clearPending(actionId);
+      this.handleActionError(err);
+    },
   }));
 
   readonly rejectMutation = injectMutation(() => ({
@@ -363,6 +385,17 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     () => this.queueContext() === 'PENDING_APPROVAL' && this.selectedPriceActionIds().length > 0,
   );
 
+  readonly bulkApproveItems = computed(() =>
+    this.selectedRows()
+      .filter((r) => r.entityType === 'price_action')
+      .map((r) => ({
+        sku: this.summary(r, 'skuCode') ?? '—',
+        current: this.summaryNum(r, 'currentPrice'),
+        target: this.summaryNum(r, 'targetPrice'),
+        delta: this.summaryNum(r, 'priceChangePct'),
+      })),
+  );
+
   readonly showRetryBulk = computed(
     () => this.queueContext() === 'EXECUTION_ERRORS' && this.selectedPriceActionIds().length > 0,
   );
@@ -400,6 +433,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   });
 
   private gridApi: GridApi<QueueItem> | null = null;
+  private queueWsSub: Subscription | null = null;
 
   constructor() {
     effect(() => {
@@ -407,6 +441,20 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
       if (Number.isFinite(id) && id > 0) {
         this.queueStore.selectQueue(id);
         this.detailPanel.close();
+      }
+    });
+
+    effect(() => {
+      const wsId = this.workspaceId();
+      const qId = this.queueIdNum();
+      this.queueWsSub?.unsubscribe();
+      this.queueWsSub = null;
+      if (wsId && qId > 0) {
+        this.queueWsSub = this.ws.subscribeToQueueItems(wsId, qId, (msg) => {
+          if (msg.type === 'ITEM_ADDED' || msg.type === 'ITEM_RESOLVED' || msg.type === 'ITEM_UPDATED') {
+            this.afterMutation();
+          }
+        });
       }
     });
   }
@@ -425,6 +473,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.queueWsSub?.unsubscribe();
   }
 
   // --- Grid events ---
@@ -533,6 +582,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
 
   approveOne(item: QueueItem): void {
     if (item.entityType === 'price_action') {
+      this.markPending(item.entityId);
       this.approveMutation.mutate(item.entityId);
     }
   }
@@ -557,8 +607,22 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
 
   holdOne(item: QueueItem): void {
     if (item.entityType === 'price_action') {
-      this.holdMutation.mutate({ actionId: item.entityId, reason: '' });
+      this.inlineHoldItemId.set(item.entityId);
+      this.inlineHoldReason.set('');
     }
+  }
+
+  confirmInlineHold(): void {
+    const id = this.inlineHoldItemId();
+    if (id) {
+      this.holdMutation.mutate({ actionId: id, reason: this.inlineHoldReason() });
+      this.cancelInlineHold();
+    }
+  }
+
+  cancelInlineHold(): void {
+    this.inlineHoldItemId.set(null);
+    this.inlineHoldReason.set('');
   }
 
   retryOne(item: QueueItem): void {
@@ -599,8 +663,20 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   bulkApprove(): void {
     const ids = this.selectedPriceActionIds();
     if (ids.length > 0) {
+      this.bulkApproveOpen.set(true);
+    }
+  }
+
+  confirmBulkApprove(): void {
+    const ids = this.selectedPriceActionIds();
+    if (ids.length > 0) {
       this.bulkApproveMutation.mutate(ids);
     }
+    this.bulkApproveOpen.set(false);
+  }
+
+  cancelBulkApprove(): void {
+    this.bulkApproveOpen.set(false);
   }
 
   openBulkReject(): void {
@@ -650,6 +726,107 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
 
   selectAllVisible(): void {
     this.gridApi?.selectAll();
+  }
+
+  onCellContextMenu(event: { event: Event | null; data: QueueItem | undefined }): void {
+    if (!(event.event instanceof MouseEvent) || !event.data) return;
+    event.event.preventDefault();
+    this.contextMenu.set({
+      x: event.event.clientX,
+      y: event.event.clientY,
+      item: event.data,
+    });
+  }
+
+  closeContextMenu(): void {
+    this.contextMenu.set(null);
+  }
+
+  ctxOpenDetail(): void {
+    const ctx = this.contextMenu();
+    if (ctx) {
+      this.detailPanel.open('action', ctx.item.entityId);
+      this.closeContextMenu();
+    }
+  }
+
+  ctxOpenNewTab(): void {
+    const ctx = this.contextMenu();
+    if (ctx) {
+      const wsId = this.workspaceId();
+      const url = `/workspace/${wsId}/queues/${this.queueIdNum()}?item=${ctx.item.itemId}`;
+      window.open(url, '_blank');
+      this.closeContextMenu();
+    }
+  }
+
+  ctxCopySku(): void {
+    const ctx = this.contextMenu();
+    if (ctx) {
+      const sku = this.summary(ctx.item, 'skuCode') ?? '';
+      navigator.clipboard.writeText(sku);
+      this.toast.info(this.translate.instant('queues.context_menu.copied'));
+      this.closeContextMenu();
+    }
+  }
+
+  ctxApprove(): void {
+    const ctx = this.contextMenu();
+    if (ctx) {
+      this.approveOne(ctx.item);
+      this.closeContextMenu();
+    }
+  }
+
+  ctxReject(): void {
+    const ctx = this.contextMenu();
+    if (ctx) {
+      this.openInlineReject(ctx.item);
+      this.closeContextMenu();
+    }
+  }
+
+  ctxRetry(): void {
+    const ctx = this.contextMenu();
+    if (ctx) {
+      this.retryOne(ctx.item);
+      this.closeContextMenu();
+    }
+  }
+
+  toggleDensity(): void {
+    const compact = !this.compactMode();
+    this.compactMode.set(compact);
+    this.gridApi?.updateGridOptions({
+      rowHeight: compact ? 32 : 44,
+    });
+    this.gridApi?.resetRowHeights();
+  }
+
+  toggleColumnPanel(): void {
+    if (!this.gridApi) return;
+    const cols = this.gridApi.getColumns() ?? [];
+    const visible = cols.filter((c) => c.isVisible());
+    if (visible.length === cols.length) {
+      const actionCols = ['checkbox', 'actions'];
+      cols.forEach((c) => {
+        if (!actionCols.includes(c.getColId())) {
+          this.gridApi!.setColumnsVisible([c], true);
+        }
+      });
+    }
+  }
+
+  private markPending(entityId: number): void {
+    const s = new Set(this.pendingActionIds());
+    s.add(entityId);
+    this.pendingActionIds.set(s);
+  }
+
+  private clearPending(entityId: number): void {
+    const s = new Set(this.pendingActionIds());
+    s.delete(entityId);
+    this.pendingActionIds.set(s);
   }
 
   // --- Private ---
@@ -706,10 +883,16 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
       }
     }, 'queues');
     this.shortcuts.register('escape', () => {
-      if (this.bulkRejectOpen()) {
+      if (this.contextMenu()) {
+        this.closeContextMenu();
+      } else if (this.bulkApproveOpen()) {
+        this.cancelBulkApprove();
+      } else if (this.bulkRejectOpen()) {
         this.cancelBulkReject();
       } else if (this.inlineRejectItemId()) {
         this.cancelInlineReject();
+      } else if (this.inlineHoldItemId()) {
+        this.cancelInlineHold();
       } else if (this.inlineCostItemId()) {
         this.cancelInlineCost();
       } else {
@@ -718,6 +901,17 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     }, 'queues');
     this.shortcuts.register('ctrl+a', () => this.selectAllVisible(), 'queues');
     this.shortcuts.register('ctrl+f', () => this.focusSearch(), 'queues');
+    this.shortcuts.register('enter', () => {
+      if (this.inlineRejectItemId() || this.inlineHoldItemId() || this.inlineCostItemId()) return;
+      if (this.bulkRejectOpen() || this.bulkApproveOpen()) return;
+      const focused = this.gridApi?.getFocusedCell();
+      if (focused) {
+        const row = this.gridApi?.getDisplayedRowAtIndex(focused.rowIndex);
+        if (row?.data) {
+          this.detailPanel.open('action', (row.data as QueueItem).entityId);
+        }
+      }
+    }, 'queues');
   }
 
   // --- Column Definitions ---
@@ -1017,6 +1211,13 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   private renderActions(item: QueueItem, ctx: QueueContext): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'flex flex-wrap items-center gap-1 py-1';
+
+    if (this.pendingActionIds().has(item.entityId)) {
+      const spinner = document.createElement('div');
+      spinner.className = 'h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent-primary)] border-t-transparent';
+      wrap.appendChild(spinner);
+      return wrap;
+    }
 
     const addBtn = (
       labelKey: string,

@@ -1,6 +1,7 @@
 package io.datapulse.sellerops.domain;
 
 import io.datapulse.common.exception.BadRequestException;
+import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.sellerops.api.CreateQueueRequest;
 import io.datapulse.sellerops.api.QueueSummaryResponse;
@@ -179,7 +180,7 @@ class WorkingQueueServiceTest {
 
       assertThatThrownBy(() ->
           service.claimItem(WORKSPACE_ID, QUEUE_ID, ITEM_ID, USER_ID))
-          .isInstanceOf(BadRequestException.class);
+          .isInstanceOf(ConflictException.class);
     }
   }
 

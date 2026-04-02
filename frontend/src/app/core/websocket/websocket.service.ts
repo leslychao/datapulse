@@ -95,6 +95,15 @@ export class WebSocketService {
     return sub;
   }
 
+  subscribeToQueueItems(
+    workspaceId: number,
+    queueId: number,
+    callback: (msg: { type: string; itemId?: number }) => void,
+  ): Subscription | null {
+    const dest = `/topic/workspace/${workspaceId}/queues/${queueId}`;
+    return this.subscribeTo(dest, callback);
+  }
+
   subscribeToAction(workspaceId: number, actionId: number): Subscription | null {
     const destination = `/topic/workspace/${workspaceId}/actions/${actionId}`;
     return this.subscribeTo(destination, () => {

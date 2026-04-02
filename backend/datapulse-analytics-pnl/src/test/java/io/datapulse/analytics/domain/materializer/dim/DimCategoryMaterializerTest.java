@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import io.datapulse.analytics.config.AnalyticsProperties;
 import io.datapulse.analytics.domain.MaterializationPhase;
@@ -52,17 +54,21 @@ class DimCategoryMaterializerTest {
   class Full {
 
     @Test
-    @DisplayName("should truncate and process in batches")
-    void should_truncateAndBatch_when_fullRun() {
-      when(jdbc.ch()).thenReturn(chTemplate);
+    @DisplayName("should use fullMaterializeWithSwap and process in batches")
+    void should_useSwapAndBatch_when_fullRun() {
       when(jdbc.pg()).thenReturn(pgTemplate);
       when(properties.batchSize()).thenReturn(5000);
       when(pgTemplate.queryForList(anyString(), any(Map.class)))
           .thenReturn(List.of());
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
-      verify(chTemplate).execute("TRUNCATE TABLE dim_category");
+      verify(jdbc).fullMaterializeWithSwap(eq("dim_category"), any());
     }
   }
 

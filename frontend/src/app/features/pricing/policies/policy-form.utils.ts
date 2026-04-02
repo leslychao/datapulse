@@ -106,7 +106,7 @@ export function buildStrategyParams(
     const rawMarginPct = tm['targetMarginPct'] as number | null;
     const rawCommissionPct = tm['commissionManualPct'] as number | null;
     return {
-      targetMarginPct: rawMarginPct != null ? rawMarginPct / 100 : null,
+      targetMarginPct: rawMarginPct != null ? rawMarginPct / 100 : 0,
       commissionSource: tm['commissionSource'] as CommissionSource,
       commissionManualPct: rawCommissionPct != null ? rawCommissionPct / 100 : null,
       commissionLookbackDays: tm['commissionLookbackDays'] as number,

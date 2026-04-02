@@ -556,7 +556,7 @@ export class ActionsListPageComponent implements OnInit {
           ${label}
         </span>`;
       },
-      cellStyle: (params: any) => {
+      cellStyle: (params: any): Record<string, string> => {
         const st = params.value;
         if (st === 'FAILED') return { 'border-left': '2px solid var(--status-error)' };
         if (st === 'PENDING_APPROVAL') return { 'border-left': '2px solid var(--status-info)' };
@@ -709,7 +709,7 @@ export class ActionsListPageComponent implements OnInit {
 
   readonly getRowId = (params: any) => String(params.data.id);
 
-  private readonly bulkApproveMutation = injectMutation(() => ({
+  protected readonly bulkApproveMutation = injectMutation(() => ({
     mutationFn: (actionIds: number[]) =>
       lastValueFrom(this.actionApi.bulkApprove(this.wsStore.currentWorkspaceId()!, { actionIds })),
     onSuccess: (result) => {

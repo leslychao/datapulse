@@ -405,11 +405,7 @@ export class EvaluationsListPageComponent {
   }
 
   onRowClicked(row: any): void {
-    this.detailPanel.open({
-      type: 'promo-evaluation',
-      title: row.productName,
-      data: row,
-    });
+    this.detailPanel.open('promo-evaluation', row.id);
   }
 
   private badgeCell(

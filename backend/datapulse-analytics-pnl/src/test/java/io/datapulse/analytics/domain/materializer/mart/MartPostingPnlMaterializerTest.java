@@ -1,16 +1,17 @@
 package io.datapulse.analytics.domain.materializer.mart;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.datapulse.analytics.domain.MaterializationPhase;
 import io.datapulse.analytics.persistence.MaterializationJdbc;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,14 +49,19 @@ class MartPostingPnlMaterializerTest {
   class Full {
 
     @Test
-    @DisplayName("should truncate mart_posting_pnl before insert")
-    void should_truncateFirst_when_fullRun() {
+    @DisplayName("should use fullMaterializeWithSwap for mart_posting_pnl")
+    void should_useSwap_when_fullRun() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
-      verify(chTemplate).execute("TRUNCATE TABLE mart_posting_pnl");
+      verify(jdbc).fullMaterializeWithSwap(eq("mart_posting_pnl"), any());
     }
 
     @Test
@@ -63,14 +69,19 @@ class MartPostingPnlMaterializerTest {
     void should_executeInsertSql_when_fullRun() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(100L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String executedSql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT INTO mart_posting_pnl"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse(null);
       assertThat(executedSql).isNotNull();
@@ -83,6 +94,11 @@ class MartPostingPnlMaterializerTest {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject("SELECT count() FROM mart_posting_pnl", Long.class))
           .thenReturn(5000L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
@@ -94,14 +110,19 @@ class MartPostingPnlMaterializerTest {
     void should_containPnlFormula_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
@@ -122,14 +143,19 @@ class MartPostingPnlMaterializerTest {
     void should_containCogsWithDivisionGuard_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
@@ -144,14 +170,19 @@ class MartPostingPnlMaterializerTest {
     void should_containAcquiringAllocation_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
@@ -164,14 +195,19 @@ class MartPostingPnlMaterializerTest {
     void should_containReconciliationResidual_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
 
       materializer.materializeFull();
 
       ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-      verify(chTemplate, atLeast(2)).execute(sqlCaptor.capture());
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
 
       String sql = sqlCaptor.getAllValues().stream()
-          .filter(s -> s.contains("INSERT"))
+          .filter(s -> s.contains("INSERT INTO"))
           .findFirst()
           .orElse("");
 
