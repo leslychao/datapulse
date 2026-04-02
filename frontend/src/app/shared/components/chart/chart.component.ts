@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   input,
+  output,
 } from '@angular/core';
 import { NgxEchartsDirective, provideEchartsCore } from 'ngx-echarts';
 import * as echarts from 'echarts/core';
@@ -46,6 +47,7 @@ echarts.use([
         [options]="options()"
         [style.height]="height()"
         class="w-full"
+        (chartClick)="chartClick.emit($event)"
       ></div>
     }
   `,
@@ -54,4 +56,5 @@ export class ChartComponent {
   readonly options = input.required<EChartsOption>();
   readonly height = input<string>('300px');
   readonly loading = input<boolean>(false);
+  readonly chartClick = output<Record<string, unknown>>();
 }

@@ -2,6 +2,7 @@ package io.datapulse.tenancy.api;
 
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.InvitationService;
+import io.datapulse.tenancy.persistence.WorkspaceInvitationEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,9 @@ public class InvitationController {
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public List<InvitationResponse> listInvitations(@PathVariable("workspaceId") Long workspaceId) {
-        return invitationService.listInvitations(workspaceId);
+        return invitationService.listInvitations(workspaceId).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @PostMapping
@@ -37,9 +40,10 @@ public class InvitationController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public InvitationResponse createInvitation(@PathVariable("workspaceId") Long workspaceId,
                                                @Valid @RequestBody CreateInvitationRequest request) {
-        return invitationService.createInvitation(
+        var entity = invitationService.createInvitation(
                 workspaceId, workspaceContext.getUserId(),
-                workspaceContext.getRole(), request);
+                workspaceContext.getRole(), request.email(), request.role());
+        return toResponse(entity);
     }
 
     @DeleteMapping("/{invitationId}")
@@ -54,6 +58,17 @@ public class InvitationController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public InvitationResponse resendInvitation(@PathVariable("workspaceId") Long workspaceId,
                                                @PathVariable("invitationId") Long invitationId) {
-        return invitationService.resendInvitation(workspaceId, invitationId);
+        var entity = invitationService.resendInvitation(workspaceId, invitationId);
+        return toResponse(entity);
+    }
+
+    private InvitationResponse toResponse(WorkspaceInvitationEntity entity) {
+        return new InvitationResponse(
+                entity.getId(),
+                entity.getEmail(),
+                entity.getRole(),
+                entity.getStatus(),
+                entity.getCreatedAt(),
+                entity.getExpiresAt());
     }
 }

@@ -13,7 +13,7 @@
           <span
             class="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 font-mono text-sm tabular-nums text-[var(--text-secondary)]"
           >
-            {{ q.totalActiveCount }}
+            {{ q.totalActiveCount | number }}
           </span>
         </div>
         @if (queueDescription()) {
@@ -69,9 +69,74 @@
       {{ 'queues.filters.assigned_me' | translate }}
     </button>
 
+    <!-- Severity pill (MISMATCHES only) -->
+    @if (showSeverityFilter()) {
+      <label class="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+        {{ 'queues.filters.severity' | translate }}
+        <select
+          class="border-none bg-transparent text-xs text-[var(--text-primary)] outline-none"
+          (change)="onSeverityChange($event)"
+        >
+          <option value="">{{ 'queues.filters.all' | translate }}</option>
+          @for (s of severityOptions; track s) {
+            <option [value]="s">{{ s }}</option>
+          }
+        </select>
+      </label>
+    }
+
+    <!-- Mismatch type pill (MISMATCHES only) -->
+    @if (showMismatchTypeFilter()) {
+      <label class="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+        {{ 'queues.filters.mismatch_type' | translate }}
+        <select
+          class="border-none bg-transparent text-xs text-[var(--text-primary)] outline-none"
+          (change)="onMismatchTypeChange($event)"
+        >
+          <option value="">{{ 'queues.filters.all' | translate }}</option>
+          @for (t of mismatchTypeOptions; track t) {
+            <option [value]="t">{{ t }}</option>
+          }
+        </select>
+      </label>
+    }
+
+    <!-- Decision type pill (RECENT_DECISIONS only) -->
+    @if (showDecisionTypeFilter()) {
+      <label class="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+        {{ 'queues.filters.decision_type' | translate }}
+        <select
+          class="border-none bg-transparent text-xs text-[var(--text-primary)] outline-none"
+          (change)="onDecisionTypeChange($event)"
+        >
+          <option value="">{{ 'queues.filters.all' | translate }}</option>
+          @for (d of decisionTypeOptions; track d) {
+            <option [value]="d">{{ d }}</option>
+          }
+        </select>
+      </label>
+    }
+
+    <!-- Action status pill (ERRORS / RECENT_DECISIONS) -->
+    @if (showActionStatusFilter()) {
+      <label class="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+        {{ 'queues.filters.action_status' | translate }}
+        <select
+          class="border-none bg-transparent text-xs text-[var(--text-primary)] outline-none"
+          (change)="onActionStatusChange($event)"
+        >
+          <option value="">{{ 'queues.filters.all' | translate }}</option>
+          @for (a of actionStatusOptions; track a) {
+            <option [value]="a">{{ 'grid.action_status.' + a | translate }}</option>
+          }
+        </select>
+      </label>
+    }
+
     <!-- Search -->
     <div class="ml-auto flex items-center">
       <input
+        #searchInput
         type="search"
         class="w-56 rounded-full border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
         [placeholder]="'queues.filters.search_placeholder' | translate"
@@ -81,7 +146,7 @@
     </div>
 
     <!-- Reset -->
-    @if (statusFilter() || marketplaceFilter().length || assignedToMe() || searchQuery()) {
+    @if (hasActiveFilters()) {
       <button
         type="button"
         class="text-xs text-[var(--accent-primary)] hover:underline"
@@ -110,9 +175,22 @@
         class="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-10 text-center"
       >
         <lucide-icon [img]="checkIcon" [size]="48" class="text-[var(--status-success)]" />
-        <p class="max-w-md text-sm text-[var(--text-secondary)]">
-          {{ 'queues.page.empty' | translate }}
-        </p>
+        @if (hasActiveFilters()) {
+          <p class="max-w-md text-sm text-[var(--text-secondary)]">
+            {{ 'queues.page.empty_filters' | translate }}
+          </p>
+          <button
+            type="button"
+            class="text-sm text-[var(--accent-primary)] hover:underline"
+            (click)="resetFilters()"
+          >
+            {{ 'queues.filters.reset' | translate }}
+          </button>
+        } @else {
+          <p class="max-w-md text-sm text-[var(--text-secondary)]">
+            {{ 'queues.page.empty' | translate }}
+          </p>
+        }
       </div>
     } @else {
       @if (itemsQuery.isPending()) {
@@ -176,6 +254,43 @@
     </div>
   }
 
+  <!-- Inline cost editor (NO_COST queue) -->
+  @if (inlineCostItemId()) {
+    <div
+      class="flex flex-wrap items-center gap-2 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+    >
+      <span class="text-sm text-[var(--text-secondary)]">
+        {{ 'queues.inline_cost.label' | translate }}
+      </span>
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        class="w-36 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 font-mono text-sm text-[var(--text-primary)]"
+        [placeholder]="'queues.inline_cost.placeholder' | translate"
+        [value]="inlineCostValue()"
+        (input)="inlineCostValue.set((($event.target) as HTMLInputElement).value)"
+        (keyup.enter)="confirmInlineCost()"
+        (keyup.escape)="cancelInlineCost()"
+      />
+      <span class="text-sm text-[var(--text-tertiary)]">₽</span>
+      <button
+        type="button"
+        class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-3 py-1.5 text-sm font-medium text-white"
+        (click)="confirmInlineCost()"
+      >
+        {{ 'queues.inline_cost.save' | translate }}
+      </button>
+      <button
+        type="button"
+        class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+        (click)="cancelInlineCost()"
+      >
+        {{ 'actions.cancel' | translate }}
+      </button>
+    </div>
+  }
+
   <!-- Bulk action bar -->
   @if (selectedRows().length > 0) {
     <div
@@ -186,6 +301,7 @@
         {{ 'queues.bulk.selected' | translate: { count: selectedRows().length } }}
       </span>
 
+      <!-- PENDING_APPROVAL bulk -->
       @if (showApprovalBulk()) {
         @if (rbac.canApproveActions()) {
           <button
@@ -207,6 +323,52 @@
         }
       }
 
+      <!-- EXECUTION_ERRORS bulk -->
+      @if (showRetryBulk()) {
+        @if (rbac.canApproveActions()) {
+          <button
+            type="button"
+            class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)]"
+            (click)="bulkRetry()"
+            [disabled]="bulkRetryMutation.isPending()"
+          >
+            {{ 'queues.bulk.retry' | translate }}
+          </button>
+        }
+        @if (rbac.canOperateActions()) {
+          <button
+            type="button"
+            class="rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
+            (click)="bulkCancel()"
+            [disabled]="bulkCancelMutation.isPending()"
+          >
+            {{ 'queues.bulk.cancel' | translate }}
+          </button>
+        }
+      }
+
+      <!-- MISMATCHES bulk -->
+      @if (showAcknowledgeBulk()) {
+        @if (rbac.canOperateActions()) {
+          <button
+            type="button"
+            class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)]"
+            (click)="bulkAcknowledge()"
+            [disabled]="bulkAcknowledgeMutation.isPending()"
+          >
+            {{ 'queues.bulk.acknowledge' | translate }}
+          </button>
+        }
+      }
+
+      <!-- Export (all queues) -->
+      <button
+        type="button"
+        class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+      >
+        {{ 'queues.bulk.export' | translate }}
+      </button>
+
       <button
         type="button"
         class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
@@ -222,17 +384,21 @@
     <footer
       class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-secondary)]"
     >
-      <div class="flex items-center gap-2">
-        <span>{{ 'queues.page.rows_per_page' | translate }}</span>
-        <select
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1"
-          [value]="pageSize()"
-          (change)="setPageSize(+(($event.target) as HTMLSelectElement).value)"
-        >
-          @for (n of pageSizeOptions; track n) {
-            <option [value]="n">{{ n }}</option>
-          }
-        </select>
+      <div class="flex items-center gap-3">
+        <span class="tabular-nums">{{ paginationLabel() }}</span>
+        <span class="text-[var(--text-tertiary)]">·</span>
+        <div class="flex items-center gap-1.5">
+          <span>{{ 'queues.page.rows_per_page' | translate }}</span>
+          <select
+            class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1"
+            [value]="pageSize()"
+            (change)="setPageSize(+(($event.target) as HTMLSelectElement).value)"
+          >
+            @for (n of pageSizeOptions; track n) {
+              <option [value]="n">{{ n }}</option>
+            }
+          </select>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <button
@@ -241,18 +407,23 @@
           (click)="prevPage()"
           [disabled]="pageIndex() <= 0 || itemsQuery.isPending()"
         >
-          {{ 'queues.page.prev' | translate }}
+          ◀
         </button>
-        <span class="tabular-nums">
-          {{ pageIndex() + 1 }} / {{ totalPages() }}
-        </span>
+        <input
+          type="text"
+          class="w-10 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-1.5 py-0.5 text-center tabular-nums text-sm"
+          [value]="pageIndex() + 1"
+          (change)="goToPage($event)"
+          (keyup.enter)="goToPage($event)"
+        />
+        <span class="text-[var(--text-tertiary)]">/ {{ totalPages() }}</span>
         <button
           type="button"
           class="rounded-[var(--radius-md)] px-2 py-1 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
           (click)="nextPage()"
           [disabled]="pageIndex() >= totalPages() - 1 || itemsQuery.isPending()"
         >
-          {{ 'queues.page.next' | translate }}
+          ▶
         </button>
       </div>
     </footer>

@@ -47,4 +47,16 @@ export class MismatchApiService {
   bulkIgnore(workspaceId: number, ids: number[], reason: string): Observable<void> {
     return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/mismatches/bulk-ignore`, { ids, reason });
   }
+
+  exportCsv(workspaceId: number, filter: MismatchFilter): Observable<Blob> {
+    let params = new HttpParams();
+    if (filter.type?.length) params = params.set('type', filter.type.join(','));
+    if (filter.connectionId?.length) params = params.set('connectionId', filter.connectionId.join(','));
+    if (filter.status?.length) params = params.set('status', filter.status.join(','));
+    if (filter.severity?.length) params = params.set('severity', filter.severity.join(','));
+    if (filter.from) params = params.set('from', filter.from);
+    if (filter.to) params = params.set('to', filter.to);
+    if (filter.query) params = params.set('query', filter.query);
+    return this.http.get(`${this.base}/workspaces/${workspaceId}/mismatches/export`, { params, responseType: 'blob' });
+  }
 }

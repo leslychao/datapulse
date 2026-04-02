@@ -72,6 +72,17 @@ export interface MismatchSummary {
   timeline: { date: string; newCount: number; resolvedCount: number }[];
 }
 
+export type MismatchWsEventType = 'MISMATCH_DETECTED' | 'MISMATCH_RESOLVED' | 'MISMATCH_ACKNOWLEDGED' | 'MISMATCH_IGNORED';
+
+export interface MismatchWsEvent {
+  eventType: MismatchWsEventType;
+  mismatchId: number;
+  type: MismatchType;
+  severity: MismatchSeverity;
+  offerName: string;
+  deltaPct: number | null;
+}
+
 export interface MismatchFilter {
   type?: MismatchType[];
   connectionId?: number[];

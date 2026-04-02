@@ -12,4 +12,6 @@ public interface SavedViewRepository extends JpaRepository<SavedViewEntity, Long
     Optional<SavedViewEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     boolean existsByWorkspaceIdAndUserIdAndName(Long workspaceId, Long userId, String name);
+
+    long countByWorkspaceIdAndUserId(Long workspaceId, Long userId);
 }

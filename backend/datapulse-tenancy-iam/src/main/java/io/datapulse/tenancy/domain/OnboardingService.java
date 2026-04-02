@@ -2,10 +2,6 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.CreateTenantRequest;
-import io.datapulse.tenancy.api.CreateWorkspaceRequest;
-import io.datapulse.tenancy.api.TenantResponse;
-import io.datapulse.tenancy.api.WorkspaceListResponse;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.TenantEntity;
@@ -32,36 +28,34 @@ public class OnboardingService {
     private final TenancyAuditPublisher auditPublisher;
 
     @Transactional
-    public TenantResponse createTenant(CreateTenantRequest request, Long ownerUserId) {
+    public TenantEntity createTenant(String name, Long ownerUserId) {
         long ownedCount = tenantRepository.countByOwnerUserId(ownerUserId);
         if (ownedCount >= MAX_TENANTS_PER_USER) {
             throw BadRequestException.of("tenant.limit.exceeded", MAX_TENANTS_PER_USER);
         }
 
-        String name = request.name().trim();
-        String slug = generateUniqueSlug(name, tenantRepository::existsBySlug);
+        String trimmed = name.trim();
+        String slug = generateUniqueSlug(trimmed, tenantRepository::existsBySlug);
 
         var tenant = new TenantEntity();
-        tenant.setName(name);
+        tenant.setName(trimmed);
         tenant.setSlug(slug);
         tenant.setStatus(TenantStatus.ACTIVE);
         tenant.setOwnerUserId(ownerUserId);
 
         tenantRepository.save(tenant);
         auditPublisher.publish("tenant.create", "tenant", String.valueOf(tenant.getId()));
-        return new TenantResponse(tenant.getId(), tenant.getName(), tenant.getSlug());
+        return tenant;
     }
 
     @Transactional(readOnly = true)
-    public TenantResponse getTenant(Long tenantId) {
-        TenantEntity tenant = tenantRepository.findById(tenantId)
+    public TenantEntity getTenant(Long tenantId) {
+        return tenantRepository.findById(tenantId)
                 .orElseThrow(() -> NotFoundException.entity("Tenant", tenantId));
-        return new TenantResponse(tenant.getId(), tenant.getName(), tenant.getSlug());
     }
 
     @Transactional
-    public WorkspaceListResponse createWorkspace(Long tenantId, CreateWorkspaceRequest request,
-                                                 Long ownerUserId) {
+    public WorkspaceSummary createWorkspace(Long tenantId, String name, Long ownerUserId) {
         TenantEntity tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> NotFoundException.entity("Tenant", tenantId));
 
@@ -69,8 +63,8 @@ public class OnboardingService {
             throw BadRequestException.of("tenant.not.owner");
         }
 
-        String name = request.name().trim();
-        String slug = generateUniqueSlug(name,
+        String trimmed = name.trim();
+        String slug = generateUniqueSlug(trimmed,
                 s -> workspaceRepository.existsByTenant_IdAndSlug(tenantId, s));
 
         AppUserEntity owner = appUserRepository.findById(ownerUserId)
@@ -78,7 +72,7 @@ public class OnboardingService {
 
         var workspace = new WorkspaceEntity();
         workspace.setTenant(tenant);
-        workspace.setName(name);
+        workspace.setName(trimmed);
         workspace.setSlug(slug);
         workspace.setStatus(WorkspaceStatus.ACTIVE);
         workspace.setOwnerUserId(ownerUserId);
@@ -92,7 +86,7 @@ public class OnboardingService {
         memberRepository.save(member);
         auditPublisher.publish("workspace.create", "workspace", String.valueOf(workspace.getId()));
 
-        return new WorkspaceListResponse(
+        return new WorkspaceSummary(
                 workspace.getId(), workspace.getName(), workspace.getSlug(),
                 workspace.getStatus(), tenant.getId(), tenant.getName(),
                 0, 1);

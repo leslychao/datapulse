@@ -2,24 +2,30 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  HostListener,
   inject,
   signal,
 } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { ColDef } from 'ag-grid-community';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
-import { ConnectionApiService } from '@core/api/connection-api.service';
 import { ReturnsByProduct } from '@core/models';
+import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
+import {
+  formatMoney,
+  formatPercent,
+  currentMonth,
+} from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-returns-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, DataGridComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
@@ -43,86 +49,18 @@ import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.u
         />
       </div>
 
-      <!-- Table -->
-      <div class="flex-1 overflow-x-auto">
-        <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
-          <table class="w-full text-left text-[length:var(--text-sm)]">
-            <thead class="bg-[var(--bg-secondary)] text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-              <tr>
-                <th class="px-3 py-2 font-medium">SKU</th>
-                <th class="px-3 py-2 font-medium">{{ 'analytics.returns.col.product' | translate }}</th>
-                <th class="px-3 py-2 font-medium">{{ 'analytics.returns.col.platform' | translate }}</th>
-                <th class="px-3 py-2 font-medium text-right">{{ 'analytics.returns.col.return_count' | translate }}</th>
-                <th class="px-3 py-2 font-medium text-right">{{ 'analytics.returns.col.return_rate' | translate }}</th>
-                <th class="px-3 py-2 font-medium text-right">{{ 'analytics.returns.col.refund' | translate }}</th>
-                <th class="px-3 py-2 font-medium text-right">{{ 'analytics.returns.col.penalties' | translate }}</th>
-                <th class="px-3 py-2 font-medium">{{ 'analytics.returns.col.reason' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @if (returnsQuery.isPending()) {
-                @for (_ of shimmerRows; track $index) {
-                  <tr>
-                    <td colspan="8" class="px-3 py-2">
-                      <div class="dp-shimmer h-4 rounded"></div>
-                    </td>
-                  </tr>
-                }
-              }
-              @if (returnsQuery.isError()) {
-                <tr>
-                  <td colspan="8" class="px-3 py-8 text-center text-[var(--status-error)]">
-                    {{ 'analytics.returns.by_product.error' | translate }}
-                    <button
-                      (click)="returnsQuery.refetch()"
-                      class="ml-2 cursor-pointer underline"
-                    >
-                      {{ 'actions.retry' | translate }}
-                    </button>
-                  </td>
-                </tr>
-              }
-              @if (returnsQuery.data(); as page) {
-                @for (row of page.content; track row.sellerSkuId) {
-                  <tr
-                    class="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-tertiary)]"
-                    (click)="onRowClicked(row)"
-                  >
-                    <td class="px-3 py-2 font-mono text-[length:var(--text-xs)]">{{ row.skuCode }}</td>
-                    <td class="max-w-[200px] truncate px-3 py-2">{{ row.productName }}</td>
-                    <td class="px-3 py-2">
-                      <span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[length:var(--text-xs)] font-medium"
-                            [class]="platformBadge(row.sourcePlatform)">
-                        {{ row.sourcePlatform }}
-                      </span>
-                    </td>
-                    <td class="px-3 py-2 text-right font-mono">{{ row.returnCount }}</td>
-                    <td class="px-3 py-2 text-right font-mono" [class]="returnRateClass(row.returnRatePct)">
-                      {{ formatPct(row.returnRatePct) }}
-                    </td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--status-error)]">
-                      {{ formatMoney(row.financialRefundAmount) }}
-                    </td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--status-error)]">
-                      {{ formatMoney(row.penaltiesAmount) }}
-                    </td>
-                    <td class="px-3 py-2">{{ row.topReturnReason }}</td>
-                  </tr>
-                }
-                @if (page.content.length === 0) {
-                  <tr>
-                    <td colspan="8" class="px-3 py-8 text-center text-[var(--text-secondary)]">
-                      {{ 'analytics.returns.by_product.empty' | translate }}
-                    </td>
-                  </tr>
-                }
-              }
-            </tbody>
-          </table>
-        </div>
+      <div class="flex-1">
+        <dp-data-grid
+          [columnDefs]="columnDefs()"
+          [rowData]="gridRows()"
+          [loading]="returnsQuery.isPending()"
+          [pagination]="false"
+          [pageSize]="50"
+          height="calc(100vh - 320px)"
+          (rowClicked)="onRowClicked($event)"
+        />
       </div>
 
-      <!-- Pagination -->
       @if (returnsQuery.data(); as page) {
         <div class="flex items-center justify-between pb-4 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
           <span>
@@ -248,14 +186,17 @@ export class ReturnsByProductPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.selectedProduct.set(null);
+  }
+
   readonly period = signal(currentMonth());
   readonly search = signal('');
   readonly selectedProduct = signal<ReturnsByProduct | null>(null);
   readonly currentPage = signal(0);
   readonly currentSort = signal('return_rate_pct,desc');
   readonly pageSize = signal(50);
-
-  readonly shimmerRows = Array.from({ length: 8 });
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -280,6 +221,71 @@ export class ReturnsByProductPageComponent {
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
+
+  readonly gridRows = computed(() => this.returnsQuery.data()?.content ?? []);
+
+  readonly columnDefs = computed<ColDef[]>(() => [
+    {
+      field: 'skuCode',
+      headerName: 'SKU',
+      cellClass: 'font-mono text-[11px]',
+    },
+    {
+      field: 'productName',
+      headerName: this.t.instant('analytics.returns.col.product'),
+      minWidth: 200,
+    },
+    {
+      field: 'sourcePlatform',
+      headerName: this.t.instant('analytics.returns.col.platform'),
+      cellRenderer: (p: { value: string }) => {
+        const cls = p.value === 'WB'
+          ? 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]'
+          : p.value === 'OZON'
+            ? 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]'
+            : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
+        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${p.value}</span>`;
+      },
+    },
+    {
+      field: 'returnCount',
+      headerName: this.t.instant('analytics.returns.col.return_count'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+    },
+    {
+      field: 'returnRatePct',
+      headerName: this.t.instant('analytics.returns.col.return_rate'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatPercent(p.value),
+      cellStyle: (p) => {
+        if (p.value > 10) return { color: 'var(--status-error)' };
+        if (p.value >= 5) return { color: 'var(--status-warning)' };
+        return { color: 'var(--text-primary)' };
+      },
+    },
+    {
+      field: 'financialRefundAmount',
+      headerName: this.t.instant('analytics.returns.col.refund'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: () => ({ color: 'var(--status-error)' }),
+    },
+    {
+      field: 'penaltiesAmount',
+      headerName: this.t.instant('analytics.returns.col.penalties'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: () => ({ color: 'var(--status-error)' }),
+    },
+    {
+      field: 'topReturnReason',
+      headerName: this.t.instant('analytics.returns.col.reason'),
+    },
+  ]);
 
   onPeriodChange(event: Event): void {
     this.period.set((event.target as HTMLInputElement).value);
@@ -311,12 +317,6 @@ export class ReturnsByProductPageComponent {
     if (rate > 10) return 'text-[var(--status-error)]';
     if (rate >= 5) return 'text-[var(--status-warning)]';
     return 'text-[var(--text-primary)]';
-  }
-
-  platformBadge(platform: string): string {
-    if (platform === 'WB') return 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]';
-    if (platform === 'OZON') return 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]';
-    return 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
   }
 
   formatMoney(value: number | null): string {

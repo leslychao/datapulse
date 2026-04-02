@@ -6,11 +6,15 @@ import io.datapulse.platform.audit.AlertTriggeredEvent;
 import io.datapulse.sellerops.config.MismatchProperties;
 import io.datapulse.sellerops.persistence.FinanceMismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.FinanceMismatchJdbcRepository.FinanceGapCandidate;
+import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
+import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
 import io.datapulse.sellerops.persistence.MismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.PriceMismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.PriceMismatchJdbcRepository.PriceMismatchCandidate;
 import io.datapulse.sellerops.persistence.PromoMismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.PromoMismatchJdbcRepository.PromoMismatchCandidate;
+import io.datapulse.sellerops.persistence.StockMismatchJdbcRepository;
+import io.datapulse.sellerops.persistence.StockMismatchJdbcRepository.StockCandidate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,6 +34,9 @@ public class MismatchMonitorService {
     private final PriceMismatchJdbcRepository priceMismatchRepository;
     private final PromoMismatchJdbcRepository promoMismatchRepository;
     private final FinanceMismatchJdbcRepository financeMismatchRepository;
+    private final StockMismatchJdbcRepository stockMismatchRepository;
+    private final GridClickHouseReadRepository chRepository;
+    private final GridPostgresReadRepository pgRepository;
     private final MismatchJdbcRepository mismatchJdbcRepository;
     private final MismatchProperties mismatchProperties;
     private final ApplicationEventPublisher eventPublisher;
@@ -54,6 +61,13 @@ public class MismatchMonitorService {
             checkFinanceMismatches(workspaceId);
         } catch (Exception e) {
             log.error("Finance mismatch check failed: workspaceId={}, error={}",
+                    workspaceId, e.getMessage(), e);
+        }
+
+        try {
+            checkStockMismatches(workspaceId);
+        } catch (Exception e) {
+            log.error("Stock mismatch check failed: workspaceId={}, error={}",
                     workspaceId, e.getMessage(), e);
         }
 
@@ -131,6 +145,53 @@ public class MismatchMonitorService {
         }
     }
 
+    public void checkStockMismatches(long workspaceId) {
+        List<StockCandidate> pgStocks = stockMismatchRepository.findCanonicalStocks(workspaceId);
+        if (pgStocks.isEmpty()) {
+            return;
+        }
+
+        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+        Map<Long, Integer> chStocks;
+        try {
+            chStocks = chRepository.findLatestSnapshotStocks(connectionIds);
+        } catch (Exception e) {
+            log.warn("CH unavailable for stock mismatch check, skipping: workspaceId={}, error={}",
+                    workspaceId, e.getMessage());
+            return;
+        }
+
+        int found = 0;
+        for (StockCandidate pg : pgStocks) {
+            Integer chStock = chStocks.get(pg.offerId());
+            if (chStock == null) {
+                continue;
+            }
+            int delta = Math.abs(pg.canonicalStock() - chStock);
+            double deltaPct = chStock == 0 ? 100.0
+                    : (double) delta / chStock * 100;
+
+            boolean thresholdBreached = delta > mismatchProperties.getStockAbsoluteThreshold()
+                    || deltaPct > mismatchProperties.getStockPercentThreshold();
+
+            if (thresholdBreached) {
+                found++;
+                publishMismatch(
+                        pg.workspaceId(),
+                        pg.connectionId(),
+                        MismatchSeverity.WARNING.name(),
+                        "Stock mismatch: %s (%s)".formatted(pg.skuCode(), pg.offerName()),
+                        buildStockDetailsJson(pg, chStock, delta, deltaPct)
+                );
+            }
+        }
+
+        if (found > 0) {
+            log.info("Stock mismatch check completed: workspaceId={}, mismatchesFound={}",
+                    workspaceId, found);
+        }
+    }
+
     @Transactional
     public void autoResolveClearedMismatches(long workspaceId) {
         int resolved = mismatchJdbcRepository.autoResolveCleared(workspaceId);
@@ -185,6 +246,19 @@ public class MismatchMonitorService {
                 "expected_value", mismatch.actionOutcome(),
                 "actual_value", mismatch.canonicalStatus(),
                 "delta_pct", "0"
+        ));
+    }
+
+    private String buildStockDetailsJson(StockCandidate pg, int chStock,
+                                             int delta, double deltaPct) {
+        return toJson(Map.of(
+                "mismatch_type", MismatchType.STOCK_INCONSISTENCY.name(),
+                "offer_id", pg.offerId(),
+                "offer_name", pg.offerName(),
+                "sku_code", pg.skuCode(),
+                "expected_value", String.valueOf(chStock),
+                "actual_value", String.valueOf(pg.canonicalStock()),
+                "delta_pct", String.valueOf(Math.round(deltaPct * 100) / 100.0)
         ));
     }
 

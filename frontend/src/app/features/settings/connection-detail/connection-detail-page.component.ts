@@ -145,13 +145,13 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
                 @if (conn.marketplaceType === 'WB') {
                   <div>
                     <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_token_label' | translate }}</label>
-                    <input
-                      type="password"
+                    <textarea
                       [(ngModel)]="newWbToken"
                       name="newWbToken"
                       required
+                      rows="3"
                       class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                    />
+                    ></textarea>
                   </div>
                 } @else {
                   <div>

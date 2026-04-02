@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
+
+import { AnalyticsHealthService } from './analytics-health.service';
 
 interface NavTab {
   labelKey: string;
@@ -52,6 +54,13 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe],
   template: `
     <div class="flex h-full min-h-0 flex-col">
+      @if (healthService.clickhouseUnavailable()) {
+        <div class="flex items-center gap-2 border-b border-[var(--status-warning)] bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)] px-4 py-2 text-[length:var(--text-sm)] text-[var(--status-warning)]">
+          <span>⚠</span>
+          <span>{{ 'analytics.clickhouse_unavailable' | translate }}</span>
+        </div>
+      }
+
       <!-- Section tabs -->
       <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4
                   [&>a:first-child]:pl-0">
@@ -95,9 +104,30 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
   `,
 })
 export class AnalyticsLayoutComponent {
+  readonly healthService = inject(AnalyticsHealthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly sectionTabs = SECTION_TABS;
+
+  private static readonly SHORTCUT_ROUTES: Record<string, string> = {
+    '1': 'pnl/summary',
+    '2': 'inventory/overview',
+    '3': 'returns/summary',
+    '4': 'data-quality/status',
+  };
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    const tag = (event.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+    const route = AnalyticsLayoutComponent.SHORTCUT_ROUTES[event.key];
+    if (route) {
+      event.preventDefault();
+      this.router.navigate([route], { relativeTo: this.route });
+    }
+  }
 
   private readonly url = toSignal(
     this.router.events.pipe(map(() => this.router.url)),

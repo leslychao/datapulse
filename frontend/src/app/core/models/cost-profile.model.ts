@@ -9,6 +9,14 @@ export interface CostProfile {
   updatedAt: string | null;
 }
 
+export interface CostProfilePage {
+  content: CostProfile[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
 export interface CreateCostProfileRequest {
   sellerSkuId: number;
   costPrice: number;

@@ -33,7 +33,7 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String CH_INSERT = """
-            INSERT INTO dim_category
+            INSERT INTO %s
             (category_id, connection_id, external_category_id, name,
              parent_category_id, marketplace_type, ver)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -44,44 +44,47 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
-        int offset = 0;
-        int total = 0;
+        final int[] total = {0};
 
-        while (true) {
-            List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            String chInsert = CH_INSERT.formatted(staging);
+            int offset = 0;
+
+            while (true) {
+                List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
                     Map.of("limit", properties.batchSize(), "offset", offset));
-            if (rows.isEmpty()) {
-                break;
-            }
-
-            jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
-                ps.setLong(1, ((Number) row.get("category_id")).longValue());
-                ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-                ps.setString(3, (String) row.get("external_category_id"));
-                ps.setString(4, (String) row.get("name"));
-                Number parentId = (Number) row.get("parent_category_id");
-                if (parentId != null) {
-                    ps.setLong(5, parentId.longValue());
-                } else {
-                    ps.setNull(5, java.sql.Types.BIGINT);
+                if (rows.isEmpty()) {
+                    break;
                 }
-                ps.setString(6, (String) row.get("marketplace_type"));
-                ps.setLong(7, ver);
-            });
 
-            total += rows.size();
-            offset += properties.batchSize();
-        }
+                jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
+                    ps.setLong(1, ((Number) row.get("category_id")).longValue());
+                    ps.setInt(2, ((Number) row.get("connection_id")).intValue());
+                    ps.setString(3, (String) row.get("external_category_id"));
+                    ps.setString(4, (String) row.get("name"));
+                    Number parentId = (Number) row.get("parent_category_id");
+                    if (parentId != null) {
+                        ps.setLong(5, parentId.longValue());
+                    } else {
+                        ps.setNull(5, java.sql.Types.BIGINT);
+                    }
+                    ps.setString(6, (String) row.get("marketplace_type"));
+                    ps.setLong(7, ver);
+                });
 
-        log.info("Materialized dim_category: rows={}", total);
+                total[0] += rows.size();
+                offset += properties.batchSize();
+            }
+        });
+
+        log.info("Materialized dim_category: rows={}", total[0]);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
         long ver = Instant.now().toEpochMilli();
+        String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
                 SELECT c.id                       AS category_id,
@@ -98,7 +101,7 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
             return;
         }
 
-        jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
+        jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
             ps.setLong(1, ((Number) row.get("category_id")).longValue());
             ps.setInt(2, ((Number) row.get("connection_id")).intValue());
             ps.setString(3, (String) row.get("external_category_id"));

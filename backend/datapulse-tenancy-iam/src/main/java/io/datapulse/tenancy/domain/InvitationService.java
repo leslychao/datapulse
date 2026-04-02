@@ -4,9 +4,6 @@ import io.datapulse.common.exception.AppException;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.AcceptInvitationResponse;
-import io.datapulse.tenancy.api.CreateInvitationRequest;
-import io.datapulse.tenancy.api.InvitationResponse;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
@@ -45,26 +42,26 @@ public class InvitationService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional(readOnly = true)
-    public List<InvitationResponse> listInvitations(Long workspaceId) {
-        return invitationRepository.findByWorkspace_IdOrderByCreatedAtDesc(workspaceId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public List<WorkspaceInvitationEntity> listInvitations(Long workspaceId) {
+        return invitationRepository.findByWorkspace_IdOrderByCreatedAtDesc(workspaceId);
     }
 
     @Transactional
-    public InvitationResponse createInvitation(Long workspaceId, Long invitedByUserId,
-                                               String actorRole, CreateInvitationRequest request) {
-        if (request.role() == MemberRole.OWNER) {
+    public WorkspaceInvitationEntity createInvitation(Long workspaceId, Long invitedByUserId,
+                                                      String actorRole, String email,
+                                                      MemberRole role) {
+        if (role == MemberRole.OWNER) {
             throw BadRequestException.of("invitation.cannot.assign.owner");
         }
 
         MemberRole actorMemberRole = MemberRole.valueOf(actorRole);
-        if (actorMemberRole == MemberRole.ADMIN && request.role() == MemberRole.ADMIN) {
+        if (actorMemberRole == MemberRole.ADMIN && role == MemberRole.ADMIN) {
             throw BadRequestException.of("invitation.admin.cannot.invite.admin");
         }
 
-        appUserRepository.findByEmail(request.email().trim().toLowerCase())
+        String normalizedEmail = email.trim().toLowerCase();
+
+        appUserRepository.findByEmail(normalizedEmail)
                 .ifPresent(existingUser -> {
                     if (memberRepository.existsByWorkspace_IdAndUser_IdAndStatus(
                             workspaceId, existingUser.getId(), MemberStatus.ACTIVE)) {
@@ -73,7 +70,7 @@ public class InvitationService {
                 });
 
         Optional<WorkspaceInvitationEntity> existing = invitationRepository
-                .findByWorkspace_IdAndEmailAndStatus(workspaceId, request.email(), InvitationStatus.PENDING);
+                .findByWorkspace_IdAndEmailAndStatus(workspaceId, normalizedEmail, InvitationStatus.PENDING);
 
         WorkspaceEntity workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> NotFoundException.workspace(workspaceId));
@@ -82,18 +79,18 @@ public class InvitationService {
 
         if (existing.isPresent()) {
             WorkspaceInvitationEntity inv = existing.get();
-            inv.setRole(request.role());
+            inv.setRole(role);
             inv.setTokenHash(hashToken(rawToken));
             inv.setExpiresAt(OffsetDateTime.now().plusDays(EXPIRATION_DAYS));
             invitationRepository.save(inv);
             sendInvitationEmail(inv, rawToken, invitedByUserId, workspace.getName());
-            return toResponse(inv);
+            return inv;
         }
 
         WorkspaceInvitationEntity invitation = new WorkspaceInvitationEntity();
         invitation.setWorkspace(workspace);
-        invitation.setEmail(request.email().trim().toLowerCase());
-        invitation.setRole(request.role());
+        invitation.setEmail(normalizedEmail);
+        invitation.setRole(role);
         invitation.setStatus(InvitationStatus.PENDING);
         invitation.setTokenHash(hashToken(rawToken));
         invitation.setExpiresAt(OffsetDateTime.now().plusDays(EXPIRATION_DAYS));
@@ -103,7 +100,7 @@ public class InvitationService {
         auditPublisher.publish("member.invite", "workspace_invitation",
                 String.valueOf(invitation.getId()));
         sendInvitationEmail(invitation, rawToken, invitedByUserId, workspace.getName());
-        return toResponse(invitation);
+        return invitation;
     }
 
     @Transactional
@@ -123,7 +120,7 @@ public class InvitationService {
     }
 
     @Transactional
-    public InvitationResponse resendInvitation(Long workspaceId, Long invitationId) {
+    public WorkspaceInvitationEntity resendInvitation(Long workspaceId, Long invitationId) {
         WorkspaceInvitationEntity invitation = invitationRepository
                 .findByIdAndWorkspace_Id(invitationId, workspaceId)
                 .orElseThrow(() -> NotFoundException.entity("WorkspaceInvitation", invitationId));
@@ -140,11 +137,14 @@ public class InvitationService {
         sendInvitationEmail(invitation, rawToken, invitation.getInvitedByUserId(),
                 invitation.getWorkspace().getName());
 
-        return toResponse(invitation);
+        auditPublisher.publish("member.resend_invitation", "workspace_invitation",
+                String.valueOf(invitationId));
+
+        return invitation;
     }
 
     @Transactional
-    public AcceptInvitationResponse acceptInvitation(String rawToken, Long acceptingUserId) {
+    public WorkspaceInvitationEntity acceptInvitation(String rawToken, Long acceptingUserId) {
         String tokenHash = hashToken(rawToken);
 
         WorkspaceInvitationEntity invitation = invitationRepository.findByTokenHash(tokenHash)
@@ -197,8 +197,7 @@ public class InvitationService {
         auditPublisher.publish("member.accept_invitation", "workspace_invitation",
                 String.valueOf(invitation.getId()));
 
-        return new AcceptInvitationResponse(
-                workspace.getId(), workspace.getName(), invitation.getRole());
+        return invitation;
     }
 
     private void sendInvitationEmail(WorkspaceInvitationEntity invitation, String rawToken,
@@ -226,16 +225,5 @@ public class InvitationService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
-    }
-
-    private InvitationResponse toResponse(WorkspaceInvitationEntity entity) {
-        return new InvitationResponse(
-                entity.getId(),
-                entity.getEmail(),
-                entity.getRole(),
-                entity.getStatus(),
-                entity.getCreatedAt(),
-                entity.getExpiresAt()
-        );
     }
 }

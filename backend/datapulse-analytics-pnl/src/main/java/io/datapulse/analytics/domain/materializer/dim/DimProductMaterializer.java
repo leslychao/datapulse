@@ -42,7 +42,7 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String CH_INSERT = """
-            INSERT INTO dim_product
+            INSERT INTO %s
             (product_id, connection_id, source_platform, seller_sku_id, product_master_id,
              sku_code, marketplace_sku, product_name, brand, category, status, ver)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -53,44 +53,47 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
-        int offset = 0;
-        int total = 0;
+        final int[] total = {0};
 
-        while (true) {
-            List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            String chInsert = CH_INSERT.formatted(staging);
+            int offset = 0;
+
+            while (true) {
+                List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
                     Map.of("limit", properties.batchSize(), "offset", offset));
-            if (rows.isEmpty()) {
-                break;
+                if (rows.isEmpty()) {
+                    break;
+                }
+
+                jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
+                    ps.setLong(1, ((Number) row.get("product_id")).longValue());
+                    ps.setInt(2, ((Number) row.get("connection_id")).intValue());
+                    ps.setString(3, (String) row.get("source_platform"));
+                    ps.setLong(4, ((Number) row.get("seller_sku_id")).longValue());
+                    ps.setLong(5, ((Number) row.get("product_master_id")).longValue());
+                    ps.setString(6, (String) row.get("sku_code"));
+                    ps.setString(7, (String) row.get("marketplace_sku"));
+                    ps.setString(8, (String) row.get("product_name"));
+                    ps.setString(9, (String) row.get("brand"));
+                    ps.setString(10, (String) row.get("category"));
+                    ps.setString(11, (String) row.get("status"));
+                    ps.setLong(12, ver);
+                });
+
+                total[0] += rows.size();
+                offset += properties.batchSize();
             }
+        });
 
-            jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
-                ps.setLong(1, ((Number) row.get("product_id")).longValue());
-                ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-                ps.setString(3, (String) row.get("source_platform"));
-                ps.setLong(4, ((Number) row.get("seller_sku_id")).longValue());
-                ps.setLong(5, ((Number) row.get("product_master_id")).longValue());
-                ps.setString(6, (String) row.get("sku_code"));
-                ps.setString(7, (String) row.get("marketplace_sku"));
-                ps.setString(8, (String) row.get("product_name"));
-                ps.setString(9, (String) row.get("brand"));
-                ps.setString(10, (String) row.get("category"));
-                ps.setString(11, (String) row.get("status"));
-                ps.setLong(12, ver);
-            });
-
-            total += rows.size();
-            offset += properties.batchSize();
-        }
-
-        log.info("Materialized dim_product: rows={}", total);
+        log.info("Materialized dim_product: rows={}", total[0]);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
         long ver = Instant.now().toEpochMilli();
+        String chInsert = CH_INSERT.formatted(TABLE);
 
         String pgQuery = """
                 SELECT mo.id              AS product_id,
@@ -119,7 +122,7 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
             return;
         }
 
-        jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
+        jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
             ps.setLong(1, ((Number) row.get("product_id")).longValue());
             ps.setInt(2, ((Number) row.get("connection_id")).intValue());
             ps.setString(3, (String) row.get("source_platform"));

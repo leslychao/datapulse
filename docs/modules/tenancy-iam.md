@@ -130,7 +130,7 @@ Slug — человекочитаемый URL-safe идентификатор д
 
 ### Роли
 
-Enum в `workspace_member.role`:
+Enum `MemberRole` в `workspace_member.role`:
 
 | Роль | Назначение |
 |------|------------|
@@ -359,7 +359,47 @@ Scheduled job (hourly): `UPDATE workspace_invitation SET status = 'EXPIRED' WHER
 
 Default `expires_at`: 7 дней от создания. Cron: `datapulse.tenancy.invitation-expiry-cron` (default: `0 0 * * * *` — каждый час).
 
-Реализация: `InvitationExpiryScheduler` — `@Scheduled` + `@Transactional`, bulk JPQL UPDATE.
+Реализация: `InvitationExpiryScheduler` — `@Scheduled` + `@SchedulerLock(name = "invitationExpiry")` + `@Transactional`, bulk JPQL UPDATE.
+
+## Доменные сервисы
+
+### OnboardingService
+
+Первоначальная настройка: `createTenant(name, ownerUserId)` → `TenantEntity`, `createWorkspace(tenantId, name, ownerUserId)` → `WorkspaceSummary`, `getTenant(tenantId)` → `TenantEntity`. Лимит: MAX_TENANTS_PER_USER = 3. Создание workspace автоматически назначает OWNER.
+
+### WorkspaceService
+
+Управление lifecycle workspace: `listWorkspaces`, `getWorkspace`, `updateWorkspace`, `suspendWorkspace`, `reactivateWorkspace`, `archiveWorkspace`. Публикует audit events для каждой мутации.
+
+### MemberService
+
+Управление членством: `listMembers`, `changeRole`, `removeMember`, `transferOwnership`, `deactivateUser`, `reactivateUser`. Бизнес-правила: OWNER не может быть удалён/изменён; при transfer ownership — старый OWNER → ADMIN; деактивация каскадно выключает все memberships.
+
+### InvitationService
+
+Lifecycle приглашений: `createInvitation`, `cancelInvitation`, `resendInvitation`, `acceptInvitation`. Генерация SHA-256 hashed token. Дубль pending email → обновляет token и expires_at. Интеграция с `InvitationMailService` (Optional dependency).
+
+### UserProfileService
+
+Профиль текущего пользователя: `getProfile(userId)` → `UserProfile` (включает `needsOnboarding` flag и список memberships), `updateProfile(userId, name)`.
+
+### InvitationMailService
+
+Отправка email-приглашений: `@Async("mailExecutor")`, `@ConditionalOnBean(JavaMailSender.class)`. Thymeleaf-шаблон `invitation-email`.
+
+### TenancyAuditPublisher
+
+Обёртка над `ApplicationEventPublisher` для публикации `AuditEvent`. Вызывается из всех мутирующих сервисов. Обогащает событие `WorkspaceContext` данными (workspaceId, userId).
+
+### SlugUtils
+
+Utility для генерации URL-safe slug: транслитерация кириллицы → латиница, нормализация, appending random suffix при collision. Используется для tenant.slug и workspace.slug.
+
+### Domain records
+
+- `WorkspaceSummary` — результат `listWorkspaces` и `createWorkspace` (id, name, slug, status, tenantId, tenantName, connectionsCount, membersCount)
+- `UserProfile` — результат `getProfile` (id, email, name, needsOnboarding, memberships)
+- `UserProfile.WorkspaceMembership` — элемент списка memberships (workspaceId, workspaceName, tenantId, tenantName, role)
 
 ## Пользовательский сценарий: Онбординг (SC-1)
 
@@ -388,6 +428,7 @@ Audit records immutable: update и delete запрещены. Retention: не м
 | `user.deactivate` | `app_user` | Деактивация пользователя |
 | `user.reactivate` | `app_user` | Реактивация пользователя |
 | `workspace.create` | `workspace` | Создание workspace |
+| `workspace.update` | `workspace` | Обновление workspace (name) |
 | `workspace.suspend` | `workspace` | Suspend |
 | `workspace.reactivate` | `workspace` | Reactivate |
 | `workspace.archive` | `workspace` | Archive |
@@ -395,6 +436,7 @@ Audit records immutable: update и delete запрещены. Retention: не м
 | `member.invite` | `workspace_invitation` | Приглашение отправлено |
 | `member.accept_invitation` | `workspace_invitation` | Приглашение принято |
 | `member.cancel_invitation` | `workspace_invitation` | Приглашение отменено |
+| `member.resend_invitation` | `workspace_invitation` | Приглашение переотправлено |
 | `member.change_role` | `workspace_member` | Роль изменена; details: `{ old_role, new_role }` |
 | `member.remove` | `workspace_member` | Удалён из workspace |
 | `credential.access` | `marketplace_connection` | Credential read (vault) |
@@ -421,7 +463,7 @@ Audit records immutable: update и delete запрещены. Retention: не м
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/tenants/{tenantId}/workspaces` | OWNER (tenant) | Создать workspace. Body: `{ name }`. Response: `201 { id, name, slug }`. Создатель → OWNER |
+| POST | `/api/tenants/{tenantId}/workspaces` | OWNER (tenant) | Создать workspace. Body: `{ name }`. Response: `201 { id, name, slug, status, tenantId, tenantName, connectionsCount, membersCount }`. Создатель → OWNER |
 | GET | `/api/workspaces` | Authenticated | Список workspace-ов текущего пользователя (все memberships). No `X-Workspace-Id` header |
 | GET | `/api/workspaces/{workspaceId}` | Any role | Детали workspace. Response: `{ id, name, slug, status, createdAt, tenantId, tenantName, tenantSlug }` |
 | PUT | `/api/workspaces/{workspaceId}` | ADMIN, OWNER | Обновить workspace (name). Body: `{ name }` |
@@ -433,7 +475,7 @@ Audit records immutable: update и delete запрещены. Retention: не м
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/members` | Any role | Список членов workspace. Response: `[{ userId, email, name, role, status }]` |
+| GET | `/api/workspaces/{workspaceId}/members` | Any role | Список членов workspace. Response: `[{ userId, email, name, role, status, createdAt }]` |
 | PUT | `/api/workspaces/{workspaceId}/members/{userId}/role` | ADMIN, OWNER | Изменить роль. Body: `{ role }`. Ограничения: нельзя изменить OWNER; нельзя назначить OWNER (используй ownership transfer) |
 | DELETE | `/api/workspaces/{workspaceId}/members/{userId}` | ADMIN, OWNER | Удалить из workspace → `workspace_member.status = INACTIVE`. Нельзя удалить OWNER |
 | POST | `/api/workspaces/{workspaceId}/ownership-transfer` | OWNER | Transfer ownership. Body: `{ newOwnerUserId }` |

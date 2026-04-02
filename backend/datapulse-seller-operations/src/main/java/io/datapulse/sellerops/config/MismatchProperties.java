@@ -16,4 +16,13 @@ public class MismatchProperties {
     private int stockDeltaUnitsThreshold = 10;
     private BigDecimal stockDeltaPctThreshold = new BigDecimal("20");
     private int financeGapHoursThreshold = 48;
+    private int retentionDays = 90;
+
+    public int getStockAbsoluteThreshold() {
+        return stockDeltaUnitsThreshold;
+    }
+
+    public double getStockPercentThreshold() {
+        return stockDeltaPctThreshold.doubleValue();
+    }
 }

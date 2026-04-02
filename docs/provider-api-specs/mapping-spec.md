@@ -785,6 +785,7 @@ Use `@JsonIgnoreProperties(ignoreUnknown = true)` + nullable types.
 | `MarketplaceServicePremiumPromotion` | services | PREMIUM_PROMOTION | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: Premium promotion fixed commission |
 | `MarketplaceServicePremiumCashbackIndividualPoints` | services | PREMIUM_SELLER_BONUS | `marketing_cost_amount` | C-docs | amount < 0 | Official enum: seller bonus promotion |
 | `OperationSubscriptionPremium` | services | PREMIUM_SUBSCRIPTION | `other_marketplace_charges_amount` | C-docs | amount < 0 | Official enum: Premium subscription |
+| `InsuranceServiceSellerItem` | services | INSURANCE_SELLER | `other_marketplace_charges_amount` | C-code | amount < 0 | Discovered empirically; seller insurance service charge |
 | `MarketplaceReturnStorageServiceAtThePickupPointFbsItem` | services | FBS_RETURN_STORAGE_PVZ | `storage_cost_amount` | C-docs | amount < 0 | Official enum: FBS short-term return storage at PVZ |
 | `MarketplaceReturnStorageServiceInTheWarehouseFbsItem` | services | FBS_RETURN_STORAGE_WH | `storage_cost_amount` | C-docs | amount < 0 | Official enum: FBS long-term return storage in warehouse |
 | `MarketplaceServiceItemDeliveryKGT` | services | KGT_LOGISTICS | `logistics_cost_amount` | C-docs | amount < 0 | Official enum: oversized item logistics |
@@ -826,6 +827,7 @@ Per-posting P&L requires aggregating ALL operations by `posting_number`.
 | `MarketplaceServiceItemRedistributionReturnsPVZ` | `logistics_cost_amount` | 60 | -900 | C |
 | `MarketplaceServiceItemRedistributionDropOffApvz` | `logistics_cost_amount` | 7 | -105 | C |
 | `MarketplaceServiceItemDropoffPVZ` | `logistics_cost_amount` | 7 | -105 | C |
+| `MarketplaceServiceItemRedistributionLastMileCourier` | `logistics_cost_amount` | — | — | C-code (discovered empirically, not in official enum) |
 | `ItemAgentServiceStarsMembership` | `other_marketplace_charges_amount` | 1854 | -1,466 | C |
 | `MarketplaceRedistributionOfAcquiringOperation` | `acquiring_commission_amount` | 1648 | -2,864 | C |
 | `MarketplaceServiceBrandCommission` | `marketplace_commission_amount` | 1847 | -1,398 | C |

@@ -249,4 +249,33 @@ public class GridClickHouseReadRepository {
                 .returnRatePct(rs.getBigDecimal("return_rate_pct"))
                 .build();
     }
+
+    private static final String STOCK_SNAPSHOT_QUERY = """
+            SELECT
+                marketplace_offer_id AS offer_id,
+                toInt32(sum(available)) AS snapshot_stock
+            FROM fact_inventory_snapshot
+            WHERE marketplace_connection_id IN (%s)
+              AND snapshot_date = (
+                  SELECT max(snapshot_date) FROM fact_inventory_snapshot
+                  WHERE marketplace_connection_id IN (%s)
+              )
+            GROUP BY marketplace_offer_id
+            """;
+
+    public Map<Long, Integer> findLatestSnapshotStocks(List<Long> connectionIds) {
+        if (connectionIds == null || connectionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        String inClause = connectionIds.stream()
+                .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        String sql = STOCK_SNAPSHOT_QUERY.formatted(inClause, inClause);
+        return ch.getJdbcTemplate().query(sql, (ResultSet rs) -> {
+            Map<Long, Integer> result = new java.util.HashMap<>();
+            while (rs.next()) {
+                result.put(rs.getLong("offer_id"), rs.getInt("snapshot_stock"));
+            }
+            return result;
+        });
+    }
 }

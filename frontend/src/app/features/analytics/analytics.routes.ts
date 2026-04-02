@@ -1,6 +1,16 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { CanActivateFn, Router, Routes } from '@angular/router';
+
+import { RbacService } from '@core/auth/rbac.service';
 
 import { AnalyticsLayoutComponent } from './analytics-layout.component';
+
+const reconciliationGuard: CanActivateFn = () => {
+  const rbac = inject(RbacService);
+  const router = inject(Router);
+  if (rbac.isAdmin()) return true;
+  return router.createUrlTree(['/analytics/data-quality/status']);
+};
 
 const routes: Routes = [
   {
@@ -118,6 +128,7 @@ const routes: Routes = [
       },
       {
         path: 'data-quality/reconciliation',
+        canActivate: [reconciliationGuard],
         loadComponent: () =>
           import('./data-quality/reconciliation-page.component').then(
             (m) => m.ReconciliationPageComponent,

@@ -27,7 +27,7 @@ import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { ActionFilter, ActionSummary } from '@core/models';
-import { formatMoney, formatRelativeTime } from '@shared/utils/format.utils';
+import { formatMoney, formatRelativeTime, formatDateTime } from '@shared/utils/format.utils';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -54,6 +54,7 @@ const ACTION_STATUSES = [
 
 const CANCELLABLE = new Set([
   'PENDING_APPROVAL', 'APPROVED', 'ON_HOLD', 'SCHEDULED', 'RETRY_SCHEDULED',
+  'RECONCILIATION_PENDING',
 ]);
 
 interface ContextMenuState {
@@ -135,16 +136,14 @@ interface ContextMenuState {
             </div>
           }
         </div>
-        @if (rbac.canExport()) {
-          <button
-            (click)="exportCsv()"
-            [disabled]="exportPending()"
-            class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:opacity-50"
-            [attr.aria-label]="'execution.list.export' | translate"
-          >
-            {{ 'execution.list.export' | translate }}
-          </button>
-        }
+        <button
+          (click)="exportCsv()"
+          [disabled]="exportPending()"
+          class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          [attr.aria-label]="'execution.list.export' | translate"
+        >
+          {{ 'execution.list.export' | translate }}
+        </button>
       </div>
 
       <!-- Data Grid -->
@@ -158,8 +157,8 @@ interface ContextMenuState {
         } @else if (!actionsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
             [message]="hasActiveFilters() ? ('execution.list.empty_filtered' | translate) : ('execution.list.empty' | translate)"
-            [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
-            (action)="onFiltersChanged({})"
+            [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ('execution.list.empty_action' | translate)"
+            (action)="hasActiveFilters() ? onFiltersChanged({}) : navigateToPricing()"
           />
         } @else {
           <dp-data-grid
@@ -262,6 +261,7 @@ interface ContextMenuState {
                     <span class="text-[11px] text-[var(--text-tertiary)]">{{ item.sku }}</span>
                   </div>
                   <span class="ml-3 whitespace-nowrap font-mono text-sm text-[var(--text-primary)]">{{ formatPrice(item.targetPrice) }}</span>
+                  <span class="ml-2 whitespace-nowrap font-mono text-[11px]" [style.color]="deltaColor(item.priceDeltaPct)">{{ deltaDisplay(item.priceDeltaPct) }}</span>
                 </div>
               }
               @if (pendingSelected().length > 5) {
@@ -599,6 +599,7 @@ export class ActionsListPageComponent implements OnInit {
       sortable: true,
       sort: 'desc' as const,
       valueFormatter: (params: any) => this.formatRelativeTime(params.value),
+      tooltipValueGetter: (params: any) => formatDateTime(params.value, 'full'),
     },
   ];
 
@@ -878,6 +879,10 @@ export class ActionsListPageComponent implements OnInit {
     this.selectedRows.set([]);
   }
 
+  navigateToPricing(): void {
+    this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'pricing', 'policies']);
+  }
+
   canCancelRow(row: ActionSummary | null): boolean {
     return !!row && CANCELLABLE.has(row.status);
   }
@@ -929,6 +934,19 @@ export class ActionsListPageComponent implements OnInit {
 
   formatPrice(value: number | null): string {
     return formatMoney(value, 0);
+  }
+
+  deltaDisplay(pct: number | null | undefined): string {
+    if (pct === null || pct === undefined) return '—';
+    const abs = Math.abs(pct).toFixed(1).replace('.', ',');
+    if (pct > 0) return `↑ ${abs}%`;
+    if (pct < 0) return `↓ ${abs}%`;
+    return `→ 0%`;
+  }
+
+  deltaColor(pct: number | null | undefined): string {
+    if (pct === null || pct === undefined || pct === 0) return 'var(--finance-zero)';
+    return pct > 0 ? 'var(--finance-positive)' : 'var(--finance-negative)';
   }
 
   private formatRelativeTime(iso: string | null): string {

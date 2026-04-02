@@ -2,6 +2,7 @@ package io.datapulse.sellerops.domain;
 
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
+import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.sellerops.api.AddQueueItemRequest;
 import io.datapulse.sellerops.api.CreateQueueRequest;
@@ -76,10 +77,18 @@ public class WorkingQueueService {
   }
 
   @Transactional
+    private static final int MAX_CUSTOM_QUEUES_PER_WORKSPACE = 20;
+
   public QueueSummaryResponse createQueue(long workspaceId, CreateQueueRequest request) {
     if (definitionRepository.existsByWorkspaceIdAndName(workspaceId, request.name())) {
       throw BadRequestException.of(
           MessageCodes.DUPLICATE_ENTITY, "working_queue", request.name());
+    }
+
+    long customCount = definitionRepository.countByWorkspaceIdAndIsSystemFalse(workspaceId);
+    if (customCount >= MAX_CUSTOM_QUEUES_PER_WORKSPACE) {
+      throw BadRequestException.of(
+          MessageCodes.QUEUE_LIMIT_EXCEEDED, MAX_CUSTOM_QUEUES_PER_WORKSPACE);
     }
 
     var entity = new WorkingQueueDefinitionEntity();
@@ -145,7 +154,7 @@ public class WorkingQueueService {
 
     int updated = assignmentRepository.casClaim(itemId, queueId, userId);
     if (updated == 0) {
-      throw BadRequestException.of(MessageCodes.QUEUE_ITEM_INVALID_STATE, "queue_item");
+      throw ConflictException.of(MessageCodes.QUEUE_ITEM_ALREADY_CLAIMED);
     }
 
     WorkingQueueAssignmentEntity item = findItemOrThrow(queueId, itemId);

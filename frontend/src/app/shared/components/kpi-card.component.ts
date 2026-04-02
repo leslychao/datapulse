@@ -28,6 +28,7 @@ const ACCENT_STYLES: Record<KpiAccent, { bg: string; fg: string }> = {
   template: `
     <div
       class="flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3.5 py-2.5"
+      [title]="tooltip()"
     >
       @if (icon(); as img) {
         <div
@@ -60,6 +61,9 @@ const ACCENT_STYLES: Record<KpiAccent, { bg: string; fg: string }> = {
           <span class="font-mono text-[length:var(--text-lg)] font-bold leading-tight text-[var(--text-primary)]">
             {{ displayValue() }}
           </span>
+          @if (subtitle()) {
+            <span class="truncate text-[length:var(--text-xs)] leading-snug text-[var(--text-tertiary)]">{{ subtitle() }}</span>
+          }
         }
       </div>
     </div>
@@ -68,6 +72,8 @@ const ACCENT_STYLES: Record<KpiAccent, { bg: string; fg: string }> = {
 export class KpiCardComponent {
   readonly label = input.required<string>();
   readonly value = input<string | number | null>(null);
+  readonly subtitle = input<string>('');
+  readonly tooltip = input<string>('');
   readonly trend = input<number | null>(null);
   readonly trendDirection = input<TrendDirection>('neutral');
   readonly icon = input<LucideIconData | null>(null);

@@ -38,6 +38,16 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
     <div class="flex flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
+        <select
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          [value]="connectionId()"
+          (change)="onConnectionChange($event)"
+        >
+          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
+          @for (conn of connectionsQuery.data() ?? []; track conn.id) {
+            <option [value]="conn.id">{{ conn.name }}</option>
+          }
+        </select>
         <label class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
           {{ 'form.date_from' | translate }}
         </label>
@@ -127,18 +137,26 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
 })
 export class PnlTrendPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
+  readonly connectionId = signal(0);
   readonly dateFrom = signal(daysAgo(90));
   readonly dateTo = signal(daysAgo(0));
   readonly granularity = signal<Granularity>('MONTHLY');
   readonly granularityOptions = GRANULARITY_OPTIONS;
 
+  readonly connectionsQuery = injectQuery(() => ({
+    queryKey: ['connections'],
+    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+  }));
+
   readonly trendQuery = injectQuery(() => ({
     queryKey: [
       'analytics', 'pnl-trend-page',
       this.wsStore.currentWorkspaceId(),
+      this.connectionId(),
       this.dateFrom(),
       this.dateTo(),
       this.granularity(),
@@ -146,6 +164,7 @@ export class PnlTrendPageComponent {
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getPnlTrend(this.wsStore.currentWorkspaceId()!, {
+          connectionId: this.connectionId() || undefined,
           from: this.dateFrom(),
           to: this.dateTo(),
           granularity: this.granularity(),
@@ -199,6 +218,10 @@ export class PnlTrendPageComponent {
       ],
     };
   });
+
+  onConnectionChange(event: Event): void {
+    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
+  }
 
   onDateFromChange(event: Event): void {
     const input = event.target as HTMLInputElement;

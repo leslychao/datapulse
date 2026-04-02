@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
-  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -205,7 +204,7 @@ export class WorkspaceSelectorComponent implements OnInit {
         membersCount: detail?.membersCount ?? 1,
         connectionsCount: detail?.connectionsCount ?? 0,
         role: m.role,
-        marketplaces: [],
+        marketplaces: detail?.marketplaceTypes ?? [],
       };
     });
   }

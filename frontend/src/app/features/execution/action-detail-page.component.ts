@@ -138,6 +138,43 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
   );
   readonly statusColor = computed(() => STATUS_COLOR[this.status()] ?? 'neutral');
 
+  readonly statusContext = computed(() => {
+    const a = this.action();
+    if (!a) return '';
+    switch (a.status) {
+      case 'PENDING_APPROVAL':
+        return this.translate.instant('execution.detail.ctx.pending_approval');
+      case 'APPROVED':
+        return a.approvedBy
+          ? this.translate.instant('execution.detail.ctx.approved', { name: a.approvedBy, at: this.formatTimestamp(a.updatedAt) })
+          : '';
+      case 'ON_HOLD':
+        return a.holdReason
+          ? this.translate.instant('execution.detail.ctx.on_hold', { reason: a.holdReason })
+          : '';
+      case 'EXECUTING':
+        return this.translate.instant('execution.detail.ctx.executing', { attempt: a.attemptCount, max: a.maxAttempts });
+      case 'RECONCILIATION_PENDING':
+        return this.translate.instant('execution.detail.ctx.reconciliation_pending');
+      case 'RETRY_SCHEDULED':
+        return this.translate.instant('execution.detail.ctx.retry_scheduled');
+      case 'FAILED': {
+        const last = (a.attempts ?? []).at(-1);
+        return last?.errorMessage
+          ? this.translate.instant('execution.detail.ctx.failed', { error: last.errorMessage })
+          : '';
+      }
+      case 'SUCCEEDED': {
+        const lastAttempt = (a.attempts ?? []).at(-1);
+        return lastAttempt?.reconciliationSource
+          ? this.translate.instant('execution.detail.ctx.succeeded', { source: lastAttempt.reconciliationSource })
+          : '';
+      }
+      default:
+        return '';
+    }
+  });
+
   readonly deltaPctDisplay = computed(() => {
     const d = this.action()?.priceDeltaPct;
     if (d === null || d === undefined) return '—';

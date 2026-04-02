@@ -5,6 +5,7 @@ import io.datapulse.sellerops.domain.GridExportService;
 import io.datapulse.sellerops.domain.GridService;
 import io.datapulse.sellerops.domain.SavedViewService;
 import io.datapulse.sellerops.persistence.SavedViewEntity;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -63,7 +64,8 @@ public class GridController {
             @RequestParam(value = "last_decision", required = false) String lastDecision,
             @RequestParam(value = "last_action_status", required = false) String lastActionStatus,
             @RequestParam(value = "stock_risk", required = false) String stockRisk,
-            @RequestParam(value = "view_id", required = false) Long viewId) {
+            @RequestParam(value = "view_id", required = false) Long viewId,
+            HttpServletResponse httpResponse) {
 
         int clampedSize = Math.min(size, gridProperties.getMaxPageSize());
 
@@ -83,8 +85,14 @@ public class GridController {
             pageSort = buildSort(sort, direction);
         }
 
-        return gridService.getGridPage(workspaceId, filter,
+        Page<GridRowResponse> result = gridService.getGridPage(workspaceId, filter,
                 PageRequest.of(page, clampedSize, pageSort));
+
+        if (gridService.wasChSortFallback()) {
+            httpResponse.setHeader("X-Sort-Fallback", "true");
+        }
+
+        return result;
     }
 
     @GetMapping("/export")
@@ -122,7 +130,7 @@ public class GridController {
 
     @GetMapping("/matching-ids")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public List<Long> getMatchingIds(
+    public MatchingIdsResponse getMatchingIds(
             @PathVariable("workspaceId") Long workspaceId,
             @RequestParam(value = "marketplace_type", required = false) List<String> marketplaceType,
             @RequestParam(value = "connection_id", required = false) List<Long> connectionId,

@@ -31,6 +31,7 @@ public class RabbitTopologyConfig {
   public static final String ETL_SYNC_WAIT_QUEUE = "etl.sync.wait";
   public static final String ETL_EVENTS_PRICING_QUEUE = "etl.events.pricing-worker";
   public static final String ETL_EVENTS_API_QUEUE = "etl.events.api";
+  public static final String ETL_EVENTS_MISMATCH_QUEUE = "etl.events.mismatch";
   public static final String PRICING_RUN_QUEUE = "pricing.run";
   public static final String PRICE_EXECUTION_QUEUE = "price.execution";
   public static final String PRICE_EXECUTION_WAIT_QUEUE = "price.execution.wait";
@@ -76,6 +77,7 @@ public class RabbitTopologyConfig {
 
     var etlEventsPricingQueue = QueueBuilder.durable(ETL_EVENTS_PRICING_QUEUE).build();
     var etlEventsApiQueue = QueueBuilder.durable(ETL_EVENTS_API_QUEUE).build();
+    var etlEventsMismatchQueue = QueueBuilder.durable(ETL_EVENTS_MISMATCH_QUEUE).build();
 
     // ── Wait queues (DLX → main exchange after TTL) ─────────────────────
 
@@ -126,6 +128,8 @@ public class RabbitTopologyConfig {
         .to(etlEventsExchange);
     Binding etlEventsApiBinding = BindingBuilder.bind(etlEventsApiQueue)
         .to(etlEventsExchange);
+    Binding etlEventsMismatchBinding = BindingBuilder.bind(etlEventsMismatchQueue)
+        .to(etlEventsExchange);
 
     return new Declarables(
         // exchanges
@@ -140,7 +144,7 @@ public class RabbitTopologyConfig {
         priceReconciliationQueue, promoExecutionQueue, promoEvaluationQueue,
 
         // fanout queues
-        etlEventsPricingQueue, etlEventsApiQueue,
+        etlEventsPricingQueue, etlEventsApiQueue, etlEventsMismatchQueue,
 
         // wait queues
         etlSyncWaitQueue, priceExecutionWaitQueue, priceReconciliationWaitQueue,
@@ -153,7 +157,7 @@ public class RabbitTopologyConfig {
         etlSyncWaitBinding, priceExecutionWaitBinding, priceReconciliationWaitBinding,
 
         // bindings: fanout
-        etlEventsPricingBinding, etlEventsApiBinding
+        etlEventsPricingBinding, etlEventsApiBinding, etlEventsMismatchBinding
     );
   }
 }

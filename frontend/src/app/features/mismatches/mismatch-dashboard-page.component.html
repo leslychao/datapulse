@@ -43,16 +43,12 @@
     </div>
 
     <!-- Charts -->
-    <div class="grid grid-cols-1 gap-3 px-4 py-3 lg:grid-cols-2">
-      <div
-        class="flex h-48 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-secondary)]"
-      >
-        {{ 'mismatches.charts.donut_placeholder' | translate }}
+    <div class="grid grid-cols-[2fr_3fr] gap-3 px-4 py-3">
+      <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2">
+        <dp-chart [options]="donutOptions()" height="180px" [loading]="summaryQuery.isPending()" (chartClick)="onChartClick($event)" />
       </div>
-      <div
-        class="flex h-48 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-secondary)]"
-      >
-        {{ 'mismatches.charts.stacked_placeholder' | translate }}
+      <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2">
+        <dp-chart [options]="timelineOptions()" height="180px" [loading]="summaryQuery.isPending()" />
       </div>
     </div>
 
@@ -145,11 +141,11 @@
       <div class="min-w-[180px] flex-1 flex-col gap-1">
         <label class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.search' | translate }}</label>
         <input
+          #searchInput
           type="search"
           class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
           [ngModel]="searchQuery()"
-          (ngModelChange)="searchQuery.set($event)"
-          (keyup.enter)="applyFilters()"
+          (ngModelChange)="onSearchInput($event)"
         />
       </div>
       <button
@@ -159,6 +155,46 @@
       >
         {{ 'filter_bar.reset_all' | translate }}
       </button>
+    </div>
+
+    <!-- Grid toolbar -->
+    <div class="flex items-center justify-between px-4 pb-1 pt-2">
+      <span class="text-sm text-[var(--text-secondary)]">
+        {{ 'mismatches.pagination.showing' | translate: { range: paginationLabel(), total: totalElements() } }}
+      </span>
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <button
+            type="button"
+            (click)="showColumnsPanel.set(!showColumnsPanel())"
+            class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+          >
+            {{ 'mismatches.toolbar.columns' | translate }}
+          </button>
+          @if (showColumnsPanel()) {
+            <div class="absolute right-0 top-full z-20 mt-1 w-56 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2 shadow-[var(--shadow-md)]">
+              @for (col of toggleableColumns(); track col.colId) {
+                <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+                  <input
+                    type="checkbox"
+                    [checked]="isColumnVisible(col.colId)"
+                    (change)="toggleColumn(col.colId)"
+                    class="accent-[var(--accent-primary)]"
+                  />
+                  {{ col.headerName }}
+                </label>
+              }
+            </div>
+          }
+        </div>
+        <button
+          type="button"
+          (click)="exportCsv()"
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+        >
+          {{ 'mismatches.toolbar.export' | translate }}
+        </button>
+      </div>
     </div>
 
     <!-- Grid -->
@@ -197,11 +233,39 @@
           [suppressCellFocus]="true"
           [animateRows]="false"
           [pagination]="false"
+          [preventDefaultOnContextMenu]="true"
           (gridReady)="onGridReady($event)"
           (rowClicked)="onRowClicked($event)"
           (selectionChanged)="onSelectionChanged($event)"
           (sortChanged)="onSortChanged($event)"
+          (cellContextMenu)="onCellContextMenu($event)"
         />
+
+        <!-- Context menu -->
+        @if (contextMenu(); as ctx) {
+          <div
+            class="fixed z-50 min-w-[180px] rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] py-1 shadow-[var(--shadow-md)]"
+            [style.left.px]="ctx.x"
+            [style.top.px]="ctx.y"
+            (click)="$event.stopPropagation()"
+          >
+            <button type="button" (click)="contextOpenDetail()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+              {{ 'mismatches.context.open' | translate }}
+            </button>
+            <button type="button" (click)="contextGoToProduct()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+              {{ 'mismatches.context.go_product' | translate }}
+            </button>
+            <button type="button" (click)="contextCopySku()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+              {{ 'mismatches.context.copy_sku' | translate }}
+            </button>
+            @if (rbac.canIgnoreMismatches()) {
+              <div class="my-1 border-t border-[var(--border-default)]"></div>
+              <button type="button" (click)="contextIgnore()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--status-error)] hover:bg-[var(--bg-tertiary)]">
+                {{ 'mismatches.context.ignore' | translate }}
+              </button>
+            }
+          </div>
+        }
       }
     </div>
 
@@ -210,7 +274,7 @@
       <div
         class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5 text-sm text-[var(--text-secondary)]"
       >
-        <span>{{ 'mismatches.pagination.total' | translate: { count: totalElements() } }}</span>
+        <span>{{ 'mismatches.pagination.showing' | translate: { range: paginationLabel(), total: totalElements() } }}</span>
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-1.5">
             <span class="text-[var(--text-xs)]">{{ 'mismatches.pagination.page_size' | translate }}:</span>

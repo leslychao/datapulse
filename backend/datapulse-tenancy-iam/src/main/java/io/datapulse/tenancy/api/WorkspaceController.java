@@ -3,6 +3,8 @@ package io.datapulse.tenancy.api;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.MemberService;
 import io.datapulse.tenancy.domain.WorkspaceService;
+import io.datapulse.tenancy.domain.WorkspaceSummary;
+import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,66 +26,85 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WorkspaceController {
 
-  private final WorkspaceService workspaceService;
-  private final MemberService memberService;
-  private final WorkspaceContext workspaceContext;
+    private final WorkspaceService workspaceService;
+    private final MemberService memberService;
+    private final WorkspaceContext workspaceContext;
 
-  @GetMapping
-  @PreAuthorize("isAuthenticated()")
-  public List<WorkspaceListResponse> listWorkspaces() {
-    return workspaceService.listWorkspaces(workspaceContext.getUserId());
-  }
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public List<WorkspaceListResponse> listWorkspaces() {
+        return workspaceService.listWorkspaces(workspaceContext.getUserId()).stream()
+                .map(this::toListResponse)
+                .toList();
+    }
 
-  @GetMapping("/{workspaceId}")
-  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-  public WorkspaceResponse getWorkspace(@PathVariable("workspaceId") Long workspaceId) {
-    return workspaceService.getWorkspace(workspaceId);
-  }
+    @GetMapping("/{workspaceId}")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public WorkspaceResponse getWorkspace(@PathVariable("workspaceId") Long workspaceId) {
+        WorkspaceEntity ws = workspaceService.getWorkspace(workspaceId);
+        return toResponse(ws);
+    }
 
-  @PutMapping("/{workspaceId}")
-  @PreAuthorize(
-      "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
-          + " and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
-  public WorkspaceResponse updateWorkspace(@PathVariable("workspaceId") Long workspaceId,
-      @Valid @RequestBody UpdateWorkspaceRequest request) {
-    return workspaceService.updateWorkspace(workspaceId, request);
-  }
+    @PutMapping("/{workspaceId}")
+    @PreAuthorize(
+            "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+                    + " and hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
+    public WorkspaceResponse updateWorkspace(@PathVariable("workspaceId") Long workspaceId,
+                                             @Valid @RequestBody UpdateWorkspaceRequest request) {
+        WorkspaceEntity ws = workspaceService.updateWorkspace(workspaceId, request.name());
+        return toResponse(ws);
+    }
 
-  @PostMapping("/{workspaceId}/suspend")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize(
-      "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
-          + " and hasAnyAuthority('ROLE_OWNER')")
-  public void suspendWorkspace(@PathVariable("workspaceId") Long workspaceId) {
-    workspaceService.suspendWorkspace(workspaceId);
-  }
+    @PostMapping("/{workspaceId}/suspend")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize(
+            "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+                    + " and hasAnyAuthority('ROLE_OWNER')")
+    public void suspendWorkspace(@PathVariable("workspaceId") Long workspaceId) {
+        workspaceService.suspendWorkspace(workspaceId);
+    }
 
-  @PostMapping("/{workspaceId}/reactivate")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize(
-      "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
-          + " and hasAnyAuthority('ROLE_OWNER')")
-  public void reactivateWorkspace(@PathVariable("workspaceId") Long workspaceId) {
-    workspaceService.reactivateWorkspace(workspaceId);
-  }
+    @PostMapping("/{workspaceId}/reactivate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize(
+            "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+                    + " and hasAnyAuthority('ROLE_OWNER')")
+    public void reactivateWorkspace(@PathVariable("workspaceId") Long workspaceId) {
+        workspaceService.reactivateWorkspace(workspaceId);
+    }
 
-  @PostMapping("/{workspaceId}/archive")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize(
-      "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
-          + " and hasAnyAuthority('ROLE_OWNER')")
-  public void archiveWorkspace(@PathVariable("workspaceId") Long workspaceId) {
-    workspaceService.archiveWorkspace(workspaceId);
-  }
+    @PostMapping("/{workspaceId}/archive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize(
+            "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+                    + " and hasAnyAuthority('ROLE_OWNER')")
+    public void archiveWorkspace(@PathVariable("workspaceId") Long workspaceId) {
+        workspaceService.archiveWorkspace(workspaceId);
+    }
 
-  @PostMapping("/{workspaceId}/ownership-transfer")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @PreAuthorize(
-      "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
-          + " and hasAnyAuthority('ROLE_OWNER')")
-  public void transferOwnership(@PathVariable("workspaceId") Long workspaceId,
-      @Valid @RequestBody OwnershipTransferRequest request) {
-    memberService.transferOwnership(
-        workspaceId, workspaceContext.getUserId(), request.newOwnerUserId());
-  }
+    @PostMapping("/{workspaceId}/ownership-transfer")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize(
+            "@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+                    + " and hasAnyAuthority('ROLE_OWNER')")
+    public void transferOwnership(@PathVariable("workspaceId") Long workspaceId,
+                                  @Valid @RequestBody OwnershipTransferRequest request) {
+        memberService.transferOwnership(
+                workspaceId, workspaceContext.getUserId(), request.newOwnerUserId());
+    }
+
+    private WorkspaceResponse toResponse(WorkspaceEntity ws) {
+        return new WorkspaceResponse(
+                ws.getId(), ws.getName(), ws.getSlug(), ws.getStatus(),
+                ws.getCreatedAt(),
+                ws.getTenant().getId(), ws.getTenant().getName(),
+                ws.getTenant().getSlug());
+    }
+
+    private WorkspaceListResponse toListResponse(WorkspaceSummary ws) {
+        return new WorkspaceListResponse(
+                ws.id(), ws.name(), ws.slug(), ws.status(),
+                ws.tenantId(), ws.tenantName(),
+                ws.connectionsCount(), ws.membersCount());
+    }
 }

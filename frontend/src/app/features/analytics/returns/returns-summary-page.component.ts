@@ -33,6 +33,16 @@ import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.u
                  px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none focus:border-[var(--accent-primary)]"
         />
+        <select
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          [value]="connectionId()"
+          (change)="onConnectionChange($event)"
+        >
+          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
+          @for (conn of connectionsQuery.data() ?? []; track conn.id) {
+            <option [value]="conn.id">{{ conn.name }}</option>
+          }
+        </select>
       </div>
 
       @if (summaryQuery.isPending()) {
@@ -133,17 +143,24 @@ import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.u
 })
 export class ReturnsSummaryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
 
   readonly period = signal(currentMonth());
+  readonly connectionId = signal(0);
+
+  readonly connectionsQuery = injectQuery(() => ({
+    queryKey: ['connections'],
+    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+  }));
 
   readonly summaryQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'returns-summary', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'returns-summary', this.wsStore.currentWorkspaceId(), this.period(), this.connectionId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getReturnsSummary(
           this.wsStore.currentWorkspaceId()!,
-          { period: this.period() },
+          { period: this.period(), connectionId: this.connectionId() || undefined },
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -196,6 +213,10 @@ export class ReturnsSummaryPageComponent {
       ],
     };
   });
+
+  onConnectionChange(event: Event): void {
+    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
+  }
 
   onPeriodChange(event: Event): void {
     this.period.set((event.target as HTMLInputElement).value);

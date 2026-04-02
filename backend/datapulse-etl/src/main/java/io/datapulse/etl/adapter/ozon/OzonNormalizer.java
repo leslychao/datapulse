@@ -50,18 +50,22 @@ public class OzonNormalizer {
 
     public NormalizedCatalogItem normalizeProductInfo(OzonProductInfo info) {
         String marketplaceSku = String.valueOf(info.id());
+        String marketplaceSkuAlt = extractFirstSourceSku(info);
         String barcode = info.barcodes() != null && !info.barcodes().isEmpty()
                 ? info.barcodes().get(0)
                 : info.barcode();
         String status = resolveProductStatus(info);
+        String category = info.descriptionCategoryId() != 0
+                ? String.valueOf(info.descriptionCategoryId())
+                : null;
 
         return new NormalizedCatalogItem(
                 info.offerId(),
                 marketplaceSku,
-                null,
+                marketplaceSkuAlt,
                 info.name(),
                 null,
-                null,
+                category,
                 barcode,
                 status
         );
@@ -164,7 +168,7 @@ public class OzonNormalizer {
         }
         BigDecimal pricePerUnit = parseBigDecimal(product.price());
         BigDecimal totalAmount = pricePerUnit.multiply(BigDecimal.valueOf(product.quantity()));
-        String region = posting.analyticsData() != null ? posting.analyticsData().region() : null;
+        String city = posting.analyticsData() != null ? posting.analyticsData().city() : null;
 
         return new NormalizedOrderItem(
                 posting.postingNumber(),
@@ -176,7 +180,7 @@ public class OzonNormalizer {
                 orderDate,
                 posting.status(),
                 "FBS",
-                region
+                city
         );
     }
 
@@ -423,6 +427,17 @@ public class OzonNormalizer {
             log.warn("Failed to serialize promo payload: {}", e.getMessage());
             return null;
         }
+    }
+
+    private static String extractFirstSourceSku(OzonProductInfo info) {
+        if (info.sources() == null || info.sources().isEmpty()) {
+            return null;
+        }
+        return info.sources().stream()
+                .filter(s -> s.sku() != null && !s.sku().isBlank())
+                .map(OzonProductInfo.OzonProductSource::sku)
+                .findFirst()
+                .orElse(null);
     }
 
     private static String resolveProductStatus(OzonProductInfo info) {

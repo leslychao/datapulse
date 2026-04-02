@@ -74,6 +74,17 @@ export class PostingDetailPageComponent {
     return result;
   });
 
+  openProvenance(entryId: number): void {
+    lastValueFrom(
+      this.analyticsApi.getProvenanceRawUrl(
+        this.wsStore.currentWorkspaceId()!,
+        entryId,
+      ),
+    ).then((result) => {
+      window.open(result.url, '_blank');
+    });
+  }
+
   goBack(): void {
     this.router.navigate(['/analytics/pnl/by-posting']);
   }

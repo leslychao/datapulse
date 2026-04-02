@@ -2,14 +2,12 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.UpdateWorkspaceRequest;
-import io.datapulse.tenancy.api.WorkspaceListResponse;
-import io.datapulse.tenancy.api.WorkspaceResponse;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.tenancy.persistence.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +22,7 @@ public class WorkspaceService {
     private final TenancyAuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
-    public List<WorkspaceListResponse> listWorkspaces(Long userId) {
+    public List<WorkspaceSummary> listWorkspaces(Long userId) {
         List<WorkspaceMemberEntity> memberships = memberRepository
                 .findByUser_IdAndStatus(userId, MemberStatus.ACTIVE);
 
@@ -33,7 +31,7 @@ public class WorkspaceService {
                     WorkspaceEntity ws = m.getWorkspace();
                     long membersCount = memberRepository.countByWorkspace_IdAndStatus(
                             ws.getId(), MemberStatus.ACTIVE);
-                    return new WorkspaceListResponse(
+                    return new WorkspaceSummary(
                             ws.getId(), ws.getName(), ws.getSlug(), ws.getStatus(),
                             ws.getTenant().getId(), ws.getTenant().getName(),
                             0, membersCount);
@@ -42,20 +40,22 @@ public class WorkspaceService {
     }
 
     @Transactional(readOnly = true)
-    public WorkspaceResponse getWorkspace(Long workspaceId) {
+    public WorkspaceEntity getWorkspace(Long workspaceId) {
         WorkspaceEntity ws = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> NotFoundException.workspace(workspaceId));
-        return toResponse(ws);
+        Hibernate.initialize(ws.getTenant());
+        return ws;
     }
 
     @Transactional
-    public WorkspaceResponse updateWorkspace(Long workspaceId, UpdateWorkspaceRequest request) {
+    public WorkspaceEntity updateWorkspace(Long workspaceId, String name) {
         WorkspaceEntity ws = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> NotFoundException.workspace(workspaceId));
-        ws.setName(request.name().trim());
+        ws.setName(name.trim());
         workspaceRepository.save(ws);
         auditPublisher.publish("workspace.update", "workspace", String.valueOf(workspaceId));
-        return toResponse(ws);
+        Hibernate.initialize(ws.getTenant());
+        return ws;
     }
 
     @Transactional
@@ -93,18 +93,5 @@ public class WorkspaceService {
             throw BadRequestException.of("workspace.not.active");
         }
         return ws;
-    }
-
-    private WorkspaceResponse toResponse(WorkspaceEntity ws) {
-        return new WorkspaceResponse(
-                ws.getId(),
-                ws.getName(),
-                ws.getSlug(),
-                ws.getStatus(),
-                ws.getCreatedAt(),
-                ws.getTenant().getId(),
-                ws.getTenant().getName(),
-                ws.getTenant().getSlug()
-        );
     }
 }

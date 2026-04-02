@@ -4,6 +4,7 @@ import io.datapulse.tenancy.domain.InvitationStatus;
 import io.datapulse.tenancy.persistence.WorkspaceInvitationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ public class InvitationExpiryScheduler {
     private final WorkspaceInvitationRepository invitationRepository;
 
     @Scheduled(cron = "${datapulse.tenancy.invitation-expiry-cron:0 0 * * * *}")
+    @SchedulerLock(name = "invitationExpiry", lockAtMostFor = "PT10M")
     @Transactional
     public void expireOverdueInvitations() {
         try {

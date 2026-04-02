@@ -25,7 +25,7 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "mart_returns_analysis";
 
     private static final String FULL_MATERIALIZE_SQL = """
-            INSERT INTO mart_returns_analysis
+            INSERT INTO %s
             SELECT
                 r.connection_id,
                 r.source_platform,
@@ -96,10 +96,11 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
-        jdbc.ch().execute(FULL_MATERIALIZE_SQL.formatted(ver));
+
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            jdbc.ch().execute(FULL_MATERIALIZE_SQL.formatted(staging, ver));
+        });
 
         Long count = jdbc.ch().queryForObject("SELECT count() FROM " + TABLE, Long.class);
         log.info("Materialized mart_returns_analysis: rows={}", count);

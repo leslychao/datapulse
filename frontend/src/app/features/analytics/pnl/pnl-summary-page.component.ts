@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -38,6 +39,7 @@ interface KpiItem {
   direction: TrendDir;
   icon: LucideIconData;
   accent: KpiAccent;
+  route: string;
 }
 
 @Component({
@@ -92,14 +94,16 @@ interface KpiItem {
       } @else {
         <div class="flex flex-wrap gap-3">
           @for (kpi of kpiCards(); track kpi.labelKey) {
-            <dp-kpi-card
-              [label]="kpi.labelKey | translate"
-              [value]="kpi.formattedValue"
-              [trend]="kpi.deltaPct"
-              [trendDirection]="kpi.direction"
-              [icon]="kpi.icon"
-              [accent]="kpi.accent"
-            />
+            <div class="cursor-pointer transition-opacity hover:opacity-80" (click)="navigateToKpi(kpi)">
+              <dp-kpi-card
+                [label]="kpi.labelKey | translate"
+                [value]="kpi.formattedValue"
+                [trend]="kpi.deltaPct"
+                [trendDirection]="kpi.direction"
+                [icon]="kpi.icon"
+                [accent]="kpi.accent"
+              />
+            </div>
           }
         </div>
 
@@ -130,6 +134,8 @@ export class PnlSummaryPageComponent {
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly period = signal(currentMonth());
   readonly connectionId = signal(0);
@@ -168,12 +174,12 @@ export class PnlSummaryPageComponent {
     const s = this.summaryQuery.data();
     if (!s) return [];
     return [
-      this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct, Banknote, 'success'),
-      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct, Receipt, 'error'),
-      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct, Package, 'warning'),
-      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct, Megaphone, 'info'),
-      this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct, ChartBar, 'primary'),
-      this.buildKpi('analytics.pnl.kpi.residual', s.reconciliationResidual, null, Scale, 'neutral'),
+      this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct, Banknote, 'success', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct, Receipt, 'error', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct, Package, 'warning', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct, Megaphone, 'info', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct, ChartBar, 'primary', 'pnl/trend'),
+      this.buildKpi('analytics.pnl.kpi.residual', s.reconciliationResidual, null, Scale, 'neutral', 'data-quality/reconciliation'),
     ];
   });
 
@@ -244,6 +250,7 @@ export class PnlSummaryPageComponent {
     deltaPct: number | null,
     icon: LucideIconData,
     accent: KpiAccent,
+    route: string,
   ): KpiItem {
     return {
       labelKey,
@@ -252,7 +259,12 @@ export class PnlSummaryPageComponent {
       direction: this.trendDir(deltaPct),
       icon,
       accent,
+      route,
     };
+  }
+
+  navigateToKpi(kpi: KpiItem): void {
+    this.router.navigate([kpi.route], { relativeTo: this.route.parent });
   }
 
   onConnectionChange(event: Event): void {

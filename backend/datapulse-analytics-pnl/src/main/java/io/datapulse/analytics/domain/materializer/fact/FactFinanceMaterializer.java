@@ -49,7 +49,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String CH_INSERT = """
-            INSERT INTO fact_finance
+            INSERT INTO %s
             (connection_id, source_platform, entry_id, posting_id, order_id,
              seller_sku_id, warehouse_id, finance_date, entry_type, attribution_level,
              revenue_amount, marketplace_commission_amount, acquiring_commission_amount,
@@ -65,32 +65,33 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
         Timestamp materializedAt = Timestamp.from(Instant.now());
-        int offset = 0;
-        int total = 0;
 
-        while (true) {
-            List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
-                    Map.of("limit", properties.batchSize(), "offset", offset));
-            if (rows.isEmpty()) {
-                break;
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            String chInsert = CH_INSERT.formatted(staging);
+            int offset = 0;
+
+            while (true) {
+                List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
+                        Map.of("limit", properties.batchSize(), "offset", offset));
+                if (rows.isEmpty()) {
+                    break;
+                }
+
+                insertBatch(rows, ver, materializedAt, chInsert);
+                offset += properties.batchSize();
             }
+        });
 
-            insertBatch(rows, ver, materializedAt);
-            total += rows.size();
-            offset += properties.batchSize();
-        }
-
-        log.info("Materialized fact_finance: rows={}", total);
+        log.info("Materialized {}", TABLE);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
         long ver = Instant.now().toEpochMilli();
         Timestamp materializedAt = Timestamp.from(Instant.now());
+        String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_INCREMENTAL_QUERY,
                 Map.of("jobExecutionId", jobExecutionId));
@@ -98,12 +99,13 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
             return;
         }
 
-        insertBatch(rows, ver, materializedAt);
+        insertBatch(rows, ver, materializedAt, chInsert);
         log.info("Incremental fact_finance: jobExecutionId={}, rows={}", jobExecutionId, rows.size());
     }
 
-    private void insertBatch(List<Map<String, Object>> rows, long ver, Timestamp materializedAt) {
-        jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
+    private void insertBatch(List<Map<String, Object>> rows, long ver,
+            Timestamp materializedAt, String chInsert) {
+        jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
             ps.setInt(1, ((Number) row.get("connection_id")).intValue());
             ps.setString(2, (String) row.get("source_platform"));
             ps.setLong(3, ((Number) row.get("id")).longValue());

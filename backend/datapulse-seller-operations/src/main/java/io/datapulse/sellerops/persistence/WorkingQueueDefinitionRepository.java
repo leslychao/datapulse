@@ -17,6 +17,8 @@ public interface WorkingQueueDefinitionRepository extends JpaRepository<WorkingQ
 
     boolean existsByWorkspaceIdAndName(long workspaceId, String name);
 
+    long countByWorkspaceIdAndIsSystemFalse(long workspaceId);
+
     @Query("""
             SELECT wqd FROM WorkingQueueDefinitionEntity wqd
             WHERE wqd.enabled = true AND wqd.autoCriteria IS NOT NULL

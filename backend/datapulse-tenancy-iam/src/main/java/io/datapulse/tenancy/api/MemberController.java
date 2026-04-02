@@ -2,6 +2,7 @@ package io.datapulse.tenancy.api;
 
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.MemberService;
+import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,9 @@ public class MemberController {
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<MemberResponse> listMembers(@PathVariable("workspaceId") Long workspaceId) {
-        return memberService.listMembers(workspaceId);
+        return memberService.listMembers(workspaceId).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @PutMapping("/{userId}/role")
@@ -37,9 +40,10 @@ public class MemberController {
     public MemberResponse changeRole(@PathVariable("workspaceId") Long workspaceId,
                                      @PathVariable("userId") Long userId,
                                      @Valid @RequestBody UpdateMemberRoleRequest request) {
-        return memberService.changeRole(
+        WorkspaceMemberEntity member = memberService.changeRole(
                 workspaceId, userId, workspaceContext.getUserId(),
-                workspaceContext.getRole(), request);
+                workspaceContext.getRole(), request.role());
+        return toResponse(member);
     }
 
     @DeleteMapping("/{userId}")
@@ -50,4 +54,13 @@ public class MemberController {
         memberService.removeMember(workspaceId, userId, workspaceContext.getUserId());
     }
 
+    private MemberResponse toResponse(WorkspaceMemberEntity entity) {
+        return new MemberResponse(
+                entity.getUser().getId(),
+                entity.getUser().getEmail(),
+                entity.getUser().getName(),
+                entity.getRole(),
+                entity.getStatus(),
+                entity.getCreatedAt());
+    }
 }

@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { LucideAngularModule, Check, Plus } from 'lucide-angular';
+import { LucideAngularModule, Check, Plus, Pencil } from 'lucide-angular';
 import { lastValueFrom } from 'rxjs';
 
 import { QueueApiService } from '@core/api/queue-api.service';
@@ -24,6 +25,7 @@ const DOT_COLORS: Record<QueueType, string> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DecimalPipe,
     RouterLink,
     RouterLinkActive,
     TranslatePipe,
@@ -56,7 +58,7 @@ const DOT_COLORS: Record<QueueType, string> = {
                   <span
                     class="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--text-secondary)]"
                   >
-                    {{ q.totalActiveCount }}
+                    {{ q.totalActiveCount | number }}
                   </span>
                 }
               </a>
@@ -75,7 +77,7 @@ const DOT_COLORS: Record<QueueType, string> = {
               type="button"
               class="flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)]"
               [attr.aria-label]="'queues.sidebar.new_queue' | translate"
-              (click)="builderOpen.set(true)"
+              (click)="openCreate()"
             >
               <lucide-icon [img]="plusIcon" [size]="14" />
             </button>
@@ -83,7 +85,7 @@ const DOT_COLORS: Record<QueueType, string> = {
         </div>
         <ul class="mt-2 space-y-0.5">
           @for (q of customQueues(); track q.queueId) {
-            <li>
+            <li class="group">
               <a
                 [routerLink]="['/workspace', workspaceId(), 'queues', q.queueId]"
                 routerLinkActive="dp-queue-nav-active"
@@ -94,13 +96,23 @@ const DOT_COLORS: Record<QueueType, string> = {
                   class="h-1.5 w-1.5 shrink-0 rounded-full border border-[var(--text-tertiary)]"
                 ></span>
                 <span class="min-w-0 flex-1 truncate">{{ q.name }}</span>
+                @if (rbac.canOperateActions()) {
+                  <button
+                    type="button"
+                    class="hidden h-5 w-5 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)] group-hover:flex"
+                    [attr.aria-label]="'queues.sidebar.edit_queue' | translate"
+                    (click)="openEdit(q, $event)"
+                  >
+                    <lucide-icon [img]="pencilIcon" [size]="12" />
+                  </button>
+                }
                 @if (q.totalActiveCount === 0) {
                   <lucide-icon [img]="checkIcon" [size]="14" class="text-[var(--status-success)]" />
                 } @else {
                   <span
                     class="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--text-secondary)]"
                   >
-                    {{ q.totalActiveCount }}
+                    {{ q.totalActiveCount | number }}
                   </span>
                 }
               </a>
@@ -114,7 +126,7 @@ const DOT_COLORS: Record<QueueType, string> = {
           <button
             type="button"
             class="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-            (click)="builderOpen.set(true)"
+            (click)="openCreate()"
           >
             <lucide-icon [img]="plusIcon" [size]="14" />
             {{ 'queues.sidebar.new_queue' | translate }}
@@ -124,7 +136,8 @@ const DOT_COLORS: Record<QueueType, string> = {
 
       <dp-queue-builder-modal
         [open]="builderOpen()"
-        (openChange)="builderOpen.set($event)"
+        [editQueue]="editingQueue()"
+        (openChange)="onModalClose($event)"
         (saved)="onQueueSaved($event)"
       />
     </div>
@@ -150,8 +163,10 @@ export class QueueSidebarComponent {
 
   readonly plusIcon = Plus;
   readonly checkIcon = Check;
+  readonly pencilIcon = Pencil;
 
   readonly builderOpen = signal(false);
+  readonly editingQueue = signal<Queue | null>(null);
 
   readonly workspaceId = this.wsStore.currentWorkspaceId;
 
@@ -178,6 +193,23 @@ export class QueueSidebarComponent {
 
   onSelect(q: Queue): void {
     this.queueStore.selectQueue(q.queueId);
+  }
+
+  openCreate(): void {
+    this.editingQueue.set(null);
+    this.builderOpen.set(true);
+  }
+
+  openEdit(q: Queue, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.editingQueue.set(q);
+    this.builderOpen.set(true);
+  }
+
+  onModalClose(open: boolean): void {
+    this.builderOpen.set(open);
+    if (!open) this.editingQueue.set(null);
   }
 
   onQueueSaved(queueId: number): void {

@@ -29,17 +29,14 @@ public class FinanceMismatchJdbcRepository {
               AND mc.status = 'ACTIVE'
             GROUP BY mc.id, mc.workspace_id, mc.name, mc.marketplace_type
             HAVING MAX(cfe.entry_date) IS NULL
-                OR MAX(cfe.entry_date) < CURRENT_DATE - INTERVAL ':gapHours hours'
+                OR MAX(cfe.entry_date) < CURRENT_DATE - make_interval(hours => :gapHours)
             """;
 
     public List<FinanceGapCandidate> findFinanceGaps(long workspaceId, int gapHoursThreshold) {
         var params = new MapSqlParameterSource()
                 .addValue("workspaceId", workspaceId)
                 .addValue("gapHours", gapHoursThreshold);
-
-        String sql = FINANCE_GAP_QUERY.replace(":gapHours", String.valueOf(gapHoursThreshold));
-        var paramsForQuery = new MapSqlParameterSource("workspaceId", workspaceId);
-        return jdbc.query(sql, paramsForQuery, this::mapCandidate);
+        return jdbc.query(FINANCE_GAP_QUERY, params, this::mapCandidate);
     }
 
     private FinanceGapCandidate mapCandidate(ResultSet rs, int rowNum) throws SQLException {

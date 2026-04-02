@@ -1509,6 +1509,8 @@ Summary of gaps between this document (target design) and the current codebase.
 | WB finance cursor | Same N-day window (default 30d) | `rrdid`-based monotonic cursor |
 | Ozon finance chunking | Same N-day window (default 30d) | Automatic monthly chunk splitting for long gaps |
 | ClickHouse materializer | Stub (logs calls, no actual writes) | Full batch INSERT via ClickHouse JDBC |
+| Ozon sale amount source | `products[].price` (STRING, parsed to BigDecimal) | `financial_data.products[].price` (NUMBER, native BigDecimal). Requires DTO expansion: `OzonFinancialData.products[]` not modeled yet |
+| Ozon sale commission | Always `null` — `financial_data.products[].commission_amount` not modeled in DTO | Expand `OzonFinancialData` with per-product financial breakdown, populate `canonical_sale.commission` |
 
 ### Implemented (recent)
 

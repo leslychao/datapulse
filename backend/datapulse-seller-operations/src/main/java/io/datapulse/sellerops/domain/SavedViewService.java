@@ -28,11 +28,18 @@ public class SavedViewService {
                 .toList();
     }
 
+    private static final int MAX_VIEWS_PER_USER = 50;
+
     @Transactional
     public SavedViewSummaryResponse createView(long workspaceId, long userId,
                                                 CreateSavedViewRequest request) {
         if (repository.existsByWorkspaceIdAndUserIdAndName(workspaceId, userId, request.name())) {
             throw BadRequestException.of(MessageCodes.DUPLICATE_ENTITY, "saved_view", request.name());
+        }
+
+        long currentCount = repository.countByWorkspaceIdAndUserId(workspaceId, userId);
+        if (currentCount >= MAX_VIEWS_PER_USER) {
+            throw BadRequestException.of(MessageCodes.SAVED_VIEW_LIMIT_EXCEEDED, MAX_VIEWS_PER_USER);
         }
 
         var entity = new SavedViewEntity();

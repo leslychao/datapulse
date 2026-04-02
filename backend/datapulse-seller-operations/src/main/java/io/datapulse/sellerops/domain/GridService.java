@@ -3,6 +3,7 @@ package io.datapulse.sellerops.domain;
 import io.datapulse.sellerops.api.GridFilter;
 import io.datapulse.sellerops.api.GridKpiResponse;
 import io.datapulse.sellerops.api.GridRowResponse;
+import io.datapulse.sellerops.api.MatchingIdsResponse;
 import io.datapulse.sellerops.config.GridProperties;
 import io.datapulse.sellerops.persistence.ClickHouseEnrichment;
 import io.datapulse.sellerops.persistence.ClickHouseKpiRow;
@@ -76,6 +77,7 @@ public class GridService {
             sortedIds = chRepository.findSortedOfferIds(connectionIds, sortColumn, direction, maxResults);
         } catch (Exception e) {
             log.warn("CH sort failed, falling back to PG sort: error={}", e.getMessage());
+            CH_SORT_FALLBACK.set(true);
             return getGridPage(workspaceId, filter,
                     PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
         }
@@ -98,10 +100,25 @@ public class GridService {
         return new PageImpl<>(enrichedRows, pageable, sortedIds.size());
     }
 
+    private static final int MATCHING_IDS_LIMIT = 500;
+    private static final ThreadLocal<Boolean> CH_SORT_FALLBACK = ThreadLocal.withInitial(() -> false);
+
+    public boolean wasChSortFallback() {
+        boolean val = CH_SORT_FALLBACK.get();
+        CH_SORT_FALLBACK.remove();
+        return val;
+    }
+
     @Transactional(readOnly = true)
-    public List<Long> getMatchingOfferIds(long workspaceId, GridFilter filter) {
+    public MatchingIdsResponse getMatchingOfferIds(long workspaceId, GridFilter filter) {
         GridFilter resolved = resolveChPreFilter(workspaceId, filter);
-        return pgRepository.findMatchingOfferIds(workspaceId, resolved, 10_000);
+        List<Long> allIds = pgRepository.findMatchingOfferIds(
+                workspaceId, resolved, MATCHING_IDS_LIMIT + 1);
+        boolean truncated = allIds.size() > MATCHING_IDS_LIMIT;
+        List<Long> resultIds = truncated
+                ? allIds.subList(0, MATCHING_IDS_LIMIT)
+                : allIds;
+        return new MatchingIdsResponse(resultIds, allIds.size(), truncated);
     }
 
     @Transactional(readOnly = true)

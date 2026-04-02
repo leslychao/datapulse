@@ -45,7 +45,7 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String CH_INSERT = """
-            INSERT INTO fact_orders
+            INSERT INTO %s
             (order_id_pk, connection_id, source_platform, external_order_id,
              seller_sku_id, product_id, quantity, price_per_unit, total_amount,
              order_date, status, fulfillment_type, region, job_execution_id, ver)
@@ -57,30 +57,31 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
-        int offset = 0;
-        int total = 0;
 
-        while (true) {
-            List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
-                    Map.of("limit", properties.batchSize(), "offset", offset));
-            if (rows.isEmpty()) {
-                break;
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            String chInsert = CH_INSERT.formatted(staging);
+            int offset = 0;
+
+            while (true) {
+                List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
+                        Map.of("limit", properties.batchSize(), "offset", offset));
+                if (rows.isEmpty()) {
+                    break;
+                }
+
+                insertBatch(rows, ver, chInsert);
+                offset += properties.batchSize();
             }
+        });
 
-            insertBatch(rows, ver);
-            total += rows.size();
-            offset += properties.batchSize();
-        }
-
-        log.info("Materialized fact_orders: rows={}", total);
+        log.info("Materialized {}", TABLE);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
         long ver = Instant.now().toEpochMilli();
+        String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
                 SELECT co.id               AS order_id_pk,
@@ -106,12 +107,12 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
             return;
         }
 
-        insertBatch(rows, ver);
+        insertBatch(rows, ver, chInsert);
         log.info("Incremental fact_orders: jobExecutionId={}, rows={}", jobExecutionId, rows.size());
     }
 
-    private void insertBatch(List<Map<String, Object>> rows, long ver) {
-        jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
+    private void insertBatch(List<Map<String, Object>> rows, long ver, String chInsert) {
+        jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
             ps.setLong(1, ((Number) row.get("order_id_pk")).longValue());
             ps.setInt(2, ((Number) row.get("connection_id")).intValue());
             ps.setString(3, (String) row.get("source_platform"));

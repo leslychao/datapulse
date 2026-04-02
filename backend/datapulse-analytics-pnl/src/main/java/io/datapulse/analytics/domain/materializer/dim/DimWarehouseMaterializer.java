@@ -32,7 +32,7 @@ public class DimWarehouseMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String CH_INSERT = """
-            INSERT INTO dim_warehouse
+            INSERT INTO %s
             (warehouse_id, external_warehouse_id, name, warehouse_type, marketplace_type, ver)
             VALUES (?, ?, ?, ?, ?, ?)
             """;
@@ -42,38 +42,41 @@ public class DimWarehouseMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
-        int offset = 0;
-        int total = 0;
+        final int[] total = {0};
 
-        while (true) {
-            List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            String chInsert = CH_INSERT.formatted(staging);
+            int offset = 0;
+
+            while (true) {
+                List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
                     Map.of("limit", properties.batchSize(), "offset", offset));
-            if (rows.isEmpty()) {
-                break;
+                if (rows.isEmpty()) {
+                    break;
+                }
+
+                jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
+                    ps.setInt(1, ((Number) row.get("warehouse_id")).intValue());
+                    ps.setString(2, (String) row.get("external_warehouse_id"));
+                    ps.setString(3, (String) row.get("name"));
+                    ps.setString(4, (String) row.get("warehouse_type"));
+                    ps.setString(5, (String) row.get("marketplace_type"));
+                    ps.setLong(6, ver);
+                });
+
+                total[0] += rows.size();
+                offset += properties.batchSize();
             }
+        });
 
-            jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
-                ps.setInt(1, ((Number) row.get("warehouse_id")).intValue());
-                ps.setString(2, (String) row.get("external_warehouse_id"));
-                ps.setString(3, (String) row.get("name"));
-                ps.setString(4, (String) row.get("warehouse_type"));
-                ps.setString(5, (String) row.get("marketplace_type"));
-                ps.setLong(6, ver);
-            });
-
-            total += rows.size();
-            offset += properties.batchSize();
-        }
-
-        log.info("Materialized dim_warehouse: rows={}", total);
+        log.info("Materialized dim_warehouse: rows={}", total[0]);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
         long ver = Instant.now().toEpochMilli();
+        String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
                 SELECT w.id                    AS warehouse_id,
@@ -89,7 +92,7 @@ public class DimWarehouseMaterializer implements AnalyticsMaterializer {
             return;
         }
 
-        jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
+        jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
             ps.setInt(1, ((Number) row.get("warehouse_id")).intValue());
             ps.setString(2, (String) row.get("external_warehouse_id"));
             ps.setString(3, (String) row.get("name"));

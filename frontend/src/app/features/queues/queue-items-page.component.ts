@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -12,6 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -79,7 +79,7 @@ const DOT_COLORS: Record<string, string> = {
   selector: 'dp-queue-items-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AgGridAngular, TranslatePipe, FormsModule, LucideAngularModule],
+  imports: [DecimalPipe, AgGridAngular, TranslatePipe, FormsModule, LucideAngularModule],
   templateUrl: './queue-items-page.component.html',
 })
 export class QueueItemsPageComponent implements OnInit, OnDestroy {
@@ -93,7 +93,6 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   private readonly detailPanel = inject(DetailPanelService);
   private readonly shortcuts = inject(ShortcutService);
   protected readonly rbac = inject(RbacService);
-  private readonly destroyRef = inject(DestroyRef);
 
   readonly queueId = input.required<string>();
   readonly checkIcon = CheckCircle2;
@@ -816,7 +815,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
           ),
           this.priceDeltaCol(),
           this.col('policy', 'queues.grid.policy', 160, (d) => this.summary(d, 'policyName')),
-          this.col('mode', 'queues.grid.mode', 80, (d) => this.summary(d, 'executionMode')),
+          this.executionModeBadgeCol(),
           this.col('explanation', 'queues.grid.explanation', 200, (d) => this.summary(d, 'explanationSummary')),
           createdCol,
           actionsCol,
@@ -986,6 +985,26 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     };
   }
 
+  private executionModeBadgeCol(): ColDef<QueueItem> {
+    return {
+      colId: 'mode',
+      headerName: this.translate.instant('queues.grid.mode'),
+      width: 110,
+      valueGetter: (p) => this.summary(p.data, 'executionMode'),
+      cellRenderer: (params: { value: string | null }) => {
+        const v = params.value;
+        if (!v) return '';
+        const isSimulated = v === 'SIMULATED';
+        const cssVar = isSimulated ? 'var(--status-neutral)' : 'var(--status-info)';
+        const label = this.translate.instant(`queues.grid.mode_${v.toLowerCase()}`);
+        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+          ${label}
+        </span>`;
+      },
+    };
+  }
+
   private actionColumnWidth(ctx: QueueContext): number {
     switch (ctx) {
       case 'PENDING_APPROVAL': return 200;
@@ -1043,7 +1062,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
 
       case 'NO_COST':
         if (this.rbac.canOperateActions()) {
-          addBtn('queues.actions.set_cost', () => this.detailPanel.open('offer', item.entityId), 'primary');
+          addBtn('queues.actions.set_cost', () => this.openInlineCost(item), 'primary');
         }
         break;
 

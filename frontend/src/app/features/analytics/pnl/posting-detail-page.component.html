@@ -94,6 +94,7 @@
         <thead class="bg-[var(--bg-secondary)] text-[length:var(--text-xs)] text-[var(--text-secondary)]">
           <tr>
             <th class="px-3 py-2 font-medium">{{ 'analytics.pnl.posting.entry_type' | translate }}</th>
+            <th class="px-3 py-2 font-medium w-16"></th>
             @for (col of measureColumns; track col.field) {
               <th class="px-3 py-2 font-medium text-right">{{ col.labelKey | translate }}</th>
             }
@@ -103,6 +104,14 @@
           @for (entry of d.entries; track entry.entryId) {
             <tr class="border-t border-[var(--border-subtle)]">
               <td class="px-3 py-2 font-medium text-[var(--text-primary)]">{{ entry.entryType }}</td>
+              <td class="px-3 py-2">
+                <button
+                  (click)="openProvenance(entry.entryId)"
+                  class="cursor-pointer text-[length:var(--text-xs)] text-[var(--accent-primary)] hover:underline"
+                >
+                  {{ 'analytics.pnl.posting.raw' | translate }}
+                </button>
+              </td>
               @for (col of measureColumns; track col.field) {
                 <td class="px-3 py-2 text-right font-mono" [class]="moneyColorClass(entryMeasure(entry, col.field))">
                   {{ formatMoney(entryMeasure(entry, col.field)) }}
@@ -116,6 +125,7 @@
             <td class="px-3 py-2 font-semibold text-[var(--text-primary)]">
               {{ 'analytics.pnl.posting.total' | translate }}
             </td>
+            <td></td>
             @for (col of measureColumns; track col.field) {
               <td class="px-3 py-2 text-right font-mono font-semibold"
                   [class]="moneyColorClass(totals()[col.field])">

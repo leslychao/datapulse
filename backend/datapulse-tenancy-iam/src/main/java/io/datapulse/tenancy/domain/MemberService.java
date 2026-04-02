@@ -2,8 +2,8 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.MemberResponse;
-import io.datapulse.tenancy.api.UpdateMemberRoleRequest;
+import io.datapulse.tenancy.persistence.AppUserEntity;
+import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
@@ -20,19 +20,18 @@ public class MemberService {
 
     private final WorkspaceMemberRepository memberRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final AppUserRepository appUserRepository;
     private final TenancyAuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
-    public List<MemberResponse> listMembers(Long workspaceId) {
-        return memberRepository.findByWorkspace_IdAndStatus(workspaceId, MemberStatus.ACTIVE)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public List<WorkspaceMemberEntity> listMembers(Long workspaceId) {
+        return memberRepository.findByWorkspace_IdAndStatus(workspaceId, MemberStatus.ACTIVE);
     }
 
     @Transactional
-    public MemberResponse changeRole(Long workspaceId, Long targetUserId, Long actorUserId,
-                                     String actorRole, UpdateMemberRoleRequest request) {
+    public WorkspaceMemberEntity changeRole(Long workspaceId, Long targetUserId,
+                                            Long actorUserId, String actorRole,
+                                            MemberRole newRole) {
         WorkspaceMemberEntity member = memberRepository
                 .findByWorkspace_IdAndUser_IdAndStatus(workspaceId, targetUserId, MemberStatus.ACTIVE)
                 .orElseThrow(() -> NotFoundException.entity("WorkspaceMember", targetUserId));
@@ -43,22 +42,22 @@ public class MemberService {
         if (targetUserId.equals(actorUserId)) {
             throw BadRequestException.of("member.role.cannot.change.self");
         }
-        if (request.role() == MemberRole.OWNER) {
+        if (newRole == MemberRole.OWNER) {
             throw BadRequestException.of("member.role.cannot.assign.owner");
         }
 
         MemberRole actorMemberRole = MemberRole.valueOf(actorRole);
-        if (actorMemberRole == MemberRole.ADMIN && request.role() == MemberRole.ADMIN) {
+        if (actorMemberRole == MemberRole.ADMIN && newRole == MemberRole.ADMIN) {
             throw BadRequestException.of("member.role.admin.cannot.assign.admin");
         }
 
         MemberRole oldRole = member.getRole();
-        member.setRole(request.role());
+        member.setRole(newRole);
         memberRepository.save(member);
         auditPublisher.publish("member.change_role", "workspace_member",
                 String.valueOf(targetUserId),
-                "{\"old_role\":\"%s\",\"new_role\":\"%s\"}".formatted(oldRole.name(), request.role().name()));
-        return toResponse(member);
+                "{\"old_role\":\"%s\",\"new_role\":\"%s\"}".formatted(oldRole.name(), newRole.name()));
+        return member;
     }
 
     @Transactional
@@ -113,14 +112,47 @@ public class MemberService {
                 "{\"from\":%d,\"to\":%d}".formatted(currentOwnerId, newOwnerUserId));
     }
 
-    private MemberResponse toResponse(WorkspaceMemberEntity entity) {
-        return new MemberResponse(
-                entity.getUser().getId(),
-                entity.getUser().getEmail(),
-                entity.getUser().getName(),
-                entity.getRole(),
-                entity.getStatus(),
-                entity.getCreatedAt()
-        );
+    @Transactional
+    public void deactivateUser(Long userId) {
+        AppUserEntity user = appUserRepository.findById(userId)
+                .orElseThrow(() -> NotFoundException.entity("AppUser", userId));
+
+        if (user.getStatus() == UserStatus.DEACTIVATED) {
+            throw BadRequestException.of("user.already.deactivated");
+        }
+
+        user.setStatus(UserStatus.DEACTIVATED);
+        appUserRepository.save(user);
+
+        List<WorkspaceMemberEntity> activeMemberships = memberRepository
+                .findByUser_IdAndStatus(userId, MemberStatus.ACTIVE);
+        for (WorkspaceMemberEntity membership : activeMemberships) {
+            membership.setStatus(MemberStatus.INACTIVE);
+            memberRepository.save(membership);
+        }
+
+        auditPublisher.publish("user.deactivate", "app_user", String.valueOf(userId));
+    }
+
+    @Transactional
+    public void reactivateUser(Long userId) {
+        AppUserEntity user = appUserRepository.findById(userId)
+                .orElseThrow(() -> NotFoundException.entity("AppUser", userId));
+
+        if (user.getStatus() != UserStatus.DEACTIVATED) {
+            throw BadRequestException.of("user.not.deactivated");
+        }
+
+        user.setStatus(UserStatus.ACTIVE);
+        appUserRepository.save(user);
+
+        List<WorkspaceMemberEntity> inactiveMemberships = memberRepository
+                .findByUser_IdAndStatus(userId, MemberStatus.INACTIVE);
+        for (WorkspaceMemberEntity membership : inactiveMemberships) {
+            membership.setStatus(MemberStatus.ACTIVE);
+            memberRepository.save(membership);
+        }
+
+        auditPublisher.publish("user.reactivate", "app_user", String.valueOf(userId));
     }
 }

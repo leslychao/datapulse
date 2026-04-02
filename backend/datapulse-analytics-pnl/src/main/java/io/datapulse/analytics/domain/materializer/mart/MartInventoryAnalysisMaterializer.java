@@ -18,7 +18,7 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
   private static final String TABLE = "mart_inventory_analysis";
 
   private static final String FULL_MATERIALIZE_SQL = """
-      INSERT INTO mart_inventory_analysis
+      INSERT INTO %s
       SELECT
           inv.connection_id,
           inv.source_platform,
@@ -89,22 +89,23 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
 
   @Override
   public void materializeFull() {
-    jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
     var inv = queryProperties.inventory();
     long ver = Instant.now().toEpochMilli();
 
-    String sql = FULL_MATERIALIZE_SQL.formatted(
-        inv.leadTimeDays(),
-        inv.leadTimeDays() * 2,
-        inv.targetDaysOfCover(),
-        inv.targetDaysOfCover(),
-        inv.targetDaysOfCover(),
-        ver,
-        inv.velocityWindowDays(),
-        inv.velocityWindowDays()
-    );
-    jdbc.ch().execute(sql);
+    jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+      String sql = FULL_MATERIALIZE_SQL.formatted(
+          staging,
+          inv.leadTimeDays(),
+          inv.leadTimeDays() * 2,
+          inv.targetDaysOfCover(),
+          inv.targetDaysOfCover(),
+          inv.targetDaysOfCover(),
+          ver,
+          inv.velocityWindowDays(),
+          inv.velocityWindowDays()
+      );
+      jdbc.ch().execute(sql);
+    });
 
     Long count = jdbc.ch().queryForObject("SELECT count() FROM " + TABLE, Long.class);
     log.info("Materialized mart_inventory_analysis: rows={}", count);

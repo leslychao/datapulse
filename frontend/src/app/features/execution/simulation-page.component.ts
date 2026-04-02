@@ -8,6 +8,7 @@ import {
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { Router } from '@angular/router';
 import { BarChart3, Percent, TrendingUp, Target } from 'lucide-angular';
 
 import { ActionApiService } from '@core/api/action-api.service';
@@ -55,7 +56,11 @@ import { ToastService } from '@shared/shell/toast/toast.service';
       @if (simulationQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
       } @else if (simulationQuery.isError()) {
-        <dp-empty-state [message]="'execution.simulation.empty_no_policies' | translate" />
+        <dp-empty-state
+          [message]="'execution.simulation.empty_no_policies' | translate"
+          [actionLabel]="'execution.simulation.go_to_pricing' | translate"
+          (action)="navigateToPricing()"
+        />
       } @else if (!simulationQuery.data() || simulationQuery.data()!.simulatedActionsCount === 0) {
         <dp-empty-state [message]="'execution.simulation.empty_no_results' | translate" />
       } @else {
@@ -86,6 +91,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
               [subtitle]="translate.instant('execution.simulation.kpi.coverage_detail', { covered: sim.coveredOffers, total: sim.totalOffers })"
               [icon]="TargetIcon"
               [accent]="sim.coveragePct < 0.5 ? 'warning' : 'primary'"
+              [tooltip]="sim.coveragePct < 0.5 ? ('execution.simulation.kpi.coverage_low_tooltip' | translate) : ''"
             />
           </div>
 
@@ -135,6 +141,7 @@ export class SimulationPageComponent {
   private readonly actionApi = inject(ActionApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   protected readonly translate = inject(TranslateService);
@@ -237,6 +244,10 @@ export class SimulationPageComponent {
     },
     onError: () => this.toast.error(this.translate.instant('common.error')),
   }));
+
+  protected navigateToPricing(): void {
+    this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'pricing', 'policies']);
+  }
 
   protected onConnectionChange(event: Event): void {
     this.connectionId.set(Number((event.target as HTMLSelectElement).value));

@@ -841,6 +841,7 @@ Posting-level P&L строится в `mart_posting_pnl` через `GROUP BY po
 
 | Column | Type | Notes |
 |--------|------|-------|
+| `job_execution_id` | UInt64 | FK to job_execution. Identifies which ETL job produced the entry; used for incremental materialization and data provenance |
 | `ver` | UInt64 | Materialization timestamp для ReplacingMergeTree |
 | `materialized_at` | DateTime | Время материализации |
 
@@ -1241,11 +1242,11 @@ ClickHouse — read-only analytics store, не source of truth. При его н
 
 | Компонент | Поведение при ClickHouse down | HTTP response |
 |-----------|-------------------------------|---------------|
-| P&L endpoints (`/analytics/pnl/*`) | Circuit breaker (Resilience4j) размыкается после 5 consecutive failures за 60s | `503 Service Unavailable` + `messageKey: analytics.clickhouse.unavailable` + `retryAfterSeconds: 30` |
-| Inventory endpoints (`/analytics/inventory/*`) | Аналогично | `503` |
-| Returns endpoints (`/analytics/returns/*`) | Аналогично | `503` |
-| Data quality endpoints (`/analytics/data-quality/*`) | Аналогично | `503` |
-| Provenance drill-down (`/analytics/provenance/*`) | **Не деградирует** — reads PostgreSQL canonical layer | Нормальный ответ |
+| P&L endpoints (`/api/workspaces/{workspaceId}/analytics/pnl/*`) | Circuit breaker (Resilience4j) размыкается после 5 consecutive failures за 60s | `503 Service Unavailable` + `messageKey: analytics.clickhouse.unavailable` + `retryAfterSeconds: 30` |
+| Inventory endpoints (`/api/workspaces/{workspaceId}/analytics/inventory/*`) | Аналогично | `503` |
+| Returns endpoints (`/api/workspaces/{workspaceId}/analytics/returns/*`) | Аналогично | `503` |
+| Data quality endpoints (`/api/workspaces/{workspaceId}/analytics/data-quality/*`) | Аналогично | `503` |
+| Provenance drill-down (`/api/workspaces/{workspaceId}/analytics/provenance/*`) | **Не деградирует** — reads PostgreSQL canonical layer | Нормальный ответ |
 | Pricing signal assembler | Fail-fast: query timeout 10s → `AnalyticsUnavailableException` | N/A (internal) |
 
 **Circuit breaker configuration:**
@@ -1319,9 +1320,9 @@ ClickHouse schema управляется numbered SQL migration scripts (`db/cli
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/analytics/inventory/overview` | Any role | Inventory overview: total SKUs, stock-out risk distribution, frozen capital. Filter: `?connectionId=...` |
-| GET | `/api/analytics/inventory/by-product` | Any role | Per-product inventory analysis. Paginated. Includes days_of_cover, stock_out_risk, frozen_capital |
-| GET | `/api/analytics/inventory/stock-history` | Any role | Historical stock levels for product. Filters: `?productId=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/analytics/inventory/overview` | Any role | Inventory overview: total SKUs, stock-out risk distribution, frozen capital. Filter: `?connectionId=...` |
+| GET | `/api/workspaces/{workspaceId}/analytics/inventory/by-product` | Any role | Per-product inventory analysis. Paginated. Includes days_of_cover, stock_out_risk, frozen_capital |
+| GET | `/api/workspaces/{workspaceId}/analytics/inventory/stock-history` | Any role | Historical stock levels for product. Filters: `?productId=...&from=...&to=...` |
 
 ### Returns & penalties
 
@@ -1335,15 +1336,21 @@ ClickHouse schema управляется numbered SQL migration scripts (`db/cli
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/analytics/data-quality/status` | Any role | Sync freshness per connection/domain. Automation blocker status |
-| GET | `/api/analytics/data-quality/reconciliation` | ADMIN, OWNER | Reconciliation residual stats per connection. Baseline vs current |
+| GET | `/api/workspaces/{workspaceId}/analytics/data-quality/status` | Any role | Sync freshness per connection/domain. Automation blocker status |
+| GET | `/api/workspaces/{workspaceId}/analytics/data-quality/reconciliation` | ADMIN, OWNER | Reconciliation residual stats per connection. Baseline vs current |
 
 ### Drill-down (provenance)
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/analytics/provenance/entry/{entryId}` | Any role | Canonical finance entry details (PostgreSQL) |
-| GET | `/api/analytics/provenance/entry/{entryId}/raw` | ADMIN, OWNER | Raw S3 payload link. Returns presigned S3 URL. **Graceful degradation:** если raw-файл удалён (retention expired), API возвращает 404 с message "Raw data expired" и timestamp последнего доступного snapshot |
+| GET | `/api/workspaces/{workspaceId}/analytics/provenance/entry/{entryId}` | Any role | Canonical finance entry details (PostgreSQL) |
+| GET | `/api/workspaces/{workspaceId}/analytics/provenance/entry/{entryId}/raw` | ADMIN, OWNER | Raw S3 payload link. Returns presigned S3 URL. **Graceful degradation:** если raw-файл удалён (retention expired), API возвращает 404 с message "Raw data expired" и timestamp последнего доступного snapshot |
+
+### Admin
+
+| Method | Path | Roles | Описание |
+|--------|------|-------|----------|
+| POST | `/api/admin/analytics/materialization/full` | OWNER, ADMIN | Trigger on-demand full re-materialization of all ClickHouse tables (dimensions → facts → marts). Returns 200 on success. Intended for manual recovery and ad-hoc data refresh |
 
 ## Связанные модули
 

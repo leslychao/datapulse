@@ -2,12 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  HostListener,
   inject,
   signal,
 } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import { ColDef, GridApi } from 'ag-grid-community';
+import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import {
@@ -15,6 +18,7 @@ import {
   InventoryByProduct,
   StockOutRisk,
 } from '@core/models';
+import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { formatMoney } from '@shared/utils/format.utils';
 
@@ -22,7 +26,7 @@ import { formatMoney } from '@shared/utils/format.utils';
   selector: 'dp-inventory-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, DataGridComponent],
   template: `
     <div class="flex h-full">
       <!-- Main content -->
@@ -57,93 +61,22 @@ import { formatMoney } from '@shared/utils/format.utils';
           />
         </div>
 
-        <!-- Table -->
-        <div class="flex-1 overflow-auto py-2">
-          @if (productsQuery.isPending()) {
-            <div class="dp-shimmer h-64 w-full rounded-[var(--radius-md)]"></div>
-          } @else if (rows().length === 0) {
-            <p class="py-12 text-center text-sm text-[var(--text-tertiary)]">
-              {{ 'analytics.inventory.empty' | translate }}
-            </p>
-          } @else {
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-sm">
-                <thead>
-                  <tr class="border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                    <th class="pb-2 pr-4 font-medium">SKU</th>
-                    <th class="pb-2 pr-4 font-medium">
-                      {{ 'analytics.inventory.col.product' | translate }}
-                    </th>
-                    <th class="pb-2 pr-4 font-medium">
-                      {{ 'analytics.inventory.col.platform' | translate }}
-                    </th>
-                    <th class="pb-2 pr-4 text-right font-medium">
-                      {{ 'analytics.inventory.col.available' | translate }}
-                    </th>
-                    <th class="pb-2 pr-4 text-right font-medium">
-                      {{ 'analytics.inventory.col.days_of_cover' | translate }}
-                    </th>
-                    <th class="pb-2 pr-4 font-medium">
-                      {{ 'analytics.inventory.col.risk' | translate }}
-                    </th>
-                    <th class="pb-2 pr-4 text-right font-medium">
-                      {{ 'analytics.inventory.col.frozen_capital' | translate }}
-                    </th>
-                    <th class="pb-2 text-right font-medium">
-                      {{ 'analytics.inventory.col.replenishment' | translate }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (item of rows(); track item.sellerSkuId) {
-                    <tr
-                      class="cursor-pointer border-b border-[var(--border-subtle)] transition-colors last:border-0 hover:bg-[var(--bg-secondary)]"
-                      [class.bg-[var(--bg-active)]]="selectedProduct()?.sellerSkuId === item.sellerSkuId"
-                      (click)="selectProduct(item)"
-                    >
-                      <td class="py-2.5 pr-4 font-mono text-xs text-[var(--text-secondary)]">
-                        {{ item.skuCode }}
-                      </td>
-                      <td class="max-w-[220px] truncate py-2.5 pr-4 text-[var(--text-primary)]">
-                        {{ item.productName }}
-                      </td>
-                      <td class="py-2.5 pr-4">
-                        <span class="rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
-                          {{ item.sourcePlatform }}
-                        </span>
-                      </td>
-                      <td class="py-2.5 pr-4 text-right font-mono">
-                        {{ item.available }}
-                      </td>
-                      <td class="py-2.5 pr-4 text-right font-mono">
-                        {{ item.daysOfCover }}
-                      </td>
-                      <td class="py-2.5 pr-4">
-                        <span class="inline-flex items-center gap-1 text-[length:var(--text-xs)]">
-                          <span
-                            class="h-1.5 w-1.5 rounded-full"
-                            [class]="riskDotClass(item.stockOutRisk)"
-                          ></span>
-                          {{ riskLabel(item.stockOutRisk) }}
-                        </span>
-                      </td>
-                      <td class="py-2.5 pr-4 text-right font-mono text-[var(--text-primary)]">
-                        {{ formatMoney(item.frozenCapital) }}
-                      </td>
-                      <td class="py-2.5 text-right font-mono">
-                        {{ item.recommendedReplenishment }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+        <div class="flex-1 py-2">
+          <dp-data-grid
+            [columnDefs]="columnDefs()"
+            [rowData]="gridRows()"
+            [loading]="productsQuery.isPending()"
+            [pagination]="false"
+            [pageSize]="25"
+            height="calc(100vh - 320px)"
+            (rowClicked)="selectProduct($event)"
+          />
 
-            <!-- Pagination -->
+          @if (gridRows().length > 0) {
             <div class="mt-3 flex items-center justify-between text-sm text-[var(--text-secondary)]">
               <span>
                 {{ 'analytics.inventory.showing' | translate }}
-                {{ rows().length }}
+                {{ gridRows().length }}
                 {{ 'analytics.inventory.of' | translate }}
                 {{ totalElements() }}
               </span>
@@ -282,6 +215,11 @@ export class InventoryByProductPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.selectedProduct.set(null);
+  }
+
   readonly connectionId = signal(0);
   readonly riskFilter = signal<StockOutRisk | ''>('');
   readonly searchTerm = signal('');
@@ -321,9 +259,68 @@ export class InventoryByProductPageComponent {
     staleTime: 30_000,
   }));
 
-  readonly rows = computed(() => this.productsQuery.data()?.content ?? []);
+  readonly gridRows = computed(() => this.productsQuery.data()?.content ?? []);
   readonly totalElements = computed(() => this.productsQuery.data()?.totalElements ?? 0);
   readonly totalPages = computed(() => this.productsQuery.data()?.totalPages ?? 0);
+
+  readonly columnDefs = computed<ColDef[]>(() => [
+    {
+      field: 'skuCode',
+      headerName: 'SKU',
+      cellClass: 'font-mono text-[11px]',
+      cellStyle: () => ({ color: 'var(--text-secondary)' }),
+    },
+    {
+      field: 'productName',
+      headerName: this.t.instant('analytics.inventory.col.product'),
+      minWidth: 220,
+    },
+    {
+      field: 'sourcePlatform',
+      headerName: this.t.instant('analytics.inventory.col.platform'),
+      cellRenderer: (p: { value: string }) =>
+        `<span class="rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">${p.value}</span>`,
+    },
+    {
+      field: 'available',
+      headerName: this.t.instant('analytics.inventory.col.available'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+    },
+    {
+      field: 'daysOfCover',
+      headerName: this.t.instant('analytics.inventory.col.days_of_cover'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+    },
+    {
+      field: 'stockOutRisk',
+      headerName: this.t.instant('analytics.inventory.col.risk'),
+      cellRenderer: (p: { value: string }) => {
+        let dotCls: string;
+        switch (p.value) {
+          case 'CRITICAL': dotCls = 'bg-[var(--status-error)]'; break;
+          case 'WARNING': dotCls = 'bg-[var(--status-warning)]'; break;
+          default: dotCls = 'bg-[var(--status-success)]'; break;
+        }
+        const label = this.t.instant(`analytics.inventory.risk.${p.value.toLowerCase()}`);
+        return `<span class="inline-flex items-center gap-1 text-[11px]"><span class="inline-block h-1.5 w-1.5 rounded-full ${dotCls}"></span>${label}</span>`;
+      },
+    },
+    {
+      field: 'frozenCapital',
+      headerName: this.t.instant('analytics.inventory.col.frozen_capital'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatMoney(p.value, 0),
+    },
+    {
+      field: 'recommendedReplenishment',
+      headerName: this.t.instant('analytics.inventory.col.replenishment'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+    },
+  ]);
 
   onConnectionChange(event: Event): void {
     this.connectionId.set(Number((event.target as HTMLSelectElement).value));

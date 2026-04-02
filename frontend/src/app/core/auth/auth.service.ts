@@ -33,6 +33,18 @@ export class AuthService {
     );
   }
 
+  /**
+   * Returns cached profile or fetches it once.
+   * Safe to call from guards that run after authGuard — profile is already in memory.
+   */
+  ensureUser(): Observable<UserProfile | null> {
+    const cached = this._user();
+    if (cached) {
+      return of(cached);
+    }
+    return this.checkSession().pipe(map(() => this._user()));
+  }
+
   login(returnUrl?: string): void {
     const rd = returnUrl ?? window.location.pathname;
     window.location.href = `${environment.oauth2.loginUrl}?rd=${encodeURIComponent(rd)}`;

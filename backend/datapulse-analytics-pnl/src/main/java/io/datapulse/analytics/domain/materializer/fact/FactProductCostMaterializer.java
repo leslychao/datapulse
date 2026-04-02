@@ -36,7 +36,7 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String CH_INSERT = """
-            INSERT INTO fact_product_cost
+            INSERT INTO %s
             (cost_id, seller_sku_id, cost_price, currency, valid_from, valid_to, ver)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """;
@@ -46,30 +46,31 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeFull() {
-        jdbc.ch().execute("TRUNCATE TABLE " + TABLE);
-
         long ver = Instant.now().toEpochMilli();
-        int offset = 0;
-        int total = 0;
 
-        while (true) {
-            List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
-                    Map.of("limit", properties.batchSize(), "offset", offset));
-            if (rows.isEmpty()) {
-                break;
+        jdbc.fullMaterializeWithSwap(TABLE, staging -> {
+            String chInsert = CH_INSERT.formatted(staging);
+            int offset = 0;
+
+            while (true) {
+                List<Map<String, Object>> rows = jdbc.pg().queryForList(PG_QUERY,
+                        Map.of("limit", properties.batchSize(), "offset", offset));
+                if (rows.isEmpty()) {
+                    break;
+                }
+
+                insertBatch(rows, ver, chInsert);
+                offset += properties.batchSize();
             }
+        });
 
-            insertBatch(rows, ver);
-            total += rows.size();
-            offset += properties.batchSize();
-        }
-
-        log.info("Materialized fact_product_cost: rows={}", total);
+        log.info("Materialized {}", TABLE);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
         long ver = Instant.now().toEpochMilli();
+        String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
                 SELECT cp.id            AS cost_id,
@@ -86,12 +87,12 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
             return;
         }
 
-        insertBatch(rows, ver);
+        insertBatch(rows, ver, chInsert);
         log.info("Incremental fact_product_cost: rows={}", rows.size());
     }
 
-    private void insertBatch(List<Map<String, Object>> rows, long ver) {
-        jdbc.ch().batchUpdate(CH_INSERT, rows, rows.size(), (ps, row) -> {
+    private void insertBatch(List<Map<String, Object>> rows, long ver, String chInsert) {
+        jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
             ps.setLong(1, ((Number) row.get("cost_id")).longValue());
             ps.setLong(2, ((Number) row.get("seller_sku_id")).longValue());
             ps.setBigDecimal(3, (BigDecimal) row.get("cost_price"));

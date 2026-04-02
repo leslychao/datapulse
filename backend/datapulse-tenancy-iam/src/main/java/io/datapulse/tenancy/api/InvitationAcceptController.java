@@ -2,6 +2,7 @@ package io.datapulse.tenancy.api;
 
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.InvitationService;
+import io.datapulse.tenancy.persistence.WorkspaceInvitationEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -21,7 +22,13 @@ public class InvitationAcceptController {
     private final WorkspaceContext workspaceContext;
 
     @PostMapping("/accept")
-    public AcceptInvitationResponse acceptInvitation(@Valid @RequestBody AcceptInvitationRequest request) {
-        return invitationService.acceptInvitation(request.token(), workspaceContext.getUserId());
+    public AcceptInvitationResponse acceptInvitation(
+            @Valid @RequestBody AcceptInvitationRequest request) {
+        WorkspaceInvitationEntity invitation = invitationService.acceptInvitation(
+                request.token(), workspaceContext.getUserId());
+        return new AcceptInvitationResponse(
+                invitation.getWorkspace().getId(),
+                invitation.getWorkspace().getName(),
+                invitation.getRole());
     }
 }

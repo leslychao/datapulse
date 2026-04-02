@@ -6,6 +6,7 @@ import { environment } from '@env';
 import {
   CostProfile,
   CostProfileImportResult,
+  CostProfilePage,
   CreateCostProfileRequest,
   UpdateCostProfileRequest,
 } from '@core/models';
@@ -15,12 +16,12 @@ export class CostProfileApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
-  listCostProfiles(search?: string, page = 0, size = 50): Observable<CostProfile[]> {
+  listCostProfiles(search?: string, page = 0, size = 50): Observable<CostProfilePage> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (search) {
       params = params.set('search', search);
     }
-    return this.http.get<CostProfile[]>(`${this.base}/cost-profiles`, { params });
+    return this.http.get<CostProfilePage>(`${this.base}/cost-profiles`, { params });
   }
 
   createCostProfile(req: CreateCostProfileRequest): Observable<CostProfile> {
@@ -29,10 +30,6 @@ export class CostProfileApiService {
 
   updateCostProfile(id: number, req: UpdateCostProfileRequest): Observable<CostProfile> {
     return this.http.put<CostProfile>(`${this.base}/cost-profiles/${id}`, req);
-  }
-
-  deleteCostProfile(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/cost-profiles/${id}`);
   }
 
   importCsv(file: File): Observable<CostProfileImportResult> {

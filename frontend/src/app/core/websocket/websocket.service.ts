@@ -5,7 +5,7 @@ import { QueryClient } from '@tanstack/angular-query-experimental';
 
 import { environment } from '@env';
 import { NotificationApiService } from '@core/api/notification-api.service';
-import { AppNotification, ConnectionSyncStatus } from '@core/models';
+import { AppNotification, ConnectionSyncStatus, MismatchWsEvent } from '@core/models';
 import { SyncStatusStore } from '@shared/stores/sync-status.store';
 import { NotificationStore } from '@shared/stores/notification.store';
 
@@ -27,6 +27,7 @@ export class WebSocketService {
   readonly connected = signal(false);
   readonly reconnecting = signal(false);
   readonly wasConnected = signal(false);
+  readonly lastMismatchEvent = signal<MismatchWsEvent | null>(null);
 
   connect(workspaceId: number): void {
     this.disconnect();
@@ -151,10 +152,11 @@ export class WebSocketService {
       this.queryClient.invalidateQueries({ queryKey: ['pricing-decisions'] });
     });
 
-    this.subscribeTo(`${ws}/mismatches`, () => {
+    this.subscribeTo<MismatchWsEvent>(`${ws}/mismatches`, (msg) => {
       this.queryClient.invalidateQueries({ queryKey: ['mismatches'] });
       this.queryClient.invalidateQueries({ queryKey: ['mismatch-summary'] });
       this.queryClient.invalidateQueries({ queryKey: ['mismatch-detail'] });
+      this.lastMismatchEvent.set(msg);
     });
 
     this.subscribeTo(`${ws}/promo-campaigns`, () => {

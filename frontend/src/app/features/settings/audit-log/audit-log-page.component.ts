@@ -6,7 +6,9 @@ import { LucideAngularModule, ChevronRight, ChevronDown } from 'lucide-angular';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AuditLogApiService } from '@core/api/audit-log-api.service';
+import { MemberApiService } from '@core/api/member-api.service';
 import { AuditLogEntry, AuditOutcome } from '@core/models';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -42,7 +44,7 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
       </div>
 
       <dp-filter-bar
-        [filters]="filterConfigs"
+        [filters]="filterConfigs()"
         [values]="filterValues()"
         (filtersChanged)="onFiltersChanged($event)"
       />
@@ -190,6 +192,8 @@ export class AuditLogPageComponent {
   protected readonly Math = Math;
 
   private readonly auditLogApi = inject(AuditLogApiService);
+  private readonly memberApi = inject(MemberApiService);
+  private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
@@ -197,27 +201,47 @@ export class AuditLogPageComponent {
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
 
-  readonly filterConfigs: FilterConfig[] = [
-    {
-      key: 'actorName',
-      label: 'settings.audit_log.filter.user',
-      type: 'text',
-    },
-    {
-      key: 'actionType',
-      label: 'settings.audit_log.filter.action_type',
-      type: 'select',
-      options: [
-        { value: 'connection', label: 'settings.audit_log.filter.action_group.connection' },
-        { value: 'credential', label: 'settings.audit_log.filter.action_group.credential' },
-        { value: 'member', label: 'settings.audit_log.filter.action_group.member' },
-        { value: 'workspace', label: 'settings.audit_log.filter.action_group.workspace' },
-        { value: 'policy', label: 'settings.audit_log.filter.action_group.policy' },
-        { value: 'action', label: 'settings.audit_log.filter.action_group.action' },
-        { value: 'promo', label: 'settings.audit_log.filter.action_group.promo' },
-        { value: 'alert', label: 'settings.audit_log.filter.action_group.alert' },
-      ],
-    },
+  private readonly membersQuery = injectQuery(() => ({
+    queryKey: ['members', this.wsStore.currentWorkspaceId()],
+    queryFn: () => lastValueFrom(this.memberApi.listMembers(this.wsStore.currentWorkspaceId()!)),
+    enabled: !!this.wsStore.currentWorkspaceId(),
+  }));
+
+  readonly filterConfigs = computed<FilterConfig[]>(() => {
+    const memberOptions: { value: string; label: string }[] = [];
+    const members = this.membersQuery.data();
+    if (members) {
+      for (const m of members) {
+        memberOptions.push({ value: `user:${m.userId}`, label: m.name });
+      }
+    }
+    memberOptions.push(
+      { value: 'actorType:SYSTEM', label: 'settings.audit_log.actor.SYSTEM' },
+      { value: 'actorType:SCHEDULER', label: 'settings.audit_log.actor.SCHEDULER' },
+    );
+
+    return [
+      {
+        key: 'actor',
+        label: 'settings.audit_log.filter.user',
+        type: 'select' as const,
+        options: memberOptions,
+      },
+      {
+        key: 'actionType',
+        label: 'settings.audit_log.filter.action_type',
+        type: 'select' as const,
+        options: [
+          { value: 'connection', label: 'settings.audit_log.filter.action_group.connection' },
+          { value: 'credential', label: 'settings.audit_log.filter.action_group.credential' },
+          { value: 'member', label: 'settings.audit_log.filter.action_group.member' },
+          { value: 'workspace', label: 'settings.audit_log.filter.action_group.workspace' },
+          { value: 'policy', label: 'settings.audit_log.filter.action_group.policy' },
+          { value: 'action', label: 'settings.audit_log.filter.action_group.action' },
+          { value: 'promo', label: 'settings.audit_log.filter.action_group.promo' },
+          { value: 'alert', label: 'settings.audit_log.filter.action_group.alert' },
+        ],
+      },
     {
       key: 'entityType',
       label: 'settings.audit_log.filter.entity_type',
@@ -259,13 +283,23 @@ export class AuditLogPageComponent {
     const filters = this.filterValues();
     const page = this.currentPage();
     const period = filters['period'];
+    const actorVal = filters['actor'] as string | undefined;
+
+    let userId: number | undefined;
+    let actorName: string | undefined;
+    if (actorVal?.startsWith('user:')) {
+      userId = parseInt(actorVal.slice(5), 10);
+    } else if (actorVal?.startsWith('actorType:')) {
+      actorName = actorVal.slice(10);
+    }
 
     return {
       queryKey: ['audit-log', filters, page],
       queryFn: () =>
         lastValueFrom(
           this.auditLogApi.listAuditLog({
-            actorName: filters['actorName'] || undefined,
+            userId,
+            actorName,
             actionType: filters['actionType'] || undefined,
             entityType: filters['entityType'] || undefined,
             from: period?.from || undefined,

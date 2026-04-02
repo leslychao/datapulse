@@ -63,14 +63,6 @@ const routes: Routes = [
           ),
         data: { breadcrumb: 'Журнал аудита' },
       },
-      {
-        path: 'jobs',
-        loadComponent: () =>
-          import('./jobs/jobs-page.component').then(
-            (m) => m.JobsPageComponent,
-          ),
-        data: { breadcrumb: 'Синхронизация' },
-      },
     ],
   },
 ];

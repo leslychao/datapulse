@@ -2,9 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
+  effect,
+  ElementRef,
+  HostListener,
   inject,
+  OnInit,
   signal,
+  ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -12,6 +16,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AgGridAngular } from 'ag-grid-angular';
 import {
+  CellContextMenuEvent,
   ColDef,
   GetRowIdParams,
   GridApi,
@@ -44,7 +49,9 @@ import {
   MismatchSeverity,
   MismatchStatus,
   MismatchType,
+  MismatchWsEvent,
 } from '@core/models';
+import { WebSocketService } from '@core/websocket/websocket.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -87,7 +94,7 @@ const TYPE_COLORS: Record<MismatchType, { bg: string; text: string }> = {
   ],
   templateUrl: './mismatch-dashboard-page.component.html',
 })
-export class MismatchDashboardPageComponent {
+export class MismatchDashboardPageComponent implements OnInit {
   private readonly api = inject(MismatchApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly ws = inject(WorkspaceContextStore);
@@ -97,6 +104,7 @@ export class MismatchDashboardPageComponent {
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
+  private readonly webSocket = inject(WebSocketService);
 
   protected readonly ActivityIcon = Activity;
   protected readonly AlertTriangleIcon = AlertTriangle;
@@ -136,6 +144,10 @@ export class MismatchDashboardPageComponent {
   readonly showBulkIgnoreModal = signal(false);
   readonly bulkIgnoreReason = signal('');
   readonly showColumnsPanel = signal(false);
+
+  readonly contextMenu = signal<{ x: number; y: number; row: Mismatch } | null>(null);
+
+  @ViewChild('searchInput') searchInputRef?: ElementRef<HTMLInputElement>;
 
   readonly typeOptions: MismatchType[] = ['PRICE', 'STOCK', 'PROMO', 'FINANCE'];
   readonly statusOptions: MismatchStatus[] = [
@@ -347,6 +359,10 @@ export class MismatchDashboardPageComponent {
     onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
   }));
 
+  private wsToastTimestamps: number[] = [];
+  private readonly WS_TOAST_LIMIT = 3;
+  private readonly WS_TOAST_WINDOW_MS = 10_000;
+
   constructor() {
     this.searchSubject.pipe(
       debounceTime(300),
@@ -355,6 +371,15 @@ export class MismatchDashboardPageComponent {
     ).subscribe(q => {
       this.searchQuery.set(q);
       this.applyFilters();
+    });
+
+    effect(() => {
+      const evt = this.webSocket.lastMismatchEvent();
+      if (!evt) return;
+      this.applyPulseAnimation(evt);
+      if (evt.eventType === 'MISMATCH_DETECTED' && evt.severity === 'CRITICAL') {
+        this.showThrottledCriticalToast(evt);
+      }
     });
 
     const tr = this.translate;
@@ -538,6 +563,14 @@ export class MismatchDashboardPageComponent {
     });
   }
 
+  onCellContextMenu(e: CellContextMenuEvent<Mismatch>): void {
+    const row = e.data;
+    const evt = e.event as MouseEvent;
+    if (!row || !evt) return;
+    evt.preventDefault();
+    this.contextMenu.set({ x: evt.clientX, y: evt.clientY, row });
+  }
+
   onSelectionChanged(e: SelectionChangedEvent<Mismatch>): void {
     this.selectedRows.set(e.api.getSelectedRows());
   }
@@ -616,6 +649,7 @@ export class MismatchDashboardPageComponent {
 
   applyFilters(): void {
     this.currentPage.set(0);
+    this.persistFilters();
     this.invalidateList();
   }
 
@@ -698,6 +732,138 @@ export class MismatchDashboardPageComponent {
 
   clearBulkSelection(): void {
     this.clearGridSelection();
+  }
+
+  ngOnInit(): void {
+    this.restoreFilters();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Escape') {
+      if (this.selectedMismatchId()) {
+        this.closeDetail();
+        e.preventDefault();
+      } else if (this.contextMenu()) {
+        this.contextMenu.set(null);
+        e.preventDefault();
+      }
+    }
+    if (e.ctrlKey && e.key === 'f') {
+      e.preventDefault();
+      this.searchInputRef?.nativeElement.focus();
+    }
+    if (e.ctrlKey && e.shiftKey && e.key === 'E') {
+      e.preventDefault();
+      this.exportCsv();
+    }
+  }
+
+  @HostListener('document:click')
+  onDocClick(): void {
+    this.contextMenu.set(null);
+    this.showColumnsPanel.set(false);
+  }
+
+  onContextMenu(event: MouseEvent, row: Mismatch): void {
+    event.preventDefault();
+    this.contextMenu.set({ x: event.clientX, y: event.clientY, row });
+  }
+
+  contextOpenDetail(): void {
+    const ctx = this.contextMenu();
+    if (!ctx) return;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { selected: ctx.row.mismatchId },
+      queryParamsHandling: 'merge',
+    });
+    this.contextMenu.set(null);
+  }
+
+  contextGoToProduct(): void {
+    const ctx = this.contextMenu();
+    if (!ctx) return;
+    void this.router.navigate(
+      ['/workspace', this.ws.currentWorkspaceId(), 'grid'],
+      { queryParams: { offerId: ctx.row.offerId } },
+    );
+    this.contextMenu.set(null);
+  }
+
+  contextCopySku(): void {
+    const ctx = this.contextMenu();
+    if (!ctx) return;
+    navigator.clipboard.writeText(ctx.row.skuCode);
+    this.toast.info(this.translate.instant('mismatches.context.sku_copied'));
+    this.contextMenu.set(null);
+  }
+
+  contextIgnore(): void {
+    const ctx = this.contextMenu();
+    if (!ctx) return;
+    this.contextMenu.set(null);
+    this.selectedRows.set([ctx.row]);
+    this.openBulkIgnoreModal();
+  }
+
+  private applyPulseAnimation(evt: MismatchWsEvent): void {
+    if (!this.gridApi) return;
+    const rowNode = this.gridApi.getRowNode(String(evt.mismatchId));
+    if (!rowNode?.rowElement) return;
+    const el = rowNode.rowElement as HTMLElement;
+    const cssClass = evt.eventType === 'MISMATCH_DETECTED'
+      ? 'dp-pulse-new'
+      : evt.eventType === 'MISMATCH_RESOLVED'
+        ? 'dp-pulse-resolved'
+        : 'dp-pulse-acknowledged';
+    el.classList.add(cssClass);
+    setTimeout(() => el.classList.remove(cssClass), 2000);
+  }
+
+  private showThrottledCriticalToast(evt: MismatchWsEvent): void {
+    const now = Date.now();
+    this.wsToastTimestamps = this.wsToastTimestamps.filter(
+      t => now - t < this.WS_TOAST_WINDOW_MS,
+    );
+    if (this.wsToastTimestamps.length >= this.WS_TOAST_LIMIT) return;
+    this.wsToastTimestamps.push(now);
+    const delta = evt.deltaPct != null ? `${evt.deltaPct > 0 ? '+' : ''}${evt.deltaPct.toFixed(1)}%` : '';
+    this.toast.error(
+      this.translate.instant('mismatches.ws.critical_detected', {
+        name: evt.offerName,
+        type: this.translate.instant('mismatches.type.' + evt.type),
+        delta,
+      }),
+    );
+  }
+
+  private persistFilters(): void {
+    const key = `dp-mismatch-filters-${this.ws.currentWorkspaceId()}`;
+    const state = {
+      connectionId: this.connectionId(),
+      types: this.filterTypes(),
+      statuses: this.filterStatuses(),
+      severities: this.filterSeverities(),
+      from: this.periodFrom(),
+      to: this.periodTo(),
+    };
+    localStorage.setItem(key, JSON.stringify(state));
+  }
+
+  private restoreFilters(): void {
+    const key = `dp-mismatch-filters-${this.ws.currentWorkspaceId()}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const state = JSON.parse(raw);
+      if (state.connectionId != null) this.connectionId.set(state.connectionId);
+      if (state.types?.length) this.filterTypes.set(state.types);
+      if (state.statuses?.length) this.filterStatuses.set(state.statuses);
+      if (state.severities?.length) this.filterSeverities.set(state.severities);
+      if (state.from) this.periodFrom.set(state.from);
+      if (state.to) this.periodTo.set(state.to);
+    } catch { /* ignore corrupt data */ }
   }
 
   private clearGridSelection(): void {

@@ -9,6 +9,7 @@ export interface WorkspaceDetail {
   tenantName: string;
   connectionsCount: number;
   membersCount: number;
+  marketplaceTypes?: string[];
 }
 
 export interface TenantDetail {

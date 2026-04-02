@@ -2,6 +2,8 @@ package io.datapulse.tenancy.api;
 
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.OnboardingService;
+import io.datapulse.tenancy.domain.WorkspaceSummary;
+import io.datapulse.tenancy.persistence.TenantEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,13 +29,16 @@ public class TenantController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
     public TenantResponse createTenant(@Valid @RequestBody CreateTenantRequest request) {
-        return onboardingService.createTenant(request, workspaceContext.getUserId());
+        TenantEntity tenant = onboardingService.createTenant(
+                request.name(), workspaceContext.getUserId());
+        return toResponse(tenant);
     }
 
     @GetMapping("/{tenantId}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER')")
     public TenantResponse getTenant(@PathVariable("tenantId") Long tenantId) {
-        return onboardingService.getTenant(tenantId);
+        TenantEntity tenant = onboardingService.getTenant(tenantId);
+        return toResponse(tenant);
     }
 
     @PostMapping("/{tenantId}/workspaces")
@@ -41,6 +46,19 @@ public class TenantController {
     @PreAuthorize("isAuthenticated()")
     public WorkspaceListResponse createWorkspace(@PathVariable("tenantId") Long tenantId,
                                                  @Valid @RequestBody CreateWorkspaceRequest request) {
-        return onboardingService.createWorkspace(tenantId, request, workspaceContext.getUserId());
+        WorkspaceSummary ws = onboardingService.createWorkspace(
+                tenantId, request.name(), workspaceContext.getUserId());
+        return toListResponse(ws);
+    }
+
+    private TenantResponse toResponse(TenantEntity entity) {
+        return new TenantResponse(entity.getId(), entity.getName(), entity.getSlug());
+    }
+
+    private WorkspaceListResponse toListResponse(WorkspaceSummary ws) {
+        return new WorkspaceListResponse(
+                ws.id(), ws.name(), ws.slug(), ws.status(),
+                ws.tenantId(), ws.tenantName(),
+                ws.connectionsCount(), ws.membersCount());
     }
 }

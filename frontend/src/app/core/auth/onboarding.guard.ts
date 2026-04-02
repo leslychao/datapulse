@@ -2,15 +2,15 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { UserApiService } from '@core/api/user-api.service';
+import { AuthService } from './auth.service';
 
 export const onboardingGuard: CanActivateFn = async () => {
-  const userApi = inject(UserApiService);
+  const authService = inject(AuthService);
   const router = inject(Router);
 
-  const me = await firstValueFrom(userApi.getMe());
+  const me = await firstValueFrom(authService.ensureUser());
 
-  if (me.memberships.length > 0) {
+  if (!me || (!me.needsOnboarding && me.memberships.length > 0)) {
     return router.createUrlTree(['/workspaces']);
   }
 
