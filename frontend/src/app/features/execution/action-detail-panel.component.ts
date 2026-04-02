@@ -257,7 +257,7 @@ export class ActionDetailPanelComponent {
   openFullPage(): void {
     const wsId = this.wsStore.currentWorkspaceId();
     this.panel.close();
-    this.router.navigate(['/workspace', wsId, 'execution', 'actions', this.actionId()]);
+    this.router.navigate(['/workspace', wsId, 'pricing', 'price-actions', this.actionId()]);
   }
 
   toggleAttempt(n: number): void {

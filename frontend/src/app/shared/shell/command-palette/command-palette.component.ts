@@ -12,6 +12,7 @@ import { Router } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subject, catchError, debounceTime, of, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { TranslateService } from '@ngx-translate/core';
 
 import { SearchApiService } from '@core/api/search-api.service';
 import { SearchResult } from '@core/models';
@@ -47,14 +48,15 @@ const ICON_PATHS: Record<string, string> = {
     '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
 };
 
-const STATIC_COMMANDS: { label: string; path: string }[] = [
-  { label: 'Перейти к операциям', path: 'grid' },
-  { label: 'Перейти к аналитике', path: 'analytics' },
-  { label: 'Перейти к ценообразованию', path: 'pricing' },
-  { label: 'Перейти к промо', path: 'promo' },
-  { label: 'Перейти к настройкам', path: 'settings' },
-  { label: 'Запустить синхронизацию', path: 'settings/sync' },
-  { label: 'Создать ценовую политику', path: 'pricing/new' },
+const STATIC_COMMANDS: { labelKey: string; path: string }[] = [
+  { labelKey: 'shell.command_palette.go_grid', path: 'grid' },
+  { labelKey: 'shell.command_palette.go_analytics', path: 'analytics' },
+  { labelKey: 'shell.command_palette.go_pricing', path: 'pricing' },
+  { labelKey: 'shell.command_palette.go_price_actions', path: 'pricing/price-actions' },
+  { labelKey: 'shell.command_palette.go_promo', path: 'promo' },
+  { labelKey: 'shell.command_palette.go_settings', path: 'settings' },
+  { labelKey: 'shell.command_palette.start_sync', path: 'settings/sync' },
+  { labelKey: 'shell.command_palette.create_policy', path: 'pricing/new' },
 ];
 
 @Component({
@@ -270,6 +272,7 @@ export class CommandPaletteComponent {
   private readonly router = inject(Router);
   private readonly searchApi = inject(SearchApiService);
   private readonly workspaceStore = inject(WorkspaceContextStore);
+  private readonly translate = inject(TranslateService);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly el = inject(ElementRef);
 
@@ -334,14 +337,16 @@ export class CommandPaletteComponent {
     }
 
     const matchingCommands = STATIC_COMMANDS.filter(
-      (c) => q.length < 2 || c.label.toLowerCase().includes(q),
+      (c) =>
+        q.length < 2
+        || this.translate.instant(c.labelKey).toLowerCase().includes(q),
     );
     if (matchingCommands.length > 0) {
       groups.push({
         label: 'КОМАНДЫ',
         items: matchingCommands.slice(0, 5).map((c) => ({
           type: 'command' as const,
-          label: c.label,
+          label: this.translate.instant(c.labelKey),
           action: () => this.navigateInWorkspace(c.path),
         })),
       });
@@ -482,7 +487,7 @@ export class CommandPaletteComponent {
   private navigateInWorkspace(path: string, queryParams?: Record<string, unknown>): void {
     const wsId = this.workspaceStore.currentWorkspaceId();
     if (!wsId) return;
-    const segments = ['/w', wsId, ...path.split('/')];
+    const segments = ['/workspace', wsId, ...path.split('/')];
     this.router.navigate(segments, queryParams ? { queryParams } : undefined);
   }
 }

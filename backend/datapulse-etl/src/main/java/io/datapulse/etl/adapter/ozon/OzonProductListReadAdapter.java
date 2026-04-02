@@ -51,7 +51,13 @@ public class OzonProductListReadAdapter {
             results.add(page.captureResult());
 
             lastId = page.cursor();
-            if (lastId == null || lastId.isEmpty() || page.captureResult().byteSize() < 200) {
+            if (OzonCursorPaging.shouldStopAfterStringPage(
+                    lastId, currentLastId, page.captureResult().byteSize())) {
+                if (OzonCursorPaging.isNonAdvancingStringCursor(lastId, currentLastId)) {
+                    log.debug(
+                            "Ozon product list pagination stopped: non-advancing last_id, connectionId={}",
+                            context.connectionId());
+                }
                 hasMore = false;
             }
 

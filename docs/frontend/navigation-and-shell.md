@@ -460,7 +460,7 @@ Response:
 
 #### Data source
 
-WebSocket topic `/topic/workspace/{workspaceId}/sync-status` обновляет status в реальном времени. Initial load: `GET /api/connections` (список connections с `lastSuccessAt`).
+WebSocket topic `/topic/workspace/{workspaceId}/sync-status` обновляет индикаторы в реальном времени (тело: `WorkspaceSyncStatusPush` — см. integration API). Initial load: `GET /api/connections/sync-health` (агрегированный health по подключениям).
 
 ### Center zone: Workspace name
 

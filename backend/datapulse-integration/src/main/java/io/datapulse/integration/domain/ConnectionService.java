@@ -1,14 +1,20 @@
 package io.datapulse.integration.domain;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.api.CallLogFilter;
 import io.datapulse.integration.api.CallLogResponse;
+import io.datapulse.integration.api.ConnectionSyncHealthResponse;
 import io.datapulse.integration.api.ConnectionMapper;
 import io.datapulse.integration.api.ConnectionResponse;
 import io.datapulse.integration.api.ConnectionSummaryResponse;
 import io.datapulse.integration.api.CreateConnectionRequest;
 import io.datapulse.integration.api.SyncStateResponse;
+import io.datapulse.integration.api.TriggerSyncRequest;
 import io.datapulse.integration.api.UpdateConnectionRequest;
 import io.datapulse.integration.api.UpdateCredentialsRequest;
 import io.datapulse.integration.api.UpdatePerformanceCredentialsRequest;
@@ -25,17 +31,16 @@ import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -52,6 +57,8 @@ public class ConnectionService {
     private final ConnectionValidationService validationService;
     private final ConnectionMapper connectionMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectProvider<ManualSyncEligibilityChecker> manualSyncEligibilityChecker;
+    private final ConnectionSyncHealthService connectionSyncHealthService;
 
     @Transactional
     public ConnectionResponse createConnection(CreateConnectionRequest request, Long workspaceId, Long userId) {
@@ -89,6 +96,11 @@ public class ConnectionService {
     public List<ConnectionSummaryResponse> listConnections(Long workspaceId) {
         List<MarketplaceConnectionEntity> connections = connectionRepository.findAllByWorkspaceId(workspaceId);
         return connectionMapper.toSummaries(connections);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConnectionSyncHealthResponse> listSyncHealth(Long workspaceId) {
+        return connectionSyncHealthService.listForWorkspace(workspaceId);
     }
 
     @Transactional(readOnly = true)
@@ -249,11 +261,16 @@ public class ConnectionService {
 
     @Transactional
     public void triggerSync(Long connectionId, Long workspaceId, Long userId,
-                            io.datapulse.integration.api.TriggerSyncRequest request) {
+                            TriggerSyncRequest request) {
         MarketplaceConnectionEntity connection = findConnectionOrThrow(connectionId, workspaceId);
 
         if (!ConnectionStatus.ACTIVE.name().equals(connection.getStatus())) {
             throw BadRequestException.of("connection.sync.requires.active", connection.getStatus());
+        }
+
+        ManualSyncEligibilityChecker syncGuard = manualSyncEligibilityChecker.getIfAvailable();
+        if (syncGuard != null) {
+            syncGuard.ensureCanTriggerManualSync(connectionId);
         }
 
         List<String> domains = request != null ? request.domains() : null;

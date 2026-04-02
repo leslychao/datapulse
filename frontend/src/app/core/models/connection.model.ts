@@ -61,6 +61,14 @@ export interface ConnectionSyncStatus {
   status: SyncHealth;
 }
 
+/** WebSocket envelope for `/topic/workspace/{id}/sync-status` (backend `WorkspaceSyncStatusPush`). */
+export type SyncStatusPushReason = 'STATE_CHANGED' | 'ETL_JOB_COMPLETED';
+
+export interface WorkspaceSyncStatusPush {
+  reason: SyncStatusPushReason;
+  connection: ConnectionSyncStatus;
+}
+
 export interface CallLogEntry {
   id: number;
   endpoint: string;

@@ -19,6 +19,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
+import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { CallLogEntry, SyncState } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -411,7 +412,14 @@ export class ConnectionDetailPageComponent {
       this.toast.success(this.translate.instant('settings.connection_detail.sync_started'));
       this.syncStateQuery.refetch();
     },
-    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.sync_start_error')),
+    onError: (error: unknown) =>
+      this.toast.error(
+        translateApiErrorMessage(
+          this.translate,
+          error,
+          'settings.connection_detail.sync_start_error',
+        ),
+      ),
   }));
 
   readonly disableMutation = injectMutation(() => ({
@@ -558,24 +566,11 @@ export class ConnectionDetailPageComponent {
   }
 
   triggerSyncAll(): void {
-    if (this.hasActiveSyncing()) {
-      this.toast.info(this.translate.instant('settings.connection_detail.sync_already_running'));
-      return;
-    }
     this.triggerSyncMutation.mutate(undefined);
   }
 
   triggerSyncDomain(domain: string): void {
-    if (this.hasActiveSyncing()) {
-      this.toast.info(this.translate.instant('settings.connection_detail.sync_already_running'));
-      return;
-    }
     this.triggerSyncMutation.mutate([domain]);
-  }
-
-  private hasActiveSyncing(): boolean {
-    const states = this.syncStateQuery.data();
-    return states?.some(s => s.status === 'SYNCING') ?? false;
   }
 
   goBack(): void {

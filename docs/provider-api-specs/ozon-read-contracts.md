@@ -40,6 +40,7 @@
 | ----------------------- | ------------------------------------------------- | ---------- |
 | `/v3/product/list`      | Cursor (`last_id` + `limit`), `total` in response | confirmed  |
 | `last_id` format        | Base64-encoded cursor string                      | confirmed  |
+| Terminal page           | `last_id` may **repeat** the value sent in the request (often with empty `items`); payload can stay hundreds of bytes — clients must stop when cursor does not advance | confirmed (2026-04-03, loop observed + fix in `OzonProductListReadAdapter`) |
 | `/v3/product/info/list` | Batch by `product_id` list                        | confirmed  |
 | Typical flow            | List IDs first, then fetch info in batches        | confirmed  |
 

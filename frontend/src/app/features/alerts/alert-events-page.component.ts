@@ -381,6 +381,12 @@ export class AlertEventsPageComponent {
     this.router.navigate(['/workspace', ws, 'alerts', 'events', row.id]);
   }
 
+  /** Сброс к умолчанию: открытые и подтверждённые (как при первом открытии страницы). */
+  resetFilters(): void {
+    this.filterValues.set({ status: ['OPEN', 'ACKNOWLEDGED'] });
+    this.pageIndex.set(0);
+  }
+
   prevPage(): void {
     const p = this.pageIndex();
     if (p > 0) {

@@ -27,7 +27,6 @@ import { BreadcrumbService } from '@shared/services/breadcrumb.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
 import { FormModalComponent } from '@shared/components/form-modal.component';
-import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 import { FormsModule } from '@angular/forms';
 
 const STATUS_COLOR: Record<string, StatusColor> = {
@@ -65,7 +64,7 @@ const OUTCOME_COLOR: Record<string, StatusColor> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe, LucideAngularModule, StatusBadgeComponent,
-    FormModalComponent, ConfirmationModalComponent, FormsModule, RouterLink,
+    FormModalComponent, FormsModule, RouterLink,
   ],
   templateUrl: './action-detail-page.component.html',
 })
@@ -89,10 +88,10 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
       const a = this.action();
       if (!a) return;
       const wsId = this.wsStore.currentWorkspaceId();
-      const base = `/workspace/${wsId}/execution`;
+      const base = `/workspace/${wsId}/pricing`;
       this.breadcrumbs.setSegments([
-        { label: this.translate.instant('execution.nav.title'), route: base },
-        { label: this.translate.instant('execution.nav.actions'), route: `${base}/actions` },
+        { label: this.translate.instant('shell.nav.pricing'), route: `${base}/policies` },
+        { label: this.translate.instant('pricing.tabs.price_actions'), route: `${base}/price-actions` },
         { label: `${a.offerName} (${a.sku})`, route: null },
       ]);
     });
@@ -314,7 +313,7 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
 
   goBack(): void {
     const wsId = this.wsStore.currentWorkspaceId();
-    this.router.navigate(['/workspace', wsId, 'execution', 'actions']);
+    this.router.navigate(['/workspace', wsId, 'pricing', 'price-actions']);
   }
 
   approve(): void {

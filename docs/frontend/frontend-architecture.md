@@ -388,9 +388,10 @@ Component                   API Service              Backend
 Backend (Spring STOMP)                WebSocketService                 Stores
     │                                       │                           │
     │  /topic/workspace/{id}/sync-status    │                           │
+    │  (WorkspaceSyncStatusPush)              │                           │
     │──────────────────────────────────────►│  subscribeTo()            │
     │                                       │──────────────────────────►│ SyncStatusStore
-    │                                       │                           │ .updateConnection()
+    │                                       │                           │ .upsertConnection()
     │  /user/queue/notifications            │                           │
     │──────────────────────────────────────►│                           │
     │                                       │──────────────────────────►│ NotificationStore
@@ -399,7 +400,7 @@ Backend (Spring STOMP)                WebSocketService                 Stores
 
 **WebSocket topics subscribed on workspace entry:**
 - `/topic/workspace/{id}/alerts` — alert events (TODO: Phase B)
-- `/topic/workspace/{id}/sync-status` — connection sync health updates
+- `/topic/workspace/{id}/sync-status` — `WorkspaceSyncStatusPush` (health DTO + `reason`; bootstrap `GET /api/connections/sync-health`)
 - `/topic/workspace/{id}/actions` — action lifecycle events (TODO: Phase D)
 - `/user/queue/notifications` — personal notifications
 

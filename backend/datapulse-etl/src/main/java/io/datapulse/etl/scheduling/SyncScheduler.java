@@ -6,6 +6,8 @@ import java.util.Map;
 
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.integration.domain.SyncStatus;
+import io.datapulse.integration.api.SyncStatusPushReason;
+import io.datapulse.integration.domain.event.ConnectionSyncHealthInvalidatedEvent;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.platform.outbox.OutboxEventType;
@@ -13,6 +15,7 @@ import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,7 @@ public class SyncScheduler {
     private final MarketplaceSyncStateRepository syncStateRepository;
     private final JobExecutionRepository jobExecutionRepository;
     private final OutboxService outboxService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Scheduled(fixedDelayString = "${datapulse.etl.sync-poll-interval:PT1M}")
     @SchedulerLock(name = "syncScheduler", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
@@ -86,5 +90,7 @@ public class SyncScheduler {
             state.setErrorMessage(null);
         }
         syncStateRepository.saveAll(states);
+        eventPublisher.publishEvent(
+                new ConnectionSyncHealthInvalidatedEvent(connectionId, SyncStatusPushReason.STATE_CHANGED));
     }
 }

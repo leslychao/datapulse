@@ -16,5 +16,7 @@ public record IngestProperties(
         @DefaultValue("2") int retryBackoffMultiplier,
         @DefaultValue("PT1H") Duration staleRetryThreshold,
         @DefaultValue("PT48H") Duration staleCampaignThreshold,
-        @DefaultValue("30") int incrementalFactLookbackDays
+        @DefaultValue("30") int incrementalFactLookbackDays,
+        /** Delay before the next scheduled sync attempt after terminal failure (sync state ERROR). */
+        @DefaultValue("PT15M") Duration syncNextAttemptAfterError
 ) {}

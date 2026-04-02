@@ -8,6 +8,7 @@ import {
   CallLogFilter,
   ConnectionDetail,
   ConnectionSummary,
+  ConnectionSyncStatus,
   CreateConnectionRequest,
   Page,
   SyncState,
@@ -33,6 +34,10 @@ export class ConnectionApiService {
 
   listConnections(): Observable<ConnectionSummary[]> {
     return this.http.get<ConnectionSummary[]>(`${this.base}/connections`);
+  }
+
+  listSyncHealth(): Observable<ConnectionSyncStatus[]> {
+    return this.http.get<ConnectionSyncStatus[]>(`${this.base}/connections/sync-health`);
   }
 
   updateCredentials(id: number, req: UpdateCredentialsRequest): Observable<ConnectionDetail> {

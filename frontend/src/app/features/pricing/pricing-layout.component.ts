@@ -45,6 +45,8 @@ export class PricingLayoutComponent {
     { label: 'pricing.tabs.policies', path: 'policies' },
     { label: 'pricing.tabs.runs', path: 'runs' },
     { label: 'pricing.tabs.decisions', path: 'decisions' },
+    { label: 'pricing.tabs.price_actions', path: 'price-actions' },
+    { label: 'pricing.tabs.simulation', path: 'simulation' },
     { label: 'pricing.tabs.locks', path: 'locks' },
   ];
 

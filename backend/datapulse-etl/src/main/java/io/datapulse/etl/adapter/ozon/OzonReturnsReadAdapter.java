@@ -59,10 +59,15 @@ public class OzonReturnsReadAdapter {
             pageNumber++;
 
             String cursor = page.cursor();
-            if (cursor != null && !cursor.isEmpty() && !"0".equals(cursor)) {
-                lastId = Long.parseLong(cursor);
-            } else {
+            if (cursor == null || cursor.isEmpty() || "0".equals(cursor)) {
                 hasMore = false;
+            } else {
+                long parsed = Long.parseLong(cursor);
+                if (parsed == currentLastId) {
+                    hasMore = false;
+                } else {
+                    lastId = parsed;
+                }
             }
 
             if (page.captureResult().byteSize() < 200) {

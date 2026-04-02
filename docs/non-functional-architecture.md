@@ -419,11 +419,10 @@ Validation errors (`400`) содержат `fieldErrors[]`: `field`, `messageKey
 - `WorkspaceChannelInterceptor` (`ChannelInterceptor`) — перехватывает STOMP `SUBSCRIBE`. Проверяет, что destination `/topic/workspace/{id}/*` доступен пользователю (workspace ID есть в `ws.workspaceIds` из session). Отклоняет подписку `MessageDeliveryException` при нарушении.
 - Destinations вне паттерна `/topic/workspace/{id}/*` — не ограничиваются workspace-проверкой.
 
-**ETL sync status push:**
-- `SyncStatusPushListener` (`@RabbitListener(queues = "etl.events.api")`) — слушает `ETL_SYNC_COMPLETED` из fanout exchange `datapulse.etl.events`.
-- Извлекает `connectionId` из payload, резолвит `workspaceId` через `MarketplaceConnectionRepository`.
-- Пушит в `/topic/workspace/{workspaceId}/sync-status`.
-- Это позволяет UI обновлять статус синхронизации в реальном времени без polling REST API.
+**ETL sync status push (единый топик, один JSON-контракт):**
+- `ConnectionSyncHealthPushListener` — `@TransactionalEventListener(AFTER_COMMIT)` на `ConnectionSyncHealthInvalidatedEvent`. Пушит `WorkspaceSyncStatusPush` в `/topic/workspace/{workspaceId}/sync-status`; `reason` берётся из события: обычно `STATE_CHANGED`, при успешном завершении ingest в той же транзакции, что и outbox `ETL_SYNC_COMPLETED`, — `ETL_JOB_COMPLETED` (один WS-кадр: снимок + подсказка инвалидации offers/analytics, без дубля из Rabbit).
+- `SyncStatusPushListener` — `@RabbitListener` на `ETL_SYNC_COMPLETED`: только fan-out уведомлений в `/user/queue/notifications`, без повторного пуша в `sync-status`.
+- Initial load в shell: `GET /api/connections/sync-health` (список `ConnectionSyncHealthResponse`).
 
 ### Email (scope ограничен)
 

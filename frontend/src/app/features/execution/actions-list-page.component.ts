@@ -36,7 +36,6 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { StatusColor } from '@shared/components/status-badge.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
-import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 import { FormModalComponent } from '@shared/components/form-modal.component';
 
 const ACTION_STATUS_COLOR: Record<string, StatusColor> = {
@@ -71,7 +70,7 @@ interface ContextMenuState {
   imports: [
     TranslatePipe, FormsModule,
     KpiCardComponent, FilterBarComponent, DataGridComponent,
-    EmptyStateComponent, ConfirmationModalComponent, FormModalComponent,
+    EmptyStateComponent, FormModalComponent,
     LucideAngularModule,
   ],
   template: `
@@ -769,7 +768,7 @@ export class ActionsListPageComponent implements OnInit {
 
   onRowDoubleClicked(row: ActionSummary): void {
     this.detailPanel.close();
-    this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'execution', 'actions', row.id]);
+    this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'pricing', 'price-actions', row.id]);
   }
 
   onSelectionChanged(rows: any[]): void {
@@ -888,7 +887,7 @@ export class ActionsListPageComponent implements OnInit {
     const row = this.ctxMenu().row;
     this.closeOverlays();
     if (row) {
-      this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'execution', 'actions', row.id]);
+      this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'pricing', 'price-actions', row.id]);
     }
   }
 

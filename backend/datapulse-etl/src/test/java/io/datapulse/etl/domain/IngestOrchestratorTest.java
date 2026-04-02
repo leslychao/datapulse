@@ -53,7 +53,8 @@ class IngestOrchestratorTest {
   private final IngestProperties ingestProperties = new IngestProperties(
       500, 5000, Duration.ofHours(2), 3,
       Duration.ofMinutes(5), Duration.ofMinutes(20), 2,
-      Duration.ofHours(1), Duration.ofHours(48), 30);
+      Duration.ofHours(1), Duration.ofHours(48), 30,
+      Duration.ofMinutes(15));
 
   @BeforeEach
   void setUp() {

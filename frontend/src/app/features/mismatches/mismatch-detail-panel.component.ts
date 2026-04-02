@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { NgClass } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectMutation,
@@ -59,6 +60,7 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgClass,
+    RouterLink,
     TranslatePipe,
     LucideAngularModule,
     MarketplaceBadgeComponent,
@@ -158,7 +160,8 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
             </dl>
 
             <div class="mt-3">
-              <a class="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)] hover:underline" [attr.href]="'/workspace/' + ws.currentWorkspaceId() + '/execution?selected=' + d.relatedAction.actionId">
+              <a class="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)] hover:underline"
+                 [routerLink]="['/workspace', ws.currentWorkspaceId(), 'pricing', 'price-actions', d.relatedAction.actionId]">
                 {{ 'mismatches.detail.open_action' | translate }} →
               </a>
             </div>

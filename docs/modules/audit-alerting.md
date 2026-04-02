@@ -420,7 +420,7 @@ user_notification:
 | Destination | Type | Описание | Payload |
 |-------------|------|----------|---------|
 | `/topic/workspace/{workspaceId}/alerts` | Topic (broadcast) | Новые alert_events (OPEN), auto-resolution | `{ alertEventId, ruleType, severity, title, status, connectionId }` |
-| `/topic/workspace/{workspaceId}/sync-status` | Topic | Статус ETL sync (started, completed, failed) | `{ connectionId, jobExecutionId, status, completedDomains[] }` |
+| `/topic/workspace/{workspaceId}/sync-status` | Topic | Агрегированный health синка по подключению (как REST `GET /api/connections/sync-health`) | `WorkspaceSyncStatusPush`: `{ reason: STATE_CHANGED \| ETL_JOB_COMPLETED, connection: { connectionId, connectionName, lastSuccessAt, status: OK\|STALE\|ERROR } }` |
 | `/topic/workspace/{workspaceId}/actions` | Topic | Изменения статуса price/promo actions | `{ actionId, actionType, status, offerId }` |
 | `/user/queue/notifications` | User-specific | Персональные уведомления | `{ notificationId, notificationType, title, severity, createdAt }` |
 

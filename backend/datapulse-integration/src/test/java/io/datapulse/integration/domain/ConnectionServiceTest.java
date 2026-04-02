@@ -18,6 +18,7 @@ import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
@@ -37,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,9 +65,18 @@ class ConnectionServiceTest {
   private ConnectionMapper connectionMapper;
   @Mock
   private ApplicationEventPublisher eventPublisher;
+  @Mock
+  private ObjectProvider<ManualSyncEligibilityChecker> manualSyncEligibilityChecker;
+  @Mock
+  private ConnectionSyncHealthService connectionSyncHealthService;
 
   @InjectMocks
   private ConnectionService connectionService;
+
+  @BeforeEach
+  void defaultManualSyncGuardAbsent() {
+    lenient().when(manualSyncEligibilityChecker.getIfAvailable()).thenReturn(null);
+  }
 
   private MarketplaceConnectionEntity buildConnection(Long id, String marketplace, String status) {
     var conn = new MarketplaceConnectionEntity();

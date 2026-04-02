@@ -63,6 +63,12 @@ public final class MessageCodes {
     public static final String CONNECTION_MARKETPLACE_MISMATCH = "connection.marketplace.mismatch";
     public static final String CREDENTIALS_INVALID = "credentials.invalid";
     public static final String VAULT_UNAVAILABLE = "vault.unavailable";
+    /** Stored in {@code user_notification.title} / pushed over WS; translate on client for SYNC_COMPLETED. */
+    public static final String INTEGRATION_NOTIFICATION_SYNC_COMPLETED_TITLE =
+            "integration.notification.sync_completed.title";
+    /** Stored in {@code user_notification.body}; translate on client for SYNC_COMPLETED. */
+    public static final String INTEGRATION_NOTIFICATION_SYNC_COMPLETED_BODY =
+            "integration.notification.sync_completed.body";
 
     // --- ETL ---
     public static final String JOB_NOT_FOUND = "job.not.found";

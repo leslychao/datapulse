@@ -51,7 +51,8 @@ public class OzonPricesReadAdapter {
             results.add(page.captureResult());
 
             lastId = page.cursor();
-            if (lastId == null || lastId.isEmpty() || page.captureResult().byteSize() < 200) {
+            if (OzonCursorPaging.shouldStopAfterStringPage(
+                    lastId, currentLastId, page.captureResult().byteSize())) {
                 hasMore = false;
             }
 

@@ -66,6 +66,7 @@ datapulse:
       min-retry-backoff: ${ETL_MIN_RETRY_BACKOFF:PT5M}
       max-retry-backoff: ${ETL_MAX_RETRY_BACKOFF:PT30M}
       retry-backoff-multiplier: ${ETL_RETRY_BACKOFF_MULTIPLIER:2}
+      sync-next-attempt-after-error: ${ETL_SYNC_NEXT_ATTEMPT_AFTER_ERROR:PT15M}
   vault:
     uri: http://${VAULT_HOST:localhost}:${VAULT_PORT:8200}
     token: ${VAULT_TOKEN:}

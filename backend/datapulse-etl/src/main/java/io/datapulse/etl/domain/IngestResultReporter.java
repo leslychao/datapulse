@@ -11,15 +11,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.datapulse.platform.etl.PostIngestMaterializationResult;
+import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.persistence.JobExecutionRow;
+import io.datapulse.integration.api.SyncStatusPushReason;
 import io.datapulse.integration.domain.SyncStatus;
+import io.datapulse.integration.domain.event.ConnectionSyncHealthInvalidatedEvent;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -30,6 +34,8 @@ public class IngestResultReporter {
     private final OutboxService outboxService;
     private final MarketplaceSyncStateRepository syncStateRepository;
     private final ObjectMapper objectMapper;
+    private final IngestProperties ingestProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void updateSyncStateSyncing(long connectionId) {
         List<MarketplaceSyncStateEntity> states =
@@ -41,6 +47,7 @@ public class IngestResultReporter {
             state.setErrorMessage(null);
         }
         syncStateRepository.saveAll(states);
+        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
     }
 
     public void updateSyncStateSuccess(long connectionId) {
@@ -54,19 +61,24 @@ public class IngestResultReporter {
             state.setErrorMessage(null);
         }
         syncStateRepository.saveAll(states);
+        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.ETL_JOB_COMPLETED);
     }
 
     public void updateSyncStateError(long connectionId, String errorMessage) {
         List<MarketplaceSyncStateEntity> states =
                 syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime nextAttempt = now.plus(ingestProperties.syncNextAttemptAfterError());
         for (MarketplaceSyncStateEntity state : states) {
             state.setStatus(SyncStatus.ERROR.name());
+            state.setNextScheduledAt(nextAttempt);
             if (errorMessage != null) {
                 state.setErrorMessage(
                         errorMessage.length() > 1000 ? errorMessage.substring(0, 1000) : errorMessage);
             }
         }
         syncStateRepository.saveAll(states);
+        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
     }
 
     public void publishCompletionEvent(JobExecutionRow job, Map<EtlEventType, EventResult> results) {
@@ -91,6 +103,10 @@ public class IngestResultReporter {
                 "job_execution",
                 job.getId(),
                 payload);
+    }
+
+    private void publishSyncHealthInvalidated(long connectionId, SyncStatusPushReason reason) {
+        eventPublisher.publishEvent(new ConnectionSyncHealthInvalidatedEvent(connectionId, reason));
     }
 
     public String buildErrorDetails(Map<EtlEventType, EventResult> results) {
