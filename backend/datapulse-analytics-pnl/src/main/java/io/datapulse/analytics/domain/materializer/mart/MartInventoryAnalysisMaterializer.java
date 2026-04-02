@@ -30,23 +30,27 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
           inv.reserved,
           sales_agg.avg_daily_sales,
           if(sales_agg.avg_daily_sales IS NOT NULL AND sales_agg.avg_daily_sales > 0,
-             toDecimal64(inv.available, 1) / sales_agg.avg_daily_sales,
+             cast(
+                 cast(inv.available AS Decimal(18, 4)) / sales_agg.avg_daily_sales
+                 AS Decimal(18, 1)),
              NULL) AS days_of_cover,
           multiIf(
               sales_agg.avg_daily_sales IS NULL OR sales_agg.avg_daily_sales = 0, 'NORMAL',
-              toDecimal64(inv.available, 1) / sales_agg.avg_daily_sales < %d, 'CRITICAL',
-              toDecimal64(inv.available, 1) / sales_agg.avg_daily_sales < %d, 'WARNING',
+              cast(cast(inv.available AS Decimal(18, 4)) / sales_agg.avg_daily_sales AS Decimal(18, 4))
+                  < %d, 'CRITICAL',
+              cast(cast(inv.available AS Decimal(18, 4)) / sales_agg.avg_daily_sales AS Decimal(18, 4))
+                  < %d, 'WARNING',
               'NORMAL'
           ) AS stock_out_risk,
           fpc.cost_price,
           if(fpc.cost_price IS NOT NULL AND sales_agg.avg_daily_sales IS NOT NULL
-             AND inv.available > sales_agg.avg_daily_sales * %d,
-             toDecimal64(
-                 toInt32(inv.available - sales_agg.avg_daily_sales * %d), 2
-             ) * fpc.cost_price,
+             AND cast(inv.available AS Decimal(18, 4)) > sales_agg.avg_daily_sales * %d,
+             toDecimal128(
+                 toInt64(inv.available - sales_agg.avg_daily_sales * %d) * fpc.cost_price,
+                 2),
              NULL) AS frozen_capital,
           if(sales_agg.avg_daily_sales IS NOT NULL AND sales_agg.avg_daily_sales > 0,
-             greatest(0, toInt32(sales_agg.avg_daily_sales * %d - inv.available)),
+             greatest(toInt32(0), toInt32(sales_agg.avg_daily_sales * %d - inv.available)),
              NULL) AS recommended_replenishment,
           %d AS ver
       FROM (
@@ -67,7 +71,7 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
           SELECT
               product_id,
               connection_id,
-              toDecimal64(sum(quantity), 2) / %d AS avg_daily_sales
+              cast(sum(quantity) AS Decimal(18, 2)) / toDecimal32(%d, 0) AS avg_daily_sales
           FROM fact_sales
           WHERE sale_date >= today() - %d
           GROUP BY product_id, connection_id

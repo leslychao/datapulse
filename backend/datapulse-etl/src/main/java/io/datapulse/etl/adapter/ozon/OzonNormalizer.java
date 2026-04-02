@@ -238,10 +238,7 @@ public class OzonNormalizer {
     }
 
     public NormalizedReturnItem normalizeReturn(OzonReturnItem item) {
-        OffsetDateTime returnDate = OzonTimestampParser.parseIso8601(item.returnDate());
-        if (returnDate == null) {
-            returnDate = OzonTimestampParser.parseIso8601(item.acceptedFromCustomerMoment());
-        }
+        OffsetDateTime returnDate = resolveOzonReturnDate(item);
         if (returnDate == null) {
             returnDate = OffsetDateTime.now();
             log.warn("Return has no date, using now(): returnId={}", item.id());
@@ -274,6 +271,55 @@ public class OzonNormalizer {
                 returnDate,
                 item.status()
         );
+    }
+
+    private OffsetDateTime resolveOzonReturnDate(OzonReturnItem item) {
+        if (item.logistic() != null) {
+            OffsetDateTime d = tryParseReturnTimestamp(item.logistic().returnDate());
+            if (d != null) {
+                return d;
+            }
+        }
+        OffsetDateTime d = tryParseReturnTimestamp(item.returnDate());
+        if (d != null) {
+            return d;
+        }
+        if (item.logistic() != null) {
+            d = tryParseReturnTimestamp(item.logistic().finalMoment());
+            if (d != null) {
+                return d;
+            }
+            d = tryParseReturnTimestamp(item.logistic().technicalReturnMoment());
+            if (d != null) {
+                return d;
+            }
+            d = tryParseReturnTimestamp(item.logistic().cancelledWithCompensationMoment());
+            if (d != null) {
+                return d;
+            }
+        }
+        d = tryParseReturnTimestamp(item.acceptedFromCustomerMoment());
+        if (d != null) {
+            return d;
+        }
+        if (item.visual() != null) {
+            d = tryParseReturnTimestamp(item.visual().changeMoment());
+            if (d != null) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    private static OffsetDateTime tryParseReturnTimestamp(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return OzonTimestampParser.parseIso8601(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     /**

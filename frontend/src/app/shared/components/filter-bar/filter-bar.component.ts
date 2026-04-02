@@ -50,7 +50,7 @@ export interface FilterConfig {
           >
             <option value="">{{ filter.label | translate }}</option>
             @for (opt of filter.options ?? []; track opt.value) {
-              <option [value]="opt.value">{{ opt.label }}</option>
+              <option [value]="opt.value">{{ opt.label | translate }}</option>
             }
           </select>
         }

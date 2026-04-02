@@ -3,7 +3,6 @@ package io.datapulse.integration.domain;
 import io.datapulse.integration.api.ValidateConnectionResponse;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
-import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -21,9 +20,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,13 +30,13 @@ class ConnectionValidationServiceTest {
   @Mock
   private SecretReferenceRepository secretReferenceRepository;
   @Mock
-  private MarketplaceSyncStateRepository syncStateRepository;
-  @Mock
   private CredentialStore credentialStore;
   @Mock
   private ApplicationEventPublisher eventPublisher;
   @Mock
   private List<MarketplaceHealthProbe> healthProbes;
+  @Mock
+  private ConnectionValidationResultApplier resultApplier;
 
   @InjectMocks
   private ConnectionValidationService validationService;
@@ -84,8 +80,12 @@ class ConnectionValidationServiceTest {
       };
 
       var service = new ConnectionValidationService(
-          connectionRepository, secretReferenceRepository, syncStateRepository,
-          credentialStore, eventPublisher, List.of(probe));
+          connectionRepository,
+          secretReferenceRepository,
+          credentialStore,
+          eventPublisher,
+          List.of(probe),
+          resultApplier);
 
       ValidateConnectionResponse result = service.validateSync(conn);
 
@@ -118,8 +118,12 @@ class ConnectionValidationServiceTest {
       };
 
       var service = new ConnectionValidationService(
-          connectionRepository, secretReferenceRepository, syncStateRepository,
-          credentialStore, eventPublisher, List.of(probe));
+          connectionRepository,
+          secretReferenceRepository,
+          credentialStore,
+          eventPublisher,
+          List.of(probe),
+          resultApplier);
 
       ValidateConnectionResponse result = service.validateSync(conn);
 
@@ -152,8 +156,12 @@ class ConnectionValidationServiceTest {
       };
 
       var service = new ConnectionValidationService(
-          connectionRepository, secretReferenceRepository, syncStateRepository,
-          credentialStore, eventPublisher, List.of(wbProbe));
+          connectionRepository,
+          secretReferenceRepository,
+          credentialStore,
+          eventPublisher,
+          List.of(wbProbe),
+          resultApplier);
 
       assertThatThrownBy(() -> service.validateSync(conn))
           .isInstanceOf(IllegalStateException.class)

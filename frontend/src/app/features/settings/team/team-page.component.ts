@@ -129,9 +129,9 @@ export class TeamPageComponent {
       lastValueFrom(this.memberApi.changeRole(this.wsStore.currentWorkspaceId()!, vars.userId, { role: vars.role })),
     onSuccess: () => {
       this.membersQuery.refetch();
-      this.toast.success(this.translate.instant('settings.team.role_updated'));
+      this.toast.success(this.translate.instant('settings.team.role_changed'));
     },
-    onError: () => this.toast.error(this.translate.instant('settings.team.role_update_error')),
+    onError: () => this.toast.error(this.translate.instant('settings.team.role_change_error')),
   }));
 
   readonly removeMutation = injectMutation(() => ({
@@ -140,9 +140,9 @@ export class TeamPageComponent {
     onSuccess: () => {
       this.membersQuery.refetch();
       this.showRemoveModal.set(false);
-      this.toast.success(this.translate.instant('settings.team.member_removed'));
+      this.toast.success(this.translate.instant('settings.team.removed'));
     },
-    onError: () => this.toast.error(this.translate.instant('settings.team.member_remove_error')),
+    onError: () => this.toast.error(this.translate.instant('settings.team.remove_error')),
   }));
 
   changeRole(member: Member, newRole: WorkspaceRole): void {

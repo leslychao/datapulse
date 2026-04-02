@@ -1,8 +1,10 @@
 package io.datapulse.analytics.domain;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
@@ -40,9 +42,10 @@ public class MaterializationService {
         log.info("Full re-materialization completed: succeeded={}", successCount);
     }
 
-    public void runIncrementalMaterialization(long jobExecutionId) {
+    public PostIngestMaterializationResult runIncrementalMaterialization(long jobExecutionId) {
         log.info("Incremental materialization started: jobExecutionId={}", jobExecutionId);
 
+        List<String> failedTables = new ArrayList<>();
         for (AnalyticsMaterializer materializer : orderedMaterializers) {
             String table = materializer.tableName();
             try {
@@ -50,9 +53,15 @@ public class MaterializationService {
             } catch (Exception e) {
                 log.error("Incremental materialization failed: table={}, jobExecutionId={}",
                         table, jobExecutionId, e);
+                failedTables.add(table);
             }
         }
 
-        log.info("Incremental materialization completed: jobExecutionId={}", jobExecutionId);
+        log.info("Incremental materialization completed: jobExecutionId={}, failedTables={}",
+                jobExecutionId, failedTables.size());
+        if (failedTables.isEmpty()) {
+            return PostIngestMaterializationResult.ok();
+        }
+        return PostIngestMaterializationResult.partialFailure(failedTables);
     }
 }

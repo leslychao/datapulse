@@ -46,47 +46,46 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                 r.top_return_reason,
                 %d AS ver
             FROM (
-                -- Returns aggregation
+                -- Returns aggregation (GROUP BY raw keys; coalesce only in SELECT for CH compatibility)
                 SELECT
                     connection_id,
                     any(source_platform) AS source_platform,
-                    coalesce(product_id, 0) AS product_id,
-                    coalesce(seller_sku_id, 0) AS seller_sku_id,
+                    coalesce(product_id, toUInt64(0)) AS product_id,
+                    coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,
                     toYYYYMM(return_date) AS period,
                     count() AS return_count,
                     sum(quantity) AS return_quantity,
-                    sum(coalesce(return_amount, toDecimal64(0, 2))) AS return_amount,
+                    sum(ifNull(return_amount, toDecimal64(0, 2))) AS return_amount,
                     topK(1)(return_reason)[1] AS top_return_reason
                 FROM fact_returns
-                GROUP BY connection_id, coalesce(product_id, 0),
-                         coalesce(seller_sku_id, 0), toYYYYMM(return_date)
+                GROUP BY connection_id, product_id, seller_sku_id, toYYYYMM(return_date)
             ) r
             -- Sales for the same product x period (for return rate)
             LEFT JOIN (
                 SELECT
                     connection_id,
-                    coalesce(product_id, 0) AS product_id,
-                    coalesce(seller_sku_id, 0) AS seller_sku_id,
+                    coalesce(product_id, toUInt64(0)) AS product_id,
+                    coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,
                     toYYYYMM(sale_date) AS period,
                     count() AS sale_count,
                     sum(quantity) AS sale_quantity
                 FROM fact_sales
-                GROUP BY connection_id, coalesce(product_id, 0),
-                         coalesce(seller_sku_id, 0), toYYYYMM(sale_date)
+                GROUP BY connection_id, product_id, seller_sku_id, toYYYYMM(sale_date)
             ) s ON r.connection_id = s.connection_id
+                AND r.product_id = s.product_id
                 AND r.seller_sku_id = s.seller_sku_id
                 AND r.period = s.period
             -- Financial impact from fact_finance
             LEFT JOIN (
                 SELECT
                     connection_id,
-                    coalesce(seller_sku_id, 0) AS seller_sku_id,
+                    coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,
                     toYYYYMM(finance_date) AS period,
                     sum(refund_amount) AS financial_refund_amount,
                     sum(penalties_amount) AS penalties_amount
                 FROM fact_finance
                 WHERE attribution_level = 'POSTING'
-                GROUP BY connection_id, coalesce(seller_sku_id, 0), toYYYYMM(finance_date)
+                GROUP BY connection_id, seller_sku_id, toYYYYMM(finance_date)
             ) fin ON r.connection_id = fin.connection_id
                 AND r.seller_sku_id = fin.seller_sku_id
                 AND r.period = fin.period

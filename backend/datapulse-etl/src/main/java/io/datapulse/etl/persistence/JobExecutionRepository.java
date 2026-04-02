@@ -29,7 +29,7 @@ public class JobExecutionRepository {
     private static final String CAS_STATUS = """
             UPDATE job_execution
             SET status = :target, started_at = CASE WHEN :target = 'IN_PROGRESS' AND started_at IS NULL THEN now() ELSE started_at END,
-                completed_at = CASE WHEN :target IN ('COMPLETED','COMPLETED_WITH_ERRORS','FAILED') THEN now() ELSE completed_at END
+                completed_at = CASE WHEN :target IN ('COMPLETED','COMPLETED_WITH_ERRORS','FAILED','STALE') THEN now() ELSE completed_at END
             WHERE id = :id AND status = :expected
             """;
 
@@ -56,14 +56,14 @@ public class JobExecutionRepository {
             SELECT EXISTS(
                 SELECT 1 FROM job_execution
                 WHERE connection_id = :connectionId
-                  AND status IN ('PENDING', 'IN_PROGRESS', 'RETRY_SCHEDULED')
+                  AND status IN ('PENDING', 'IN_PROGRESS', 'MATERIALIZING', 'RETRY_SCHEDULED')
             )
             """;
 
     private static final String MARK_STALE_IN_PROGRESS = """
             UPDATE job_execution
             SET status = 'STALE', completed_at = now()
-            WHERE status = 'IN_PROGRESS'
+            WHERE status IN ('IN_PROGRESS', 'MATERIALIZING')
               AND started_at < :threshold
             """;
 

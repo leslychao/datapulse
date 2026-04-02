@@ -8,6 +8,10 @@ import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
@@ -99,6 +103,40 @@ public class IngestResultReporter {
             return objectMapper.writeValueAsString(details);
         } catch (JsonProcessingException e) {
             return "{}";
+        }
+    }
+
+    /**
+     * Merges materialization failures into ingest {@code error_details} JSON. No-op when
+     * materialization fully succeeded.
+     */
+    public String mergeMaterializationIntoErrorDetails(
+            String ingestErrorDetailsJson, PostIngestMaterializationResult materialization) {
+        if (materialization.fullySucceeded()) {
+            return ingestErrorDetailsJson;
+        }
+        try {
+            ObjectNode root;
+            if (ingestErrorDetailsJson == null || ingestErrorDetailsJson.isBlank()) {
+                root = objectMapper.createObjectNode();
+            } else {
+                root = (ObjectNode) objectMapper.readTree(ingestErrorDetailsJson);
+            }
+            ObjectNode mat = objectMapper.createObjectNode();
+            mat.put("fully_succeeded", false);
+            if (materialization.fatalError() != null) {
+                mat.put("fatal_error", materialization.fatalError());
+            }
+            ArrayNode failed = objectMapper.createArrayNode();
+            for (String table : materialization.failedTables()) {
+                failed.add(table);
+            }
+            mat.set("failed_tables", failed);
+            root.set("materialization", mat);
+            return objectMapper.writeValueAsString(root);
+        } catch (Exception e) {
+            log.warn("Failed to merge materialization into error_details: {}", e.getMessage());
+            return ingestErrorDetailsJson;
         }
     }
 }

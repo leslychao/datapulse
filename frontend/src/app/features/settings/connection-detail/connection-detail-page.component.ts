@@ -415,7 +415,11 @@ export class ConnectionDetailPageComponent {
       valueFormatter: (params) => formatDateTime(params.value),
     },
     { headerName: this.translate.instant('settings.connection_detail.col_method'), field: 'httpMethod', width: 80 },
-    { headerName: 'Endpoint', field: 'endpoint', flex: 3 },
+    {
+      headerName: this.translate.instant('settings.connection_detail.col_endpoint'),
+      field: 'endpoint',
+      flex: 3,
+    },
     {
       headerName: this.translate.instant('settings.connection_detail.col_http_status'),
       field: 'httpStatus',
@@ -428,7 +432,11 @@ export class ConnectionDetailPageComponent {
       },
     },
     { headerName: this.translate.instant('settings.connection_detail.col_duration'), field: 'durationMs', width: 100 },
-    { headerName: 'Retry', field: 'retryAttempt', width: 70 },
+    {
+      headerName: this.translate.instant('settings.connection_detail.col_retry'),
+      field: 'retryAttempt',
+      width: 70,
+    },
     {
       headerName: this.translate.instant('settings.connection_detail.col_error'),
       field: 'errorDetails',

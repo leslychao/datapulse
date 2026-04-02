@@ -18,9 +18,11 @@ import {
   injectQuery,
   injectMutation,
 } from '@tanstack/angular-query-experimental';
+import { TranslateService } from '@ngx-translate/core';
 import { lastValueFrom } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import {
   CommissionSource,
   CreatePolicyRequest,
@@ -49,6 +51,7 @@ export class PolicyFormPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly policyId = input<string>();
   readonly isEditMode = computed(() => !!this.policyId());
@@ -80,13 +83,20 @@ export class PolicyFormPageComponent {
     },
     onSuccess: (result: PricingPolicy) => {
       if (this.isEditMode()) {
-        this.toast.success(`Политика обновлена (v${result.version})`);
+        this.toast.success(
+          this.translate.instant('pricing.policies.updated', {
+            version: String(result.version),
+          }),
+        );
       } else {
-        this.toast.success('Политика создана');
+        this.toast.success(this.translate.instant('pricing.policies.created'));
       }
       this.navigateToList();
     },
-    onError: () => this.toast.error('Не удалось сохранить политику'),
+    onError: (err) =>
+      this.toast.error(
+        translateApiErrorMessage(this.translate, err, 'pricing.policies.save_error'),
+      ),
   }));
 
   readonly strategyTypes: { value: StrategyType; label: string }[] = [

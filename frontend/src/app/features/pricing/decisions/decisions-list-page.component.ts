@@ -214,10 +214,15 @@ export class DecisionsListPageComponent {
       width: 100,
       sortable: true,
       cellRenderer: (params: any) => {
-        if (params.value === 'SIMULATED') {
-          return `<span class="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">SIM</span>`;
+        const mode = params.value as string;
+        const label =
+          mode === 'SIMULATED'
+            ? this.translate.instant('pricing.decisions.execution_mode.SIMULATED')
+            : this.translate.instant('pricing.decisions.execution_mode.LIVE');
+        if (mode === 'SIMULATED') {
+          return `<span class="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">${label}</span>`;
         }
-        return `<span class="text-[11px] text-[var(--text-primary)]">LIVE</span>`;
+        return `<span class="text-[11px] text-[var(--text-primary)]">${label}</span>`;
       },
     },
     {

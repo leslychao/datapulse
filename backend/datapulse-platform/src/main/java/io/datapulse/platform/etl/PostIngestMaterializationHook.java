@@ -1,12 +1,12 @@
 package io.datapulse.platform.etl;
 
 /**
- * Invoked by the ingest pipeline after a sync job finishes successfully (including
- * {@code COMPLETED_WITH_ERRORS}). Implementations refresh ClickHouse mart tables from facts
- * written during the same ingest run.
+ * Invoked by the ingest pipeline after ingest data is committed and the job is in
+ * {@code MATERIALIZING}. Implementations refresh ClickHouse / mart tables from data written
+ * during the same ingest run.
  */
 @FunctionalInterface
 public interface PostIngestMaterializationHook {
 
-  void afterSuccessfulIngest(long jobExecutionId);
+  PostIngestMaterializationResult afterSuccessfulIngest(long jobExecutionId);
 }

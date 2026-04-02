@@ -6,6 +6,7 @@ import java.util.List;
 import io.datapulse.etl.adapter.wb.WbFinanceReadAdapter;
 import io.datapulse.etl.adapter.wb.WbNormalizer;
 import io.datapulse.etl.adapter.wb.dto.WbFinanceRow;
+import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.domain.CanonicalFinanceNormalizer;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WbFinanceFactSource implements EventSource {
 
+    private final IngestProperties ingestProperties;
     private final WbFinanceReadAdapter adapter;
     private final WbNormalizer normalizer;
     private final CanonicalFinanceEntryUpsertRepository repository;
@@ -42,7 +44,7 @@ public class WbFinanceFactSource implements EventSource {
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
         String token = ctx.credentials().get("apiToken");
-        LocalDate dateFrom = LocalDate.now().minusDays(7);
+        LocalDate dateFrom = LocalDate.now().minusDays(ingestProperties.incrementalFactLookbackDays());
         var captureCtx = CaptureContextFactory.build(ctx, eventType(), "WbFinanceReadAdapter");
         List<CaptureResult> pages = adapter.captureAllPages(captureCtx, token, dateFrom, LocalDate.now());
 

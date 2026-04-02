@@ -218,13 +218,22 @@ export class AuditLogPageComponent {
       label: 'settings.audit_log.filter.entity_type',
       type: 'select',
       options: [
-        { value: 'marketplace_connection', label: 'marketplace_connection' },
-        { value: 'workspace_invitation', label: 'workspace_invitation' },
-        { value: 'workspace_member', label: 'workspace_member' },
-        { value: 'workspace', label: 'workspace' },
-        { value: 'price_policy', label: 'price_policy' },
-        { value: 'price_action', label: 'price_action' },
-        { value: 'app_user', label: 'app_user' },
+        {
+          value: 'marketplace_connection',
+          label: 'settings.audit_log.entity_type.marketplace_connection',
+        },
+        {
+          value: 'workspace_invitation',
+          label: 'settings.audit_log.entity_type.workspace_invitation',
+        },
+        {
+          value: 'workspace_member',
+          label: 'settings.audit_log.entity_type.workspace_member',
+        },
+        { value: 'workspace', label: 'settings.audit_log.entity_type.workspace' },
+        { value: 'price_policy', label: 'settings.audit_log.entity_type.price_policy' },
+        { value: 'price_action', label: 'settings.audit_log.entity_type.price_action' },
+        { value: 'app_user', label: 'settings.audit_log.entity_type.app_user' },
       ],
     },
     {

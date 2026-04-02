@@ -52,17 +52,19 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                 refund_amount,
                 net_payout,
                 gross_cogs,
-                -- product_refund_ratio at product x month level
+                -- product_refund_ratio at product x month level (single Decimal scale for if branches)
                 if(revenue_amount != 0,
-                   abs(refund_amount) / revenue_amount,
-                   NULL) AS product_refund_ratio,
+                   toDecimal128(abs(refund_amount) / revenue_amount, 4),
+                   CAST(NULL AS Nullable(Decimal(18, 4)))) AS product_refund_ratio,
                 -- net_cogs = gross_cogs * (1 - product_refund_ratio)
                 if(gross_cogs IS NOT NULL,
-                   gross_cogs * greatest(toDecimal128(0, 4), 1 - coalesce(
-                       if(revenue_amount != 0,
-                          abs(refund_amount) / revenue_amount,
-                          toDecimal128(0, 4)),
-                       toDecimal128(0, 4))),
+                   gross_cogs * greatest(
+                       toDecimal128(0, 4),
+                       toDecimal128(1, 4) - coalesce(
+                           if(revenue_amount != 0,
+                              toDecimal128(abs(refund_amount) / revenue_amount, 4),
+                              toDecimal128(0, 4)),
+                           toDecimal128(0, 4))),
                    NULL) AS net_cogs,
                 -- cogs_status: worst of posting statuses
                 cogs_status,
@@ -82,54 +84,100 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                        + other_marketplace_charges_amount + compensation_amount
                        + refund_amount)
                    - toDecimal64(0, 2)
-                   - (gross_cogs * greatest(toDecimal128(0, 4), 1 - coalesce(
-                       if(revenue_amount != 0,
-                          abs(refund_amount) / revenue_amount,
-                          toDecimal128(0, 4)),
-                       toDecimal128(0, 4)))),
+                   - (gross_cogs * greatest(
+                       toDecimal128(0, 4),
+                       toDecimal128(1, 4) - coalesce(
+                           if(revenue_amount != 0,
+                              toDecimal128(abs(refund_amount) / revenue_amount, 4),
+                              toDecimal128(0, 4)),
+                           toDecimal128(0, 4)))),
                    NULL) AS full_pnl,
                 %d AS ver
             FROM (
                 -- Source 1: Rollup of mart_posting_pnl → PRODUCT rows
+                -- Inner query: only plain aggregates (no countIf inside multiIf/if — CH 24 ILLEGAL_AGGREGATION).
                 SELECT
                     connection_id,
                     source_platform,
-                    coalesce(seller_sku_id, 0) AS seller_sku_id,
-                    coalesce(product_id, 0) AS product_id,
-                    toYYYYMM(finance_date) AS period,
+                    seller_sku_id,
+                    product_id,
+                    period,
                     'PRODUCT' AS attribution_level,
-                    sum(revenue_amount) AS revenue_amount,
-                    sum(marketplace_commission_amount) AS marketplace_commission_amount,
-                    sum(acquiring_commission_amount) AS acquiring_commission_amount,
-                    sum(logistics_cost_amount) AS logistics_cost_amount,
-                    sum(storage_cost_amount) AS storage_cost_amount,
-                    sum(penalties_amount) AS penalties_amount,
-                    sum(marketing_cost_amount) AS marketing_cost_amount,
-                    sum(acceptance_cost_amount) AS acceptance_cost_amount,
-                    sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
-                    sum(compensation_amount) AS compensation_amount,
-                    sum(refund_amount) AS refund_amount,
-                    sum(net_payout) AS net_payout,
-                    sumIf(gross_cogs, cogs_status = 'OK') AS gross_cogs,
-                    multiIf(
-                        countIf(cogs_status = 'NO_SALES') > 0 AND countIf(cogs_status = 'OK') = 0, 'NO_SALES',
-                        countIf(cogs_status = 'NO_COST_PROFILE') > 0, 'NO_COST_PROFILE',
-                        'OK'
-                    ) AS cogs_status
-                FROM mart_posting_pnl
-                GROUP BY connection_id, source_platform,
-                         coalesce(seller_sku_id, 0), coalesce(product_id, 0),
-                         toYYYYMM(finance_date)
+                    revenue_amount,
+                    marketplace_commission_amount,
+                    acquiring_commission_amount,
+                    logistics_cost_amount,
+                    storage_cost_amount,
+                    penalties_amount,
+                    marketing_cost_amount,
+                    acceptance_cost_amount,
+                    other_marketplace_charges_amount,
+                    compensation_amount,
+                    refund_amount,
+                    net_payout,
+                    gross_cogs,
+                    if(cnt_no_sales > 0 AND cnt_ok = 0,
+                        'NO_SALES',
+                        if(cnt_no_cost_profile > 0, 'NO_COST_PROFILE', 'OK')) AS cogs_status
+                FROM (
+                    SELECT
+                        connection_id,
+                        source_platform,
+                        seller_sku_id,
+                        product_id,
+                        period,
+                        sum(revenue_amount) AS revenue_amount,
+                        sum(marketplace_commission_amount) AS marketplace_commission_amount,
+                        sum(acquiring_commission_amount) AS acquiring_commission_amount,
+                        sum(logistics_cost_amount) AS logistics_cost_amount,
+                        sum(storage_cost_amount) AS storage_cost_amount,
+                        sum(penalties_amount) AS penalties_amount,
+                        sum(marketing_cost_amount) AS marketing_cost_amount,
+                        sum(acceptance_cost_amount) AS acceptance_cost_amount,
+                        sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
+                        sum(compensation_amount) AS compensation_amount,
+                        sum(refund_amount) AS refund_amount,
+                        sum(net_payout) AS net_payout,
+                        sumIf(gross_cogs, cogs_status = 'OK') AS gross_cogs,
+                        countIf(cogs_status = 'NO_SALES') AS cnt_no_sales,
+                        countIf(cogs_status = 'OK') AS cnt_ok,
+                        countIf(cogs_status = 'NO_COST_PROFILE') AS cnt_no_cost_profile
+                    FROM (
+                        SELECT
+                            connection_id,
+                            source_platform,
+                            coalesce(seller_sku_id, 0) AS seller_sku_id,
+                            coalesce(product_id, 0) AS product_id,
+                            toYYYYMM(finance_date) AS period,
+                            revenue_amount,
+                            marketplace_commission_amount,
+                            acquiring_commission_amount,
+                            logistics_cost_amount,
+                            storage_cost_amount,
+                            penalties_amount,
+                            marketing_cost_amount,
+                            acceptance_cost_amount,
+                            other_marketplace_charges_amount,
+                            compensation_amount,
+                            refund_amount,
+                            net_payout,
+                            gross_cogs,
+                            cogs_status
+                        FROM mart_posting_pnl
+                    ) AS posting_keys
+                    GROUP BY connection_id, source_platform, seller_sku_id, product_id, period
+                ) AS posting_rollup
 
                 UNION ALL
 
                 -- Source 2: PRODUCT-level fact_finance entries (not in mart_posting_pnl)
+                -- Inner projection so GROUP BY keys match SELECT (CH 24 NOT_AN_AGGREGATE on coalesce).
                 SELECT
                     connection_id,
                     any(source_platform) AS source_platform,
-                    coalesce(seller_sku_id, 0) AS seller_sku_id,
+                    seller_sku_id_key AS seller_sku_id,
                     0 AS product_id,
-                    toYYYYMM(finance_date) AS period,
+                    period,
                     'PRODUCT' AS attribution_level,
                     sum(revenue_amount) AS revenue_amount,
                     sum(marketplace_commission_amount) AS marketplace_commission_amount,
@@ -145,9 +193,28 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                     sum(net_payout) AS net_payout,
                     NULL AS gross_cogs,
                     'NO_SALES' AS cogs_status
-                FROM fact_finance
-                WHERE attribution_level = 'PRODUCT'
-                GROUP BY connection_id, coalesce(seller_sku_id, 0), toYYYYMM(finance_date)
+                FROM (
+                    SELECT
+                        connection_id,
+                        source_platform,
+                        coalesce(seller_sku_id, 0) AS seller_sku_id_key,
+                        toYYYYMM(finance_date) AS period,
+                        revenue_amount,
+                        marketplace_commission_amount,
+                        acquiring_commission_amount,
+                        logistics_cost_amount,
+                        storage_cost_amount,
+                        penalties_amount,
+                        marketing_cost_amount,
+                        acceptance_cost_amount,
+                        other_marketplace_charges_amount,
+                        compensation_amount,
+                        refund_amount,
+                        net_payout
+                    FROM fact_finance
+                    WHERE attribution_level = 'PRODUCT'
+                ) AS ff_product
+                GROUP BY connection_id, seller_sku_id_key, period
 
                 UNION ALL
 

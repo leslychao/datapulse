@@ -9,11 +9,12 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
+import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { CreatePromoPolicyRequest, ParticipationMode } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -37,6 +38,7 @@ export class PromoPolicyFormPageComponent implements OnInit {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private readonly fb = inject(FormBuilder);
   private readonly queryClient = inject(QueryClient);
 
@@ -71,10 +73,13 @@ export class PromoPolicyFormPageComponent implements OnInit {
       lastValueFrom(this.promoApi.createPolicy(this.wsStore.currentWorkspaceId()!, req)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
-      this.toast.success('Промо-политика создана');
+      this.toast.success(this.translate.instant('promo.form.toast.created'));
       this.navigateBack();
     },
-    onError: () => this.toast.error('Не удалось создать промо-политику'),
+    onError: (err) =>
+      this.toast.error(
+        translateApiErrorMessage(this.translate, err, 'promo.form.toast.create_error'),
+      ),
   }));
 
   private readonly updateMutation = injectMutation(() => ({
@@ -89,10 +94,13 @@ export class PromoPolicyFormPageComponent implements OnInit {
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
       this.queryClient.invalidateQueries({ queryKey: ['promo-policy'] });
-      this.toast.success('Промо-политика обновлена');
+      this.toast.success(this.translate.instant('promo.form.toast.updated'));
       this.navigateBack();
     },
-    onError: () => this.toast.error('Не удалось обновить промо-политику'),
+    onError: (err) =>
+      this.toast.error(
+        translateApiErrorMessage(this.translate, err, 'promo.form.toast.update_error'),
+      ),
   }));
 
   ngOnInit(): void {

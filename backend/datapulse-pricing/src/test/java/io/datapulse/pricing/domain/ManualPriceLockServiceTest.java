@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -151,9 +155,9 @@ class ManualPriceLockServiceTest {
           OffsetDateTime.now(), null, null, null);
       when(lockMapper.toResponse(entity)).thenReturn(response);
 
-      List<ManualLockResponse> result = service.listActiveLocks(WORKSPACE_ID, 100L);
+      var result = service.listActiveLocks(WORKSPACE_ID, 100L, PageRequest.of(0, 10));
 
-      assertThat(result).hasSize(1);
+      assertThat(result.getContent()).hasSize(1);
     }
 
     @Test
@@ -161,21 +165,20 @@ class ManualPriceLockServiceTest {
     void should_returnEmpty_when_noActiveLockForOffer() {
       when(lockRepository.findActiveLock(100L)).thenReturn(Optional.empty());
 
-      List<ManualLockResponse> result = service.listActiveLocks(WORKSPACE_ID, 100L);
+      var result = service.listActiveLocks(WORKSPACE_ID, 100L, PageRequest.of(0, 10));
 
-      assertThat(result).isEmpty();
+      assertThat(result.getContent()).isEmpty();
     }
 
     @Test
     @DisplayName("returns all workspace locks when offer ID is null")
     void should_returnAllLocks_when_offerIdNull() {
-      when(lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(WORKSPACE_ID))
-          .thenReturn(List.of());
-      when(lockMapper.toResponses(any())).thenReturn(List.of());
+      when(lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(eq(WORKSPACE_ID), any(Pageable.class)))
+          .thenReturn(new PageImpl<>(List.of()));
 
-      service.listActiveLocks(WORKSPACE_ID, null);
+      service.listActiveLocks(WORKSPACE_ID, null, PageRequest.of(0, 20));
 
-      verify(lockRepository).findAllByWorkspaceIdAndUnlockedAtIsNull(WORKSPACE_ID);
+      verify(lockRepository).findAllByWorkspaceIdAndUnlockedAtIsNull(eq(WORKSPACE_ID), any(Pageable.class));
     }
   }
 

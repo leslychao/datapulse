@@ -15,5 +15,6 @@ public record IngestProperties(
         @DefaultValue("PT20M") Duration maxRetryBackoff,
         @DefaultValue("2") int retryBackoffMultiplier,
         @DefaultValue("PT1H") Duration staleRetryThreshold,
-        @DefaultValue("PT48H") Duration staleCampaignThreshold
+        @DefaultValue("PT48H") Duration staleCampaignThreshold,
+        @DefaultValue("30") int incrementalFactLookbackDays
 ) {}

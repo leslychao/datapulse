@@ -198,7 +198,7 @@ class BulkManualPricingServiceTest {
 
       BulkManualApplyResponse response = service.apply(request, WORKSPACE_ID, 1L);
 
-      assertThat(response.created()).isEqualTo(1);
+      assertThat(response.processed()).isEqualTo(1);
       assertThat(response.skipped()).isZero();
       verify(decisionRepository).saveAll(decisionsCaptor.capture());
       assertThat(decisionsCaptor.getValue()).hasSize(1);
@@ -249,7 +249,7 @@ class BulkManualPricingServiceTest {
       BulkManualApplyResponse response = service.apply(request, WORKSPACE_ID, 1L);
 
       assertThat(response.skipped()).isEqualTo(1);
-      assertThat(response.created()).isZero();
+      assertThat(response.processed()).isZero();
       verify(decisionRepository, never()).saveAll(any());
     }
 
@@ -274,7 +274,7 @@ class BulkManualPricingServiceTest {
       BulkManualApplyResponse response = service.apply(request, WORKSPACE_ID, 1L);
 
       assertThat(response.skipped()).isEqualTo(1);
-      assertThat(response.created()).isZero();
+      assertThat(response.processed()).isZero();
     }
 
     @Test
@@ -301,7 +301,7 @@ class BulkManualPricingServiceTest {
 
       BulkManualApplyResponse response = service.apply(request, WORKSPACE_ID, 1L);
 
-      assertThat(response.created()).isEqualTo(1);
+      assertThat(response.processed()).isEqualTo(1);
       assertThat(response.skipped()).isEqualTo(1);
       assertThat(response.errors()).hasSize(1);
     }

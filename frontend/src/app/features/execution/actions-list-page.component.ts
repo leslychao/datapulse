@@ -15,8 +15,9 @@ import {
 import { lastValueFrom } from 'rxjs';
 
 import { ActionApiService } from '@core/api/action-api.service';
-import { formatMoney, formatRelativeTime } from '@shared/utils/format.utils';
+import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { ActionFilter, ActionSummary } from '@core/models';
+import { formatMoney, formatRelativeTime } from '@shared/utils/format.utils';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
@@ -280,10 +281,15 @@ export class ActionsListPageComponent {
       width: 80,
       sortable: true,
       cellRenderer: (params: any) => {
-        if (params.value === 'SIMULATED') {
-          return `<span class="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">SIM</span>`;
+        const mode = params.value as string;
+        const label =
+          mode === 'SIMULATED'
+            ? this.translate.instant('pricing.decisions.execution_mode.SIMULATED')
+            : this.translate.instant('pricing.decisions.execution_mode.LIVE');
+        if (mode === 'SIMULATED') {
+          return `<span class="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">${label}</span>`;
         }
-        return `<span class="text-[var(--text-primary)] text-[11px]">LIVE</span>`;
+        return `<span class="text-[var(--text-primary)] text-[11px]">${label}</span>`;
       },
     },
     {
@@ -412,9 +418,11 @@ export class ActionsListPageComponent {
         );
       }
     },
-    onError: () => {
+    onError: (err) => {
       this.showBulkApproveModal.set(false);
-      this.toast.error(this.translate.instant('execution.bulk.approve_error'));
+      this.toast.error(
+        translateApiErrorMessage(this.translate, err, 'execution.bulk.approve_error'),
+      );
     },
   }));
 

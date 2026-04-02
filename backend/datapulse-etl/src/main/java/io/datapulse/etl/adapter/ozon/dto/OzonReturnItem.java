@@ -16,8 +16,24 @@ public record OzonReturnItem(
         @JsonProperty("accepted_from_customer_moment") String acceptedFromCustomerMoment,
         OzonReturnProduct product,
         @JsonProperty("is_opened") boolean isOpened,
-        @JsonProperty("place_id") long placeId
+        @JsonProperty("place_id") long placeId,
+        @JsonProperty("logistic") OzonReturnLogistic logistic,
+        @JsonProperty("visual") OzonReturnVisual visual
 ) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record OzonReturnLogistic(
+            @JsonProperty("return_date") String returnDate,
+            @JsonProperty("final_moment") String finalMoment,
+            @JsonProperty("technical_return_moment") String technicalReturnMoment,
+            @JsonProperty("cancelled_with_compensation_moment") String cancelledWithCompensationMoment,
+            String barcode
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record OzonReturnVisual(
+            @JsonProperty("change_moment") String changeMoment
+    ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record OzonReturnProduct(

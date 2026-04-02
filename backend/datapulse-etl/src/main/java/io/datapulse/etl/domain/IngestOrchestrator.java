@@ -9,6 +9,7 @@ import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +27,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>Resolve credentials from Vault</li>
  *   <li>Parse checkpoint (if DLX retry)</li>
  *   <li>Execute DAG (level-based parallelism)</li>
- *   <li>Determine final status based on event results</li>
- *   <li>Publish outbox events (ETL_SYNC_COMPLETED or ETL_SYNC_RETRY)</li>
- *   <li>Refresh ClickHouse mart tables (incremental materialization for this job)</li>
+ *   <li>Determine ingest outcome from event results</li>
+ *   <li>CAS to {@code MATERIALIZING}, incremental ClickHouse / mart refresh, then terminal status</li>
+ *   <li>Publish {@code ETL_SYNC_COMPLETED} (and related side effects) only after terminal status</li>
+ *   <li>On retriable failures: {@code ETL_SYNC_RETRY} as before</li>
  * </ol>
  */
 @Slf4j
@@ -124,7 +126,7 @@ public class IngestOrchestrator {
     private void completeJob(JobExecutionRow job, IngestContext context,
                              Map<EtlEventType, EventResult> results) {
         long jobId = job.getId();
-        JobExecutionStatus finalStatus = determineFinalStatus(results);
+        JobExecutionStatus ingestStatus = determineFinalStatus(results);
 
         boolean hasRetriableFailures = hasRetriableFailures(results);
         int retryCount = checkpointManager.extractRetryCount(job.getCheckpoint());
@@ -134,14 +136,47 @@ public class IngestOrchestrator {
             return;
         }
 
-        transactionTemplate.executeWithoutResult(tx -> {
-            jobExecutionRepository.casStatus(jobId, JobExecutionStatus.IN_PROGRESS, finalStatus);
-            jobExecutionRepository.updateErrorDetails(jobId, resultReporter.buildErrorDetails(results));
-            jobExecutionRepository.updateCheckpoint(jobId,
-                    checkpointManager.serialize(results, retryCount));
+        if (ingestStatus == JobExecutionStatus.FAILED) {
+            transactionTemplate.executeWithoutResult(tx -> {
+                jobExecutionRepository.casStatus(jobId, JobExecutionStatus.IN_PROGRESS,
+                        JobExecutionStatus.FAILED);
+                jobExecutionRepository.updateErrorDetails(jobId,
+                        resultReporter.buildErrorDetails(results));
+                jobExecutionRepository.updateCheckpoint(jobId,
+                        checkpointManager.serialize(results, retryCount));
+            });
+            log.info("Ingest completed: jobExecutionId={}, status={}", jobId, ingestStatus);
+            return;
+        }
 
-            if (finalStatus == JobExecutionStatus.COMPLETED
-                    || finalStatus == JobExecutionStatus.COMPLETED_WITH_ERRORS) {
+        String ingestErrorDetails = resultReporter.buildErrorDetails(results);
+        String checkpointJson = checkpointManager.serialize(results, retryCount);
+
+        transactionTemplate.executeWithoutResult(tx -> {
+            jobExecutionRepository.casStatus(jobId, JobExecutionStatus.IN_PROGRESS,
+                    JobExecutionStatus.MATERIALIZING);
+            jobExecutionRepository.updateErrorDetails(jobId, ingestErrorDetails);
+            jobExecutionRepository.updateCheckpoint(jobId, checkpointJson);
+        });
+
+        PostIngestMaterializationResult matResult;
+        try {
+            matResult = postIngestMaterialization.afterSuccessfulIngest(jobId);
+        } catch (Exception e) {
+            log.error("Mart materialization failed after ingest: jobExecutionId={}", jobId, e);
+            matResult = PostIngestMaterializationResult.fatal(
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+        }
+
+        JobExecutionStatus terminalStatus = resolveTerminalStatus(ingestStatus, matResult);
+        String finalErrorDetails =
+                resultReporter.mergeMaterializationIntoErrorDetails(ingestErrorDetails, matResult);
+
+        transactionTemplate.executeWithoutResult(tx -> {
+            jobExecutionRepository.casStatus(jobId, JobExecutionStatus.MATERIALIZING, terminalStatus);
+            jobExecutionRepository.updateErrorDetails(jobId, finalErrorDetails);
+            if (terminalStatus == JobExecutionStatus.COMPLETED
+                    || terminalStatus == JobExecutionStatus.COMPLETED_WITH_ERRORS) {
                 resultReporter.updateSyncStateSuccess(job.getConnectionId());
                 resultReporter.publishCompletionEvent(job, results);
 
@@ -151,16 +186,15 @@ public class IngestOrchestrator {
             }
         });
 
-        if (finalStatus == JobExecutionStatus.COMPLETED
-                || finalStatus == JobExecutionStatus.COMPLETED_WITH_ERRORS) {
-            try {
-                postIngestMaterialization.afterSuccessfulIngest(jobId);
-            } catch (Exception e) {
-                log.error("Mart materialization failed after ingest: jobExecutionId={}", jobId, e);
-            }
-        }
+        log.info("Ingest completed: jobExecutionId={}, status={}", jobId, terminalStatus);
+    }
 
-        log.info("Ingest completed: jobExecutionId={}, status={}", jobId, finalStatus);
+    private static JobExecutionStatus resolveTerminalStatus(
+            JobExecutionStatus ingestStatus, PostIngestMaterializationResult matResult) {
+        if (matResult.fullySucceeded()) {
+            return ingestStatus;
+        }
+        return JobExecutionStatus.COMPLETED_WITH_ERRORS;
     }
 
     private void scheduleRetry(JobExecutionRow job, IngestContext context,

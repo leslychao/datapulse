@@ -179,7 +179,9 @@ class OzonNormalizerTest {
           new OzonReturnItem.OzonReturnProduct(
               "OFFER-1", "Product", 55555L, 1,
               new OzonReturnItem.OzonReturnPrice("750.00", "RUB")),
-          false, 0L);
+          false, 0L,
+          null,
+          null);
 
       var result = normalizer.normalizeReturn(item);
 
@@ -191,6 +193,30 @@ class OzonNormalizerTest {
       assertThat(result.currency()).isEqualTo("RUB");
       assertThat(result.status()).isEqualTo("returned_to_seller");
       assertThat(result.returnDate()).isNotNull();
+    }
+
+    @Test
+    void should_useLogisticReturnDate_when_topLevelReturnDateNull() {
+      var logistic = new OzonReturnItem.OzonReturnLogistic(
+          "2024-07-13T01:47:09.440Z",
+          "2024-07-14T22:06:27.340Z",
+          null,
+          null,
+          null);
+      var item = new OzonReturnItem(
+          5001L, 6001L, 1001L, "ORD-001", null,
+          "returned_to_seller", "Defective product",
+          null, null,
+          new OzonReturnItem.OzonReturnProduct(
+              "OFFER-1", "Product", 55555L, 1,
+              new OzonReturnItem.OzonReturnPrice("750.00", "RUB")),
+          false, 0L,
+          logistic,
+          null);
+
+      var result = normalizer.normalizeReturn(item);
+
+      assertThat(result.returnDate().toInstant().toString()).startsWith("2024-07-13T01:47:09");
     }
   }
 

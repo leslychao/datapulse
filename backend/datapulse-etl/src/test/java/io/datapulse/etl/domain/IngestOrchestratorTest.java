@@ -23,6 +23,7 @@ import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import io.datapulse.platform.outbox.OutboxService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,7 +53,7 @@ class IngestOrchestratorTest {
   private final IngestProperties ingestProperties = new IngestProperties(
       500, 5000, Duration.ofHours(2), 3,
       Duration.ofMinutes(5), Duration.ofMinutes(20), 2,
-      Duration.ofHours(1), Duration.ofHours(48));
+      Duration.ofHours(1), Duration.ofHours(48), 30);
 
   @BeforeEach
   void setUp() {
@@ -66,6 +67,11 @@ class IngestOrchestratorTest {
       action.accept(null);
       return null;
     }).when(transactionTemplate).executeWithoutResult(any());
+
+    lenient().when(postIngestMaterialization.afterSuccessfulIngest(anyLong()))
+        .thenReturn(PostIngestMaterializationResult.ok());
+    lenient().when(resultReporter.mergeMaterializationIntoErrorDetails(anyString(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
   }
 
   @Nested
@@ -90,8 +96,32 @@ class IngestOrchestratorTest {
 
       verify(dagExecutor).execute(any());
       verify(jobExecutionRepository).casStatus(
-          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED);
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.MATERIALIZING, JobExecutionStatus.COMPLETED);
       verify(postIngestMaterialization).afterSuccessfulIngest(1L);
+    }
+
+    @Test
+    void should_completeWithErrors_when_materializationFailsAfterCleanIngest() {
+      JobExecutionRow job = buildJob(1L, "PENDING");
+      when(jobExecutionRepository.findById(1L)).thenReturn(Optional.of(job));
+      when(jobExecutionRepository.casStatus(1L, JobExecutionStatus.PENDING,
+          JobExecutionStatus.IN_PROGRESS)).thenReturn(true);
+      when(credentialResolver.resolve(100L)).thenReturn(buildCredentials());
+      when(checkpointManager.parse(any())).thenReturn(Map.of());
+      when(checkpointManager.extractRetryCount(any())).thenReturn(0);
+      when(dagExecutor.execute(any())).thenReturn(allCompletedResults());
+      when(resultReporter.buildErrorDetails(any())).thenReturn("{}");
+      when(postIngestMaterialization.afterSuccessfulIngest(1L)).thenReturn(
+          PostIngestMaterializationResult.partialFailure(List.of("mart_posting_pnl")));
+
+      orchestrator.processSync(1L);
+
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.MATERIALIZING, JobExecutionStatus.COMPLETED_WITH_ERRORS);
     }
 
     @Test
@@ -174,7 +204,9 @@ class IngestOrchestratorTest {
       orchestrator.processSync(1L);
 
       verify(jobExecutionRepository).casStatus(
-          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED_WITH_ERRORS);
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.MATERIALIZING, JobExecutionStatus.COMPLETED_WITH_ERRORS);
       verify(outboxService, never()).createEvent(any(), any(), anyLong(), any());
       verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
@@ -203,7 +235,9 @@ class IngestOrchestratorTest {
       orchestrator.processSync(1L);
 
       verify(jobExecutionRepository).casStatus(
-          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED);
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.MATERIALIZING, JobExecutionStatus.COMPLETED);
       verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
 
@@ -220,7 +254,9 @@ class IngestOrchestratorTest {
       orchestrator.processSync(1L);
 
       verify(jobExecutionRepository).casStatus(
-          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED_WITH_ERRORS);
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.MATERIALIZING, JobExecutionStatus.COMPLETED_WITH_ERRORS);
       verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
 

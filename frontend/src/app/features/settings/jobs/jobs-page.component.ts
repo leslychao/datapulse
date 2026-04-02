@@ -18,7 +18,7 @@ import { StatusLabelPipe, StatusColorPipe } from '@shared/pipes/status-label.pip
 import { JobDetailPanelComponent } from './job-detail-panel.component';
 
 const JOB_STATUSES: JobStatus[] = [
-  'PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS',
+  'PENDING', 'IN_PROGRESS', 'MATERIALIZING', 'COMPLETED', 'COMPLETED_WITH_ERRORS',
   'RETRY_SCHEDULED', 'FAILED', 'STALE',
 ];
 

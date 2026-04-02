@@ -11,6 +11,7 @@ import io.datapulse.etl.adapter.ozon.OzonReturnsReadAdapter;
 import io.datapulse.etl.adapter.ozon.dto.OzonFboPosting;
 import io.datapulse.etl.adapter.ozon.dto.OzonFbsPosting;
 import io.datapulse.etl.adapter.ozon.dto.OzonReturnItem;
+import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OzonSalesFactSource implements EventSource {
 
+    private final IngestProperties ingestProperties;
     private final OzonFboOrdersReadAdapter fboAdapter;
     private final OzonFbsOrdersReadAdapter fbsAdapter;
     private final OzonReturnsReadAdapter returnsAdapter;
@@ -54,7 +56,8 @@ public class OzonSalesFactSource implements EventSource {
     public List<SubSourceResult> execute(IngestContext ctx) {
         String clientId = ctx.credentials().get("clientId");
         String apiKey = ctx.credentials().get("apiKey");
-        OffsetDateTime since = OffsetDateTime.now().minusDays(7);
+        int lookbackDays = ingestProperties.incrementalFactLookbackDays();
+        OffsetDateTime since = OffsetDateTime.now().minusDays(lookbackDays);
         OffsetDateTime to = OffsetDateTime.now();
         List<SubSourceResult> results = new ArrayList<>();
 

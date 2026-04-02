@@ -1,17 +1,17 @@
-import { ApplicationConfig } from '@angular/core';
+import { APP_INITIALIZER, ApplicationConfig } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { HttpClient } from '@angular/common/http';
-import { TranslateLoader, provideTranslateService } from '@ngx-translate/core';
-import { TranslateHttpLoader } from '@ngx-translate/http-loader';
+import { TranslateLoader, TranslateService, provideTranslateService } from '@ngx-translate/core';
+import { firstValueFrom } from 'rxjs';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
+import { StaticTranslateLoader } from './core/i18n/static-translate.loader';
 
-function createTranslateLoader(http: HttpClient): TranslateHttpLoader {
-  return new TranslateHttpLoader(http, './locale/', '.json');
+function translateAppInitializer(translate: TranslateService) {
+  return () => firstValueFrom(translate.use('ru'));
 }
 
 export const appConfig: ApplicationConfig = {
@@ -30,9 +30,14 @@ export const appConfig: ApplicationConfig = {
       defaultLanguage: 'ru',
       loader: {
         provide: TranslateLoader,
-        useFactory: createTranslateLoader,
-        deps: [HttpClient],
+        useClass: StaticTranslateLoader,
       },
     }),
+    {
+      provide: APP_INITIALIZER,
+      multi: true,
+      useFactory: translateAppInitializer,
+      deps: [TranslateService],
+    },
   ],
 };

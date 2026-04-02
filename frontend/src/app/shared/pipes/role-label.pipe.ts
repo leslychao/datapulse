@@ -12,6 +12,8 @@ export class RoleLabelPipe implements PipeTransform {
   private readonly translate = inject(TranslateService);
 
   transform(role: WorkspaceRole): string {
-    return this.translate.instant(`role.${role}`);
+    const key = `role.${role}`;
+    const translated = this.translate.instant(key);
+    return translated !== key ? translated : role;
   }
 }

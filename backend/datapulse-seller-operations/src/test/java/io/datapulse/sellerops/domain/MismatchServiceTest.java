@@ -34,6 +34,10 @@ class MismatchServiceTest {
   private static final long MISMATCH_ID = 100L;
   private static final long USER_ID = 10L;
 
+  /** All filter dimensions unset — matches {@link MismatchFilter} record arity. */
+  private static final MismatchFilter EMPTY_FILTER =
+      new MismatchFilter(null, null, null, null, null, null, null, null);
+
   @Mock
   private MismatchJdbcRepository mismatchRepository;
 
@@ -47,13 +51,12 @@ class MismatchServiceTest {
     @Test
     void should_return_mapped_page() {
       Pageable pageable = PageRequest.of(0, 20);
-      MismatchFilter filter = new MismatchFilter(null, null, null);
       var row = buildMismatchRow("OPEN");
 
-      when(mismatchRepository.findAll(WORKSPACE_ID, filter, pageable))
+      when(mismatchRepository.findAll(WORKSPACE_ID, EMPTY_FILTER, pageable))
           .thenReturn(new PageImpl<>(List.of(row), pageable, 1));
 
-      Page<MismatchResponse> result = service.listMismatches(WORKSPACE_ID, filter, pageable);
+      Page<MismatchResponse> result = service.listMismatches(WORKSPACE_ID, EMPTY_FILTER, pageable);
 
       assertThat(result.getContent()).hasSize(1);
       MismatchResponse response = result.getContent().get(0);
@@ -66,12 +69,11 @@ class MismatchServiceTest {
     @Test
     void should_return_empty_page_when_no_results() {
       Pageable pageable = PageRequest.of(0, 20);
-      MismatchFilter filter = new MismatchFilter(null, null, null);
 
-      when(mismatchRepository.findAll(WORKSPACE_ID, filter, pageable))
+      when(mismatchRepository.findAll(WORKSPACE_ID, EMPTY_FILTER, pageable))
           .thenReturn(Page.empty(pageable));
 
-      Page<MismatchResponse> result = service.listMismatches(WORKSPACE_ID, filter, pageable);
+      Page<MismatchResponse> result = service.listMismatches(WORKSPACE_ID, EMPTY_FILTER, pageable);
 
       assertThat(result.getContent()).isEmpty();
       assertThat(result.getTotalElements()).isZero();

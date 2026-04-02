@@ -1,4 +1,4 @@
-package io.datapulse.etl.domain;
+package io.datapulse.etl.adapter.ozon;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,48 +15,42 @@ class OzonServiceClassifierTest {
 
     @Test
     void should_returnLogistics_for_directFlowLogistic() {
-      var result = OzonServiceClassifier.classify(
-          "MarketplaceServiceItemDirectFlowLogistic");
+      var result = OzonServiceClassifier.classify("MarketplaceServiceItemDirectFlowLogistic");
 
       assertThat(result).isEqualTo(MeasureColumn.LOGISTICS);
     }
 
     @Test
     void should_returnLogistics_for_delivToCustomer() {
-      var result = OzonServiceClassifier.classify(
-          "MarketplaceServiceItemDelivToCustomer");
+      var result = OzonServiceClassifier.classify("MarketplaceServiceItemDelivToCustomer");
 
       assertThat(result).isEqualTo(MeasureColumn.LOGISTICS);
     }
 
     @Test
     void should_returnAcquiring_for_acquiringOperation() {
-      var result = OzonServiceClassifier.classify(
-          "MarketplaceRedistributionOfAcquiringOperation");
+      var result = OzonServiceClassifier.classify("MarketplaceRedistributionOfAcquiringOperation");
 
       assertThat(result).isEqualTo(MeasureColumn.ACQUIRING);
     }
 
     @Test
     void should_returnMarketplaceCommission_for_brandCommission() {
-      var result = OzonServiceClassifier.classify(
-          "MarketplaceServiceBrandCommission");
+      var result = OzonServiceClassifier.classify("MarketplaceServiceBrandCommission");
 
       assertThat(result).isEqualTo(MeasureColumn.MARKETPLACE_COMMISSION);
     }
 
     @Test
     void should_returnPenalties_for_disposalDetailed() {
-      var result = OzonServiceClassifier.classify(
-          "MarketplaceServiceItemDisposalDetailed");
+      var result = OzonServiceClassifier.classify("MarketplaceServiceItemDisposalDetailed");
 
       assertThat(result).isEqualTo(MeasureColumn.PENALTIES);
     }
 
     @Test
     void should_returnOther_for_unknownServiceName() {
-      var result = OzonServiceClassifier.classify(
-          "SomeCompletelyUnknownService");
+      var result = OzonServiceClassifier.classify("SomeCompletelyUnknownService");
 
       assertThat(result).isEqualTo(MeasureColumn.OTHER);
     }

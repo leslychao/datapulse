@@ -26,6 +26,7 @@ const COLORS: Record<string, StatusColor> = {
   PAUSED: 'warning',
   PENDING: 'info',
   IN_PROGRESS: 'info',
+  MATERIALIZING: 'info',
   COMPLETED: 'success',
   COMPLETED_WITH_ERRORS: 'warning',
   RETRY_SCHEDULED: 'warning',
@@ -43,7 +44,19 @@ export class StatusLabelPipe implements PipeTransform {
   private readonly translate = inject(TranslateService);
 
   transform(status: string): string {
-    return this.translate.instant(`status.${status.toLowerCase()}`);
+    if (!status) {
+      return '';
+    }
+    const key = `status.${status.toLowerCase()}`;
+    const translated = this.translate.instant(key);
+    if (translated !== key) {
+      return translated;
+    }
+    return status
+      .toLowerCase()
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   }
 }
 

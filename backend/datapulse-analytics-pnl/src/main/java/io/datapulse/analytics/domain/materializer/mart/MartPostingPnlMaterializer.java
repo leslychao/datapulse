@@ -61,26 +61,28 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                 ) AS net_payout,
                 s.quantity,
                 -- gross_cogs = quantity * cost_price (NULL if either missing)
-                if(s.quantity IS NOT NULL AND fpc.cost_price IS NOT NULL,
-                   toDecimal64(s.quantity, 2) * fpc.cost_price,
+                if(s.quantity IS NOT NULL AND fpc_cost.cost_price IS NOT NULL,
+                   toDecimal64(s.quantity, 2) * fpc_cost.cost_price,
                    NULL) AS gross_cogs,
-                -- refund_ratio = |refund_amount| / revenue_amount
+                -- refund_ratio = |refund_amount| / revenue_amount (uniform Decimal(18,4) branches)
                 if(pm.revenue_amount != 0,
-                   abs(pm.refund_amount) / pm.revenue_amount,
-                   NULL) AS refund_ratio,
+                   toDecimal128(abs(pm.refund_amount) / pm.revenue_amount, 4),
+                   CAST(NULL AS Nullable(Decimal(18, 4)))) AS refund_ratio,
                 -- net_cogs = gross_cogs * (1 - refund_ratio)
-                if(s.quantity IS NOT NULL AND fpc.cost_price IS NOT NULL,
-                   (toDecimal64(s.quantity, 2) * fpc.cost_price)
-                       * greatest(toDecimal128(0, 4), 1 - coalesce(
-                           if(pm.revenue_amount != 0,
-                              abs(pm.refund_amount) / pm.revenue_amount,
-                              toDecimal128(0, 4)),
-                           toDecimal128(0, 4))),
+                if(s.quantity IS NOT NULL AND fpc_cost.cost_price IS NOT NULL,
+                   (toDecimal64(s.quantity, 2) * fpc_cost.cost_price)
+                       * greatest(
+                           toDecimal128(0, 4),
+                           toDecimal128(1, 4) - coalesce(
+                               if(pm.revenue_amount != 0,
+                                  toDecimal128(abs(pm.refund_amount) / pm.revenue_amount, 4),
+                                  toDecimal128(0, 4)),
+                               toDecimal128(0, 4))),
                    NULL) AS net_cogs,
                 -- cogs_status
                 multiIf(
                     s.quantity IS NULL, 'NO_SALES',
-                    fpc.cost_price IS NULL, 'NO_COST_PROFILE',
+                    fpc_cost.cost_price IS NULL, 'NO_COST_PROFILE',
                     'OK'
                 ) AS cogs_status,
                 -- reconciliation_residual = net_payout - sum(all named components)
@@ -173,11 +175,46 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
             LEFT JOIN dim_product AS dp
                 ON pm.seller_sku_id = dp.seller_sku_id
                 AND pm.connection_id = dp.connection_id
-            -- SCD2 cost for COGS
-            LEFT JOIN fact_product_cost AS fpc
-                ON pm.seller_sku_id = fpc.seller_sku_id
-                AND pm.finance_date >= fpc.valid_from
-                AND (fpc.valid_to IS NULL OR pm.finance_date < fpc.valid_to)
+            -- SCD2 cost for COGS (equality-only JOIN: range filter moved to WHERE — CH hash join)
+            LEFT JOIN (
+                SELECT
+                    pm_c.posting_id AS posting_id,
+                    any(fpc_inner.cost_price) AS cost_price
+                FROM (
+                    SELECT
+                        posting_id,
+                        connection_id,
+                        any(source_platform) AS source_platform,
+                        any(order_id) AS order_id,
+                        any(seller_sku_id) AS seller_sku_id,
+                        coalesce(
+                            minIf(finance_date, entry_type = 'SALE_ACCRUAL'),
+                            min(finance_date)
+                        ) AS finance_date,
+                        sum(revenue_amount) AS revenue_amount,
+                        sum(marketplace_commission_amount) AS marketplace_commission_amount,
+                        sum(acquiring_commission_amount) AS acquiring_commission_amount,
+                        sum(logistics_cost_amount) AS logistics_cost_amount,
+                        sum(storage_cost_amount) AS storage_cost_amount,
+                        sum(penalties_amount) AS penalties_amount,
+                        sum(marketing_cost_amount) AS marketing_cost_amount,
+                        sum(acceptance_cost_amount) AS acceptance_cost_amount,
+                        sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
+                        sum(compensation_amount) AS compensation_amount,
+                        sum(refund_amount) AS refund_amount,
+                        sum(net_payout) AS net_payout
+                    FROM fact_finance
+                    WHERE attribution_level = 'POSTING'
+                      AND posting_id IS NOT NULL
+                      AND posting_id != ''
+                    GROUP BY posting_id, connection_id
+                ) AS pm_c
+                INNER JOIN fact_product_cost AS fpc_inner
+                    ON pm_c.seller_sku_id = fpc_inner.seller_sku_id
+                WHERE pm_c.finance_date >= fpc_inner.valid_from
+                  AND (fpc_inner.valid_to IS NULL OR pm_c.finance_date < fpc_inner.valid_to)
+                GROUP BY pm_c.posting_id
+            ) AS fpc_cost ON pm.posting_id = fpc_cost.posting_id
             SETTINGS final = 1
             """;
 
@@ -211,12 +248,18 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                   AND posting_id != ''
                 """.formatted(jobExecutionId);
 
+        // Text blocks strip the closing-delimiter indent (12 spaces); match runtime strings.
         String incrementalSql =
                 FULL_MATERIALIZE_SQL.formatted(ver)
                         .replace(
                                 "    GROUP BY posting_id, connection_id\n) pm",
                                 "    GROUP BY posting_id, connection_id\n"
                                         + "    HAVING posting_id IN (%s)\n) pm"
+                                        .formatted(affectedPostingsQuery))
+                        .replace(
+                                "        GROUP BY posting_id, connection_id\n    ) AS pm_c",
+                                "        GROUP BY posting_id, connection_id\n"
+                                        + "        HAVING posting_id IN (%s)\n    ) AS pm_c"
                                         .formatted(affectedPostingsQuery));
 
         jdbc.ch().execute(incrementalSql);

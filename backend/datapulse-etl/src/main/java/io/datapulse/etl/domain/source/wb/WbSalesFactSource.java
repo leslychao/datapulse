@@ -11,6 +11,7 @@ import io.datapulse.etl.adapter.wb.WbSalesReadAdapter;
 import io.datapulse.etl.adapter.wb.dto.WbOrderItem;
 import io.datapulse.etl.adapter.wb.dto.WbReturnItem;
 import io.datapulse.etl.adapter.wb.dto.WbSaleItem;
+import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WbSalesFactSource implements EventSource {
 
+    private final IngestProperties ingestProperties;
     private final WbOrdersReadAdapter ordersAdapter;
     private final WbSalesReadAdapter salesAdapter;
     private final WbReturnsReadAdapter returnsAdapter;
@@ -53,7 +55,7 @@ public class WbSalesFactSource implements EventSource {
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
         String token = ctx.credentials().get("apiToken");
-        LocalDate dateFrom = LocalDate.now().minusDays(7);
+        LocalDate dateFrom = LocalDate.now().minusDays(ingestProperties.incrementalFactLookbackDays());
         List<SubSourceResult> results = new ArrayList<>();
 
         var ordersCtx = CaptureContextFactory.build(ctx, eventType(), "WbOrdersReadAdapter");

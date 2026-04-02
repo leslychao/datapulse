@@ -1,5 +1,6 @@
 package io.datapulse.analytics.domain;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doNothing;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -134,8 +136,8 @@ class MaterializationServiceTest {
       var fact = factMaterializer();
 
       var service = new MaterializationService(List.of(fact, dim));
-      assertThatCode(() -> service.runIncrementalMaterialization(42L))
-          .doesNotThrowAnyException();
+      PostIngestMaterializationResult result = service.runIncrementalMaterialization(42L);
+      assertThat(result.fullySucceeded()).isTrue();
     }
 
     @Test
@@ -164,8 +166,9 @@ class MaterializationServiceTest {
 
       var service = new MaterializationService(List.of(failing, fact));
 
-      assertThatCode(() -> service.runIncrementalMaterialization(99L))
-          .doesNotThrowAnyException();
+      PostIngestMaterializationResult result = service.runIncrementalMaterialization(99L);
+      assertThat(result.fullySucceeded()).isFalse();
+      assertThat(result.failedTables()).containsExactly("dim_broken");
     }
   }
 }

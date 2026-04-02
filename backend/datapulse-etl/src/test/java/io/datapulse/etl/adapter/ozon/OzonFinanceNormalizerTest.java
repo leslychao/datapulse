@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import java.math.BigDecimal;
 import java.util.List;
 
+import io.datapulse.etl.adapter.ozon.dto.OzonFinanceItem;
+import io.datapulse.etl.adapter.ozon.dto.OzonFinancePosting;
+import io.datapulse.etl.adapter.ozon.dto.OzonFinanceService;
 import io.datapulse.etl.adapter.ozon.dto.OzonFinanceTransaction;
 import io.datapulse.etl.domain.FinanceEntryType;
 import org.junit.jupiter.api.DisplayName;
@@ -27,14 +30,14 @@ class OzonFinanceNormalizerTest {
           "2024-01-15 10:30:00", "Доставка покупателю",
           BigDecimal.valueOf(1000), BigDecimal.valueOf(150),
           BigDecimal.valueOf(700), "orders",
-          new OzonFinanceTransaction.OzonFinancePosting(
+          new OzonFinancePosting(
               "FBO", "2024-01-14", "87621408-0010-1", 777L),
           List.of(
-              new OzonFinanceTransaction.OzonFinanceService(
+              new OzonFinanceService(
                   "MarketplaceServiceItemDirectFlowLogistic", BigDecimal.valueOf(-80)),
-              new OzonFinanceTransaction.OzonFinanceService(
+              new OzonFinanceService(
                   "MarketplaceRedistributionOfAcquiringOperation", BigDecimal.valueOf(-20))),
-          List.of(new OzonFinanceTransaction.OzonFinanceItem("Product", 12345L)));
+          List.of(new OzonFinanceItem("Product", 12345L)));
 
       var result = normalizer.normalizeFinanceTransaction(tx);
 
@@ -58,10 +61,10 @@ class OzonFinanceNormalizerTest {
           "2024-01-20 14:00:00", "Возврат",
           BigDecimal.valueOf(-500), BigDecimal.ZERO,
           BigDecimal.valueOf(-500), "returns",
-          new OzonFinanceTransaction.OzonFinancePosting(
+          new OzonFinancePosting(
               "FBO", "2024-01-14", "87621408-0010-1", 777L),
           null,
-          List.of(new OzonFinanceTransaction.OzonFinanceItem("Product", 12345L)));
+          List.of(new OzonFinanceItem("Product", 12345L)));
 
       var result = normalizer.normalizeFinanceTransaction(tx);
 
@@ -107,7 +110,7 @@ class OzonFinanceNormalizerTest {
           "2024-01-15 10:30:00", "Доставка",
           BigDecimal.valueOf(500), BigDecimal.ZERO,
           BigDecimal.valueOf(500), "orders",
-          new OzonFinanceTransaction.OzonFinancePosting(
+          new OzonFinancePosting(
               "FBO", "2024-01-14", "87621408-0010-1", 0L),
           null, null);
 
@@ -124,7 +127,7 @@ class OzonFinanceNormalizerTest {
           "2024-01-15 10:30:00", "Эквайринг",
           null, null,
           BigDecimal.valueOf(-20), "services",
-          new OzonFinanceTransaction.OzonFinancePosting(
+          new OzonFinancePosting(
               "FBO", "2024-01-14", "87621408-0010", 0L),
           null, null);
 
@@ -157,7 +160,7 @@ class OzonFinanceNormalizerTest {
           BigDecimal.valueOf(500), BigDecimal.ZERO,
           BigDecimal.valueOf(500), "orders",
           null, null,
-          List.of(new OzonFinanceTransaction.OzonFinanceItem("Product", 12345L)));
+          List.of(new OzonFinanceItem("Product", 12345L)));
 
       var result = normalizer.normalizeFinanceTransaction(tx);
 

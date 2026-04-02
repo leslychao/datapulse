@@ -10,12 +10,20 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
+import { StatusLabelPipe } from '@shared/pipes/status-label.pipe';
 
 @Component({
   selector: 'dp-general-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, SectionCardComponent, SpinnerComponent, DateFormatPipe],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    SectionCardComponent,
+    SpinnerComponent,
+    DateFormatPipe,
+    StatusLabelPipe,
+  ],
   template: `
     <div class="max-w-2xl">
       <div class="mb-6">
@@ -46,7 +54,7 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
               </div>
               <div>
                 <span class="text-[var(--text-secondary)]">{{ 'settings.general.status' | translate }}</span>
-                <p class="mt-0.5 text-[var(--text-primary)]">{{ ws.status }}</p>
+                <p class="mt-0.5 text-[var(--text-primary)]">{{ ws.status | dpStatusLabel }}</p>
               </div>
             </div>
           </div>

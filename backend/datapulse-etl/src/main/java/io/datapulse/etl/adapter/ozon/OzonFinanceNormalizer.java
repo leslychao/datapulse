@@ -8,7 +8,6 @@ import io.datapulse.etl.adapter.ozon.dto.OzonFinanceTransaction;
 import io.datapulse.etl.adapter.util.OzonTimestampParser;
 import io.datapulse.etl.domain.FinanceEntryType;
 import io.datapulse.etl.domain.FinanceEntryType.MeasureColumn;
-import io.datapulse.etl.domain.OzonServiceClassifier;
 import io.datapulse.etl.domain.normalized.NormalizedFinanceItem;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

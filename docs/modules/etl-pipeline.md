@@ -640,18 +640,18 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 
 **Incremental strategy per domain (target design):**
 
-> **Current implementation (Phase A):** все date-range domains используют упрощённую стратегию `now() - 7 days` вместо `last_success_at - overlap_buffer`. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке 7-дневного окна. `rrdid`-based cursor для WB finance и Ozon date-range chunking **не реализованы** — используется тот же hardcoded 7d window.
+> **Current implementation (Phase A):** все date-range domains используют упрощённую стратегию `now() - N days` (`datapulse.etl.ingest.incremental-fact-lookback-days`, default **30**) вместо `last_success_at - overlap_buffer`. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке этого окна. `rrdid`-based cursor для WB finance и Ozon date-range chunking **не реализованы** — используется то же configurable N-day window.
 
 | Domain | Incremental strategy (target) | Cursor / pagination | Current impl |
 |--------|------------------------------|---------------------|--------------|
 | Каталог | Full scan (catalog small, no incremental API) | Offset-based / cursor pagination | Implemented |
 | Цены | Full scan per connection (no incremental API) | Offset-based pagination | Implemented |
 | Остатки | Full scan per connection (real-time state, no delta) | Offset-based pagination | Implemented |
-| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination | `now - 7d` hardcoded |
-| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination | `now - 7d` hardcoded |
-| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination | `now - 7d` hardcoded |
-| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination | `now - 7d` hardcoded |
-| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) | `now - 7d` hardcoded |
+| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination | `now - Nd` (default 30d, `incremental-fact-lookback-days`) |
+| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination | `now - Nd` (default 30d) |
+| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination | `now - Nd` (default 30d) |
+| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination | `now - Nd` (default 30d) |
+| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) | `now - Nd` (default 30d) |
 | Промо | Full scan (promo list small per connection) | Offset-based pagination | Implemented (full scan per sync) |
 | Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based | Stub (Phase B) |
 
@@ -1419,8 +1419,8 @@ Summary of gaps between this document (target design) and the current codebase.
 |------|-------------------|------------------|
 | Date-range strategy | Hardcoded `now() - 7 days` for all date-range domains | `last_success_at - overlap_buffer` per domain |
 | Scheduling interval | Uniform 6h for all domains per connection | Per-domain cron (4x/day finance, 2x/day catalog) |
-| WB finance cursor | Same 7d window | `rrdid`-based monotonic cursor |
-| Ozon finance chunking | Same 7d window | Automatic monthly chunk splitting for long gaps |
+| WB finance cursor | Same N-day window (default 30d) | `rrdid`-based monotonic cursor |
+| Ozon finance chunking | Same N-day window (default 30d) | Automatic monthly chunk splitting for long gaps |
 | ClickHouse materializer | Stub (logs calls, no actual writes) | Full batch INSERT via ClickHouse JDBC |
 
 ### Implemented (recent)

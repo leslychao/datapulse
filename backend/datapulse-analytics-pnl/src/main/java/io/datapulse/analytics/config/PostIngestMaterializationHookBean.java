@@ -2,6 +2,7 @@ package io.datapulse.analytics.config;
 
 import io.datapulse.analytics.domain.MaterializationService;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;
+import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,9 +15,9 @@ public class PostIngestMaterializationHookBean implements PostIngestMaterializat
   private final MaterializationService materializationService;
 
   @Override
-  public void afterSuccessfulIngest(long jobExecutionId) {
+  public PostIngestMaterializationResult afterSuccessfulIngest(long jobExecutionId) {
     log.info("Running incremental mart materialization after ingest: jobExecutionId={}",
         jobExecutionId);
-    materializationService.runIncrementalMaterialization(jobExecutionId);
+    return materializationService.runIncrementalMaterialization(jobExecutionId);
   }
 }
