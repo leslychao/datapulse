@@ -29,7 +29,7 @@ import { RbacService } from '@core/auth/rbac.service';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
-
+import { renderBadge } from '@shared/utils/format.utils';
 
 const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
   CONNECTION: 'info',
@@ -204,10 +204,7 @@ export class PromoPolicyAssignmentsPageComponent {
           const label = this.translate.instant(`promo.assignments.scope.${st.toLowerCase()}`);
           const color = SCOPE_TYPE_COLOR[st] ?? 'neutral';
           const cssVar = `var(--status-${color})`;
-          return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                    style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-            ${label}
-          </span>`;
+          return renderBadge(label, cssVar);
         },
       },
       {

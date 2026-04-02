@@ -1,7 +1,7 @@
 import { MarketplaceType } from './connection.model';
 import { EvaluationResult } from './offer.model';
 
-export type CampaignStatus = 'UPCOMING' | 'ACTIVE' | 'FROZEN' | 'ENDED' | 'CANCELLED';
+export type CampaignStatus = 'UPCOMING' | 'ACTIVE' | 'ENDED';
 export type ParticipationStatus =
   | 'ELIGIBLE'
   | 'PARTICIPATING'

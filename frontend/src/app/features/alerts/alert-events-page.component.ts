@@ -35,7 +35,7 @@ import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { LucideAngularModule, AlertCircle, AlertTriangle, Eye, CheckCircle2 } from 'lucide-angular';
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
-import { formatDateTime } from '@shared/utils/format.utils';
+import { formatDateTime, renderBadge } from '@shared/utils/format.utils';
 
 const RULE_TYPES: AlertRuleType[] = [
   'STALE_DATA',
@@ -241,22 +241,18 @@ export class AlertEventsPageComponent {
       headerValueGetter: () => this.translate.instant('alerts.col.severity'),
       width: 120,
       cellRenderer: (params: ICellRendererParams<AlertEvent>) => {
-        const wrap = document.createElement('span');
         const sev = params.data?.severity;
         if (!sev) {
-          return wrap;
+          return '';
         }
-        wrap.className = 'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium';
         const fg =
           sev === 'CRITICAL'
             ? 'var(--status-error)'
             : sev === 'WARNING'
               ? 'var(--status-warning)'
               : 'var(--status-info)';
-        wrap.style.color = fg;
-        wrap.style.backgroundColor = `color-mix(in srgb, ${fg} 12%, transparent)`;
-        wrap.textContent = this.translate.instant(`alerts.severity.${sev}`);
-        return wrap;
+        const label = this.translate.instant(`alerts.severity.${sev}`);
+        return renderBadge(label, fg);
       },
     },
     {
@@ -271,17 +267,12 @@ export class AlertEventsPageComponent {
       headerValueGetter: () => this.translate.instant('alerts.col.status'),
       width: 140,
       cellRenderer: (params: ICellRendererParams<AlertEvent>) => {
-        const wrap = document.createElement('span');
         const st = params.data?.status;
         if (!st) {
-          return wrap;
+          return '';
         }
-        wrap.className = 'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium';
-        wrap.style.color = 'var(--text-primary)';
-        wrap.style.backgroundColor =
-          'color-mix(in srgb, var(--text-tertiary) 12%, transparent)';
-        wrap.textContent = this.translate.instant(`alerts.status.${st}`);
-        return wrap;
+        const label = this.translate.instant(`alerts.status.${st}`);
+        return renderBadge(label, 'var(--text-primary)');
       },
     },
     {

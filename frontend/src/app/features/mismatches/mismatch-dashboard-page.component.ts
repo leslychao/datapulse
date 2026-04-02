@@ -58,6 +58,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { renderBadge } from '@shared/utils/format.utils';
 import { MismatchDetailPanelComponent } from './mismatch-detail-panel.component';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -494,7 +495,7 @@ export class MismatchDashboardPageComponent implements OnInit {
           const color = STATUS_BADGE[st] ?? 'neutral';
           const cssVar = `var(--status-${color})`;
           const label = tr.instant(`mismatches.status.${st}`);
-          return `<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}"><span class="inline-block h-1.5 w-1.5 rounded-full" style="background:${cssVar}"></span>${escapeHtml(label)}</span>`;
+          return renderBadge(escapeHtml(label), cssVar);
         },
       },
       {

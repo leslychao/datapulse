@@ -20,7 +20,7 @@ import { lastValueFrom } from 'rxjs';
 import { Users, CheckCircle, XCircle, Clock, CheckCheck, AlertTriangle } from 'lucide-angular';
 
 import { PromoApiService } from '@core/api/promo-api.service';
-import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
+import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
 import {
   CampaignStatus,
   EvaluationResult,
@@ -46,9 +46,7 @@ import { StatusBadgeComponent, StatusColor } from '@shared/components/status-bad
 const CAMPAIGN_STATUS_COLOR: Record<CampaignStatus, StatusColor> = {
   UPCOMING: 'info',
   ACTIVE: 'success',
-  FROZEN: 'warning',
   ENDED: 'neutral',
-  CANCELLED: 'neutral',
 };
 
 const PARTICIPATION_STATUSES: ParticipationStatus[] = [
@@ -468,9 +466,9 @@ export class CampaignDetailPageComponent {
     return c ? MP_BADGE[c.sourcePlatform] ?? null : null;
   });
 
-  readonly isCampaignFrozenOrEnded = computed(() => {
+  readonly isCampaignEnded = computed(() => {
     const c = this.campaign();
-    return c ? c.status === 'FROZEN' || c.status === 'ENDED' || c.status === 'CANCELLED' : false;
+    return c ? c.status === 'ENDED' : false;
   });
 
   readonly hasActiveFilters = computed(() =>
@@ -624,11 +622,6 @@ export class CampaignDetailPageComponent {
     if (!value) return '';
     const label = this.translate.instant(`${i18nPrefix}.${value}`);
     const color = colors[value] ?? 'neutral';
-    const cssVar = `var(--status-${color})`;
-    return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-              style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-      <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-      ${label}
-    </span>`;
+    return renderBadge(label, `var(--status-${color})`);
   }
 }

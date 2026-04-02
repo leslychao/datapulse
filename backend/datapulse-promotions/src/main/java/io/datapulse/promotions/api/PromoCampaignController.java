@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping(value = "/api/workspaces/{workspaceId}/promo/campaigns",
@@ -28,8 +29,8 @@ public class PromoCampaignController {
     public Page<PromoCampaignSummaryResponse> listCampaigns(
             @PathVariable("workspaceId") long workspaceId,
             @RequestParam(value = "connectionId", required = false) Long connectionId,
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "marketplaceType", required = false) String marketplaceType,
+            @RequestParam(value = "status", required = false) List<String> status,
+            @RequestParam(value = "marketplaceType", required = false) List<String> marketplaceType,
             @RequestParam(value = "from", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(value = "to", required = false)

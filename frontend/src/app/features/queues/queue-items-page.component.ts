@@ -48,6 +48,7 @@ import {
   formatDateTime,
   formatInteger,
   financeColor,
+  renderBadge,
 } from '@shared/utils/format.utils';
 
 type QueueContext = SystemQueueCode | 'CUSTOM';
@@ -1149,11 +1150,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
         const color = statusColors[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         const label = this.translate.instant(`grid.action_status.${st}`);
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-          ${label}
-        </span>`;
+        return renderBadge(label, cssVar);
       },
     };
   }
@@ -1169,10 +1166,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
         if (!v) return '';
         const color = v === 'CRITICAL' ? 'error' : v === 'WARNING' ? 'warning' : 'neutral';
         const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          ${v}
-        </span>`;
+        return renderBadge(v, cssVar);
       },
     };
   }
@@ -1189,10 +1183,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
         const isSimulated = v === 'SIMULATED';
         const cssVar = isSimulated ? 'var(--status-neutral)' : 'var(--status-info)';
         const label = this.translate.instant(`queues.grid.mode_${v.toLowerCase()}`);
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          ${label}
-        </span>`;
+        return renderBadge(label, cssVar);
       },
     };
   }

@@ -14,7 +14,7 @@ import { lastValueFrom, startWith } from 'rxjs';
 import { Zap, Calendar, Package, Clock } from 'lucide-angular';
 
 import { PromoApiService } from '@core/api/promo-api.service';
-import { formatDateTime } from '@shared/utils/format.utils';
+import { formatDateTime, renderBadge } from '@shared/utils/format.utils';
 import {
   CampaignStatus,
   PromoCampaignFilter,
@@ -29,13 +29,11 @@ import { KpiCardComponent } from '@shared/components/kpi-card.component';
 const CAMPAIGN_STATUS_COLOR: Record<CampaignStatus, string> = {
   UPCOMING: 'info',
   ACTIVE: 'success',
-  FROZEN: 'warning',
   ENDED: 'neutral',
-  CANCELLED: 'neutral',
 };
 
 const CAMPAIGN_STATUSES: CampaignStatus[] = [
-  'UPCOMING', 'ACTIVE', 'FROZEN', 'ENDED', 'CANCELLED',
+  'UPCOMING', 'ACTIVE', 'ENDED',
 ];
 
 const MP_BADGE: Record<
@@ -294,12 +292,7 @@ export class CampaignListPageComponent {
           const st = params.value as CampaignStatus;
           const label = this.translate.instant(`promo.campaigns.status.${st}`);
           const color = CAMPAIGN_STATUS_COLOR[st] ?? 'neutral';
-          const cssVar = `var(--status-${color})`;
-          return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                    style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-            <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-            ${label}
-          </span>`;
+          return renderBadge(label, `var(--status-${color})`);
         },
       },
     ];

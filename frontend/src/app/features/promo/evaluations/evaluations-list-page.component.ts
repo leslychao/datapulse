@@ -13,7 +13,7 @@ import { lastValueFrom, startWith } from 'rxjs';
 import { ClipboardList, TrendingUp, AlertCircle, TrendingDown } from 'lucide-angular';
 
 import { PromoApiService } from '@core/api/promo-api.service';
-import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
+import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
 import { EvaluationResult, PromoEvaluationFilter } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
@@ -418,10 +418,6 @@ export class EvaluationsListPageComponent {
     const label = this.translate.instant(`${i18nPrefix}.${value}`);
     const color = colors[value] ?? 'neutral';
     const cssVar = `var(--status-${color})`;
-    return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-              style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-      <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-      ${label}
-    </span>`;
+    return renderBadge(label, cssVar);
   }
 }

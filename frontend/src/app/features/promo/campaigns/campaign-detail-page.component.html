@@ -36,13 +36,9 @@
       </p>
     }
 
-    @if (isCampaignFrozenOrEnded()) {
+    @if (isCampaignEnded()) {
       <div class="mt-2 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-        @if (campaign()?.status === 'FROZEN') {
-          {{ 'promo.campaigns.frozen_banner' | translate }}
-        } @else {
-          {{ 'promo.campaigns.ended_banner' | translate }}
-        }
+        {{ 'promo.campaigns.ended_banner' | translate }}
       </div>
     }
   </div>
@@ -107,7 +103,7 @@
   </div>
 
   <!-- Bulk actions bar -->
-  @if (pendingApprovalIds().length > 0 && !isCampaignFrozenOrEnded() && rbac.canApprovePromo()) {
+  @if (pendingApprovalIds().length > 0 && !isCampaignEnded() && rbac.canApprovePromo()) {
     <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] px-4 py-2">
       <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
         {{ pendingApprovalIds().length }} {{ 'promo.decisions.kpi.pending_review' | translate }}

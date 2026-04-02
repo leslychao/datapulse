@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,7 +40,8 @@ public class PromoCampaignQueryRepository {
             """;
 
     public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
-                                                             String status, String marketplaceType,
+                                                             Collection<String> statuses,
+                                                             Collection<String> marketplaceTypes,
                                                              LocalDate from, LocalDate to,
                                                              Pageable pageable) {
         var where = new StringBuilder(BASE_SELECT);
@@ -49,13 +51,13 @@ public class PromoCampaignQueryRepository {
             where.append(" AND cpc.connection_id = :connectionId");
             params.addValue("connectionId", connectionId);
         }
-        if (status != null) {
-            where.append(" AND cpc.status = :status");
-            params.addValue("status", status);
+        if (statuses != null && !statuses.isEmpty()) {
+            where.append(" AND cpc.status IN (:statuses)");
+            params.addValue("statuses", statuses);
         }
-        if (marketplaceType != null) {
-            where.append(" AND cpc.source_platform = :marketplaceType");
-            params.addValue("marketplaceType", marketplaceType);
+        if (marketplaceTypes != null && !marketplaceTypes.isEmpty()) {
+            where.append(" AND cpc.source_platform IN (:marketplaceTypes)");
+            params.addValue("marketplaceTypes", marketplaceTypes);
         }
         if (from != null) {
             where.append(" AND cpc.date_to >= :from");

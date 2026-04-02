@@ -528,14 +528,11 @@
   "promo.campaigns.empty": "Нет активных кампаний",
   "promo.campaigns.empty_filtered": "Нет кампаний по заданным фильтрам",
   "promo.campaigns.indefinite": "бессрочно",
-  "promo.campaigns.frozen_banner": "Срок подачи заявок истёк",
   "promo.campaigns.ended_banner": "Кампания завершена",
 
   "promo.campaigns.status.UPCOMING": "Предстоящая",
   "promo.campaigns.status.ACTIVE": "Активная",
-  "promo.campaigns.status.FROZEN": "Заморожена",
   "promo.campaigns.status.ENDED": "Завершена",
-  "promo.campaigns.status.CANCELLED": "Отменена",
 
   "promo.campaigns.col.name": "Название",
   "promo.campaigns.col.marketplace": "МП",

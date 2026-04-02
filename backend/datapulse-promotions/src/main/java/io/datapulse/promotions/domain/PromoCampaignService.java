@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,11 +22,12 @@ public class PromoCampaignService {
 
     @Transactional(readOnly = true)
     public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
-                                                             String status, String marketplaceType,
+                                                             List<String> statuses,
+                                                             List<String> marketplaceTypes,
                                                              LocalDate from, LocalDate to,
                                                              Pageable pageable) {
         return campaignQueryRepository.listCampaigns(
-                workspaceId, connectionId, status, marketplaceType, from, to, pageable);
+                workspaceId, connectionId, statuses, marketplaceTypes, from, to, pageable);
     }
 
     @Transactional(readOnly = true)
