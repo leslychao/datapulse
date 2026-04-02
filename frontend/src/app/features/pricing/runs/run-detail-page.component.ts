@@ -10,11 +10,18 @@ import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import {
+  ColDef,
+  GetRowIdParams,
+  ICellRendererParams,
+  ValueFormatterParams,
+} from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
@@ -57,7 +64,7 @@ const DECISION_COLOR: Record<string, string> = {
   template: `
     <div class="flex h-full flex-col">
       <!-- Back button -->
-      <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5">
+      <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <button
           (click)="goBack()"
           class="cursor-pointer rounded-[var(--radius-sm)] px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
@@ -88,7 +95,7 @@ const DECISION_COLOR: Record<string, string> = {
         </div>
       } @else if (run()) {
         <!-- KPI Strip -->
-        <div class="flex gap-3 bg-[var(--bg-secondary)] px-6 py-3">
+        <div class="flex gap-3 bg-[var(--bg-secondary)] px-4 py-2">
           <dp-kpi-card
             [label]="'pricing.runs.kpi.total' | translate"
             [value]="run()!.totalOffers"
@@ -117,7 +124,7 @@ const DECISION_COLOR: Record<string, string> = {
         </div>
 
         <!-- Meta info -->
-        <div class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] px-6 py-2.5">
+        <div class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] px-4 py-2">
           <!-- Trigger badge -->
           <span
             class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -157,7 +164,7 @@ const DECISION_COLOR: Record<string, string> = {
         }
 
         <!-- Decision filter -->
-        <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+        <div class="border-b border-[var(--border-default)] px-4 py-2">
           <dp-filter-bar
             [filters]="decisionFilterConfigs"
             [values]="decisionFilterValues()"
@@ -166,7 +173,7 @@ const DECISION_COLOR: Record<string, string> = {
         </div>
 
         <!-- Decision Grid -->
-        <div class="flex-1 px-6 py-3">
+        <div class="flex-1 px-4 py-2">
           @if (decisionsQuery.isError()) {
             <dp-empty-state
               [message]="'pricing.decisions.error' | translate"
@@ -186,6 +193,7 @@ const DECISION_COLOR: Record<string, string> = {
               [pageSize]="100"
               [getRowId]="getRowId"
               [height]="'100%'"
+              (rowClicked)="onDecisionRowClicked($event)"
             />
           }
         </div>
@@ -202,6 +210,7 @@ export class RunDetailPageComponent {
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
+  private readonly detailPanel = inject(DetailPanelService);
 
   readonly decisionFilterValues = signal<Record<string, any>>({});
   readonly decisionPage = signal(0);
@@ -285,7 +294,7 @@ export class RunDetailPageComponent {
     },
   ];
 
-  readonly decisionColumnDefs = [
+  readonly decisionColumnDefs: ColDef[] = [
     {
       headerName: this.translate.instant('pricing.runs.detail.col.offer'),
       field: 'offerName',
@@ -305,7 +314,7 @@ export class RunDetailPageComponent {
       field: 'decisionType',
       width: 120,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const dt = params.value as string;
         const label = this.translate.instant(`pricing.decisions.type.${dt}`);
         const color = DECISION_COLOR[dt] ?? 'neutral';
@@ -324,7 +333,8 @@ export class RunDetailPageComponent {
       sortable: true,
       type: 'rightAligned',
       cellClass: 'font-mono text-[length:var(--text-sm)]',
-      valueFormatter: (params: any) => this.formatPrice(params.value),
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) =>
+        this.formatPrice(params.value),
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.target_price'),
@@ -333,7 +343,8 @@ export class RunDetailPageComponent {
       sortable: true,
       type: 'rightAligned',
       cellClass: 'font-mono text-[length:var(--text-sm)]',
-      valueFormatter: (params: any) => this.formatPrice(params.value),
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) =>
+        this.formatPrice(params.value),
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.price_delta'),
@@ -341,7 +352,7 @@ export class RunDetailPageComponent {
       width: 90,
       sortable: true,
       cellClass: 'font-mono text-right',
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const v = params.value;
         if (v === null || v === undefined) return '—';
         const abs = Math.abs(v).toFixed(1).replace('.', ',');
@@ -361,7 +372,7 @@ export class RunDetailPageComponent {
       field: 'strategyType',
       width: 140,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const st = params.value as string;
         const label = this.translate.instant(`pricing.policies.strategy.${st}`);
         return `<span class="inline-flex items-center rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
@@ -375,18 +386,23 @@ export class RunDetailPageComponent {
       width: 200,
       sortable: false,
       cellClass: 'text-[length:var(--text-sm)] text-[color:var(--text-tertiary)]',
-      valueFormatter: (params: any) => {
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) => {
         if (!params.value) return '—';
         return this.translate.instant(params.value);
       },
     },
   ];
 
-  readonly getRowId = (params: any) => String(params.data.id);
+  readonly getRowId = (params: GetRowIdParams<PricingDecisionSummary>) =>
+    String(params.data.id);
 
   goBack(): void {
     const wsId = this.wsStore.currentWorkspaceId();
     this.router.navigate(['/workspace', wsId, 'pricing', 'runs']);
+  }
+
+  onDecisionRowClicked(row: PricingDecisionSummary): void {
+    this.detailPanel.open('pricing-decision', row.id);
   }
 
   onDecisionFiltersChanged(values: Record<string, any>): void {

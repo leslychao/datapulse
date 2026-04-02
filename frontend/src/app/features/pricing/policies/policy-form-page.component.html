@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-3xl px-6 py-6">
+<div class="mx-auto max-w-3xl px-4 py-6">
 
   <!-- Page header -->
   <div class="mb-5">
@@ -115,7 +115,7 @@
                   type="radio"
                   formControlName="strategyType"
                   [value]="st.value"
-                  (change)="onStrategyTypeChange()"
+                  (change)="onStrategyTypeUserChange(st.value)"
                   class="sr-only"
                 />
                 {{ st.labelKey | translate }}
@@ -156,15 +156,32 @@
         </div>
 
         @if (executionMode === 'FULL_AUTO') {
-          <div class="flex items-start gap-2 rounded-[var(--radius-md)] bg-[var(--status-warning-bg)] px-3 py-2">
-            <lucide-icon
-              [name]="icons.AlertTriangle"
-              [size]="14"
-              class="mt-0.5 shrink-0 text-[var(--status-warning)]"
-            />
-            <span class="text-[var(--text-xs)] leading-relaxed text-[var(--text-primary)]/80">
-              {{ 'pricing.form.full_auto_warning' | translate }}
-            </span>
+          <div class="space-y-2 rounded-[var(--radius-md)] border border-[var(--status-warning)]/30 bg-[var(--status-warning-bg)] px-3 py-2.5">
+            <div class="flex items-start gap-2">
+              <lucide-icon
+                [name]="icons.AlertTriangle"
+                [size]="14"
+                class="mt-0.5 shrink-0 text-[var(--status-warning)]"
+              />
+              <span class="text-[var(--text-xs)] leading-relaxed text-[var(--text-primary)]/80">
+                {{ 'pricing.form.full_auto_warning' | translate }}
+              </span>
+            </div>
+            <label class="flex cursor-pointer items-start gap-2 pl-5">
+              <input
+                type="checkbox"
+                formControlName="confirmFullAuto"
+                class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]"
+              />
+              <span class="text-[var(--text-xs)] font-medium text-[var(--text-primary)]">
+                {{ 'pricing.form.full_auto_confirm' | translate }}
+              </span>
+            </label>
+            @if (hasError('confirmFullAuto', 'requiredTrue')) {
+              <p class="pl-5 text-[var(--text-xs)] text-[var(--status-error)]">
+                {{ 'pricing.form.validation.full_auto_confirm_required' | translate }}
+              </p>
+            }
           </div>
         }
 
@@ -320,7 +337,7 @@
       <dp-guard-config-form [form]="form" [submitted]="submitted()" />
 
       <!-- ─── Footer ─── -->
-      <div class="sticky bottom-0 -mx-6 flex items-center justify-between border-t border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-6 py-3 backdrop-blur-sm">
+      <div class="sticky bottom-0 -mx-6 flex items-center justify-between border-t border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur-sm">
         <div>
           @if (submitted() && form.invalid) {
             <span class="text-[var(--text-xs)] text-[var(--status-error)]">
@@ -329,6 +346,16 @@
           }
         </div>
         <div class="flex items-center gap-2">
+          @if (isEditMode()) {
+            <button
+              type="button"
+              (click)="showPreviewModal.set(true)"
+              class="flex h-7 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <lucide-icon [name]="icons.Eye" [size]="14" />
+              {{ 'pricing.form.preview_impact' | translate }}
+            </button>
+          }
           <button
             type="button"
             (click)="cancel()"
@@ -356,3 +383,11 @@
     </form>
   }
 </div>
+
+@if (isEditMode()) {
+  <dp-impact-preview-modal
+    [open]="showPreviewModal()"
+    [policyId]="+policyId()!"
+    (closed)="showPreviewModal.set(false)"
+  />
+}

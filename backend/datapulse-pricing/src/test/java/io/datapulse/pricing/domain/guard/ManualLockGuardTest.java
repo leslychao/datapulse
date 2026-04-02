@@ -61,6 +61,6 @@ class ManualLockGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), null, null, null,
         manualLockActive, false,
-        null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null);
   }
 }

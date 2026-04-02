@@ -151,6 +151,6 @@ class VolatilityGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), null, null, null,
         false, false,
-        null, null, null, null, null, reversals, null);
+        null, null, null, null, null, reversals, null, null);
   }
 }

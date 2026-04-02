@@ -37,6 +37,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -55,6 +56,9 @@ class PricePolicyControllerSliceTest {
 
   @MockitoBean
   private PricePolicyService policyService;
+
+  @MockitoBean
+  private io.datapulse.pricing.domain.ImpactPreviewService impactPreviewService;
 
   @MockitoBean
   private WorkspaceContext workspaceContext;

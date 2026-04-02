@@ -23,6 +23,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -41,6 +42,8 @@ class PricePolicyServiceTest {
   @Mock private PricePolicyRepository policyRepository;
   @Mock private PricePolicyMapper policyMapper;
   @Mock private ObjectMapper objectMapper;
+  @Mock private FullAutoSafetyGate fullAutoSafetyGate;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks
   private PricePolicyService service;
@@ -60,7 +63,7 @@ class PricePolicyServiceTest {
     void should_createDraftPolicy_when_validRequest() throws Exception {
       CreatePricePolicyRequest request = new CreatePricePolicyRequest(
           "Margin Policy", PolicyType.TARGET_MARGIN, "{\"targetMarginPct\": 0.20}",
-          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null);
+          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null, null);
 
       when(objectMapper.readValue(eq("{\"targetMarginPct\": 0.20}"), eq(TargetMarginParams.class)))
           .thenReturn(new TargetMarginParams(
@@ -87,7 +90,7 @@ class PricePolicyServiceTest {
     void should_reject_when_manualOverrideType() {
       CreatePricePolicyRequest request = new CreatePricePolicyRequest(
           "Manual", PolicyType.MANUAL_OVERRIDE, "{}",
-          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null);
+          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null, null);
 
       assertThatThrownBy(() -> service.createPolicy(request, WORKSPACE_ID, USER_ID))
           .isInstanceOf(BadRequestException.class);
@@ -98,7 +101,7 @@ class PricePolicyServiceTest {
     void should_reject_when_nullStrategyParams() {
       CreatePricePolicyRequest request = new CreatePricePolicyRequest(
           "Policy", PolicyType.TARGET_MARGIN, null,
-          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null);
+          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null, null);
 
       assertThatThrownBy(() -> service.createPolicy(request, WORKSPACE_ID, USER_ID))
           .isInstanceOf(BadRequestException.class);
@@ -109,7 +112,7 @@ class PricePolicyServiceTest {
     void should_setApprovalTimeout72_when_semiAuto() throws Exception {
       CreatePricePolicyRequest request = new CreatePricePolicyRequest(
           "Semi Auto", PolicyType.TARGET_MARGIN, "{\"targetMarginPct\": 0.15}",
-          null, null, null, null, null, ExecutionMode.SEMI_AUTO, null);
+          null, null, null, null, null, ExecutionMode.SEMI_AUTO, null, null);
 
       when(objectMapper.readValue(any(String.class), eq(TargetMarginParams.class)))
           .thenReturn(new TargetMarginParams(
@@ -270,7 +273,7 @@ class PricePolicyServiceTest {
 
       UpdatePricePolicyRequest request = new UpdatePricePolicyRequest(
           "Updated", PolicyType.TARGET_MARGIN, "{\"targetMarginPct\": 0.25}",
-          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null);
+          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null, null, null);
 
       assertThatThrownBy(() -> service.updatePolicy(1L, request, WORKSPACE_ID))
           .isInstanceOf(BadRequestException.class);
@@ -296,7 +299,7 @@ class PricePolicyServiceTest {
 
       UpdatePricePolicyRequest request = new UpdatePricePolicyRequest(
           "Updated", PolicyType.TARGET_MARGIN, newParams,
-          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null);
+          null, null, null, null, null, ExecutionMode.RECOMMENDATION, null, null, null);
 
       service.updatePolicy(1L, request, WORKSPACE_ID);
 

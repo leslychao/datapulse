@@ -64,7 +64,9 @@ export function buildPolicyForm(fb: FormBuilder): FormGroup {
     promoGuardEnabled: [true],
     stockOutGuardEnabled: [true],
     staleDataGuardHours: [24, [Validators.min(1), Validators.max(168)]],
-  }, { validators: [maxPriceGtMinValidator] });
+
+    confirmFullAuto: [false],
+  }, { validators: [maxPriceGtMinValidator, fullAutoConfirmValidator] });
 }
 
 export function corridorValidator(group: AbstractControl): ValidationErrors | null {
@@ -82,15 +84,31 @@ export function maxPriceGtMinValidator(group: AbstractControl): ValidationErrors
   return null;
 }
 
+export function fullAutoConfirmValidator(group: AbstractControl): ValidationErrors | null {
+  const mode = group.get('executionMode')?.value;
+  const confirmed = group.get('confirmFullAuto')?.value;
+  if (mode === 'FULL_AUTO' && !confirmed) {
+    group.get('confirmFullAuto')?.setErrors({ requiredTrue: true });
+    return null;
+  }
+  const ctrl = group.get('confirmFullAuto');
+  if (ctrl?.hasError('requiredTrue')) {
+    ctrl.setErrors(null);
+  }
+  return null;
+}
+
 export function buildStrategyParams(
   raw: Record<string, unknown>,
 ): TargetMarginParams | PriceCorridorParams {
   if (raw['strategyType'] === 'TARGET_MARGIN') {
     const tm = raw['targetMargin'] as Record<string, unknown>;
+    const rawMarginPct = tm['targetMarginPct'] as number | null;
+    const rawCommissionPct = tm['commissionManualPct'] as number | null;
     return {
-      targetMarginPct: tm['targetMarginPct'] as number,
+      targetMarginPct: rawMarginPct != null ? rawMarginPct / 100 : null,
       commissionSource: tm['commissionSource'] as CommissionSource,
-      commissionManualPct: tm['commissionManualPct'] as number | null,
+      commissionManualPct: rawCommissionPct != null ? rawCommissionPct / 100 : null,
       commissionLookbackDays: tm['commissionLookbackDays'] as number,
       commissionMinTransactions: tm['commissionMinTransactions'] as number,
       logisticsSource: tm['logisticsSource'] as CommissionSource,
@@ -172,6 +190,8 @@ export function collectPolicyValidationErrors(
     errors.push(t('pricing.form.validation.volatility_period_range'));
   if (form.get('staleDataGuardHours')!.hasError('min') || form.get('staleDataGuardHours')!.hasError('max'))
     errors.push(t('pricing.form.validation.stale_data_hours_range'));
+  if (form.get('confirmFullAuto')!.hasError('requiredTrue'))
+    errors.push(t('pricing.form.validation.full_auto_confirm_required'));
 
   return errors;
 }

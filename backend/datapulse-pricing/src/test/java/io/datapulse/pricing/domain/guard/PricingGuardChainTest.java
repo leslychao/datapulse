@@ -34,7 +34,7 @@ class PricingGuardChainTest {
 
   private final PricingSignalSet signals = new PricingSignalSet(
       new BigDecimal("1000"), null, null, null,
-      false, false, null, null, null, null, null, null, null);
+      false, false, null, null, null, null, null, null, null, null);
 
   @Nested
   @DisplayName("evaluate — all pass")

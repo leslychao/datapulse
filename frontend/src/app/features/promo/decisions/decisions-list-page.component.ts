@@ -9,6 +9,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
+import { CheckCircle, XCircle, Clock } from 'lucide-angular';
+
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatDateTime } from '@shared/utils/format.utils';
 import {
@@ -59,31 +61,37 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'promo.decisions.title' | translate }}
         </h2>
       </div>
 
-      <div class="flex gap-3 px-6 pt-4">
+      <div class="flex flex-wrap gap-3 px-4 pt-3">
         <dp-kpi-card
           [label]="'promo.decisions.kpi.participate' | translate"
           [value]="kpiParticipate()"
+          [icon]="CheckCircleIcon"
+          accent="success"
           [loading]="decisionsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.decisions.kpi.decline' | translate"
           [value]="kpiDecline()"
+          [icon]="XCircleIcon"
+          accent="neutral"
           [loading]="decisionsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.decisions.kpi.pending_review' | translate"
           [value]="kpiPendingReview()"
+          [icon]="ClockIcon"
+          accent="warning"
           [loading]="decisionsQuery.isPending()"
         />
       </div>
 
-      <div class="px-6 pt-3">
+      <div class="px-6 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -91,7 +99,7 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
         />
       </div>
 
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (decisionsQuery.isError()) {
           <dp-empty-state
             [message]="'promo.decisions.error' | translate"
@@ -126,6 +134,10 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
 export class DecisionsListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+
+  protected readonly CheckCircleIcon = CheckCircle;
+  protected readonly XCircleIcon = XCircle;
+  protected readonly ClockIcon = Clock;
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);

@@ -302,7 +302,8 @@ class BulkManualPricingServiceTest {
       BulkManualApplyResponse response = service.apply(request, WORKSPACE_ID, 1L);
 
       assertThat(response.processed()).isEqualTo(1);
-      assertThat(response.skipped()).isEqualTo(1);
+      assertThat(response.errored()).isEqualTo(1);
+      assertThat(response.skipped()).isZero();
       assertThat(response.errors()).hasSize(1);
     }
 

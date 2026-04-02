@@ -44,3 +44,6 @@ databaseChangeLog:
   - include:
       file: changes/0018-price-action-state-transition.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0019-pricing-audit-fixes.sql
+      relativeToChangelogFile: true

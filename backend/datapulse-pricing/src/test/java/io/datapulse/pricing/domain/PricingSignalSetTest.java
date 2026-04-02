@@ -32,7 +32,8 @@ class PricingSignalSetTest {
           new BigDecimal("0.03"),
           now.minusHours(5),
           2,
-          now);
+          now,
+          new BigDecimal("50"));
 
       assertThat(signals.currentPrice()).isEqualByComparingTo(new BigDecimal("1000"));
       assertThat(signals.cogs()).isEqualByComparingTo(new BigDecimal("400"));
@@ -47,6 +48,7 @@ class PricingSignalSetTest {
       assertThat(signals.lastPriceChangeAt()).isBefore(now);
       assertThat(signals.priceReversalsInPeriod()).isEqualTo(2);
       assertThat(signals.dataFreshnessAt()).isEqualTo(now);
+      assertThat(signals.marketplaceMinPrice()).isEqualByComparingTo(new BigDecimal("50"));
     }
   }
 
@@ -60,7 +62,7 @@ class PricingSignalSetTest {
       PricingSignalSet signals = new PricingSignalSet(
           null, null, null, null,
           false, false,
-          null, null, null, null, null, null, null);
+          null, null, null, null, null, null, null, null);
 
       assertThat(signals.currentPrice()).isNull();
       assertThat(signals.cogs()).isNull();
@@ -75,6 +77,7 @@ class PricingSignalSetTest {
       assertThat(signals.lastPriceChangeAt()).isNull();
       assertThat(signals.priceReversalsInPeriod()).isNull();
       assertThat(signals.dataFreshnessAt()).isNull();
+      assertThat(signals.marketplaceMinPrice()).isNull();
     }
   }
 
@@ -87,10 +90,10 @@ class PricingSignalSetTest {
     void should_beEqual_when_sameValues() {
       PricingSignalSet a = new PricingSignalSet(
           new BigDecimal("100"), null, null, null,
-          false, false, null, null, null, null, null, null, null);
+          false, false, null, null, null, null, null, null, null, null);
       PricingSignalSet b = new PricingSignalSet(
           new BigDecimal("100"), null, null, null,
-          false, false, null, null, null, null, null, null, null);
+          false, false, null, null, null, null, null, null, null, null);
 
       assertThat(a).isEqualTo(b);
     }

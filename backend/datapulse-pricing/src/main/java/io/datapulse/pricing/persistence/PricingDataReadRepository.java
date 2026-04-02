@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -82,6 +83,15 @@ public class PricingDataReadRepository {
               AND pd.decision_type = 'CHANGE'
               AND pd.created_at >= :since
             GROUP BY pd.marketplace_offer_id
+            """;
+
+    private static final String PROMO_ACTIVE_OFFERS = """
+            SELECT DISTINCT pp.marketplace_offer_id
+            FROM canonical_promo_product pp
+            JOIN canonical_promo_campaign pc ON pp.canonical_promo_campaign_id = pc.id
+            WHERE pp.marketplace_offer_id IN (:offerIds)
+              AND pp.participation_status = 'PARTICIPATING'
+              AND pc.status IN ('ACTIVE', 'UPCOMING', 'FROZEN')
             """;
 
     public List<OfferRow> findOffersByConnection(long connectionId) {
@@ -194,6 +204,16 @@ public class PricingDataReadRepository {
                 });
     }
 
+    public Set<Long> findPromoActiveOfferIds(List<Long> offerIds) {
+        if (offerIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        List<Long> ids = jdbc.queryForList(PROMO_ACTIVE_OFFERS,
+                new MapSqlParameterSource("offerIds", offerIds),
+                Long.class);
+        return Set.copyOf(ids);
+    }
+
     private static final String OFFERS_BY_IDS_ENRICHED = """
             SELECT mo.id,
                    mo.seller_sku_id,
@@ -243,6 +263,22 @@ public class PricingDataReadRepository {
             long connectionId,
             String status
     ) {
+    }
+
+    private static final String FAILED_ACTIONS_COUNT = """
+            SELECT count(*) FROM price_action pa
+            WHERE pa.workspace_id = :workspaceId
+              AND pa.status = 'FAILED'
+              AND pa.updated_at >= :since
+            """;
+
+    public boolean hasFailedActionsInPeriod(long workspaceId, OffsetDateTime since) {
+        Integer count = jdbc.queryForObject(FAILED_ACTIONS_COUNT,
+                new MapSqlParameterSource()
+                        .addValue("workspaceId", workspaceId)
+                        .addValue("since", since),
+                Integer.class);
+        return count != null && count > 0;
     }
 
     public record EnrichedOfferRow(

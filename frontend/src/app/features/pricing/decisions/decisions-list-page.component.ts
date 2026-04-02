@@ -8,11 +8,18 @@ import {
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import {
+  ColDef,
+  GetRowIdParams,
+  ICellRendererParams,
+  ValueFormatterParams,
+} from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
-import { PricingDecisionFilter } from '@core/models';
+import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { DetailPanelService } from '@shared/services/detail-panel.service';
 import {
   FilterBarComponent,
   FilterConfig,
@@ -39,7 +46,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
   host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
-      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+      <div class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -47,7 +54,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
         />
       </div>
 
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (decisionsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.decisions.error' | translate"
@@ -73,6 +80,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
             [pageSize]="100"
             [getRowId]="getRowId"
             [height]="'100%'"
+            (rowClicked)="onRowClicked($event)"
           />
         }
       </div>
@@ -83,6 +91,7 @@ export class DecisionsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly translate = inject(TranslateService);
+  private readonly detailPanel = inject(DetailPanelService);
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
@@ -114,7 +123,7 @@ export class DecisionsListPageComponent {
     },
   ];
 
-  readonly columnDefs = [
+  readonly columnDefs: ColDef[] = [
     {
       headerName: '#',
       field: 'id',
@@ -147,7 +156,7 @@ export class DecisionsListPageComponent {
       field: 'decisionType',
       width: 130,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const val = params.value as string;
         const label = this.translate.instant(`pricing.decisions.type.${val}`);
         const color = DECISION_TYPE_COLOR[val] ?? 'neutral';
@@ -165,7 +174,8 @@ export class DecisionsListPageComponent {
       width: 110,
       sortable: true,
       cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => this.formatPrice(params.value),
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) =>
+        this.formatPrice(params.value),
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.target_price'),
@@ -173,7 +183,8 @@ export class DecisionsListPageComponent {
       width: 110,
       sortable: true,
       cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => this.formatPrice(params.value),
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) =>
+        this.formatPrice(params.value),
     },
     {
       headerName: 'Δ%',
@@ -181,7 +192,7 @@ export class DecisionsListPageComponent {
       width: 80,
       sortable: true,
       cellClass: 'font-mono text-right',
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const v = params.value;
         if (v === null || v === undefined) return '—';
         const abs = Math.abs(v).toFixed(1).replace('.', ',');
@@ -203,7 +214,7 @@ export class DecisionsListPageComponent {
       field: 'strategyType',
       width: 150,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const label = this.translate.instant(
           `pricing.policies.strategy.${params.value}`,
         );
@@ -215,7 +226,7 @@ export class DecisionsListPageComponent {
       field: 'executionMode',
       width: 100,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const mode = params.value as string;
         const label =
           mode === 'SIMULATED'
@@ -233,7 +244,7 @@ export class DecisionsListPageComponent {
       width: 80,
       sortable: true,
       cellClass: 'font-mono',
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         if (!params.value) return '—';
         return `<span class="text-[var(--accent-primary)] cursor-pointer hover:underline">#${params.value}</span>`;
       },
@@ -244,7 +255,7 @@ export class DecisionsListPageComponent {
       minWidth: 200,
       flex: 1,
       sortable: false,
-      valueFormatter: (params: any) => {
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) => {
         if (!params.value) return '—';
         return this.translate.instant(params.value);
       },
@@ -255,7 +266,8 @@ export class DecisionsListPageComponent {
       width: 140,
       sortable: true,
       sort: 'desc' as const,
-      valueFormatter: (params: any) => this.formatTimestamp(params.value),
+      valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) =>
+        this.formatTimestamp(params.value),
     },
   ];
 
@@ -303,11 +315,16 @@ export class DecisionsListPageComponent {
     ),
   );
 
-  readonly getRowId = (params: any) => String(params.data.id);
+  readonly getRowId = (params: GetRowIdParams<PricingDecisionSummary>) =>
+    String(params.data.id);
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);
     this.currentPage.set(0);
+  }
+
+  onRowClicked(row: PricingDecisionSummary): void {
+    this.detailPanel.open('pricing-decision', row.id);
   }
 
   private formatPrice(value: number | null): string {

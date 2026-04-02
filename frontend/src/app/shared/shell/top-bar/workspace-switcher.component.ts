@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { LucideAngularModule, ChevronDown, Check } from 'lucide-angular';
+import { LucideAngularModule, Check } from 'lucide-angular';
 
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { WorkspaceDetail } from '@core/models';
@@ -19,21 +19,17 @@ import { WorkspaceDetail } from '@core/models';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule, RouterLink],
   template: `
-    <div class="relative flex items-center">
+    <div class="relative">
       <button
         (click)="toggle()"
-        class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-2 py-1 transition-colors hover:bg-[var(--bg-tertiary)]"
+        class="flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1 transition-colors hover:bg-[var(--bg-tertiary)]"
+        [attr.aria-label]="'Переключить рабочее пространство'"
       >
-        <span class="text-sm font-semibold text-[var(--text-primary)]">Datapulse</span>
-
-        @if (workspaceName()) {
-          <span class="mx-1 text-[var(--text-tertiary)]">/</span>
-          <span class="max-w-[120px] truncate text-sm font-semibold text-[var(--text-primary)]">
-            {{ workspaceName() }}
-          </span>
-        }
-
-        <lucide-icon [img]="ChevronDown" [size]="14" class="text-[var(--text-tertiary)]" />
+        <div
+          class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-primary)] text-xs font-bold text-white"
+        >
+          {{ workspaceInitial() }}
+        </div>
       </button>
 
       @if (open()) {
@@ -75,7 +71,6 @@ import { WorkspaceDetail } from '@core/models';
   `,
 })
 export class WorkspaceSwitcherComponent {
-  protected readonly ChevronDown = ChevronDown;
   protected readonly Check = Check;
 
   private readonly store = inject(WorkspaceContextStore);
@@ -87,10 +82,9 @@ export class WorkspaceSwitcherComponent {
 
   protected readonly currentWorkspaceId = this.store.currentWorkspaceId;
 
-  protected readonly workspaceName = computed(() => {
+  protected readonly workspaceInitial = computed(() => {
     const name = this.store.currentWorkspaceName();
-    if (!name) return null;
-    return name.length > 20 ? name.slice(0, 20) + '…' : name;
+    return name ? name.charAt(0).toUpperCase() : 'D';
   });
 
   @HostListener('document:click', ['$event'])

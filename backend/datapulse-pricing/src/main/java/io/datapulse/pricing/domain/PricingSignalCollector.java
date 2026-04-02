@@ -42,6 +42,7 @@ public class PricingSignalCollector {
 
         OffsetDateTime volatilitySince = OffsetDateTime.now().minusDays(volatilityPeriodDays);
         Map<Long, Integer> reversals = dataReadRepository.findPriceReversals(offerIds, volatilitySince);
+        Set<Long> promoActiveIds = Set.copyOf(dataReadRepository.findPromoActiveOfferIds(offerIds));
 
         Map<Long, PricingSignalSet> result = new HashMap<>();
 
@@ -52,7 +53,7 @@ public class PricingSignalCollector {
                     null,
                     stock.get(offerId),
                     lockedIds.contains(offerId),
-                    false,
+                    promoActiveIds.contains(offerId),
                     null,
                     null,
                     null,

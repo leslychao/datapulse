@@ -5,6 +5,7 @@ import io.datapulse.execution.persistence.PriceActionAttemptEntity;
 import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.platform.observability.MetricsFacade;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class ReconciliationService {
     private final ActionService actionService;
     private final OutboxService outboxService;
     private final ExecutionProperties properties;
+    private final MetricsFacade metrics;
 
     @Transactional
     public void processReconciliationCheck(long actionId, int reconciliationAttempt,
@@ -46,10 +48,12 @@ public class ReconciliationService {
         if (priceMatch) {
             actionService.casSucceed(actionId, ActionStatus.RECONCILIATION_PENDING,
                     ActionReconciliationSource.AUTO, null);
+            metrics.incrementCounter("execution.reconciliation.outcome", "result", "succeeded");
             log.info("Reconciliation succeeded: actionId={}, targetPrice={}, actualPrice={}",
                     actionId, action.getTargetPrice(), actualPrice);
         } else if (reconciliationAttempt < properties.getReconciliation().getMaxAttempts()) {
             scheduleNextReconciliation(actionId, reconciliationAttempt);
+            metrics.incrementCounter("execution.reconciliation.outcome", "result", "retry");
             log.info("Reconciliation mismatch, scheduling retry: actionId={}, attempt={}, target={}, actual={}",
                     actionId, reconciliationAttempt, action.getTargetPrice(), actualPrice);
         } else {
@@ -57,6 +61,7 @@ public class ReconciliationService {
                     action.getAttemptCount(), ErrorClassification.PROVIDER_ERROR,
                     "Reconciliation failed: price mismatch after %d checks"
                             .formatted(properties.getReconciliation().getMaxAttempts()));
+            metrics.incrementCounter("execution.reconciliation.outcome", "result", "failed");
             log.warn("Reconciliation failed (max attempts): actionId={}, target={}, actual={}",
                     actionId, action.getTargetPrice(), actualPrice);
         }
@@ -94,10 +99,10 @@ public class ReconciliationService {
     }
 
     private void scheduleNextReconciliation(long actionId, int currentAttempt) {
-        long delaySeconds = properties.getReconciliation().getInitialDelay().toSeconds();
+        long delayMs = properties.getReconciliation().getInitialDelay().toMillis();
         int multiplier = properties.getReconciliation().getBackoffMultiplier();
         for (int i = 1; i < currentAttempt; i++) {
-            delaySeconds *= multiplier;
+            delayMs *= multiplier;
         }
 
         outboxService.createEvent(
@@ -107,7 +112,7 @@ public class ReconciliationService {
                 Map.of(
                         "actionId", actionId,
                         "attempt", currentAttempt + 1,
-                        "delaySeconds", delaySeconds
+                        "delay_ms", delayMs
                 )
         );
     }
@@ -122,7 +127,9 @@ public class ReconciliationService {
                 .orElse(null);
 
         if (latestAttempt != null) {
-            latestAttempt.setReconciliationSource(ReconciliationSource.DEFERRED);
+            if (latestAttempt.getReconciliationSource() != ReconciliationSource.IMMEDIATE) {
+                latestAttempt.setReconciliationSource(ReconciliationSource.DEFERRED);
+            }
             latestAttempt.setReconciliationReadAt(OffsetDateTime.now());
             latestAttempt.setReconciliationSnapshot(rawSnapshot);
             latestAttempt.setActualPrice(actualPrice);

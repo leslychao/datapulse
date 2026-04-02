@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { LucideAngularModule, TrendingUp, TrendingDown, Minus } from 'lucide-angular';
+import { LucideAngularModule, LucideIconData, TrendingUp, TrendingDown, Minus } from 'lucide-angular';
 
 type TrendDirection = 'up' | 'down' | 'neutral';
+export type KpiAccent = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 const TREND_COLORS: Record<TrendDirection, string> = {
   up: 'var(--finance-positive)',
@@ -9,40 +10,58 @@ const TREND_COLORS: Record<TrendDirection, string> = {
   neutral: 'var(--finance-zero)',
 };
 
+const ACCENT_STYLES: Record<KpiAccent, { bg: string; fg: string }> = {
+  primary: { bg: 'var(--accent-subtle)', fg: 'var(--accent-primary)' },
+  success: { bg: 'var(--status-success-bg)', fg: 'var(--status-success)' },
+  warning: { bg: 'var(--status-warning-bg)', fg: 'var(--status-warning)' },
+  error: { bg: 'var(--status-error-bg)', fg: 'var(--status-error)' },
+  info: { bg: 'var(--status-info-bg)', fg: 'var(--status-info)' },
+  neutral: { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral)' },
+};
+
 @Component({
   selector: 'dp-kpi-card',
   standalone: true,
   imports: [LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex min-w-0 flex-1 basis-[150px]' },
   template: `
     <div
-      class="flex min-w-[160px] flex-col justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3.5 py-2.5"
+      class="flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3.5 py-2.5"
     >
-      @if (loading()) {
-        <div class="dp-shimmer h-3 w-20 rounded-[var(--radius-sm)]"></div>
-        <div class="dp-shimmer h-6 w-24 rounded-[var(--radius-sm)]"></div>
-        <div class="dp-shimmer h-3 w-16 rounded-[var(--radius-sm)]"></div>
-      } @else {
-        <span class="truncate text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-          {{ label() }}
-        </span>
-
-        <span class="font-mono text-[length:var(--text-2xl)] font-bold text-[var(--text-primary)]">
-          {{ displayValue() }}
-        </span>
-
-        @if (trend() !== null) {
-          <span
-            class="inline-flex items-center gap-0.5 text-[length:var(--text-xs)]"
-            [style.color]="trendColor()"
-          >
-            <lucide-icon [img]="trendIcon()" [size]="14"></lucide-icon>
-            {{ formattedTrend() }}
-          </span>
-        } @else {
-          <span class="h-[14px]"></span>
-        }
+      @if (icon(); as img) {
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+          [style.background-color]="accentBg()"
+        >
+          <lucide-icon [img]="img" [size]="18" [style.color]="accentFg()" />
+        </div>
       }
+
+      <div class="flex min-w-0 flex-col">
+        @if (loading()) {
+          <div class="dp-shimmer mb-1 h-3 w-16 rounded-[var(--radius-sm)]"></div>
+          <div class="dp-shimmer h-5 w-20 rounded-[var(--radius-sm)]"></div>
+        } @else {
+          <div class="flex items-center gap-1.5">
+            <span class="truncate text-[length:var(--text-xs)] leading-snug text-[var(--text-secondary)]">
+              {{ label() }}
+            </span>
+            @if (trend() !== null) {
+              <span
+                class="inline-flex shrink-0 items-center gap-0.5 text-[length:var(--text-xs)] leading-snug"
+                [style.color]="trendColor()"
+              >
+                <lucide-icon [img]="trendIcon()" [size]="11" />
+                {{ formattedTrend() }}
+              </span>
+            }
+          </div>
+          <span class="font-mono text-[length:var(--text-lg)] font-bold leading-tight text-[var(--text-primary)]">
+            {{ displayValue() }}
+          </span>
+        }
+      </div>
     </div>
   `,
 })
@@ -51,12 +70,17 @@ export class KpiCardComponent {
   readonly value = input<string | number | null>(null);
   readonly trend = input<number | null>(null);
   readonly trendDirection = input<TrendDirection>('neutral');
-  readonly icon = input<string | null>(null);
+  readonly icon = input<LucideIconData | null>(null);
+  readonly accent = input<KpiAccent>('neutral');
   readonly loading = input(false);
 
-  readonly TrendingUp = TrendingUp;
-  readonly TrendingDown = TrendingDown;
-  readonly Minus = Minus;
+  protected readonly accentBg = computed(() =>
+    ACCENT_STYLES[this.accent()]?.bg ?? ACCENT_STYLES.neutral.bg,
+  );
+
+  protected readonly accentFg = computed(() =>
+    ACCENT_STYLES[this.accent()]?.fg ?? ACCENT_STYLES.neutral.fg,
+  );
 
   protected readonly displayValue = computed(() => {
     const v = this.value();
@@ -69,9 +93,9 @@ export class KpiCardComponent {
 
   protected readonly trendIcon = computed(() => {
     switch (this.trendDirection()) {
-      case 'up': return this.TrendingUp;
-      case 'down': return this.TrendingDown;
-      default: return this.Minus;
+      case 'up': return TrendingUp;
+      case 'down': return TrendingDown;
+      default: return Minus;
     }
   });
 

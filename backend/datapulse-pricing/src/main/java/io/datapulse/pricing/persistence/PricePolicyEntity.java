@@ -73,6 +73,9 @@ public class PricePolicyEntity extends BaseEntity {
     @Column(name = "last_preview_version", nullable = false)
     private Integer lastPreviewVersion;
 
+    @Column(name = "execution_mode_changed_at")
+    private java.time.OffsetDateTime executionModeChangedAt;
+
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 

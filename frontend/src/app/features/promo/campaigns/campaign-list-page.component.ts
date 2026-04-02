@@ -11,6 +11,8 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
 
+import { Zap, Calendar, Package, Clock } from 'lucide-angular';
+
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatDateTime } from '@shared/utils/format.utils';
 import {
@@ -67,36 +69,44 @@ const MP_BADGE: Record<
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'promo.campaigns.title' | translate }}
         </h2>
       </div>
 
-      <div class="flex gap-3 px-6 pt-4">
+      <div class="flex flex-wrap gap-3 px-4 pt-3">
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.active' | translate"
           [value]="kpiActive()"
+          [icon]="ZapIcon"
+          accent="success"
           [loading]="campaignsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.upcoming' | translate"
           [value]="kpiUpcoming()"
+          [icon]="CalendarIcon"
+          accent="info"
           [loading]="campaignsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.products_participating' | translate"
           [value]="kpiProductsParticipating()"
+          [icon]="PackageIcon"
+          accent="primary"
           [loading]="campaignsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.pending_decisions' | translate"
           [value]="kpiPendingDecisions()"
+          [icon]="ClockIcon"
+          accent="warning"
           [loading]="campaignsQuery.isPending()"
         />
       </div>
 
-      <div class="px-6 pt-3">
+      <div class="px-4 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -104,7 +114,7 @@ const MP_BADGE: Record<
         />
       </div>
 
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (campaignsQuery.isError()) {
           <dp-empty-state
             [message]="'promo.campaigns.error' | translate"
@@ -142,6 +152,11 @@ export class CampaignListPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly translate = inject(TranslateService);
+
+  protected readonly ZapIcon = Zap;
+  protected readonly CalendarIcon = Calendar;
+  protected readonly PackageIcon = Package;
+  protected readonly ClockIcon = Clock;
 
   readonly filterValues = signal<Record<string, any>>({
     status: ['UPCOMING', 'ACTIVE'],

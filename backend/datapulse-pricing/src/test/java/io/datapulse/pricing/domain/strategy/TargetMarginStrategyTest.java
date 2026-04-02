@@ -406,7 +406,7 @@ class TargetMarginStrategyTest {
           new BigDecimal("1000"), new BigDecimal("500"), null, null,
           false, false,
           new BigDecimal("0.10"), null, null, new BigDecimal("0.05"),
-          null, null, null);
+          null, null, null, null);
 
       String params = """
           {
@@ -519,17 +519,19 @@ class TargetMarginStrategyTest {
     private BigDecimal cogs;
     private BigDecimal avgCommissionPct;
     private BigDecimal avgLogisticsPerUnit;
+    private BigDecimal marketplaceMinPrice;
 
     SignalSetBuilder currentPrice(BigDecimal v) { this.currentPrice = v; return this; }
     SignalSetBuilder cogs(BigDecimal v) { this.cogs = v; return this; }
     SignalSetBuilder avgCommissionPct(BigDecimal v) { this.avgCommissionPct = v; return this; }
     SignalSetBuilder avgLogisticsPerUnit(BigDecimal v) { this.avgLogisticsPerUnit = v; return this; }
+    SignalSetBuilder marketplaceMinPrice(BigDecimal v) { this.marketplaceMinPrice = v; return this; }
 
     PricingSignalSet build() {
       return new PricingSignalSet(
           currentPrice, cogs, null, null, false, false,
           avgCommissionPct, avgLogisticsPerUnit,
-          null, null, null, null, null);
+          null, null, null, null, null, marketplaceMinPrice);
     }
   }
 }

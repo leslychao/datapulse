@@ -17,6 +17,8 @@ import {
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
+import { Users, CheckCircle, XCircle, Clock, CheckCheck, AlertTriangle } from 'lucide-angular';
+
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import {
@@ -129,6 +131,13 @@ export class CampaignDetailPageComponent {
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
+
+  protected readonly UsersIcon = Users;
+  protected readonly CheckCircleIcon = CheckCircle;
+  protected readonly XCircleIcon = XCircle;
+  protected readonly ClockIcon = Clock;
+  protected readonly CheckCheckIcon = CheckCheck;
+  protected readonly AlertTriangleIcon = AlertTriangle;
 
   readonly campaignId = input.required<string>();
 
@@ -276,22 +285,24 @@ export class CampaignDetailPageComponent {
         const frozen = this.isCampaignFrozenOrEnded();
         if (frozen) return '';
 
+        const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+        const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
         let btns = '';
         if (
           (p.participationStatus === 'ELIGIBLE' && !p.actionId) ||
           p.participationStatus === 'DECLINED' ||
           p.participationStatus === 'AUTO_DECLINED'
         ) {
-          btns += `<button class="action-btn" data-action="participate" title="${this.translate.instant('actions.participate')}">✓</button>`;
+          btns += `<button class="action-btn" data-action="participate" title="${this.translate.instant('actions.participate')}">${checkIcon}</button>`;
         }
         if (p.participationStatus === 'ELIGIBLE' && !p.actionId) {
-          btns += `<button class="action-btn" data-action="decline" title="${this.translate.instant('actions.reject')}">✗</button>`;
+          btns += `<button class="action-btn" data-action="decline" title="${this.translate.instant('actions.reject')}">${xIcon}</button>`;
         }
         if (p.actionStatus === 'PENDING_APPROVAL') {
-          btns += `<button class="action-btn" data-action="approve" title="${this.translate.instant('actions.approve')}">✓</button>`;
-          btns += `<button class="action-btn" data-action="reject" title="${this.translate.instant('actions.reject')}">✗</button>`;
+          btns += `<button class="action-btn" data-action="approve" title="${this.translate.instant('actions.approve')}">${checkIcon}</button>`;
+          btns += `<button class="action-btn" data-action="reject" title="${this.translate.instant('actions.reject')}">${xIcon}</button>`;
         }
-        return btns ? `<div class="flex items-center gap-1">${btns}</div>` : '';
+        return btns ? `<div class="flex items-center gap-0.5">${btns}</div>` : '';
       },
       onCellClicked: (params: any) => {
         const target = params.event?.target as HTMLElement;

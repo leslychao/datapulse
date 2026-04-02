@@ -345,13 +345,13 @@ class PricingConstraintResolverTest {
   private PricingSignalSet signals(BigDecimal currentPrice) {
     return new PricingSignalSet(
         currentPrice, null, null, null,
-        false, false, null, null, null, null, null, null, null);
+        false, false, null, null, null, null, null, null, null, null);
   }
 
   private PricingSignalSet signalsWithCogs(BigDecimal currentPrice, BigDecimal cogs) {
     return new PricingSignalSet(
         currentPrice, cogs, null, null,
-        false, false, null, null, null, null, null, null, null);
+        false, false, null, null, null, null, null, null, null, null);
   }
 
   private PolicySnapshot targetMarginSnapshot(BigDecimal minPrice, BigDecimal maxPrice,

@@ -18,6 +18,7 @@ import io.datapulse.analytics.api.PnlFilter;
 import io.datapulse.analytics.api.PnlSummaryResponse;
 import io.datapulse.analytics.api.PnlTrendResponse;
 import io.datapulse.analytics.api.PostingDetailResponse;
+import io.datapulse.analytics.api.PostingPnlDetailResponse;
 import io.datapulse.analytics.api.PostingPnlResponse;
 import io.datapulse.analytics.api.ProductPnlResponse;
 import io.datapulse.analytics.api.TrendGranularity;
@@ -204,20 +205,20 @@ class PnlQueryServiceTest {
     }
 
     @Test
-    @DisplayName("should use default sort column 'revenueAmount' when unsorted")
+    @DisplayName("should use default sort column 'revenue_amount' when unsorted")
     void should_useDefaultSort_when_noSortProvided() {
       List<Long> connIds = List.of(10L);
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(connIds);
       when(pnlReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(0L);
       when(pnlReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
-          eq("revenueAmount"), eq(20), eq(0L)))
+          eq("revenue_amount"), eq(20), eq(0L)))
           .thenReturn(List.of());
 
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
 
       verify(pnlReadRepository).findByProduct(connIds, EMPTY_FILTER,
-          "revenueAmount", 20, 0L);
+          "revenue_amount", 20, 0L);
     }
 
     @Test
@@ -286,20 +287,20 @@ class PnlQueryServiceTest {
     }
 
     @Test
-    @DisplayName("should use default sort column 'financeDate' when unsorted")
+    @DisplayName("should use default sort column 'finance_date' when unsorted")
     void should_useDefaultSort_when_noSortOnPosting() {
       List<Long> connIds = List.of(10L);
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(connIds);
       when(pnlReadRepository.countByPosting(connIds, EMPTY_FILTER)).thenReturn(0L);
       when(pnlReadRepository.findByPosting(eq(connIds), eq(EMPTY_FILTER),
-          eq("financeDate"), eq(20), eq(0L)))
+          eq("finance_date"), eq(20), eq(0L)))
           .thenReturn(List.of());
 
       service.getByPosting(WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
 
       verify(pnlReadRepository).findByPosting(connIds, EMPTY_FILTER,
-          "financeDate", 20, 0L);
+          "finance_date", 20, 0L);
     }
   }
 
@@ -308,14 +309,15 @@ class PnlQueryServiceTest {
   class GetPostingDetails {
 
     @Test
-    @DisplayName("should return empty list when no connections")
+    @DisplayName("should return empty detail when no connections")
     void should_returnEmpty_when_noConnections() {
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(List.of());
 
-      List<PostingDetailResponse> result = service.getPostingDetails(WORKSPACE_ID, "P-001");
+      PostingPnlDetailResponse result = service.getPostingDetails(WORKSPACE_ID, "P-001");
 
-      assertThat(result).isEmpty();
+      assertThat(result.entries()).isEmpty();
+      assertThat(result.postingId()).isEqualTo("P-001");
     }
 
     @Test
@@ -324,12 +326,15 @@ class PnlQueryServiceTest {
       List<Long> connIds = List.of(10L);
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(connIds);
-      when(pnlReadRepository.findPostingDetails(connIds, "P-001"))
-          .thenReturn(List.of());
+      when(pnlReadRepository.findPostingDetail(connIds, "P-001"))
+          .thenReturn(new PostingPnlDetailResponse(
+              "P-001", null, null, null, null,
+              java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO,
+              null, java.math.BigDecimal.ZERO, List.of()));
 
       service.getPostingDetails(WORKSPACE_ID, "P-001");
 
-      verify(pnlReadRepository).findPostingDetails(connIds, "P-001");
+      verify(pnlReadRepository).findPostingDetail(connIds, "P-001");
     }
   }
 

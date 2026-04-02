@@ -53,13 +53,13 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
   template: `
     <div class="flex h-full min-h-0 flex-col">
       <!-- Section tabs -->
-      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6
+      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4
                   [&>a:first-child]:pl-0">
         @for (tab of sectionTabs; track tab.path) {
           <a
             [routerLink]="tab.path"
             routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
-            class="border-b-2 border-transparent px-3 py-2.5 text-[length:var(--text-sm)]
+            class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
                    font-medium text-[var(--text-secondary)] transition-colors
                    hover:text-[var(--text-primary)]"
           >
@@ -70,15 +70,16 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
 
       <!-- Sub-navigation -->
       @if (subNavLinks().length > 0) {
-        <div class="flex gap-1 px-6 py-2 [&>a:first-child]:ml-[-0.75rem]">
+        <div class="flex gap-1 border-b border-[var(--border-default)] px-4
+                    [&>a:first-child]:pl-0">
           @for (link of subNavLinks(); track link.path) {
             <a
               [routerLink]="link.path"
-              routerLinkActive="bg-[var(--accent-subtle)] text-[var(--accent-primary)] font-medium"
+              routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
               [routerLinkActiveOptions]="{ exact: link.exact }"
-              class="rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)]
-                     text-[var(--text-secondary)] transition-colors
-                     hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
+                     font-medium text-[var(--text-secondary)] transition-colors
+                     hover:text-[var(--text-primary)]"
             >
               {{ link.labelKey | translate }}
             </a>
@@ -87,7 +88,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
       }
 
       <!-- Page content -->
-      <div class="flex-1 overflow-y-auto min-h-0 p-6">
+      <div class="flex-1 overflow-y-auto min-h-0 p-4">
         <router-outlet />
       </div>
     </div>

@@ -43,7 +43,6 @@ public class RabbitTopologyConfig {
 
   private static final long ETL_WAIT_TTL = 1_500_000L;
   private static final long EXECUTION_WAIT_TTL = 60_000L;
-  private static final long RECONCILIATION_WAIT_TTL = 60_000L;
 
   @Bean
   public Declarables rabbitTopology() {
@@ -94,7 +93,6 @@ public class RabbitTopologyConfig {
     var priceReconciliationWaitQueue = QueueBuilder.durable(PRICE_RECONCILIATION_WAIT_QUEUE)
         .deadLetterExchange(PRICE_RECONCILIATION_EXCHANGE)
         .deadLetterRoutingKey(PRICE_RECONCILIATION_QUEUE)
-        .ttl((int) RECONCILIATION_WAIT_TTL)
         .build();
 
     // ── Bindings: direct exchanges → queues ─────────────────────────────

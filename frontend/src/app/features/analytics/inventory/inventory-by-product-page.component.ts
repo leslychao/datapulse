@@ -58,7 +58,7 @@ import { formatMoney } from '@shared/utils/format.utils';
         </div>
 
         <!-- Table -->
-        <div class="flex-1 overflow-auto py-3">
+        <div class="flex-1 overflow-auto py-2">
           @if (productsQuery.isPending()) {
             <div class="dp-shimmer h-64 w-full rounded-[var(--radius-md)]"></div>
           } @else if (rows().length === 0) {

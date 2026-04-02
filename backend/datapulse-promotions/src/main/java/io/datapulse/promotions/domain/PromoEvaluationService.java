@@ -38,11 +38,23 @@ public class PromoEvaluationService {
     private final PromoPolicyResolver policyResolver;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final PromoSignalAssembler signalAssembler;
 
-    // TODO: implement full evaluate flow (create run, load products, delegate to executeRun)
     @Transactional
     public void evaluate(long connectionId, long workspaceId) {
-        throw new UnsupportedOperationException("PromoEvaluationService.evaluate not implemented yet");
+        if (runRepository.existsByConnectionIdAndStatus(connectionId, PromoRunStatus.IN_PROGRESS)) {
+            log.warn("Promo evaluation already in progress for connectionId={}, skipping", connectionId);
+            return;
+        }
+
+        var run = new PromoEvaluationRunEntity();
+        run.setWorkspaceId(workspaceId);
+        run.setConnectionId(connectionId);
+        run.setTriggerType(PromoRunTriggerType.MANUAL);
+        run.setStatus(PromoRunStatus.PENDING);
+        runRepository.save(run);
+
+        executeRun(run.getId());
     }
 
     @Transactional
@@ -50,18 +62,18 @@ public class PromoEvaluationService {
         PromoEvaluationRunEntity run = runRepository.findById(runId)
                 .orElseThrow(() -> new IllegalStateException("PromoEvaluationRun not found: " + runId));
 
-        if (run.getStatus() != PromoRunStatus.PENDING) {
-            log.warn("PromoEvaluationRun {} is not PENDING (status={}), skipping", runId, run.getStatus());
+        int updated = runRepository.casUpdateStatus(runId, PromoRunStatus.PENDING, PromoRunStatus.IN_PROGRESS);
+        if (updated == 0) {
+            log.warn("PromoEvaluationRun {} is not PENDING, skipping (CAS failed)", runId);
             return;
         }
-
         run.setStatus(PromoRunStatus.IN_PROGRESS);
         run.setStartedAt(OffsetDateTime.now());
-        runRepository.save(run);
 
         try {
             List<PromoProductRow> products = policyResolver.loadEligibleProducts(
                     run.getConnectionId(), run.getWorkspaceId());
+            products = signalAssembler.enrichWithSignals(products);
             run.setTotalProducts(products.size());
 
             run.setEligibleCount(products.size());
@@ -263,7 +275,6 @@ public class PromoEvaluationService {
         return evaluationRepository
                 .findFirstByCanonicalPromoProductIdOrderByCreatedAtDesc(promoProductId)
                 .filter(prev -> prev.getEvaluationResult() == currentResult)
-                .filter(prev -> currentResult == PromoEvaluationResult.PROFITABLE)
                 .filter(prev -> prev.getMarginAtPromoPrice() != null)
                 .filter(prev -> currentMargin.subtract(prev.getMarginAtPromoPrice()).abs()
                         .compareTo(STABLE_STATE_THRESHOLD) < 0)
@@ -336,7 +347,8 @@ public class PromoEvaluationService {
         decision.setDecisionType(decisionType);
         decision.setParticipationMode(policy.getParticipationMode());
         decision.setExecutionMode(
-                policy.getParticipationMode() == ParticipationMode.SIMULATED ? "SIMULATED" : "LIVE");
+                policy.getParticipationMode() == ParticipationMode.SIMULATED
+                        ? PromoExecutionMode.SIMULATED : PromoExecutionMode.LIVE);
         decision.setTargetPromoPrice(product.requiredPrice());
 
         String explanation = buildExplanation(eval, decisionType, policy);

@@ -33,7 +33,7 @@ import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
-import { LucideAngularModule, AlertCircle, CheckCircle2 } from 'lucide-angular';
+import { LucideAngularModule, AlertCircle, AlertTriangle, Eye, CheckCircle2 } from 'lucide-angular';
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 import { formatDateTime } from '@shared/utils/format.utils';
 
@@ -122,6 +122,8 @@ export class AlertEventsPageComponent {
   readonly sortField = signal('openedAt,desc');
 
   readonly alertCircleIcon = AlertCircle;
+  readonly alertTriangleIcon = AlertTriangle;
+  readonly eyeIcon = Eye;
   readonly checkCircleIcon = CheckCircle2;
 
   readonly workspaceId = computed(() => this.wsStore.currentWorkspaceId());

@@ -2,6 +2,7 @@ package io.datapulse.promotions.persistence;
 
 import io.datapulse.promotions.domain.ParticipationMode;
 import io.datapulse.promotions.domain.PromoDecisionType;
+import io.datapulse.promotions.domain.PromoExecutionMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,8 +54,9 @@ public class PromoDecisionEntity {
     @Column(name = "participation_mode", nullable = false, length = 20)
     private ParticipationMode participationMode;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "execution_mode", nullable = false, length = 20)
-    private String executionMode;
+    private PromoExecutionMode executionMode;
 
     @Column(name = "target_promo_price")
     private BigDecimal targetPromoPrice;

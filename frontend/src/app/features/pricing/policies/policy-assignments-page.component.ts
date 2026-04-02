@@ -15,8 +15,16 @@ import {
   QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import {
+  CellClickedEvent,
+  ColDef,
+  GetRowIdParams,
+  ICellRendererParams,
+  ValueGetterParams,
+} from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import {
   AssignmentScopeType,
   CreateAssignmentRequest,
@@ -50,7 +58,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
       <div
-        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3"
+        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2"
       >
         <div class="flex items-center gap-3">
           <button
@@ -63,18 +71,20 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
             {{ 'pricing.assignments.title' | translate }}
           </h2>
         </div>
-        <button
-          (click)="showCreateForm.set(true)"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-        >
-          {{ 'pricing.assignments.add' | translate }}
-        </button>
+        @if (rbac.canWritePolicies()) {
+          <button
+            (click)="showCreateForm.set(true)"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+          >
+            {{ 'pricing.assignments.add' | translate }}
+          </button>
+        }
       </div>
 
       <!-- Create Form Panel -->
       @if (showCreateForm()) {
         <div
-          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-4"
+          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-4"
         >
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
@@ -153,7 +163,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
       }
 
       <!-- Data Grid -->
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (assignmentsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.assignments.error' | translate"
@@ -163,12 +173,12 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
         } @else if (!assignmentsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
             [message]="'pricing.assignments.empty' | translate"
-            [actionLabel]="'pricing.assignments.add' | translate"
+            [actionLabel]="rbac.canWritePolicies() ? ('pricing.assignments.add' | translate) : ''"
             (action)="showCreateForm.set(true)"
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="assignmentsQuery.isPending()"
             [pagination]="false"
@@ -197,6 +207,7 @@ export class PolicyAssignmentsPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
+  protected readonly rbac = inject(RbacService);
 
   readonly policyId = input.required<number>();
 
@@ -215,13 +226,13 @@ export class PolicyAssignmentsPageComponent {
     { value: 'SKU' as const, labelKey: 'pricing.assignments.scope.SKU' },
   ];
 
-  readonly columnDefs = [
+  private readonly baseColumnDefs: ColDef[] = [
     {
       headerName: this.translate.instant('pricing.assignments.col.scope'),
       field: 'scopeType',
       width: 150,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PolicyAssignment>) => {
         const val = params.value as string;
         const label = this.translate.instant(`pricing.assignments.scope.${val}`);
         const color = SCOPE_TYPE_COLOR[val] ?? 'neutral';
@@ -246,9 +257,9 @@ export class PolicyAssignmentsPageComponent {
       minWidth: 250,
       flex: 1,
       sortable: false,
-      valueGetter: (params: any) => {
+      valueGetter: (params: ValueGetterParams<PolicyAssignment>) => {
         if (!params.data) return '';
-        const a = params.data as PolicyAssignment;
+        const a = params.data;
         if (a.scopeType === 'CONNECTION') return '—';
         if (a.scopeType === 'CATEGORY') return a.categoryName ?? '—';
         return a.offerName
@@ -256,26 +267,35 @@ export class PolicyAssignmentsPageComponent {
           : a.sellerSku ?? '—';
       },
     },
-    {
-      headerName: '',
-      field: 'actions',
-      width: 60,
-      sortable: false,
-      suppressMovable: true,
-      cellRenderer: () =>
-        `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">🗑</button>`,
-      onCellClicked: (params: any) => {
-        const target = params.event?.target as HTMLElement;
-        const action = target
-          ?.closest('[data-action]')
-          ?.getAttribute('data-action');
-        if (action === 'delete' && params.data) {
-          this.deleteTarget.set(params.data);
-          this.showDeleteModal.set(true);
-        }
-      },
-    },
   ];
+
+  private readonly deleteColumnDef: ColDef = {
+    headerName: '',
+    field: 'actions',
+    width: 60,
+    sortable: false,
+    suppressMovable: true,
+    cellRenderer: () => {
+      const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+      return `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">${trashIcon}</button>`;
+    },
+    onCellClicked: (event: CellClickedEvent<PolicyAssignment>) => {
+      const target = event.event?.target as HTMLElement;
+      const action = target
+        ?.closest('[data-action]')
+        ?.getAttribute('data-action');
+      if (action === 'delete' && event.data) {
+        this.deleteTarget.set(event.data);
+        this.showDeleteModal.set(true);
+      }
+    },
+  };
+
+  readonly columnDefs = computed(() =>
+    this.rbac.canWritePolicies()
+      ? [...this.baseColumnDefs, this.deleteColumnDef]
+      : this.baseColumnDefs,
+  );
 
   readonly assignmentsQuery = injectQuery(() => ({
     queryKey: [
@@ -334,7 +354,8 @@ export class PolicyAssignmentsPageComponent {
     },
   }));
 
-  readonly getRowId = (params: any) => String(params.data.id);
+  readonly getRowId = (params: GetRowIdParams<PolicyAssignment>) =>
+    String(params.data.id);
 
   isFormValid(): boolean {
     if (this.formConnectionId === null) return false;

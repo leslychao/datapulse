@@ -87,6 +87,7 @@ export interface CreatePolicyRequest {
   minPrice: number | null;
   maxPrice: number | null;
   guardConfig: GuardConfig;
+  confirmFullAuto?: boolean;
 }
 
 export interface UpdatePolicyRequest extends CreatePolicyRequest {}

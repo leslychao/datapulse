@@ -8,6 +8,7 @@ import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionCasRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.platform.observability.MetricsFacade;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +38,7 @@ public class PriceActionExecutor {
     private final ActionService actionService;
     private final ExecutionCredentialResolver credentialResolver;
     private final ExecutionProperties properties;
+    private final MetricsFacade metrics;
     private final Map<ActionExecutionMode, PriceActionGateway> gateways;
 
     public PriceActionExecutor(PriceActionRepository actionRepository,
@@ -45,6 +47,7 @@ public class PriceActionExecutor {
                                ActionService actionService,
                                ExecutionCredentialResolver credentialResolver,
                                ExecutionProperties properties,
+                               MetricsFacade metrics,
                                List<PriceActionGateway> gatewayList) {
         this.actionRepository = actionRepository;
         this.attemptRepository = attemptRepository;
@@ -52,6 +55,7 @@ public class PriceActionExecutor {
         this.actionService = actionService;
         this.credentialResolver = credentialResolver;
         this.properties = properties;
+        this.metrics = metrics;
         this.gateways = gatewayList.stream()
                 .collect(Collectors.toMap(PriceActionGateway::executionMode, Function.identity()));
     }
@@ -160,19 +164,33 @@ public class PriceActionExecutor {
     }
 
     private void handleOutcome(PriceActionEntity action, GatewayResult result, int attemptNumber) {
+        String mode = action.getExecutionMode().name();
+
         if (result.isSuccess()) {
-            actionService.casSucceed(action.getId(), ActionStatus.EXECUTING,
-                    ActionReconciliationSource.AUTO, null);
+            if (action.getExecutionMode() == ActionExecutionMode.SIMULATED) {
+                actionService.casSucceed(action.getId(), ActionStatus.EXECUTING,
+                        ActionReconciliationSource.AUTO, null);
+                metrics.incrementCounter("execution.outcome", "result", "succeeded", "mode", mode);
+            } else {
+                actionService.casReconciliationPending(action.getId());
+                metrics.incrementCounter("execution.outcome",
+                        "result", "reconciliation_pending", "mode", mode, "reason", "confirmed");
+                log.info("Confirmed write, deferred reconciliation: actionId={}, mode={}",
+                        action.getId(), mode);
+            }
             return;
         }
 
         if (result.isUncertain()) {
             actionService.casReconciliationPending(action.getId());
+            metrics.incrementCounter("execution.outcome",
+                    "result", "reconciliation_pending", "mode", mode, "reason", "uncertain");
             return;
         }
 
         if (result.isRetriable() && attemptNumber < properties.getMaxAttempts()) {
             actionService.casScheduleRetry(action.getId(), attemptNumber);
+            metrics.incrementCounter("execution.outcome", "result", "retry_scheduled", "mode", mode);
             return;
         }
 
@@ -180,6 +198,7 @@ public class PriceActionExecutor {
                 attemptNumber,
                 result.errorClassification(),
                 result.errorMessage());
+        metrics.incrementCounter("execution.outcome", "result", "failed", "mode", mode);
     }
 
     private void handleTerminalFailure(PriceActionEntity action,

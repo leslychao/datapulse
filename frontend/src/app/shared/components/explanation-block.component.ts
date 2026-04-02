@@ -1,45 +1,92 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+} from '@angular/core';
 
 export interface ExplanationSection {
-  title: string;
-  entries: { label: string; value: string; highlight?: boolean }[];
+  label: string;
+  content: string;
+}
+
+/**
+ * Parses `explanation_summary`-style text into sections. Headers are lines that
+ * match `^\s*\[([^\]]+)\]\s*$` (a single bracketed label on a line).
+ */
+function parseExplanationSections(raw: string): ExplanationSection[] {
+  const lines = raw.split('\n');
+  const headerRe = /^\s*\[([^\]]+)\]\s*$/;
+  const sections: ExplanationSection[] = [];
+  let currentLabel: string | null = null;
+  const contentLines: string[] = [];
+  const pendingPreamble: string[] = [];
+
+  const flush = (): void => {
+    if (currentLabel === null) {
+      return;
+    }
+    sections.push({
+      label: currentLabel,
+      content: contentLines.join('\n').replace(/\s+$/u, ''),
+    });
+  };
+
+  for (const line of lines) {
+    const hm = line.match(headerRe);
+    if (hm) {
+      flush();
+      currentLabel = hm[1].trim();
+      contentLines.length = 0;
+      if (sections.length === 0 && pendingPreamble.length > 0) {
+        contentLines.push(...pendingPreamble);
+        pendingPreamble.length = 0;
+      }
+    } else if (currentLabel === null) {
+      pendingPreamble.push(line);
+    } else {
+      contentLines.push(line);
+    }
+  }
+  flush();
+
+  return sections.length > 0 ? sections : [];
 }
 
 @Component({
   selector: 'dp-explanation-block',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
   template: `
-    <div class="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4">
-      @if (title()) {
-        <h4 class="text-sm font-semibold text-[var(--text-primary)]">{{ title() | translate }}</h4>
-      }
-      @for (section of sections(); track section.title) {
-        <div class="flex flex-col gap-1">
-          <span class="text-xs font-medium text-[var(--text-secondary)]">{{ section.title | translate }}</span>
-          @for (entry of section.entries; track entry.label) {
-            <div class="flex items-baseline justify-between gap-4 text-sm">
-              <span class="text-[var(--text-secondary)]">{{ entry.label | translate }}</span>
-              <span
-                class="font-mono"
-                [class]="entry.highlight ? 'font-semibold text-[var(--accent-primary)]' : 'text-[var(--text-primary)]'"
-              >{{ entry.value }}</span>
+    <div
+      class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4"
+    >
+      @if (sections().length > 0) {
+        @for (section of sections(); track section.label; let last = $last) {
+          <div
+            [class]="last ? 'py-3' : 'border-b border-[var(--border-subtle)] py-3'"
+            [class.pt-0]="$first"
+          >
+            <h4
+              class="mb-1 text-[length:var(--text-sm)] font-semibold uppercase text-[var(--text-secondary)]"
+            >
+              {{ section.label }}
+            </h4>
+            <div class="whitespace-pre-line text-sm text-[var(--text-primary)]">
+              {{ section.content }}
             </div>
-          }
-        </div>
-      }
-      @if (summary()) {
-        <div class="mt-1 border-t border-[var(--border-subtle)] pt-2 text-sm text-[var(--text-secondary)]">
-          {{ summary() }}
+          </div>
+        }
+      } @else {
+        <div class="whitespace-pre-line text-sm text-[var(--text-primary)]">
+          {{ text() }}
         </div>
       }
     </div>
   `,
 })
 export class ExplanationBlockComponent {
-  readonly title = input('');
-  readonly sections = input<ExplanationSection[]>([]);
-  readonly summary = input('');
+  readonly text = input.required<string>();
+
+  readonly sections = computed(() => parseExplanationSections(this.text()));
 }

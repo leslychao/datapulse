@@ -35,6 +35,7 @@ import io.datapulse.execution.persistence.PriceActionCasRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionQueryRepository;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.execution.persistence.PriceActionStateTransitionRepository;
 import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.platform.security.WorkspaceContext;
@@ -47,6 +48,7 @@ class ActionServiceTest {
   @Mock private PriceActionCasRepository casRepository;
   @Mock private PriceActionAttemptRepository attemptRepository;
   @Mock private PriceActionQueryRepository queryRepository;
+  @Mock private PriceActionStateTransitionRepository stateTransitionRepository;
   @Mock private DeferredActionRepository deferredActionRepository;
   @Mock private OutboxService outboxService;
   @Mock private ExecutionProperties properties;
@@ -488,7 +490,7 @@ class ActionServiceTest {
       var entity = actionEntity(ActionStatus.EXECUTING);
       when(actionRepository.findById(ACTION_ID)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> service.retryFailed(ACTION_ID))
+      assertThatThrownBy(() -> service.retryFailed(ACTION_ID, "test reason"))
           .isInstanceOf(ConflictException.class);
     }
   }

@@ -11,6 +11,8 @@ import {
   BulkApproveRequest,
   BulkRejectRequest,
   Page,
+  ReconcileRequest,
+  SimulationComparison,
 } from '@core/models';
 
 @Injectable({ providedIn: 'root' })

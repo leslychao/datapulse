@@ -7,7 +7,7 @@ import { TranslatePipe } from '@ngx-translate/core';
   imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex items-center justify-between border-t border-[var(--border-default)] px-6 py-2 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+    <div class="flex items-center justify-between border-t border-[var(--border-default)] px-4 py-2 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
       <span>{{ 'pagination.showing' | translate:{ from: from(), to: to(), total: formattedTotal() } }}</span>
 
       <div class="flex items-center gap-2">

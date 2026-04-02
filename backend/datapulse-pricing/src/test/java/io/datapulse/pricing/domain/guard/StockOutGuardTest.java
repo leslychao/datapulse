@@ -112,6 +112,6 @@ class StockOutGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), null, null, stock,
         false, false,
-        null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null);
   }
 }

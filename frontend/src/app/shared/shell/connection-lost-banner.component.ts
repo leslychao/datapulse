@@ -16,7 +16,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
   template: `
     @if (ws.wasConnected() && !ws.connected()) {
       <div
-        class="flex items-center gap-2 bg-[var(--status-warning)] px-6 py-1.5 text-[length:var(--text-sm)] font-medium text-white"
+        class="flex items-center gap-2 bg-[var(--status-warning)] px-4 py-1.5 text-[length:var(--text-sm)] font-medium text-white"
         role="alert"
         aria-live="assertive"
       >

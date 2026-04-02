@@ -40,6 +40,12 @@ public class LivePriceActionGateway implements PriceActionGateway {
 
     @Override
     public GatewayResult execute(PriceActionEntity action, OfferExecutionContext context) {
+        if (action.getExecutionMode() != ActionExecutionMode.LIVE) {
+            throw new IllegalStateException(
+                    "Live gateway received non-LIVE action: actionId=%d, mode=%s"
+                            .formatted(action.getId(), action.getExecutionMode()));
+        }
+
         PriceWriteAdapter adapter = writeAdapters.get(context.marketplaceType());
         if (adapter == null) {
             return GatewayResult.terminal(

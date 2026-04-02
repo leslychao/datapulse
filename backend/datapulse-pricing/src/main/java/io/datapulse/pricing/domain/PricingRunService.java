@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -61,6 +63,8 @@ public class PricingRunService {
     private final PriceDecisionRepository decisionRepository;
     private final PricingRunRepository runRepository;
     private final ObjectMapper objectMapper;
+    private final BlastRadiusBreaker blastRadiusBreaker;
+    private final FullAutoSafetyGate fullAutoSafetyGate;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -134,6 +138,13 @@ public class PricingRunService {
         int holdCount = 0;
         List<PriceDecisionEntity> decisions = new ArrayList<>();
 
+        boolean isFullAuto = isFullAutoRun(eligible);
+        if (isFullAuto) {
+            blastRadiusBreaker.reset();
+        }
+
+        Set<Long> downgradedPolicyIds = checkFullAutoSafety(eligible);
+
         for (EligibleOffer offer : eligible) {
             PricingSignalSet signalSet = signals.get(offer.marketplaceOfferId());
             if (signalSet == null) {
@@ -155,13 +166,63 @@ public class PricingRunService {
                 case SKIP -> skipCount++;
                 case HOLD -> holdCount++;
             }
+
+            if (isFullAuto && decision.getDecisionType() == DecisionType.CHANGE) {
+                blastRadiusBreaker.recordDecision(
+                        decision.getCurrentPrice(), decision.getTargetPrice());
+                if (blastRadiusBreaker.isBreached()) {
+                    String metric = blastRadiusBreaker.breachedMetric();
+                    BigDecimal value = "max_abs_change_pct".equals(metric)
+                            ? blastRadiusBreaker.currentMaxAbsChangePct()
+                            : blastRadiusBreaker.currentRatio();
+                    log.warn("Blast radius breached for run {}: metric={}, value={}",
+                            run.getId(), metric, value);
+                    decisionRepository.saveAll(decisions);
+                    pauseRunForBlastRadius(run, metric, value);
+                    return new RunCounters(changeCount, skipCount, holdCount);
+                }
+            }
         }
 
         decisionRepository.saveAll(decisions);
 
-        scheduleActions(decisions, run.getWorkspaceId());
+        scheduleActions(decisions, run.getWorkspaceId(), downgradedPolicyIds);
 
         return new RunCounters(changeCount, skipCount, holdCount);
+    }
+
+    private Set<Long> checkFullAutoSafety(List<EligibleOffer> eligible) {
+        Set<Long> downgraded = new HashSet<>();
+        Set<Long> checked = new HashSet<>();
+        for (EligibleOffer offer : eligible) {
+            PricePolicyEntity policy = offer.policy();
+            if (policy.getExecutionMode() != ExecutionMode.FULL_AUTO
+                    || !checked.add(policy.getId())) {
+                continue;
+            }
+            List<String> violations = fullAutoSafetyGate.runtimeCheck(policy);
+            if (!violations.isEmpty()) {
+                log.warn("FULL_AUTO runtime check failed for policy {}: {}, "
+                        + "downgrading to SEMI_AUTO for this run",
+                        policy.getId(), violations);
+                downgraded.add(policy.getId());
+            }
+        }
+        return downgraded;
+    }
+
+    private boolean isFullAutoRun(List<EligibleOffer> eligible) {
+        return eligible.stream()
+                .anyMatch(o -> o.policy().getExecutionMode() == ExecutionMode.FULL_AUTO);
+    }
+
+    private void pauseRunForBlastRadius(PricingRunEntity run, String metric, BigDecimal value) {
+        run.setStatus(RunStatus.PAUSED);
+        run.setErrorDetails(serializeJson(Map.of(
+                "reason", MessageCodes.PRICING_RUN_BLAST_RADIUS_BREACHED,
+                "metric", metric,
+                "value", value.toPlainString())));
+        runRepository.save(run);
     }
 
     private PriceDecisionEntity processSingleOffer(PricingRunEntity run, EligibleOffer offer,
@@ -236,7 +297,8 @@ public class PricingRunService {
         return eligible;
     }
 
-    private void scheduleActions(List<PriceDecisionEntity> decisions, long workspaceId) {
+    private void scheduleActions(List<PriceDecisionEntity> decisions, long workspaceId,
+                                  Set<Long> downgradedPolicyIds) {
         for (PriceDecisionEntity decision : decisions) {
             if (decision.getDecisionType() != DecisionType.CHANGE) {
                 continue;
@@ -248,6 +310,11 @@ public class PricingRunService {
 
             if (mode == ExecutionMode.RECOMMENDATION) {
                 continue;
+            }
+
+            if (mode == ExecutionMode.FULL_AUTO
+                    && downgradedPolicyIds.contains(decision.getPricePolicyId())) {
+                mode = ExecutionMode.SEMI_AUTO;
             }
 
             actionScheduler.scheduleAction(

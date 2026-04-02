@@ -56,9 +56,19 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
       </div>
 
       <div class="flex-1 overflow-y-auto px-3 py-2.5">
-        <span class="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-          {{ 'queues.sidebar.custom' | translate }}
-        </span>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+            {{ 'queues.sidebar.custom' | translate }}
+          </span>
+          <button
+            type="button"
+            class="flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)]"
+            [attr.aria-label]="'queues.sidebar.new_queue' | translate"
+            (click)="builderOpen.set(true)"
+          >
+            <lucide-icon [img]="plusIcon" [size]="14" />
+          </button>
+        </div>
         <ul class="mt-2 space-y-0.5">
           @for (q of customQueues(); track q.queueId) {
             <li>
@@ -83,17 +93,6 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
             </li>
           }
         </ul>
-      </div>
-
-      <div class="border-t border-[var(--border-default)] p-2">
-        <button
-          type="button"
-          class="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)]"
-          (click)="builderOpen.set(true)"
-        >
-          <lucide-icon [img]="plusIcon" [size]="16" />
-          {{ 'queues.sidebar.new_queue' | translate }}
-        </button>
       </div>
 
       <dp-queue-builder-modal

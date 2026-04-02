@@ -1,5 +1,4 @@
 import { MarketplaceType } from './connection.model';
-import { Page } from './connection.model';
 import { EvaluationResult } from './offer.model';
 
 export type CampaignStatus = 'UPCOMING' | 'ACTIVE' | 'FROZEN' | 'ENDED' | 'CANCELLED';
@@ -10,7 +9,7 @@ export type ParticipationStatus =
   | 'REMOVED'
   | 'BANNED'
   | 'AUTO_DECLINED';
-export type PromoDecisionType = 'PARTICIPATE' | 'DECLINE' | 'PENDING_REVIEW';
+export type PromoDecisionType = 'PARTICIPATE' | 'DECLINE' | 'DEACTIVATE' | 'PENDING_REVIEW';
 export type PromoActionStatus =
   | 'PENDING_APPROVAL'
   | 'APPROVED'

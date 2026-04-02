@@ -92,3 +92,38 @@ export interface BulkRejectRequest {
   actionIds: number[];
   cancelReason?: string;
 }
+
+export interface ReconcileRequest {
+  outcome: 'SUCCEEDED' | 'FAILED';
+  manualOverrideReason: string;
+}
+
+export interface SimulationComparison {
+  simulatedActionsCount: number;
+  averagePriceDeltaPct: number;
+  directionDistribution: {
+    up: number;
+    down: number;
+    unchanged: number;
+  };
+  coveragePct: number;
+  totalOffers: number;
+  coveredOffers: number;
+  estimatedMarginImpact: number;
+  perConnectionBreakdown: SimulationConnectionBreakdown[];
+  deltaDistribution: DeltaBucket[];
+}
+
+export interface SimulationConnectionBreakdown {
+  connectionId: number;
+  connectionName: string;
+  marketplace: string;
+  simulatedCount: number;
+  avgDeltaPct: number;
+  marginImpact: number;
+}
+
+export interface DeltaBucket {
+  bucket: string;
+  count: number;
+}

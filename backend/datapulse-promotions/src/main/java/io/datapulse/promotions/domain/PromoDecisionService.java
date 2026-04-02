@@ -91,7 +91,7 @@ public class PromoDecisionService {
         decision.setPolicySnapshot(serializeJson(snapshot));
         decision.setDecisionType(PromoDecisionType.PARTICIPATE);
         decision.setParticipationMode(ParticipationMode.RECOMMENDATION);
-        decision.setExecutionMode("LIVE");
+        decision.setExecutionMode(PromoExecutionMode.LIVE);
         decision.setTargetPromoPrice(targetPromoPrice != null ? targetPromoPrice : info.requiredPrice());
         decision.setDecidedBy(userId);
         decision.setExplanationSummary("Manual participate by user " + userId);
@@ -137,7 +137,7 @@ public class PromoDecisionService {
         decision.setPolicySnapshot(serializeJson(snapshot));
         decision.setDecisionType(PromoDecisionType.DECLINE);
         decision.setParticipationMode(ParticipationMode.RECOMMENDATION);
-        decision.setExecutionMode("LIVE");
+        decision.setExecutionMode(PromoExecutionMode.LIVE);
         decision.setDecidedBy(userId);
         decision.setExplanationSummary(reason != null ? reason : "Manual decline by user " + userId);
         decisionRepository.save(decision);
@@ -172,7 +172,7 @@ public class PromoDecisionService {
         decision.setPolicySnapshot(serializeJson(snapshot));
         decision.setDecisionType(PromoDecisionType.DEACTIVATE);
         decision.setParticipationMode(ParticipationMode.RECOMMENDATION);
-        decision.setExecutionMode("LIVE");
+        decision.setExecutionMode(PromoExecutionMode.LIVE);
         decision.setDecidedBy(userId);
         decision.setExplanationSummary(reason != null ? reason : "Manual deactivate by user " + userId);
         decisionRepository.save(decision);

@@ -81,6 +81,14 @@ public class CostProfileController {
             .body(csv);
     }
 
+    @PostMapping("/bulk-update")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    public BulkUpdateCostProfileResponse bulkUpdate(
+            @Valid @RequestBody BulkUpdateCostProfileRequest request) {
+        return costProfileService.bulkUpdate(
+                request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    }
+
     @GetMapping("/{sellerSkuId}/history")
     @PreAuthorize("isAuthenticated()")
     public List<CostProfileResponse> getHistory(@PathVariable("sellerSkuId") Long sellerSkuId) {

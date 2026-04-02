@@ -10,6 +10,11 @@ import io.datapulse.promotions.api.BulkPromoActionRequest;
 import io.datapulse.promotions.api.BulkPromoActionResponse;
 import io.datapulse.promotions.api.PromoActionMapper;
 import io.datapulse.promotions.api.PromoActionResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.datapulse.promotions.adapter.ozon.OzonPromoWriteAdapter;
+import io.datapulse.promotions.adapter.simulated.SimulatedPromoWriteAdapter;
+import io.datapulse.promotions.persistence.PromoActionAttemptEntity;
+import io.datapulse.promotions.persistence.PromoActionAttemptRepository;
 import io.datapulse.promotions.persistence.PromoActionEntity;
 import io.datapulse.promotions.persistence.PromoActionQueryRepository;
 import io.datapulse.promotions.persistence.PromoActionRepository;
@@ -18,11 +23,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -36,12 +45,258 @@ public class PromoActionService {
     private final PromoActionMapper actionMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final WorkspaceContext workspaceContext;
+    private final PromoActionAttemptRepository attemptRepository;
+    private final OzonPromoWriteAdapter ozonAdapter;
+    private final SimulatedPromoWriteAdapter simulatedAdapter;
+    private final PromoCredentialResolver credentialResolver;
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
-    // TODO: implement promo action execution (marketplace API call, status transitions, retry)
+    private static final int MAX_ATTEMPTS = 2;
+
     @Transactional
     public void executeAction(long actionId) {
-        throw new UnsupportedOperationException("PromoActionService.executeAction not implemented yet");
+        PromoActionEntity action = actionRepository.findById(actionId)
+                .orElseThrow(() -> new IllegalStateException("PromoAction not found: " + actionId));
+
+        if (action.getExecutionMode() == PromoExecutionMode.SIMULATED) {
+            executeSimulated(action);
+            return;
+        }
+
+        int updated = actionRepository.casUpdateStatus(
+                actionId, PromoActionStatus.APPROVED, PromoActionStatus.EXECUTING);
+        if (updated == 0) {
+            log.warn("PromoAction {} is not APPROVED (CAS failed), skipping execution", actionId);
+            return;
+        }
+        action.setStatus(PromoActionStatus.EXECUTING);
+
+        ActionContext ctx = loadActionContext(action);
+        if (ctx == null) {
+            failAction(action, "Failed to load action context (campaign/offer not found)");
+            return;
+        }
+
+        executeWithRetry(action, ctx);
     }
+
+    private void executeSimulated(PromoActionEntity action) {
+        int updated = actionRepository.casUpdateStatus(
+                action.getId(), PromoActionStatus.APPROVED, PromoActionStatus.EXECUTING);
+        if (updated == 0) {
+            log.warn("Simulated PromoAction {} is not APPROVED, skipping", action.getId());
+            return;
+        }
+
+        OzonPromoWriteAdapter.PromoWriteResult result;
+        if (action.getActionType() == PromoActionType.ACTIVATE) {
+            result = simulatedAdapter.simulateActivate(0L,
+                    List.of(new OzonPromoWriteAdapter.ActivateProductRequest(
+                            0L, action.getTargetPromoPrice(), null)));
+        } else {
+            result = simulatedAdapter.simulateDeactivate(0L, List.of(0L));
+        }
+
+        recordAttempt(action, 1, PromoAttemptOutcome.SUCCESS, null,
+                "{\"simulated\":true}", result.rawResponse());
+        succeedAction(action);
+        log.info("Simulated promo action completed: actionId={}, type={}",
+                action.getId(), action.getActionType());
+    }
+
+    private void executeWithRetry(PromoActionEntity action, ActionContext ctx) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            action.setAttemptCount(attempt);
+            actionRepository.save(action);
+
+            try {
+                OzonPromoWriteAdapter.PromoWriteResult result = callProvider(action, ctx);
+                boolean accepted = result.isAccepted(ctx.externalProductId());
+
+                if (accepted) {
+                    recordAttempt(action, attempt, PromoAttemptOutcome.SUCCESS, null,
+                            buildRequestSummary(action, ctx), result.rawResponse());
+                    succeedAction(action);
+                    updateCanonicalStatus(action);
+                    return;
+                }
+
+                String rejectReason = result.rejected().stream()
+                        .filter(r -> r.productId() == ctx.externalProductId())
+                        .map(OzonPromoWriteAdapter.PromoWriteResult.RejectedProduct::reason)
+                        .findFirst()
+                        .orElse("Unknown rejection reason");
+
+                recordAttempt(action, attempt, PromoAttemptOutcome.NON_RETRIABLE_FAILURE,
+                        rejectReason, buildRequestSummary(action, ctx), result.rawResponse());
+                failAction(action, rejectReason);
+                return;
+
+            } catch (Exception e) {
+                boolean retriable = isRetriable(e);
+                recordAttempt(action, attempt,
+                        retriable ? PromoAttemptOutcome.RETRIABLE_FAILURE
+                                : PromoAttemptOutcome.NON_RETRIABLE_FAILURE,
+                        e.getMessage(), buildRequestSummary(action, ctx), null);
+
+                if (!retriable || attempt >= MAX_ATTEMPTS) {
+                    failAction(action, e.getMessage());
+                    return;
+                }
+
+                sleep(2000L * attempt);
+            }
+        }
+    }
+
+    private OzonPromoWriteAdapter.PromoWriteResult callProvider(PromoActionEntity action,
+                                                                 ActionContext ctx) {
+        if (action.getActionType() == PromoActionType.ACTIVATE) {
+            return ozonAdapter.activateProducts(ctx.clientId(), ctx.apiKey(),
+                    ctx.externalActionId(),
+                    List.of(new OzonPromoWriteAdapter.ActivateProductRequest(
+                            ctx.externalProductId(), action.getTargetPromoPrice(), null)));
+        } else {
+            return ozonAdapter.deactivateProducts(ctx.clientId(), ctx.apiKey(),
+                    ctx.externalActionId(),
+                    List.of(ctx.externalProductId()));
+        }
+    }
+
+    private void succeedAction(PromoActionEntity action) {
+        actionRepository.casUpdateStatus(
+                action.getId(), PromoActionStatus.EXECUTING, PromoActionStatus.SUCCEEDED);
+        log.info("Promo action succeeded: actionId={}, type={}", action.getId(), action.getActionType());
+    }
+
+    private void failAction(PromoActionEntity action, String error) {
+        action.setLastError(error);
+        action.setStatus(PromoActionStatus.FAILED);
+        actionRepository.save(action);
+        log.warn("Promo action failed: actionId={}, error={}", action.getId(), error);
+    }
+
+    private void updateCanonicalStatus(PromoActionEntity action) {
+        String newStatus = action.getActionType() == PromoActionType.ACTIVATE
+                ? "PARTICIPATING" : "REMOVED";
+        String expectedStatus = action.getActionType() == PromoActionType.ACTIVATE
+                ? "ELIGIBLE" : "PARTICIPATING";
+        String source = "AUTO";
+
+        var params = new MapSqlParameterSource()
+                .addValue("offerId", action.getMarketplaceOfferId())
+                .addValue("campaignId", action.getCanonicalPromoCampaignId())
+                .addValue("newStatus", newStatus)
+                .addValue("expectedStatus", expectedStatus)
+                .addValue("source", source);
+
+        int updated = jdbcTemplate.update("""
+                UPDATE canonical_promo_product
+                SET participation_status = :newStatus,
+                    participation_decision_source = :source,
+                    updated_at = NOW()
+                WHERE marketplace_offer_id = :offerId
+                  AND canonical_promo_campaign_id = :campaignId
+                  AND participation_status = :expectedStatus
+                """, params);
+
+        if (updated == 0) {
+            log.warn("CAS conflict updating canonical_promo_product after action: actionId={}",
+                    action.getId());
+        }
+    }
+
+    private void recordAttempt(PromoActionEntity action, int attemptNumber,
+                                PromoAttemptOutcome outcome, String errorMessage,
+                                String requestSummary, String responseSummary) {
+        var attempt = new PromoActionAttemptEntity();
+        attempt.setPromoActionId(action.getId());
+        attempt.setAttemptNumber(attemptNumber);
+        attempt.setStartedAt(OffsetDateTime.now());
+        attempt.setCompletedAt(OffsetDateTime.now());
+        attempt.setOutcome(outcome);
+        attempt.setErrorMessage(errorMessage);
+        attempt.setProviderRequestSummary(requestSummary);
+        attempt.setProviderResponseSummary(responseSummary);
+        attemptRepository.save(attempt);
+    }
+
+    private ActionContext loadActionContext(PromoActionEntity action) {
+        var params = new MapSqlParameterSource()
+                .addValue("campaignId", action.getCanonicalPromoCampaignId())
+                .addValue("offerId", action.getMarketplaceOfferId());
+
+        try {
+            CampaignOfferRow row = jdbcTemplate.query("""
+                    SELECT cpc.external_promo_id, cpc.connection_id,
+                           mo.marketplace_sku
+                    FROM canonical_promo_campaign cpc
+                    JOIN canonical_promo_product cpp
+                        ON cpp.canonical_promo_campaign_id = cpc.id
+                        AND cpp.marketplace_offer_id = :offerId
+                    JOIN marketplace_offer mo ON mo.id = :offerId
+                    WHERE cpc.id = :campaignId
+                    """, params, rs -> {
+                if (!rs.next()) return null;
+                return new CampaignOfferRow(
+                        Long.parseLong(rs.getString("external_promo_id")),
+                        Long.parseLong(rs.getString("marketplace_sku")),
+                        rs.getLong("connection_id"));
+            });
+
+            if (row == null) {
+                return null;
+            }
+
+            var creds = credentialResolver.resolve(row.connectionId());
+
+            return new ActionContext(
+                    row.externalPromoId(),
+                    row.externalProductId(),
+                    row.connectionId(),
+                    creds.ozonClientId(),
+                    creds.ozonApiKey());
+        } catch (Exception e) {
+            log.error("Failed to load action context: actionId={}, error={}",
+                    action.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private record CampaignOfferRow(long externalPromoId, long externalProductId,
+                                     long connectionId) {}
+
+    private String buildRequestSummary(PromoActionEntity action, ActionContext ctx) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "action_type", action.getActionType().name(),
+                    "external_action_id", ctx.externalActionId(),
+                    "external_product_id", ctx.externalProductId(),
+                    "target_promo_price", action.getTargetPromoPrice() != null
+                            ? action.getTargetPromoPrice().toString() : "null"));
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private boolean isRetriable(Exception e) {
+        String msg = e.getMessage();
+        if (msg == null) return false;
+        return msg.contains("429") || msg.contains("503") || msg.contains("timeout")
+                || msg.contains("connect");
+    }
+
+    private void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private record ActionContext(long externalActionId, long externalProductId,
+                                  long connectionId, String clientId, String apiKey) {}
 
     @Transactional(readOnly = true)
     public Page<PromoActionResponse> listActions(long workspaceId, Long campaignId,

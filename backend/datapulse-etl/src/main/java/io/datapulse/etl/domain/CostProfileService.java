@@ -17,6 +17,8 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.etl.api.BulkImportResponse;
 import io.datapulse.etl.api.BulkImportResponse.BulkImportError;
+import io.datapulse.etl.api.BulkUpdateCostProfileRequest;
+import io.datapulse.etl.api.BulkUpdateCostProfileResponse;
 import io.datapulse.etl.api.CostProfileFilter;
 import io.datapulse.etl.api.CostProfileResponse;
 import io.datapulse.etl.api.CreateCostProfileRequest;
@@ -134,6 +136,43 @@ public class CostProfileService {
                 imported, skipped, errors.size(), userId);
 
         return new BulkImportResponse(imported, skipped, errors);
+    }
+
+    @Transactional
+    public BulkUpdateCostProfileResponse bulkUpdate(BulkUpdateCostProfileRequest request,
+                                                     long workspaceId, long userId) {
+        int updated = 0;
+        int created = 0;
+        int errorCount = 0;
+
+        for (BulkUpdateCostProfileRequest.Item item : request.items()) {
+            try {
+                Optional<Long> existingId = costProfileRepository
+                        .findCurrentProfileId(item.sellerSkuId(), workspaceId);
+
+                if (existingId.isPresent()) {
+                    costProfileRepository.updateProfile(existingId.get(),
+                            item.costPrice(), item.currency(), item.validFrom(), userId);
+                    updated++;
+                } else {
+                    var entity = new CostProfileEntity();
+                    entity.setSellerSkuId(item.sellerSkuId());
+                    entity.setCostPrice(item.costPrice());
+                    entity.setCurrency(item.currency());
+                    entity.setValidFrom(item.validFrom());
+                    entity.setUpdatedByUserId(userId);
+                    costProfileRepository.createVersion(entity);
+                    created++;
+                }
+            } catch (Exception e) {
+                log.warn("Bulk update failed for sellerSkuId={}: {}", item.sellerSkuId(), e.getMessage());
+                errorCount++;
+            }
+        }
+
+        log.info("Bulk cost profile update completed: updated={}, created={}, errors={}, userId={}",
+                updated, created, errorCount, userId);
+        return new BulkUpdateCostProfileResponse(updated, created, errorCount);
     }
 
     @Transactional

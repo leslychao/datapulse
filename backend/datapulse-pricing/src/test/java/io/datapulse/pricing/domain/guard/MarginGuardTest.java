@@ -41,7 +41,7 @@ class MarginGuardTest {
       GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
 
       assertThat(result.passed()).isFalse();
-      assertThat(result.reason()).isEqualTo("pricing.guard.margin_negative");
+      assertThat(result.reason()).isEqualTo("pricing.guard.margin_below_threshold");
       assertThat(result.args()).containsKey("marginPct");
       assertThat(result.args()).containsKey("targetPrice");
       assertThat(result.args()).containsKey("cogs");
@@ -164,6 +164,6 @@ class MarginGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), cogs, null, null,
         false, false,
-        null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null);
   }
 }

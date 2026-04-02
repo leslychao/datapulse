@@ -34,6 +34,12 @@ public class SimulatedPriceActionGateway implements PriceActionGateway {
 
     @Override
     public GatewayResult execute(PriceActionEntity action, OfferExecutionContext context) {
+        if (action.getExecutionMode() != ActionExecutionMode.SIMULATED) {
+            throw new IllegalStateException(
+                    "Simulated gateway received non-SIMULATED action: actionId=%d, mode=%s"
+                            .formatted(action.getId(), action.getExecutionMode()));
+        }
+
         BigDecimal targetPrice = action.getTargetPrice();
         BigDecimal canonicalPrice = action.getCurrentPriceAtCreation();
 

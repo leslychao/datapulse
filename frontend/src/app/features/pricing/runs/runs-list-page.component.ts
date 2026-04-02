@@ -14,8 +14,15 @@ import {
   QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import {
+  ColDef,
+  GetRowIdParams,
+  ICellRendererParams,
+  ValueFormatterParams,
+} from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { formatRelativeTime } from '@shared/utils/format.utils';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import {
@@ -59,20 +66,22 @@ const TRIGGER_COLOR: Record<string, string> = {
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <h2 class="text-sm font-semibold text-[var(--text-primary)]">
           {{ 'pricing.runs.title' | translate }}
         </h2>
-        <button
-          (click)="showTriggerModal.set(true)"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-        >
-          {{ 'pricing.runs.trigger_run' | translate }}
-        </button>
+        @if (rbac.canWritePolicies()) {
+          <button
+            (click)="showTriggerModal.set(true)"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+          >
+            {{ 'pricing.runs.trigger_run' | translate }}
+          </button>
+        }
       </div>
 
       <!-- Filter Bar -->
-      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+      <div class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -81,7 +90,7 @@ const TRIGGER_COLOR: Record<string, string> = {
       </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (runsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.runs.error' | translate"
@@ -178,6 +187,7 @@ export class RunsListPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
+  protected readonly rbac = inject(RbacService);
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly showTriggerModal = signal(false);
@@ -211,7 +221,7 @@ export class RunsListPageComponent {
     },
   ];
 
-  readonly columnDefs = [
+  readonly columnDefs: ColDef[] = [
     {
       headerName: '#',
       field: 'id',
@@ -224,7 +234,7 @@ export class RunsListPageComponent {
       field: 'triggerType',
       width: 130,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingRunSummary>) => {
         const t = params.value as string;
         const label = this.translate.instant(`pricing.runs.trigger.${t}`);
         const color = TRIGGER_COLOR[t] ?? 'var(--text-secondary)';
@@ -246,7 +256,7 @@ export class RunsListPageComponent {
       field: 'status',
       width: 140,
       sortable: true,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<PricingRunSummary>) => {
         const st = params.value as string;
         const label = this.translate.instant(`pricing.runs.status.${st}`);
         const color = RUN_STATUS_COLOR[st] ?? 'neutral';
@@ -305,7 +315,7 @@ export class RunsListPageComponent {
       width: 110,
       sortable: false,
       cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => {
+      valueFormatter: (params: ValueFormatterParams<PricingRunSummary>) => {
         if (!params.data) return '';
         return this.formatDuration(params.data.startedAt, params.data.completedAt);
       },
@@ -316,7 +326,8 @@ export class RunsListPageComponent {
       width: 120,
       sortable: true,
       sort: 'desc' as const,
-      valueFormatter: (params: any) => this.formatRelativeTime(params.value),
+      valueFormatter: (params: ValueFormatterParams<PricingRunSummary>) =>
+        this.formatRelativeTime(params.value),
     },
   ];
 
@@ -366,7 +377,8 @@ export class RunsListPageComponent {
     ),
   );
 
-  readonly getRowId = (params: any) => String(params.data.id);
+  readonly getRowId = (params: GetRowIdParams<PricingRunSummary>) =>
+    String(params.data.id);
 
   readonly triggerMutation = injectMutation(() => ({
     mutationFn: (connectionId: number) =>

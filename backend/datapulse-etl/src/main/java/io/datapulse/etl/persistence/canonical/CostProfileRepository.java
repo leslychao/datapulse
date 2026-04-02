@@ -143,6 +143,23 @@ public class CostProfileRepository {
         jdbc.update(DELETE_BY_ID, Map.of("id", id));
     }
 
+    private static final String FIND_CURRENT_PROFILE_ID = """
+            SELECT cp.id
+            FROM cost_profile cp
+            JOIN seller_sku ss ON ss.id = cp.seller_sku_id
+            WHERE cp.seller_sku_id = :sellerSkuId
+              AND ss.workspace_id = :workspaceId
+              AND cp.valid_to IS NULL
+            LIMIT 1
+            """;
+
+    public Optional<Long> findCurrentProfileId(long sellerSkuId, long workspaceId) {
+        var rows = jdbc.queryForList(FIND_CURRENT_PROFILE_ID,
+                Map.of("sellerSkuId", sellerSkuId, "workspaceId", workspaceId),
+                Long.class);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
     public List<CostProfileEntity> findCurrentBySku(long sellerSkuId) {
         return jdbc.query(FIND_CURRENT_BY_SKU, Map.of("sellerSkuId", sellerSkuId), this::mapEntity);
     }

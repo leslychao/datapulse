@@ -16,7 +16,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, LucideAngularModule, ConfirmationModalComponent],
   template: `
-    <div class="flex items-center gap-4 border-b border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] px-6 py-2.5">
+    <div class="flex items-center gap-4 border-b border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] px-4 py-2.5">
       <div class="flex items-center gap-2">
         <lucide-icon [img]="pencilIcon" [size]="14" class="text-[var(--accent-primary)]" />
         <span class="text-[length:var(--text-sm)] font-semibold text-[var(--text-primary)]">

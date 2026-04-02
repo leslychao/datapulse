@@ -14,6 +14,8 @@ import {
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
+import { ClipboardList, Clock, Play, XCircle } from 'lucide-angular';
+
 import { ActionApiService } from '@core/api/action-api.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { ActionFilter, ActionSummary } from '@core/models';
@@ -63,31 +65,39 @@ const ACTION_STATUSES = [
   template: `
     <div class="flex h-full flex-col">
       <!-- KPI Strip -->
-      <div class="flex gap-3 bg-[var(--bg-secondary)] px-6 py-3">
+      <div class="flex flex-wrap gap-3 px-4 pt-3">
         <dp-kpi-card
           [label]="'execution.kpi.total' | translate"
           [value]="kpiTotal()"
+          [icon]="ClipboardListIcon"
+          accent="primary"
           [loading]="actionsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'execution.kpi.pending' | translate"
           [value]="kpiPending()"
+          [icon]="ClockIcon"
+          accent="warning"
           [loading]="actionsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'execution.kpi.executing' | translate"
           [value]="kpiExecuting()"
+          [icon]="PlayIcon"
+          accent="info"
           [loading]="actionsQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'execution.kpi.failed' | translate"
           [value]="kpiFailed()"
+          [icon]="XCircleIcon"
+          accent="error"
           [loading]="actionsQuery.isPending()"
         />
       </div>
 
       <!-- Filter Bar -->
-      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+      <div class="px-4 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -96,7 +106,7 @@ const ACTION_STATUSES = [
       </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (actionsQuery.isError()) {
           <dp-empty-state
             [message]="'execution.list.error' | translate"
@@ -128,7 +138,7 @@ const ACTION_STATUSES = [
       <!-- Bulk Action Bar -->
       @if (selectedRows().length > 0) {
         <div
-          class="flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5"
+          class="flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
           aria-live="polite"
         >
           <span class="text-sm text-[var(--text-secondary)]">
@@ -168,6 +178,11 @@ export class ActionsListPageComponent {
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
+
+  protected readonly ClipboardListIcon = ClipboardList;
+  protected readonly ClockIcon = Clock;
+  protected readonly PlayIcon = Play;
+  protected readonly XCircleIcon = XCircle;
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly selectedRows = signal<ActionSummary[]>([]);

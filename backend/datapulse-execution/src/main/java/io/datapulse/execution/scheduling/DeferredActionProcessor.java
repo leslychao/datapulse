@@ -4,8 +4,10 @@ import io.datapulse.execution.domain.ActionExecutionMode;
 import io.datapulse.execution.domain.ActionService;
 import io.datapulse.execution.persistence.DeferredActionEntity;
 import io.datapulse.execution.persistence.DeferredActionRepository;
+import io.datapulse.execution.config.ExecutionProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,6 +26,7 @@ public class DeferredActionProcessor {
 
     private final DeferredActionRepository deferredActionRepository;
     private final ActionService actionService;
+    private final ExecutionProperties properties;
     private final NamedParameterJdbcTemplate jdbc;
 
     private static final String DECISION_PRICES_SQL = """
@@ -33,6 +36,7 @@ public class DeferredActionProcessor {
             """;
 
     @Scheduled(fixedDelayString = "PT30S")
+    @SchedulerLock(name = "execution_deferredActionProcessor", lockAtMostFor = "PT5M")
     @Transactional
     public void processDeferred() {
         cleanupExpired();
@@ -82,7 +86,7 @@ public class DeferredActionProcessor {
                 deferred.getExecutionMode(),
                 targetPrice,
                 currentPrice,
-                24,
+                properties.getApprovalTimeoutHours(),
                 autoApprove
         );
     }

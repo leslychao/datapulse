@@ -30,6 +30,18 @@ public interface PriceActionRepository extends JpaRepository<PriceActionEntity, 
 
     @Query(value = """
             SELECT * FROM price_action
+            WHERE marketplace_offer_id = :offerId
+              AND execution_mode = :mode
+              AND status NOT IN ('SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED', 'SUPERSEDED')
+            FOR UPDATE
+            """, nativeQuery = true)
+    Optional<PriceActionEntity> findActiveByOfferAndModeForUpdate(
+            @Param("offerId") long offerId,
+            @Param("mode") String mode
+    );
+
+    @Query(value = """
+            SELECT * FROM price_action
             WHERE status = :status
               AND updated_at < CURRENT_TIMESTAMP - CAST(:minutesAgo || ' minutes' AS INTERVAL)
             """, nativeQuery = true)

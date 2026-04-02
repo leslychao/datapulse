@@ -1,6 +1,6 @@
 <div class="flex h-full flex-col">
   <!-- Header -->
-  <div class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
+  <div class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
     <div class="flex items-center gap-2">
       <button
         (click)="navigateBack()"
@@ -49,36 +49,48 @@
 
   <!-- KPI -->
   @if (campaign(); as c) {
-    <div class="flex gap-3 px-6 pt-4">
+    <div class="flex flex-wrap gap-3 px-4 pt-3">
       <dp-kpi-card
         [label]="'promo.detail.kpi.eligible' | translate"
         [value]="c.eligibleCount"
+        [icon]="UsersIcon"
+        accent="primary"
         [loading]="campaignQuery.isPending()"
       />
       <dp-kpi-card
         [label]="'promo.detail.kpi.participating' | translate"
         [value]="c.participatedCount"
+        [icon]="CheckCircleIcon"
+        accent="success"
         [loading]="campaignQuery.isPending()"
       />
       <dp-kpi-card
         [label]="'promo.detail.kpi.declined' | translate"
         [value]="c.declinedCount"
+        [icon]="XCircleIcon"
+        accent="neutral"
         [loading]="campaignQuery.isPending()"
       />
       <dp-kpi-card
         [label]="'promo.detail.kpi.pending_review' | translate"
         [value]="c.pendingReviewCount"
+        [icon]="ClockIcon"
+        accent="warning"
         [loading]="campaignQuery.isPending()"
       />
       <dp-kpi-card
         [label]="'promo.detail.kpi.succeeded_actions' | translate"
         [value]="c.succeededActionsCount"
+        [icon]="CheckCheckIcon"
+        accent="success"
         [loading]="campaignQuery.isPending()"
       />
       @if (c.failedActionsCount > 0) {
         <dp-kpi-card
           [label]="'promo.detail.kpi.failed_actions' | translate"
           [value]="c.failedActionsCount"
+          [icon]="AlertTriangleIcon"
+          accent="error"
           [loading]="campaignQuery.isPending()"
         />
       }
@@ -86,7 +98,7 @@
   }
 
   <!-- Filters -->
-  <div class="px-6 pt-3">
+  <div class="px-6 pt-2">
     <dp-filter-bar
       [filters]="filterConfigs"
       [values]="filterValues()"
@@ -95,7 +107,7 @@
   </div>
 
   <!-- Grid -->
-  <div class="flex-1 px-6 py-3">
+  <div class="flex-1 px-4 py-2">
     @if (productsQuery.isError()) {
       <dp-empty-state
         [message]="'promo.detail.products_error' | translate"

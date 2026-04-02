@@ -1,0 +1,311 @@
+<div class="flex h-full flex-col">
+  <!-- Toolbar -->
+  <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
+    <div class="flex items-center gap-4">
+      <h2 class="text-sm font-semibold text-[var(--text-primary)]">
+        {{ 'pricing.policies.title' | translate }}
+      </h2>
+      @if (statusSummary().length) {
+        <div class="flex items-center gap-3">
+          @for (s of statusSummary(); track s.status) {
+            <span class="flex items-center gap-1.5 text-[11px] text-[var(--text-tertiary)]">
+              <span class="inline-block h-1.5 w-1.5 rounded-full" [style.background-color]="s.color"></span>
+              {{ s.count }} {{ s.label | lowercase }}
+            </span>
+          }
+        </div>
+      }
+    </div>
+    @if (rbac.canWritePolicies()) {
+      <button
+        (click)="navigateToCreate()"
+        class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+      >
+        {{ 'pricing.policies.create' | translate }}
+      </button>
+    }
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="border-b border-[var(--border-default)] px-4 py-2">
+    <dp-filter-bar
+      [filters]="filterConfigs"
+      [values]="filterValues()"
+      (filtersChanged)="onFiltersChanged($event)"
+    />
+  </div>
+
+  <!-- Content -->
+  <div class="flex-1 overflow-y-auto">
+    @if (policiesQuery.isError()) {
+      <div class="p-6">
+        <dp-empty-state
+          [message]="'pricing.policies.error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="policiesQuery.refetch()"
+        />
+      </div>
+    } @else if (policiesQuery.isPending()) {
+      <!-- Skeleton -->
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
+            <th class="py-2 pl-5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.name' | translate }}
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.status' | translate }}
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.strategy_type' | translate }}
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.execution_mode' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.priority' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.assignments_count' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.version' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.updated_at' | translate }}
+            </th>
+            <th class="w-[100px] py-2 pl-3 pr-4"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (i of [1,2,3,4]; track i) {
+            <tr class="border-b border-[var(--border-subtle)]">
+              <td class="py-3 pl-5 pr-3"><div class="h-4 w-36 rounded dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="h-5 w-20 rounded-full dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="h-5 w-24 rounded-full dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="h-5 w-24 rounded-full dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="ml-auto h-4 w-6 rounded dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="ml-auto h-4 w-6 rounded dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="ml-auto h-4 w-8 rounded dp-shimmer"></div></td>
+              <td class="px-3 py-3"><div class="ml-auto h-4 w-16 rounded dp-shimmer"></div></td>
+              <td class="py-3 pl-3 pr-4"></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    } @else if (rows().length === 0) {
+      <div class="p-6">
+        <dp-empty-state
+          [message]="hasActiveFilters()
+            ? ('pricing.policies.empty_filtered' | translate)
+            : ('pricing.policies.empty' | translate)"
+          [actionLabel]="hasActiveFilters()
+            ? ('filter_bar.reset_all' | translate)
+            : (rbac.canWritePolicies()
+              ? ('pricing.policies.create' | translate)
+              : '')"
+          (action)="hasActiveFilters()
+            ? onFiltersChanged({})
+            : navigateToCreate()"
+        />
+      </div>
+    } @else {
+      <!-- Policy table -->
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
+            <th class="py-2 pl-5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.name' | translate }}
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.status' | translate }}
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.strategy_type' | translate }}
+            </th>
+            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.execution_mode' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.priority' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.assignments_count' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.version' | translate }}
+            </th>
+            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+              {{ 'pricing.policies.col.updated_at' | translate }}
+            </th>
+            <th class="w-[100px] py-2 pl-3 pr-4"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of rows(); track p.id) {
+            <tr
+              class="policy-row cursor-pointer border-b border-[var(--border-subtle)]"
+              [style.border-left-color]="statusColor(p.status)"
+              (click)="navigateToEdit(p, $event)"
+            >
+              <!-- Name -->
+              <td class="py-3 pl-4 pr-3">
+                <span class="text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
+                  {{ p.name }}
+                </span>
+              </td>
+
+              <!-- Status -->
+              <td class="px-3 py-3">
+                <span
+                  class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  [style.color]="statusColor(p.status)"
+                  [style.background-color]="statusBg(p.status)"
+                >
+                  <span
+                    class="inline-block h-1.5 w-1.5 rounded-full"
+                    [class.animate-pulse]="p.status === 'ACTIVE'"
+                    [style.background-color]="statusColor(p.status)"
+                  ></span>
+                  {{ 'pricing.policies.status.' + p.status | translate }}
+                </span>
+              </td>
+
+              <!-- Strategy -->
+              <td class="px-3 py-3">
+                <span class="inline-flex rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.policies.strategy.' + p.strategyType | translate }}
+                </span>
+              </td>
+
+              <!-- Mode -->
+              <td class="px-3 py-3">
+                <span
+                  class="inline-flex rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-medium"
+                  [style.color]="modeColor(p.executionMode)"
+                  [style.background-color]="modeBg(p.executionMode)"
+                >
+                  {{ 'pricing.policies.mode.' + p.executionMode | translate }}
+                </span>
+              </td>
+
+              <!-- Priority -->
+              <td class="px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ p.priority }}
+              </td>
+
+              <!-- Assignments -->
+              <td class="px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ p.assignmentsCount }}
+              </td>
+
+              <!-- Version -->
+              <td class="px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+                v{{ p.version }}
+              </td>
+
+              <!-- Updated -->
+              <td class="px-3 py-3 text-right text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+                {{ relativeTime(p.updatedAt) }}
+              </td>
+
+              <!-- Actions (hover-reveal) -->
+              <td class="py-2 pl-3 pr-4">
+                @if (rbac.canWritePolicies()) {
+                  <div class="row-actions flex items-center justify-end gap-0.5">
+                    <!-- Edit -->
+                    <button
+                      class="action-icon"
+                      [title]="'actions.edit' | translate"
+                      (click)="navigateToEdit(p, $event)"
+                    >
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
+                      </svg>
+                    </button>
+
+                    <!-- Activate (for DRAFT / PAUSED) -->
+                    @if (p.status === 'DRAFT' || p.status === 'PAUSED') {
+                      <button
+                        class="action-icon success"
+                        [title]="'actions.activate' | translate"
+                        (click)="startActivate(p, $event)"
+                      >
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polygon points="6 3 20 12 6 21 6 3"/>
+                        </svg>
+                      </button>
+                    }
+
+                    <!-- Pause (for ACTIVE) -->
+                    @if (p.status === 'ACTIVE') {
+                      <button
+                        class="action-icon warning"
+                        [title]="'actions.pause' | translate"
+                        (click)="startPause(p, $event)"
+                      >
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="14" y="4" width="4" height="16" rx="1"/>
+                          <rect x="6" y="4" width="4" height="16" rx="1"/>
+                        </svg>
+                      </button>
+                    }
+
+                    <!-- Archive (for non-archived) -->
+                    @if (p.status !== 'ARCHIVED') {
+                      <button
+                        class="action-icon danger"
+                        [title]="'actions.archive' | translate"
+                        (click)="startArchive(p, $event)"
+                      >
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect width="20" height="5" x="2" y="3" rx="1"/>
+                          <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
+                          <path d="M10 12h4"/>
+                        </svg>
+                      </button>
+                    }
+                  </div>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>
+
+<!-- Confirmation modals -->
+<dp-confirmation-modal
+  [open]="showActivateModal()"
+  [title]="'pricing.policies.activate_title' | translate"
+  [message]="activateMessage()"
+  [confirmLabel]="'pricing.policies.activate_confirm' | translate"
+  [cancelLabel]="'common.cancel' | translate"
+  (confirmed)="executeActivate()"
+  (cancelled)="showActivateModal.set(false)"
+/>
+<dp-confirmation-modal
+  [open]="showPauseModal()"
+  [title]="'pricing.policies.pause_title' | translate"
+  [message]="pauseMessage()"
+  [confirmLabel]="'pricing.policies.pause_confirm' | translate"
+  [cancelLabel]="'common.cancel' | translate"
+  (confirmed)="executePause()"
+  (cancelled)="showPauseModal.set(false)"
+/>
+<dp-confirmation-modal
+  [open]="showArchiveModal()"
+  [title]="'pricing.policies.archive_title' | translate"
+  [message]="archiveMessage()"
+  [confirmLabel]="'pricing.policies.archive_confirm' | translate"
+  [cancelLabel]="'common.cancel' | translate"
+  [danger]="true"
+  (confirmed)="executeArchive()"
+  (cancelled)="showArchiveModal.set(false)"
+/>

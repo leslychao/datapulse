@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 
 import { PricingLayoutComponent } from './pricing-layout.component';
+import { pricingWriteGuard } from './pricing-write.guard';
+import { unsavedChangesGuard } from './unsaved-changes.guard';
 
 const routes: Routes = [
   {
@@ -18,6 +20,8 @@ const routes: Routes = [
       },
       {
         path: 'policies/new',
+        canActivate: [pricingWriteGuard],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./policies/policy-form-page.component').then(
             (m) => m.PolicyFormPageComponent,
@@ -26,6 +30,8 @@ const routes: Routes = [
       },
       {
         path: 'policies/:policyId/edit',
+        canActivate: [pricingWriteGuard],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./policies/policy-form-page.component').then(
             (m) => m.PolicyFormPageComponent,
@@ -63,6 +69,14 @@ const routes: Routes = [
             (m) => m.DecisionsListPageComponent,
           ),
         data: { breadcrumb: 'Решения' },
+      },
+      {
+        path: 'decisions/:decisionId',
+        loadComponent: () =>
+          import('./decisions/decision-detail-page.component').then(
+            (m) => m.DecisionDetailPageComponent,
+          ),
+        data: { breadcrumb: 'Решение' },
       },
       {
         path: 'locks',

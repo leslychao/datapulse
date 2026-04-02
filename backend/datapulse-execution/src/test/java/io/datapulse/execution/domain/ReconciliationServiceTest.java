@@ -1,5 +1,6 @@
 package io.datapulse.execution.domain;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -25,6 +26,7 @@ import io.datapulse.execution.persistence.PriceActionAttemptEntity;
 import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.platform.observability.MetricsFacade;
 import io.datapulse.platform.outbox.OutboxService;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,7 @@ class ReconciliationServiceTest {
   @Mock private ActionService actionService;
   @Mock private OutboxService outboxService;
   @Mock private ExecutionProperties properties;
+  @Mock private MetricsFacade metrics;
 
   @InjectMocks
   private ReconciliationService service;
@@ -116,6 +119,28 @@ class ReconciliationServiceTest {
       verify(actionService).casFail(eq(ACTION_ID),
           eq(ActionStatus.RECONCILIATION_PENDING),
           anyInt(), eq(ErrorClassification.PROVIDER_ERROR), any());
+    }
+
+    @Test
+    @DisplayName("should preserve IMMEDIATE source when deferred reconciliation confirms")
+    void should_preserveImmediateSource_when_deferredConfirms() {
+      var action = reconciliationAction(BigDecimal.valueOf(999));
+      when(actionRepository.findById(ACTION_ID)).thenReturn(Optional.of(action));
+
+      var attempt = new PriceActionAttemptEntity();
+      attempt.setReconciliationSource(ReconciliationSource.IMMEDIATE);
+      attempt.setPriceMatch(true);
+      when(attemptRepository.findByPriceActionIdAndAttemptNumber(ACTION_ID, 1))
+          .thenReturn(Optional.of(attempt));
+
+      service.processReconciliationCheck(ACTION_ID, 1,
+          BigDecimal.valueOf(999), "{\"snapshot\":true}");
+
+      verify(actionService).casSucceed(ACTION_ID,
+          ActionStatus.RECONCILIATION_PENDING,
+          ActionReconciliationSource.AUTO, null);
+      verify(attemptRepository).save(attempt);
+      assertThat(attempt.getReconciliationSource()).isEqualTo(ReconciliationSource.IMMEDIATE);
     }
 
     @Test

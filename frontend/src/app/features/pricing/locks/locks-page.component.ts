@@ -13,8 +13,16 @@ import {
   QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
+import {
+  CellClickedEvent,
+  ColDef,
+  GetRowIdParams,
+  ICellRendererParams,
+  ValueFormatterParams,
+} from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
 import {
   CreateLockRequest,
@@ -48,23 +56,25 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
       <div
-        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3"
+        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2"
       >
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'pricing.locks.title' | translate }}
         </h2>
-        <button
-          (click)="showCreateForm.set(true)"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-        >
-          {{ 'pricing.locks.create' | translate }}
-        </button>
+        @if (rbac.canManageLocks()) {
+          <button
+            (click)="showCreateForm.set(true)"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+          >
+            {{ 'pricing.locks.create' | translate }}
+          </button>
+        }
       </div>
 
       <!-- Create Form Panel -->
       @if (showCreateForm()) {
         <div
-          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-4"
+          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-4"
         >
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
@@ -130,7 +140,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       }
 
       <!-- Filter Bar -->
-      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+      <div class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -139,7 +149,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (locksQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.locks.error' | translate"
@@ -152,7 +162,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="locksQuery.isPending()"
             [pagination]="true"
@@ -180,6 +190,7 @@ export class LocksPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
+  protected readonly rbac = inject(RbacService);
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
@@ -198,7 +209,7 @@ export class LocksPageComponent {
     { key: 'search', label: 'pricing.locks.filter.search', type: 'text' },
   ];
 
-  readonly columnDefs = [
+  private readonly baseColumnDefs: ColDef[] = [
     {
       headerName: this.translate.instant('pricing.locks.col.offer'),
       field: 'offerName',
@@ -225,7 +236,8 @@ export class LocksPageComponent {
       width: 120,
       sortable: true,
       cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => this.formatPrice(params.value),
+      valueFormatter: (params: ValueFormatterParams<ManualPriceLock>) =>
+        this.formatPrice(params.value),
     },
     {
       headerName: this.translate.instant('pricing.locks.col.reason'),
@@ -233,7 +245,8 @@ export class LocksPageComponent {
       minWidth: 200,
       flex: 1,
       sortable: false,
-      valueFormatter: (params: any) => params.value ?? '—',
+      valueFormatter: (params: ValueFormatterParams<ManualPriceLock>) =>
+        params.value ?? '—',
     },
     {
       headerName: this.translate.instant('pricing.locks.col.locked_by'),
@@ -247,14 +260,15 @@ export class LocksPageComponent {
       width: 140,
       sortable: true,
       sort: 'desc' as const,
-      valueFormatter: (params: any) => this.formatTimestamp(params.value),
+      valueFormatter: (params: ValueFormatterParams<ManualPriceLock>) =>
+        this.formatTimestamp(params.value),
     },
     {
       headerName: this.translate.instant('pricing.locks.col.expires_at'),
       field: 'expiresAt',
       width: 140,
       sortable: true,
-      valueFormatter: (params: any) =>
+      valueFormatter: (params: ValueFormatterParams<ManualPriceLock>) =>
         params.value
           ? this.formatTimestamp(params.value)
           : this.translate.instant('pricing.locks.indefinite'),
@@ -265,7 +279,7 @@ export class LocksPageComponent {
       colId: 'timeRemaining',
       width: 120,
       sortable: false,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<ManualPriceLock>) => {
         if (!params.data?.expiresAt) {
           return `<span class="text-[var(--text-secondary)]">${this.translate.instant('pricing.locks.indefinite')}</span>`;
         }
@@ -287,26 +301,35 @@ export class LocksPageComponent {
         return `<span style="${color}">${hours} ${hUnit}</span>`;
       },
     },
-    {
-      headerName: '',
-      field: 'actions',
-      width: 60,
-      sortable: false,
-      suppressMovable: true,
-      cellRenderer: () =>
-        `<button class="action-btn" data-action="unlock" title="${this.translate.instant('actions.unlock')}">🔓</button>`,
-      onCellClicked: (params: any) => {
-        const target = params.event?.target as HTMLElement;
-        const action = target
-          ?.closest('[data-action]')
-          ?.getAttribute('data-action');
-        if (action === 'unlock' && params.data) {
-          this.unlockTarget.set(params.data);
-          this.showUnlockModal.set(true);
-        }
-      },
-    },
   ];
+
+  private readonly unlockColumnDef: ColDef = {
+    headerName: '',
+    field: 'actions',
+    width: 60,
+    sortable: false,
+    suppressMovable: true,
+    cellRenderer: () => {
+      const unlockIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
+      return `<button class="action-btn" data-action="unlock" title="${this.translate.instant('actions.unlock')}">${unlockIcon}</button>`;
+    },
+    onCellClicked: (event: CellClickedEvent<ManualPriceLock>) => {
+      const target = event.event?.target as HTMLElement;
+      const action = target
+        ?.closest('[data-action]')
+        ?.getAttribute('data-action');
+      if (action === 'unlock' && event.data) {
+        this.unlockTarget.set(event.data);
+        this.showUnlockModal.set(true);
+      }
+    },
+  };
+
+  readonly columnDefs = computed(() =>
+    this.rbac.canManageLocks()
+      ? [...this.baseColumnDefs, this.unlockColumnDef]
+      : this.baseColumnDefs,
+  );
 
   private readonly filter = computed<PricingLockFilter>(() => {
     const vals = this.filterValues();
@@ -381,7 +404,8 @@ export class LocksPageComponent {
     },
   }));
 
-  readonly getRowId = (params: any) => String(params.data.id);
+  readonly getRowId = (params: GetRowIdParams<ManualPriceLock>) =>
+    String(params.data.id);
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);

@@ -29,6 +29,8 @@ import {
 import { lastValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+import { LucideAngularModule, Activity, AlertTriangle, Clock, CheckCircle } from 'lucide-angular';
+
 import { MismatchApiService } from '@core/api/mismatch-api.service';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import {
@@ -62,6 +64,7 @@ const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'info' | 'n
     FormsModule,
     TranslatePipe,
     AgGridAngular,
+    LucideAngularModule,
     KpiCardComponent,
     EmptyStateComponent,
     MismatchDetailPanelComponent,
@@ -74,6 +77,11 @@ export class MismatchDashboardPageComponent {
   private readonly ws = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  protected readonly ActivityIcon = Activity;
+  protected readonly AlertTriangleIcon = AlertTriangle;
+  protected readonly ClockIcon = Clock;
+  protected readonly CheckCircleIcon = CheckCircle;
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);

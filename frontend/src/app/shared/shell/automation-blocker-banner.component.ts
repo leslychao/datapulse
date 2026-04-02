@@ -20,7 +20,7 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
   template: `
     @if (isBlocked()) {
       <div
-        class="flex items-center gap-2 bg-[var(--status-error)] px-6 py-1.5 text-sm font-medium text-white"
+        class="flex items-center gap-2 bg-[var(--status-error)] px-4 py-1.5 text-sm font-medium text-white"
         role="alert"
       >
         <lucide-icon [img]="ShieldAlert" [size]="16" />

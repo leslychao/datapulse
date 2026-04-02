@@ -46,7 +46,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <div class="flex items-center gap-2">
           <button
             (click)="navigateBack()"
@@ -60,7 +60,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
         </h2>
       </div>
 
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (showAddForm()) {
           <div class="mb-4 flex items-end gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3">
             <div>
@@ -192,7 +192,10 @@ export class PromoPolicyAssignmentsPageComponent {
       field: '_delete',
       width: 60,
       sortable: false,
-      cellRenderer: () => `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">🗑</button>`,
+      cellRenderer: () => {
+        const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+        return `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">${trashIcon}</button>`;
+      },
       onCellClicked: (params: any) => {
         const target = params.event?.target as HTMLElement;
         if (target?.closest('[data-action="delete"]') && params.data) {

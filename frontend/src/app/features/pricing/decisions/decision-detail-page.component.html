@@ -1,0 +1,330 @@
+<!-- Header -->
+<div
+  class="shrink-0 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3"
+>
+  <div class="flex items-center gap-3">
+    <button
+      type="button"
+      (click)="navigateBack()"
+      class="cursor-pointer rounded-[var(--radius-sm)] px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+    >
+      ← {{ 'pricing.decisions.detail.back' | translate }}
+    </button>
+    <h2 class="text-base font-semibold text-[var(--text-primary)]">
+      {{ 'pricing.decisions.detail.title' | translate: { id: decisionId() } }}
+    </h2>
+  </div>
+</div>
+
+<div class="flex flex-1 flex-col gap-6 px-4 py-4">
+  @if (decisionQuery.isPending()) {
+    <div class="flex flex-col gap-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+          <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] p-3">
+            <div class="dp-shimmer mb-2 h-3 w-24 rounded-[var(--radius-sm)]"></div>
+            <div class="dp-shimmer h-4 w-full rounded-[var(--radius-sm)]"></div>
+          </div>
+        }
+      </div>
+      <dp-loading-skeleton [type]="'card'" [lines]="1" />
+      <dp-loading-skeleton [type]="'table-row'" [lines]="5" />
+    </div>
+  } @else if (decisionQuery.isError()) {
+    <dp-empty-state
+      [message]="'pricing.decisions.detail.error' | translate"
+      [actionLabel]="'actions.retry' | translate"
+      (action)="decisionQuery.refetch()"
+    />
+  } @else {
+    @if (decision(); as d) {
+    <!-- Meta -->
+    <section class="flex flex-col gap-3">
+      <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+        {{ 'pricing.decisions.detail.section.meta' | translate }}
+      </h3>
+      <div
+        class="grid grid-cols-1 gap-x-6 gap-y-2 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 sm:grid-cols-2"
+      >
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.offer' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">{{ d.offerName }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.sku' | translate }}
+          </span>
+          <span class="font-mono text-sm text-[var(--text-primary)]">{{ d.sellerSku }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.connection' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">{{ d.connectionName }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.decision_type' | translate }}
+          </span>
+          <span
+            class="inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+            [style.background-color]="
+              'color-mix(in srgb, ' + decisionTypeCssVar() + ' 12%, transparent)'
+            "
+            [style.color]="decisionTypeCssVar()"
+          >
+            <span
+              class="inline-block h-1.5 w-1.5 rounded-full"
+              [style.background-color]="decisionTypeCssVar()"
+            ></span>
+            {{ ('pricing.decisions.type.' + d.decisionType) | translate }}
+          </span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.current_price' | translate }}
+          </span>
+          <span class="font-mono text-sm text-[var(--text-primary)]">{{
+            formatPrice(d.currentPrice)
+          }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.target_price' | translate }}
+          </span>
+          <span class="font-mono text-sm text-[var(--text-primary)]">{{
+            formatPrice(d.targetPrice)
+          }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.change_pct' | translate }}
+          </span>
+          <span [class]="changePctClass(d.changePct)">{{ formatChangePct(d.changePct) }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.policy' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">{{ d.policyName }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.strategy' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">{{
+            ('pricing.policies.strategy.' + d.strategyType) | translate
+          }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.execution_mode' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">{{
+            ('pricing.decisions.execution_mode.' + d.executionMode) | translate
+          }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.run' | translate }}
+          </span>
+          @if (d.pricingRunId) {
+            <button
+              type="button"
+              class="w-fit cursor-pointer font-mono text-sm text-[var(--accent-primary)] transition-colors hover:underline"
+              (click)="navigateToRun(d.pricingRunId)"
+            >
+              #{{ d.pricingRunId }}
+            </button>
+          } @else {
+            <span class="text-sm text-[var(--text-primary)]">—</span>
+          }
+        </div>
+        <div class="flex flex-col gap-0.5 sm:col-span-2">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.skip_reason' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">
+            @if (d.skipReason) {
+              {{ d.skipReason | translate }}
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        <div class="flex flex-col gap-0.5 sm:col-span-2">
+          <span class="text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+            {{ 'pricing.decisions.detail.meta.created' | translate }}
+          </span>
+          <span class="text-sm text-[var(--text-primary)]">{{ formatCreatedAt(d.createdAt) }}</span>
+        </div>
+      </div>
+    </section>
+
+    @if (d.explanationSummary) {
+      <section class="flex flex-col gap-3">
+        <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+          {{ 'pricing.decisions.detail.section.explanation' | translate }}
+        </h3>
+        <dp-explanation-block [text]="d.explanationSummary" />
+      </section>
+    }
+
+    @if (signalRows().length > 0) {
+      <section class="flex flex-col gap-3">
+        <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+          {{ 'pricing.decisions.detail.section.signals' | translate }}
+        </h3>
+        <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
+          <table class="w-full border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] text-left">
+                <th class="px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.signal_key' | translate }}
+                </th>
+                <th class="px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.signal_value' | translate }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of signalRows(); track row.key) {
+                <tr class="border-b border-[var(--border-subtle)] last:border-b-0">
+                  <td class="px-3 py-2 text-[var(--text-primary)]">{{ row.label }}</td>
+                  <td class="px-3 py-2 font-mono text-[length:var(--text-sm)] text-[var(--text-primary)]">
+                    {{ row.value }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <section class="flex flex-col gap-3">
+      <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+        {{ 'pricing.decisions.detail.section.constraints' | translate }}
+      </h3>
+      @if (constraintsRows().length === 0) {
+        <p class="text-sm text-[var(--text-secondary)]">
+          {{ 'pricing.decisions.detail.constraints_empty' | translate }}
+        </p>
+      } @else {
+        <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
+          <table class="w-full border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] text-left">
+                <th class="w-12 px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  #
+                </th>
+                <th class="px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.constraint' | translate }}
+                </th>
+                <th class="px-3 py-2 text-right text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.before' | translate }}
+                </th>
+                <th class="px-3 py-2 text-right text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.after' | translate }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (step of constraintsRows(); track $index) {
+                <tr class="border-b border-[var(--border-subtle)] last:border-b-0">
+                  <td class="px-3 py-2 text-[var(--text-tertiary)]">{{ $index + 1 }}</td>
+                  <td class="px-3 py-2 text-[var(--text-primary)]">{{ step.name }}</td>
+                  <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">
+                    {{ formatPrice(step.priceBefore) }}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">
+                    {{ formatPrice(step.priceAfter) }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    @if (guardsRows().length > 0) {
+      <section class="flex flex-col gap-3">
+        <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+          {{ 'pricing.decisions.detail.section.guards' | translate }}
+        </h3>
+        <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
+          <table class="w-full border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] text-left">
+                <th class="w-12 px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  #
+                </th>
+                <th class="px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.guard' | translate }}
+                </th>
+                <th class="px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.result' | translate }}
+                </th>
+                <th class="min-w-[200px] px-3 py-2 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.decisions.detail.col.details' | translate }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (g of guardsRows(); track $index) {
+                <tr class="border-b border-[var(--border-subtle)] last:border-b-0">
+                  <td class="px-3 py-2 text-[var(--text-tertiary)]">{{ $index + 1 }}</td>
+                  <td class="px-3 py-2 text-[var(--text-primary)]">{{ g.guardName }}</td>
+                  <td class="px-3 py-2">
+                    @if (g.passed) {
+                      <span class="inline-flex items-center gap-1 text-[var(--status-success)]">
+                        <span aria-hidden="true">✓</span>
+                        <span>{{ 'pricing.decisions.detail.guard.passed' | translate }}</span>
+                      </span>
+                    } @else {
+                      <span class="inline-flex items-center gap-1 text-[var(--status-error)]">
+                        <span aria-hidden="true">✗</span>
+                        <span>{{ 'pricing.decisions.detail.guard.blocked' | translate }}</span>
+                      </span>
+                    }
+                  </td>
+                  <td class="px-3 py-2 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                    {{ guardDetails(g.details) }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    @if (hasPolicySnapshot()) {
+      <section class="flex flex-col gap-2">
+        <button
+          type="button"
+          (click)="togglePolicySnapshot()"
+          class="flex w-full cursor-pointer items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-left text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+          [attr.aria-expanded]="policyExpanded()"
+        >
+          <span>{{ 'pricing.decisions.detail.section.policy' | translate }}</span>
+          <span class="text-[var(--text-tertiary)]">{{
+            (policyExpanded()
+              ? 'pricing.decisions.detail.policy_collapse'
+              : 'pricing.decisions.detail.policy_expand'
+            ) | translate
+          }}</span>
+        </button>
+        @if (policyExpanded()) {
+          <pre
+            class="max-h-[480px] overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3 font-mono text-[length:var(--text-xs)] text-[var(--text-primary)]"
+          >{{ policyJson() }}</pre>
+        }
+      </section>
+    }
+    }
+  }
+</div>

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  HostListener,
   computed,
   effect,
   inject,
@@ -16,7 +17,7 @@ import {
 } from '@tanstack/angular-query-experimental';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lastValueFrom } from 'rxjs';
-import { LucideAngularModule, Info, AlertTriangle } from 'lucide-angular';
+import { LucideAngularModule, Info, AlertTriangle, Eye } from 'lucide-angular';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
@@ -40,6 +41,7 @@ import {
 import { TargetMarginFormComponent } from './target-margin-form.component';
 import { ConstraintsFormComponent } from './constraints-form.component';
 import { GuardConfigFormComponent } from './guard-config-form.component';
+import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
 
 @Component({
   selector: 'dp-policy-form-page',
@@ -52,6 +54,7 @@ import { GuardConfigFormComponent } from './guard-config-form.component';
     TargetMarginFormComponent,
     ConstraintsFormComponent,
     GuardConfigFormComponent,
+    ImpactPreviewModalComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto' },
   templateUrl: './policy-form-page.component.html',
@@ -64,7 +67,7 @@ export class PolicyFormPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
-  readonly icons = { Info, AlertTriangle };
+  readonly icons = { Info, AlertTriangle, Eye };
 
   readonly policyId = input<string>();
   readonly isEditMode = computed(() => !!this.policyId());
@@ -72,6 +75,9 @@ export class PolicyFormPageComponent {
 
   readonly form = buildPolicyForm(this.fb);
   readonly submitted = signal(false);
+  readonly showPreviewModal = signal(false);
+  readonly formDirty = signal(false);
+  private formPristineAfterPatch = false;
 
   readonly policyQuery = injectQuery(() => ({
     queryKey: ['policy', this.policyId()],
@@ -105,6 +111,7 @@ export class PolicyFormPageComponent {
       } else {
         this.toast.success(this.translate.instant('pricing.policies.created'));
       }
+      this.formDirty.set(false);
       this.navigateToList();
     },
     onError: (err) =>
@@ -160,6 +167,26 @@ export class PolicyFormPageComponent {
         this.patchForm(policy);
       }
     });
+
+    this.form.valueChanges.subscribe(() => {
+      if (this.formPristineAfterPatch) {
+        this.formPristineAfterPatch = false;
+        return;
+      }
+      this.formDirty.set(true);
+    });
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.formDirty()) {
+      event.preventDefault();
+    }
+  }
+
+  canDeactivate(): boolean {
+    if (!this.formDirty()) return true;
+    return confirm(this.translate.instant('pricing.form.unsaved_changes'));
   }
 
   get strategyType(): StrategyType {
@@ -178,13 +205,8 @@ export class PolicyFormPageComponent {
     return this.executionModes.find(m => m.value === this.executionMode)?.descKey ?? '';
   }
 
-  get targetMarginGroup(): FormGroup {
-    return this.form.get('targetMargin') as FormGroup;
-  }
-
-  get corridorGroup(): FormGroup {
-    return this.form.get('corridor') as FormGroup;
-  }
+  readonly targetMarginGroup = this.form.get('targetMargin') as FormGroup;
+  readonly corridorGroup = this.form.get('corridor') as FormGroup;
 
   onStrategyTypeChange(): void {
     if (this.strategyType === 'TARGET_MARGIN') {
@@ -194,6 +216,23 @@ export class PolicyFormPageComponent {
       this.form.get('targetMargin')!.disable();
       this.form.get('corridor')!.enable();
     }
+  }
+
+  onStrategyTypeUserChange(newType: string): void {
+    const current = this.strategyType;
+    if (current === newType) return;
+
+    if (this.formDirty()) {
+      const confirmed = confirm(
+        this.translate.instant('pricing.form.strategy_switch_confirm'),
+      );
+      if (!confirmed) {
+        this.form.get('strategyType')!.setValue(current, { emitEvent: false });
+        return;
+      }
+    }
+    this.form.get('strategyType')!.setValue(newType);
+    this.onStrategyTypeChange();
   }
 
   submit(): void {
@@ -214,6 +253,7 @@ export class PolicyFormPageComponent {
       minPrice: raw.minPrice || null,
       maxPrice: raw.maxPrice || null,
       guardConfig: buildGuardConfig(raw),
+      confirmFullAuto: raw.executionMode === 'FULL_AUTO' ? raw.confirmFullAuto : undefined,
     };
     this.saveMutation.mutate(req);
   }
@@ -267,6 +307,8 @@ export class PolicyFormPageComponent {
     }
 
     this.onStrategyTypeChange();
+    this.formDirty.set(false);
+    this.formPristineAfterPatch = true;
   }
 
   private navigateToList(): void {

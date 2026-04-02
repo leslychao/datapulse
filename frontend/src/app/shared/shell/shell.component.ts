@@ -12,6 +12,8 @@ import { CommandPaletteComponent } from './command-palette/command-palette.compo
 import { ToastContainerComponent } from './toast/toast-container.component';
 import { OfferDetailPanelComponent } from '@features/grid/components/offer-detail/offer-detail-panel.component';
 import { AlertDetailPanelComponent } from '@features/alerts/alert-detail-panel.component';
+import { PolicyDetailPanelComponent } from '@features/pricing/policies/policy-detail-panel.component';
+import { DecisionDetailPanelComponent } from '@features/pricing/decisions/decision-detail-panel.component';
 import { AutomationBlockerBannerComponent } from './automation-blocker-banner.component';
 import { ConnectionLostBannerComponent } from './connection-lost-banner.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -35,6 +37,8 @@ import { WebSocketService } from '@core/websocket/websocket.service';
     ToastContainerComponent,
     OfferDetailPanelComponent,
     AlertDetailPanelComponent,
+    PolicyDetailPanelComponent,
+    DecisionDetailPanelComponent,
     AutomationBlockerBannerComponent,
     ConnectionLostBannerComponent,
   ],
@@ -64,6 +68,12 @@ import { WebSocketService } from '@core/websocket/websocket.service';
           }
           @if (detailPanel.entityType() === 'alert') {
             <dp-alert-detail-panel />
+          }
+          @if (detailPanel.entityType() === 'policy') {
+            <dp-policy-detail-panel />
+          }
+          @if (detailPanel.entityType() === 'pricing-decision') {
+            <dp-decision-detail-panel />
           }
         </dp-detail-panel>
       }

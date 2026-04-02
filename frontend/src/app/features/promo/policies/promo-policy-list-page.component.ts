@@ -57,7 +57,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'promo.policies.title' | translate }}
         </h2>
@@ -69,7 +69,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
         </button>
       </div>
 
-      <div class="px-6 pt-3">
+      <div class="px-6 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -77,7 +77,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
         />
       </div>
 
-      <div class="flex-1 px-6 py-3">
+      <div class="flex-1 px-4 py-2">
         @if (policiesQuery.isError()) {
           <dp-empty-state
             [message]="'promo.policies.error' | translate"
@@ -256,17 +256,21 @@ export class PromoPolicyListPageComponent {
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const p = params.data as PromoPolicySummary;
-        let buttons = `<button class="action-btn" data-action="edit" title="${this.translate.instant('actions.edit')}">✏</button>`;
+        const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>`;
+        const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
+        const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>`;
+        const archiveIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>`;
+        let buttons = `<button class="action-btn" data-action="edit" title="${this.translate.instant('actions.edit')}">${editIcon}</button>`;
         if (p.status === 'DRAFT' || p.status === 'PAUSED') {
-          buttons += `<button class="action-btn" data-action="activate" title="${this.translate.instant('actions.activate')}">▶</button>`;
+          buttons += `<button class="action-btn" data-action="activate" title="${this.translate.instant('actions.activate')}">${playIcon}</button>`;
         }
         if (p.status === 'ACTIVE') {
-          buttons += `<button class="action-btn" data-action="pause" title="${this.translate.instant('actions.pause')}">⏸</button>`;
+          buttons += `<button class="action-btn" data-action="pause" title="${this.translate.instant('actions.pause')}">${pauseIcon}</button>`;
         }
         if (p.status !== 'ARCHIVED') {
-          buttons += `<button class="action-btn" data-action="archive" title="${this.translate.instant('actions.archive')}">📦</button>`;
+          buttons += `<button class="action-btn" data-action="archive" title="${this.translate.instant('actions.archive')}">${archiveIcon}</button>`;
         }
-        return `<div class="flex items-center gap-1">${buttons}</div>`;
+        return `<div class="flex items-center gap-0.5">${buttons}</div>`;
       },
       onCellClicked: (params: any) => {
         const target = params.event?.target as HTMLElement;

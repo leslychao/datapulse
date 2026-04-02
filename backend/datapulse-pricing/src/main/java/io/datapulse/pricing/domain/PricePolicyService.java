@@ -31,6 +31,7 @@ public class PricePolicyService {
     private final PricePolicyMapper policyMapper;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final FullAutoSafetyGate fullAutoSafetyGate;
 
     @Transactional
     public PricePolicyResponse createPolicy(CreatePricePolicyRequest request,
@@ -49,6 +50,7 @@ public class PricePolicyService {
         entity.setMaxPrice(request.maxPrice());
         entity.setGuardConfig(request.guardConfig());
         entity.setExecutionMode(request.executionMode());
+        entity.setExecutionModeChangedAt(java.time.OffsetDateTime.now());
         entity.setApprovalTimeoutHours(
             request.approvalTimeoutHours() != null ? request.approvalTimeoutHours()
                 : request.executionMode() == ExecutionMode.SEMI_AUTO ? 72 : 0);
@@ -123,6 +125,11 @@ public class PricePolicyService {
 
         validateStrategyParams(request.strategyType(), request.strategyParams());
 
+        if (request.executionMode() == ExecutionMode.FULL_AUTO
+                && entity.getExecutionMode() != ExecutionMode.FULL_AUTO) {
+            fullAutoSafetyGate.validateOnSwitch(entity, request.confirmFullAuto());
+        }
+
         boolean logicChanged = isLogicChanged(entity, request);
 
         entity.setName(request.name());
@@ -133,6 +140,9 @@ public class PricePolicyService {
         entity.setMinPrice(request.minPrice());
         entity.setMaxPrice(request.maxPrice());
         entity.setGuardConfig(request.guardConfig());
+        if (request.executionMode() != entity.getExecutionMode()) {
+            entity.setExecutionModeChangedAt(java.time.OffsetDateTime.now());
+        }
         entity.setExecutionMode(request.executionMode());
         if (request.approvalTimeoutHours() != null) {
             entity.setApprovalTimeoutHours(request.approvalTimeoutHours());

@@ -17,34 +17,32 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
   standalone: true,
   imports: [LucideAngularModule, TranslatePipe, FormModalComponent, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex shrink-0 items-center' },
   template: `
-    <div class="flex items-center border-b border-[var(--border-default)] px-6">
-      <div class="flex items-center gap-0.5 overflow-x-auto [&>button:first-child]:pl-0">
-        @for (view of viewsQuery.data() ?? []; track view.id) {
-          <button
-            (click)="selectView(view)"
-            class="relative flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 py-2 text-[length:var(--text-sm)] transition-colors"
-            [class]="view.id === gridStore.selectedViewId()
-              ? 'font-semibold text-[var(--text-primary)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
-          >
-            @if (view.isSystem) {
-              <lucide-icon [img]="LockIcon" [size]="12" class="text-[var(--text-tertiary)]"></lucide-icon>
-            }
-            {{ view.name }}
-            @if (view.id === gridStore.selectedViewId()) {
-              <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent-primary)]"></span>
-            }
-          </button>
-        }
-      </div>
-
+    <div class="flex items-center gap-0.5 overflow-x-auto">
+      @for (view of viewsQuery.data() ?? []; track view.id) {
+        <button
+          (click)="selectView(view)"
+          class="relative flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 py-2.5 text-[length:var(--text-sm)] transition-colors"
+          [class]="view.id === gridStore.selectedViewId()
+            ? 'font-semibold text-[var(--text-primary)]'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+        >
+          @if (view.isSystem) {
+            <lucide-icon [img]="LockIcon" [size]="12" class="text-[var(--text-tertiary)]" />
+          }
+          {{ view.name }}
+          @if (view.id === gridStore.selectedViewId()) {
+            <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent-primary)]"></span>
+          }
+        </button>
+      }
       <button
         (click)="showCreateModal.set(true)"
-        class="flex cursor-pointer items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        class="flex shrink-0 cursor-pointer items-center justify-center px-2 py-2.5 text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
         [attr.aria-label]="'grid.views.create' | translate"
       >
-        <lucide-icon [img]="PlusIcon" [size]="14"></lucide-icon>
+        <lucide-icon [img]="PlusIcon" [size]="14" />
       </button>
     </div>
 

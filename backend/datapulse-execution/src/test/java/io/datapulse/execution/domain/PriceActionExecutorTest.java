@@ -24,12 +24,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import io.datapulse.execution.config.ExecutionProperties;
 import io.datapulse.execution.domain.gateway.GatewayResult;
 import io.datapulse.execution.domain.gateway.PriceActionGateway;
-import io.datapulse.execution.persistence.PriceActionAttemptEntity;
 import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionCasRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionRepository;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.platform.observability.MetricsFacade;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PriceActionExecutor")
@@ -41,7 +41,9 @@ class PriceActionExecutorTest {
   @Mock private ActionService actionService;
   @Mock private ExecutionCredentialResolver credentialResolver;
   @Mock private ExecutionProperties properties;
+  @Mock private MetricsFacade metrics;
   @Mock private PriceActionGateway liveGateway;
+  @Mock private PriceActionGateway simulatedGateway;
 
   private PriceActionExecutor executor;
 
@@ -50,10 +52,11 @@ class PriceActionExecutorTest {
   @BeforeEach
   void setUp() {
     when(liveGateway.executionMode()).thenReturn(ActionExecutionMode.LIVE);
+    when(simulatedGateway.executionMode()).thenReturn(ActionExecutionMode.SIMULATED);
     executor = new PriceActionExecutor(
         actionRepository, attemptRepository, casRepository,
-        actionService, credentialResolver, properties,
-        List.of(liveGateway));
+        actionService, credentialResolver, properties, metrics,
+        List.of(liveGateway, simulatedGateway));
   }
 
   @Nested
@@ -61,8 +64,8 @@ class PriceActionExecutorTest {
   class ExecuteHappyPath {
 
     @Test
-    @DisplayName("should claim, execute, and succeed when gateway confirms")
-    void should_succeed_when_gatewayConfirms() {
+    @DisplayName("should claim, execute, and schedule reconciliation when LIVE gateway confirms")
+    void should_reconcile_when_liveGatewayConfirms() {
       var scheduled = actionEntity(ActionStatus.SCHEDULED);
       var executing = actionEntity(ActionStatus.EXECUTING);
       var context = testContext();
@@ -79,8 +82,30 @@ class PriceActionExecutorTest {
 
       verify(actionService).casClaim(ACTION_ID);
       verify(casRepository).casIncrementAttempt(ACTION_ID);
+      verify(actionService).casReconciliationPending(ACTION_ID);
+      verify(actionService, never()).casSucceed(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("should succeed immediately when SIMULATED gateway confirms")
+    void should_succeed_when_simulatedGatewayConfirms() {
+      var scheduled = simulatedActionEntity(ActionStatus.SCHEDULED);
+      var executing = simulatedActionEntity(ActionStatus.EXECUTING);
+      var context = testContext();
+
+      when(actionRepository.findById(ACTION_ID))
+          .thenReturn(Optional.of(scheduled))
+          .thenReturn(Optional.of(executing));
+      when(credentialResolver.resolve(100L)).thenReturn(context);
+      when(attemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(simulatedGateway.execute(any(), any()))
+          .thenReturn(GatewayResult.confirmed(null, "{sim_resp}"));
+
+      executor.execute(ACTION_ID);
+
       verify(actionService).casSucceed(ACTION_ID, ActionStatus.EXECUTING,
           ActionReconciliationSource.AUTO, null);
+      verify(actionService, never()).casReconciliationPending(anyLong());
     }
 
     @Test
@@ -237,7 +262,7 @@ class PriceActionExecutorTest {
   class ExecuteRetry {
 
     @Test
-    @DisplayName("should execute retry when in RETRY_SCHEDULED state")
+    @DisplayName("should execute retry and schedule reconciliation when LIVE gateway confirms")
     void should_executeRetry_when_retryScheduled() {
       var retryAction = actionEntity(ActionStatus.RETRY_SCHEDULED);
       retryAction.setAttemptCount(1);
@@ -256,8 +281,7 @@ class PriceActionExecutorTest {
       executor.executeRetry(ACTION_ID, 2);
 
       verify(actionService).casExecuteFromRetry(ACTION_ID);
-      verify(actionService).casSucceed(ACTION_ID, ActionStatus.EXECUTING,
-          ActionReconciliationSource.AUTO, null);
+      verify(actionService).casReconciliationPending(ACTION_ID);
     }
 
     @Test
@@ -285,6 +309,12 @@ class PriceActionExecutorTest {
     entity.setMaxAttempts(3);
     entity.setAttemptCount(0);
     entity.setApprovalTimeoutHours(24);
+    return entity;
+  }
+
+  private PriceActionEntity simulatedActionEntity(ActionStatus status) {
+    var entity = actionEntity(status);
+    entity.setExecutionMode(ActionExecutionMode.SIMULATED);
     return entity;
   }
 

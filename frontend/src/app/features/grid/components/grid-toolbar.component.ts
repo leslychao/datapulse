@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
-import { LucideAngularModule, Download, Columns3, AlignJustify, Pencil, X } from 'lucide-angular';
+import { LucideAngularModule, Download, AlignJustify, Pencil } from 'lucide-angular';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import { GridStore } from '@shared/stores/grid.store';
@@ -16,50 +16,57 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
     SearchInputComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block shrink-0' },
   template: `
-    <div class="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-2">
-      <div class="flex items-center gap-3">
+    <!-- Combined bar: projected tabs left, search + actions right -->
+    <div class="flex items-center border-b border-[var(--border-default)] px-4">
+      <ng-content />
+
+      <div class="mx-2 h-5 w-px shrink-0 bg-[var(--border-default)]"></div>
+
+      <div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 py-1.5">
         <dp-search-input
+          class="mr-auto max-w-xs flex-1"
           [placeholder]="'grid.search_placeholder' | translate"
           (searchChange)="onSearch($event)"
         />
 
-        <dp-filter-bar
-          [filters]="gridFilters"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
-        />
-      </div>
-
-      <div class="flex items-center gap-1.5">
         <button
           (click)="gridStore.toggleDraftMode()"
-          class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)] transition-colors"
+          class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)] transition-colors"
           [class]="gridStore.draftMode()
             ? 'bg-[var(--accent-primary)] font-medium text-white'
             : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'"
         >
-          <lucide-icon [img]="PencilIcon" [size]="14"></lucide-icon>
+          <lucide-icon [img]="PencilIcon" [size]="14" />
           {{ 'grid.toolbar.draft' | translate }}
         </button>
 
         <button
           (click)="gridStore.toggleDensity()"
-          class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+          class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
           [attr.aria-label]="'grid.toolbar.density' | translate"
         >
-          <lucide-icon [img]="DensityIcon" [size]="14"></lucide-icon>
-          {{ 'grid.toolbar.density' | translate }}
+          <lucide-icon [img]="DensityIcon" [size]="14" />
         </button>
 
         <button
           (click)="exportClicked.emit()"
-          class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+          class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
         >
-          <lucide-icon [img]="DownloadIcon" [size]="14"></lucide-icon>
+          <lucide-icon [img]="DownloadIcon" [size]="14" />
           {{ 'grid.export' | translate }}
         </button>
       </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="border-b border-[var(--border-default)] px-4 py-2">
+      <dp-filter-bar
+        [filters]="gridFilters"
+        [values]="filterValues()"
+        (filtersChanged)="onFiltersChanged($event)"
+      />
     </div>
   `,
 })
@@ -67,10 +74,8 @@ export class GridToolbarComponent {
   protected readonly gridStore = inject(GridStore);
 
   protected readonly DownloadIcon = Download;
-  protected readonly ColumnsIcon = Columns3;
   protected readonly DensityIcon = AlignJustify;
   protected readonly PencilIcon = Pencil;
-  protected readonly CloseIcon = X;
 
   readonly exportClicked = output<void>();
 

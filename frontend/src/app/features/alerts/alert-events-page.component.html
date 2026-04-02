@@ -1,5 +1,5 @@
 <div class="flex h-full min-h-0 flex-col">
-  <div class="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-6 py-3">
+  <div class="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-4 py-3">
     <lucide-icon [img]="alertCircleIcon" [size]="22" class="text-[var(--status-warning)]" />
     <h1 class="text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
       {{ 'alerts.events.title' | translate }}
@@ -7,54 +7,62 @@
   </div>
 
   <!-- KPI strip -->
-  <div class="flex shrink-0 flex-wrap gap-3 bg-[var(--bg-secondary)] px-6 py-3">
+  <div class="flex shrink-0 flex-wrap gap-3 px-4 pt-3">
     <button
       type="button"
-      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      class="cursor-pointer rounded-[var(--radius-lg)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
       (click)="onKpiClick('critical')"
     >
       <dp-kpi-card
         [label]="'alerts.kpi.critical' | translate"
         [value]="summaryQuery.data()?.openCritical ?? null"
+        [icon]="alertTriangleIcon"
+        accent="error"
         [loading]="summaryQuery.isPending()"
       />
     </button>
     <button
       type="button"
-      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      class="cursor-pointer rounded-[var(--radius-lg)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
       (click)="onKpiClick('warning')"
     >
       <dp-kpi-card
         [label]="'alerts.kpi.warning' | translate"
         [value]="summaryQuery.data()?.openWarning ?? null"
+        [icon]="alertCircleIcon"
+        accent="warning"
         [loading]="summaryQuery.isPending()"
       />
     </button>
     <button
       type="button"
-      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      class="cursor-pointer rounded-[var(--radius-lg)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
       (click)="onKpiClick('ack')"
     >
       <dp-kpi-card
         [label]="'alerts.kpi.acknowledged' | translate"
         [value]="summaryQuery.data()?.acknowledged ?? null"
+        [icon]="eyeIcon"
+        accent="info"
         [loading]="summaryQuery.isPending()"
       />
     </button>
     <button
       type="button"
-      class="cursor-pointer rounded-[var(--radius-md)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      class="cursor-pointer rounded-[var(--radius-lg)] transition hover:ring-2 hover:ring-[var(--accent-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
       (click)="onKpiClick('resolved')"
     >
       <dp-kpi-card
         [label]="'alerts.kpi.resolved_7d' | translate"
         [value]="summaryQuery.data()?.resolvedLast7Days ?? null"
+        [icon]="checkCircleIcon"
+        accent="success"
         [loading]="summaryQuery.isPending()"
       />
     </button>
   </div>
 
-  <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+  <div class="px-4 pt-2">
     <dp-filter-bar
       [filters]="filterConfigs()"
       [values]="filterValues()"
@@ -62,7 +70,7 @@
     />
   </div>
 
-  <div class="flex min-h-0 flex-1 flex-col px-6 py-3">
+  <div class="flex min-h-0 flex-1 flex-col px-4 py-3">
     @if (alertsQuery.isError()) {
       <dp-empty-state
         [message]="'alerts.events.load_error' | translate"
@@ -103,7 +111,7 @@
 
   @if (!alertsQuery.isPending() && !alertsQuery.isError() && totalElements() > 0) {
     <div
-      class="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5"
+      class="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
     >
       <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
         {{ 'alerts.pagination.summary' | translate: { page: pageIndex() + 1, total: totalPages(), count: totalElements() } }}

@@ -94,21 +94,13 @@ public class ActionService {
                                           BigDecimal currentPrice,
                                           int approvalTimeoutHours,
                                           boolean autoApprove) {
-        var existingActive = actionRepository.findActiveByOfferAndMode(marketplaceOfferId, executionMode);
+        var existingActive = actionRepository.findActiveByOfferAndModeForUpdate(
+                marketplaceOfferId, executionMode.name());
 
         if (existingActive.isPresent()) {
             var active = existingActive.get();
 
-            if (active.getStatus().isPreExecution()) {
-                ActionStatus prevStatus = active.getStatus();
-                int rows = casRepository.casSupersede(active.getId(), prevStatus, 0);
-                if (rows == 0) {
-                    log.warn("CAS supersede conflict: actionId={}, status={}", active.getId(), prevStatus);
-                } else {
-                    recordTransition(active.getId(), prevStatus,
-                        ActionStatus.SUPERSEDED, null, null);
-                }
-            } else {
+            if (!active.getStatus().isPreExecution()) {
                 deferAction(workspaceId, marketplaceOfferId, priceDecisionId,
                         executionMode, approvalTimeoutHours);
                 log.info("Action deferred: offerId={}, activeActionId={}, activeStatus={}",
@@ -135,6 +127,18 @@ public class ActionService {
         }
 
         action = actionRepository.save(action);
+
+        if (existingActive.isPresent()) {
+            var active = existingActive.get();
+            ActionStatus prevStatus = active.getStatus();
+            int rows = casRepository.casSupersede(active.getId(), prevStatus, action.getId());
+            if (rows == 0) {
+                log.warn("CAS supersede conflict: actionId={}, status={}", active.getId(), prevStatus);
+            } else {
+                recordTransition(active.getId(), prevStatus,
+                    ActionStatus.SUPERSEDED, null, "Superseded by action " + action.getId());
+            }
+        }
 
         if (autoApprove) {
             scheduleExecution(action);
@@ -255,7 +259,7 @@ public class ActionService {
     }
 
     @Transactional
-    public void retryFailed(long actionId) {
+    public void retryFailed(long actionId, String retryReason) {
         var action = findActionOrThrow(actionId);
 
         if (action.getStatus() != ActionStatus.FAILED) {
@@ -274,8 +278,23 @@ public class ActionService {
                 true
         );
 
-        publishAudit("action.retry", actionId, "SUCCESS", null);
-        log.info("Retry created for failed action: originalActionId={}", actionId);
+        publishAudit("action.retry", actionId, "SUCCESS", retryReason);
+        log.info("Retry created for failed action: originalActionId={}, reason={}",
+                actionId, retryReason);
+    }
+
+    @Transactional
+    public void casExpire(long actionId) {
+        int rows = casRepository.casTransition(actionId,
+                ActionStatus.PENDING_APPROVAL, ActionStatus.EXPIRED);
+        if (rows == 0) {
+            log.debug("CAS expire skipped: actionId={} (already transitioned)", actionId);
+            return;
+        }
+
+        recordTransition(actionId, ActionStatus.PENDING_APPROVAL,
+            ActionStatus.EXPIRED, null, "Approval timeout exceeded");
+        log.info("Action expired: actionId={}", actionId);
     }
 
     @Transactional
@@ -386,14 +405,16 @@ public class ActionService {
         recordTransition(actionId, ActionStatus.EXECUTING,
             ActionStatus.RECONCILIATION_PENDING, null, null);
 
+        long initialDelayMs = properties.getReconciliation().getInitialDelay().toMillis();
         outboxService.createEvent(
                 OutboxEventType.RECONCILIATION_CHECK,
                 AGGREGATE_TYPE,
                 actionId,
-                Map.of("actionId", actionId, "attempt", 1)
+                Map.of("actionId", actionId, "attempt", 1, "delay_ms", initialDelayMs)
         );
 
-        log.info("Reconciliation pending: actionId={}", actionId);
+        log.info("Reconciliation pending: actionId={}, firstCheckDelayMs={}",
+                actionId, initialDelayMs);
     }
 
     private void scheduleExecution(PriceActionEntity action) {

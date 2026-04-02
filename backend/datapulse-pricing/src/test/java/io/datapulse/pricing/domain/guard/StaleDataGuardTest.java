@@ -129,6 +129,6 @@ class StaleDataGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), null, null, null,
         false, false,
-        null, null, null, null, null, null, dataFreshnessAt);
+        null, null, null, null, null, null, dataFreshnessAt, null);
   }
 }

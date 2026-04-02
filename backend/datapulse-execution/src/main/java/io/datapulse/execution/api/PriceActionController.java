@@ -174,7 +174,7 @@ public class PriceActionController {
     public void retry(@PathVariable("workspaceId") long workspaceId,
                        @PathVariable("actionId") long actionId,
                        @Valid @RequestBody RetryRequest request) {
-        actionService.retryFailed(actionId);
+        actionService.retryFailed(actionId, request.retryReason());
     }
 
     @PostMapping("/{actionId}/reconcile")

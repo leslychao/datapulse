@@ -9,11 +9,20 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
+import {
+  LucideIconData,
+  Banknote,
+  Receipt,
+  Package,
+  Megaphone,
+  ChartBar,
+  Scale,
+} from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
-import { KpiCardComponent } from '@shared/components/kpi-card.component';
+import { KpiCardComponent, KpiAccent } from '@shared/components/kpi-card.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
@@ -31,6 +40,8 @@ interface KpiItem {
   formattedValue: string;
   deltaPct: number | null;
   direction: TrendDir;
+  icon: LucideIconData;
+  accent: KpiAccent;
 }
 
 @Component({
@@ -53,14 +64,12 @@ interface KpiItem {
       </div>
 
       @if (summaryQuery.isPending()) {
-        <!-- Shimmer: KPI cards -->
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div class="flex flex-wrap gap-3">
           @for (_ of shimmerCards; track $index) {
             <dp-kpi-card label="" [loading]="true" />
           }
         </div>
 
-        <!-- Shimmer: Charts -->
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <dp-section-card
             [title]="'analytics.pnl.trend_title' | translate"
@@ -75,19 +84,19 @@ interface KpiItem {
       } @else if (summaryQuery.isError()) {
         <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
       } @else {
-        <!-- KPI cards -->
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div class="flex flex-wrap gap-3">
           @for (kpi of kpiCards(); track kpi.labelKey) {
             <dp-kpi-card
               [label]="kpi.labelKey | translate"
               [value]="kpi.formattedValue"
               [trend]="kpi.deltaPct"
               [trendDirection]="kpi.direction"
+              [icon]="kpi.icon"
+              [accent]="kpi.accent"
             />
           }
         </div>
 
-        <!-- Charts -->
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <dp-section-card
             [title]="'analytics.pnl.trend_title' | translate"
@@ -144,12 +153,12 @@ export class PnlSummaryPageComponent {
     const s = this.summaryQuery.data();
     if (!s) return [];
     return [
-      this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct),
-      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct),
-      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct),
-      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct),
-      this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct),
-      this.buildKpi('analytics.pnl.kpi.residual', s.reconciliationResidual, null),
+      this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct, Banknote, 'success'),
+      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct, Receipt, 'error'),
+      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct, Package, 'warning'),
+      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct, Megaphone, 'info'),
+      this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct, ChartBar, 'primary'),
+      this.buildKpi('analytics.pnl.kpi.residual', s.reconciliationResidual, null, Scale, 'neutral'),
     ];
   });
 
@@ -214,16 +223,20 @@ export class PnlSummaryPageComponent {
     };
   });
 
-  fmtMoney(value: number | null): string {
-    return formatMoney(value, 0);
-  }
-
-  private buildKpi(labelKey: string, value: number, deltaPct: number | null): KpiItem {
+  private buildKpi(
+    labelKey: string,
+    value: number,
+    deltaPct: number | null,
+    icon: LucideIconData,
+    accent: KpiAccent,
+  ): KpiItem {
     return {
       labelKey,
-      formattedValue: this.fmtMoney(value),
+      formattedValue: formatMoney(value, 0),
       deltaPct,
       direction: this.trendDir(deltaPct),
+      icon,
+      accent,
     };
   }
 

@@ -38,7 +38,7 @@ public class ImpactPreviewService {
   private final ImpactPreviewReadRepository previewRepository;
   private final ObjectMapper objectMapper;
 
-  @Transactional(readOnly = true)
+  @Transactional
   public ImpactPreviewResponse preview(long policyId, long workspaceId, Pageable pageable) {
     PricePolicyEntity policy = policyRepository.findByIdAndWorkspaceId(policyId, workspaceId)
         .orElseThrow(() -> NotFoundException.entity("PricePolicy", policyId));
@@ -52,6 +52,9 @@ public class ImpactPreviewService {
 
     ImpactPreviewSummary summary = buildSummary(allRows.size(), evaluated);
     Page<ImpactPreviewOfferResponse> offersPage = paginateOffers(evaluated, pageable);
+
+    policy.setLastPreviewVersion(policy.getVersion());
+    policyRepository.save(policy);
 
     log.info("Impact preview: policyId={}, totalOffers={}, changes={}, skips={}, holds={}",
         policyId, summary.totalOffers(), summary.changeCount(),

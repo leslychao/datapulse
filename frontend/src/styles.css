@@ -206,9 +206,40 @@ router-outlet + * {
   --ag-font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --ag-font-size: var(--text-sm);
   --ag-header-height: 38px;
-  --ag-row-height: 36px;
+  --ag-row-height: 40px;
   --ag-cell-horizontal-padding: 10px;
   --ag-range-selection-border-color: var(--accent-primary);
   --ag-checkbox-checked-color: var(--accent-primary);
   --ag-input-focus-border-color: var(--accent-primary);
+}
+
+.ag-theme-alpine .ag-cell {
+  display: flex;
+  align-items: center;
+}
+
+/* Action buttons inside AG Grid cells */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.action-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.action-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
 }
