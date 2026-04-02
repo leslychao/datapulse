@@ -37,6 +37,9 @@ public class GridExportService {
 
   @Transactional(readOnly = true)
   public void exportCsv(long workspaceId, GridFilter filter, OutputStream out) {
+    long deadlineMs = System.currentTimeMillis()
+        + gridProperties.getExportTimeoutSeconds() * 1000L;
+
     try {
       out.write(UTF8_BOM);
       var writer = new PrintWriter(
@@ -48,6 +51,12 @@ public class GridExportService {
       int maxRows = gridProperties.getExportMaxRows();
 
       while (true) {
+        if (System.currentTimeMillis() > deadlineMs) {
+          log.warn("Export timeout reached: workspaceId={}, timeoutSec={}",
+              workspaceId, gridProperties.getExportTimeoutSeconds());
+          break;
+        }
+
         List<GridRow> batch = pgRepository.findBatchForExport(
             workspaceId, filter, BATCH_SIZE, offset);
         if (batch.isEmpty()) {

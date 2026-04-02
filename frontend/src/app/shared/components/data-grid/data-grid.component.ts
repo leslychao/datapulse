@@ -11,6 +11,7 @@ import {
   ColDef,
   GetRowIdParams,
   GridApi,
+  GridReadyEvent,
   RowClickedEvent,
   RowDoubleClickedEvent,
   RowDataUpdatedEvent,
@@ -55,6 +56,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           (paginationChanged)="onPageChanged($event)"
           (rowDataUpdated)="onRowDataUpdated($event)"
           (cellContextMenu)="onCellContextMenu($event)"
+          (gridReady)="onGridReady($event)"
           [suppressContextMenu]="true"
         ></ag-grid-angular>
       }
@@ -83,10 +85,20 @@ export class DataGridComponent {
   readonly sortChanged = output<{ column: string; direction: string }>();
   readonly pageChanged = output<{ page: number; pageSize: number }>();
   readonly contextMenu = output<{ event: MouseEvent; data: any }>();
+  readonly gridReady = output<GridApi>();
 
   protected readonly localeText = AG_GRID_LOCALE_RU;
   private previousRowIds = new Set<string>();
   private gridApi: GridApi | null = null;
+
+  getApi(): GridApi | null {
+    return this.gridApi;
+  }
+
+  onGridReady(event: GridReadyEvent<any>): void {
+    this.gridApi = event.api;
+    this.gridReady.emit(event.api);
+  }
 
   onRowClicked(event: RowClickedEvent<any>): void {
     if (event.data) this.rowClicked.emit(event.data);

@@ -3,6 +3,7 @@ package io.datapulse.sellerops.domain;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.sellerops.api.AddQueueItemRequest;
 import io.datapulse.sellerops.api.CreateQueueRequest;
 import io.datapulse.sellerops.api.PreviewCountRequest;
 import io.datapulse.sellerops.api.PreviewCountResponse;
@@ -50,6 +51,28 @@ public class WorkingQueueService {
         .stream()
         .map(this::toQueueSummary)
         .toList();
+  }
+
+  @Transactional
+  public QueueItemResponse addManualItem(long workspaceId, long queueId,
+                                          AddQueueItemRequest request) {
+    WorkingQueueDefinitionEntity queue = findQueueOrThrow(workspaceId, queueId);
+
+    if (assignmentRepository.findActiveAssignment(
+            queue.getId(), request.entityType(), request.entityId()).isPresent()) {
+      throw BadRequestException.of(MessageCodes.QUEUE_ITEM_ALREADY_EXISTS);
+    }
+
+    var assignment = new WorkingQueueAssignmentEntity();
+    assignment.setQueueDefinitionId(queue.getId());
+    assignment.setEntityType(request.entityType());
+    assignment.setEntityId(request.entityId());
+    assignment.setStatus(QueueAssignmentStatus.PENDING.name());
+    if (request.note() != null) {
+      assignment.setNote(request.note());
+    }
+    assignmentRepository.save(assignment);
+    return toItemResponse(assignment, null);
   }
 
   @Transactional
@@ -119,15 +142,13 @@ public class WorkingQueueService {
   public QueueItemResponse claimItem(long workspaceId, long queueId,
                                       long itemId, long userId) {
     findQueueOrThrow(workspaceId, queueId);
-    WorkingQueueAssignmentEntity item = findItemOrThrow(queueId, itemId);
 
-    if (!QueueAssignmentStatus.PENDING.name().equals(item.getStatus())) {
+    int updated = assignmentRepository.casClaim(itemId, queueId, userId);
+    if (updated == 0) {
       throw BadRequestException.of(MessageCodes.QUEUE_ITEM_INVALID_STATE, "queue_item");
     }
 
-    item.setStatus(QueueAssignmentStatus.IN_PROGRESS.name());
-    item.setAssignedToUserId(userId);
-    assignmentRepository.save(item);
+    WorkingQueueAssignmentEntity item = findItemOrThrow(queueId, itemId);
     return toItemResponse(item, null);
   }
 

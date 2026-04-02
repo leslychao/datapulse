@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,14 @@ public class GridService {
     @Transactional(readOnly = true)
     public Page<GridRowResponse> getGridPage(long workspaceId, GridFilter filter,
                                               Pageable pageable) {
-        Page<GridRow> pgPage = pgRepository.findAll(workspaceId, filter, pageable);
+        GridFilter resolvedFilter = resolveChPreFilter(workspaceId, filter);
+
+        String sortColumn = extractSortColumn(pageable);
+        if (sortColumn != null && chRepository.isChSortColumn(sortColumn)) {
+            return getGridPageWithChSort(workspaceId, resolvedFilter, pageable, sortColumn);
+        }
+
+        Page<GridRow> pgPage = pgRepository.findAll(workspaceId, resolvedFilter, pageable);
         if (pgPage.isEmpty()) {
             return Page.empty(pageable);
         }
@@ -51,6 +59,49 @@ public class GridService {
                 .toList();
 
         return new PageImpl<>(enrichedRows, pageable, pgPage.getTotalElements());
+    }
+
+    private Page<GridRowResponse> getGridPageWithChSort(long workspaceId, GridFilter filter,
+                                                         Pageable pageable, String sortColumn) {
+        String direction = pageable.getSort().stream()
+                .findFirst()
+                .map(o -> o.getDirection().name())
+                .orElse("ASC");
+
+        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+        int maxResults = (int) pageable.getOffset() + pageable.getPageSize();
+
+        List<Long> sortedIds;
+        try {
+            sortedIds = chRepository.findSortedOfferIds(connectionIds, sortColumn, direction, maxResults);
+        } catch (Exception e) {
+            log.warn("CH sort failed, falling back to PG sort: error={}", e.getMessage());
+            return getGridPage(workspaceId, filter,
+                    PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+        }
+
+        if (sortedIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        int fromIdx = (int) Math.min(pageable.getOffset(), sortedIds.size());
+        int toIdx = (int) Math.min(pageable.getOffset() + pageable.getPageSize(), sortedIds.size());
+        List<Long> pageIds = sortedIds.subList(fromIdx, toIdx);
+
+        List<GridRow> pgRows = pgRepository.findByOrderedIds(pageIds);
+        Map<Long, ClickHouseEnrichment> enrichment = fetchEnrichmentSafely(pageIds);
+
+        List<GridRowResponse> enrichedRows = pgRows.stream()
+                .map(row -> toGridRowResponse(row, enrichment.get(row.getOfferId())))
+                .toList();
+
+        return new PageImpl<>(enrichedRows, pageable, sortedIds.size());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getMatchingOfferIds(long workspaceId, GridFilter filter) {
+        GridFilter resolved = resolveChPreFilter(workspaceId, filter);
+        return pgRepository.findMatchingOfferIds(workspaceId, resolved, 10_000);
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +121,38 @@ public class GridService {
 
     public boolean isSortableColumn(String column) {
         return pgRepository.isSortableColumn(column);
+    }
+
+    private GridFilter resolveChPreFilter(long workspaceId, GridFilter filter) {
+        if (filter == null || filter.stockRisk() == null) {
+            return filter;
+        }
+        try {
+            List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+            List<Long> chOfferIds = chRepository.findOfferIdsByStockRisk(connectionIds, filter.stockRisk());
+            if (chOfferIds.isEmpty()) {
+                return filter;
+            }
+            List<Long> merged = filter.connectionId() != null
+                    ? filter.connectionId() : List.of();
+            return new GridFilter(
+                    filter.marketplaceType(), merged, filter.status(),
+                    filter.skuCode(), filter.productName(), filter.categoryId(),
+                    filter.marginMin(), filter.marginMax(), filter.hasManualLock(),
+                    filter.hasActivePromo(), filter.lastDecision(), filter.lastActionStatus(),
+                    filter.viewId(), null
+            );
+        } catch (Exception e) {
+            log.warn("CH pre-filter failed, ignoring stock_risk filter: error={}", e.getMessage());
+            return filter;
+        }
+    }
+
+    private String extractSortColumn(Pageable pageable) {
+        return pageable.getSort().stream()
+                .findFirst()
+                .map(org.springframework.data.domain.Sort.Order::getProperty)
+                .orElse(null);
     }
 
     private ClickHouseKpiRow fetchChKpiSafely(long workspaceId) {

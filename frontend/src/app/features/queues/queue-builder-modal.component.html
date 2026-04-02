@@ -2,96 +2,110 @@
   <div class="fixed inset-0 z-[9000] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="close()"></div>
     <div
-      class="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]"
+      class="relative z-10 flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]"
     >
-      <div class="border-b border-[var(--border-default)] px-5 py-4">
-        <h2 class="text-base font-semibold text-[var(--text-primary)]">
-          {{ 'queues.builder.title' | translate }}
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
+        <h2 class="text-lg font-semibold text-[var(--text-primary)]">
+          {{ (isEditMode() ? 'queues.builder.title_edit' : 'queues.builder.title') | translate }}
         </h2>
+        <button
+          type="button"
+          class="flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]"
+          aria-label="Close"
+          (click)="close()"
+        >
+          ×
+        </button>
       </div>
+
       <form class="flex min-h-0 flex-1 flex-col" [formGroup]="form" (ngSubmit)="submit()">
         <div class="space-y-4 overflow-y-auto px-5 py-4">
+          <!-- Name -->
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm text-[var(--text-secondary)]" for="q-name">{{
-              'queues.builder.name' | translate
-            }}</label>
+            <label class="text-sm text-[var(--text-secondary)]" for="q-name">
+              {{ 'queues.builder.name' | translate }} *
+            </label>
             <input
               id="q-name"
               type="text"
               formControlName="name"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             />
             @if (form.controls.name.touched && form.controls.name.invalid) {
-              <span class="text-[var(--text-xs)] text-[var(--status-error)]">{{
-                'queues.builder.name_error' | translate
-              }}</span>
+              <span class="text-[11px] text-[var(--status-error)]">
+                {{ 'queues.builder.name_error' | translate }}
+              </span>
             }
           </div>
+
+          <!-- Queue type -->
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm text-[var(--text-secondary)]" for="q-type">{{
-              'queues.builder.queue_type' | translate
-            }}</label>
+            <label class="text-sm text-[var(--text-secondary)]" for="q-type">
+              {{ 'queues.builder.queue_type' | translate }}
+            </label>
             <select
               id="q-type"
               formControlName="queueType"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             >
               @for (t of queueTypes; track t) {
                 <option [value]="t">{{ 'queues.type.' + t | translate }}</option>
               }
             </select>
           </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-sm text-[var(--text-secondary)]" for="q-entity">{{
-              'queues.builder.entity_type' | translate
-            }}</label>
-            <select
-              id="q-entity"
-              formControlName="entityType"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-            >
-              @for (e of entityTypes; track e) {
-                <option [value]="e">{{ 'queues.builder.entity.' + e | translate }}</option>
-              }
-            </select>
-          </div>
+
+          <!-- Criteria builder -->
           <div>
-            <div class="mb-2 flex items-center justify-between">
-              <span class="text-sm font-medium text-[var(--text-primary)]">{{
-                'queues.builder.rules' | translate
-              }}</span>
-              <button
-                type="button"
-                class="text-sm text-[var(--accent-primary)] hover:underline"
-                (click)="addRule()"
-              >
-                {{ 'queues.builder.add_rule' | translate }}
-              </button>
+            <div class="mb-2 border-b border-[var(--border-subtle)] pb-2">
+              <span class="text-sm font-medium text-[var(--text-primary)]">
+                {{ 'queues.builder.rules' | translate }}
+              </span>
             </div>
+
             <div formArrayName="rules" class="space-y-2">
               @for (rule of rules.controls; track $index; let i = $index) {
                 <div [formGroupName]="i" class="flex flex-wrap items-end gap-2">
+                  <!-- Field -->
                   <select
                     formControlName="field"
-                    class="min-w-[120px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                    class="min-w-[140px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
                   >
-                    @for (f of fieldOptions(); track f) {
-                      <option [value]="f">{{ f }}</option>
+                    @for (f of criteriaFields; track f.id) {
+                      <option [value]="f.id">{{ f.labelKey | translate }}</option>
                     }
                   </select>
+
+                  <!-- Operator -->
                   <select
                     formControlName="op"
-                    class="w-24 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                    class="w-20 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
                   >
-                    @for (o of operators; track o) {
+                    @for (o of operatorsFor(rule.controls.field.value); track o) {
                       <option [value]="o">{{ 'queues.builder.op.' + o | translate }}</option>
                     }
                   </select>
-                  <input
-                    type="text"
-                    formControlName="value"
-                    class="min-w-[100px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
-                  />
+
+                  <!-- Value -->
+                  @if (optionsFor(rule.controls.field.value); as opts) {
+                    <select
+                      formControlName="value"
+                      class="min-w-[120px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                    >
+                      <option value="">—</option>
+                      @for (opt of opts; track opt) {
+                        <option [value]="opt">{{ opt }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <input
+                      type="text"
+                      formControlName="value"
+                      class="min-w-[120px] flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                    />
+                  }
+
+                  <!-- Remove -->
                   <button
                     type="button"
                     class="rounded-[var(--radius-md)] px-2 py-1.5 text-sm text-[var(--status-error)] hover:bg-[var(--bg-tertiary)]"
@@ -103,12 +117,33 @@
                 </div>
               }
             </div>
+
+            @if (rules.length === 0) {
+              <p class="mt-2 text-xs text-[var(--text-tertiary)]">
+                {{ 'queues.builder.no_rules_hint' | translate }}
+              </p>
+            }
+
+            <button
+              type="button"
+              class="mt-2 text-sm text-[var(--accent-primary)] hover:underline"
+              (click)="addRule()"
+            >
+              {{ 'queues.builder.add_rule' | translate }}
+            </button>
           </div>
+
+          <!-- Preview -->
           <div
             class="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]"
           >
             <span>{{ 'queues.builder.preview_label' | translate }}</span>
             <span class="font-mono text-[var(--text-primary)]">{{ previewCount() ?? '—' }}</span>
+            @if (previewCount() === 0) {
+              <span class="text-xs text-[var(--status-warning)]">
+                {{ 'queues.builder.preview_zero' | translate }}
+              </span>
+            }
             <button
               type="button"
               class="ml-auto text-[var(--accent-primary)] hover:underline"
@@ -118,7 +153,47 @@
               {{ 'queues.builder.preview_refresh' | translate }}
             </button>
           </div>
+
+          <!-- Delete (edit mode) -->
+          @if (isEditMode()) {
+            <div class="border-t border-[var(--border-subtle)] pt-4">
+              @if (!deleteConfirmOpen()) {
+                <button
+                  type="button"
+                  class="text-sm text-[var(--status-error)] hover:underline"
+                  (click)="deleteConfirmOpen.set(true)"
+                >
+                  {{ 'queues.builder.delete' | translate }}
+                </button>
+              } @else {
+                <div class="rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_5%,transparent)] p-3">
+                  <p class="text-sm text-[var(--text-primary)]">
+                    {{ 'queues.builder.delete_confirm' | translate: { name: editQueue()?.name } }}
+                  </p>
+                  <div class="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      class="rounded-[var(--radius-md)] bg-[var(--status-error)] px-3 py-1.5 text-sm font-medium text-white"
+                      (click)="confirmDelete()"
+                      [disabled]="deleteMutation.isPending()"
+                    >
+                      {{ 'queues.builder.delete' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                      (click)="deleteConfirmOpen.set(false)"
+                    >
+                      {{ 'actions.cancel' | translate }}
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </div>
+
+        <!-- Footer -->
         <div class="flex justify-end gap-3 border-t border-[var(--border-default)] px-5 py-4">
           <button
             type="button"
@@ -130,9 +205,9 @@
           <button
             type="submit"
             class="rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
-            [disabled]="createMutation.isPending()"
+            [disabled]="saveMutation.isPending()"
           >
-            {{ 'queues.builder.submit' | translate }}
+            {{ (isEditMode() ? 'queues.builder.submit_edit' : 'queues.builder.submit') | translate }}
           </button>
         </div>
       </form>

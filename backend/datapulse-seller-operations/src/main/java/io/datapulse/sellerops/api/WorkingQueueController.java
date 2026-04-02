@@ -83,6 +83,16 @@ public class WorkingQueueController {
         queueService.deleteQueue(workspaceId, queueId);
     }
 
+    @PostMapping("/{queueId}/items")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public QueueItemResponse addManualItem(
+            @PathVariable("workspaceId") Long workspaceId,
+            @PathVariable("queueId") Long queueId,
+            @Valid @RequestBody AddQueueItemRequest request) {
+        return queueService.addManualItem(workspaceId, queueId, request);
+    }
+
     @GetMapping("/{queueId}/items")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<QueueItemResponse> listItems(

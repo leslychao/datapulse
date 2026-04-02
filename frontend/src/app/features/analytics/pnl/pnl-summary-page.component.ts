@@ -26,12 +26,7 @@ import { KpiCardComponent, KpiAccent } from '@shared/components/kpi-card.compone
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
-import { formatMoney } from '@shared/utils/format.utils';
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { formatMoney, currentMonth } from '@shared/utils/format.utils';
 
 type TrendDir = 'up' | 'down' | 'neutral';
 
@@ -75,10 +70,10 @@ interface KpiItem {
             [title]="'analytics.pnl.trend_title' | translate"
             class="lg:col-span-2"
           >
-            <div class="dp-shimmer h-[240px] rounded-[var(--radius-sm)]"></div>
+            <div class="dp-shimmer h-[200px] rounded-[var(--radius-sm)]"></div>
           </dp-section-card>
           <dp-section-card [title]="'analytics.pnl.cost_breakdown' | translate">
-            <div class="dp-shimmer h-[240px] rounded-[var(--radius-sm)]"></div>
+            <div class="dp-shimmer h-[200px] rounded-[var(--radius-sm)]"></div>
           </dp-section-card>
         </div>
       } @else if (summaryQuery.isError()) {
@@ -104,14 +99,14 @@ interface KpiItem {
           >
             <dp-chart
               [options]="trendOptions()"
-              height="240px"
+              height="200px"
               [loading]="trendQuery.isPending()"
             />
           </dp-section-card>
           <dp-section-card [title]="'analytics.pnl.cost_breakdown' | translate">
             <dp-chart
               [options]="donutOptions()"
-              height="240px"
+              height="200px"
             />
           </dp-section-card>
         </div>
@@ -128,7 +123,7 @@ export class PnlSummaryPageComponent {
   readonly shimmerCards = Array.from({ length: 6 });
 
   readonly summaryQuery = injectQuery(() => ({
-    queryKey: ['pnl-summary', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'pnl-summary', this.wsStore.currentWorkspaceId(), this.period()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getPnlSummary(this.wsStore.currentWorkspaceId()!, {
@@ -139,7 +134,7 @@ export class PnlSummaryPageComponent {
   }));
 
   readonly trendQuery = injectQuery(() => ({
-    queryKey: ['pnl-trend', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'pnl-trend', this.wsStore.currentWorkspaceId(), this.period()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getPnlTrend(this.wsStore.currentWorkspaceId()!, {

@@ -5,7 +5,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -14,12 +13,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { PnlByProduct } from '@core/models';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { formatMoney } from '@shared/utils/format.utils';
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { formatMoney, currentMonth } from '@shared/utils/format.utils';
 
 const COGS_STATUS_KEY: Record<string, string> = {
   OK: 'analytics.pnl.cogs_status.OK',
@@ -164,13 +158,12 @@ const COGS_STATUS_COLOR: Record<string, string> = {
 export class PnlByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
-  private readonly router = inject(Router);
   private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
   readonly search = signal('');
   readonly currentPage = signal(0);
-  readonly pageSize = signal(20);
+  readonly pageSize = signal(50);
 
   readonly shimmerRows = Array.from({ length: 8 });
 
@@ -178,7 +171,7 @@ export class PnlByProductPageComponent {
 
   readonly productsQuery = injectQuery(() => ({
     queryKey: [
-      'pnl-by-product',
+      'analytics', 'pnl-by-product',
       this.wsStore.currentWorkspaceId(),
       this.period(),
       this.search(),
@@ -208,7 +201,7 @@ export class PnlByProductPageComponent {
     this.searchTimer = setTimeout(() => {
       this.search.set(input.value);
       this.currentPage.set(0);
-    }, 400);
+    }, 300);
   }
 
   prevPage(): void {

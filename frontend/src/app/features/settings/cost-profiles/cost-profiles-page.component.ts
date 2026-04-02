@@ -6,12 +6,12 @@ import { LucideAngularModule, Plus, Upload, Download } from 'lucide-angular';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { CostProfileApiService } from '@core/api/cost-profile-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { CostProfile, CostProfileImportResult } from '@core/models';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { FormModalComponent } from '@shared/components/form-modal.component';
-import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 
 @Component({
@@ -25,7 +25,6 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
     SpinnerComponent,
     EmptyStateComponent,
     FormModalComponent,
-    ConfirmationModalComponent,
     DateFormatPipe,
   ],
   template: `
@@ -36,20 +35,22 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
           <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.cost_profiles.subtitle' | translate }}</p>
         </div>
         <div class="flex items-center gap-2">
-          <button
-            (click)="showAddModal.set(true)"
-            class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-          >
-            <lucide-icon [img]="PlusIcon" [size]="16" />
-            {{ 'settings.cost_profiles.add' | translate }}
-          </button>
-          <label
-            class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-          >
-            <lucide-icon [img]="UploadIcon" [size]="16" />
-            {{ 'settings.cost_profiles.import_csv' | translate }}
-            <input type="file" accept=".csv" class="hidden" (change)="onFileSelected($event)" />
-          </label>
+          @if (rbac.canEditCostProfiles()) {
+            <button
+              (click)="showAddModal.set(true)"
+              class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+            >
+              <lucide-icon [img]="PlusIcon" [size]="16" />
+              {{ 'settings.cost_profiles.add' | translate }}
+            </button>
+            <label
+              class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+            >
+              <lucide-icon [img]="UploadIcon" [size]="16" />
+              {{ 'settings.cost_profiles.import_csv' | translate }}
+              <input type="file" accept=".csv" class="hidden" (change)="onFileSelected($event)" />
+            </label>
+          }
           <button
             (click)="exportCsv()"
             [disabled]="exportMutation.isPending()"
@@ -90,7 +91,6 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
                   <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_product_name' | translate }}</th>
                   <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_cost_price' | translate }}</th>
                   <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'settings.cost_profiles.col_updated_at' | translate }}</th>
-                  <th class="w-20 px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -113,8 +113,10 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
                         />
                       } @else {
                         <span
-                          (dblclick)="startInlineEdit(cp)"
-                          class="cursor-pointer font-mono text-[var(--text-primary)]"
+                          [attr.role]="rbac.canEditCostProfiles() ? 'button' : null"
+                          (dblclick)="rbac.canEditCostProfiles() && startInlineEdit(cp)"
+                          [class.cursor-pointer]="rbac.canEditCostProfiles()"
+                          class="font-mono text-[var(--text-primary)]"
                           [class.text-[var(--text-tertiary)]]="cp.costPrice == null"
                         >
                           {{ cp.costPrice != null ? (cp.costPrice + ' ₽') : ('settings.cost_profiles.not_set' | translate) }}
@@ -123,14 +125,6 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
                     </td>
                     <td class="px-4 py-2.5 text-right text-[var(--text-secondary)]">
                       {{ cp.updatedAt | dpDateFormat:'short' }}
-                    </td>
-                    <td class="px-4 py-2.5 text-right">
-                      <button
-                        (click)="confirmDelete(cp)"
-                        class="cursor-pointer text-sm text-[var(--status-error)] transition-colors hover:underline"
-                      >
-                        {{ 'actions.delete' | translate }}
-                      </button>
                     </td>
                   </tr>
                 }
@@ -207,15 +201,6 @@ import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
         }
       </dp-form-modal>
 
-      <dp-confirmation-modal
-        [open]="showDeleteModal()"
-        [title]="'settings.cost_profiles.delete_title' | translate"
-        [message]="translate.instant('settings.cost_profiles.delete_message', { sku: profileToDelete()?.skuCode || '' })"
-        [confirmLabel]="'actions.delete' | translate"
-        [danger]="true"
-        (confirmed)="doDelete()"
-        (cancelled)="showDeleteModal.set(false)"
-      />
     </div>
   `,
 })
@@ -227,12 +212,11 @@ export class CostProfilesPageComponent {
   private readonly costProfileApi = inject(CostProfileApiService);
   private readonly toast = inject(ToastService);
   protected readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   readonly showAddModal = signal(false);
-  readonly showDeleteModal = signal(false);
   readonly showImportResult = signal(false);
   readonly importResult = signal<CostProfileImportResult | null>(null);
-  readonly profileToDelete = signal<CostProfile | null>(null);
   readonly editingId = signal<number | null>(null);
 
   searchQuery = '';
@@ -280,16 +264,6 @@ export class CostProfilesPageComponent {
       this.editingId.set(null);
       this.toast.error(this.translate.instant('settings.cost_profiles.error_save'));
     },
-  }));
-
-  readonly deleteMutation = injectMutation(() => ({
-    mutationFn: (id: number) => lastValueFrom(this.costProfileApi.deleteCostProfile(id)),
-    onSuccess: () => {
-      this.profilesQuery.refetch();
-      this.showDeleteModal.set(false);
-      this.toast.success(this.translate.instant('settings.cost_profiles.deleted'));
-    },
-    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.error_delete')),
   }));
 
   readonly importMutation = injectMutation(() => ({
@@ -393,14 +367,4 @@ export class CostProfilesPageComponent {
     this.exportMutation.mutate(undefined as never);
   }
 
-  confirmDelete(cp: CostProfile): void {
-    this.profileToDelete.set(cp);
-    this.showDeleteModal.set(true);
-  }
-
-  doDelete(): void {
-    const cp = this.profileToDelete();
-    if (!cp) return;
-    this.deleteMutation.mutate(cp.id);
-  }
 }

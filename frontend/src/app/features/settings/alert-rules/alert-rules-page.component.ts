@@ -5,6 +5,7 @@ import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AlertRuleApiService } from '@core/api/alert-rule-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { AlertRule, AlertRuleType, AlertSeverity } from '@core/models';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
@@ -90,9 +91,10 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
             <tbody>
               @for (rule of rules; track rule.id) {
                 <tr
-                  class="border-b border-[var(--border-subtle)] cursor-pointer transition-colors hover:bg-[var(--bg-secondary)]"
+                  class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]"
+                  [class.cursor-pointer]="rbac.isAdmin()"
                   [class.bg-[var(--bg-secondary)]]="expandedRuleId() === rule.id"
-                  (click)="toggleExpand(rule)"
+                  (click)="rbac.isAdmin() && toggleExpand(rule)"
                 >
                   <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ ruleTypeLabel(rule.ruleType) }}</td>
                   <td class="px-4 py-2.5 font-mono text-[var(--text-secondary)]">{{ rule.ruleType }}</td>
@@ -100,15 +102,26 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
                     <dp-status-badge [label]="severityLabel(rule.severity)" [color]="severityColor(rule.severity)" />
                   </td>
                   <td class="px-4 py-2.5 text-center">
-                    <button
-                      (click)="toggleEnabled(rule, $event)"
-                      class="cursor-pointer rounded-full px-3 py-0.5 text-xs font-medium transition-colors"
-                      [class]="rule.enabled
-                        ? 'bg-[var(--status-success)]/15 text-[var(--status-success)]'
-                        : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'"
-                    >
-                      {{ rule.enabled ? ('settings.alert_rules.enabled' | translate) : ('settings.alert_rules.disabled' | translate) }}
-                    </button>
+                    @if (rbac.isAdmin()) {
+                      <button
+                        (click)="toggleEnabled(rule, $event)"
+                        class="cursor-pointer rounded-full px-3 py-0.5 text-xs font-medium transition-colors"
+                        [class]="rule.enabled
+                          ? 'bg-[var(--status-success)]/15 text-[var(--status-success)]'
+                          : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'"
+                      >
+                        {{ rule.enabled ? ('settings.alert_rules.enabled' | translate) : ('settings.alert_rules.disabled' | translate) }}
+                      </button>
+                    } @else {
+                      <span
+                        class="rounded-full px-3 py-0.5 text-xs font-medium"
+                        [class]="rule.enabled
+                          ? 'bg-[var(--status-success)]/15 text-[var(--status-success)]'
+                          : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'"
+                      >
+                        {{ rule.enabled ? ('settings.alert_rules.enabled' | translate) : ('settings.alert_rules.disabled' | translate) }}
+                      </span>
+                    }
                   </td>
                   <td class="px-4 py-2.5 text-right text-[var(--text-secondary)]">
                     {{ rule.lastTriggeredAt | dpDateFormat:'short' }}
@@ -196,7 +209,9 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
           </table>
         </div>
 
-        <p class="mt-3 text-xs text-[var(--text-tertiary)]">{{ 'settings.alert_rules.click_to_edit' | translate }}</p>
+        @if (rbac.isAdmin()) {
+          <p class="mt-3 text-xs text-[var(--text-tertiary)]">{{ 'settings.alert_rules.click_to_edit' | translate }}</p>
+        }
       }
     </div>
   `,
@@ -205,6 +220,7 @@ export class AlertRulesPageComponent {
   private readonly alertRuleApi = inject(AlertRuleApiService);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   readonly expandedRuleId = signal<number | null>(null);
   readonly editForm = signal<{

@@ -305,6 +305,31 @@ public class GridPostgresReadRepository {
                 .build();
     }
 
+    public List<Long> findMatchingOfferIds(long workspaceId, GridFilter filter, int maxIds) {
+        var where = new StringBuilder(" WHERE mc.workspace_id = :workspaceId");
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        appendFilters(filter, where, params);
+
+        String sql = "SELECT mo.id " + FROM_JOINS + where + " LIMIT :limit";
+        params.addValue("limit", maxIds);
+        return jdbc.queryForList(sql, params, Long.class);
+    }
+
+    public List<GridRow> findByOrderedIds(List<Long> orderedOfferIds) {
+        if (orderedOfferIds == null || orderedOfferIds.isEmpty()) {
+            return List.of();
+        }
+        String sql = BASE_SELECT + FROM_JOINS
+                + " WHERE mo.id IN (:offerIds)"
+                + " ORDER BY array_position(ARRAY[" + joinIds(orderedOfferIds) + "], mo.id)";
+        var params = new MapSqlParameterSource("offerIds", orderedOfferIds);
+        return jdbc.query(sql, params, this::mapGridRow);
+    }
+
+    private String joinIds(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+    }
+
     public GridKpiRow findKpi(long workspaceId) {
         var params = new MapSqlParameterSource("workspaceId", workspaceId);
         return jdbc.queryForObject(KPI_SQL, params, this::mapKpiRow);

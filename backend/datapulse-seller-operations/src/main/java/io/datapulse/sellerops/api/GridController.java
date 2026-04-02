@@ -5,20 +5,20 @@ import io.datapulse.sellerops.domain.GridExportService;
 import io.datapulse.sellerops.domain.GridService;
 import io.datapulse.sellerops.domain.SavedViewService;
 import io.datapulse.sellerops.persistence.SavedViewEntity;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -89,7 +89,40 @@ public class GridController {
 
     @GetMapping("/export")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public void exportCsv(
+    public ResponseEntity<StreamingResponseBody> exportCsv(
+            @PathVariable("workspaceId") Long workspaceId,
+            @RequestParam(value = "marketplace_type", required = false) List<String> marketplaceType,
+            @RequestParam(value = "connection_id", required = false) List<Long> connectionId,
+            @RequestParam(value = "status", required = false) List<String> status,
+            @RequestParam(value = "sku_code", required = false) String skuCode,
+            @RequestParam(value = "product_name", required = false) String productName,
+            @RequestParam(value = "category_id", required = false) List<Long> categoryId,
+            @RequestParam(value = "margin_min", required = false) BigDecimal marginMin,
+            @RequestParam(value = "margin_max", required = false) BigDecimal marginMax,
+            @RequestParam(value = "has_manual_lock", required = false) Boolean hasManualLock,
+            @RequestParam(value = "has_active_promo", required = false) Boolean hasActivePromo) {
+
+        GridFilter filter = new GridFilter(
+                marketplaceType, connectionId, status, skuCode, productName,
+                categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
+                null, null, null, null
+        );
+
+        String filename = "datapulse-export-"
+                + LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) + ".csv";
+
+        StreamingResponseBody body = out ->
+                exportService.exportCsv(workspaceId, filter, out);
+
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/csv; charset=UTF-8")
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .body(body);
+    }
+
+    @GetMapping("/matching-ids")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public List<Long> getMatchingIds(
             @PathVariable("workspaceId") Long workspaceId,
             @RequestParam(value = "marketplace_type", required = false) List<String> marketplaceType,
             @RequestParam(value = "connection_id", required = false) List<Long> connectionId,
@@ -101,21 +134,17 @@ public class GridController {
             @RequestParam(value = "margin_max", required = false) BigDecimal marginMax,
             @RequestParam(value = "has_manual_lock", required = false) Boolean hasManualLock,
             @RequestParam(value = "has_active_promo", required = false) Boolean hasActivePromo,
-            HttpServletResponse response) throws IOException {
+            @RequestParam(value = "last_decision", required = false) String lastDecision,
+            @RequestParam(value = "last_action_status", required = false) String lastActionStatus,
+            @RequestParam(value = "stock_risk", required = false) String stockRisk) {
 
         GridFilter filter = new GridFilter(
                 marketplaceType, connectionId, status, skuCode, productName,
                 categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
-                null, null, null, null
+                lastDecision, lastActionStatus, null, stockRisk
         );
 
-        String filename = "datapulse-export-"
-                + LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) + ".csv";
-
-        response.setContentType("text/csv; charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-
-        exportService.exportCsv(workspaceId, filter, response.getOutputStream());
+        return gridService.getMatchingOfferIds(workspaceId, filter);
     }
 
     private Sort buildSort(String column, String direction) {
@@ -142,7 +171,8 @@ public class GridController {
                 f.get("has_active_promo") instanceof Boolean b ? b : null,
                 f.get("last_decision") instanceof String s ? s : null,
                 f.get("last_action_status") instanceof String s ? s : null,
-                null
+                null,
+                f.get("stock_risk") instanceof String s ? s : null
         );
     }
 

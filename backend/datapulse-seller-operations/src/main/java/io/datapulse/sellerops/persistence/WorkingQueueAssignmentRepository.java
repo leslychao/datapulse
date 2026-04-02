@@ -27,6 +27,18 @@ public interface WorkingQueueAssignmentRepository extends JpaRepository<WorkingQ
 
     Optional<WorkingQueueAssignmentEntity> findByIdAndQueueDefinitionId(long id, long queueDefinitionId);
 
+    @Modifying
+    @Query("""
+            UPDATE WorkingQueueAssignmentEntity a
+            SET a.status = 'IN_PROGRESS', a.assignedToUserId = :userId
+            WHERE a.id = :itemId
+              AND a.queueDefinitionId = :queueId
+              AND a.status = 'PENDING'
+            """)
+    int casClaim(@Param("itemId") long itemId,
+                 @Param("queueId") long queueDefinitionId,
+                 @Param("userId") long userId);
+
     @Query("""
             SELECT COUNT(a) FROM WorkingQueueAssignmentEntity a
             WHERE a.queueDefinitionId = :queueId AND a.status = :status

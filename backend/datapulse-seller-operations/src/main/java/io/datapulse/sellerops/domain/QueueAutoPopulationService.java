@@ -1,5 +1,7 @@
 package io.datapulse.sellerops.domain;
 
+import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
+import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
 import io.datapulse.sellerops.persistence.WorkingQueueAssignmentEntity;
 import io.datapulse.sellerops.persistence.WorkingQueueAssignmentRepository;
 import io.datapulse.sellerops.persistence.WorkingQueueDefinitionEntity;
@@ -27,6 +29,10 @@ public class QueueAutoPopulationService {
     private final WorkingQueueAssignmentRepository assignmentRepository;
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate transactionTemplate;
+    private final GridClickHouseReadRepository chRepository;
+    private final GridPostgresReadRepository pgRepository;
+
+    private static final int MAX_BATCH_SIZE = 1000;
 
     public void populateAllQueues() {
         List<WorkingQueueDefinitionEntity> queues =
@@ -84,8 +90,15 @@ public class QueueAutoPopulationService {
             return;
         }
 
+        long activeCount = assignmentRepository.countActiveByQueue(queue.getId());
+        int remainingCapacity = (int) Math.max(0, MAX_BATCH_SIZE - activeCount);
+
         int added = 0;
         for (Long entityId : matchingIds) {
+            if (added >= remainingCapacity) {
+                log.warn("Queue batch limit reached: queueId={}, limit={}", queue.getId(), MAX_BATCH_SIZE);
+                break;
+            }
             if (assignmentRepository.findActiveAssignment(
                     queue.getId(), entityType, entityId).isEmpty()) {
                 var assignment = new WorkingQueueAssignmentEntity();
@@ -108,7 +121,7 @@ public class QueueAutoPopulationService {
 
     private Set<Long> evaluateCriteria(long workspaceId, String entityType,
                                         List<MatchRule> matchRules) {
-        return switch (entityType) {
+        Set<Long> pgIds = switch (entityType) {
             case "price_action" -> evaluatePriceActionCriteria(workspaceId, matchRules);
             case "marketplace_offer" -> evaluateOfferCriteria(workspaceId, matchRules);
             default -> {
@@ -116,6 +129,41 @@ public class QueueAutoPopulationService {
                 yield Set.of();
             }
         };
+
+        List<MatchRule> chRules = matchRules.stream()
+                .filter(r -> isChField(r.field))
+                .toList();
+
+        if (chRules.isEmpty()) {
+            return pgIds;
+        }
+
+        Set<Long> chIds = evaluateChCriteria(workspaceId, chRules);
+        if (pgIds.isEmpty()) {
+            return chIds;
+        }
+        pgIds.retainAll(chIds);
+        return pgIds;
+    }
+
+    private boolean isChField(String field) {
+        return "stock_risk".equals(field) || "days_of_cover_lt".equals(field);
+    }
+
+    private Set<Long> evaluateChCriteria(long workspaceId, List<MatchRule> chRules) {
+        try {
+            List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+            Set<Long> result = new HashSet<>();
+            for (MatchRule rule : chRules) {
+                if ("stock_risk".equals(rule.field) && rule.value instanceof String risk) {
+                    result.addAll(chRepository.findOfferIdsByStockRisk(connectionIds, risk));
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("CH criteria evaluation failed, skipping CH filter: error={}", e.getMessage());
+            return Set.of();
+        }
     }
 
     private Set<Long> evaluatePriceActionCriteria(long workspaceId,

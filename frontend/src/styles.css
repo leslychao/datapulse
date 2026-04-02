@@ -155,6 +155,11 @@ router-outlet + * {
   animation: dp-shimmer 1.5s ease infinite;
 }
 
+/* CRITICAL row left border in AG Grid */
+.dp-critical-row {
+  border-left: 2px solid var(--status-error) !important;
+}
+
 /* Background flash for WS updates */
 @keyframes dp-flash {
   0% { background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent); }

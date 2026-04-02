@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { MemberApiService } from '@core/api/member-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { Member, WorkspaceRole } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -13,6 +14,9 @@ import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
+
+const ALL_ROLES: WorkspaceRole[] = ['ADMIN', 'PRICING_MANAGER', 'OPERATOR', 'ANALYST', 'VIEWER'];
+const NON_ADMIN_ROLES: WorkspaceRole[] = ['PRICING_MANAGER', 'OPERATOR', 'ANALYST', 'VIEWER'];
 
 @Component({
   selector: 'dp-team-page',
@@ -50,16 +54,23 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
                   <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_email' | translate }}</th>
                   <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_role' | translate }}</th>
                   <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_joined' | translate }}</th>
-                  <th class="px-4 py-2"></th>
+                  @if (rbac.isAdmin()) {
+                    <th class="px-4 py-2"></th>
+                  }
                 </tr>
               </thead>
               <tbody>
                 @for (m of members; track m.userId) {
                   <tr class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]">
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ m.name }}</td>
+                    <td class="px-4 py-2.5 text-[var(--text-primary)]">
+                      {{ m.name }}
+                      @if (isSelf(m)) {
+                        <span class="ml-1 text-xs text-[var(--text-tertiary)]">({{ 'settings.team.you' | translate }})</span>
+                      }
+                    </td>
                     <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ m.email }}</td>
                     <td class="px-4 py-2.5">
-                      @if (m.role === 'OWNER') {
+                      @if (m.role === 'OWNER' || !rbac.isAdmin() || isSelf(m)) {
                         <span class="text-sm font-medium text-[var(--text-primary)]">{{ m.role | dpRoleLabel }}</span>
                       } @else {
                         <select
@@ -68,7 +79,7 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
                           [disabled]="roleChangeMutation.isPending()"
                           class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-50"
                         >
-                          @for (role of assignableRoles; track role) {
+                          @for (role of assignableRoles(); track role) {
                             <option [value]="role">{{ role | dpRoleLabel }}</option>
                           }
                         </select>
@@ -77,16 +88,18 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
                     <td class="px-4 py-2.5 text-[var(--text-secondary)]">
                       {{ m.createdAt | dpDateFormat:'short' }}
                     </td>
-                    <td class="px-4 py-2.5 text-right">
-                      @if (m.role !== 'OWNER') {
-                        <button
-                          (click)="confirmRemove(m)"
-                          class="cursor-pointer text-sm text-[var(--status-error)] transition-colors hover:underline"
-                        >
-                          {{ 'actions.delete' | translate }}
-                        </button>
-                      }
-                    </td>
+                    @if (rbac.isAdmin()) {
+                      <td class="px-4 py-2.5 text-right">
+                        @if (m.role !== 'OWNER' && !isSelf(m)) {
+                          <button
+                            (click)="confirmRemove(m)"
+                            class="cursor-pointer text-sm text-[var(--status-error)] transition-colors hover:underline"
+                          >
+                            {{ 'actions.delete' | translate }}
+                          </button>
+                        }
+                      </td>
+                    }
                   </tr>
                 }
               </tbody>
@@ -112,11 +125,14 @@ export class TeamPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   protected readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   readonly showRemoveModal = signal(false);
   readonly memberToRemove = signal<Member | null>(null);
 
-  readonly assignableRoles: WorkspaceRole[] = ['ADMIN', 'PRICING_MANAGER', 'OPERATOR', 'ANALYST', 'VIEWER'];
+  readonly assignableRoles = computed<WorkspaceRole[]>(() =>
+    this.rbac.isOwner() ? ALL_ROLES : NON_ADMIN_ROLES,
+  );
 
   readonly membersQuery = injectQuery(() => ({
     queryKey: ['members', this.wsStore.currentWorkspaceId()],
@@ -144,6 +160,10 @@ export class TeamPageComponent {
     },
     onError: () => this.toast.error(this.translate.instant('settings.team.remove_error')),
   }));
+
+  isSelf(member: Member): boolean {
+    return member.userId === this.rbac.currentUserId();
+  }
 
   changeRole(member: Member, newRole: WorkspaceRole): void {
     this.roleChangeMutation.mutate({ userId: member.userId, role: newRole });

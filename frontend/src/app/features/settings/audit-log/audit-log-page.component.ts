@@ -199,6 +199,11 @@ export class AuditLogPageComponent {
 
   readonly filterConfigs: FilterConfig[] = [
     {
+      key: 'actorName',
+      label: 'settings.audit_log.filter.user',
+      type: 'text',
+    },
+    {
       key: 'actionType',
       label: 'settings.audit_log.filter.action_type',
       type: 'select',

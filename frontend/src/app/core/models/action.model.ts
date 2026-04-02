@@ -82,6 +82,7 @@ export interface ActionFilter {
   search?: string;
   from?: string;
   to?: string;
+  actionIds?: number[];
 }
 
 export interface BulkApproveRequest {

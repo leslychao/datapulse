@@ -50,15 +50,15 @@ export class QueueLayoutComponent {
       const wsId = this.wsStore.currentWorkspaceId();
       const list = this.queuesQuery.data();
       const pending = this.queuesQuery.isPending();
-      if (!wsId || pending || !list?.length) {
-        return;
-      }
-      if (!this.route.firstChild) {
-        void this.router.navigate(
-          ['/workspace', wsId, 'queues', list[0].queueId],
-          { replaceUrl: true },
-        );
-      }
+      if (!wsId || pending || !list?.length) return;
+      if (this.route.firstChild) return;
+
+      const firstNonEmpty = list.find((q) => q.totalActiveCount > 0);
+      const target = firstNonEmpty ?? list[0];
+      void this.router.navigate(
+        ['/workspace', wsId, 'queues', target.queueId],
+        { replaceUrl: true },
+      );
     });
   }
 }

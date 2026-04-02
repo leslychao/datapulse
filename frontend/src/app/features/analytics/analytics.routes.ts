@@ -7,11 +7,12 @@ const routes: Routes = [
     path: '',
     component: AnalyticsLayoutComponent,
     children: [
-      { path: '', redirectTo: 'pnl', pathMatch: 'full' },
+      { path: '', redirectTo: 'pnl/summary', pathMatch: 'full' },
 
       // P&L
+      { path: 'pnl', redirectTo: 'pnl/summary', pathMatch: 'full' },
       {
-        path: 'pnl',
+        path: 'pnl/summary',
         loadComponent: () =>
           import('./pnl/pnl-summary-page.component').then(
             (m) => m.PnlSummaryPageComponent,
@@ -52,8 +53,9 @@ const routes: Routes = [
       },
 
       // Inventory
+      { path: 'inventory', redirectTo: 'inventory/overview', pathMatch: 'full' },
       {
-        path: 'inventory',
+        path: 'inventory/overview',
         loadComponent: () =>
           import('./inventory/inventory-overview-page.component').then(
             (m) => m.InventoryOverviewPageComponent,
@@ -78,8 +80,9 @@ const routes: Routes = [
       },
 
       // Returns
+      { path: 'returns', redirectTo: 'returns/summary', pathMatch: 'full' },
       {
-        path: 'returns',
+        path: 'returns/summary',
         loadComponent: () =>
           import('./returns/returns-summary-page.component').then(
             (m) => m.ReturnsSummaryPageComponent,
@@ -104,8 +107,9 @@ const routes: Routes = [
       },
 
       // Data Quality
+      { path: 'data-quality', redirectTo: 'data-quality/status', pathMatch: 'full' },
       {
-        path: 'data-quality',
+        path: 'data-quality/status',
         loadComponent: () =>
           import('./data-quality/data-quality-status-page.component').then(
             (m) => m.DataQualityStatusPageComponent,

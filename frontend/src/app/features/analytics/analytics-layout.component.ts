@@ -24,23 +24,23 @@ const SECTION_TABS: NavTab[] = [
 
 const SUB_NAV: Record<string, SubNavLink[]> = {
   pnl: [
-    { labelKey: 'analytics.subnav.pnl.summary', path: 'pnl', exact: true },
+    { labelKey: 'analytics.subnav.pnl.summary', path: 'pnl/summary', exact: true },
     { labelKey: 'analytics.subnav.pnl.by_product', path: 'pnl/by-product', exact: true },
     { labelKey: 'analytics.subnav.pnl.by_posting', path: 'pnl/by-posting', exact: true },
     { labelKey: 'analytics.subnav.pnl.trend', path: 'pnl/trend', exact: true },
   ],
   inventory: [
-    { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory', exact: true },
+    { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory/overview', exact: true },
     { labelKey: 'analytics.subnav.inventory.by_product', path: 'inventory/by-product', exact: true },
     { labelKey: 'analytics.subnav.inventory.history', path: 'inventory/stock-history', exact: true },
   ],
   returns: [
-    { labelKey: 'analytics.subnav.returns.summary', path: 'returns', exact: true },
+    { labelKey: 'analytics.subnav.returns.summary', path: 'returns/summary', exact: true },
     { labelKey: 'analytics.subnav.returns.by_product', path: 'returns/by-product', exact: true },
     { labelKey: 'analytics.subnav.returns.trend', path: 'returns/trend', exact: true },
   ],
   'data-quality': [
-    { labelKey: 'analytics.subnav.data_quality.status', path: 'data-quality', exact: true },
+    { labelKey: 'analytics.subnav.data_quality.status', path: 'data-quality/status', exact: true },
     { labelKey: 'analytics.subnav.data_quality.reconciliation', path: 'data-quality/reconciliation', exact: true },
   ],
 };

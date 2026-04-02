@@ -2,13 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   ElementRef,
   HostListener,
   inject,
+  OnInit,
   signal,
   viewChild,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
@@ -19,7 +21,8 @@ import {
 import { lastValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 
-import { ClipboardList, Clock, Play, XCircle, Download } from 'lucide-angular';
+import { LucideAngularModule, ClipboardList, Clock, Play, XCircle, Download, Columns3 } from 'lucide-angular';
+import { GridApi } from 'ag-grid-community';
 
 import { ActionApiService } from '@core/api/action-api.service';
 import { ConnectionApiService } from '@core/api/connection-api.service';
@@ -70,6 +73,7 @@ interface ContextMenuState {
     TranslatePipe, FormsModule,
     KpiCardComponent, FilterBarComponent, DataGridComponent,
     EmptyStateComponent, ConfirmationModalComponent, FormModalComponent,
+    LucideAngularModule,
   ],
   template: `
     <div class="flex h-full flex-col">
@@ -105,7 +109,7 @@ interface ContextMenuState {
         />
       </div>
 
-      <!-- Toolbar: Filters + Export -->
+      <!-- Toolbar: Filters + Columns + Export -->
       <div class="flex items-center gap-3 px-4 pt-2">
         <div class="flex-1">
           <dp-filter-bar
@@ -113,6 +117,25 @@ interface ContextMenuState {
             [values]="filterValues()"
             (filtersChanged)="onFiltersChanged($event)"
           />
+        </div>
+        <div class="relative">
+          <button
+            (click)="toggleColumnsPopover()"
+            class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+            [attr.aria-label]="'execution.list.columns' | translate"
+          >
+            <lucide-icon [img]="ColumnsIcon" [size]="16" />
+          </button>
+          @if (showColumnsPopover()) {
+            <div class="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2 shadow-[var(--shadow-md)]">
+              @for (col of toggleableColumns(); track col.field) {
+                <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]">
+                  <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col.field)" class="accent-[var(--accent-primary)]" />
+                  {{ col.label }}
+                </label>
+              }
+            </div>
+          }
         </div>
         @if (rbac.canExport()) {
           <button
@@ -156,6 +179,7 @@ interface ContextMenuState {
             (cellDoubleClicked)="onRowDoubleClicked($event)"
             (selectionChanged)="onSelectionChanged($event)"
             (contextMenu)="onContextMenu($event)"
+            (gridReady)="onGridReady($event)"
           />
         }
       </div>
@@ -186,6 +210,13 @@ interface ContextMenuState {
             </button>
           }
           <button
+            (click)="exportSelectedCsv()"
+            [disabled]="exportPending()"
+            class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+          >
+            {{ 'execution.list.export' | translate }}
+          </button>
+          <button
             (click)="clearSelection()"
             class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
           >
@@ -196,14 +227,57 @@ interface ContextMenuState {
     </div>
 
     <!-- Bulk Approve Modal -->
-    <dp-confirmation-modal
-      [open]="showBulkApproveModal()"
+    <dp-form-modal
       [title]="'execution.bulk.approve_title' | translate"
-      [message]="bulkApproveMessage()"
-      [confirmLabel]="bulkApproveLabel()"
-      (confirmed)="executeBulkApprove()"
-      (cancelled)="showBulkApproveModal.set(false)"
-    />
+      [isOpen]="showBulkApproveModal()"
+      [submitLabel]="bulkApproveLabel()"
+      [isPending]="bulkApproveMutation.isPending()"
+      [submitDisabled]="pendingSelected().length === 0"
+      (submit)="executeBulkApprove()"
+      (close)="showBulkApproveModal.set(false)"
+    >
+      <div class="flex flex-col gap-3">
+        <div class="rounded-[var(--radius-md)] bg-[var(--bg-secondary)] p-3 text-sm">
+          <div class="flex justify-between text-[var(--text-secondary)]">
+            <span>{{ 'execution.bulk.selected_count' | translate }}</span>
+            <span class="font-medium text-[var(--text-primary)]">{{ selectedRows().length }}</span>
+          </div>
+          <div class="mt-1 flex justify-between text-[var(--text-secondary)]">
+            <span>{{ 'execution.bulk.eligible_count' | translate }}</span>
+            <span class="font-medium text-[var(--text-primary)]">{{ pendingSelected().length }}</span>
+          </div>
+          @if (selectedRows().length - pendingSelected().length > 0) {
+            <div class="mt-1 flex justify-between text-[var(--text-secondary)]">
+              <span>{{ 'execution.bulk.skipped_count' | translate }}</span>
+              <span class="font-medium text-[var(--text-tertiary)]">{{ selectedRows().length - pendingSelected().length }}</span>
+            </div>
+          }
+        </div>
+        @if (pendingSelected().length > 0) {
+          <div>
+            <p class="mb-1.5 text-xs font-medium text-[var(--text-secondary)]">{{ 'execution.bulk.preview_list_title' | translate }}</p>
+            <div class="max-h-[200px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
+              @for (item of pendingSelected().slice(0, 5); track item.id) {
+                <div class="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0">
+                  <div class="min-w-0 flex-1">
+                    <span class="block truncate text-sm text-[var(--text-primary)]">{{ item.offerName }}</span>
+                    <span class="text-[11px] text-[var(--text-tertiary)]">{{ item.sku }}</span>
+                  </div>
+                  <span class="ml-3 whitespace-nowrap font-mono text-sm text-[var(--text-primary)]">{{ formatPrice(item.targetPrice) }}</span>
+                </div>
+              }
+              @if (pendingSelected().length > 5) {
+                <div class="px-3 py-2 text-center text-xs text-[var(--text-tertiary)]">
+                  {{ 'execution.bulk.preview_more' | translate:{ count: pendingSelected().length - 5 } }}
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <p class="text-center text-sm text-[var(--text-tertiary)]">{{ 'execution.bulk.no_eligible' | translate }}</p>
+        }
+      </div>
+    </dp-form-modal>
 
     <!-- Bulk Cancel Modal -->
     <dp-form-modal
@@ -275,11 +349,12 @@ interface ContextMenuState {
     }
   `,
 })
-export class ActionsListPageComponent {
+export class ActionsListPageComponent implements OnInit {
   private readonly actionApi = inject(ActionApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
@@ -291,6 +366,7 @@ export class ActionsListPageComponent {
   protected readonly PlayIcon = Play;
   protected readonly XCircleIcon = XCircle;
   protected readonly DownloadIcon = Download;
+  protected readonly ColumnsIcon = Columns3;
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly selectedRows = signal<ActionSummary[]>([]);
@@ -301,12 +377,56 @@ export class ActionsListPageComponent {
   readonly currentPage = signal(0);
   readonly currentSort = signal('createdAt,desc');
   readonly ctxMenu = signal<ContextMenuState>({ visible: false, x: 0, y: 0, row: null });
+  readonly showColumnsPopover = signal(false);
+  readonly columnVisibility = signal<Record<string, boolean>>({});
+  private gridApiRef: GridApi | null = null;
+  private skipUrlSync = false;
+
+  constructor() {
+    effect(() => {
+      if (this.skipUrlSync) return;
+      const vals = this.filterValues();
+      const params: Record<string, string> = {};
+      if (vals['connectionId']) params['connectionId'] = vals['connectionId'];
+      if (vals['status']?.length) params['status'] = vals['status'].join(',');
+      if (vals['executionMode']) params['mode'] = vals['executionMode'];
+      if (vals['search']) params['search'] = vals['search'];
+      if (vals['period']?.from) params['from'] = vals['period'].from;
+      if (vals['period']?.to) params['to'] = vals['period'].to;
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: params,
+        queryParamsHandling: 'replace',
+        replaceUrl: true,
+      });
+    });
+  }
+
+  ngOnInit(): void {
+    const qp = this.route.snapshot.queryParams;
+    const restored: Record<string, any> = {};
+    if (qp['connectionId']) restored['connectionId'] = qp['connectionId'];
+    if (qp['status']) restored['status'] = qp['status'].split(',');
+    if (qp['mode']) restored['executionMode'] = qp['mode'];
+    if (qp['search']) restored['search'] = qp['search'];
+    if (qp['from'] || qp['to']) {
+      restored['period'] = { from: qp['from'] ?? '', to: qp['to'] ?? '' };
+    }
+    if (Object.keys(restored).length > 0) {
+      this.skipUrlSync = true;
+      this.filterValues.set(restored);
+      this.skipUrlSync = false;
+    }
+  }
 
   @HostListener('document:click')
   @HostListener('document:keydown.escape')
-  closeContextMenu(): void {
+  closeOverlays(): void {
     if (this.ctxMenu().visible) {
       this.ctxMenu.set({ visible: false, x: 0, y: 0, row: null });
+    }
+    if (this.showColumnsPopover()) {
+      this.showColumnsPopover.set(false);
     }
   }
 
@@ -542,7 +662,7 @@ export class ActionsListPageComponent {
     return kpi && kpi.failed > 0 ? kpi.failed.toLocaleString('ru-RU') : null;
   });
 
-  private readonly pendingSelected = computed(() =>
+  readonly pendingSelected = computed(() =>
     this.selectedRows().filter((r) => r.status === 'PENDING_APPROVAL'),
   );
 
@@ -698,17 +818,56 @@ export class ActionsListPageComponent {
     }
   }
 
+  onGridReady(api: GridApi): void {
+    this.gridApiRef = api;
+    const vis: Record<string, boolean> = {};
+    api.getColumns()?.forEach((col) => {
+      const id = col.getColId();
+      if (id && !id.startsWith('0')) vis[id] = col.isVisible();
+    });
+    this.columnVisibility.set(vis);
+  }
+
+  readonly toggleableColumns = computed(() => {
+    const vis = this.columnVisibility();
+    return this.columnDefs
+      .filter((c: any) => c.field && c.headerName)
+      .map((c: any) => ({ field: c.field as string, label: c.headerName as string, visible: vis[c.field] !== false }));
+  });
+
+  toggleColumnsPopover(): void {
+    this.showColumnsPopover.update(v => !v);
+  }
+
+  toggleColumn(field: string): void {
+    if (!this.gridApiRef) return;
+    const current = this.columnVisibility()[field] !== false;
+    this.gridApiRef.setColumnsVisible([field], !current);
+    this.columnVisibility.update(v => ({ ...v, [field]: !current }));
+  }
+
   exportCsv(): void {
     this.exportPending.set(true);
     lastValueFrom(
       this.actionApi.exportActions(this.wsStore.currentWorkspaceId()!, this.filter()),
     ).then((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `actions-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      this.downloadBlob(blob, `actions-${new Date().toISOString().slice(0, 10)}.csv`);
+      this.exportPending.set(false);
+      this.toast.success(this.translate.instant('execution.list.export_success'));
+    }).catch(() => {
+      this.exportPending.set(false);
+      this.toast.error(this.translate.instant('execution.list.export_error'));
+    });
+  }
+
+  exportSelectedCsv(): void {
+    if (!this.gridApiRef) return;
+    this.exportPending.set(true);
+    const ids = this.selectedRows().map(r => r.id);
+    lastValueFrom(
+      this.actionApi.exportActions(this.wsStore.currentWorkspaceId()!, { ...this.filter(), actionIds: ids }),
+    ).then((blob) => {
+      this.downloadBlob(blob, `actions-selected-${new Date().toISOString().slice(0, 10)}.csv`);
       this.exportPending.set(false);
       this.toast.success(this.translate.instant('execution.list.export_success'));
     }).catch(() => {
@@ -770,11 +929,20 @@ export class ActionsListPageComponent {
     this.queryClient.invalidateQueries({ queryKey: ['actions-kpi'] });
   }
 
-  private formatPrice(value: number | null): string {
+  formatPrice(value: number | null): string {
     return formatMoney(value, 0);
   }
 
   private formatRelativeTime(iso: string | null): string {
     return formatRelativeTime(iso);
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }

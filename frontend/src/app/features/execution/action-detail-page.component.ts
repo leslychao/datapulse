@@ -11,7 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, Subscription } from 'rxjs';
@@ -65,7 +65,7 @@ const OUTCOME_COLOR: Record<string, StatusColor> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe, LucideAngularModule, StatusBadgeComponent,
-    FormModalComponent, ConfirmationModalComponent, FormsModule,
+    FormModalComponent, ConfirmationModalComponent, FormsModule, RouterLink,
   ],
   templateUrl: './action-detail-page.component.html',
 })
@@ -111,6 +111,7 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
   readonly expandedAttempt = signal<number | null>(null);
   readonly actionPending = signal(false);
 
+  readonly cancelConfirmText = signal('');
   readonly reconcileOutcome = signal<'SUCCEEDED' | 'FAILED'>('SUCCEEDED');
   readonly reconcileReason = signal('');
   readonly reconcileConfirmText = signal('');
@@ -318,6 +319,7 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
 
   openReasonModal(type: 'reject' | 'cancel' | 'retry'): void {
     this.reasonText.set('');
+    this.cancelConfirmText.set('');
     if (type === 'reject') this.showRejectModal.set(true);
     else if (type === 'cancel') this.showCancelModal.set(true);
     else this.showRetryModal.set(true);

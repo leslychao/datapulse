@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -6,6 +6,7 @@ import { LucideAngularModule, Send, RotateCcw, X } from 'lucide-angular';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { InvitationApiService } from '@core/api/invitation-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { Invitation, WorkspaceRole } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -60,7 +61,7 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
               name="inviteRole"
               class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             >
-              @for (role of assignableRoles; track role.value) {
+              @for (role of assignableRoles(); track role.value) {
                 <option [value]="role.value">{{ role.value | dpRoleLabel }}</option>
               }
             </select>
@@ -165,20 +166,27 @@ export class InvitationsPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   protected readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   inviteEmail = '';
-  inviteRole: WorkspaceRole = 'VIEWER';
+  inviteRole: WorkspaceRole = 'ANALYST';
 
   readonly showCancelModal = signal(false);
   readonly invToCancel = signal<Invitation | null>(null);
 
-  readonly assignableRoles = [
-    { value: 'ADMIN' as WorkspaceRole },
-    { value: 'PRICING_MANAGER' as WorkspaceRole },
-    { value: 'OPERATOR' as WorkspaceRole },
-    { value: 'ANALYST' as WorkspaceRole },
-    { value: 'VIEWER' as WorkspaceRole },
-  ];
+  readonly assignableRoles = computed(() => {
+    const roles: { value: WorkspaceRole }[] = [];
+    if (this.rbac.isOwner()) {
+      roles.push({ value: 'ADMIN' });
+    }
+    roles.push(
+      { value: 'PRICING_MANAGER' },
+      { value: 'OPERATOR' },
+      { value: 'ANALYST' },
+      { value: 'VIEWER' },
+    );
+    return roles;
+  });
 
   readonly invitationsQuery = injectQuery(() => ({
     queryKey: ['invitations', this.wsStore.currentWorkspaceId()],
@@ -247,10 +255,10 @@ export class InvitationsPageComponent {
 
   invStatusColor(status: string): 'success' | 'error' | 'warning' | 'info' | 'neutral' {
     switch (status) {
-      case 'PENDING': return 'info';
+      case 'PENDING': return 'warning';
       case 'ACCEPTED': return 'success';
       case 'CANCELLED': return 'neutral';
-      case 'EXPIRED': return 'warning';
+      case 'EXPIRED': return 'error';
       default: return 'neutral';
     }
   }

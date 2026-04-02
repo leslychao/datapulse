@@ -15,7 +15,7 @@ public class QueueAutoPopulationScheduler {
     private final QueueAutoPopulationService autoPopulationService;
 
     @Scheduled(fixedDelayString = "${datapulse.queue.auto-populate-interval:PT5M}")
-    @SchedulerLock(name = "queueAutoPopulation", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
+    @SchedulerLock(name = "queueAutoPopulation", lockAtMostFor = "PT2M", lockAtLeastFor = "PT30S")
     public void autoPopulateQueues() {
         try {
             autoPopulationService.populateAllQueues();

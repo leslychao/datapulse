@@ -91,12 +91,16 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 
           <!-- Margin Impact Chart -->
           <dp-section-card [title]="'execution.simulation.margin_impact' | translate">
-            <dp-chart [options]="marginChartOptions()" height="300px" />
+            <div [attr.aria-label]="marginChartAriaLabel()" role="img">
+              <dp-chart [options]="marginChartOptions()" height="300px" />
+            </div>
           </dp-section-card>
 
           <!-- Distribution Chart -->
           <dp-section-card [title]="'execution.simulation.distribution_title' | translate">
-            <dp-chart [options]="distributionChartOptions()" height="250px" />
+            <div [attr.aria-label]="distributionChartAriaLabel()" role="img">
+              <dp-chart [options]="distributionChartOptions()" height="250px" />
+            </div>
           </dp-section-card>
         }
       }
@@ -257,4 +261,20 @@ export class SimulationPageComponent {
   protected formatCoverage(pct: number): string {
     return `${Math.round(pct * 100)}%`;
   }
+
+  protected readonly marginChartAriaLabel = computed(() => {
+    const sim = this.simulationQuery.data();
+    if (!sim) return '';
+    const items = sim.perConnectionBreakdown.map(b =>
+      `${b.connectionName}: ${b.marginImpact >= 0 ? '+' : ''}${b.marginImpact.toLocaleString('ru-RU')}₽`,
+    );
+    return this.translate.instant('execution.simulation.margin_impact') + ': ' + items.join(', ');
+  });
+
+  protected readonly distributionChartAriaLabel = computed(() => {
+    const sim = this.simulationQuery.data();
+    if (!sim) return '';
+    const items = sim.deltaDistribution.map(d => `${d.bucket}: ${d.count}`);
+    return this.translate.instant('execution.simulation.distribution_title') + ': ' + items.join(', ');
+  });
 }

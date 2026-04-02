@@ -47,7 +47,7 @@
       <div
         class="flex h-48 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-secondary)]"
       >
-        Chart placeholder - integrate ECharts
+        {{ 'mismatches.charts.donut_placeholder' | translate }}
       </div>
       <div
         class="flex h-48 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-secondary)]"
@@ -192,6 +192,7 @@
           [defaultColDef]="defaultColDef"
           [rowData]="rows()"
           [getRowId]="getRowId"
+          [getRowClass]="getRowClass"
           [rowSelection]="'multiple'"
           [suppressCellFocus]="true"
           [animateRows]="false"
@@ -210,24 +211,38 @@
         class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5 text-sm text-[var(--text-secondary)]"
       >
         <span>{{ 'mismatches.pagination.total' | translate: { count: totalElements() } }}</span>
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            (click)="prevPage()"
-            [disabled]="currentPage() === 0"
-            class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
-          >
-            {{ 'common.prev' | translate }}
-          </button>
-          <span class="font-mono text-[var(--text-primary)]">{{ currentPage() + 1 }} / {{ totalPages() || 1 }}</span>
-          <button
-            type="button"
-            (click)="nextPage()"
-            [disabled]="currentPage() >= totalPages() - 1"
-            class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
-          >
-            {{ 'common.next' | translate }}
-          </button>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[var(--text-xs)]">{{ 'mismatches.pagination.page_size' | translate }}:</span>
+            <select
+              class="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-1.5 py-1 text-xs"
+              [ngModel]="pageSize()"
+              (ngModelChange)="onPageSizeChange($event)"
+            >
+              @for (ps of pageSizes; track ps) {
+                <option [ngValue]="ps">{{ ps }}</option>
+              }
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              (click)="prevPage()"
+              [disabled]="currentPage() === 0"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+            >
+              {{ 'common.prev' | translate }}
+            </button>
+            <span class="font-mono text-[var(--text-primary)]">{{ currentPage() + 1 }} / {{ totalPages() || 1 }}</span>
+            <button
+              type="button"
+              (click)="nextPage()"
+              [disabled]="currentPage() >= totalPages() - 1"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+            >
+              {{ 'common.next' | translate }}
+            </button>
+          </div>
         </div>
       </div>
     }
@@ -241,14 +256,26 @@
         <span class="text-sm text-[var(--text-secondary)]">
           {{ selectedRows().length }} {{ 'mismatches.bulk.selected' | translate }}
         </span>
-        <button
-          type="button"
-          (click)="bulkAcknowledge()"
-          [disabled]="bulkAckMutation.isPending()"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
-        >
-          {{ 'mismatches.bulk.acknowledge' | translate }}
-        </button>
+        @if (rbac.canOperateMismatches()) {
+          <button
+            type="button"
+            (click)="bulkAcknowledge()"
+            [disabled]="bulkAckMutation.isPending()"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
+          >
+            {{ 'mismatches.bulk.acknowledge' | translate }}
+          </button>
+        }
+        @if (rbac.canIgnoreMismatches()) {
+          <button
+            type="button"
+            (click)="openBulkIgnoreModal()"
+            [disabled]="bulkIgnoreMutation.isPending()"
+            class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-1.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+          >
+            {{ 'mismatches.bulk.ignore' | translate }}
+          </button>
+        }
         <button
           type="button"
           (click)="clearBulkSelection()"
@@ -264,3 +291,45 @@
     <dp-mismatch-detail-panel [mismatchId]="mid" (closed)="closeDetail()" />
   }
 </div>
+
+<!-- Bulk Ignore Modal -->
+@if (showBulkIgnoreModal()) {
+  <div class="fixed inset-0 z-[9000] flex items-center justify-center">
+    <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="cancelBulkIgnore()"></div>
+    <div class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]">
+      <h3 class="text-base font-semibold text-[var(--text-primary)]">
+        {{ 'mismatches.bulk_ignore.title' | translate }}
+      </h3>
+      <p class="mt-2 text-sm text-[var(--text-secondary)]">
+        {{ 'mismatches.bulk_ignore.message' | translate: { count: selectedRows().length } }}
+      </p>
+      <div class="mt-4 flex flex-col gap-1.5">
+        <label class="text-sm text-[var(--text-secondary)]">{{ 'mismatches.bulk_ignore.reason_label' | translate }}</label>
+        <textarea
+          rows="3"
+          required
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          [ngModel]="bulkIgnoreReason()"
+          (ngModelChange)="bulkIgnoreReason.set($event)"
+        ></textarea>
+      </div>
+      <div class="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          (click)="cancelBulkIgnore()"
+          class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+        >
+          {{ 'actions.cancel' | translate }}
+        </button>
+        <button
+          type="button"
+          (click)="confirmBulkIgnore()"
+          [disabled]="!bulkIgnoreReason().trim() || bulkIgnoreMutation.isPending()"
+          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {{ 'mismatches.bulk_ignore.confirm' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

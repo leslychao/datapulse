@@ -19,6 +19,7 @@ export interface AuditLogEntry {
 
 export interface AuditLogFilter {
   userId?: number;
+  actorName?: string;
   actionType?: string;
   entityType?: string;
   from?: string;

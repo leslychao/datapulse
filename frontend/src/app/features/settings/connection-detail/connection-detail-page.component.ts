@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef } from 'ag-grid-community';
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import {
   LucideAngularModule,
   ArrowLeft,
@@ -13,10 +13,12 @@ import {
   Trash2,
   Power,
   PowerOff,
+  Pencil,
 } from 'lucide-angular';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { CallLogEntry, SyncState } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -66,7 +68,37 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
       @if (connectionQuery.data(); as conn) {
         <div class="mb-6 flex items-center gap-3">
           <dp-marketplace-badge [type]="conn.marketplaceType" />
-          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ conn.name }}</h1>
+          @if (editingName()) {
+            <form (ngSubmit)="submitNameEdit()" class="flex items-center gap-2">
+              <input
+                type="text"
+                [(ngModel)]="editNameValue"
+                name="editName"
+                required
+                class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[var(--text-lg)] font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              />
+              <button
+                type="submit"
+                [disabled]="!editNameValue.trim() || editNameValue.trim() === conn.name || renameMutation.isPending()"
+                class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              >{{ 'actions.save' | translate }}</button>
+              <button
+                type="button"
+                (click)="editingName.set(false)"
+                class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+              >{{ 'actions.cancel' | translate }}</button>
+            </form>
+          } @else {
+            <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ conn.name }}</h1>
+            @if (rbac.isAdmin()) {
+              <button
+                (click)="startNameEdit(conn.name)"
+                class="cursor-pointer rounded p-1 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)]"
+              >
+                <lucide-icon [img]="PencilIcon" [size]="14" />
+              </button>
+            }
+          }
           <dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" />
         </div>
 
@@ -81,6 +113,10 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
               <p class="mt-0.5"><dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" /></p>
             </div>
             <div>
+              <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.created_at' | translate }}</span>
+              <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.createdAt | dpDateFormat:'short' }}</p>
+            </div>
+            <div>
               <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.last_success_sync' | translate }}</span>
               <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.lastSuccessAt | dpDateFormat }}</p>
             </div>
@@ -91,80 +127,84 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           </div>
         </dp-section-card>
 
-        <dp-section-card [title]="'settings.connection_detail.credentials_title' | translate" class="mb-6">
-          @if (!showRotation()) {
-            <div class="flex items-center justify-between">
-              <p class="text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.credentials_hint' | translate }}</p>
-              <button
-                (click)="showRotation.set(true)"
-                class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-              >
-                <lucide-icon [img]="ShieldIcon" [size]="14" />
-                {{ 'settings.connection_detail.update_credentials' | translate }}
-              </button>
-            </div>
-          } @else {
-            <form (ngSubmit)="submitRotation()" class="max-w-md space-y-4">
-              @if (conn.marketplaceType === 'WB') {
-                <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_token_label' | translate }}</label>
-                  <input
-                    type="password"
-                    [(ngModel)]="newWbToken"
-                    name="newWbToken"
-                    required
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              } @else {
-                <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_client_id_label' | translate }}</label>
-                  <input
-                    type="text"
-                    [(ngModel)]="newOzonClientId"
-                    name="newOzonClientId"
-                    required
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-                <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_api_key_label' | translate }}</label>
-                  <input
-                    type="password"
-                    [(ngModel)]="newOzonApiKey"
-                    name="newOzonApiKey"
-                    required
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              }
-              <div class="flex gap-3">
+        @if (rbac.isAdmin()) {
+          <dp-section-card [title]="'settings.connection_detail.credentials_title' | translate" class="mb-6">
+            @if (!showRotation()) {
+              <div class="flex items-center justify-between">
+                <p class="text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.credentials_hint' | translate }}</p>
                 <button
-                  type="submit"
-                  [disabled]="!isRotationValid() || rotateMutation.isPending()"
-                  class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                >{{ 'actions.save' | translate }}</button>
-                <button
-                  type="button"
-                  (click)="cancelRotation()"
-                  class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-                >{{ 'actions.cancel' | translate }}</button>
+                  (click)="showRotation.set(true)"
+                  class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                >
+                  <lucide-icon [img]="ShieldIcon" [size]="14" />
+                  {{ 'settings.connection_detail.update_credentials' | translate }}
+                </button>
               </div>
-            </form>
-          }
-        </dp-section-card>
+            } @else {
+              <form (ngSubmit)="submitRotation()" class="max-w-md space-y-4">
+                @if (conn.marketplaceType === 'WB') {
+                  <div>
+                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_token_label' | translate }}</label>
+                    <input
+                      type="password"
+                      [(ngModel)]="newWbToken"
+                      name="newWbToken"
+                      required
+                      class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                    />
+                  </div>
+                } @else {
+                  <div>
+                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_client_id_label' | translate }}</label>
+                    <input
+                      type="text"
+                      [(ngModel)]="newOzonClientId"
+                      name="newOzonClientId"
+                      required
+                      class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_api_key_label' | translate }}</label>
+                    <input
+                      type="password"
+                      [(ngModel)]="newOzonApiKey"
+                      name="newOzonApiKey"
+                      required
+                      class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                    />
+                  </div>
+                }
+                <div class="flex gap-3">
+                  <button
+                    type="submit"
+                    [disabled]="!isRotationValid() || rotateMutation.isPending()"
+                    class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >{{ 'actions.save' | translate }}</button>
+                  <button
+                    type="button"
+                    (click)="cancelRotation()"
+                    class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                  >{{ 'actions.cancel' | translate }}</button>
+                </div>
+              </form>
+            }
+          </dp-section-card>
+        }
 
         <dp-section-card [title]="'settings.connection_detail.sync_domains_title' | translate" class="mb-6">
           <div class="mb-2 flex items-center justify-between">
             <p class="text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.sync_domains_hint' | translate }}</p>
-            <button
-              (click)="triggerSyncMutation.mutate(undefined)"
-              [disabled]="triggerSyncMutation.isPending() || conn.status !== 'ACTIVE'"
-              class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <lucide-icon [img]="RefreshIcon" [size]="14" [class.dp-spinner]="triggerSyncMutation.isPending()" />
-              {{ 'settings.connection_detail.trigger_sync' | translate }}
-            </button>
+            @if (rbac.isAdmin()) {
+              <button
+                (click)="triggerSyncAll()"
+                [disabled]="triggerSyncMutation.isPending() || conn.status !== 'ACTIVE'"
+                class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <lucide-icon [img]="RefreshIcon" [size]="14" [class.dp-spinner]="triggerSyncMutation.isPending()" />
+                {{ 'settings.connection_detail.trigger_sync' | translate }}
+              </button>
+            }
           </div>
           @if (syncStateQuery.data(); as syncStates) {
             <ag-grid-angular
@@ -181,72 +221,76 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           }
         </dp-section-card>
 
-        <dp-section-card [title]="'settings.connection_detail.call_log_title' | translate" class="mb-6">
-          @if (callLogQuery.data(); as callLogPage) {
-            <ag-grid-angular
-              class="ag-theme-alpine"
-              style="width: 100%; height: 400px;"
-              [rowData]="callLogPage.content"
-              [columnDefs]="callLogColDefs"
-              [defaultColDef]="defaultColDef"
-              [animateRows]="true"
-              [suppressCellFocus]="true"
-              [pagination]="true"
-              [paginationPageSize]="20"
-              [localeText]="AG_GRID_LOCALE_RU"
-            />
-          }
-        </dp-section-card>
+        @if (rbac.isAdmin()) {
+          <dp-section-card [title]="'settings.connection_detail.call_log_title' | translate" class="mb-6">
+            @if (callLogQuery.data(); as callLogPage) {
+              <ag-grid-angular
+                class="ag-theme-alpine"
+                style="width: 100%; height: 400px;"
+                [rowData]="callLogPage.content"
+                [columnDefs]="callLogColDefs"
+                [defaultColDef]="defaultColDef"
+                [animateRows]="true"
+                [suppressCellFocus]="true"
+                [pagination]="true"
+                [paginationPageSize]="20"
+                [localeText]="AG_GRID_LOCALE_RU"
+              />
+            }
+          </dp-section-card>
 
-        <dp-section-card [title]="'settings.connection_detail.danger_zone' | translate" class="mb-6">
-          <div class="space-y-3">
-            @if (conn.status !== 'DISABLED' && conn.status !== 'ARCHIVED') {
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.connection_detail.disable_title' | translate }}</p>
-                  <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.disable_hint' | translate }}</p>
+          <dp-section-card [title]="'settings.connection_detail.danger_zone' | translate" class="mb-6">
+            <div class="space-y-3">
+              @if (conn.status !== 'DISABLED' && conn.status !== 'ARCHIVED') {
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.connection_detail.disable_title' | translate }}</p>
+                    <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.disable_hint' | translate }}</p>
+                  </div>
+                  <button
+                    (click)="disableMutation.mutate(undefined)"
+                    [disabled]="disableMutation.isPending()"
+                    class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-warning)] px-3 py-1.5 text-sm text-[var(--status-warning)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)]"
+                  >
+                    <lucide-icon [img]="PowerOffIcon" [size]="14" />
+                    {{ 'settings.connection_detail.disable_btn' | translate }}
+                  </button>
                 </div>
-                <button
-                  (click)="disableMutation.mutate(undefined)"
-                  [disabled]="disableMutation.isPending()"
-                  class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-warning)] px-3 py-1.5 text-sm text-[var(--status-warning)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)]"
-                >
-                  <lucide-icon [img]="PowerOffIcon" [size]="14" />
-                  {{ 'settings.connection_detail.disable_btn' | translate }}
-                </button>
-              </div>
-            }
-            @if (conn.status === 'DISABLED') {
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.connection_detail.enable_title' | translate }}</p>
-                  <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.enable_hint' | translate }}</p>
+              }
+              @if (conn.status === 'DISABLED') {
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-[var(--text-primary)]">{{ 'settings.connection_detail.enable_title' | translate }}</p>
+                    <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.enable_hint' | translate }}</p>
+                  </div>
+                  <button
+                    (click)="enableMutation.mutate(undefined)"
+                    [disabled]="enableMutation.isPending()"
+                    class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-success)] px-3 py-1.5 text-sm text-[var(--status-success)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-success)_8%,transparent)]"
+                  >
+                    <lucide-icon [img]="PowerIcon" [size]="14" />
+                    {{ 'settings.connection_detail.enable_btn' | translate }}
+                  </button>
                 </div>
-                <button
-                  (click)="enableMutation.mutate(undefined)"
-                  [disabled]="enableMutation.isPending()"
-                  class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-success)] px-3 py-1.5 text-sm text-[var(--status-success)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-success)_8%,transparent)]"
-                >
-                  <lucide-icon [img]="PowerIcon" [size]="14" />
-                  {{ 'settings.connection_detail.enable_btn' | translate }}
-                </button>
-              </div>
-            }
-            <div class="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
-              <div>
-                <p class="text-sm font-medium text-[var(--status-error)]">{{ 'settings.connection_detail.delete_title' | translate }}</p>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.delete_hint' | translate }}</p>
-              </div>
-              <button
-                (click)="showDeleteModal.set(true)"
-                class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-error)] px-3 py-1.5 text-sm text-[var(--status-error)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)]"
-              >
-                <lucide-icon [img]="Trash2Icon" [size]="14" />
-                {{ 'actions.delete' | translate }}
-              </button>
+              }
+              @if (rbac.isOwner()) {
+                <div class="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
+                  <div>
+                    <p class="text-sm font-medium text-[var(--status-error)]">{{ 'settings.connection_detail.delete_title' | translate }}</p>
+                    <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.delete_hint' | translate }}</p>
+                  </div>
+                  <button
+                    (click)="showDeleteModal.set(true)"
+                    class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-error)] px-3 py-1.5 text-sm text-[var(--status-error)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)]"
+                  >
+                    <lucide-icon [img]="Trash2Icon" [size]="14" />
+                    {{ 'actions.delete' | translate }}
+                  </button>
+                </div>
+              }
             </div>
-          </div>
-        </dp-section-card>
+          </dp-section-card>
+        }
       }
 
       @if (connectionQuery.data(); as conn) {
@@ -271,6 +315,7 @@ export class ConnectionDetailPageComponent {
   protected readonly Trash2Icon = Trash2;
   protected readonly PowerIcon = Power;
   protected readonly PowerOffIcon = PowerOff;
+  protected readonly PencilIcon = Pencil;
   protected readonly Math = Math;
   protected readonly AG_GRID_LOCALE_RU = AG_GRID_LOCALE_RU;
 
@@ -282,8 +327,12 @@ export class ConnectionDetailPageComponent {
   private readonly toast = inject(ToastService);
   private readonly breadcrumbs = inject(BreadcrumbService);
   protected readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   private readonly isPendingValidation = signal(false);
+
+  readonly editingName = signal(false);
+  editNameValue = '';
 
   constructor() {
     effect(() => {
@@ -327,6 +376,17 @@ export class ConnectionDetailPageComponent {
     queryFn: () => lastValueFrom(this.connectionApi.getCallLog(this.connId, {}, 0, 50)),
   }));
 
+  readonly renameMutation = injectMutation(() => ({
+    mutationFn: () =>
+      lastValueFrom(this.connectionApi.updateConnectionName(this.connId, this.editNameValue.trim())),
+    onSuccess: () => {
+      this.editingName.set(false);
+      this.connectionQuery.refetch();
+      this.toast.success(this.translate.instant('settings.connection_detail.name_updated'));
+    },
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.name_update_error')),
+  }));
+
   readonly rotateMutation = injectMutation(() => ({
     mutationFn: () => {
       const conn = this.connectionQuery.data()!;
@@ -344,7 +404,8 @@ export class ConnectionDetailPageComponent {
   }));
 
   readonly triggerSyncMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.connectionApi.triggerSync(this.connId)),
+    mutationFn: (domains?: string[]) =>
+      lastValueFrom(this.connectionApi.triggerSync(this.connId, domains)),
     onSuccess: () => {
       this.toast.success(this.translate.instant('settings.connection_detail.sync_started'));
       this.syncStateQuery.refetch();
@@ -410,6 +471,22 @@ export class ConnectionDetailPageComponent {
       flex: 2,
       valueFormatter: (params) => formatDateTime(params.value),
     },
+    {
+      headerName: '',
+      width: 100,
+      cellRenderer: (params: ICellRendererParams<SyncState>) => {
+        if (!this.rbac.isAdmin()) return '';
+        const domain = params.data?.dataDomain;
+        if (!domain) return '';
+        const btn = document.createElement('button');
+        btn.className = 'cursor-pointer text-xs text-[var(--accent-primary)] hover:underline';
+        btn.textContent = this.translate.instant('settings.connection_detail.sync_domain_btn');
+        btn.addEventListener('click', () => this.triggerSyncDomain(domain));
+        return btn;
+      },
+      sortable: false,
+      resizable: false,
+    },
   ];
 
   readonly callLogColDefs: ColDef<CallLogEntry>[] = [
@@ -450,6 +527,16 @@ export class ConnectionDetailPageComponent {
     },
   ];
 
+  startNameEdit(currentName: string): void {
+    this.editNameValue = currentName;
+    this.editingName.set(true);
+  }
+
+  submitNameEdit(): void {
+    if (!this.editNameValue.trim()) return;
+    this.renameMutation.mutate(undefined);
+  }
+
   isRotationValid(): boolean {
     const conn = this.connectionQuery.data();
     if (!conn) return false;
@@ -467,6 +554,14 @@ export class ConnectionDetailPageComponent {
   submitRotation(): void {
     if (!this.isRotationValid()) return;
     this.rotateMutation.mutate(undefined);
+  }
+
+  triggerSyncAll(): void {
+    this.triggerSyncMutation.mutate(undefined);
+  }
+
+  triggerSyncDomain(domain: string): void {
+    this.triggerSyncMutation.mutate([domain]);
   }
 
   goBack(): void {

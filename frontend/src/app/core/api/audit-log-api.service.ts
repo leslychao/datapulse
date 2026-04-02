@@ -13,6 +13,7 @@ export class AuditLogApiService {
   listAuditLog(filter: AuditLogFilter = {}): Observable<AuditLogPage> {
     let params = new HttpParams();
     if (filter.userId) params = params.set('userId', filter.userId);
+    if (filter.actorName) params = params.set('actorName', filter.actorName);
     if (filter.actionType) params = params.set('actionType', filter.actionType);
     if (filter.entityType) params = params.set('entityType', filter.entityType);
     if (filter.from) params = params.set('from', filter.from);

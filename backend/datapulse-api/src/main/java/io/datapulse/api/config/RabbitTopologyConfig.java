@@ -40,8 +40,9 @@ public class RabbitTopologyConfig {
   public static final String PROMO_EVALUATION_QUEUE = "promo.evaluation";
 
   // ── DLX TTL defaults (ms) ───────────────────────────────────────────────
-
-  private static final long ETL_WAIT_TTL = 1_500_000L;
+  // Per-message TTL (from delay_ms in payload) controls actual backoff.
+  // Queue TTL = safety cap matching datapulse.etl.ingest.max-retry-backoff.
+  private static final long ETL_WAIT_TTL = 1_200_000L;
   private static final long EXECUTION_WAIT_TTL = 60_000L;
 
   @Bean

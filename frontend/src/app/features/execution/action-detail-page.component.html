@@ -165,7 +165,13 @@
             }
             @if (a.supersedingActionId) {
               <div>
-                <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.status_context.SUPERSEDED' | translate:{ id: a.supersedingActionId } }}</span>
+                <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.superseded_label' | translate }}</span>
+                <p>
+                  <a [routerLink]="['/workspace', wsStore.currentWorkspaceId(), 'execution', 'actions', a.supersedingActionId]"
+                     class="text-sm font-medium text-[var(--accent-primary)] hover:underline">
+                    {{ 'execution.detail.superseded_link' | translate:{ id: a.supersedingActionId } }}
+                  </a>
+                </p>
               </div>
             }
           </div>
@@ -434,23 +440,34 @@
   [isOpen]="showCancelModal()"
   [submitLabel]="'execution.detail.btn_cancel' | translate"
   [isPending]="actionPending()"
-  [submitDisabled]="reasonText().length < 5"
+  [submitDisabled]="reasonText().length < 5 || (isCancelDestructive() && cancelConfirmText() !== ('execution.detail.cancel_destructive_confirm_word' | translate))"
   (submit)="submitCancel()"
   (close)="showCancelModal.set(false)"
 >
-  <div class="flex flex-col gap-2">
+  <div class="flex flex-col gap-3">
     @if (isCancelDestructive()) {
-      <div class="mb-2 rounded-[var(--radius-md)] border border-[var(--status-warning)] bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)] p-3 text-sm text-[var(--text-primary)]">
+      <div class="rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] p-3 text-sm text-[var(--text-primary)]">
         {{ 'execution.detail.cancel_destructive_warning' | translate }}
       </div>
     }
-    <label class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
-    <textarea
-      [ngModel]="reasonText()"
-      (ngModelChange)="reasonText.set($event)"
-      class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-      [placeholder]="'execution.detail.cancel_placeholder' | translate"
-    ></textarea>
+    <div>
+      <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
+      <textarea
+        [ngModel]="reasonText()"
+        (ngModelChange)="reasonText.set($event)"
+        class="w-full min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        [placeholder]="'execution.detail.cancel_placeholder' | translate"
+      ></textarea>
+    </div>
+    @if (isCancelDestructive()) {
+      <div>
+        <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'execution.detail.cancel_destructive_hint' | translate }}</label>
+        <input type="text"
+               [ngModel]="cancelConfirmText()"
+               (ngModelChange)="cancelConfirmText.set($event)"
+               class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]" />
+      </div>
+    }
   </div>
 </dp-form-modal>
 

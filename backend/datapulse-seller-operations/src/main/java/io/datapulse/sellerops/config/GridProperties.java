@@ -13,5 +13,5 @@ public class GridProperties {
     private int maxPageSize = 200;
     private int exportMaxRows = 100_000;
     private int exportTimeoutSeconds = 60;
-    private int freshnessThresholdHours = 6;
+    private int freshnessThresholdHours = 4;
 }
