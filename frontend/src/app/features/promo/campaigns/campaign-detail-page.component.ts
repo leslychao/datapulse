@@ -17,6 +17,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 
 import { Users, CheckCircle, XCircle, Clock, CheckCheck, AlertTriangle } from 'lucide-angular';
+import { GridApi } from 'ag-grid-community';
 
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
@@ -161,6 +162,7 @@ export class CampaignDetailPageComponent {
   readonly cancelReason = signal('');
   readonly cancelTargetActionId = signal<number | null>(null);
   readonly selectedActionIds = signal<number[]>([]);
+  private gridApi: GridApi | null = null;
 
   readonly filterConfigs: FilterConfig[] = [
     {
@@ -489,9 +491,18 @@ export class CampaignDetailPageComponent {
 
   readonly getRowId = (params: any) => String(params.data.id);
 
+  onGridReady(api: GridApi): void {
+    this.gridApi = api;
+  }
+
   private refreshData(): void {
-    this.productsQuery.refetch();
-    this.campaignQuery.refetch();
+    Promise.all([
+      this.productsQuery.refetch(),
+      this.campaignQuery.refetch(),
+    ]).then(([productsResult]) => {
+      const freshRows = productsResult.data?.content ?? [];
+      this.gridApi?.setGridOption('rowData', freshRows);
+    });
   }
 
   private readonly participateMutation = injectMutation(() => ({

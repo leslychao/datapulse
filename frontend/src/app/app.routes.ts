@@ -38,7 +38,7 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'invitations/accept',
+    path: 'invitation/accept',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/invitation/invitation-accept.component').then(

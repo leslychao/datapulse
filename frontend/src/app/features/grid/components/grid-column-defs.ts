@@ -183,7 +183,7 @@ export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
         cb.style.height = '16px';
         cb.addEventListener('click', (e) => {
           e.stopPropagation();
-          callbacks?.onLockToggle?.(params.data.id, locked, params.data.currentPrice);
+          callbacks?.onLockToggle?.(params.data.offerId, locked, params.data.currentPrice);
         });
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center justify-center h-full';

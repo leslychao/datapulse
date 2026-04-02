@@ -20,7 +20,7 @@ class FakeLoader implements TranslateLoader {
 
 function buildOfferDetail(overrides: Partial<OfferDetail> = {}): OfferDetail {
   return {
-    id: 100, skuCode: 'SKU-001', productName: 'Test Product', marketplaceType: 'WB',
+    offerId: 100, skuCode: 'SKU-001', productName: 'Test Product', marketplaceType: 'WB',
     connectionId: 1, connectionName: 'WB Main', status: 'ACTIVE', category: 'Electronics',
     currentPrice: 1000, discountPrice: 900, costPrice: 500, marginPct: 50,
     availableStock: 100, daysOfCover: 45, stockRisk: 'NORMAL',

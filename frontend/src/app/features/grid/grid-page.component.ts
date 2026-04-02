@@ -144,7 +144,7 @@ export class GridPageComponent implements OnInit, OnDestroy {
     enableClickSelection: false,
   };
 
-  protected readonly getRowId = (params: any): string => String(params.data.id);
+  protected readonly getRowId = (params: any): string => String(params.data.offerId);
 
   protected readonly showDraftExitConfirm = signal(false);
 
@@ -202,18 +202,18 @@ export class GridPageComponent implements OnInit, OnDestroy {
   }
 
   onRowClicked(row: OfferSummary): void {
-    this.detailPanelService.open('offer', row.id);
+    this.detailPanelService.open('offer', row.offerId);
     const wsId = this.wsStore.currentWorkspaceId();
     if (wsId) {
       this.router.navigate([], {
-        queryParams: { offerId: row.id },
+        queryParams: { offerId: row.offerId },
         queryParamsHandling: 'merge',
       });
     }
   }
 
   onSelectionChanged(rows: OfferSummary[]): void {
-    this.gridStore.selectOffers(rows.map((r) => r.id));
+    this.gridStore.selectOffers(rows.map((r) => r.offerId));
   }
 
   onSortChanged(sort: { column: string; direction: string }): void {

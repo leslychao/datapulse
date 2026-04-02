@@ -141,13 +141,13 @@ export type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action
               <dp-offer-overview-tab [offer]="offer" />
             }
             @case ('price-journal') {
-              <dp-offer-price-journal-tab [offerId]="offer.id" />
+              <dp-offer-price-journal-tab [offerId]="offer.offerId" />
             }
             @case ('promo-journal') {
-              <dp-offer-promo-journal-tab [offerId]="offer.id" />
+              <dp-offer-promo-journal-tab [offerId]="offer.offerId" />
             }
             @case ('action-history') {
-              <dp-offer-action-history-tab [offerId]="offer.id" />
+              <dp-offer-action-history-tab [offerId]="offer.offerId" />
             }
             @case ('stock') {
               <dp-offer-stock-tab [offer]="offer" />

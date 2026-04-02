@@ -150,6 +150,7 @@
         [pageSize]="50"
         [getRowId]="getRowId"
         [height]="'100%'"
+        (gridReady)="onGridReady($event)"
       />
     }
   </div>

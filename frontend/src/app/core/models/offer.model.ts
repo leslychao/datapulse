@@ -21,7 +21,7 @@ export type ActionStatus =
   | 'RECONCILIATION_PENDING';
 
 export interface OfferSummary {
-  id: number;
+  offerId: number;
   skuCode: string;
   productName: string;
   marketplaceType: MarketplaceType;
