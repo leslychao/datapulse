@@ -13,7 +13,6 @@ import { startWith } from 'rxjs';
 import {
   injectQuery,
   injectMutation,
-  QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -134,7 +133,6 @@ export class CampaignDetailPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
-  private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
 
@@ -492,8 +490,8 @@ export class CampaignDetailPageComponent {
   readonly getRowId = (params: any) => String(params.data.id);
 
   private refreshData(): void {
-    this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
-    this.queryClient.invalidateQueries({ queryKey: ['promo-campaign'] });
+    this.productsQuery.refetch();
+    this.campaignQuery.refetch();
   }
 
   private readonly participateMutation = injectMutation(() => ({

@@ -5,7 +5,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -15,7 +15,7 @@ import org.thymeleaf.context.Context;
 
 @Slf4j
 @Service
-@ConditionalOnBean(JavaMailSender.class)
+@ConditionalOnProperty(name = "spring.mail.username", matchIfMissing = false)
 @RequiredArgsConstructor
 public class InvitationMailService {
 
