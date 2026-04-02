@@ -321,10 +321,15 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: '',
-      field: 'actions',
+      colId: 'actions',
       width: 200,
       sortable: false,
       suppressMovable: true,
+      valueGetter: (params: any) => {
+        if (!params.data) return '';
+        const d = params.data as PromoProductSummary;
+        return `${d.participationStatus}_${d.actionStatus}_${d.actionId}`;
+      },
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const p = params.data as PromoProductSummary;
@@ -337,27 +342,34 @@ export class CampaignDetailPageComponent {
         const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
         const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
         const banIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>`;
+        const hasActiveAction = p.actionId != null;
         let btns = '';
-        if (canOperate) {
-          if (
-            (p.participationStatus === 'ELIGIBLE' && !p.actionId) ||
+
+        if (canOperate && !hasActiveAction) {
+          const canParticipate =
+            p.participationStatus === 'ELIGIBLE' ||
             p.participationStatus === 'DECLINED' ||
-            p.participationStatus === 'AUTO_DECLINED'
-          ) {
+            p.participationStatus === 'AUTO_DECLINED' ||
+            p.participationStatus === 'REMOVED';
+
+          if (canParticipate) {
             btns += `<button class="action-btn" data-action="participate" title="${this.translate.instant('promo.detail.action.participate')}">${checkIcon}</button>`;
           }
-          if (p.participationStatus === 'ELIGIBLE' && !p.actionId) {
+          if (p.participationStatus === 'ELIGIBLE') {
             btns += `<button class="action-btn" data-action="decline" title="${this.translate.instant('promo.detail.action.decline')}">${xIcon}</button>`;
           }
-          if (p.participationStatus === 'PARTICIPATING') {
-            btns += `<button class="action-btn" data-action="deactivate" title="${this.translate.instant('promo.detail.action.deactivate')}">${banIcon}</button>`;
-          }
         }
+
+        if (canOperate && p.participationStatus === 'PARTICIPATING') {
+          btns += `<button class="action-btn" data-action="deactivate" title="${this.translate.instant('promo.detail.action.deactivate')}">${banIcon}</button>`;
+        }
+
         if (canApprove && p.actionStatus === 'PENDING_APPROVAL') {
           btns += `<button class="action-btn" data-action="approve" title="${this.translate.instant('promo.detail.action.approve')}">${checkIcon}</button>`;
           btns += `<button class="action-btn" data-action="reject" title="${this.translate.instant('promo.detail.action.reject')}">${xIcon}</button>`;
         }
-        if (canOperate && p.actionId && (p.actionStatus === 'PENDING_APPROVAL' || p.actionStatus === 'APPROVED')) {
+        if (canOperate && hasActiveAction
+            && ['PENDING_APPROVAL', 'APPROVED'].includes(p.actionStatus!)) {
           btns += `<button class="action-btn" data-action="cancel" title="${this.translate.instant('promo.detail.action.cancel')}">${xIcon}</button>`;
         }
         return btns ? `<div class="flex items-center gap-0.5">${btns}</div>` : '';
@@ -479,12 +491,17 @@ export class CampaignDetailPageComponent {
 
   readonly getRowId = (params: any) => String(params.data.id);
 
+  private refreshData(): void {
+    this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+    this.queryClient.invalidateQueries({ queryKey: ['promo-campaign'] });
+  }
+
   private readonly participateMutation = injectMutation(() => ({
     mutationFn: (promoProductId: number) =>
       lastValueFrom(this.promoApi.participate(this.wsStore.currentWorkspaceId()!, promoProductId, {})),
     onSuccess: () => {
       this.toast.success(this.translate.instant('promo.detail.toast.participate_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.participate_error')),
   }));
@@ -494,7 +511,7 @@ export class CampaignDetailPageComponent {
       lastValueFrom(this.promoApi.decline(this.wsStore.currentWorkspaceId()!, promoProductId, {})),
     onSuccess: () => {
       this.toast.success(this.translate.instant('promo.detail.toast.decline_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.decline_error')),
   }));
@@ -504,7 +521,7 @@ export class CampaignDetailPageComponent {
       lastValueFrom(this.promoApi.approveAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
       this.toast.success(this.translate.instant('promo.detail.toast.approve_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.approve_error')),
   }));
@@ -515,7 +532,7 @@ export class CampaignDetailPageComponent {
     onSuccess: () => {
       this.showRejectPopup.set(false);
       this.toast.success(this.translate.instant('promo.detail.toast.reject_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.reject_error')),
   }));
@@ -526,7 +543,7 @@ export class CampaignDetailPageComponent {
     onSuccess: () => {
       this.showCancelPopup.set(false);
       this.toast.success(this.translate.instant('promo.detail.toast.cancel_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.cancel_error')),
   }));
@@ -537,7 +554,7 @@ export class CampaignDetailPageComponent {
     onSuccess: () => {
       this.showDeactivatePopup.set(false);
       this.toast.success(this.translate.instant('promo.detail.toast.deactivate_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.deactivate_error')),
   }));
@@ -548,7 +565,7 @@ export class CampaignDetailPageComponent {
     onSuccess: () => {
       this.selectedActionIds.set([]);
       this.toast.success(this.translate.instant('promo.detail.toast.bulk_approve_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.bulk_approve_error')),
   }));
@@ -559,7 +576,7 @@ export class CampaignDetailPageComponent {
     onSuccess: () => {
       this.selectedActionIds.set([]);
       this.toast.success(this.translate.instant('promo.detail.toast.bulk_reject_success'));
-      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.refreshData();
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.bulk_reject_error')),
   }));

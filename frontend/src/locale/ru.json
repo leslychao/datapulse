@@ -856,6 +856,7 @@
   "promo.product.not_found": "Промо-товар не найден.",
   "promo.product.not_eligible": "Товар не может участвовать в данной акции.",
   "promo.product.not_participating": "Товар не участвует в данной акции.",
+  "promo.product.active_action_exists": "По этому товару уже выполняется действие. Отмените его перед созданием нового.",
   "promo.campaign.frozen": "Срок подачи заявки на участие в акции истёк.",
   "promo.wb.write_unavailable": "Автоматическое управление промо для WB временно недоступно. Используйте ЛК Wildberries.",
 

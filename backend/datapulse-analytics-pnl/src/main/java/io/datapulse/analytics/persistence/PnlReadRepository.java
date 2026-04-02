@@ -137,6 +137,7 @@ public class PnlReadRepository {
                 m.full_pnl
             FROM mart_product_pnl AS m
             WHERE m.connection_id IN (:connectionIds)
+              AND m.attribution_level = 'PRODUCT'
             """;
 
     private static final String BY_POSTING_SQL = """
@@ -272,7 +273,8 @@ public class PnlReadRepository {
         var sb = new StringBuilder("""
                 SELECT count(*)
                 FROM mart_product_pnl AS m
-                WHERE m.connection_id IN (:connectionIds)""");
+                WHERE m.connection_id IN (:connectionIds)
+                  AND m.attribution_level = 'PRODUCT'""");
         appendProductFilter(sb, params, filter);
         sb.append(SETTINGS_FINAL);
 

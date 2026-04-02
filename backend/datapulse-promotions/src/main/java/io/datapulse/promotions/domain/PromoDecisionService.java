@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
+import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.platform.audit.AuditEvent;
 import io.datapulse.promotions.api.PromoDecisionMapper;
@@ -68,7 +69,7 @@ public class PromoDecisionService {
     }
 
     private static final java.util.Set<String> PARTICIPABLE_STATUSES =
-            java.util.Set.of("ELIGIBLE", "DECLINED", "AUTO_DECLINED");
+            java.util.Set.of("ELIGIBLE", "DECLINED", "AUTO_DECLINED", "REMOVED");
 
     @Transactional
     public void manualParticipate(long promoProductId, BigDecimal targetPromoPrice,
@@ -80,8 +81,7 @@ public class PromoDecisionService {
         }
 
         ensureCampaignNotFrozen(info.campaignId());
-
-        cancelActiveActions(promoProductId, info.campaignId());
+        ensureNoActiveAction(promoProductId, info.campaignId());
 
         PromoPolicyEntity policy = policyResolver.resolvePolicy(
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
@@ -134,6 +134,8 @@ public class PromoDecisionService {
             throw BadRequestException.of(MessageCodes.PROMO_PRODUCT_NOT_ELIGIBLE);
         }
 
+        ensureNoActiveAction(promoProductId, info.campaignId());
+
         PromoPolicyEntity policy = policyResolver.resolvePolicy(
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
 
@@ -168,6 +170,7 @@ public class PromoDecisionService {
         }
 
         ensureCampaignNotFrozen(info.campaignId());
+        cancelActiveActions(promoProductId, info.campaignId());
 
         PromoPolicyEntity policy = policyResolver.resolvePolicy(
                 info.marketplaceOfferId(), info.categoryId(), info.connectionId(), workspaceId);
@@ -206,23 +209,49 @@ public class PromoDecisionService {
     }
 
     private void cancelActiveActions(long promoProductId, long campaignId) {
-        var params = new MapSqlParameterSource()
+        var cancelParams = new MapSqlParameterSource()
                 .addValue("campaignId", campaignId)
                 .addValue("promoProductId", promoProductId);
 
         int cancelled = jdbcTemplate.update("""
                 UPDATE promo_action pa
-                SET status = 'CANCELLED', cancel_reason = 'Superseded by manual action', updated_at = NOW()
+                SET status = 'CANCELLED',
+                    cancel_reason = 'Superseded by manual deactivation',
+                    updated_at = NOW()
                 FROM promo_decision pd
                 WHERE pa.promo_decision_id = pd.id
                   AND pd.canonical_promo_product_id = :promoProductId
                   AND pa.canonical_promo_campaign_id = :campaignId
-                  AND pa.status IN ('PENDING_APPROVAL', 'APPROVED')
-                """, params);
+                  AND pa.status IN ('PENDING_APPROVAL', 'APPROVED', 'EXECUTING')
+                """, cancelParams);
 
         if (cancelled > 0) {
-            log.info("Cancelled {} active promo actions for promoProductId={}, campaignId={}",
+            log.info("Cancelled {} active actions before deactivation: promoProductId={}, campaignId={}",
                     cancelled, promoProductId, campaignId);
+        }
+    }
+
+    private void ensureNoActiveAction(long promoProductId, long campaignId) {
+        var params = new MapSqlParameterSource()
+                .addValue("campaignId", campaignId)
+                .addValue("promoProductId", promoProductId);
+
+        Boolean exists = jdbcTemplate.query("""
+                SELECT EXISTS(
+                  SELECT 1
+                  FROM promo_action pa
+                  JOIN promo_decision pd ON pa.promo_decision_id = pd.id
+                  WHERE pd.canonical_promo_product_id = :promoProductId
+                    AND pa.canonical_promo_campaign_id = :campaignId
+                    AND pa.status IN ('PENDING_APPROVAL', 'APPROVED', 'EXECUTING')
+                ) AS has_active
+                """, params, rs -> {
+            rs.next();
+            return rs.getBoolean("has_active");
+        });
+
+        if (Boolean.TRUE.equals(exists)) {
+            throw ConflictException.of(MessageCodes.PROMO_PRODUCT_ACTIVE_ACTION_EXISTS);
         }
     }
 

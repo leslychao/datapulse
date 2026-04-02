@@ -156,6 +156,7 @@ public final class MessageCodes {
     public static final String PROMO_PRODUCT_NOT_FOUND = "promo.product.not_found";
     public static final String PROMO_PRODUCT_NOT_ELIGIBLE = "promo.product.not_eligible";
     public static final String PROMO_PRODUCT_NOT_PARTICIPATING = "promo.product.not_participating";
+    public static final String PROMO_PRODUCT_ACTIVE_ACTION_EXISTS = "promo.product.active_action_exists";
     public static final String PROMO_CAMPAIGN_FROZEN = "promo.campaign.frozen";
     public static final String PROMO_WB_WRITE_UNAVAILABLE = "promo.wb.write_unavailable";
 
