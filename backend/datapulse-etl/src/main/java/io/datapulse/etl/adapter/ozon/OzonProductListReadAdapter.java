@@ -51,8 +51,7 @@ public class OzonProductListReadAdapter {
             results.add(page.captureResult());
 
             lastId = page.cursor();
-            if (OzonCursorPaging.shouldStopAfterStringPage(
-                    lastId, currentLastId, page.captureResult().byteSize())) {
+            if (OzonCursorPaging.shouldStopAfterStringPage(lastId, currentLastId)) {
                 if (OzonCursorPaging.isNonAdvancingStringCursor(lastId, currentLastId)) {
                     log.debug(
                             "Ozon product list pagination stopped: non-advancing last_id, connectionId={}",

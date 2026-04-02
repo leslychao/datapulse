@@ -53,8 +53,7 @@ public class OzonAttributesReadAdapter {
             results.add(page.captureResult());
 
             lastId = page.cursor();
-            if (OzonCursorPaging.shouldStopAfterStringPage(
-                    lastId, currentLastId, page.captureResult().byteSize())) {
+            if (OzonCursorPaging.shouldStopAfterStringPage(lastId, currentLastId)) {
                 hasMore = false;
             }
 

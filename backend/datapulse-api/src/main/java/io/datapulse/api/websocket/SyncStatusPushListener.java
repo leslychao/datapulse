@@ -84,10 +84,17 @@ public class SyncStatusPushListener {
         }
     }
 
+    /**
+     * Notify only when payload explicitly lists zero failed domains. Missing or malformed
+     * {@code failedDomains} is treated as non-success to avoid false-positive "sync completed" toasts.
+     */
     private static boolean shouldNotifySyncSuccess(Map<String, Object> payload) {
         Object failed = payload.get("failedDomains");
+        if (failed == null) {
+            return false;
+        }
         if (!(failed instanceof List<?> list)) {
-            return true;
+            return false;
         }
         return list.isEmpty();
     }

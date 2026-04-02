@@ -11,14 +11,13 @@ public final class OzonCursorPaging {
     private OzonCursorPaging() {}
 
     /**
-     * True when the page should be treated as the last one: missing cursor, very small payload, or
-     * the API echoed the same {@code last_id} as in the request (terminal page with non-trivial JSON).
+     * True when the page should be treated as the last one: missing cursor, or the API echoed the
+     * same {@code last_id} as in the request (pagination did not advance). Deliberately does not use
+     * response byte size — small valid JSON pages must not truncate the crawl.
      */
-    public static boolean shouldStopAfterStringPage(
-            String responseLastId, String requestLastId, long captureByteSize) {
+    public static boolean shouldStopAfterStringPage(String responseLastId, String requestLastId) {
         return responseLastId == null
                 || responseLastId.isEmpty()
-                || captureByteSize < 200
                 || Objects.equals(responseLastId, requestLastId);
     }
 

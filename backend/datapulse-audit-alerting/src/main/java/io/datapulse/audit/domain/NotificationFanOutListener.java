@@ -7,7 +7,6 @@ import io.datapulse.audit.domain.event.AlertEventCreatedEvent;
 import io.datapulse.audit.domain.event.AlertResolvedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -32,9 +31,12 @@ public class NotificationFanOutListener {
     /**
      * AFTER_COMMIT: {@code user_notification} FK requires {@code alert_event} row visible
      * (publisher often runs inside an open transaction; async fan-out must not race commit).
+     * {@code fallbackExecution} keeps tests and any non-transactional publisher paths working.
      */
     @Async("notificationExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(
+            phase = TransactionPhase.AFTER_COMMIT,
+            fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAlertCreated(AlertEventCreatedEvent event) {
         try {
@@ -57,7 +59,9 @@ public class NotificationFanOutListener {
     }
 
     @Async("notificationExecutor")
-    @EventListener
+    @TransactionalEventListener(
+            phase = TransactionPhase.AFTER_COMMIT,
+            fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAlertResolved(AlertResolvedEvent event) {
         try {
