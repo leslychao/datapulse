@@ -159,13 +159,13 @@ export function collectPolicyValidationErrors(
       errors.push(t('pricing.form.validation.target_margin_range'));
     if (g.get('commissionManualPct')!.hasError('min') || g.get('commissionManualPct')!.hasError('max'))
       errors.push(t('pricing.form.validation.commission_manual_range'));
-    if (g.get('commissionLookbackDays')!.hasError('min') || g.get('commissionLookbackDays')!.hasError('max'))
+    if (g.get('commissionLookbackDays')!.invalid)
       errors.push(t('pricing.form.validation.commission_lookback_range'));
-    if (g.get('commissionMinTransactions')!.hasError('min') || g.get('commissionMinTransactions')!.hasError('max'))
+    if (g.get('commissionMinTransactions')!.invalid)
       errors.push(t('pricing.form.validation.commission_min_txn_range'));
     if (g.get('logisticsManualAmount')!.hasError('min'))
       errors.push(t('pricing.form.validation.logistics_manual_min'));
-    if (g.get('roundingStep')!.hasError('min') || g.get('roundingStep')!.hasError('max'))
+    if (g.get('roundingStep')!.invalid)
       errors.push(t('pricing.form.validation.rounding_step_range'));
   } else {
     const c = form.get('corridor')!;
@@ -173,22 +173,23 @@ export function collectPolicyValidationErrors(
     if (c.hasError('corridorMaxGtMin')) errors.push(t('pricing.form.validation.corridor_max_gt_min'));
   }
 
-  if (form.get('minMarginPct')!.hasError('min') || form.get('minMarginPct')!.hasError('max'))
+  if (form.get('minMarginPct')!.invalid)
     errors.push(t('pricing.form.validation.min_margin_range'));
-  if (form.get('maxPriceChangePct')!.hasError('min') || form.get('maxPriceChangePct')!.hasError('max'))
+  if (form.get('maxPriceChangePct')!.invalid)
     errors.push(t('pricing.form.validation.max_price_change_range'));
   if (form.get('minPrice')!.hasError('min')) errors.push(t('pricing.form.validation.min_price_positive'));
   if (form.get('maxPrice')!.hasError('min')) errors.push(t('pricing.form.validation.max_price_positive'));
   if (form.hasError('maxPriceGtMin')) errors.push(t('pricing.form.validation.max_price_gt_min'));
-  if (form.get('priority')!.hasError('min')) errors.push(t('pricing.form.validation.priority_min'));
-  if (form.get('approvalTimeoutHours')!.hasError('min')) errors.push(t('pricing.form.validation.approval_timeout_min'));
-  if (form.get('frequencyGuardHours')!.hasError('min') || form.get('frequencyGuardHours')!.hasError('max'))
+  if (form.get('priority')!.invalid) errors.push(t('pricing.form.validation.priority_min'));
+  if (form.get('approvalTimeoutHours')!.invalid)
+    errors.push(t('pricing.form.validation.approval_timeout_min'));
+  if (form.get('frequencyGuardHours')!.invalid)
     errors.push(t('pricing.form.validation.frequency_hours_range'));
-  if (form.get('volatilityGuardReversals')!.hasError('min') || form.get('volatilityGuardReversals')!.hasError('max'))
+  if (form.get('volatilityGuardReversals')!.invalid)
     errors.push(t('pricing.form.validation.volatility_reversals_range'));
-  if (form.get('volatilityGuardPeriodDays')!.hasError('min') || form.get('volatilityGuardPeriodDays')!.hasError('max'))
+  if (form.get('volatilityGuardPeriodDays')!.invalid)
     errors.push(t('pricing.form.validation.volatility_period_range'));
-  if (form.get('staleDataGuardHours')!.hasError('min') || form.get('staleDataGuardHours')!.hasError('max'))
+  if (form.get('staleDataGuardHours')!.invalid)
     errors.push(t('pricing.form.validation.stale_data_hours_range'));
   if (form.get('confirmFullAuto')!.hasError('requiredTrue'))
     errors.push(t('pricing.form.validation.full_auto_confirm_required'));

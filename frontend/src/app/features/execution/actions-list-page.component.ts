@@ -27,7 +27,7 @@ import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { ActionFilter, ActionSummary } from '@core/models';
-import { formatMoney, formatRelativeTime, formatDateTime } from '@shared/utils/format.utils';
+import { formatMoney, formatRelativeTime, formatDateTime, renderBadge } from '@shared/utils/format.utils';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -167,7 +167,7 @@ interface ContextMenuState {
             [loading]="actionsQuery.isPending()"
             [pagination]="true"
             [pageSize]="50"
-            [rowSelection]="'multiple'"
+            [rowSelection]="rowSelectionConfig"
             [getRowId]="getRowId"
             [height]="'100%'"
             [enableFlash]="true"
@@ -486,15 +486,14 @@ export class ActionsListPageComponent implements OnInit {
     ];
   });
 
+  protected readonly rowSelectionConfig = {
+    mode: 'multiRow' as const,
+    checkboxes: true,
+    headerCheckbox: true,
+    enableClickSelection: false,
+  };
+
   readonly columnDefs = [
-    {
-      headerCheckboxSelection: true,
-      checkboxSelection: true,
-      width: 40,
-      pinned: 'left' as const,
-      sortable: false,
-      suppressMovable: true,
-    },
     {
       headerName: this.translate.instant('execution.col.offer'),
       field: 'offerName',
@@ -547,14 +546,11 @@ export class ActionsListPageComponent implements OnInit {
       sortable: true,
       cellRenderer: (params: any) => {
         const st = params.value as string;
+        if (!st) return '';
         const label = this.translate.instant(`grid.action_status.${st}`);
         const color = ACTION_STATUS_COLOR[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-          ${label}
-        </span>`;
+        return renderBadge(label, cssVar, st === 'EXECUTING');
       },
       cellStyle: (params: any): Record<string, string> => {
         const st = params.value;
@@ -571,14 +567,15 @@ export class ActionsListPageComponent implements OnInit {
       sortable: true,
       cellRenderer: (params: any) => {
         const mode = params.value as string;
+        if (!mode) return '';
         const label =
           mode === 'SIMULATED'
             ? this.translate.instant('pricing.decisions.execution_mode.SIMULATED')
             : this.translate.instant('pricing.decisions.execution_mode.LIVE');
         if (mode === 'SIMULATED') {
-          return `<span class="rounded-full border border-dashed border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">${label}</span>`;
+          return `<span style="display:inline-flex;align-items:center;border-radius:9999px;border:1px dashed var(--border-default);padding:2px 8px;font-size:11px;color:var(--text-secondary);white-space:nowrap">${label}</span>`;
         }
-        return `<span class="text-[var(--text-primary)] text-[11px]">${label}</span>`;
+        return `<span style="font-size:11px;color:var(--text-primary)">${label}</span>`;
       },
     },
     {

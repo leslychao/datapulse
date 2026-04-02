@@ -18,7 +18,7 @@ import {
 } from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
-import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
+import { formatMoney, formatDateTime, renderBadge, renderOutlineBadge } from '@shared/utils/format.utils';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -29,24 +29,24 @@ import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 
 const RUN_STATUS_COLOR: Record<string, string> = {
-  PENDING: 'info',
-  IN_PROGRESS: 'info',
-  COMPLETED: 'success',
-  COMPLETED_WITH_ERRORS: 'warning',
-  FAILED: 'error',
+  PENDING: 'var(--status-info)',
+  IN_PROGRESS: 'var(--status-info)',
+  COMPLETED: 'var(--status-success)',
+  COMPLETED_WITH_ERRORS: 'var(--status-warning)',
+  FAILED: 'var(--status-error)',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {
   POST_SYNC: 'var(--accent-primary)',
   MANUAL: 'var(--status-info)',
-  SCHEDULED: 'var(--text-secondary)',
+  SCHEDULED: 'var(--status-neutral)',
   POLICY_CHANGE: 'var(--status-warning)',
 };
 
 const DECISION_COLOR: Record<string, string> = {
-  CHANGE: 'success',
-  SKIP: 'warning',
-  HOLD: 'neutral',
+  CHANGE: 'var(--status-success)',
+  SKIP: 'var(--status-warning)',
+  HOLD: 'var(--status-neutral)',
 };
 
 @Component({
@@ -127,10 +127,11 @@ const DECISION_COLOR: Record<string, string> = {
         <div class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] px-4 py-2">
           <!-- Trigger badge -->
           <span
-            class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+            class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-4"
             [style.background-color]="'color-mix(in srgb, ' + triggerCssColor() + ' 12%, transparent)'"
             [style.color]="triggerCssColor()"
           >
+            <span class="inline-block h-1.5 w-1.5 rounded-full" [style.background-color]="triggerCssColor()"></span>
             {{ triggerLabel() }}
           </span>
 
@@ -141,7 +142,7 @@ const DECISION_COLOR: Record<string, string> = {
 
           <!-- Status badge -->
           <span
-            class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+            class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-4"
             [style.background-color]="'color-mix(in srgb, ' + statusCssVar() + ' 12%, transparent)'"
             [style.color]="statusCssVar()"
           >
@@ -238,13 +239,12 @@ export class RunDetailPageComponent {
     return trigger ? this.translate.instant(`pricing.runs.trigger.${trigger}`) : '';
   });
 
-  readonly statusCssVar = computed(() => {
-    const color = RUN_STATUS_COLOR[this.run()?.status ?? ''] ?? 'neutral';
-    return `var(--status-${color})`;
-  });
+  readonly statusCssVar = computed(() =>
+    RUN_STATUS_COLOR[this.run()?.status ?? ''] ?? 'var(--status-neutral)',
+  );
 
   readonly triggerCssColor = computed(() =>
-    TRIGGER_COLOR[this.run()?.triggerType ?? ''] ?? 'var(--text-secondary)',
+    TRIGGER_COLOR[this.run()?.triggerType ?? ''] ?? 'var(--status-neutral)',
   );
 
   readonly timingDisplay = computed(() => {
@@ -316,14 +316,10 @@ export class RunDetailPageComponent {
       sortable: true,
       cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const dt = params.value as string;
+        if (!dt) return '';
         const label = this.translate.instant(`pricing.decisions.type.${dt}`);
-        const color = DECISION_COLOR[dt] ?? 'neutral';
-        const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-          ${label}
-        </span>`;
+        const color = DECISION_COLOR[dt] ?? 'var(--status-neutral)';
+        return renderBadge(label, color);
       },
     },
     {
@@ -374,10 +370,9 @@ export class RunDetailPageComponent {
       sortable: true,
       cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
         const st = params.value as string;
+        if (!st) return '';
         const label = this.translate.instant(`pricing.policies.strategy.${st}`);
-        return `<span class="inline-flex items-center rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
-          ${label}
-        </span>`;
+        return renderOutlineBadge(label);
       },
     },
     {

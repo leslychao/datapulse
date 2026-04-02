@@ -100,3 +100,34 @@ export function financeColor(value: number | null | undefined): string {
   if (value === null || value === undefined || value === 0) return 'var(--finance-zero)';
   return value > 0 ? 'var(--finance-positive)' : 'var(--finance-negative)';
 }
+
+const BADGE_STYLE =
+  'display:inline-flex;align-items:center;gap:6px;border-radius:9999px;' +
+  'padding:2px 10px;font-size:11px;font-weight:500;line-height:16px;white-space:nowrap;';
+
+const DOT_STYLE =
+  'display:inline-block;width:6px;height:6px;border-radius:9999px;flex-shrink:0;';
+
+const OUTLINE_BADGE_STYLE =
+  'display:inline-flex;align-items:center;border-radius:9999px;' +
+  'padding:2px 8px;font-size:11px;font-weight:500;line-height:16px;white-space:nowrap;' +
+  'border:1px solid var(--border-default);color:var(--text-secondary);';
+
+/**
+ * Renders a pill-shaped badge with a colored dot (inline styles for AG Grid cells).
+ * Matches the dp-status-badge component visual output.
+ */
+export function renderBadge(label: string, color: string, pulse = false): string {
+  const bg = `color-mix(in srgb, ${color} 12%, transparent)`;
+  const dotAnim = pulse ? 'animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite;' : '';
+  return `<span style="${BADGE_STYLE}background-color:${bg};color:${color}">` +
+    `<span style="${DOT_STYLE}background-color:${color};${dotAnim}"></span>` +
+    `${label}</span>`;
+}
+
+/**
+ * Renders an outlined (ghost) badge without a dot — for neutral/tag-like labels.
+ */
+export function renderOutlineBadge(label: string): string {
+  return `<span style="${OUTLINE_BADGE_STYLE}">${label}</span>`;
+}

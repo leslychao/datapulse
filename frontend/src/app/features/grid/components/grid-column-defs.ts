@@ -1,4 +1,4 @@
-import { ColDef, ValueFormatterParams } from 'ag-grid-community';
+import { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
 
 const MARGIN_THRESHOLDS = { high: 30, low: 10, negative: 0 };
 
@@ -56,19 +56,12 @@ const ACTION_STATUS_LABELS: Record<string, string> = {
 const STOCK_RISK_LABELS: Record<string, string> = { CRITICAL: 'Критический', WARNING: 'Предупреждение', NORMAL: 'Нормальный' };
 const PROMO_LABELS: Record<string, string> = { PARTICIPATING: 'Участвует', ELIGIBLE: 'Доступно' };
 
-export function buildGridColumnDefs(): ColDef[] {
+export interface GridColumnCallbacks {
+  onLockToggle?: (offerId: number, currentlyLocked: boolean, currentPrice: number | null) => void;
+}
+
+export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
   return [
-    {
-      headerCheckboxSelection: true,
-      checkboxSelection: true,
-      width: 40,
-      pinned: 'left' as const,
-      lockPosition: true,
-      suppressMovable: true,
-      sortable: false,
-      filter: false,
-      resizable: false,
-    },
     {
       field: 'skuCode',
       headerName: 'Артикул',
@@ -177,11 +170,26 @@ export function buildGridColumnDefs(): ColDef[] {
     },
     {
       field: 'manualLock',
-      headerName: 'Блокировка',
+      headerName: 'Блоки...',
       width: 80,
       sortable: false,
-      cellClass: 'text-center',
-      valueFormatter: (p: ValueFormatterParams) => p.value ? '🔒' : '🔓',
+      cellRenderer: (params: ICellRendererParams) => {
+        const locked = !!params.value;
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = locked;
+        cb.className = 'cursor-pointer accent-[var(--accent-primary)]';
+        cb.style.width = '16px';
+        cb.style.height = '16px';
+        cb.addEventListener('click', (e) => {
+          e.stopPropagation();
+          callbacks?.onLockToggle?.(params.data.id, locked, params.data.currentPrice);
+        });
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex items-center justify-center h-full';
+        wrapper.appendChild(cb);
+        return wrapper;
+      },
     },
     {
       field: 'dataFreshness',

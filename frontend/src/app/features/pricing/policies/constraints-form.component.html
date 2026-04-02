@@ -24,12 +24,11 @@
           type="number"
           min="0"
           max="80"
-          placeholder="—"
+          placeholder="0–80"
           class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
         />
         <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sm)] text-[var(--text-tertiary)]">%</span>
       </div>
-      <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.min_margin' | translate }}</p>
       @if (hasError('minMarginPct', 'min') || hasError('minMarginPct', 'max')) {
         <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
           {{ 'pricing.form.validation.min_margin_range' | translate }}
@@ -47,12 +46,11 @@
           type="number"
           min="1"
           max="50"
-          placeholder="—"
+          placeholder="1–50"
           class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
         />
         <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sm)] text-[var(--text-tertiary)]">%</span>
       </div>
-      <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.max_price_change' | translate }}</p>
       @if (hasError('maxPriceChangePct', 'min') || hasError('maxPriceChangePct', 'max')) {
         <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
           {{ 'pricing.form.validation.max_price_change_range' | translate }}

@@ -1,9 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="DatapulseApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
-    <envs>
-      <env name="S3_ACCESS_KEY" value="datapulse" />
-      <env name="S3_SECRET_KEY" value="SUTAycVQpUcKVuTS" />
-    </envs>
+    <option name="ACTIVE_PROFILES" value="local" />
     <module name="datapulse-api" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="io.datapulse.DatapulseApplication" />
     <option name="WORKING_DIRECTORY" value="file://$MODULE_WORKING_DIR$" />

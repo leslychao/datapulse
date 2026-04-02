@@ -315,6 +315,13 @@ export class MismatchDashboardPageComponent implements OnInit {
       })),
   );
 
+  readonly rowSelectionConfig = {
+    mode: 'multiRow' as const,
+    checkboxes: true,
+    headerCheckbox: true,
+    enableClickSelection: false,
+  };
+
   readonly columnDefs!: ColDef<Mismatch>[];
   readonly defaultColDef: ColDef<Mismatch> = {
     resizable: true,
@@ -384,15 +391,6 @@ export class MismatchDashboardPageComponent implements OnInit {
 
     const tr = this.translate;
     this.columnDefs = [
-      {
-        colId: 'selection',
-        headerCheckboxSelection: true,
-        checkboxSelection: true,
-        width: 44,
-        pinned: 'left' as const,
-        sortable: false,
-        suppressMovable: true,
-      },
       {
         headerName: tr.instant('mismatches.grid.offer'),
         colId: 'offerName',

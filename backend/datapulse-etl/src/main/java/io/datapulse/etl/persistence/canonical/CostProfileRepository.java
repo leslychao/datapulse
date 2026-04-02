@@ -216,6 +216,7 @@ public class CostProfileRepository {
         if (search != null && !search.isBlank()) {
             sb.append(" AND ss.sku_code ILIKE :search");
         }
+        sb.append('\n');
         return sb.toString();
     }
 

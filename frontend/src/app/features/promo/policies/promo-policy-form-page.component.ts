@@ -30,6 +30,7 @@ const MODES: { value: ParticipationMode; titleKey: string; descKey: string }[] =
   selector: 'dp-promo-policy-form-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   imports: [ReactiveFormsModule, TranslatePipe],
   templateUrl: './promo-policy-form-page.component.html',
 })

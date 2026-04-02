@@ -194,6 +194,13 @@ export class NotificationsPageComponent {
     () => (this.notificationsQuery.data()?.length ?? 0) === 0,
   );
 
+  readonly rowSelectionConfig = {
+    mode: 'multiRow' as const,
+    checkboxes: true,
+    headerCheckbox: true,
+    enableClickSelection: false,
+  };
+
   readonly columnDefs: ColDef<AppNotification>[] = this.buildColumnDefs();
 
   readonly localeText = AG_GRID_LOCALE_RU;
@@ -261,14 +268,6 @@ export class NotificationsPageComponent {
 
   private buildColumnDefs(): ColDef<AppNotification>[] {
     return [
-      {
-        width: 48,
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
-        pinned: 'left' as const,
-        sortable: false,
-        resizable: false,
-      },
       {
         field: 'severity',
         headerValueGetter: () => this.translate.instant('alerts.col.severity'),

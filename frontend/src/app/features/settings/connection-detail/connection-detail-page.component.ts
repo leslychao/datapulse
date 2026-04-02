@@ -473,7 +473,7 @@ export class ConnectionDetailPageComponent {
       valueFormatter: (params) => formatDateTime(params.value),
     },
     {
-      headerName: '',
+      headerName: this.translate.instant('settings.connection_detail.col_actions'),
       width: 140,
       cellRenderer: (params: ICellRendererParams<SyncState>) => {
         if (!this.rbac.isAdmin()) return '';

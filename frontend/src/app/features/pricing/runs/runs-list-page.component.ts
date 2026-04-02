@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  HostListener,
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -14,16 +16,9 @@ import {
   QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import {
-  ColDef,
-  GetRowIdParams,
-  ICellRendererParams,
-  ValueFormatterParams,
-} from 'ag-grid-community';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { RbacService } from '@core/auth/rbac.service';
-import { formatRelativeTime } from '@shared/utils/format.utils';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import {
   PricingRunSummary,
@@ -32,16 +27,28 @@ import {
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
-import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
-import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
+import {
+  FilterBarComponent,
+  FilterConfig,
+} from '@shared/components/filter-bar/filter-bar.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { formatRelativeTime, formatMoney } from '@shared/utils/format.utils';
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  sortField?: string;
+  defaultWidth: number;
+  minWidth: number;
+  align: 'left' | 'right';
+}
 
 const RUN_STATUS_COLOR: Record<string, string> = {
-  PENDING: 'info',
-  IN_PROGRESS: 'info',
-  COMPLETED: 'success',
-  COMPLETED_WITH_ERRORS: 'warning',
-  FAILED: 'error',
+  PENDING: 'var(--status-info)',
+  IN_PROGRESS: 'var(--status-info)',
+  COMPLETED: 'var(--status-success)',
+  COMPLETED_WITH_ERRORS: 'var(--status-warning)',
+  FAILED: 'var(--status-error)',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {
@@ -51,6 +58,12 @@ const TRIGGER_COLOR: Record<string, string> = {
   POLICY_CHANGE: 'var(--status-warning)',
 };
 
+const DECISION_COLOR: Record<string, string> = {
+  CHANGE: 'var(--status-success)',
+  SKIP: 'var(--status-warning)',
+  HOLD: 'var(--text-tertiary)',
+};
+
 @Component({
   selector: 'dp-runs-list-page',
   standalone: true,
@@ -58,141 +71,94 @@ const TRIGGER_COLOR: Record<string, string> = {
   imports: [
     TranslatePipe,
     FormsModule,
+    RouterLink,
+    NgTemplateOutlet,
     FilterBarComponent,
-    DataGridComponent,
     EmptyStateComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0' },
-  template: `
-    <div class="flex h-full flex-col">
-      <!-- Toolbar -->
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
-        <h2 class="text-sm font-semibold text-[var(--text-primary)]">
-          {{ 'pricing.runs.title' | translate }}
-        </h2>
-        @if (rbac.canWritePolicies()) {
-          <button
-            (click)="showTriggerModal.set(true)"
-            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-          >
-            {{ 'pricing.runs.trigger_run' | translate }}
-          </button>
-        }
-      </div>
-
-      <!-- Filter Bar -->
-      <div class="border-b border-[var(--border-default)] px-4 py-2">
-        <dp-filter-bar
-          [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
-        />
-      </div>
-
-      <!-- Data Grid -->
-      <div class="flex-1 px-4 py-2">
-        @if (runsQuery.isError()) {
-          <dp-empty-state
-            [message]="'pricing.runs.error' | translate"
-            [actionLabel]="'actions.retry' | translate"
-            (action)="runsQuery.refetch()"
-          />
-        } @else if (!runsQuery.isPending() && rows().length === 0) {
-          <dp-empty-state
-            [message]="hasActiveFilters()
-              ? ('pricing.runs.empty_filtered' | translate)
-              : ('pricing.runs.empty' | translate)"
-            [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
-            (action)="onFiltersChanged({})"
-          />
-        } @else {
-          <dp-data-grid
-            [columnDefs]="columnDefs"
-            [rowData]="rows()"
-            [loading]="runsQuery.isPending()"
-            [pagination]="true"
-            [pageSize]="50"
-            [getRowId]="getRowId"
-            [height]="'100%'"
-            (rowClicked)="onRowClicked($event)"
-          />
-        }
-      </div>
-    </div>
-
-    <!-- Trigger Manual Run Modal -->
-    @if (showTriggerModal()) {
-      <div class="fixed inset-0 z-[9000] flex items-center justify-center">
-        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="showTriggerModal.set(false)"></div>
-        <div
-          class="relative z-10 w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)] animate-[fadeIn_150ms_ease]"
-        >
-          <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ 'pricing.runs.trigger_run' | translate }}</h3>
-          <p class="mt-1 text-sm text-[var(--text-secondary)]">
-            {{ 'pricing.runs.trigger_modal.description' | translate }}
-          </p>
-
-          <div class="mt-4 flex flex-col gap-1.5">
-            <label class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.trigger_modal.connection_label' | translate }}</label>
-            @if (connectionsQuery.isPending()) {
-              <div class="h-9 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] dp-shimmer"></div>
-            } @else {
-              <select
-                [(ngModel)]="selectedConnectionId"
-                class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-              >
-                <option [ngValue]="null" disabled>{{ 'pricing.runs.trigger_modal.connection_placeholder' | translate }}</option>
-                @for (conn of activeConnections(); track conn.id) {
-                  <option [ngValue]="conn.id">{{ conn.name }} ({{ conn.marketplaceType }})</option>
-                }
-              </select>
-            }
-          </div>
-
-          <div class="mt-6 flex justify-end gap-3">
-            <button
-              (click)="showTriggerModal.set(false)"
-              class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-            >
-              {{ 'actions.cancel' | translate }}
-            </button>
-            <button
-              (click)="triggerRun()"
-              [disabled]="!selectedConnectionId || triggerMutation.isPending()"
-              class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              @if (triggerMutation.isPending()) {
-                {{ 'pricing.runs.trigger_modal.submitting' | translate }}
-              } @else {
-                {{ 'pricing.runs.trigger_modal.submit' | translate }}
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-  `,
+  templateUrl: './runs-list-page.component.html',
   styles: [`
+    .run-row {
+      border-left: 3px solid transparent;
+      transition: background-color 150ms ease, border-color 150ms ease;
+    }
+    .run-row:hover { background-color: var(--bg-secondary); }
+    .run-row.expanded {
+      background-color: var(--bg-secondary);
+      border-bottom-color: transparent;
+    }
+    .peek-section {
+      animation: peekReveal 200ms ease-out;
+    }
+    @keyframes peekReveal {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: scale(0.97); }
       to { opacity: 1; transform: scale(1); }
+    }
+    .resize-handle {
+      position: absolute;
+      right: 0;
+      top: 4px;
+      bottom: 4px;
+      width: 3px;
+      cursor: col-resize;
+      border-radius: 1px;
+      opacity: 0;
+      background-color: var(--accent-primary);
+      transition: opacity 120ms ease;
+    }
+    th:hover .resize-handle,
+    .resize-handle:active {
+      opacity: 1;
     }
   `],
 })
 export class RunsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly connectionApi = inject(ConnectionApiService);
-  private readonly wsStore = inject(WorkspaceContextStore);
+  protected readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
 
+  readonly columnDefs: ColumnDef[] = [
+    { key: 'id', label: '#', sortField: 'id', defaultWidth: 50, minWidth: 40, align: 'right' },
+    { key: 'trigger', label: this.translate.instant('pricing.runs.col.trigger'), sortField: 'triggerType', defaultWidth: 110, minWidth: 80, align: 'left' },
+    { key: 'connection', label: this.translate.instant('pricing.runs.col.connection'), sortField: 'connectionName', defaultWidth: 180, minWidth: 100, align: 'left' },
+    { key: 'status', label: this.translate.instant('pricing.runs.col.status'), sortField: 'status', defaultWidth: 130, minWidth: 90, align: 'left' },
+    { key: 'total', label: this.translate.instant('pricing.runs.col.total'), sortField: 'totalOffers', defaultWidth: 60, minWidth: 45, align: 'right' },
+    { key: 'change', label: this.translate.instant('pricing.runs.col.change'), sortField: 'changeCount', defaultWidth: 65, minWidth: 45, align: 'right' },
+    { key: 'skip', label: this.translate.instant('pricing.runs.col.skip'), sortField: 'skipCount', defaultWidth: 65, minWidth: 45, align: 'right' },
+    { key: 'duration', label: this.translate.instant('pricing.runs.col.duration'), defaultWidth: 90, minWidth: 60, align: 'right' },
+    { key: 'created', label: this.translate.instant('pricing.runs.col.created_at'), sortField: 'createdAt', defaultWidth: 100, minWidth: 70, align: 'right' },
+    { key: 'expand', label: '', defaultWidth: 32, minWidth: 32, align: 'left' },
+  ];
+
+  readonly columnWidths = signal<Record<string, number>>(
+    Object.fromEntries(
+      this.columnDefs.map((c) => [c.key, c.defaultWidth]),
+    ),
+  );
+
+  readonly currentSort = signal<{
+    field: string;
+    dir: 'asc' | 'desc';
+  }>({ field: 'createdAt', dir: 'desc' });
+
+  readonly sortParam = computed(() => {
+    const s = this.currentSort();
+    return `${s.field},${s.dir}`;
+  });
+
   readonly filterValues = signal<Record<string, any>>({});
   readonly showTriggerModal = signal(false);
-  readonly currentPage = signal(0);
-  readonly currentSort = signal('createdAt,desc');
+  readonly expandedRunId = signal<number | null>(null);
   protected selectedConnectionId: number | null = null;
 
   readonly filterConfigs: FilterConfig[] = [
@@ -200,7 +166,15 @@ export class RunsListPageComponent {
       key: 'status',
       label: 'pricing.runs.filter.status',
       type: 'multi-select',
-      options: (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED'] as const).map(value => ({
+      options: (
+        [
+          'PENDING',
+          'IN_PROGRESS',
+          'COMPLETED',
+          'COMPLETED_WITH_ERRORS',
+          'FAILED',
+        ] as const
+      ).map((value) => ({
         value,
         label: `pricing.runs.status.${value}`,
       })),
@@ -209,7 +183,14 @@ export class RunsListPageComponent {
       key: 'triggerType',
       label: 'pricing.runs.filter.trigger',
       type: 'multi-select',
-      options: (['POST_SYNC', 'MANUAL', 'SCHEDULED', 'POLICY_CHANGE'] as const).map(value => ({
+      options: (
+        [
+          'POST_SYNC',
+          'MANUAL',
+          'SCHEDULED',
+          'POLICY_CHANGE',
+        ] as const
+      ).map((value) => ({
         value,
         label: `pricing.runs.trigger.${value}`,
       })),
@@ -221,136 +202,32 @@ export class RunsListPageComponent {
     },
   ];
 
-  readonly columnDefs: ColDef[] = [
-    {
-      headerName: '#',
-      field: 'id',
-      width: 70,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.trigger'),
-      field: 'triggerType',
-      width: 130,
-      sortable: true,
-      cellRenderer: (params: ICellRendererParams<PricingRunSummary>) => {
-        const t = params.value as string;
-        const label = this.translate.instant(`pricing.runs.trigger.${t}`);
-        const color = TRIGGER_COLOR[t] ?? 'var(--text-secondary)';
-        return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${color} 12%, transparent); color: ${color}">
-          ${label}
-        </span>`;
-      },
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.connection'),
-      field: 'connectionName',
-      minWidth: 160,
-      flex: 1,
-      sortable: true,
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.status'),
-      field: 'status',
-      width: 140,
-      sortable: true,
-      cellRenderer: (params: ICellRendererParams<PricingRunSummary>) => {
-        const st = params.value as string;
-        const label = this.translate.instant(`pricing.runs.status.${st}`);
-        const color = RUN_STATUS_COLOR[st] ?? 'neutral';
-        const cssVar = `var(--status-${color})`;
-        const dotHtml = st === 'IN_PROGRESS'
-          ? `<span class="inline-block h-1.5 w-1.5 rounded-full animate-pulse" style="background-color: ${cssVar}"></span>`
-          : `<span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          ${dotHtml}
-          ${label}
-        </span>`;
-      },
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.total'),
-      field: 'totalOffers',
-      width: 80,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.eligible'),
-      field: 'eligibleCount',
-      width: 90,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.change'),
-      field: 'changeCount',
-      width: 100,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-      cellStyle: () => ({ color: 'var(--status-success)' }),
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.skip'),
-      field: 'skipCount',
-      width: 90,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-      cellStyle: () => ({ color: 'var(--status-warning)' }),
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.hold'),
-      field: 'holdCount',
-      width: 90,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-      cellStyle: () => ({ color: 'var(--text-tertiary)' }),
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.duration'),
-      field: 'startedAt',
-      width: 110,
-      sortable: false,
-      cellClass: 'font-mono text-right',
-      valueFormatter: (params: ValueFormatterParams<PricingRunSummary>) => {
-        if (!params.data) return '';
-        return this.formatDuration(params.data.startedAt, params.data.completedAt);
-      },
-    },
-    {
-      headerName: this.translate.instant('pricing.runs.col.created_at'),
-      field: 'createdAt',
-      width: 120,
-      sortable: true,
-      sort: 'desc' as const,
-      valueFormatter: (params: ValueFormatterParams<PricingRunSummary>) =>
-        this.formatRelativeTime(params.value),
-    },
-  ];
-
   private readonly filter = computed<PricingRunFilter>(() => {
     const vals = this.filterValues();
     const f: PricingRunFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
-    if (vals['triggerType']?.length) f.triggerType = vals['triggerType'];
+    if (vals['triggerType']?.length)
+      f.triggerType = vals['triggerType'];
     if (vals['period']?.from) f.from = vals['period'].from;
     if (vals['period']?.to) f.to = vals['period'].to;
     return f;
   });
 
   readonly runsQuery = injectQuery(() => ({
-    queryKey: ['pricing-runs', this.wsStore.currentWorkspaceId(), this.filter(), this.currentPage(), this.currentSort()],
+    queryKey: [
+      'pricing-runs',
+      this.wsStore.currentWorkspaceId(),
+      this.filter(),
+      this.sortParam(),
+    ],
     queryFn: () =>
       lastValueFrom(
         this.pricingApi.listRuns(
           this.wsStore.currentWorkspaceId()!,
           this.filter(),
-          this.currentPage(),
+          0,
           50,
-          this.currentSort(),
+          this.sortParam(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -360,50 +237,173 @@ export class RunsListPageComponent {
 
   readonly connectionsQuery = injectQuery(() => ({
     queryKey: ['connections'],
-    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+    queryFn: () =>
+      lastValueFrom(this.connectionApi.listConnections()),
     enabled: this.showTriggerModal(),
     staleTime: 60_000,
   }));
 
-  readonly rows = computed(() => this.runsQuery.data()?.content ?? []);
+  readonly peekDecisionsQuery = injectQuery(() => ({
+    queryKey: [
+      'pricing-decisions',
+      'peek',
+      this.wsStore.currentWorkspaceId(),
+      this.expandedRunId(),
+    ],
+    queryFn: () =>
+      lastValueFrom(
+        this.pricingApi.listDecisions(
+          this.wsStore.currentWorkspaceId()!,
+          { pricingRunId: this.expandedRunId()! },
+          0,
+          10,
+          'decisionType,asc',
+        ),
+      ),
+    enabled:
+      this.expandedRunId() != null &&
+      !!this.wsStore.currentWorkspaceId(),
+    staleTime: 30_000,
+  }));
+
+  readonly rows = computed(
+    () => this.runsQuery.data()?.content ?? [],
+  );
 
   readonly activeConnections = computed<ConnectionSummary[]>(() =>
-    (this.connectionsQuery.data() ?? []).filter((c) => c.status === 'ACTIVE'),
+    (this.connectionsQuery.data() ?? []).filter(
+      (c) => c.status === 'ACTIVE',
+    ),
   );
 
   readonly hasActiveFilters = computed(() =>
     Object.values(this.filterValues()).some(
-      (v) => v !== '' && v !== null && v !== undefined && (!Array.isArray(v) || v.length > 0),
+      (v) =>
+        v !== '' &&
+        v !== null &&
+        v !== undefined &&
+        (!Array.isArray(v) || v.length > 0),
     ),
   );
 
-  readonly getRowId = (params: GetRowIdParams<PricingRunSummary>) =>
-    String(params.data.id);
+  readonly peekDecisions = computed(
+    () => this.peekDecisionsQuery.data()?.content ?? [],
+  );
+
+  readonly peekDecisionsTotalCount = computed(
+    () => this.peekDecisionsQuery.data()?.totalElements ?? 0,
+  );
 
   readonly triggerMutation = injectMutation(() => ({
     mutationFn: (connectionId: number) =>
       lastValueFrom(
-        this.pricingApi.triggerManualRun(this.wsStore.currentWorkspaceId()!, connectionId),
+        this.pricingApi.triggerManualRun(
+          this.wsStore.currentWorkspaceId()!,
+          connectionId,
+        ),
       ),
     onSuccess: () => {
       this.showTriggerModal.set(false);
       this.selectedConnectionId = null;
-      this.queryClient.invalidateQueries({ queryKey: ['pricing-runs'] });
-      this.toast.success(this.translate.instant('pricing.runs.trigger_success'));
+      this.queryClient.invalidateQueries({
+        queryKey: ['pricing-runs'],
+      });
+      this.toast.success(
+        this.translate.instant('pricing.runs.trigger_success'),
+      );
     },
     onError: () => {
-      this.toast.error(this.translate.instant('pricing.runs.trigger_error'));
+      this.toast.error(
+        this.translate.instant('pricing.runs.trigger_error'),
+      );
     },
   }));
 
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-    this.currentPage.set(0);
+  private resizingCol: string | null = null;
+  private resizeStartX = 0;
+  private resizeStartWidth = 0;
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.expandedRunId() !== null) {
+      this.closeExpand();
+    }
   }
 
-  onRowClicked(row: PricingRunSummary): void {
-    const wsId = this.wsStore.currentWorkspaceId();
-    this.router.navigate(['/workspace', wsId, 'pricing', 'runs', row.id]);
+  colWidth(key: string): number {
+    return this.columnWidths()[key] ?? 80;
+  }
+
+  sortDir(colKey: string): 'asc' | 'desc' | null {
+    const col = this.columnDefs.find((c) => c.key === colKey);
+    if (!col?.sortField) return null;
+    const s = this.currentSort();
+    return s.field === col.sortField ? s.dir : null;
+  }
+
+  toggleSort(colKey: string): void {
+    const col = this.columnDefs.find((c) => c.key === colKey);
+    if (!col?.sortField) return;
+
+    const current = this.currentSort();
+    if (current.field === col.sortField) {
+      this.currentSort.set({
+        field: col.sortField,
+        dir: current.dir === 'asc' ? 'desc' : 'asc',
+      });
+    } else {
+      this.currentSort.set({ field: col.sortField, dir: 'asc' });
+    }
+    this.expandedRunId.set(null);
+  }
+
+  startResize(event: MouseEvent, colKey: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.resizingCol = colKey;
+    this.resizeStartX = event.clientX;
+    this.resizeStartWidth = this.colWidth(colKey);
+
+    const col = this.columnDefs.find((c) => c.key === colKey);
+    const min = col?.minWidth ?? 40;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!this.resizingCol) return;
+      const delta = e.clientX - this.resizeStartX;
+      const newWidth = Math.max(min, this.resizeStartWidth + delta);
+      this.columnWidths.update((w) => ({
+        ...w,
+        [this.resizingCol!]: newWidth,
+      }));
+    };
+
+    const onMouseUp = () => {
+      this.resizingCol = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  toggleExpand(run: PricingRunSummary): void {
+    this.expandedRunId.set(
+      this.expandedRunId() === run.id ? null : run.id,
+    );
+  }
+
+  closeExpand(): void {
+    this.expandedRunId.set(null);
+  }
+
+  onFiltersChanged(values: Record<string, any>): void {
+    this.filterValues.set(values);
+    this.expandedRunId.set(null);
   }
 
   triggerRun(): void {
@@ -412,7 +412,50 @@ export class RunsListPageComponent {
     }
   }
 
-  private formatDuration(start: string | null, end: string | null): string {
+  statusColor(status: string): string {
+    return RUN_STATUS_COLOR[status] ?? 'var(--text-tertiary)';
+  }
+
+  statusBg(status: string): string {
+    return `color-mix(in srgb, ${this.statusColor(status)} 12%, transparent)`;
+  }
+
+  triggerColor(trigger: string): string {
+    return TRIGGER_COLOR[trigger] ?? 'var(--text-secondary)';
+  }
+
+  triggerBg(trigger: string): string {
+    return `color-mix(in srgb, ${this.triggerColor(trigger)} 12%, transparent)`;
+  }
+
+  decisionColor(dt: string): string {
+    return DECISION_COLOR[dt] ?? 'var(--text-tertiary)';
+  }
+
+  decisionBg(dt: string): string {
+    return `color-mix(in srgb, ${this.decisionColor(dt)} 12%, transparent)`;
+  }
+
+  changePctText(value: number | null): string {
+    if (value === null || value === undefined) return '—';
+    const abs = Math.abs(value).toFixed(1).replace('.', ',');
+    if (value > 0) return `+${abs}%`;
+    if (value < 0) return `−${abs}%`;
+    return '0%';
+  }
+
+  changePctColor(value: number | null): string {
+    if (value === null || value === undefined)
+      return 'var(--text-tertiary)';
+    if (value > 0) return 'var(--finance-positive)';
+    if (value < 0) return 'var(--finance-negative)';
+    return 'var(--finance-zero)';
+  }
+
+  formatDuration(
+    start: string | null,
+    end: string | null,
+  ): string {
     if (!start) return '—';
     const endMs = end ? new Date(end).getTime() : Date.now();
     const ms = endMs - new Date(start).getTime();
@@ -423,10 +466,16 @@ export class RunsListPageComponent {
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
     const minUnit = this.translate.instant('common.time.min');
-    return sec > 0 ? `${min} ${minUnit} ${sec} ${secUnit}` : `${min} ${minUnit}`;
+    return sec > 0
+      ? `${min} ${minUnit} ${sec} ${secUnit}`
+      : `${min} ${minUnit}`;
   }
 
-  private formatRelativeTime(iso: string | null): string {
+  relativeTime(iso: string | null): string {
     return formatRelativeTime(iso);
+  }
+
+  formatPrice(value: number | null): string {
+    return formatMoney(value, 0);
   }
 }

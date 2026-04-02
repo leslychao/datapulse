@@ -120,6 +120,7 @@ const MP_BADGE: Record<
   selector: 'dp-campaign-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   imports: [
     TranslatePipe,
     FilterBarComponent,

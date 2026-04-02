@@ -41,6 +41,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
   selector: 'dp-promo-policy-assignments-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   imports: [
     TranslatePipe,
     FormsModule,

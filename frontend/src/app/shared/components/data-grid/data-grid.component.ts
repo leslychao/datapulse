@@ -15,6 +15,7 @@ import {
   RowClickedEvent,
   RowDoubleClickedEvent,
   RowDataUpdatedEvent,
+  RowSelectionOptions,
   SelectionChangedEvent,
   SortChangedEvent,
   PaginationChangedEvent,
@@ -47,6 +48,8 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           [rowSelection]="rowSelection()"
           [getRowId]="getRowId()"
           [suppressCellFocus]="true"
+          [suppressRowClickSelection]="true"
+          [alwaysShowVerticalScroll]="true"
           [animateRows]="false"
           [localeText]="localeText"
           (rowClicked)="onRowClicked($event)"
@@ -69,7 +72,7 @@ export class DataGridComponent {
   readonly loading = input(false);
   readonly pagination = input(true);
   readonly pageSize = input(50);
-  readonly rowSelection = input<'single' | 'multiple' | undefined>(undefined);
+  readonly rowSelection = input<'single' | 'multiple' | RowSelectionOptions<any> | undefined>(undefined);
   readonly getRowId = input<((params: GetRowIdParams) => string) | undefined>(undefined);
   readonly height = input('500px');
   readonly totalRows = input(0);

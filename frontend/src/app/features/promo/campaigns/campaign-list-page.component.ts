@@ -67,6 +67,7 @@ const MP_BADGE: Record<
     EmptyStateComponent,
     KpiCardComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">

@@ -293,12 +293,13 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           UNION ALL
 
           -- Source 3: ACCOUNT-level fact_finance entries
+          -- Inner projection isolates WHERE from SELECT alias to avoid CH alias shadowing.
           SELECT
               connection_id,
               any(source_platform) AS source_platform,
               0 AS seller_sku_id,
               0 AS product_id,
-              toYYYYMM(finance_date) AS period,
+              period,
               'ACCOUNT' AS attribution_level,
               sum(revenue_amount) AS revenue_amount,
               sum(marketplace_commission_amount) AS marketplace_commission_amount,
@@ -314,9 +315,27 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
               sum(net_payout) AS net_payout,
               NULL AS gross_cogs,
               'NO_SALES' AS cogs_status
-          FROM fact_finance
-          WHERE attribution_level = 'ACCOUNT'
-          GROUP BY connection_id, toYYYYMM(finance_date)
+          FROM (
+              SELECT
+                  connection_id,
+                  source_platform,
+                  toYYYYMM(finance_date) AS period,
+                  revenue_amount,
+                  marketplace_commission_amount,
+                  acquiring_commission_amount,
+                  logistics_cost_amount,
+                  storage_cost_amount,
+                  penalties_amount,
+                  marketing_cost_amount,
+                  acceptance_cost_amount,
+                  other_marketplace_charges_amount,
+                  compensation_amount,
+                  refund_amount,
+                  net_payout
+              FROM fact_finance
+              WHERE attribution_level = 'ACCOUNT'
+          ) AS ff_account
+          GROUP BY connection_id, period
       ) AS raw_union
       GROUP BY connection_id, seller_sku_id, period, attribution_level
       )

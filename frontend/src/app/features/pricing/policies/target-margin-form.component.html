@@ -12,6 +12,7 @@
         type="number"
         min="1"
         max="80"
+        placeholder="1–80"
         class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
         [class]="isInvalid('targetMarginPct')
           ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
@@ -19,7 +20,6 @@
       />
       <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sm)] text-[var(--text-tertiary)]">%</span>
     </div>
-    <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.target_margin' | translate }}</p>
     @if (hasError('targetMarginPct', 'required')) {
       <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
         {{ 'pricing.form.validation.target_margin_required' | translate }}
@@ -65,6 +65,7 @@
               type="number"
               min="1"
               max="50"
+              placeholder="1–50"
               class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
               [class]="isInvalid('commissionManualPct')
                 ? 'border-[var(--status-error)]'
@@ -72,7 +73,6 @@
             />
             <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sm)] text-[var(--text-tertiary)]">%</span>
           </div>
-          <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.commission_manual' | translate }}</p>
           @if (hasError('commissionManualPct', 'min') || hasError('commissionManualPct', 'max')) {
             <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
               {{ 'pricing.form.validation.commission_manual_range' | translate }}
@@ -108,9 +108,9 @@
               type="number"
               min="7"
               max="365"
+              placeholder="7–365"
               class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
             />
-            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.commission_lookback' | translate }}</p>
             @if (hasError('commissionLookbackDays', 'min') || hasError('commissionLookbackDays', 'max')) {
               <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
                 {{ 'pricing.form.validation.commission_lookback_range' | translate }}
@@ -127,9 +127,9 @@
               type="number"
               min="1"
               max="100"
+              placeholder="1–100"
               class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
             />
-            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.commission_min_txn' | translate }}</p>
             @if (hasError('commissionMinTransactions', 'min') || hasError('commissionMinTransactions', 'max')) {
               <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
                 {{ 'pricing.form.validation.commission_min_txn_range' | translate }}
@@ -215,12 +215,13 @@
         type="number"
         min="1"
         max="100"
+        placeholder="1–100"
         class="h-8 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
         [class]="isInvalid('roundingStep')
           ? 'border-[var(--status-error)]'
           : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
       />
-      <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.rounding_step' | translate }}</p>
+      <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.rounding_step_example' | translate }}</p>
       @if (hasError('roundingStep', 'min') || hasError('roundingStep', 'max')) {
         <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
           {{ 'pricing.form.validation.rounding_step_range' | translate }}

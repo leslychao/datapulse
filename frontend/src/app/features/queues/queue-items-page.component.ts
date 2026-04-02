@@ -367,6 +367,13 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
 
   // --- Computed ---
 
+  readonly rowSelectionConfig = {
+    mode: 'multiRow' as const,
+    checkboxes: true,
+    headerCheckbox: true,
+    enableClickSelection: false,
+  };
+
   readonly columnDefs = computed(() => this.buildColumnDefs(this.queueContext()));
   readonly rowData = computed(() => this.itemsQuery.data()?.content ?? []);
   readonly totalElements = computed(() => this.itemsQuery.data()?.totalElements ?? 0);
@@ -917,15 +924,6 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   // --- Column Definitions ---
 
   private buildColumnDefs(ctx: QueueContext): ColDef<QueueItem>[] {
-    const checkboxCol: ColDef<QueueItem> = {
-      headerCheckboxSelection: true,
-      checkboxSelection: true,
-      width: 40,
-      pinned: 'left',
-      sortable: false,
-      suppressMovable: true,
-    };
-
     const skuCol: ColDef<QueueItem> = {
       colId: 'sku_code',
       headerName: this.translate.instant('queues.grid.sku'),
@@ -998,7 +996,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
         params.data ? this.renderActions(params.data, ctx) : '',
     };
 
-    const common = [checkboxCol, skuCol, productCol, mpCol, currentPriceCol, costCol, marginCol];
+    const common = [skuCol, productCol, mpCol, currentPriceCol, costCol, marginCol];
 
     switch (ctx) {
       case 'PENDING_APPROVAL':

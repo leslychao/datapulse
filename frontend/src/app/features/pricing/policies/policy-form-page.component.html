@@ -44,27 +44,6 @@
   } @else {
     <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5">
 
-      <!-- Validation summary -->
-      @if (submitted() && form.invalid) {
-        <div class="flex gap-2.5 rounded-[var(--radius-md)] border border-[var(--status-error)]/30 bg-[var(--status-error-bg)] px-3 py-2.5">
-          <lucide-icon
-            [name]="icons.AlertTriangle"
-            [size]="15"
-            class="mt-0.5 shrink-0 text-[var(--status-error)]"
-          />
-          <div class="min-w-0">
-            <p class="text-[var(--text-sm)] font-medium text-[var(--status-error)]">
-              {{ 'pricing.form.validation_summary.title' | translate }}
-            </p>
-            <ul class="mt-1 space-y-0.5">
-              @for (err of collectValidationErrors(); track err) {
-                <li class="text-[var(--text-xs)] text-[var(--text-primary)]/70">{{ err }}</li>
-              }
-            </ul>
-          </div>
-        </div>
-      }
-
       <!-- ─── Section 1: Basics ─── -->
       <div class="space-y-4 border-b border-[var(--border-default)] pb-5">
         <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
@@ -337,14 +316,7 @@
       <dp-guard-config-form [form]="form" [submitted]="submitted()" />
 
       <!-- ─── Footer ─── -->
-      <div class="sticky bottom-0 -mx-6 flex items-center justify-between border-t border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur-sm">
-        <div>
-          @if (submitted() && form.invalid) {
-            <span class="text-[var(--text-xs)] text-[var(--status-error)]">
-              {{ 'pricing.form.has_errors' | translate }}
-            </span>
-          }
-        </div>
+      <div class="sticky bottom-0 -mx-6 flex items-center justify-end border-t border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur-sm">
         <div class="flex items-center gap-2">
           @if (isEditMode()) {
             <button

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   HostListener,
   computed,
   effect,
@@ -14,6 +15,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import {
   injectQuery,
   injectMutation,
+  QueryClient,
 } from '@tanstack/angular-query-experimental';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lastValueFrom } from 'rxjs';
@@ -62,8 +64,10 @@ import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
 export class PolicyFormPageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly el = inject(ElementRef);
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly queryClient = inject(QueryClient);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
@@ -102,7 +106,9 @@ export class PolicyFormPageComponent {
       return lastValueFrom(this.pricingApi.createPolicy(this.wsId(), req));
     },
     onSuccess: (result: PricingPolicy) => {
+      this.queryClient.invalidateQueries({ queryKey: ['policies'] });
       if (this.isEditMode()) {
+        this.queryClient.invalidateQueries({ queryKey: ['policy', this.policyId()] });
         this.toast.success(
           this.translate.instant('pricing.policies.updated', {
             version: String(result.version),
@@ -161,6 +167,8 @@ export class PolicyFormPageComponent {
   ];
 
   constructor() {
+    this.onStrategyTypeChange();
+
     effect(() => {
       const policy = this.policyQuery.data();
       if (policy) {
@@ -238,7 +246,16 @@ export class PolicyFormPageComponent {
   submit(): void {
     this.submitted.set(true);
     this.form.markAllAsTouched();
-    if (this.form.invalid) return;
+
+    if (this.form.invalid) {
+      const validationErrors = this.collectValidationErrors();
+      const message = validationErrors.length
+        ? validationErrors[0]
+        : this.translate.instant('pricing.form.has_errors');
+      this.toast.error(message);
+      this.scrollToFirstInvalidControl();
+      return;
+    }
 
     const raw = this.form.getRawValue();
     const req: CreatePolicyRequest = {
@@ -274,6 +291,15 @@ export class PolicyFormPageComponent {
 
   collectValidationErrors(): string[] {
     return collectPolicyValidationErrors(this.form, this.translate);
+  }
+
+  private scrollToFirstInvalidControl(): void {
+    const host: HTMLElement = this.el.nativeElement;
+    const invalid = host.querySelector('.ng-invalid:not(form):not([formGroupName])');
+    if (invalid) {
+      (invalid as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (invalid as HTMLElement).focus?.();
+    }
   }
 
   private patchForm(policy: PricingPolicy): void {

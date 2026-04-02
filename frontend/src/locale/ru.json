@@ -220,6 +220,7 @@
   "grid.error_title": "Не удалось загрузить данные.",
   "grid.error_hint": "Попробуйте обновить страницу.",
   "grid.search_placeholder": "Поиск по артикулу / названию",
+  "grid.lock_toggle_error": "Не удалось изменить блокировку.",
 
   "grid.toolbar.draft": "Черновик",
   "grid.toolbar.columns": "Колонки",
@@ -1335,6 +1336,7 @@
   "settings.connection_detail.col_http_status": "HTTP",
   "settings.connection_detail.col_duration": "Длительность",
   "settings.connection_detail.col_retry": "Повтор",
+  "settings.connection_detail.col_actions": "Действия",
   "settings.connection_detail.danger_zone": "Опасная зона",
   "settings.connection_detail.disable_title": "Отключить подключение",
   "settings.connection_detail.disable_hint": "Синхронизация и операции будут остановлены до повторного включения.",
@@ -1916,6 +1918,7 @@
   "pricing.form.hint.min_margin": "0–80%",
   "pricing.form.hint.max_price_change": "1–50%",
   "pricing.form.hint.rounding_step": "1–100 ₽. Например, 10 → цена 3842 станет 3840",
+  "pricing.form.hint.rounding_step_example": "Например, 10 → цена 3842 станет 3840",
   "pricing.form.hint.return_adjustment": "Учтёт историческую долю возвратов",
   "pricing.form.hint.ad_cost": "Рекомендуется после 14+ дней данных",
   "pricing.form.hint.constraints": "Если не нужны — оставьте пустыми",
@@ -2648,6 +2651,10 @@
   "pricing.runs.detail.col.policy": "Политика",
   "pricing.runs.detail.col.strategy": "Стратегия",
   "pricing.runs.detail.col.skip_reason": "Причина пропуска",
+
+  "pricing.runs.peek.open_full": "Открыть полностью →",
+  "pricing.runs.peek.shown_of": "Показано {{shown}} из {{total}} решений",
+  "pricing.runs.peek.no_decisions": "Решений пока нет.",
 
   "pricing.locks.form.offer_id_label": "ID оффера",
   "pricing.locks.form.price_label": "Цена",

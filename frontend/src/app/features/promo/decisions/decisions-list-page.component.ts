@@ -58,6 +58,7 @@ const MP_BADGE: Record<
   selector: 'dp-decisions-list-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   imports: [
     TranslatePipe,
     FilterBarComponent,

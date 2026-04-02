@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, HostListener, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, HostListener, inject, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -10,6 +10,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { GridStore } from '@shared/stores/grid.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
+import { ToastService } from '@shared/shell/toast/toast.service';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -20,7 +21,7 @@ import { ViewTabsComponent } from './components/view-tabs.component';
 import { GridToolbarComponent } from './components/grid-toolbar.component';
 import { BulkActionsBarComponent } from './components/bulk-actions-bar.component';
 import { DraftBannerComponent } from './components/draft-banner.component';
-import { buildGridColumnDefs } from './components/grid-column-defs';
+import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-column-defs';
 
 @Component({
   selector: 'dp-grid-page',
@@ -87,7 +88,7 @@ import { buildGridColumnDefs } from './components/grid-column-defs';
             [rowData]="rows()"
             [loading]="false"
             [pagination]="false"
-            [rowSelection]="'multiple'"
+            [rowSelection]="rowSelectionConfig"
             [getRowId]="getRowId"
             [height]="'100%'"
             (rowClicked)="onRowClicked($event)"
@@ -129,8 +130,19 @@ export class GridPageComponent implements OnInit, OnDestroy {
   private readonly webSocket = inject(WebSocketService);
   private readonly queryClient = injectQueryClient();
   protected readonly gridStore = inject(GridStore);
+  private readonly zone = inject(NgZone);
 
-  protected readonly columnDefs = buildGridColumnDefs();
+  protected readonly columnDefs = buildGridColumnDefs({
+    onLockToggle: (offerId, locked, currentPrice) =>
+      this.zone.run(() => this.toggleLock(offerId, locked, currentPrice)),
+  });
+
+  protected readonly rowSelectionConfig = {
+    mode: 'multiRow' as const,
+    checkboxes: true,
+    headerCheckbox: true,
+    enableClickSelection: false,
+  };
 
   protected readonly getRowId = (params: any): string => String(params.data.id);
 
@@ -242,6 +254,27 @@ export class GridPageComponent implements OnInit, OnDestroy {
   }
 
   private readonly translate = inject(TranslateService);
+  private readonly toast = inject(ToastService);
+
+  readonly lockMutation = injectMutation(() => ({
+    mutationFn: (params: { offerId: number; locked: boolean; currentPrice: number | null }) => {
+      const wsId = this.wsStore.currentWorkspaceId()!;
+      if (params.locked) {
+        return lastValueFrom(this.offerApi.unlockOffer(wsId, params.offerId));
+      }
+      return lastValueFrom(
+        this.offerApi.lockOffer(wsId, params.offerId, {
+          lockedPrice: params.currentPrice ?? 0,
+        }),
+      );
+    },
+    onSuccess: () => this.offersQuery.refetch(),
+    onError: () => this.toast.error(this.translate.instant('grid.lock_toggle_error')),
+  }));
+
+  toggleLock(offerId: number, currentlyLocked: boolean, currentPrice: number | null): void {
+    this.lockMutation.mutate({ offerId, locked: currentlyLocked, currentPrice });
+  }
 
   protected draftExitMessage(): string {
     return this.translate.instant('draft.exit_message', { count: this.gridStore.draftCount() });
