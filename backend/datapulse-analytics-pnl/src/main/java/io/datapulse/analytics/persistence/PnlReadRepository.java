@@ -11,6 +11,7 @@ import io.datapulse.analytics.api.PnlFilter;
 import io.datapulse.analytics.api.PnlSummaryResponse;
 import io.datapulse.analytics.api.PnlTrendResponse;
 import io.datapulse.analytics.api.PostingDetailResponse;
+import io.datapulse.analytics.api.PostingPnlDetailResponse;
 import io.datapulse.analytics.api.PostingPnlResponse;
 import io.datapulse.analytics.api.ProductPnlResponse;
 import io.datapulse.analytics.api.TrendGranularity;
@@ -28,23 +29,23 @@ public class PnlReadRepository {
     private static final String SETTINGS_FINAL = "\nSETTINGS final = 1";
 
     private static final Map<String, String> PRODUCT_SORT_WHITELIST = Map.ofEntries(
-            Map.entry("revenueAmount", "revenue_amount"),
-            Map.entry("marketplacePnl", "marketplace_pnl"),
-            Map.entry("fullPnl", "full_pnl"),
-            Map.entry("netCogs", "net_cogs"),
-            Map.entry("advertisingCost", "advertising_cost"),
-            Map.entry("logisticsCostAmount", "logistics_cost_amount"),
-            Map.entry("refundAmount", "refund_amount"),
-            Map.entry("netPayout", "net_payout"),
-            Map.entry("sellerSkuId", "seller_sku_id")
+            Map.entry("revenue_amount", "revenue_amount"),
+            Map.entry("marketplace_pnl", "marketplace_pnl"),
+            Map.entry("full_pnl", "full_pnl"),
+            Map.entry("net_cogs", "net_cogs"),
+            Map.entry("advertising_cost", "advertising_cost"),
+            Map.entry("logistics_cost_amount", "logistics_cost_amount"),
+            Map.entry("refund_amount", "refund_amount"),
+            Map.entry("net_payout", "net_payout"),
+            Map.entry("seller_sku_id", "seller_sku_id")
     );
 
     private static final Map<String, String> POSTING_SORT_WHITELIST = Map.ofEntries(
-            Map.entry("financeDate", "finance_date"),
-            Map.entry("revenueAmount", "revenue_amount"),
-            Map.entry("netPayout", "net_payout"),
-            Map.entry("reconciliationResidual", "reconciliation_residual"),
-            Map.entry("postingId", "posting_id")
+            Map.entry("finance_date", "finance_date"),
+            Map.entry("revenue_amount", "revenue_amount"),
+            Map.entry("net_payout", "net_payout"),
+            Map.entry("reconciliation_residual", "reconciliation_residual"),
+            Map.entry("posting_id", "posting_id")
     );
 
     private static final String SUMMARY_SQL = """
@@ -102,6 +103,10 @@ public class PnlReadRepository {
               AND toYYYYMM(finance_date) = :period
             """;
 
+    /**
+     * Product/posting lists read sku_code, product_name, marketplace_sku from marts (denormalized
+     * at materialization from facts + catalog). No dim joins here.
+     */
     private static final String BY_PRODUCT_SQL = """
             SELECT
                 m.connection_id,
@@ -110,8 +115,8 @@ public class PnlReadRepository {
                 m.product_id,
                 m.period,
                 m.attribution_level,
-                p.sku_code,
-                p.product_name,
+                m.sku_code,
+                m.product_name,
                 m.revenue_amount,
                 m.marketplace_commission_amount,
                 m.acquiring_commission_amount,
@@ -131,38 +136,60 @@ public class PnlReadRepository {
                 m.marketplace_pnl,
                 m.full_pnl
             FROM mart_product_pnl AS m
-            LEFT JOIN dim_product AS p ON m.product_id = p.product_id
             WHERE m.connection_id IN (:connectionIds)
             """;
 
     private static final String BY_POSTING_SQL = """
             SELECT
+                m.posting_id AS posting_id,
+                m.connection_id AS connection_id,
+                m.source_platform AS source_platform,
+                m.order_id AS order_id,
+                m.seller_sku_id AS seller_sku_id,
+                m.product_id AS product_id,
+                m.sku_code AS sku_code,
+                m.product_name AS product_name,
+                m.finance_date AS finance_date,
+                m.revenue_amount AS revenue_amount,
+                m.marketplace_commission_amount AS marketplace_commission_amount,
+                m.acquiring_commission_amount AS acquiring_commission_amount,
+                m.logistics_cost_amount AS logistics_cost_amount,
+                m.storage_cost_amount AS storage_cost_amount,
+                m.penalties_amount AS penalties_amount,
+                m.marketing_cost_amount AS marketing_cost_amount,
+                m.acceptance_cost_amount AS acceptance_cost_amount,
+                m.other_marketplace_charges_amount AS other_marketplace_charges_amount,
+                m.compensation_amount AS compensation_amount,
+                m.refund_amount AS refund_amount,
+                m.net_payout AS net_payout,
+                m.quantity AS quantity,
+                m.gross_cogs AS gross_cogs,
+                m.net_cogs AS net_cogs,
+                m.cogs_status AS cogs_status,
+                m.reconciliation_residual AS reconciliation_residual
+            FROM mart_posting_pnl AS m
+            WHERE m.connection_id IN (:connectionIds)
+            """;
+
+    private static final String POSTING_SUMMARY_SQL = """
+            SELECT
                 posting_id,
-                connection_id,
                 source_platform,
-                order_id,
-                seller_sku_id,
-                product_id,
+                sku_code,
+                product_name,
                 finance_date,
                 revenue_amount,
-                marketplace_commission_amount,
-                acquiring_commission_amount,
-                logistics_cost_amount,
-                storage_cost_amount,
-                penalties_amount,
-                marketing_cost_amount,
-                acceptance_cost_amount,
-                other_marketplace_charges_amount,
-                compensation_amount,
-                refund_amount,
+                marketplace_commission_amount + acquiring_commission_amount
+                    + logistics_cost_amount + storage_cost_amount + penalties_amount
+                    + marketing_cost_amount + acceptance_cost_amount
+                    + other_marketplace_charges_amount AS total_costs_amount,
                 net_payout,
-                quantity,
-                gross_cogs,
                 net_cogs,
-                cogs_status,
                 reconciliation_residual
             FROM mart_posting_pnl
-            WHERE connection_id IN (:connectionIds)
+            WHERE posting_id = :postingId
+              AND connection_id IN (:connectionIds)
+            SETTINGS final = 1
             """;
 
     private static final String POSTING_DETAIL_SQL = """
@@ -242,7 +269,10 @@ public class PnlReadRepository {
 
     public long countByProduct(List<Long> connectionIds, PnlFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
-        var sb = new StringBuilder("SELECT count(*) FROM mart_product_pnl AS m WHERE m.connection_id IN (:connectionIds)");
+        var sb = new StringBuilder("""
+                SELECT count(*)
+                FROM mart_product_pnl AS m
+                WHERE m.connection_id IN (:connectionIds)""");
         appendProductFilter(sb, params, filter);
         sb.append(SETTINGS_FINAL);
 
@@ -268,7 +298,10 @@ public class PnlReadRepository {
 
     public long countByPosting(List<Long> connectionIds, PnlFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
-        var sb = new StringBuilder("SELECT count(*) FROM mart_posting_pnl WHERE connection_id IN (:connectionIds)");
+        var sb = new StringBuilder("""
+                SELECT count(*)
+                FROM mart_posting_pnl AS m
+                WHERE m.connection_id IN (:connectionIds)""");
         appendPostingFilter(sb, params, filter);
         sb.append(SETTINGS_FINAL);
 
@@ -276,22 +309,52 @@ public class PnlReadRepository {
         return result != null ? result : 0L;
     }
 
-    public List<PostingDetailResponse> findPostingDetails(List<Long> connectionIds, String postingId) {
+    public PostingPnlDetailResponse findPostingDetail(List<Long> connectionIds, String postingId) {
         var params = new MapSqlParameterSource()
                 .addValue("connectionIds", connectionIds)
                 .addValue("postingId", postingId);
 
-        return jdbc.ch().query(POSTING_DETAIL_SQL, params, this::mapPostingDetail);
+        List<PostingPnlDetailResponse> summaries = jdbc.ch().query(
+                POSTING_SUMMARY_SQL, params, this::mapPostingSummary);
+        List<PostingDetailResponse> entries = jdbc.ch().query(
+                POSTING_DETAIL_SQL, params, this::mapPostingDetail);
+
+        if (summaries.isEmpty()) {
+            return new PostingPnlDetailResponse(
+                    postingId, null, null, null, null,
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null,
+                    BigDecimal.ZERO, entries);
+        }
+
+        PostingPnlDetailResponse summary = summaries.get(0);
+        return new PostingPnlDetailResponse(
+                summary.postingId(),
+                summary.skuCode(),
+                summary.productName(),
+                summary.sourcePlatform(),
+                summary.financeDate(),
+                summary.revenueAmount(),
+                summary.totalCostsAmount(),
+                summary.netPayout(),
+                summary.netCogs(),
+                summary.reconciliationResidual(),
+                entries);
     }
 
     public List<PnlTrendResponse> findTrend(List<Long> connectionIds, PnlFilter filter,
                                              TrendGranularity granularity) {
-        var params = new MapSqlParameterSource("connectionIds", connectionIds);
-        String periodExpr = buildTrendPeriodExpression(granularity);
+        if (granularity == TrendGranularity.MONTHLY) {
+            return findTrendFromProductMart(connectionIds, filter);
+        }
+        return findTrendFromPostingMart(connectionIds, filter, granularity);
+    }
 
+    private List<PnlTrendResponse> findTrendFromProductMart(List<Long> connectionIds,
+                                                             PnlFilter filter) {
+        var params = new MapSqlParameterSource("connectionIds", connectionIds);
         var sql = """
                 SELECT
-                    %s AS period_label,
+                    toString(period) AS period_label,
                     sum(revenue_amount) AS revenue_amount,
                     sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
                         + sum(logistics_cost_amount) + sum(storage_cost_amount)
@@ -303,27 +366,102 @@ public class PnlReadRepository {
                     sum(full_pnl) AS full_pnl
                 FROM mart_product_pnl
                 WHERE connection_id IN (:connectionIds)
-                """.formatted(periodExpr);
+                """;
 
         var sb = new StringBuilder(sql);
-        appendPeriodFilter(sb, params, filter);
+        appendMonthlyTrendFilter(sb, params, filter);
         sb.append(" GROUP BY period_label ORDER BY period_label");
         sb.append(SETTINGS_FINAL);
 
-        return jdbc.ch().query(sb.toString(), params, (rs, rowNum) -> new PnlTrendResponse(
+        return jdbc.ch().query(sb.toString(), params, this::mapTrendRow);
+    }
+
+    private List<PnlTrendResponse> findTrendFromPostingMart(List<Long> connectionIds,
+                                                             PnlFilter filter,
+                                                             TrendGranularity granularity) {
+        var params = new MapSqlParameterSource("connectionIds", connectionIds);
+
+        String periodExpr = granularity == TrendGranularity.DAILY
+                ? "toString(finance_date)"
+                : "toString(toStartOfWeek(finance_date))";
+
+        var sql = """
+                SELECT
+                    %s AS period_label,
+                    sum(revenue_amount) AS revenue_amount,
+                    sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
+                        + sum(logistics_cost_amount) + sum(storage_cost_amount)
+                        + sum(penalties_amount) + sum(marketing_cost_amount)
+                        + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount)
+                        AS total_costs_amount,
+                sum(net_cogs) AS cogs_amount,
+                toDecimal64(0, 2) AS advertising_cost_amount,
+                revenue_amount + total_costs_amount
+                    + sum(compensation_amount) + sum(refund_amount)
+                    - coalesce(cogs_amount, toDecimal64(0, 2)) AS full_pnl
+                FROM mart_posting_pnl
+                WHERE connection_id IN (:connectionIds)
+                """.formatted(periodExpr);
+
+        var sb = new StringBuilder(sql);
+        appendDateTrendFilter(sb, params, filter);
+        sb.append(" GROUP BY period_label ORDER BY period_label");
+        sb.append(SETTINGS_FINAL);
+
+        return jdbc.ch().query(sb.toString(), params, this::mapTrendRow);
+    }
+
+    private PnlTrendResponse mapTrendRow(ResultSet rs, int rowNum) throws SQLException {
+        return new PnlTrendResponse(
                 rs.getString("period_label"),
                 rs.getBigDecimal("revenue_amount"),
                 rs.getBigDecimal("total_costs_amount"),
                 rs.getBigDecimal("cogs_amount"),
                 rs.getBigDecimal("advertising_cost_amount"),
-                rs.getBigDecimal("full_pnl")
-        ));
+                rs.getBigDecimal("full_pnl"));
     }
 
-    private void appendPeriodFilter(StringBuilder sb, MapSqlParameterSource params, PnlFilter filter) {
+    private void appendMonthlyTrendFilter(StringBuilder sb, MapSqlParameterSource params,
+                                           PnlFilter filter) {
         if (filter.connectionId() != null) {
             sb.append(" AND connection_id = :connectionId");
             params.addValue("connectionId", filter.connectionId());
+        }
+        if (filter.from() != null) {
+            sb.append(" AND period >= :periodFrom");
+            params.addValue("periodFrom", toPeriod(filter.from()));
+        }
+        if (filter.to() != null) {
+            sb.append(" AND period <= :periodTo");
+            params.addValue("periodTo", toPeriod(filter.to()));
+        }
+    }
+
+    private void appendDateTrendFilter(StringBuilder sb, MapSqlParameterSource params,
+                                        PnlFilter filter) {
+        if (filter.connectionId() != null) {
+            sb.append(" AND connection_id = :connectionId");
+            params.addValue("connectionId", filter.connectionId());
+        }
+        if (filter.from() != null) {
+            sb.append(" AND finance_date >= :dateFrom");
+            params.addValue("dateFrom", filter.from());
+        }
+        if (filter.to() != null) {
+            sb.append(" AND finance_date <= :dateTo");
+            params.addValue("dateTo", filter.to());
+        }
+    }
+
+    private void appendPeriodFilter(StringBuilder sb, MapSqlParameterSource params,
+                                      PnlFilter filter) {
+        if (filter.connectionId() != null) {
+            sb.append(" AND connection_id = :connectionId");
+            params.addValue("connectionId", filter.connectionId());
+        }
+        if (filter.periodAsInt() != null) {
+            sb.append(" AND period = :period");
+            params.addValue("period", filter.periodAsInt());
         }
         if (filter.from() != null) {
             sb.append(" AND period >= :periodFrom");
@@ -349,36 +487,36 @@ public class PnlReadRepository {
             params.addValue("sellerSkuId", filter.sellerSkuId());
         }
         if (filter.search() != null && !filter.search().isBlank()) {
-            sb.append(" AND (p.product_name ILIKE :search OR p.sku_code ILIKE :search)");
+            sb.append(
+                    " AND (m.product_name ILIKE :search OR m.sku_code ILIKE :search OR"
+                        + " m.marketplace_sku ILIKE :search)");
             params.addValue("search", "%%" + filter.search().trim() + "%%");
         }
     }
 
     private void appendPostingFilter(StringBuilder sb, MapSqlParameterSource params, PnlFilter filter) {
         if (filter.connectionId() != null) {
-            sb.append(" AND connection_id = :connectionId");
+            sb.append(" AND m.connection_id = :connectionId");
             params.addValue("connectionId", filter.connectionId());
         }
         if (filter.from() != null) {
-            sb.append(" AND finance_date >= :dateFrom");
+            sb.append(" AND m.finance_date >= :dateFrom");
             params.addValue("dateFrom", filter.from());
         }
         if (filter.to() != null) {
-            sb.append(" AND finance_date <= :dateTo");
+            sb.append(" AND m.finance_date <= :dateTo");
             params.addValue("dateTo", filter.to());
         }
         if (filter.sellerSkuId() != null) {
-            sb.append(" AND seller_sku_id = :sellerSkuId");
+            sb.append(" AND m.seller_sku_id = :sellerSkuId");
             params.addValue("sellerSkuId", filter.sellerSkuId());
         }
-    }
-
-    private String buildTrendPeriodExpression(TrendGranularity granularity) {
-        return switch (granularity) {
-            case DAILY -> "toString(toDate(toStartOfDay(toDateTime(toDate(concat(toString(intDiv(period, 100)), '-', toString(period % 100), '-01'))))))";
-            case WEEKLY -> "toString(toStartOfWeek(toDate(concat(toString(intDiv(period, 100)), '-', toString(period % 100), '-01'))))";
-            case MONTHLY -> "toString(period)";
-        };
+        if (filter.search() != null && !filter.search().isBlank()) {
+            sb.append(
+                    " AND (m.product_name ILIKE :search OR m.sku_code ILIKE :search OR"
+                        + " m.marketplace_sku ILIKE :search OR toString(m.posting_id) ILIKE :search)");
+            params.addValue("search", "%%" + filter.search().trim() + "%%");
+        }
     }
 
     private int toPeriod(LocalDate date) {
@@ -448,6 +586,8 @@ public class PnlReadRepository {
                 rs.getString("order_id"),
                 getBoxedLong(rs, "seller_sku_id"),
                 getBoxedLong(rs, "product_id"),
+                rs.getString("sku_code"),
+                rs.getString("product_name"),
                 rs.getDate("finance_date").toLocalDate(),
                 rs.getBigDecimal("revenue_amount"),
                 rs.getBigDecimal("marketplace_commission_amount"),
@@ -467,6 +607,21 @@ public class PnlReadRepository {
                 rs.getString("cogs_status"),
                 rs.getBigDecimal("reconciliation_residual")
         );
+    }
+
+    private PostingPnlDetailResponse mapPostingSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new PostingPnlDetailResponse(
+                rs.getString("posting_id"),
+                rs.getString("sku_code"),
+                rs.getString("product_name"),
+                rs.getString("source_platform"),
+                rs.getDate("finance_date").toLocalDate(),
+                rs.getBigDecimal("revenue_amount"),
+                rs.getBigDecimal("total_costs_amount"),
+                rs.getBigDecimal("net_payout"),
+                rs.getBigDecimal("net_cogs"),
+                rs.getBigDecimal("reconciliation_residual"),
+                List.of());
     }
 
     private PostingDetailResponse mapPostingDetail(ResultSet rs, int rowNum) throws SQLException {

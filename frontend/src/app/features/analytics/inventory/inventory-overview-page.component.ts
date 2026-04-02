@@ -22,7 +22,7 @@ import { formatMoney } from '@shared/utils/format.utils';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, ChartComponent],
   template: `
-    <div class="flex h-full flex-col gap-4 p-4">
+    <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <select
@@ -46,7 +46,7 @@ import { formatMoney } from '@shared/utils/format.utils';
           @if (overviewQuery.isPending()) {
             <div class="dp-shimmer mt-1 h-7 w-20 rounded"></div>
           } @else {
-            <p class="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+            <p class="mt-1 font-mono text-2xl font-semibold text-[var(--text-primary)]">
               {{ overview()?.totalSkus?.toLocaleString('ru-RU') ?? '—' }}
             </p>
           }
@@ -66,7 +66,7 @@ import { formatMoney } from '@shared/utils/format.utils';
             <div class="dp-shimmer mt-1 h-7 w-14 rounded"></div>
           } @else {
             <p
-              class="mt-1 text-2xl font-semibold"
+              class="mt-1 font-mono text-2xl font-semibold"
               [class]="criticalCount() > 0
                 ? 'text-[var(--status-error)]'
                 : 'text-[var(--text-primary)]'"
@@ -152,9 +152,9 @@ import { formatMoney } from '@shared/utils/format.utils';
                       {{ item.daysOfCover }}
                     </td>
                     <td class="py-2">
-                      <span class="inline-flex items-center gap-1">
+                      <span class="inline-flex items-center gap-1 text-[length:var(--text-xs)]">
                         <span
-                          class="h-2 w-2 rounded-full"
+                          class="h-1.5 w-1.5 rounded-full"
                           [class]="riskDotClass(item.stockOutRisk)"
                         ></span>
                         {{ riskLabel(item.stockOutRisk) }}

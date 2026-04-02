@@ -50,7 +50,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
       <div
-        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3"
+        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3"
       >
         <div class="flex items-center gap-3">
           <button
@@ -74,7 +74,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
       <!-- Create Form Panel -->
       @if (showCreateForm()) {
         <div
-          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-4"
+          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-4"
         >
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
@@ -153,7 +153,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
       }
 
       <!-- Data Grid -->
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (assignmentsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.assignments.error' | translate"

@@ -57,7 +57,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'promo.policies.title' | translate }}
         </h2>
@@ -69,7 +69,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
         </button>
       </div>
 
-      <div class="px-4 pt-3">
+      <div class="px-6 pt-3">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -77,7 +77,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
         />
       </div>
 
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (policiesQuery.isError()) {
           <dp-empty-state
             [message]="'promo.policies.error' | translate"

@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, HostListener, input, output } from 
         aria-modal="true"
         [attr.aria-labelledby]="'form-modal-title'"
       >
-        <div class="absolute inset-0 bg-black/40" (click)="onClose()"></div>
+        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="onClose()"></div>
         <div
           class="relative z-10 w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-lg)] animate-[fadeIn_150ms_ease] sm:max-w-xl"
         >

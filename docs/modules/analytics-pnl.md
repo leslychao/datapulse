@@ -563,6 +563,9 @@ Grain: одна строка per posting. Materialized из fact_finance + fact_
 | `net_cogs` | Decimal(18,2) | gross_cogs × (1 − refund_ratio) | Yes | P&L-grade COGS (renamed from `cogs_amount` for consistency with §COGS formula and mart_product_pnl) |
 | `cogs_status` | LowCardinality(String) | computed | No | OK / NO_COST_PROFILE / NO_SALES |
 | `reconciliation_residual` | Decimal(18,2) | net_payout − Σ(named components) | No | Диагностический residual |
+| `sku_code` | String | dim_product (resolved at materialization) | Yes | Денормализованный SKU code для read-запросов без JOIN к dim |
+| `product_name` | String | dim_product (resolved at materialization) | Yes | Денормализованное название продукта |
+| `marketplace_sku` | String | dim_product (resolved at materialization) | Yes | Артикул маркетплейса |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```
@@ -604,6 +607,9 @@ Grain: connection × seller_sku × period × attribution_level. Содержит
 | `advertising_cost` | Decimal(18,2) | SUM(fact_advertising.spend) allocated per product-month | Yes | 0 до Phase B extended; pro-rata or direct per §Advertising allocation |
 | `marketplace_pnl` | Decimal(18,2) | SUM(all 11 signed marketplace measures) | No | = revenue + commissions + logistics + … (аддитивная формула, costs < 0) |
 | `full_pnl` | Decimal(18,2) | marketplace_pnl − advertising_cost − net_cogs | Yes | Computed. NULL when `net_cogs IS NULL` (cogs_status ≠ OK). При `advertising_cost = 0` (Phase B core) — P&L считается валидным (0 = fallback, не ошибка). **Не использует net_payout** — reconciliation_residual не входит в P&L (инвариант) |
+| `sku_code` | String | dim_product (resolved at materialization) | Yes | Денормализованный SKU code |
+| `product_name` | String | dim_product (resolved at materialization) | Yes | Денормализованное название продукта |
+| `marketplace_sku` | String | dim_product (resolved at materialization) | Yes | Артикул маркетплейса |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```
@@ -622,7 +628,7 @@ Grain: product × warehouse × snapshot date. Phase B.
 | `source_platform` | LowCardinality(String) | — | No | |
 | `product_id` | UInt64 | — | No | FK dim_product |
 | `seller_sku_id` | UInt64 | — | No | FK seller_sku |
-| `warehouse_id` | UInt32 | — | Yes | FK dim_warehouse |
+| `warehouse_id` | UInt32 | — | No | FK dim_warehouse. DEFAULT 0 (ORDER BY key, cannot be Nullable) |
 | `analysis_date` | Date | — | No | Дата анализа |
 | `available` | Int32 | fact_inventory_snapshot | No | Текущий остаток |
 | `reserved` | Int32 | fact_inventory_snapshot | Yes | Зарезервировано |
@@ -1167,6 +1173,12 @@ WB realization reports can be retroactively corrected. Corrected rows are upsert
 **Mart re-aggregation strategy:** materializer определяет affected postings как `SELECT DISTINCT posting_id FROM fact_finance WHERE job_execution_id = :currentJobId AND posting_id IS NOT NULL`. Для каждого affected posting — полный пересчёт `mart_posting_pnl` row (SUM всех entries для posting, не только новых). Аналогично для `mart_product_pnl`: affected `(seller_sku_id, period)` tuples пересчитываются полностью.
 
 Latency: минуты после sync completion. Scope: только изменённые записи.
+
+### Execution order
+
+Materializer-ы выполняются в порядке: `phase()` (DIMENSION → FACT → MART), затем `order()` внутри фазы. Дефолтный `order() = 0`. Зависимости внутри фазы:
+
+- `MartPostingPnlMaterializer` (order=0) → `MartProductPnlMaterializer` (order=1), т.к. `mart_product_pnl` читает из `mart_posting_pnl`.
 
 ### Full re-materialization (daily)
 

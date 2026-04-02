@@ -1,6 +1,6 @@
 <div class="flex h-full min-h-0 flex-col bg-[var(--bg-primary)]">
   <!-- Queue header -->
-  <header class="border-b border-[var(--border-default)] px-4 py-3">
+  <header class="border-b border-[var(--border-default)] px-6 py-3">
     @if (queueQuery.isPending()) {
       <div class="h-6 w-48 animate-pulse rounded bg-[var(--bg-tertiary)]"></div>
     } @else if (queueQuery.isError()) {
@@ -24,7 +24,7 @@
 
   <!-- Filter bar -->
   <div
-    class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+    class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5"
   >
     <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
       <span>{{ 'queues.filters.status' | translate }}</span>
@@ -62,7 +62,7 @@
   </div>
 
   <!-- Grid / empty / error -->
-  <div class="relative min-h-0 flex-1 px-4 py-3">
+  <div class="relative min-h-0 flex-1 px-6 py-3">
     @if (itemsQuery.isError()) {
       <div class="flex h-48 flex-col items-center justify-center gap-2 text-sm text-[var(--status-error)]">
         <span>{{ 'queues.page.items_error' | translate }}</span>
@@ -105,7 +105,7 @@
   <!-- Bulk action bar -->
   @if (selectedRows().length > 0) {
     <div
-      class="flex flex-wrap items-center gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+      class="flex flex-wrap items-center gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5"
       aria-live="polite"
     >
       <span class="text-sm text-[var(--text-secondary)]">
@@ -144,7 +144,7 @@
   <!-- Pagination -->
   @if (!itemsQuery.isError() && totalElements() > 0) {
     <footer
-      class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] px-4 py-2.5 text-sm text-[var(--text-secondary)]"
+      class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-2.5 text-sm text-[var(--text-secondary)]"
     >
       <div class="flex items-center gap-2">
         <span>{{ 'queues.page.rows_per_page' | translate }}</span>
@@ -185,7 +185,7 @@
 
 @if (bulkRejectOpen()) {
   <div class="fixed inset-0 z-[8500] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/40" (click)="cancelBulkReject()"></div>
+    <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="cancelBulkReject()"></div>
     <div
       class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-5 shadow-[var(--shadow-md)]"
     >

@@ -10,7 +10,7 @@ import { TranslatePipe } from '@ngx-translate/core';
   template: `
     @if (open()) {
       <div class="fixed inset-0 z-[9000] flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" (click)="onCancel()"></div>
+        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="onCancel()"></div>
         <div
           role="dialog"
           aria-modal="true"

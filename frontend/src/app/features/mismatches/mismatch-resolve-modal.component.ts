@@ -20,7 +20,7 @@ const RESOLUTION_OPTIONS: MismatchResolution[] = [
   template: `
     @if (open()) {
       <div class="fixed inset-0 z-[9000] flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" (click)="onCancel()"></div>
+        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="onCancel()"></div>
         <div
           class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]"
         >

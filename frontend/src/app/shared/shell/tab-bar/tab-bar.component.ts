@@ -11,36 +11,39 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive, LucideAngularModule],
   template: `
-    <div class="flex h-9 items-end gap-0 overflow-x-auto bg-[var(--bg-secondary)] px-1"
-         role="tablist">
-      @for (tab of sortedTabs(); track tab.id) {
-        <a [routerLink]="tabRoute(tab)"
-           routerLinkActive="tab-active"
-           class="group relative flex h-[32px] max-w-[180px] items-center gap-1.5 border-b-2
-                  border-transparent px-3 text-[13px] text-[var(--text-secondary)]
-                  transition-colors duration-[var(--transition-fast)]
-                  hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-           [class.border-b-[var(--accent-primary)]]="isActiveTab(tab)"
-           role="tab"
-           [attr.aria-selected]="isActiveTab(tab)"
-           (click)="activateTab(tab)">
-          @if (tab.pinned) {
-            <lucide-icon [img]="pinIcon" [size]="12"
-                         class="shrink-0 text-[var(--text-tertiary)]" />
-          }
-          <span class="truncate">{{ tab.label }}</span>
-          @if (tab.closeable && !tab.pinned) {
-            <button class="ml-1 hidden shrink-0 rounded-[var(--radius-sm)] p-0.5
-                          text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]
-                          hover:text-[var(--text-primary)] group-hover:block"
-                    (click)="closeTab($event, tab)"
-                    [attr.aria-label]="'Закрыть ' + tab.label">
-              <lucide-icon [img]="closeIcon" [size]="12" />
-            </button>
-          }
-        </a>
-      }
-    </div>
+    @if (sortedTabs().length > 0) {
+      <div class="flex h-9 items-end gap-0 overflow-x-auto border-b border-[var(--border-default)]
+                  bg-[var(--bg-secondary)] px-1"
+           role="tablist">
+        @for (tab of sortedTabs(); track tab.id) {
+          <a [routerLink]="tabRoute(tab)"
+             routerLinkActive="tab-active"
+             class="group relative flex h-[32px] max-w-[180px] items-center gap-1.5 border-b-2
+                    border-transparent px-3 text-[13px] text-[var(--text-secondary)]
+                    transition-colors duration-[var(--transition-fast)]
+                    hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+             [class.border-b-[var(--accent-primary)]]="isActiveTab(tab)"
+             role="tab"
+             [attr.aria-selected]="isActiveTab(tab)"
+             (click)="activateTab(tab)">
+            @if (tab.pinned) {
+              <lucide-icon [img]="pinIcon" [size]="12"
+                           class="shrink-0 text-[var(--text-tertiary)]" />
+            }
+            <span class="truncate">{{ tab.label }}</span>
+            @if (tab.closeable && !tab.pinned) {
+              <button class="ml-1 hidden shrink-0 rounded-[var(--radius-sm)] p-0.5
+                            text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]
+                            hover:text-[var(--text-primary)] group-hover:block"
+                      (click)="closeTab($event, tab)"
+                      [attr.aria-label]="'Закрыть ' + tab.label">
+                <lucide-icon [img]="closeIcon" [size]="12" />
+              </button>
+            }
+          </a>
+        }
+      </div>
+    }
   `,
   styles: [`
     :host ::ng-deep .tab-active {

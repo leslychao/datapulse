@@ -28,7 +28,7 @@ import { formatMoney } from '@shared/utils/format.utils';
       <!-- Main content -->
       <div class="flex flex-1 flex-col overflow-hidden">
         <!-- Filter bar -->
-        <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5">
+        <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] py-2.5">
           <select
             class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             [value]="connectionId()"
@@ -58,7 +58,7 @@ import { formatMoney } from '@shared/utils/format.utils';
         </div>
 
         <!-- Table -->
-        <div class="flex-1 overflow-auto px-4 py-3">
+        <div class="flex-1 overflow-auto py-3">
           @if (productsQuery.isPending()) {
             <div class="dp-shimmer h-64 w-full rounded-[var(--radius-md)]"></div>
           } @else if (rows().length === 0) {
@@ -119,9 +119,9 @@ import { formatMoney } from '@shared/utils/format.utils';
                         {{ item.daysOfCover }}
                       </td>
                       <td class="py-2.5 pr-4">
-                        <span class="inline-flex items-center gap-1">
+                        <span class="inline-flex items-center gap-1 text-[length:var(--text-xs)]">
                           <span
-                            class="h-2 w-2 rounded-full"
+                            class="h-1.5 w-1.5 rounded-full"
                             [class]="riskDotClass(item.stockOutRisk)"
                           ></span>
                           {{ riskLabel(item.stockOutRisk) }}
@@ -229,9 +229,9 @@ import { formatMoney } from '@shared/utils/format.utils';
                   {{ 'analytics.inventory.col.risk' | translate }}
                 </p>
                 <p class="mt-1">
-                  <span class="inline-flex items-center gap-1.5 text-sm">
+                  <span class="inline-flex items-center gap-1.5 text-[length:var(--text-xs)]">
                     <span
-                      class="h-2.5 w-2.5 rounded-full"
+                      class="h-1.5 w-1.5 rounded-full"
                       [class]="riskDotClass(product.stockOutRisk)"
                     ></span>
                     {{ riskLabel(product.stockOutRisk) }}

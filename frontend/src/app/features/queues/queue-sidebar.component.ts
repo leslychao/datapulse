@@ -26,7 +26,7 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
   template: `
     <div class="flex h-full flex-col bg-[var(--bg-secondary)]">
       <div class="border-b border-[var(--border-default)] px-3 py-2.5">
-        <span class="text-[var(--text-xs)] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+        <span class="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
           {{ 'queues.sidebar.system' | translate }}
         </span>
         <ul class="mt-2 space-y-0.5">
@@ -44,7 +44,7 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
                   <lucide-icon [img]="checkIcon" [size]="14" class="text-[var(--status-success)]" />
                 } @else {
                   <span
-                    class="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-[var(--text-xs)] tabular-nums text-[var(--text-secondary)]"
+                    class="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--text-secondary)]"
                   >
                     {{ q.totalActiveCount }}
                   </span>
@@ -56,7 +56,7 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
       </div>
 
       <div class="flex-1 overflow-y-auto px-3 py-2.5">
-        <span class="text-[var(--text-xs)] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+        <span class="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
           {{ 'queues.sidebar.custom' | translate }}
         </span>
         <ul class="mt-2 space-y-0.5">
@@ -74,7 +74,7 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
                   <lucide-icon [img]="checkIcon" [size]="14" class="text-[var(--status-success)]" />
                 } @else {
                   <span
-                    class="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-[var(--text-xs)] tabular-nums text-[var(--text-secondary)]"
+                    class="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--text-secondary)]"
                   >
                     {{ q.totalActiveCount }}
                   </span>
@@ -88,10 +88,10 @@ import { QueueBuilderModalComponent } from './queue-builder-modal.component';
       <div class="border-t border-[var(--border-default)] p-2">
         <button
           type="button"
-          class="flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] py-2 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]"
+          class="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-primary)]"
           (click)="builderOpen.set(true)"
         >
-          <lucide-icon [img]="plusIcon" [size]="18" />
+          <lucide-icon [img]="plusIcon" [size]="16" />
           {{ 'queues.sidebar.new_queue' | translate }}
         </button>
       </div>

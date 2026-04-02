@@ -41,7 +41,7 @@ import { WebSocketService } from '@core/websocket/websocket.service';
   template: `
     <div class="grid h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
          [style.grid-template-columns]="'48px 1fr ' + (detailPanel.isOpen() ? detailPanel.width() + 'px' : '0px')"
-         style="grid-template-rows: 40px 36px 1fr auto 24px;
+         style="grid-template-rows: 40px auto 1fr auto 24px;
                 grid-template-areas:
                   'topbar  topbar  topbar'
                   'actbar  tabbar  detail'
@@ -49,14 +49,12 @@ import { WebSocketService } from '@core/websocket/websocket.service';
                   'actbar  bottom  detail'
                   'status  status  status';">
       <dp-top-bar style="grid-area: topbar"
-                  class="border-b border-[var(--border-default)]"
                   (searchRequested)="openCommandPalette()" />
 
       <dp-activity-bar style="grid-area: actbar"
                        class="border-r border-[var(--border-default)]" />
 
-      <dp-tab-bar style="grid-area: tabbar"
-                  class="border-b border-[var(--border-default)]" />
+      <dp-tab-bar style="grid-area: tabbar" />
 
       @if (detailPanel.isOpen()) {
         <dp-detail-panel style="grid-area: detail"
@@ -70,10 +68,10 @@ import { WebSocketService } from '@core/websocket/websocket.service';
         </dp-detail-panel>
       }
 
-      <main style="grid-area: main" class="flex flex-col overflow-auto bg-[var(--bg-primary)]">
+      <main style="grid-area: main" class="flex flex-col overflow-hidden bg-[var(--bg-primary)]">
         <dp-automation-blocker-banner />
         <dp-connection-lost-banner />
-        <div class="flex-1 overflow-auto">
+        <div class="flex flex-1 flex-col overflow-auto min-h-0">
           <router-outlet />
         </div>
       </main>

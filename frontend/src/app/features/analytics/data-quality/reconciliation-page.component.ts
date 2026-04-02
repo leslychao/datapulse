@@ -49,7 +49,7 @@ const CONNECTION_PALETTE = [
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
-      <div class="flex items-center gap-3 px-4">
+      <div class="flex items-center gap-3">
         <input
           type="month"
           [value]="period()"
@@ -61,17 +61,17 @@ const CONNECTION_PALETTE = [
       </div>
 
       @if (reconQuery.isPending()) {
-        <div class="space-y-4 px-4 pb-4">
+        <div class="space-y-4 pb-4">
           <div class="dp-shimmer h-24 w-full rounded-[var(--radius-md)]"></div>
           <div class="dp-shimmer h-[280px] w-full rounded-[var(--radius-md)]"></div>
           <div class="dp-shimmer h-[200px] w-full rounded-[var(--radius-md)]"></div>
         </div>
       } @else if (reconQuery.isError()) {
-        <div class="px-4 text-sm text-[var(--status-error)]">
+        <div class="text-sm text-[var(--status-error)]">
           {{ 'analytics.reconciliation.load_error' | translate }}
         </div>
       } @else {
-        <div class="space-y-4 px-4 pb-4">
+        <div class="space-y-4 pb-4">
           <!-- Per-connection KPI Cards -->
           <div class="flex flex-wrap gap-3">
             @for (conn of connections(); track conn.connectionId) {
@@ -98,19 +98,19 @@ const CONNECTION_PALETTE = [
 
                 <div class="grid grid-cols-3 gap-2">
                   <div>
-                    <div class="text-[11px] text-[var(--text-tertiary)]">Residual</div>
+                    <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.reconciliation.residual' | translate }}</div>
                     <div class="font-mono text-sm font-bold text-[var(--text-primary)]">
                       {{ formatMoney(conn.residualAmount) }}
                     </div>
                   </div>
                   <div>
-                    <div class="text-[11px] text-[var(--text-tertiary)]">Residual %</div>
+                    <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.reconciliation.residual_pct' | translate }}</div>
                     <div class="font-mono text-sm font-bold text-[var(--text-primary)]">
                       {{ formatPct(conn.residualRatioPct) }}
                     </div>
                   </div>
                   <div>
-                    <div class="text-[11px] text-[var(--text-tertiary)]">Baseline %</div>
+                    <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.reconciliation.baseline_pct' | translate }}</div>
                     <div class="font-mono text-sm font-bold text-[var(--text-secondary)]">
                       {{ formatPct(conn.baselineRatioPct) }}
                     </div>

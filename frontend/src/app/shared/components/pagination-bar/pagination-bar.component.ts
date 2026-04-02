@@ -21,7 +21,7 @@ import { TranslatePipe } from '@ngx-translate/core';
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
-        <span class="text-[length:var(--text-sm)]">{{ currentPage() + 1 }} / {{ totalPages() }}</span>
+        <span class="font-mono text-[length:var(--text-sm)]">{{ currentPage() + 1 }} / {{ totalPages() }}</span>
         <button
           [disabled]="!canNext()"
           (click)="goToNext()"

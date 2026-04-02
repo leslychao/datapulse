@@ -13,7 +13,10 @@ import org.springframework.stereotype.Component;
 /**
  * Materializes mart_product_pnl from mart_posting_pnl + fact_finance (PRODUCT, ACCOUNT level).
  *
- * <p>Three sources merged:</p>
+ * <p>Three sources merged via UNION ALL, then aggregated by
+ * (connection_id, seller_sku_id, period, attribution_level) to prevent
+ * ReplacingMergeTree key collisions when the same SKU has both posting
+ * and standalone (PRODUCT-level) entries:</p>
  * <ul>
  *   <li>POSTING level: rollup of mart_posting_pnl per (seller_sku_id, period)</li>
  *   <li>PRODUCT level: fact_finance entries with attribution_level = 'PRODUCT'</li>
@@ -22,6 +25,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>COGS at product-month level uses cross-posting revenue-ratio netting (T-4/T-7).</p>
  * <p>Advertising cost = 0 in Phase B core (fallback until advertising ingestion).</p>
+ *
+ * <p>Product labels (sku_code, product_name, marketplace_sku) are resolved here via dim_product
+ * so read queries use only marts + facts.</p>
  */
 @Slf4j
 @Component
@@ -32,6 +38,48 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
 
     private static final String FULL_MATERIALIZE_SQL = """
             INSERT INTO mart_product_pnl
+            SELECT
+                base.connection_id,
+                base.source_platform,
+                base.seller_sku_id,
+                base.product_id,
+                base.period,
+                base.attribution_level,
+                base.revenue_amount,
+                base.marketplace_commission_amount,
+                base.acquiring_commission_amount,
+                base.logistics_cost_amount,
+                base.storage_cost_amount,
+                base.penalties_amount,
+                base.marketing_cost_amount,
+                base.acceptance_cost_amount,
+                base.other_marketplace_charges_amount,
+                base.compensation_amount,
+                base.refund_amount,
+                base.net_payout,
+                base.gross_cogs,
+                base.product_refund_ratio,
+                base.net_cogs,
+                base.cogs_status,
+                base.advertising_cost,
+                base.marketplace_pnl,
+                base.full_pnl,
+                coalesce(
+                    nullIf(trim(p_by_id.sku_code), ''),
+                    nullIf(trim(p_by_sku.sku_code), ''),
+                    nullIf(trim(p_by_id.marketplace_sku), ''),
+                    nullIf(trim(p_by_sku.marketplace_sku), '')
+                ) AS sku_code,
+                coalesce(
+                    nullIf(trim(p_by_id.product_name), ''),
+                    nullIf(trim(p_by_sku.product_name), '')
+                ) AS product_name,
+                coalesce(
+                    nullIf(trim(p_by_id.marketplace_sku), ''),
+                    nullIf(trim(p_by_sku.marketplace_sku), '')
+                ) AS marketplace_sku,
+                base.ver
+            FROM (
             SELECT
                 connection_id,
                 source_platform,
@@ -93,6 +141,32 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                            toDecimal128(0, 4)))),
                    NULL) AS full_pnl,
                 %d AS ver
+            FROM (
+            SELECT
+                connection_id,
+                any(source_platform) AS source_platform,
+                seller_sku_id,
+                max(product_id) AS product_id,
+                period,
+                attribution_level,
+                sum(revenue_amount) AS revenue_amount,
+                sum(marketplace_commission_amount) AS marketplace_commission_amount,
+                sum(acquiring_commission_amount) AS acquiring_commission_amount,
+                sum(logistics_cost_amount) AS logistics_cost_amount,
+                sum(storage_cost_amount) AS storage_cost_amount,
+                sum(penalties_amount) AS penalties_amount,
+                sum(marketing_cost_amount) AS marketing_cost_amount,
+                sum(acceptance_cost_amount) AS acceptance_cost_amount,
+                sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
+                sum(compensation_amount) AS compensation_amount,
+                sum(refund_amount) AS refund_amount,
+                sum(net_payout) AS net_payout,
+                if(count(gross_cogs) > 0, sum(gross_cogs), NULL) AS gross_cogs,
+                multiIf(
+                    countIf(cogs_status = 'NO_COST_PROFILE') > 0, 'NO_COST_PROFILE',
+                    countIf(cogs_status = 'OK') > 0, 'OK',
+                    'NO_SALES'
+                ) AS cogs_status
             FROM (
                 -- Source 1: Rollup of mart_posting_pnl → PRODUCT rows
                 -- Inner query: only plain aggregates (no countIf inside multiIf/if — CH 24 ILLEGAL_AGGREGATION).
@@ -243,7 +317,24 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                 FROM fact_finance
                 WHERE attribution_level = 'ACCOUNT'
                 GROUP BY connection_id, toYYYYMM(finance_date)
+            ) AS raw_union
+            GROUP BY connection_id, seller_sku_id, period, attribution_level
             )
+            ) AS base
+            LEFT JOIN dim_product AS p_by_id ON base.product_id = p_by_id.product_id
+                AND base.connection_id = p_by_id.connection_id
+            LEFT JOIN (
+                SELECT
+                    connection_id,
+                    seller_sku_id,
+                    anyLast(sku_code) AS sku_code,
+                    anyLast(marketplace_sku) AS marketplace_sku,
+                    anyLast(product_name) AS product_name
+                FROM dim_product
+                GROUP BY connection_id, seller_sku_id
+            ) AS p_by_sku
+                ON base.seller_sku_id = p_by_sku.seller_sku_id
+                AND base.connection_id = p_by_sku.connection_id
             SETTINGS final = 1
             """;
 
@@ -276,5 +367,10 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
     @Override
     public MaterializationPhase phase() {
         return MaterializationPhase.MART;
+    }
+
+    @Override
+    public int order() {
+        return 1;
     }
 }

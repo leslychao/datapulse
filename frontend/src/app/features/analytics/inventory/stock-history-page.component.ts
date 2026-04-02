@@ -22,7 +22,7 @@ import { formatMoney } from '@shared/utils/format.utils';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, ChartComponent],
   template: `
-    <div class="flex h-full flex-col gap-4 p-4">
+    <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <input
@@ -90,7 +90,7 @@ import { formatMoney } from '@shared/utils/format.utils';
             <p class="mt-1">
               <span class="inline-flex items-center gap-1.5 text-sm">
                 <span
-                  class="h-2.5 w-2.5 rounded-full"
+                  class="h-1.5 w-1.5 rounded-full"
                   [class]="riskDotClass(product.stockOutRisk)"
                 ></span>
                 {{ riskLabel(product.stockOutRisk) }}

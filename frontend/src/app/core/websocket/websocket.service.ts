@@ -26,6 +26,7 @@ export class WebSocketService {
 
   readonly connected = signal(false);
   readonly reconnecting = signal(false);
+  readonly wasConnected = signal(false);
 
   connect(workspaceId: number): void {
     this.disconnect();
@@ -56,6 +57,7 @@ export class WebSocketService {
         this.reconnecting.set(state === 0 || state === 3);
 
         if (state === 1) {
+          this.wasConnected.set(true);
           this.reconnectAttempts = 0;
           if (wasReconnecting) {
             this.syncMissedNotifications();
@@ -76,6 +78,7 @@ export class WebSocketService {
     }
     this.connected.set(false);
     this.reconnecting.set(false);
+    this.wasConnected.set(false);
     this.reconnectAttempts = 0;
   }
 
@@ -175,6 +178,12 @@ export class WebSocketService {
       this.queryClient.invalidateQueries({ queryKey: ['sync-status'] });
       this.queryClient.invalidateQueries({ queryKey: ['offers'] });
       this.queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    });
+
+    this.subscribeTo(`${ws}/connection-updates`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['connections'] });
+      this.queryClient.invalidateQueries({ queryKey: ['connection'] });
+      this.queryClient.invalidateQueries({ queryKey: ['connection-sync-state'] });
     });
   }
 

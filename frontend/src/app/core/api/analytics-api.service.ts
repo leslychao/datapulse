@@ -95,7 +95,7 @@ export class AnalyticsApiService {
   ): Observable<InventoryOverview> {
     return this.http.get<InventoryOverview>(
       `${this.base}/workspaces/${workspaceId}/analytics/inventory/overview`,
-      { params: this.buildParams(filter) },
+      { params: this.buildInventoryParams(filter) },
     );
   }
 
@@ -106,7 +106,7 @@ export class AnalyticsApiService {
     size: number,
     sort = 'stock_out_risk,asc',
   ): Observable<Page<InventoryByProduct>> {
-    let params = this.buildParams(filter)
+    let params = this.buildInventoryParams(filter)
       .set('page', page)
       .set('size', size)
       .set('sort', sort);
@@ -122,7 +122,7 @@ export class AnalyticsApiService {
   ): Observable<StockHistoryPoint[]> {
     return this.http.get<StockHistoryPoint[]>(
       `${this.base}/workspaces/${workspaceId}/analytics/inventory/stock-history`,
-      { params: this.buildParams(filter) },
+      { params: this.buildInventoryParams(filter) },
     );
   }
 
@@ -215,6 +215,11 @@ export class AnalyticsApiService {
     if (filter.sellerSkuId) {
       params = params.set('sellerSkuId', filter.sellerSkuId);
     }
+    return params;
+  }
+
+  private buildInventoryParams(filter: AnalyticsFilter): HttpParams {
+    let params = this.buildParams(filter);
     if (filter.stockOutRisk) {
       params = params.set('stockOutRisk', filter.stockOutRisk);
     }

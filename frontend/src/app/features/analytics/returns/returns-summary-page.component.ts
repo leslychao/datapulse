@@ -28,7 +28,7 @@ function currentMonth(): string {
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
-      <div class="flex items-center gap-3 px-4">
+      <div class="flex items-center gap-3">
         <input
           type="month"
           [value]="period()"
@@ -40,7 +40,7 @@ function currentMonth(): string {
       </div>
 
       @if (summaryQuery.isPending()) {
-        <div class="flex gap-3 px-4">
+        <div class="flex gap-3">
           @for (_ of [1, 2, 3]; track $index) {
             <div class="dp-shimmer h-[72px] flex-1 rounded-[var(--radius-md)]"></div>
           }
@@ -49,7 +49,7 @@ function currentMonth(): string {
 
       @if (summaryQuery.data(); as s) {
         <!-- KPI Cards -->
-        <div class="flex gap-3 px-4">
+        <div class="flex gap-3">
           <div class="flex flex-1 flex-col gap-1 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
             <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
               {{ 'analytics.returns.kpi.return_rate' | translate }}
@@ -84,7 +84,7 @@ function currentMonth(): string {
       }
 
       <!-- Chart + Penalties side-by-side -->
-      <div class="grid grid-cols-2 gap-4 px-4 pb-4">
+      <div class="grid grid-cols-2 gap-4 pb-4">
         <!-- Return Reasons Chart -->
         <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
           <h3 class="mb-3 text-sm font-medium text-[var(--text-primary)]">

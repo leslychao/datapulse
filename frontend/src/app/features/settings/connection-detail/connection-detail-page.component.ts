@@ -283,10 +283,13 @@ export class ConnectionDetailPageComponent {
   private readonly breadcrumbs = inject(BreadcrumbService);
   protected readonly translate = inject(TranslateService);
 
+  private readonly isPendingValidation = signal(false);
+
   constructor() {
     effect(() => {
       const conn = this.connectionQuery.data();
       if (!conn) return;
+      this.isPendingValidation.set(conn.status === 'PENDING_VALIDATION');
       const wsId = this.wsStore.currentWorkspaceId();
       const base = `/workspace/${wsId}/settings`;
       this.breadcrumbs.setSegments([
@@ -311,6 +314,7 @@ export class ConnectionDetailPageComponent {
   readonly connectionQuery = injectQuery(() => ({
     queryKey: ['connection', this.connectionId()],
     queryFn: () => lastValueFrom(this.connectionApi.getConnection(this.connId)),
+    refetchInterval: this.isPendingValidation() ? 3000 : false,
   }));
 
   readonly syncStateQuery = injectQuery(() => ({

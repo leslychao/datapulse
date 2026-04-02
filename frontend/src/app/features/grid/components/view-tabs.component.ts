@@ -18,7 +18,7 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
   imports: [LucideAngularModule, TranslatePipe, FormModalComponent, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex items-center border-b border-[var(--border-default)] px-4">
+    <div class="flex items-center border-b border-[var(--border-default)] px-3">
       <div class="flex items-center gap-0.5 overflow-x-auto">
         @for (view of viewsQuery.data() ?? []; track view.id) {
           <button

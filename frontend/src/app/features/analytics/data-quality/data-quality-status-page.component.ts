@@ -28,17 +28,17 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
   template: `
     <div class="flex h-full flex-col gap-4">
       @if (statusQuery.isPending()) {
-        <div class="space-y-4 px-4 pb-4">
+        <div class="space-y-4 pb-4">
           @for (_ of [1, 2]; track $index) {
             <div class="dp-shimmer h-48 w-full rounded-[var(--radius-md)]"></div>
           }
         </div>
       } @else if (statusQuery.isError()) {
-        <div class="px-4 text-sm text-[var(--status-error)]">
+        <div class="text-sm text-[var(--status-error)]">
           {{ 'analytics.data_quality.load_error' | translate }}
         </div>
       } @else {
-        <div class="space-y-6 px-4 pb-4">
+        <div class="space-y-6 pb-4">
           @for (conn of connections(); track conn.connectionId) {
             <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]">
               <!-- Connection Header -->
@@ -95,12 +95,12 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
                           {{ domainLabel(domain.domain) }}
                         </td>
                         <td class="px-4 py-2 text-[var(--text-secondary)]">
-                          {{ domain.lastSuccessAt ?? '—' }}
+                          {{ domain.lastSuccessAt ? formatDateTime(domain.lastSuccessAt) : '—' }}
                         </td>
                         <td class="px-4 py-2">
-                          <span class="inline-flex items-center gap-1.5">
+                          <span class="inline-flex items-center gap-1.5 text-[length:var(--text-xs)]">
                             <span
-                              class="h-2 w-2 rounded-full"
+                              class="h-1.5 w-1.5 rounded-full"
                               [class]="syncStatusDotClass(domain.status)"
                             ></span>
                             {{ syncStatusLabel(domain.status) }}
@@ -163,5 +163,16 @@ export class DataQualityStatusPageComponent {
 
   syncStatusLabel(status: SyncDomainStatus): string {
     return this.t.instant(`analytics.data_quality.sync_status.${status}`);
+  }
+
+  formatDateTime(iso: string): string {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return iso;
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${d}.${m}.${y} ${h}:${min}`;
   }
 }

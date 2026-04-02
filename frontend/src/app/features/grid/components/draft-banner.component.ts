@@ -16,17 +16,17 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, LucideAngularModule, ConfirmationModalComponent],
   template: `
-    <div class="flex items-center gap-4 border-b border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] px-4 py-2.5">
+    <div class="flex items-center gap-4 border-b border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] px-6 py-2.5">
       <div class="flex items-center gap-2">
         <lucide-icon [img]="pencilIcon" [size]="14" class="text-[var(--accent-primary)]" />
         <span class="text-[length:var(--text-sm)] font-semibold text-[var(--text-primary)]">
-          {{ 'draft.title' | translate }}: {{ gridStore.draftCount() }} {{ 'draft.changes' | translate }}
+          {{ 'draft.title' | translate }}: <span class="font-mono">{{ gridStore.draftCount() }}</span> {{ 'draft.changes' | translate }}
         </span>
       </div>
 
       @if (avgChange() !== null) {
         <span class="text-[length:var(--text-sm)]" [style.color]="avgChange()! >= 0 ? 'var(--finance-positive)' : 'var(--finance-negative)'">
-          {{ 'draft.avg_change' | translate }}: {{ formatPct(avgChange()!) }}
+          {{ 'draft.avg_change' | translate }}: <span class="font-mono">{{ formatPct(avgChange()!) }}</span>
         </span>
       }
 
@@ -52,7 +52,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           @if (applyMutation.isPending()) {
             {{ 'draft.applying' | translate }}
           } @else {
-            {{ 'draft.apply' | translate }} ({{ gridStore.draftCount() }})
+            {{ 'draft.apply' | translate }} (<span class="font-mono">{{ gridStore.draftCount() }}</span>)
           }
         </button>
       </div>

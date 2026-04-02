@@ -57,7 +57,7 @@ const DECISION_COLOR: Record<string, string> = {
   template: `
     <div class="flex h-full flex-col">
       <!-- Back button -->
-      <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5">
+      <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5">
         <button
           (click)="goBack()"
           class="cursor-pointer rounded-[var(--radius-sm)] px-2 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
@@ -88,7 +88,7 @@ const DECISION_COLOR: Record<string, string> = {
         </div>
       } @else if (run()) {
         <!-- KPI Strip -->
-        <div class="flex gap-3 bg-[var(--bg-secondary)] px-4 py-3">
+        <div class="flex gap-3 bg-[var(--bg-secondary)] px-6 py-3">
           <dp-kpi-card
             [label]="'pricing.runs.kpi.total' | translate"
             [value]="run()!.totalOffers"
@@ -117,7 +117,7 @@ const DECISION_COLOR: Record<string, string> = {
         </div>
 
         <!-- Meta info -->
-        <div class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] px-4 py-2.5">
+        <div class="flex flex-wrap items-center gap-3 border-b border-[var(--border-default)] px-6 py-2.5">
           <!-- Trigger badge -->
           <span
             class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -151,20 +151,22 @@ const DECISION_COLOR: Record<string, string> = {
         </div>
 
         @if (run()!.errorDetails) {
-          <div class="mx-4 mt-3 rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] px-4 py-2.5 text-sm text-[var(--status-error)]">
+          <div class="mx-6 mt-3 rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] px-4 py-2.5 text-sm text-[var(--status-error)]">
             {{ run()!.errorDetails }}
           </div>
         }
 
         <!-- Decision filter -->
-        <dp-filter-bar
-          [filters]="decisionFilterConfigs"
-          [values]="decisionFilterValues()"
-          (filtersChanged)="onDecisionFiltersChanged($event)"
-        />
+        <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+          <dp-filter-bar
+            [filters]="decisionFilterConfigs"
+            [values]="decisionFilterValues()"
+            (filtersChanged)="onDecisionFiltersChanged($event)"
+          />
+        </div>
 
         <!-- Decision Grid -->
-        <div class="flex-1 px-4 py-3">
+        <div class="flex-1 px-6 py-3">
           @if (decisionsQuery.isError()) {
             <dp-empty-state
               [message]="'pricing.decisions.error' | translate"

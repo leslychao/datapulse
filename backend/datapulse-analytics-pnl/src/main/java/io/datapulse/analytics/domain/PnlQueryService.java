@@ -12,7 +12,7 @@ import io.datapulse.analytics.api.PnlAggregatedSummaryResponse.CostBreakdownItem
 import io.datapulse.analytics.api.PnlFilter;
 import io.datapulse.analytics.api.PnlSummaryResponse;
 import io.datapulse.analytics.api.PnlTrendResponse;
-import io.datapulse.analytics.api.PostingDetailResponse;
+import io.datapulse.analytics.api.PostingPnlDetailResponse;
 import io.datapulse.analytics.api.PostingPnlResponse;
 import io.datapulse.analytics.api.ProductPnlResponse;
 import io.datapulse.analytics.api.TrendGranularity;
@@ -34,6 +34,11 @@ public class PnlQueryService {
 
     public PnlAggregatedSummaryResponse getAggregatedSummary(long workspaceId, PnlFilter filter) {
         List<Long> connectionIds = resolveConnectionIds(workspaceId);
+        if (filter.connectionId() != null) {
+            connectionIds = connectionIds.stream()
+                .filter(id -> id.equals(filter.connectionId()))
+                .toList();
+        }
         if (connectionIds.isEmpty()) {
             return emptyAggregatedSummary();
         }
@@ -96,7 +101,7 @@ public class PnlQueryService {
             return Page.empty(pageable);
         }
 
-        String sortColumn = extractSortColumn(pageable, "revenueAmount");
+        String sortColumn = extractSortColumn(pageable, "revenue_amount");
         List<ProductPnlResponse> content = pnlReadRepository.findByProduct(
                 connectionIds, filter, sortColumn, pageable.getPageSize(), pageable.getOffset());
         long total = pnlReadRepository.countByProduct(connectionIds, filter);
@@ -110,7 +115,7 @@ public class PnlQueryService {
             return Page.empty(pageable);
         }
 
-        String sortColumn = extractSortColumn(pageable, "financeDate");
+        String sortColumn = extractSortColumn(pageable, "finance_date");
         List<PostingPnlResponse> content = pnlReadRepository.findByPosting(
                 connectionIds, filter, sortColumn, pageable.getPageSize(), pageable.getOffset());
         long total = pnlReadRepository.countByPosting(connectionIds, filter);
@@ -118,12 +123,15 @@ public class PnlQueryService {
         return new PageImpl<>(content, pageable, total);
     }
 
-    public List<PostingDetailResponse> getPostingDetails(long workspaceId, String postingId) {
+    public PostingPnlDetailResponse getPostingDetails(long workspaceId, String postingId) {
         List<Long> connectionIds = resolveConnectionIds(workspaceId);
         if (connectionIds.isEmpty()) {
-            return List.of();
+            return new PostingPnlDetailResponse(
+                    postingId, null, null, null, null,
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null,
+                    BigDecimal.ZERO, List.of());
         }
-        return pnlReadRepository.findPostingDetails(connectionIds, postingId);
+        return pnlReadRepository.findPostingDetail(connectionIds, postingId);
     }
 
     public List<PnlTrendResponse> getTrend(long workspaceId, PnlFilter filter,

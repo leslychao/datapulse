@@ -10,6 +10,8 @@ public record PostingPnlResponse(
         String orderId,
         Long sellerSkuId,
         Long productId,
+        String skuCode,
+        String productName,
         LocalDate financeDate,
         BigDecimal revenueAmount,
         BigDecimal marketplaceCommissionAmount,

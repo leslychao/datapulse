@@ -14,9 +14,9 @@ import { WebSocketService } from '@core/websocket/websocket.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule, TranslatePipe],
   template: `
-    @if (!ws.connected()) {
+    @if (ws.wasConnected() && !ws.connected()) {
       <div
-        class="flex items-center gap-2 bg-amber-600 px-4 py-1.5 text-sm font-medium text-white"
+        class="flex items-center gap-2 bg-[var(--status-warning)] px-6 py-1.5 text-[length:var(--text-sm)] font-medium text-white"
         role="alert"
         aria-live="assertive"
       >

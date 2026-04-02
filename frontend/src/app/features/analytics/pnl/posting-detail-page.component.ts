@@ -83,9 +83,9 @@ export class PostingDetailPageComponent {
     return formatMoney(value, 0);
   }
 
-  moneyColorClass(value: number): string {
-    if (value > 0) return 'text-[var(--finance-positive)]';
-    if (value < 0) return 'text-[var(--finance-negative)]';
+  moneyColorClass(value: number | null): string {
+    if (value != null && value > 0) return 'text-[var(--finance-positive)]';
+    if (value != null && value < 0) return 'text-[var(--finance-negative)]';
     return 'text-[var(--finance-zero)]';
   }
 

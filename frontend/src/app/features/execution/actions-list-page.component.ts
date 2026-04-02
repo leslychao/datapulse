@@ -63,7 +63,7 @@ const ACTION_STATUSES = [
   template: `
     <div class="flex h-full flex-col">
       <!-- KPI Strip -->
-      <div class="flex gap-3 bg-[var(--bg-secondary)] px-4 py-3">
+      <div class="flex gap-3 bg-[var(--bg-secondary)] px-6 py-3">
         <dp-kpi-card
           [label]="'execution.kpi.total' | translate"
           [value]="kpiTotal()"
@@ -87,14 +87,16 @@ const ACTION_STATUSES = [
       </div>
 
       <!-- Filter Bar -->
-      <dp-filter-bar
-        [filters]="filterConfigs"
-        [values]="filterValues()"
-        (filtersChanged)="onFiltersChanged($event)"
-      />
+      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="filterValues()"
+          (filtersChanged)="onFiltersChanged($event)"
+        />
+      </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (actionsQuery.isError()) {
           <dp-empty-state
             [message]="'execution.list.error' | translate"
@@ -126,7 +128,7 @@ const ACTION_STATUSES = [
       <!-- Bulk Action Bar -->
       @if (selectedRows().length > 0) {
         <div
-          class="flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+          class="flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5"
           aria-live="polite"
         >
           <span class="text-sm text-[var(--text-secondary)]">

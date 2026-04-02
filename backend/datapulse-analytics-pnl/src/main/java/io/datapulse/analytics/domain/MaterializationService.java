@@ -17,7 +17,8 @@ public class MaterializationService {
 
     public MaterializationService(List<AnalyticsMaterializer> materializers) {
         this.orderedMaterializers = materializers.stream()
-                .sorted(Comparator.comparing(m -> m.phase().ordinal()))
+                .sorted(Comparator.comparingInt((AnalyticsMaterializer m) -> m.phase().ordinal())
+                    .thenComparingInt(AnalyticsMaterializer::order))
                 .toList();
     }
 

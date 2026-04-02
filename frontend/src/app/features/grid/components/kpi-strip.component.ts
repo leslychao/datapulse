@@ -14,7 +14,7 @@ import { formatMoney, formatPercent } from '@shared/utils/format.utils';
   imports: [KpiCardComponent, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex gap-3 bg-[var(--bg-secondary)] px-4 py-3">
+    <div class="flex gap-3 bg-[var(--bg-secondary)] px-3 py-3">
       <dp-kpi-card
         [label]="'grid.kpi.total_offers' | translate"
         [value]="totalOffers()"

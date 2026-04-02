@@ -1,0 +1,246 @@
+<div [formGroup]="form()" class="space-y-4">
+
+  <!-- Target margin pct -->
+  <div class="max-w-xs">
+    <label for="targetMarginPct" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+      {{ 'pricing.form.target_margin_pct' | translate }}
+    </label>
+    <div class="relative">
+      <input
+        id="targetMarginPct"
+        formControlName="targetMarginPct"
+        type="number"
+        min="1"
+        max="80"
+        class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+        [class]="isInvalid('targetMarginPct')
+          ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+          : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+      />
+      <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sm)] text-[var(--text-tertiary)]">%</span>
+    </div>
+    <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.target_margin' | translate }}</p>
+    @if (hasError('targetMarginPct', 'required')) {
+      <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+        {{ 'pricing.form.validation.target_margin_required' | translate }}
+      </p>
+    }
+    @if (hasError('targetMarginPct', 'min') || hasError('targetMarginPct', 'max')) {
+      <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+        {{ 'pricing.form.validation.target_margin_range' | translate }}
+      </p>
+    }
+  </div>
+
+  <!-- Commission -->
+  <div class="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+    <h3 class="text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+      {{ 'pricing.form.section.commission' | translate }}
+    </h3>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label for="commissionSource" class="mb-1 block text-[var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'pricing.form.commission_source' | translate }}
+        </label>
+        <select
+          id="commissionSource"
+          formControlName="commissionSource"
+          class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+        >
+          @for (src of commissionSources; track src.value) {
+            <option [value]="src.value">{{ src.labelKey | translate }}</option>
+          }
+        </select>
+      </div>
+
+      @if (commissionSource !== 'AUTO') {
+        <div>
+          <label for="commissionManualPct" class="mb-1 block text-[var(--text-xs)] text-[var(--text-secondary)]">
+            {{ 'pricing.form.commission_manual_pct' | translate }}
+          </label>
+          <div class="relative">
+            <input
+              id="commissionManualPct"
+              formControlName="commissionManualPct"
+              type="number"
+              min="1"
+              max="50"
+              class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+              [class]="isInvalid('commissionManualPct')
+                ? 'border-[var(--status-error)]'
+                : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+            />
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sm)] text-[var(--text-tertiary)]">%</span>
+          </div>
+          <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.commission_manual' | translate }}</p>
+          @if (hasError('commissionManualPct', 'min') || hasError('commissionManualPct', 'max')) {
+            <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+              {{ 'pricing.form.validation.commission_manual_range' | translate }}
+            </p>
+          }
+        </div>
+      }
+    </div>
+
+    @if (commissionSource !== 'MANUAL') {
+      <button
+        type="button"
+        (click)="toggleAdvancedCommission()"
+        [attr.aria-expanded]="showAdvancedCommission()"
+        class="flex cursor-pointer items-center gap-1 text-[var(--text-xs)] font-medium text-[var(--accent-primary)] transition-colors hover:text-[var(--accent-primary-hover)]"
+      >
+        <lucide-icon
+          [name]="showAdvancedCommission() ? icons.ChevronUp : icons.ChevronDown"
+          [size]="14"
+        />
+        {{ 'pricing.form.advanced_commission' | translate }}
+      </button>
+
+      @if (showAdvancedCommission()) {
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="commissionLookbackDays" class="mb-1 block text-[var(--text-xs)] text-[var(--text-secondary)]">
+              {{ 'pricing.form.commission_lookback_days' | translate }}
+            </label>
+            <input
+              id="commissionLookbackDays"
+              formControlName="commissionLookbackDays"
+              type="number"
+              min="7"
+              max="365"
+              class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+            />
+            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.commission_lookback' | translate }}</p>
+            @if (hasError('commissionLookbackDays', 'min') || hasError('commissionLookbackDays', 'max')) {
+              <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+                {{ 'pricing.form.validation.commission_lookback_range' | translate }}
+              </p>
+            }
+          </div>
+          <div>
+            <label for="commissionMinTransactions" class="mb-1 block text-[var(--text-xs)] text-[var(--text-secondary)]">
+              {{ 'pricing.form.commission_min_transactions' | translate }}
+            </label>
+            <input
+              id="commissionMinTransactions"
+              formControlName="commissionMinTransactions"
+              type="number"
+              min="1"
+              max="100"
+              class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+            />
+            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.commission_min_txn' | translate }}</p>
+            @if (hasError('commissionMinTransactions', 'min') || hasError('commissionMinTransactions', 'max')) {
+              <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+                {{ 'pricing.form.validation.commission_min_txn_range' | translate }}
+              </p>
+            }
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Logistics -->
+  <div class="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+    <h3 class="text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+      {{ 'pricing.form.section.logistics' | translate }}
+    </h3>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label for="logisticsSource" class="mb-1 block text-[var(--text-xs)] text-[var(--text-secondary)]">
+          {{ 'pricing.form.logistics_source' | translate }}
+        </label>
+        <select
+          id="logisticsSource"
+          formControlName="logisticsSource"
+          class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+        >
+          @for (src of commissionSources; track src.value) {
+            <option [value]="src.value">{{ src.labelKey | translate }}</option>
+          }
+        </select>
+      </div>
+
+      @if (logisticsSource !== 'AUTO') {
+        <div>
+          <label for="logisticsManualAmount" class="mb-1 block text-[var(--text-xs)] text-[var(--text-secondary)]">
+            {{ 'pricing.form.logistics_manual_amount' | translate }}
+          </label>
+          <div class="relative">
+            <input
+              id="logisticsManualAmount"
+              formControlName="logisticsManualAmount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+              [class]="isInvalid('logisticsManualAmount')
+                ? 'border-[var(--status-error)]'
+                : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+            />
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
+          </div>
+          @if (hasError('logisticsManualAmount', 'min')) {
+            <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+              {{ 'pricing.form.validation.logistics_manual_min' | translate }}
+            </p>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Adjustments -->
+  <div class="flex gap-4 border-t border-[var(--border-subtle)] pt-4">
+    <label class="flex cursor-pointer items-center gap-2 text-[var(--text-sm)] text-[var(--text-primary)] transition-colors hover:text-[var(--accent-primary)]">
+      <input type="checkbox" formControlName="includeReturnAdjustment" class="h-3.5 w-3.5 rounded accent-[var(--accent-primary)]" />
+      <span>{{ 'pricing.form.include_return_adjustment' | translate }}</span>
+    </label>
+    <label class="flex cursor-pointer items-center gap-2 text-[var(--text-sm)] text-[var(--text-primary)] transition-colors hover:text-[var(--accent-primary)]">
+      <input type="checkbox" formControlName="includeAdCost" class="h-3.5 w-3.5 rounded accent-[var(--accent-primary)]" />
+      <span>{{ 'pricing.form.include_ad_cost' | translate }}</span>
+    </label>
+  </div>
+
+  <!-- Rounding -->
+  <div class="grid grid-cols-2 gap-4 border-t border-[var(--border-subtle)] pt-4">
+    <div>
+      <label for="roundingStep" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+        {{ 'pricing.form.rounding_step' | translate }}
+      </label>
+      <input
+        id="roundingStep"
+        formControlName="roundingStep"
+        type="number"
+        min="1"
+        max="100"
+        class="h-8 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+        [class]="isInvalid('roundingStep')
+          ? 'border-[var(--status-error)]'
+          : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+      />
+      <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.rounding_step' | translate }}</p>
+      @if (hasError('roundingStep', 'min') || hasError('roundingStep', 'max')) {
+        <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+          {{ 'pricing.form.validation.rounding_step_range' | translate }}
+        </p>
+      }
+    </div>
+    <div>
+      <label for="roundingDirection" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+        {{ 'pricing.form.rounding_direction' | translate }}
+      </label>
+      <select
+        id="roundingDirection"
+        formControlName="roundingDirection"
+        class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+      >
+        @for (rd of roundingDirections; track rd.value) {
+          <option [value]="rd.value">{{ rd.labelKey | translate }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+</div>

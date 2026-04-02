@@ -39,7 +39,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
-      <div class="flex items-center gap-3 px-4">
+      <div class="flex items-center gap-3">
         <input
           type="date"
           [value]="dateFrom()"
@@ -60,7 +60,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
       </div>
 
       <!-- Granularity Switcher -->
-      <div class="flex gap-1 px-4">
+      <div class="flex gap-1">
         @for (opt of granularityOptions; track opt.value) {
           <button
             (click)="setGranularity(opt.value)"
@@ -75,7 +75,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
       </div>
 
       <!-- Chart -->
-      <div class="flex-1 px-4 pb-4">
+      <div class="flex-1 pb-4">
         <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
           <h3 class="mb-3 text-sm font-medium text-[var(--text-primary)]">
             {{ 'analytics.returns.trend_title' | translate }}

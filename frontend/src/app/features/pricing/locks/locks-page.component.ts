@@ -48,7 +48,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
       <div
-        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3"
+        class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3"
       >
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'pricing.locks.title' | translate }}
@@ -64,7 +64,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       <!-- Create Form Panel -->
       @if (showCreateForm()) {
         <div
-          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-4"
+          class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-4"
         >
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
@@ -130,14 +130,16 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       }
 
       <!-- Filter Bar -->
-      <dp-filter-bar
-        [filters]="filterConfigs"
-        [values]="filterValues()"
-        (filtersChanged)="onFiltersChanged($event)"
-      />
+      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="filterValues()"
+          (filtersChanged)="onFiltersChanged($event)"
+        />
+      </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (locksQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.locks.error' | translate"

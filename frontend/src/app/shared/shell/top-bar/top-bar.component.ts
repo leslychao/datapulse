@@ -20,7 +20,7 @@ import { UserMenuComponent } from './user-menu.component';
   template: `
     <header
       class="grid h-10 shrink-0 items-center border-b border-[var(--border-default)] bg-[var(--bg-primary)] px-3"
-      style="grid-template-columns: 240px 1fr auto"
+      style="grid-template-columns: auto 1fr auto"
     >
       <dp-workspace-switcher />
 

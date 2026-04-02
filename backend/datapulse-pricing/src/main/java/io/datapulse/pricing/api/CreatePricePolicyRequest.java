@@ -19,6 +19,7 @@ public record CreatePricePolicyRequest(
         BigDecimal maxPrice,
         String guardConfig,
         @NotNull ExecutionMode executionMode,
+        @Min(1) Integer approvalTimeoutHours,
         @Min(0) @Max(1000) Integer priority
 ) {
 }

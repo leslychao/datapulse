@@ -51,14 +51,15 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe],
   template: `
-    <div class="flex h-full flex-col">
+    <div class="flex h-full min-h-0 flex-col">
       <!-- Section tabs -->
-      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4">
+      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6
+                  [&>a:first-child]:pl-0">
         @for (tab of sectionTabs; track tab.path) {
           <a
             [routerLink]="tab.path"
             routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
-            class="border-b-2 border-transparent px-4 py-2.5 text-[length:var(--text-sm)]
+            class="border-b-2 border-transparent px-3 py-2.5 text-[length:var(--text-sm)]
                    font-medium text-[var(--text-secondary)] transition-colors
                    hover:text-[var(--text-primary)]"
           >
@@ -69,7 +70,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
 
       <!-- Sub-navigation -->
       @if (subNavLinks().length > 0) {
-        <div class="flex gap-1 px-4 py-2">
+        <div class="flex gap-1 px-6 py-2 [&>a:first-child]:ml-[-0.75rem]">
           @for (link of subNavLinks(); track link.path) {
             <a
               [routerLink]="link.path"
@@ -86,7 +87,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
       }
 
       <!-- Page content -->
-      <div class="flex-1 overflow-y-auto p-6">
+      <div class="flex-1 overflow-y-auto min-h-0 p-6">
         <router-outlet />
       </div>
     </div>

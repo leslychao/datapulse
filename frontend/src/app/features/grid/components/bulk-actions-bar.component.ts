@@ -17,10 +17,10 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
   imports: [TranslatePipe, LucideAngularModule, ConfirmationModalComponent],
   template: `
     <div class="flex items-center gap-3 border-t border-[var(--border-default)]
-                bg-[var(--bg-secondary)] px-4 py-2.5
+                bg-[var(--bg-secondary)] px-6 py-2.5
                 animate-[slideUp_150ms_ease]">
       <span class="text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
-        {{ gridStore.selectedCount() }} {{ 'grid.bulk.selected' | translate }}
+        <span class="font-mono">{{ gridStore.selectedCount() }}</span> {{ 'grid.bulk.selected' | translate }}
       </span>
 
       <div class="flex items-center gap-2">

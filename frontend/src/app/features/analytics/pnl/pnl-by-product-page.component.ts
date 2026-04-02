@@ -12,6 +12,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { PnlByProduct } from '@core/models';
+import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { formatMoney } from '@shared/utils/format.utils';
 
@@ -36,19 +37,12 @@ const COGS_STATUS_COLOR: Record<string, string> = {
   selector: 'dp-pnl-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, MonthPickerComponent],
   template: `
     <div class="flex flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
-        <input
-          type="month"
-          [value]="period()"
-          (change)="onPeriodChange($event)"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                 outline-none focus:border-[var(--accent-primary)]"
-        />
+        <dp-month-picker [value]="period()" (valueChange)="onPeriodChange($event)" />
         <input
           type="text"
           [value]="search()"
@@ -203,9 +197,8 @@ export class PnlByProductPageComponent {
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
-  onPeriodChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.period.set(input.value);
+  onPeriodChange(value: string): void {
+    this.period.set(value);
     this.currentPage.set(0);
   }
 
@@ -230,9 +223,9 @@ export class PnlByProductPageComponent {
     return formatMoney(value, 0);
   }
 
-  moneyColorClass(value: number): string {
-    if (value > 0) return 'text-[var(--finance-positive)]';
-    if (value < 0) return 'text-[var(--finance-negative)]';
+  moneyColorClass(value: number | null): string {
+    if (value != null && value > 0) return 'text-[var(--finance-positive)]';
+    if (value != null && value < 0) return 'text-[var(--finance-negative)]';
     return 'text-[var(--finance-zero)]';
   }
 

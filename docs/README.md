@@ -75,6 +75,7 @@
 |----------|----------|
 | [Risk Register](risk-register.md) | Architectural, integration, contractual, operational risks |
 | [Runbook](runbook.md) | Operations, failure scenarios, recovery procedures |
+| [MCP setup](mcp-setup.md) | Cursor MCP: PostgreSQL + ClickHouse для локальной отладки SQL |
 
 ### Provider Contracts (`provider-api-specs/`)
 

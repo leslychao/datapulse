@@ -39,13 +39,15 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
   host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
-      <dp-filter-bar
-        [filters]="filterConfigs"
-        [values]="filterValues()"
-        (filtersChanged)="onFiltersChanged($event)"
-      />
+      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="filterValues()"
+          (filtersChanged)="onFiltersChanged($event)"
+        />
+      </div>
 
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (decisionsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.decisions.error' | translate"

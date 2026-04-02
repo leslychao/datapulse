@@ -90,9 +90,22 @@ const ACTION_COLOR: Record<PromoActionStatus, string> = {
   CANCELLED: 'neutral',
 };
 
-const MP_BADGE: Record<string, { bg: string; label: string }> = {
-  WB: { bg: '#CB11AB', label: 'WB' },
-  OZON: { bg: '#005BFF', label: 'Ozon' },
+const MP_BADGE: Record<
+  string,
+  { bg: string; color: string; borderColor: string; label: string }
+> = {
+  WB: {
+    bg: 'var(--mp-wb-bg)',
+    color: 'var(--mp-wb)',
+    borderColor: 'var(--mp-wb)',
+    label: 'WB',
+  },
+  OZON: {
+    bg: 'var(--mp-ozon-bg)',
+    color: 'var(--mp-ozon)',
+    borderColor: 'var(--mp-ozon)',
+    label: 'Ozon',
+  },
 };
 
 @Component({

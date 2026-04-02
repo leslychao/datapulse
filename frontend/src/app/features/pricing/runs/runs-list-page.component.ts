@@ -59,7 +59,7 @@ const TRIGGER_COLOR: Record<string, string> = {
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-2.5">
         <h2 class="text-sm font-semibold text-[var(--text-primary)]">
           {{ 'pricing.runs.title' | translate }}
         </h2>
@@ -72,14 +72,16 @@ const TRIGGER_COLOR: Record<string, string> = {
       </div>
 
       <!-- Filter Bar -->
-      <dp-filter-bar
-        [filters]="filterConfigs"
-        [values]="filterValues()"
-        (filtersChanged)="onFiltersChanged($event)"
-      />
+      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="filterValues()"
+          (filtersChanged)="onFiltersChanged($event)"
+        />
+      </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (runsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.runs.error' | translate"
@@ -112,7 +114,7 @@ const TRIGGER_COLOR: Record<string, string> = {
     <!-- Trigger Manual Run Modal -->
     @if (showTriggerModal()) {
       <div class="fixed inset-0 z-[9000] flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" (click)="showTriggerModal.set(false)"></div>
+        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="showTriggerModal.set(false)"></div>
         <div
           class="relative z-10 w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)] animate-[fadeIn_150ms_ease]"
         >
@@ -128,7 +130,7 @@ const TRIGGER_COLOR: Record<string, string> = {
             } @else {
               <select
                 [(ngModel)]="selectedConnectionId"
-                class="h-9 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
               >
                 <option [ngValue]="null" disabled>{{ 'pricing.runs.trigger_modal.connection_placeholder' | translate }}</option>
                 @for (conn of activeConnections(); track conn.id) {

@@ -45,7 +45,7 @@ public class PnlController {
 
     @GetMapping("/posting/{postingId}/details")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public List<PostingDetailResponse> getPostingDetails(
+    public PostingPnlDetailResponse getPostingDetails(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("postingId") String postingId) {
         return pnlQueryService.getPostingDetails(workspaceId, postingId);

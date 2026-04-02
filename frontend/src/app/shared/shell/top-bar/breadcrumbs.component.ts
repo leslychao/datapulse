@@ -10,18 +10,18 @@ import { BreadcrumbService } from '@shared/services/breadcrumb.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, LucideAngularModule],
   template: `
-    <nav class="flex items-center gap-1 overflow-hidden">
+    <nav class="flex items-center gap-1.5 overflow-hidden">
       @for (segment of breadcrumbService.segments(); track segment.label; let last = $last) {
         @if (!last && segment.route) {
           <a
             [routerLink]="segment.route"
-            class="shrink-0 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:underline"
+            class="shrink-0 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:underline"
           >
             {{ segment.label }}
           </a>
         } @else {
           <span
-            class="truncate text-sm"
+            class="truncate text-[length:var(--text-sm)] font-medium"
             [class]="last ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'"
           >
             {{ segment.label }}
@@ -31,7 +31,7 @@ import { BreadcrumbService } from '@shared/services/breadcrumb.service';
         @if (!last) {
           <lucide-icon
             [img]="ChevronRight"
-            [size]="12"
+            [size]="14"
             class="shrink-0 text-[var(--text-tertiary)]"
           />
         }

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
 
     private static final String TABLE = "mart_posting_pnl";
+    private static final String INCR_MARKER = "/*INCR*/";
 
     /**
      * Full materialization SQL: aggregates fact_finance POSTING-level entries
@@ -36,7 +37,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                 pm.connection_id,
                 pm.source_platform,
                 pm.order_id,
-                pm.seller_sku_id,
+                coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) AS seller_sku_id,
                 dp.product_id,
                 pm.finance_date,
                 pm.revenue_amount,
@@ -102,6 +103,20 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                     + pm.compensation_amount
                     + pm.refund_amount
                 ) AS reconciliation_residual,
+                coalesce(
+                    nullIf(trim(p_by_id.sku_code), ''),
+                    nullIf(trim(p_by_sku.sku_code), ''),
+                    nullIf(trim(p_by_id.marketplace_sku), ''),
+                    nullIf(trim(p_by_sku.marketplace_sku), '')
+                ) AS sku_code,
+                coalesce(
+                    nullIf(trim(p_by_id.product_name), ''),
+                    nullIf(trim(p_by_sku.product_name), '')
+                ) AS product_name,
+                coalesce(
+                    nullIf(trim(p_by_id.marketplace_sku), ''),
+                    nullIf(trim(p_by_sku.marketplace_sku), '')
+                ) AS marketplace_sku,
                 %d AS ver
             FROM (
                 -- Aggregate posting-level entries per posting
@@ -131,7 +146,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                 WHERE attribution_level = 'POSTING'
                   AND posting_id IS NOT NULL
                   AND posting_id != ''
-                GROUP BY posting_id, connection_id
+                GROUP BY posting_id, connection_id /*INCR*/
             ) pm
             -- Acquiring: order-level entries allocated pro-rata by revenue
             LEFT JOIN (
@@ -164,6 +179,17 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                 WHERE order_id IS NOT NULL AND order_id != ''
                 GROUP BY order_id, connection_id
             ) orv ON pm.order_id = orv.order_id AND pm.connection_id = orv.connection_id
+            -- Resolve seller_sku_id from canonical sales when finance row has no SKU
+            LEFT JOIN (
+                SELECT
+                    posting_id,
+                    connection_id,
+                    anyLast(seller_sku_id) AS sales_seller_sku_id
+                FROM fact_sales
+                WHERE posting_id IS NOT NULL AND posting_id != ''
+                  AND seller_sku_id IS NOT NULL
+                GROUP BY posting_id, connection_id
+            ) fs ON pm.posting_id = fs.posting_id AND pm.connection_id = fs.connection_id
             -- Sales quantity for COGS
             LEFT JOIN (
                 SELECT posting_id, sum(quantity) AS quantity
@@ -171,9 +197,9 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                 WHERE posting_id IS NOT NULL AND posting_id != ''
                 GROUP BY posting_id
             ) s ON pm.posting_id = s.posting_id
-            -- Product dimension for product_id resolution
+            -- Product dimension for product_id resolution (uses resolved seller SKU)
             LEFT JOIN dim_product AS dp
-                ON pm.seller_sku_id = dp.seller_sku_id
+                ON coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) = dp.seller_sku_id
                 AND pm.connection_id = dp.connection_id
             -- SCD2 cost for COGS (equality-only JOIN: range filter moved to WHERE — CH hash join)
             LEFT JOIN (
@@ -207,7 +233,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                     WHERE attribution_level = 'POSTING'
                       AND posting_id IS NOT NULL
                       AND posting_id != ''
-                    GROUP BY posting_id, connection_id
+                    GROUP BY posting_id, connection_id /*INCR*/
                 ) AS pm_c
                 INNER JOIN fact_product_cost AS fpc_inner
                     ON pm_c.seller_sku_id = fpc_inner.seller_sku_id
@@ -215,6 +241,20 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
                   AND (fpc_inner.valid_to IS NULL OR pm_c.finance_date < fpc_inner.valid_to)
                 GROUP BY pm_c.posting_id
             ) AS fpc_cost ON pm.posting_id = fpc_cost.posting_id
+            LEFT JOIN dim_product AS p_by_id ON dp.product_id = p_by_id.product_id
+                AND pm.connection_id = p_by_id.connection_id
+            LEFT JOIN (
+                SELECT
+                    connection_id,
+                    seller_sku_id,
+                    anyLast(sku_code) AS sku_code,
+                    anyLast(marketplace_sku) AS marketplace_sku,
+                    anyLast(product_name) AS product_name
+                FROM dim_product
+                GROUP BY connection_id, seller_sku_id
+            ) AS p_by_sku
+                ON coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) = p_by_sku.seller_sku_id
+                AND pm.connection_id = p_by_sku.connection_id
             SETTINGS final = 1
             """;
 
@@ -234,33 +274,18 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
-        /*
-         * Re-aggregate only postings affected by this job.
-         * ReplacingMergeTree will handle dedup with the newer ver.
-         */
         long ver = Instant.now().toEpochMilli();
 
-        String affectedPostingsQuery = """
+        String affectedPostings = """
                 SELECT DISTINCT posting_id
                 FROM fact_finance
                 WHERE job_execution_id = %d
                   AND posting_id IS NOT NULL
-                  AND posting_id != ''
-                """.formatted(jobExecutionId);
+                  AND posting_id != ''""".formatted(jobExecutionId);
 
-        // Text blocks strip the closing-delimiter indent (12 spaces); match runtime strings.
-        String incrementalSql =
-                FULL_MATERIALIZE_SQL.formatted(ver)
-                        .replace(
-                                "    GROUP BY posting_id, connection_id\n) pm",
-                                "    GROUP BY posting_id, connection_id\n"
-                                        + "    HAVING posting_id IN (%s)\n) pm"
-                                        .formatted(affectedPostingsQuery))
-                        .replace(
-                                "        GROUP BY posting_id, connection_id\n    ) AS pm_c",
-                                "        GROUP BY posting_id, connection_id\n"
-                                        + "        HAVING posting_id IN (%s)\n    ) AS pm_c"
-                                        .formatted(affectedPostingsQuery));
+        String havingClause = " HAVING posting_id IN (%s)".formatted(affectedPostings);
+        String incrementalSql = FULL_MATERIALIZE_SQL.formatted(ver)
+                .replace(INCR_MARKER, havingClause);
 
         jdbc.ch().execute(incrementalSql);
         log.info("Incremental mart_posting_pnl: jobExecutionId={}", jobExecutionId);

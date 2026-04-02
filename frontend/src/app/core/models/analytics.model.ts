@@ -48,34 +48,43 @@ export interface PnlTrendPoint {
 }
 
 export interface PnlByProduct {
+  connectionId: number;
+  sourcePlatform: string;
   sellerSkuId: number;
+  productId: number;
+  period: number;
+  attributionLevel: string;
   skuCode: string;
   productName: string;
-  sourcePlatform: string;
   revenueAmount: number;
   marketplaceCommissionAmount: number;
   acquiringCommissionAmount: number;
   logisticsCostAmount: number;
   storageCostAmount: number;
   penaltiesAmount: number;
-  acceptanceCostAmount: number;
   marketingCostAmount: number;
+  acceptanceCostAmount: number;
   otherMarketplaceChargesAmount: number;
   compensationAmount: number;
   refundAmount: number;
-  netCogs: number;
-  advertisingCost: number;
-  marketplacePnl: number;
-  fullPnl: number;
+  netPayout: number;
+  grossCogs: number | null;
+  netCogs: number | null;
   cogsStatus: CogsStatus;
+  advertisingCost: number | null;
+  marketplacePnl: number;
+  fullPnl: number | null;
 }
 
 export interface PnlByPosting {
   postingId: string;
-  sellerSkuId: number;
+  connectionId: number;
+  sourcePlatform: string;
+  orderId: string | null;
+  sellerSkuId: number | null;
+  productId: number | null;
   skuCode: string;
   productName: string;
-  sourcePlatform: string;
   financeDate: string;
   revenueAmount: number;
   marketplaceCommissionAmount: number;
@@ -83,14 +92,15 @@ export interface PnlByPosting {
   logisticsCostAmount: number;
   storageCostAmount: number;
   penaltiesAmount: number;
-  acceptanceCostAmount: number;
   marketingCostAmount: number;
+  acceptanceCostAmount: number;
   otherMarketplaceChargesAmount: number;
   compensationAmount: number;
   refundAmount: number;
   netPayout: number;
-  grossCogs: number;
-  netCogs: number;
+  quantity: number | null;
+  grossCogs: number | null;
+  netCogs: number | null;
   cogsStatus: CogsStatus;
   reconciliationResidual: number;
 }
@@ -98,6 +108,7 @@ export interface PnlByPosting {
 export interface PostingEntry {
   entryId: number;
   entryType: string;
+  attributionLevel: string;
   revenueAmount: number;
   marketplaceCommissionAmount: number;
   acquiringCommissionAmount: number;

@@ -1,0 +1,98 @@
+# Frontend UI/UX — Cursor-Like Design Compliance
+
+## Принцип (жёсткое правило, без исключений)
+
+**Весь фронтенд-код** (компоненты, шаблоны, стили, layout, анимации, состояния) **ОБЯЗАН** соответствовать дизайн-направлению, описанному в документации `docs/frontend/`. Это не рекомендация — это жёсткое требование.
+
+Datapulse визуально и по UX следует стилю **Cursor IDE**: light theme, минималистичный, плотный, профессиональный, desktop-first, editor-like. Цель — не копировать Cursor буквально, а добиться того же **ощущения**: высококачественное рабочее пространство с компактными контролами, чистой типографикой, тонкими бордерами, сильной визуальной иерархией и минимальным шумом.
+
+## Обязательные источники правды
+
+Перед реализацией **любого** фронтенд-компонента, страницы или UI-изменения — **обязательно** прочитай и следуй:
+
+1. **`docs/frontend/frontend-design-direction.md`** — визуальный язык, UX-принципы, паттерны компонентов, цвета, типографика, interaction patterns, data display conventions, error/loading/empty states.
+2. **`docs/frontend/frontend-architecture.md`** — техническая архитектура, shell layout, routing, state management, API layer, styling tokens.
+3. **Остальные `docs/frontend/pages-*.md`** — спецификации конкретных страниц (если существуют для реализуемой фичи).
+
+Если документация для конкретного экрана отсутствует — **экстраполируй** из общих принципов design direction. Не придумывай свой стиль.
+
+## Что ОБЯЗАТЕЛЬНО соблюдать
+
+### Shell и Layout
+- IDE-like shell с 5 зонами: Top Bar, Activity Bar, Main Area, Detail Panel, Status Bar.
+- Activity Bar — 48px, иконки, tooltip на hover, вертикальная accent-полоска для активного модуля.
+- Detail Panel — slide-in справа, push (не overlay), resizable, 400px default.
+- Status Bar — всегда видим, 24px, compact, one-line.
+- Минимум поддерживаемого viewport: 1280×720.
+
+### Визуальный стиль
+- **Light theme only** (MVP). Тёмная тема не реализуется.
+- **Все цвета** — только через CSS custom properties (`--bg-primary`, `--text-secondary`, `--accent-primary` и т.д.). Никаких raw hex-значений в компонентах.
+- **Tailwind arbitrary values** (`text-[var(--text-primary)]`) — основной способ использования токенов.
+- **Шрифты**: Inter для UI, JetBrains Mono для данных/чисел.
+- **Тени** — минимальные, только на overlay-элементах (command palette, dropdown, modal). Всё остальное — 1px бордеры.
+- **Нет градиентов, нет теней на кнопках, нет декоративных анимаций.**
+
+### Компоненты
+- **Кнопки**: 28px height, border-radius 6px, 4 типа (Primary/Secondary/Ghost/Danger) — строго по спецификации.
+- **Inputs**: 32px height, 1px border, focus ring 2px accent-primary. Label сверху, не floating.
+- **Status badges**: pill-shaped, 6px dot + label 11px. Никаких больших баннеров для статусов.
+- **Cards**: ТОЛЬКО для KPI-полосок (max 4-6 в ряд). Не как основной layout-паттерн.
+- **Modals**: редко — только для destructive confirmations и multi-step wizards. Всё остальное: inline, panels, dropdowns.
+- **Data grid** — центральный компонент. 32px row height (compact), 40px comfortable. AG Grid.
+
+### Данные и числа
+- Валюта: `1 290 ₽` (пробел как разделитель тысяч, ₽ суффикс, monospace).
+- Проценты: `18,3%` (запятая, monospace).
+- Дельты: `↑ 8,2%` green / `↓ 2,1%` red / `→ 0,0%` gray.
+- Даты: относительные для свежих ("12 мин назад"), абсолютные для исторических ("28 мар 2026"). Никаких ISO-строк в UI.
+
+### Состояния
+- **Loading**: skeleton при первичной загрузке. Тонкий progress bar (2px) при обновлении данных. Никаких full-page спиннеров после первой загрузки.
+- **Empty**: текстовое сообщение по центру + действие. Без иллюстраций. Тон: помогающий, прямой. Без "Упс!" или игривых текстов.
+- **Error**: inline red text для валидации, toast для API-ошибок, persistent banner для connection loss.
+- **Toast**: success 3s auto-dismiss, error 8s с кнопкой dismiss. Цветная полоска слева (green/red/blue/yellow).
+
+### Interaction patterns
+- **Keyboard-first**: Ctrl+K (command palette), Escape (закрыть panel/modal), стрелки (навигация по гриду).
+- **Inline editing**: double-click → edit mode. Save on blur/Enter. Cancel on Escape.
+- **Bulk actions**: bottom bar slides up при выбранных строках.
+- **Контекстное меню**: правый клик на строках грида.
+
+## Что ЗАПРЕЩЕНО
+
+- Glossy marketing SaaS-визуалы.
+- Oversized dashboard cards как основной UI-паттерн.
+- Whitespace-heavy layouts.
+- Декоративные анимации.
+- Chart-first UX для операционных задач (гриды/таблицы — первичны).
+- Скрытие критического состояния за hover-only взаимодействиями.
+- Mobile-first компромиссы, ухудшающие dense desktop workflows.
+- Skeleton screens на каждом компоненте (только при первичной загрузке основного контента).
+- Angular Material, NG-ZORRO, PrimeNG или любые opinionated UI-фреймворки.
+- Raw цвета (`#2563EB`) в компонентах — только CSS variables.
+- `alert()` — запрещён. Используй toast или modal.
+- Full-page спиннеры после первичной загрузки.
+- Raw ISO timestamps в UI.
+
+## Процедура при реализации
+
+1. **Определи**, какой экран/компонент реализуешь.
+2. **Прочитай** `docs/frontend/frontend-design-direction.md` — найди соответствующую секцию.
+3. **Прочитай** page-specific документ из `docs/frontend/pages-*.md`, если он существует.
+4. **Реализуй** строго по спецификации.
+5. **Если спецификация не покрывает** конкретный случай — экстраполируй из общих принципов и сообщи пользователю, что документация не покрывает этот случай.
+6. **Если хочешь отступить** от design direction — остановись, объясни пользователю почему, и дождись подтверждения.
+
+## Самопроверка (checklist перед завершением UI-задачи)
+
+- [ ] Все цвета — через CSS custom properties, не raw hex.
+- [ ] Шрифт для данных/чисел — monospace (JetBrains Mono / `.font-mono`).
+- [ ] Кнопки соответствуют 4-м типам из спецификации.
+- [ ] Нет oversized cards как layout-паттерна.
+- [ ] Нет декоративных анимаций.
+- [ ] Loading/empty/error states реализованы по спецификации.
+- [ ] Числа и даты отформатированы по русским конвенциям из design direction.
+- [ ] Все user-facing строки — через `translate` pipe из `ru.json`.
+- [ ] OnPush change detection на компоненте.
+- [ ] `track` в каждом `@for`.

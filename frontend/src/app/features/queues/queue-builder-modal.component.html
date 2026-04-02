@@ -1,6 +1,6 @@
 @if (open()) {
   <div class="fixed inset-0 z-[9000] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/40" (click)="close()"></div>
+    <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="close()"></div>
     <div
       class="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]"
     >

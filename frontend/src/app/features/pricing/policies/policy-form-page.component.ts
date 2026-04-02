@@ -5,43 +5,54 @@ import {
   effect,
   inject,
   input,
+  signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import {
-  FormBuilder,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import {
   injectQuery,
   injectMutation,
 } from '@tanstack/angular-query-experimental';
-import { TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lastValueFrom } from 'rxjs';
+import { LucideAngularModule, Info, AlertTriangle } from 'lucide-angular';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import {
-  CommissionSource,
   CreatePolicyRequest,
-  GuardConfig,
   PolicyExecutionMode,
   PriceCorridorParams,
   PricingPolicy,
-  RoundingDirection,
   StrategyType,
   TargetMarginParams,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 
+import {
+  buildPolicyForm,
+  buildStrategyParams,
+  buildGuardConfig,
+  collectPolicyValidationErrors,
+} from './policy-form.utils';
+import { TargetMarginFormComponent } from './target-margin-form.component';
+import { ConstraintsFormComponent } from './constraints-form.component';
+import { GuardConfigFormComponent } from './guard-config-form.component';
+
 @Component({
   selector: 'dp-policy-form-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [
+    ReactiveFormsModule,
+    TranslatePipe,
+    LucideAngularModule,
+    TargetMarginFormComponent,
+    ConstraintsFormComponent,
+    GuardConfigFormComponent,
+  ],
   host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto' },
   templateUrl: './policy-form-page.component.html',
 })
@@ -53,11 +64,14 @@ export class PolicyFormPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
+  readonly icons = { Info, AlertTriangle };
+
   readonly policyId = input<string>();
   readonly isEditMode = computed(() => !!this.policyId());
   readonly wsId = computed(() => this.wsStore.currentWorkspaceId()!);
 
-  readonly form = this.buildForm();
+  readonly form = buildPolicyForm(this.fb);
+  readonly submitted = signal(false);
 
   readonly policyQuery = injectQuery(() => ({
     queryKey: ['policy', this.policyId()],
@@ -99,48 +113,44 @@ export class PolicyFormPageComponent {
       ),
   }));
 
-  readonly strategyTypes: { value: StrategyType; label: string }[] = [
-    { value: 'TARGET_MARGIN', label: 'Целевая маржа' },
-    { value: 'PRICE_CORRIDOR', label: 'Ценовой коридор' },
+  readonly strategyTypes: { value: StrategyType; labelKey: string; descKey: string }[] = [
+    {
+      value: 'TARGET_MARGIN',
+      labelKey: 'pricing.policies.strategy.TARGET_MARGIN',
+      descKey: 'pricing.form.tooltip.strategy_type.TARGET_MARGIN',
+    },
+    {
+      value: 'PRICE_CORRIDOR',
+      labelKey: 'pricing.policies.strategy.PRICE_CORRIDOR',
+      descKey: 'pricing.form.tooltip.strategy_type.PRICE_CORRIDOR',
+    },
   ];
 
   readonly executionModes: {
     value: PolicyExecutionMode;
-    label: string;
-    description: string;
+    labelKey: string;
+    descKey: string;
   }[] = [
     {
       value: 'RECOMMENDATION',
-      label: 'Рекомендация',
-      description: 'Только рекомендации, без автоматического применения',
+      labelKey: 'pricing.policies.mode.RECOMMENDATION',
+      descKey: 'pricing.form.tooltip.execution_mode.RECOMMENDATION',
     },
     {
       value: 'SEMI_AUTO',
-      label: 'Полуавтомат',
-      description: 'Требуется ручное подтверждение перед применением',
+      labelKey: 'pricing.policies.mode.SEMI_AUTO',
+      descKey: 'pricing.form.tooltip.execution_mode.SEMI_AUTO',
     },
     {
       value: 'FULL_AUTO',
-      label: 'Автомат',
-      description: 'Изменения применяются автоматически без подтверждения',
+      labelKey: 'pricing.policies.mode.FULL_AUTO',
+      descKey: 'pricing.form.tooltip.execution_mode.FULL_AUTO',
     },
     {
       value: 'SIMULATED',
-      label: 'Симуляция',
-      description: 'Только расчёт, без создания действий',
+      labelKey: 'pricing.policies.mode.SIMULATED',
+      descKey: 'pricing.form.tooltip.execution_mode.SIMULATED',
     },
-  ];
-
-  readonly commissionSources: { value: CommissionSource; label: string }[] = [
-    { value: 'AUTO', label: 'Автоматически' },
-    { value: 'MANUAL', label: 'Вручную' },
-    { value: 'AUTO_WITH_MANUAL_FALLBACK', label: 'Авто с ручным fallback' },
-  ];
-
-  readonly roundingDirections: { value: RoundingDirection; label: string }[] = [
-    { value: 'FLOOR', label: 'Вниз' },
-    { value: 'NEAREST', label: 'К ближайшему' },
-    { value: 'CEIL', label: 'Вверх' },
   ];
 
   constructor() {
@@ -156,16 +166,24 @@ export class PolicyFormPageComponent {
     return this.form.get('strategyType')!.value;
   }
 
+  get strategyTypeDescription(): string {
+    return this.strategyTypes.find(s => s.value === this.strategyType)?.descKey ?? '';
+  }
+
   get executionMode(): PolicyExecutionMode {
     return this.form.get('executionMode')!.value;
   }
 
-  get commissionSource(): CommissionSource {
-    return this.form.get('targetMargin.commissionSource')!.value;
+  get executionModeDescription(): string {
+    return this.executionModes.find(m => m.value === this.executionMode)?.descKey ?? '';
   }
 
-  get logisticsSource(): CommissionSource {
-    return this.form.get('targetMargin.logisticsSource')!.value;
+  get targetMarginGroup(): FormGroup {
+    return this.form.get('targetMargin') as FormGroup;
+  }
+
+  get corridorGroup(): FormGroup {
+    return this.form.get('corridor') as FormGroup;
   }
 
   onStrategyTypeChange(): void {
@@ -179,15 +197,15 @@ export class PolicyFormPageComponent {
   }
 
   submit(): void {
+    this.submitted.set(true);
+    this.form.markAllAsTouched();
     if (this.form.invalid) return;
 
     const raw = this.form.getRawValue();
-    const strategyParams = this.buildStrategyParams(raw);
-
     const req: CreatePolicyRequest = {
       name: raw.name,
       strategyType: raw.strategyType,
-      strategyParams,
+      strategyParams: buildStrategyParams(raw),
       executionMode: raw.executionMode,
       priority: raw.priority,
       approvalTimeoutHours: raw.approvalTimeoutHours,
@@ -195,9 +213,8 @@ export class PolicyFormPageComponent {
       maxPriceChangePct: raw.maxPriceChangePct || null,
       minPrice: raw.minPrice || null,
       maxPrice: raw.maxPrice || null,
-      guardConfig: this.buildGuardConfig(raw),
+      guardConfig: buildGuardConfig(raw),
     };
-
     this.saveMutation.mutate(req);
   }
 
@@ -205,54 +222,18 @@ export class PolicyFormPageComponent {
     this.navigateToList();
   }
 
-  private buildForm(): FormGroup {
-    return this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(255)]],
-      strategyType: ['TARGET_MARGIN' as StrategyType, Validators.required],
-      executionMode: [
-        'RECOMMENDATION' as PolicyExecutionMode,
-        Validators.required,
-      ],
-      priority: [0, [Validators.required, Validators.min(0)]],
-      approvalTimeoutHours: [72, [Validators.required, Validators.min(1)]],
+  hasError(path: string, error: string): boolean {
+    const ctrl = this.form.get(path);
+    return !!ctrl && ctrl.hasError(error) && (ctrl.touched || this.submitted());
+  }
 
-      targetMargin: this.fb.group({
-        targetMarginPct: [
-          null as number | null,
-          [Validators.required, Validators.min(1), Validators.max(80)],
-        ],
-        commissionSource: ['AUTO' as CommissionSource],
-        commissionManualPct: [null as number | null, [Validators.min(1), Validators.max(50)]],
-        commissionLookbackDays: [30, [Validators.min(7), Validators.max(365)]],
-        commissionMinTransactions: [5, [Validators.min(1), Validators.max(100)]],
-        logisticsSource: ['AUTO' as CommissionSource],
-        logisticsManualAmount: [null as number | null, [Validators.min(0.01)]],
-        includeReturnAdjustment: [false],
-        includeAdCost: [false],
-        roundingStep: [10, [Validators.min(1), Validators.max(100)]],
-        roundingDirection: ['FLOOR' as RoundingDirection],
-      }),
+  isInvalid(path: string): boolean {
+    const ctrl = this.form.get(path);
+    return !!ctrl && ctrl.invalid && (ctrl.touched || this.submitted());
+  }
 
-      corridor: this.fb.group({
-        corridorMinPrice: [null as number | null, [Validators.min(0.01)]],
-        corridorMaxPrice: [null as number | null, [Validators.min(0.01)]],
-      }),
-
-      minMarginPct: [null as number | null, [Validators.min(0), Validators.max(80)]],
-      maxPriceChangePct: [null as number | null, [Validators.min(1), Validators.max(50)]],
-      minPrice: [null as number | null, [Validators.min(0.01)]],
-      maxPrice: [null as number | null, [Validators.min(0.01)]],
-
-      marginGuardEnabled: [true],
-      frequencyGuardEnabled: [true],
-      frequencyGuardHours: [24, [Validators.min(1), Validators.max(720)]],
-      volatilityGuardEnabled: [true],
-      volatilityGuardReversals: [3, [Validators.min(1), Validators.max(20)]],
-      volatilityGuardPeriodDays: [7, [Validators.min(1), Validators.max(90)]],
-      promoGuardEnabled: [true],
-      stockOutGuardEnabled: [true],
-      staleDataGuardHours: [24, [Validators.min(1), Validators.max(168)]],
-    });
+  collectValidationErrors(): string[] {
+    return collectPolicyValidationErrors(this.form, this.translate);
   }
 
   private patchForm(policy: PricingPolicy): void {
@@ -286,48 +267,6 @@ export class PolicyFormPageComponent {
     }
 
     this.onStrategyTypeChange();
-  }
-
-  private buildStrategyParams(
-    raw: ReturnType<typeof this.form.getRawValue>,
-  ): TargetMarginParams | PriceCorridorParams {
-    if (raw.strategyType === 'TARGET_MARGIN') {
-      const tm = raw.targetMargin;
-      return {
-        targetMarginPct: tm.targetMarginPct!,
-        commissionSource: tm.commissionSource,
-        commissionManualPct: tm.commissionManualPct,
-        commissionLookbackDays: tm.commissionLookbackDays,
-        commissionMinTransactions: tm.commissionMinTransactions,
-        logisticsSource: tm.logisticsSource,
-        logisticsManualAmount: tm.logisticsManualAmount,
-        includeReturnAdjustment: tm.includeReturnAdjustment,
-        includeAdCost: tm.includeAdCost,
-        roundingStep: tm.roundingStep,
-        roundingDirection: tm.roundingDirection,
-      } satisfies TargetMarginParams;
-    }
-
-    return {
-      corridorMinPrice: raw.corridor.corridorMinPrice,
-      corridorMaxPrice: raw.corridor.corridorMaxPrice,
-    } satisfies PriceCorridorParams;
-  }
-
-  private buildGuardConfig(
-    raw: ReturnType<typeof this.form.getRawValue>,
-  ): GuardConfig {
-    return {
-      marginGuardEnabled: raw.marginGuardEnabled,
-      frequencyGuardEnabled: raw.frequencyGuardEnabled,
-      frequencyGuardHours: raw.frequencyGuardHours,
-      volatilityGuardEnabled: raw.volatilityGuardEnabled,
-      volatilityGuardReversals: raw.volatilityGuardReversals,
-      volatilityGuardPeriodDays: raw.volatilityGuardPeriodDays,
-      promoGuardEnabled: raw.promoGuardEnabled,
-      stockOutGuardEnabled: raw.stockOutGuardEnabled,
-      staleDataGuardHours: raw.staleDataGuardHours,
-    };
   }
 
   private navigateToList(): void {

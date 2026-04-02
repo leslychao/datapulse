@@ -59,7 +59,7 @@ const STRATEGY_TYPES = ['TARGET_MARGIN', 'PRICE_CORRIDOR'] as const;
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'pricing.policies.title' | translate }}
         </h2>
@@ -72,14 +72,16 @@ const STRATEGY_TYPES = ['TARGET_MARGIN', 'PRICE_CORRIDOR'] as const;
       </div>
 
       <!-- Filter Bar -->
-      <dp-filter-bar
-        [filters]="filterConfigs"
-        [values]="filterValues()"
-        (filtersChanged)="onFiltersChanged($event)"
-      />
+      <div class="border-b border-[var(--border-default)] px-6 py-2.5">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="filterValues()"
+          (filtersChanged)="onFiltersChanged($event)"
+        />
+      </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (policiesQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.policies.error' | translate"

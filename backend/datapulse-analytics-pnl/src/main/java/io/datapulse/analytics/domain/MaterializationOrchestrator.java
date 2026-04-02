@@ -19,7 +19,8 @@ public class MaterializationOrchestrator {
     long start = System.currentTimeMillis();
 
     List<AnalyticsMaterializer> ordered = materializers.stream()
-        .sorted(Comparator.comparingInt(m -> m.phase().ordinal()))
+        .sorted(Comparator.comparingInt((AnalyticsMaterializer m) -> m.phase().ordinal())
+            .thenComparingInt(AnalyticsMaterializer::order))
         .toList();
 
     for (AnalyticsMaterializer materializer : ordered) {
@@ -43,7 +44,8 @@ public class MaterializationOrchestrator {
         jobExecutionId);
 
     List<AnalyticsMaterializer> ordered = materializers.stream()
-        .sorted(Comparator.comparingInt(m -> m.phase().ordinal()))
+        .sorted(Comparator.comparingInt((AnalyticsMaterializer m) -> m.phase().ordinal())
+            .thenComparingInt(AnalyticsMaterializer::order))
         .toList();
 
     for (AnalyticsMaterializer materializer : ordered) {

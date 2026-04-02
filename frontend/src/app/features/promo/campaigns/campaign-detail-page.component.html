@@ -1,6 +1,6 @@
 <div class="flex h-full flex-col">
   <!-- Header -->
-  <div class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+  <div class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
     <div class="flex items-center gap-2">
       <button
         (click)="navigateBack()"
@@ -14,8 +14,10 @@
       <div class="mt-2 flex items-center gap-3">
         @if (mpBadge(); as badge) {
           <span
-            class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white"
-            [style.background]="badge.bg"
+            class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold"
+            [style.background-color]="badge.bg"
+            [style.color]="badge.color"
+            [style.border]="'1px solid ' + badge.borderColor"
           >
             {{ badge.label }}
           </span>
@@ -47,7 +49,7 @@
 
   <!-- KPI -->
   @if (campaign(); as c) {
-    <div class="flex gap-3 px-4 pt-4">
+    <div class="flex gap-3 px-6 pt-4">
       <dp-kpi-card
         [label]="'promo.detail.kpi.eligible' | translate"
         [value]="c.eligibleCount"
@@ -84,7 +86,7 @@
   }
 
   <!-- Filters -->
-  <div class="px-4 pt-3">
+  <div class="px-6 pt-3">
     <dp-filter-bar
       [filters]="filterConfigs"
       [values]="filterValues()"
@@ -93,7 +95,7 @@
   </div>
 
   <!-- Grid -->
-  <div class="flex-1 px-4 py-3">
+  <div class="flex-1 px-6 py-3">
     @if (productsQuery.isError()) {
       <dp-empty-state
         [message]="'promo.detail.products_error' | translate"

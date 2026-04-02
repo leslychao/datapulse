@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
@@ -223,6 +223,7 @@ export class ConnectionsPageComponent {
 
   readonly formStep = signal<FormStep>('idle');
   readonly selectedMarketplace = signal<MarketplaceType | null>(null);
+  private readonly hasPendingValidation = signal(false);
 
   formName = '';
   wbToken = '';
@@ -237,7 +238,17 @@ export class ConnectionsPageComponent {
   readonly connectionsQuery = injectQuery(() => ({
     queryKey: ['connections'],
     queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+    refetchInterval: this.hasPendingValidation() ? 3000 : false,
   }));
+
+  constructor() {
+    effect(() => {
+      const data = this.connectionsQuery.data();
+      this.hasPendingValidation.set(
+        data?.some((c) => c.status === 'PENDING_VALIDATION') ?? false,
+      );
+    });
+  }
 
   readonly createMutation = injectMutation(() => ({
     mutationFn: (req: CreateConnectionRequest) => lastValueFrom(this.connectionApi.createConnection(req)),

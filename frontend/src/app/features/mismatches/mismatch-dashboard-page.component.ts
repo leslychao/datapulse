@@ -391,22 +391,29 @@ export class MismatchDashboardPageComponent {
     this.invalidateList();
   }
 
-  onTypesChange(e: Event): void {
-    const el = e.target as HTMLSelectElement;
-    const v = Array.from(el.selectedOptions, (o) => o.value as MismatchType);
-    this.filterTypes.set(v);
+  toggleType(t: MismatchType): void {
+    const current = this.filterTypes();
+    this.filterTypes.set(
+      current.includes(t) ? current.filter((x) => x !== t) : [...current, t],
+    );
+    this.applyFilters();
   }
 
-  onStatusesChange(e: Event): void {
-    const el = e.target as HTMLSelectElement;
-    const v = Array.from(el.selectedOptions, (o) => o.value as MismatchStatus);
-    this.filterStatuses.set(v.length ? v : ['ACTIVE']);
+  toggleStatus(s: MismatchStatus): void {
+    const current = this.filterStatuses();
+    const next = current.includes(s)
+      ? current.filter((x) => x !== s)
+      : [...current, s];
+    this.filterStatuses.set(next.length ? next : ['ACTIVE']);
+    this.applyFilters();
   }
 
-  onSeveritiesChange(e: Event): void {
-    const el = e.target as HTMLSelectElement;
-    const v = Array.from(el.selectedOptions, (o) => o.value as MismatchSeverity);
-    this.filterSeverities.set(v);
+  toggleSeverity(sev: MismatchSeverity): void {
+    const current = this.filterSeverities();
+    this.filterSeverities.set(
+      current.includes(sev) ? current.filter((x) => x !== sev) : [...current, sev],
+    );
+    this.applyFilters();
   }
 
   prevPage(): void {

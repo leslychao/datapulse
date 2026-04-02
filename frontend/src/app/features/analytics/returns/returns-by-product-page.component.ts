@@ -27,7 +27,7 @@ function currentMonth(): string {
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
-      <div class="flex items-center gap-3 px-4">
+      <div class="flex items-center gap-3">
         <input
           type="month"
           [value]="period()"
@@ -48,7 +48,7 @@ function currentMonth(): string {
       </div>
 
       <!-- Table -->
-      <div class="flex-1 overflow-x-auto px-4">
+      <div class="flex-1 overflow-x-auto">
         <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
           <table class="w-full text-left text-[length:var(--text-sm)]">
             <thead class="bg-[var(--bg-secondary)] text-[length:var(--text-xs)] text-[var(--text-secondary)]">
@@ -128,7 +128,7 @@ function currentMonth(): string {
 
       <!-- Pagination -->
       @if (returnsQuery.data(); as page) {
-        <div class="flex items-center justify-between px-4 pb-4 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        <div class="flex items-center justify-between pb-4 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
           <span>
             {{ 'pagination.showing' | translate:{
               from: page.number * page.size + 1,

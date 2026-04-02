@@ -36,9 +36,22 @@ const CAMPAIGN_STATUSES: CampaignStatus[] = [
   'UPCOMING', 'ACTIVE', 'FROZEN', 'ENDED', 'CANCELLED',
 ];
 
-const MP_BADGE: Record<string, { bg: string; label: string }> = {
-  WB: { bg: '#CB11AB', label: 'WB' },
-  OZON: { bg: '#005BFF', label: 'Ozon' },
+const MP_BADGE: Record<
+  string,
+  { bg: string; color: string; borderColor: string; label: string }
+> = {
+  WB: {
+    bg: 'var(--mp-wb-bg)',
+    color: 'var(--mp-wb)',
+    borderColor: 'var(--mp-wb)',
+    label: 'WB',
+  },
+  OZON: {
+    bg: 'var(--mp-ozon-bg)',
+    color: 'var(--mp-ozon)',
+    borderColor: 'var(--mp-ozon)',
+    label: 'Ozon',
+  },
 };
 
 @Component({
@@ -54,13 +67,13 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'promo.campaigns.title' | translate }}
         </h2>
       </div>
 
-      <div class="flex gap-3 px-4 pt-4">
+      <div class="flex gap-3 px-6 pt-4">
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.active' | translate"
           [value]="kpiActive()"
@@ -83,7 +96,7 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
         />
       </div>
 
-      <div class="px-4 pt-3">
+      <div class="px-6 pt-3">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -91,7 +104,7 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
         />
       </div>
 
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (campaignsQuery.isError()) {
           <dp-empty-state
             [message]="'promo.campaigns.error' | translate"
@@ -188,7 +201,7 @@ export class CampaignListPageComponent {
         cellRenderer: (params: any) => {
           const mp = MP_BADGE[params.value];
           if (!mp) return params.value ?? '';
-          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white" style="background:${mp.bg}">${mp.label}</span>`;
+          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold" style="background-color:${mp.bg};color:${mp.color};border:1px solid ${mp.borderColor}">${mp.label}</span>`;
         },
       },
       {

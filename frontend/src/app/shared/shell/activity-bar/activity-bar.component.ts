@@ -74,7 +74,17 @@ interface NavItem {
     :host ::ng-deep .activity-bar-active {
       background-color: var(--accent-subtle);
       color: var(--accent-primary);
-      box-shadow: inset 2px 0 0 var(--accent-primary);
+    }
+    :host ::ng-deep .activity-bar-active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2px;
+      height: 20px;
+      border-radius: 0 1px 1px 0;
+      background-color: var(--accent-primary);
     }
   `],
 })

@@ -19,11 +19,11 @@ import { CreatePromoPolicyRequest, ParticipationMode } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 
-const MODES: { value: ParticipationMode; title: string; description: string }[] = [
-  { value: 'RECOMMENDATION', title: 'Рекомендация', description: 'Показывает рекомендацию, оператор решает' },
-  { value: 'SEMI_AUTO', title: 'Полу-авто', description: 'Создаёт действие, ожидает одобрения' },
-  { value: 'FULL_AUTO', title: 'Полный авто', description: 'Автоматическое участие через guards' },
-  { value: 'SIMULATED', title: 'Симуляция', description: 'Имитация без реального вызова API' },
+const MODES: { value: ParticipationMode; titleKey: string; descKey: string }[] = [
+  { value: 'RECOMMENDATION', titleKey: 'promo.mode.recommendation', descKey: 'promo.mode.recommendation_desc' },
+  { value: 'SEMI_AUTO', titleKey: 'promo.mode.semi_auto', descKey: 'promo.mode.semi_auto_desc' },
+  { value: 'FULL_AUTO', titleKey: 'promo.mode.full_auto', descKey: 'promo.mode.full_auto_desc' },
+  { value: 'SIMULATED', titleKey: 'promo.mode.simulated', descKey: 'promo.mode.simulated_desc' },
 ];
 
 @Component({

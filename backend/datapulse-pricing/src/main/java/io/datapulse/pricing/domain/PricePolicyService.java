@@ -47,7 +47,9 @@ public class PricePolicyService {
         entity.setMaxPrice(request.maxPrice());
         entity.setGuardConfig(request.guardConfig());
         entity.setExecutionMode(request.executionMode());
-        entity.setApprovalTimeoutHours(request.executionMode() == ExecutionMode.SEMI_AUTO ? 72 : 0);
+        entity.setApprovalTimeoutHours(
+            request.approvalTimeoutHours() != null ? request.approvalTimeoutHours()
+                : request.executionMode() == ExecutionMode.SEMI_AUTO ? 72 : 0);
         entity.setPriority(request.priority() != null ? request.priority() : 0);
         entity.setVersion(1);
         entity.setCreatedBy(userId);
@@ -129,6 +131,9 @@ public class PricePolicyService {
         entity.setMaxPrice(request.maxPrice());
         entity.setGuardConfig(request.guardConfig());
         entity.setExecutionMode(request.executionMode());
+        if (request.approvalTimeoutHours() != null) {
+            entity.setApprovalTimeoutHours(request.approvalTimeoutHours());
+        }
         entity.setPriority(request.priority() != null ? request.priority() : entity.getPriority());
 
         if (logicChanged) {

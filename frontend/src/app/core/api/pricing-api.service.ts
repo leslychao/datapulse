@@ -66,7 +66,7 @@ export class PricingApiService {
   createPolicy(workspaceId: number, req: CreatePolicyRequest): Observable<PricingPolicy> {
     return this.http.post<PricingPolicy>(
       `${this.base}/workspaces/${workspaceId}/pricing/policies`,
-      req,
+      this.toPolicyWriteBody(req),
     );
   }
 
@@ -77,8 +77,25 @@ export class PricingApiService {
   ): Observable<PricingPolicy> {
     return this.http.put<PricingPolicy>(
       `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}`,
-      req,
+      this.toPolicyWriteBody(req),
     );
+  }
+
+  /** API expects `strategyParams` and `guardConfig` as JSON strings, not nested objects. */
+  private toPolicyWriteBody(req: CreatePolicyRequest): Record<string, unknown> {
+    return {
+      name: req.name,
+      strategyType: req.strategyType,
+      strategyParams: JSON.stringify(req.strategyParams),
+      minMarginPct: req.minMarginPct,
+      maxPriceChangePct: req.maxPriceChangePct,
+      minPrice: req.minPrice,
+      maxPrice: req.maxPrice,
+      guardConfig: JSON.stringify(req.guardConfig),
+      executionMode: req.executionMode,
+      approvalTimeoutHours: req.approvalTimeoutHours,
+      priority: req.priority,
+    };
   }
 
   deletePolicy(workspaceId: number, policyId: number): Observable<void> {

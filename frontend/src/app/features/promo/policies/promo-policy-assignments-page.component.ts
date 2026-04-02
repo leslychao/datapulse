@@ -46,7 +46,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
   ],
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
         <div class="flex items-center gap-2">
           <button
             (click)="navigateBack()"
@@ -60,7 +60,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
         </h2>
       </div>
 
-      <div class="flex-1 px-4 py-3">
+      <div class="flex-1 px-6 py-3">
         @if (showAddForm()) {
           <div class="mb-4 flex items-end gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3">
             <div>

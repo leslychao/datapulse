@@ -1,705 +1,356 @@
-<div class="mx-auto max-w-3xl px-6 py-6">
-  <h1 class="mb-6 text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">
-    @if (isEditMode()) {
-      Редактирование политики
-    } @else {
-      Новая ценовая политика
-    }
-  </h1>
+<div class="mx-auto max-w-3xl px-5 py-5">
+
+  <!-- Page header -->
+  <div class="mb-5">
+    <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">
+      @if (isEditMode()) {
+        {{ 'pricing.form.title_edit' | translate }}
+      } @else {
+        {{ 'pricing.form.title_create' | translate }}
+      }
+    </h1>
+    <p class="mt-0.5 text-[var(--text-sm)] text-[var(--text-secondary)]">
+      {{ 'pricing.form.subtitle' | translate }}
+    </p>
+  </div>
 
   @if (policyQuery.isLoading() && isEditMode()) {
-    <div class="flex items-center justify-center py-20 text-[var(--text-secondary)]">
-      Загрузка...
+    <!-- Skeleton -->
+    <div class="space-y-5">
+      <div class="space-y-2">
+        <div class="dp-shimmer h-3.5 w-28 rounded"></div>
+        <div class="dp-shimmer h-8 w-full rounded-[var(--radius-md)]"></div>
+      </div>
+      <div class="space-y-2">
+        <div class="dp-shimmer h-3.5 w-24 rounded"></div>
+        <div class="dp-shimmer h-8 w-56 rounded-[var(--radius-md)]"></div>
+      </div>
+      <div class="space-y-2">
+        <div class="dp-shimmer h-3.5 w-36 rounded"></div>
+        <div class="dp-shimmer h-8 w-80 rounded-[var(--radius-md)]"></div>
+      </div>
+      <div class="border-t border-[var(--border-default)]"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <div class="dp-shimmer h-3.5 w-20 rounded"></div>
+          <div class="dp-shimmer h-8 rounded-[var(--radius-md)]"></div>
+        </div>
+        <div class="space-y-2">
+          <div class="dp-shimmer h-3.5 w-32 rounded"></div>
+          <div class="dp-shimmer h-8 rounded-[var(--radius-md)]"></div>
+        </div>
+      </div>
     </div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-8">
+    <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5">
 
-      <!-- Section 1: Основные параметры -->
-      <section>
-        <h2 class="mb-4 text-[var(--text-lg)] font-medium text-[var(--text-primary)]">
-          Основные параметры
+      <!-- Validation summary -->
+      @if (submitted() && form.invalid) {
+        <div class="flex gap-2.5 rounded-[var(--radius-md)] border border-[var(--status-error)]/30 bg-[var(--status-error-bg)] px-3 py-2.5">
+          <lucide-icon
+            [name]="icons.AlertTriangle"
+            [size]="15"
+            class="mt-0.5 shrink-0 text-[var(--status-error)]"
+          />
+          <div class="min-w-0">
+            <p class="text-[var(--text-sm)] font-medium text-[var(--status-error)]">
+              {{ 'pricing.form.validation_summary.title' | translate }}
+            </p>
+            <ul class="mt-1 space-y-0.5">
+              @for (err of collectValidationErrors(); track err) {
+                <li class="text-[var(--text-xs)] text-[var(--text-primary)]/70">{{ err }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+
+      <!-- ─── Section 1: Basics ─── -->
+      <div class="space-y-4 border-b border-[var(--border-default)] pb-5">
+        <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
+          {{ 'pricing.form.section.general' | translate }}
         </h2>
 
-        <div class="space-y-4">
-          <!-- Name -->
-          <div>
-            <label
-              for="name"
-              class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-            >
-              Название
-            </label>
-            <input
-              id="name"
-              formControlName="name"
-              type="text"
-              placeholder="Например: Маржа 25% WB"
-              class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+        <!-- Name -->
+        <div>
+          <label for="name" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+            {{ 'pricing.form.name' | translate }}
+          </label>
+          <input
+            id="name"
+            formControlName="name"
+            type="text"
+            [placeholder]="'pricing.form.name_placeholder' | translate"
+            class="h-8 w-full rounded-[var(--radius-md)] border px-3 text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+            [class]="isInvalid('name')
+              ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+              : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+          />
+          @if (hasError('name', 'required')) {
+            <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
+              {{ 'pricing.form.validation.name_required' | translate }}
+            </p>
+          }
+          @if (hasError('name', 'maxlength')) {
+            <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
+              {{ 'pricing.form.validation.name_maxlength' | translate }}
+            </p>
+          }
+        </div>
+
+        <!-- Strategy type — segmented control -->
+        <div>
+          <span class="mb-1.5 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+            {{ 'pricing.form.strategy_type' | translate }}
+          </span>
+          <div class="inline-flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
+            @for (st of strategyTypes; track st.value) {
+              <label
+                class="relative cursor-pointer select-none px-3.5 py-1.5 text-[var(--text-sm)] transition-colors"
+                [class]="form.get('strategyType')!.value === st.value
+                  ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
+                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
+              >
+                <input
+                  type="radio"
+                  formControlName="strategyType"
+                  [value]="st.value"
+                  (change)="onStrategyTypeChange()"
+                  class="sr-only"
+                />
+                {{ st.labelKey | translate }}
+              </label>
+            }
+          </div>
+          <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">
+            {{ strategyTypeDescription | translate }}
+          </p>
+        </div>
+
+        <!-- Execution mode — segmented control -->
+        <div>
+          <span class="mb-1.5 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+            {{ 'pricing.form.execution_mode' | translate }}
+          </span>
+          <div class="inline-flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
+            @for (mode of executionModes; track mode.value) {
+              <label
+                class="relative cursor-pointer select-none px-3.5 py-1.5 text-[var(--text-sm)] transition-colors"
+                [class]="form.get('executionMode')!.value === mode.value
+                  ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
+                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
+              >
+                <input
+                  type="radio"
+                  formControlName="executionMode"
+                  [value]="mode.value"
+                  class="sr-only"
+                />
+                {{ mode.labelKey | translate }}
+              </label>
+            }
+          </div>
+          <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">
+            {{ executionModeDescription | translate }}
+          </p>
+        </div>
+
+        @if (executionMode === 'FULL_AUTO') {
+          <div class="flex items-start gap-2 rounded-[var(--radius-md)] bg-[var(--status-warning-bg)] px-3 py-2">
+            <lucide-icon
+              [name]="icons.AlertTriangle"
+              [size]="14"
+              class="mt-0.5 shrink-0 text-[var(--status-warning)]"
             />
-            @if (form.get('name')!.touched && form.get('name')!.hasError('required')) {
-              <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
-                Название обязательно
+            <span class="text-[var(--text-xs)] leading-relaxed text-[var(--text-primary)]/80">
+              {{ 'pricing.form.full_auto_warning' | translate }}
+            </span>
+          </div>
+        }
+
+        <!-- Priority + Approval timeout -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="mb-1 flex items-center gap-1.5">
+              <label for="priority" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+                {{ 'pricing.form.priority' | translate }}
+              </label>
+              <span class="group relative inline-flex">
+                <lucide-icon
+                  [name]="icons.Info"
+                  [size]="13"
+                  class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]"
+                />
+                <span class="dp-tooltip">
+                  {{ 'pricing.form.tooltip.priority' | translate }}
+                </span>
+              </span>
+            </div>
+            <input
+              id="priority"
+              formControlName="priority"
+              type="number"
+              min="0"
+              class="h-8 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+              [class]="isInvalid('priority')
+                ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+                : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+            />
+            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.priority' | translate }}</p>
+            @if (hasError('priority', 'min')) {
+              <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+                {{ 'pricing.form.validation.priority_min' | translate }}
               </p>
             }
           </div>
 
-          <!-- Strategy type -->
-          <div>
-            <span class="mb-2 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-              Тип стратегии
-            </span>
-            <div class="flex gap-4">
-              @for (st of strategyTypes; track st.value) {
-                <label
-                  class="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2.5 transition-colors"
-                  [class]="form.get('strategyType')!.value === st.value
-                    ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)]'
-                    : 'border-[var(--border-default)] bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)]'"
-                >
-                  <input
-                    type="radio"
-                    formControlName="strategyType"
-                    [value]="st.value"
-                    (change)="onStrategyTypeChange()"
-                    class="accent-[var(--accent-primary)]"
+          @if (executionMode === 'SEMI_AUTO') {
+            <div>
+              <div class="mb-1 flex items-center gap-1.5">
+                <label for="approvalTimeoutHours" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+                  {{ 'pricing.form.approval_timeout' | translate }}
+                </label>
+                <span class="group relative inline-flex">
+                  <lucide-icon
+                    [name]="icons.Info"
+                    [size]="13"
+                    class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]"
                   />
-                  <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                    {{ st.label }}
+                  <span class="dp-tooltip">
+                    {{ 'pricing.form.tooltip.approval_timeout' | translate }}
                   </span>
-                </label>
+                </span>
+              </div>
+              <input
+                id="approvalTimeoutHours"
+                formControlName="approvalTimeoutHours"
+                type="number"
+                min="1"
+                class="h-8 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+                [class]="isInvalid('approvalTimeoutHours')
+                  ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+                  : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+              />
+              <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.approval_timeout' | translate }}</p>
+              @if (hasError('approvalTimeoutHours', 'min')) {
+                <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'pricing.form.validation.approval_timeout_min' | translate }}
+                </p>
               }
-            </div>
-          </div>
-
-          <!-- Execution mode -->
-          <div>
-            <span class="mb-2 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-              Режим исполнения
-            </span>
-            <div class="grid grid-cols-2 gap-3">
-              @for (mode of executionModes; track mode.value) {
-                <label
-                  class="flex cursor-pointer flex-col gap-0.5 rounded-[var(--radius-md)] border px-4 py-3 transition-colors"
-                  [class]="form.get('executionMode')!.value === mode.value
-                    ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)]'
-                    : 'border-[var(--border-default)] bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)]'"
-                >
-                  <div class="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      formControlName="executionMode"
-                      [value]="mode.value"
-                      class="accent-[var(--accent-primary)]"
-                    />
-                    <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                      {{ mode.label }}
-                    </span>
-                  </div>
-                  <span class="pl-5 text-[var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ mode.description }}
-                  </span>
-                </label>
-              }
-            </div>
-          </div>
-
-          @if (executionMode === 'FULL_AUTO') {
-            <div
-              class="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--status-warning)] bg-[var(--status-warning-bg)] px-4 py-3"
-            >
-              <span class="text-[var(--status-warning)]">⚠</span>
-              <span class="text-[var(--text-sm)] text-[var(--status-warning)]">
-                Автоматический режим: ценовые изменения будут применяться без ручного подтверждения.
-              </span>
             </div>
           }
-
-          <!-- Priority -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label
-                for="priority"
-                class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-              >
-                Приоритет
-              </label>
-              <input
-                id="priority"
-                formControlName="priority"
-                type="number"
-                min="0"
-                class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-              />
-            </div>
-
-            @if (executionMode === 'SEMI_AUTO') {
-              <div>
-                <label
-                  for="approvalTimeoutHours"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Таймаут подтверждения (часы)
-                </label>
-                <input
-                  id="approvalTimeoutHours"
-                  formControlName="approvalTimeoutHours"
-                  type="number"
-                  min="1"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                />
-              </div>
-            }
-          </div>
         </div>
-      </section>
 
-      <hr class="border-[var(--border-default)]" />
+      </div>
 
-      <!-- Section 2: Параметры стратегии -->
-      <section>
-        <h2 class="mb-4 text-[var(--text-lg)] font-medium text-[var(--text-primary)]">
-          Параметры стратегии
+      <!-- ─── Section 2: Strategy params ─── -->
+      <div class="space-y-4 border-b border-[var(--border-default)] pb-5">
+        <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
+          {{ 'pricing.form.section.strategy' | translate }}
         </h2>
-
         @if (strategyType === 'TARGET_MARGIN') {
-          <div formGroupName="targetMargin" class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-              <!-- Target margin -->
-              <div>
-                <label
-                  for="targetMarginPct"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Целевая маржа, %
-                </label>
-                <input
-                  id="targetMarginPct"
-                  formControlName="targetMarginPct"
-                  type="number"
-                  min="1"
-                  max="80"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                />
-              </div>
-            </div>
-
-            <!-- Commission -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  for="commissionSource"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Источник комиссии
-                </label>
-                <select
-                  id="commissionSource"
-                  formControlName="commissionSource"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                >
-                  @for (src of commissionSources; track src.value) {
-                    <option [value]="src.value">{{ src.label }}</option>
-                  }
-                </select>
-              </div>
-
-              @if (commissionSource !== 'AUTO') {
-                <div>
-                  <label
-                    for="commissionManualPct"
-                    class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                  >
-                    Ручная комиссия, %
-                  </label>
-                  <input
-                    id="commissionManualPct"
-                    formControlName="commissionManualPct"
-                    type="number"
-                    min="1"
-                    max="50"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              }
-            </div>
-
-            @if (commissionSource !== 'MANUAL') {
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label
-                    for="commissionLookbackDays"
-                    class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                  >
-                    Период расчёта комиссии, дн
-                  </label>
-                  <input
-                    id="commissionLookbackDays"
-                    formControlName="commissionLookbackDays"
-                    type="number"
-                    min="7"
-                    max="365"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-                <div>
-                  <label
-                    for="commissionMinTransactions"
-                    class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                  >
-                    Мин. транзакций
-                  </label>
-                  <input
-                    id="commissionMinTransactions"
-                    formControlName="commissionMinTransactions"
-                    type="number"
-                    min="1"
-                    max="100"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              </div>
-            }
-
-            <!-- Logistics -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  for="logisticsSource"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Источник логистики
-                </label>
-                <select
-                  id="logisticsSource"
-                  formControlName="logisticsSource"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                >
-                  @for (src of commissionSources; track src.value) {
-                    <option [value]="src.value">{{ src.label }}</option>
-                  }
-                </select>
-              </div>
-
-              @if (logisticsSource !== 'AUTO') {
-                <div>
-                  <label
-                    for="logisticsManualAmount"
-                    class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                  >
-                    Ручная стоимость логистики, ₽
-                  </label>
-                  <input
-                    id="logisticsManualAmount"
-                    formControlName="logisticsManualAmount"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              }
-            </div>
-
-            <!-- Toggles -->
-            <div class="flex gap-6">
-              <label class="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  formControlName="includeReturnAdjustment"
-                  class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-                />
-                <span class="text-[var(--text-sm)] text-[var(--text-primary)]">
-                  Учитывать возвраты
-                </span>
-              </label>
-              <label class="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  formControlName="includeAdCost"
-                  class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-                />
-                <span class="text-[var(--text-sm)] text-[var(--text-primary)]">
-                  Учитывать расходы на рекламу
-                </span>
-              </label>
-            </div>
-
-            <!-- Rounding -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  for="roundingStep"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Шаг округления, ₽
-                </label>
-                <input
-                  id="roundingStep"
-                  formControlName="roundingStep"
-                  type="number"
-                  min="1"
-                  max="100"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                />
-              </div>
-              <div>
-                <label
-                  for="roundingDirection"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Направление округления
-                </label>
-                <select
-                  id="roundingDirection"
-                  formControlName="roundingDirection"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                >
-                  @for (rd of roundingDirections; track rd.value) {
-                    <option [value]="rd.value">{{ rd.label }}</option>
-                  }
-                </select>
-              </div>
-            </div>
-          </div>
+          <dp-target-margin-form
+            [form]="targetMarginGroup"
+            [submitted]="submitted()"
+          />
         } @else {
           <!-- PRICE_CORRIDOR -->
           <div formGroupName="corridor" class="space-y-4">
-            <p class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              Укажите минимальную и/или максимальную цену коридора. Хотя бы одно значение обязательно.
+            <p class="text-[var(--text-xs)] text-[var(--text-tertiary)]">
+              {{ 'pricing.form.tooltip.corridor_hint' | translate }}
             </p>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label
-                  for="corridorMinPrice"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Минимальная цена, ₽
+                <label for="corridorMinPrice" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+                  {{ 'pricing.form.corridor_min_price' | translate }}
                 </label>
-                <input
-                  id="corridorMinPrice"
-                  formControlName="corridorMinPrice"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                />
+                <div class="relative">
+                  <input
+                    id="corridorMinPrice"
+                    formControlName="corridorMinPrice"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+                    [class]="isInvalid('corridor.corridorMinPrice')
+                      ? 'border-[var(--status-error)]'
+                      : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+                  />
+                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
+                </div>
               </div>
               <div>
-                <label
-                  for="corridorMaxPrice"
-                  class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-                >
-                  Максимальная цена, ₽
+                <label for="corridorMaxPrice" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
+                  {{ 'pricing.form.corridor_max_price' | translate }}
                 </label>
-                <input
-                  id="corridorMaxPrice"
-                  formControlName="corridorMaxPrice"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                />
+                <div class="relative">
+                  <input
+                    id="corridorMaxPrice"
+                    formControlName="corridorMaxPrice"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+                    [class]="isInvalid('corridor.corridorMaxPrice')
+                      ? 'border-[var(--status-error)]'
+                      : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+                  />
+                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
+                </div>
               </div>
             </div>
+            @if (form.get('corridor')!.hasError('corridorAtLeastOne') && (form.get('corridor')!.touched || submitted())) {
+              <p class="text-[var(--text-xs)] text-[var(--status-error)]">
+                {{ 'pricing.form.validation.corridor_at_least_one' | translate }}
+              </p>
+            }
+            @if (form.get('corridor')!.hasError('corridorMaxGtMin') && (form.get('corridor')!.touched || submitted())) {
+              <p class="text-[var(--text-xs)] text-[var(--status-error)]">
+                {{ 'pricing.form.validation.corridor_max_gt_min' | translate }}
+              </p>
+            }
           </div>
         }
-      </section>
+      </div>
 
-      <hr class="border-[var(--border-default)]" />
+      <!-- ─── Section 3: Constraints ─── -->
+      <dp-constraints-form [form]="form" [submitted]="submitted()" />
 
-      <!-- Section 3: Ограничения -->
-      <section>
-        <h2 class="mb-4 text-[var(--text-lg)] font-medium text-[var(--text-primary)]">
-          Ограничения
-        </h2>
-        <p class="mb-4 text-[var(--text-sm)] text-[var(--text-secondary)]">
-          Необязательные ограничения, применяемые после расчёта цены стратегией.
-        </p>
+      <!-- ─── Section 4: Guards ─── -->
+      <dp-guard-config-form [form]="form" [submitted]="submitted()" />
 
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label
-              for="minMarginPct"
-              class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-            >
-              Мин. маржа, %
-            </label>
-            <input
-              id="minMarginPct"
-              formControlName="minMarginPct"
-              type="number"
-              min="0"
-              max="80"
-              placeholder="Не задано"
-              class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-            />
-          </div>
-          <div>
-            <label
-              for="maxPriceChangePct"
-              class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-            >
-              Макс. изменение цены, %
-            </label>
-            <input
-              id="maxPriceChangePct"
-              formControlName="maxPriceChangePct"
-              type="number"
-              min="1"
-              max="50"
-              placeholder="Не задано"
-              class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-            />
-          </div>
-          <div>
-            <label
-              for="minPrice"
-              class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-            >
-              Мин. цена, ₽
-            </label>
-            <input
-              id="minPrice"
-              formControlName="minPrice"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="Не задано"
-              class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-            />
-          </div>
-          <div>
-            <label
-              for="maxPrice"
-              class="mb-1 block text-[var(--text-sm)] font-medium text-[var(--text-primary)]"
-            >
-              Макс. цена, ₽
-            </label>
-            <input
-              id="maxPrice"
-              formControlName="maxPrice"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="Не задано"
-              class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-[var(--text-base)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-            />
-          </div>
-        </div>
-      </section>
-
-      <hr class="border-[var(--border-default)]" />
-
-      <!-- Section 4: Guards -->
-      <section>
-        <h2 class="mb-4 text-[var(--text-lg)] font-medium text-[var(--text-primary)]">
-          Защитные механизмы (guards)
-        </h2>
-        <p class="mb-4 text-[var(--text-sm)] text-[var(--text-secondary)]">
-          Guards блокируют ценовое изменение при выполнении определённых условий.
-        </p>
-
-        <div class="space-y-3">
-          <!-- Margin guard -->
-          <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-3 transition-opacity"
-            [class.opacity-50]="!form.get('marginGuardEnabled')!.value"
-          >
-            <label class="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                formControlName="marginGuardEnabled"
-                class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <div>
-                <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                  Защита маржи
-                </span>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">
-                  Блокирует, если маржа отрицательная
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <!-- Frequency guard -->
-          <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-3 transition-opacity"
-            [class.opacity-50]="!form.get('frequencyGuardEnabled')!.value"
-          >
-            <label class="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                formControlName="frequencyGuardEnabled"
-                class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <div>
-                <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                  Защита от частых изменений
-                </span>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">
-                  Блокирует повторные изменения в течение заданного интервала
-                </p>
-              </div>
-            </label>
-            <div class="flex items-center gap-2">
-              <input
-                formControlName="frequencyGuardHours"
-                type="number"
-                min="1"
-                max="720"
-                class="w-20 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-50"
-                [attr.disabled]="!form.get('frequencyGuardEnabled')!.value ? '' : null"
-              />
-              <span class="text-[var(--text-xs)] text-[var(--text-secondary)]">ч</span>
-            </div>
-          </div>
-
-          <!-- Volatility guard -->
-          <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-3 transition-opacity"
-            [class.opacity-50]="!form.get('volatilityGuardEnabled')!.value"
-          >
-            <label class="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                formControlName="volatilityGuardEnabled"
-                class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <div>
-                <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                  Защита от волатильности
-                </span>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">
-                  Блокирует при слишком частых разворотах цены
-                </p>
-              </div>
-            </label>
-            <div class="flex items-center gap-3">
-              <div class="flex items-center gap-1">
-                <input
-                  formControlName="volatilityGuardReversals"
-                  type="number"
-                  min="1"
-                  max="20"
-                  class="w-16 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-50"
-                  [attr.disabled]="!form.get('volatilityGuardEnabled')!.value ? '' : null"
-                />
-                <span class="text-[var(--text-xs)] text-[var(--text-secondary)]">разв.</span>
-              </div>
-              <div class="flex items-center gap-1">
-                <input
-                  formControlName="volatilityGuardPeriodDays"
-                  type="number"
-                  min="1"
-                  max="90"
-                  class="w-16 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-50"
-                  [attr.disabled]="!form.get('volatilityGuardEnabled')!.value ? '' : null"
-                />
-                <span class="text-[var(--text-xs)] text-[var(--text-secondary)]">дн</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Promo guard -->
-          <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-3 transition-opacity"
-            [class.opacity-50]="!form.get('promoGuardEnabled')!.value"
-          >
-            <label class="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                formControlName="promoGuardEnabled"
-                class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <div>
-                <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                  Защита при промо
-                </span>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">
-                  Блокирует изменение цены, если товар участвует в промо-акции
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <!-- Stock out guard -->
-          <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-3 transition-opacity"
-            [class.opacity-50]="!form.get('stockOutGuardEnabled')!.value"
-          >
-            <label class="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                formControlName="stockOutGuardEnabled"
-                class="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <div>
-                <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                  Защита при отсутствии остатков
-                </span>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">
-                  Блокирует, если доступный остаток = 0
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <!-- Stale data guard (always on) -->
-          <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-3"
-          >
-            <div class="flex items-center gap-3">
-              <div
-                class="flex h-4 w-4 items-center justify-center rounded text-[var(--text-xs)] text-[var(--accent-primary)]"
-              >
-                ✓
-              </div>
-              <div>
-                <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">
-                  Защита от устаревших данных
-                </span>
-                <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">
-                  Всегда активна — блокирует, если данные старше заданного порога
-                </p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <input
-                formControlName="staleDataGuardHours"
-                type="number"
-                min="1"
-                max="168"
-                class="w-20 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-              />
-              <span class="text-[var(--text-xs)] text-[var(--text-secondary)]">ч</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Sticky footer -->
-      <div
-        class="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t border-[var(--border-default)] bg-[var(--bg-primary)] px-6 py-4"
-      >
-        <button
-          type="button"
-          (click)="cancel()"
-          class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-4 py-2 text-[var(--text-sm)] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)]"
-        >
-          Отмена
-        </button>
-        <button
-          type="submit"
-          [disabled]="form.invalid || saveMutation.isPending()"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-5 py-2 text-[var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          @if (saveMutation.isPending()) {
-            Сохранение...
-          } @else {
-            Сохранить
+      <!-- ─── Footer ─── -->
+      <div class="sticky bottom-0 -mx-5 flex items-center justify-between border-t border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-5 py-3 backdrop-blur-sm">
+        <div>
+          @if (submitted() && form.invalid) {
+            <span class="text-[var(--text-xs)] text-[var(--status-error)]">
+              {{ 'pricing.form.has_errors' | translate }}
+            </span>
           }
-        </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="cancel()"
+            class="h-7 cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)]"
+          >
+            {{ 'pricing.form.cancel' | translate }}
+          </button>
+          <button
+            type="submit"
+            [disabled]="saveMutation.isPending()"
+            class="h-7 cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 text-[var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            @if (saveMutation.isPending()) {
+              <span class="flex items-center gap-1.5">
+                <span class="dp-spinner h-3 w-3 rounded-full border-2 border-white/30 border-t-white"></span>
+                {{ 'pricing.form.saving' | translate }}
+              </span>
+            } @else {
+              {{ 'pricing.form.save' | translate }}
+            }
+          </button>
+        </div>
       </div>
 
     </form>

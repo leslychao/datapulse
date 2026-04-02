@@ -52,11 +52,11 @@ import { buildGridColumnDefs } from './components/grid-column-defs';
       }
 
       @if (offersQuery.isPending()) {
-        <div class="flex-1 overflow-auto p-4">
+        <div class="flex-1 overflow-auto px-6 py-4">
           <dp-loading-skeleton [type]="'table-row'" [lines]="10" />
         </div>
       } @else if (offersQuery.isError()) {
-        <div class="flex flex-1 items-center justify-center p-4">
+        <div class="flex flex-1 items-center justify-center px-6 py-4">
           <dp-empty-state
             [message]="'grid.error_title' | translate"
             [hint]="'grid.error_hint' | translate"
@@ -65,7 +65,7 @@ import { buildGridColumnDefs } from './components/grid-column-defs';
           />
         </div>
       } @else if (isEmpty()) {
-        <div class="flex flex-1 items-center justify-center p-4">
+        <div class="flex flex-1 items-center justify-center px-6 py-4">
           @if (gridStore.hasActiveFilters()) {
             <dp-empty-state
               [message]="'grid.empty' | translate"
@@ -81,7 +81,7 @@ import { buildGridColumnDefs } from './components/grid-column-defs';
           }
         </div>
       } @else {
-        <div class="flex-1 overflow-hidden">
+        <div class="flex-1 overflow-hidden px-6 pt-2">
           <dp-data-grid
             [columnDefs]="columnDefs"
             [rowData]="rows()"
