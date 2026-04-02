@@ -24,7 +24,7 @@ public class FinanceMismatchJdbcRepository {
                 MAX(cfe.entry_date)         AS last_finance_date
             FROM marketplace_connection mc
             LEFT JOIN canonical_finance_entry cfe
-                ON cfe.marketplace_connection_id = mc.id
+                ON cfe.connection_id = mc.id
             WHERE mc.workspace_id = :workspaceId
               AND mc.status = 'ACTIVE'
             GROUP BY mc.id, mc.workspace_id, mc.name, mc.marketplace_type

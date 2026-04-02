@@ -85,7 +85,7 @@ public class WorkingQueueService {
           MessageCodes.DUPLICATE_ENTITY, "working_queue", request.name());
     }
 
-    long customCount = definitionRepository.countByWorkspaceIdAndIsSystemFalse(workspaceId);
+    long customCount = definitionRepository.countByWorkspaceIdAndSystemFalse(workspaceId);
     if (customCount >= MAX_CUSTOM_QUEUES_PER_WORKSPACE) {
       throw BadRequestException.of(
           MessageCodes.QUEUE_LIMIT_EXCEEDED, MAX_CUSTOM_QUEUES_PER_WORKSPACE);
