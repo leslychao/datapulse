@@ -30,8 +30,13 @@ import {
   PromoProductFilter,
   PromoProductSummary,
 } from '@core/models';
+
+const ACTION_STATUSES: PromoActionStatus[] = [
+  'PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED',
+];
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -72,12 +77,13 @@ const EVAL_COLOR: Record<EvaluationResult, string> = {
 };
 
 const DECISION_TYPES: PromoDecisionType[] = [
-  'PARTICIPATE', 'DECLINE', 'PENDING_REVIEW',
+  'PARTICIPATE', 'DECLINE', 'DEACTIVATE', 'PENDING_REVIEW',
 ];
 
 const DECISION_COLOR: Record<PromoDecisionType, string> = {
   PARTICIPATE: 'success',
   DECLINE: 'neutral',
+  DEACTIVATE: 'error',
   PENDING_REVIEW: 'warning',
 };
 
@@ -131,6 +137,7 @@ export class CampaignDetailPageComponent {
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   protected readonly UsersIcon = Users;
   protected readonly CheckCircleIcon = CheckCircle;
@@ -147,6 +154,16 @@ export class CampaignDetailPageComponent {
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
+  readonly showRejectPopup = signal(false);
+  readonly rejectReason = signal('');
+  readonly rejectTargetActionId = signal<number | null>(null);
+  readonly showDeactivatePopup = signal(false);
+  readonly deactivateReason = signal('');
+  readonly deactivateTargetProductId = signal<number | null>(null);
+  readonly showCancelPopup = signal(false);
+  readonly cancelReason = signal('');
+  readonly cancelTargetActionId = signal<number | null>(null);
+  readonly selectedActionIds = signal<number[]>([]);
 
   readonly filterConfigs: FilterConfig[] = [
     {
@@ -176,6 +193,15 @@ export class CampaignDetailPageComponent {
         label: `promo.decision_type.${value}`,
       })),
     },
+    {
+      key: 'actionStatus',
+      label: 'promo.detail.filter.action_status',
+      type: 'multi-select',
+      options: ACTION_STATUSES.map(value => ({
+        value,
+        label: `promo.action_status.${value}`,
+      })),
+    },
     { key: 'search', label: 'promo.detail.filter.search', type: 'text' },
   ];
 
@@ -200,11 +226,25 @@ export class CampaignDetailPageComponent {
       cellClass: 'font-mono',
     },
     {
+      headerName: this.translate.instant('promo.detail.col.seller_sku'),
+      field: 'sellerSkuCode',
+      width: 120,
+      cellClass: 'font-mono',
+      valueFormatter: (params: any) => params.value ?? '—',
+    },
+    {
       headerName: this.translate.instant('promo.detail.col.promo_price'),
       field: 'requiredPrice',
       width: 110,
       cellClass: 'font-mono text-right',
       sortable: true,
+      valueFormatter: (params: any) => formatMoney(params.value),
+    },
+    {
+      headerName: this.translate.instant('promo.detail.col.max_promo_price'),
+      field: 'maxPromoPrice',
+      width: 120,
+      cellClass: 'font-mono text-right',
       valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
@@ -247,6 +287,13 @@ export class CampaignDetailPageComponent {
       valueFormatter: (params: any) => this.formatNumber(params.value),
     },
     {
+      headerName: this.translate.instant('promo.detail.col.stock_days'),
+      field: 'stockDaysOfCover',
+      width: 90,
+      cellClass: 'font-mono text-right',
+      valueFormatter: (params: any) => params.value != null ? `${params.value}` : '—',
+    },
+    {
       headerName: this.translate.instant('promo.detail.col.evaluation'),
       field: 'evaluationResult',
       width: 130,
@@ -276,7 +323,7 @@ export class CampaignDetailPageComponent {
     {
       headerName: '',
       field: 'actions',
-      width: 160,
+      width: 200,
       sortable: false,
       suppressMovable: true,
       cellRenderer: (params: any) => {
@@ -284,23 +331,35 @@ export class CampaignDetailPageComponent {
         const p = params.data as PromoProductSummary;
         const frozen = this.isCampaignFrozenOrEnded();
         if (frozen) return '';
+        const canOperate = this.rbac.canOperatePromo();
+        const canApprove = this.rbac.canApprovePromo();
+        if (!canOperate && !canApprove) return '';
 
         const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
         const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+        const banIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>`;
         let btns = '';
-        if (
-          (p.participationStatus === 'ELIGIBLE' && !p.actionId) ||
-          p.participationStatus === 'DECLINED' ||
-          p.participationStatus === 'AUTO_DECLINED'
-        ) {
-          btns += `<button class="action-btn" data-action="participate" title="${this.translate.instant('actions.participate')}">${checkIcon}</button>`;
+        if (canOperate) {
+          if (
+            (p.participationStatus === 'ELIGIBLE' && !p.actionId) ||
+            p.participationStatus === 'DECLINED' ||
+            p.participationStatus === 'AUTO_DECLINED'
+          ) {
+            btns += `<button class="action-btn" data-action="participate" title="${this.translate.instant('promo.detail.action.participate')}">${checkIcon}</button>`;
+          }
+          if (p.participationStatus === 'ELIGIBLE' && !p.actionId) {
+            btns += `<button class="action-btn" data-action="decline" title="${this.translate.instant('promo.detail.action.decline')}">${xIcon}</button>`;
+          }
+          if (p.participationStatus === 'PARTICIPATING') {
+            btns += `<button class="action-btn" data-action="deactivate" title="${this.translate.instant('promo.detail.action.deactivate')}">${banIcon}</button>`;
+          }
         }
-        if (p.participationStatus === 'ELIGIBLE' && !p.actionId) {
-          btns += `<button class="action-btn" data-action="decline" title="${this.translate.instant('actions.reject')}">${xIcon}</button>`;
+        if (canApprove && p.actionStatus === 'PENDING_APPROVAL') {
+          btns += `<button class="action-btn" data-action="approve" title="${this.translate.instant('promo.detail.action.approve')}">${checkIcon}</button>`;
+          btns += `<button class="action-btn" data-action="reject" title="${this.translate.instant('promo.detail.action.reject')}">${xIcon}</button>`;
         }
-        if (p.actionStatus === 'PENDING_APPROVAL') {
-          btns += `<button class="action-btn" data-action="approve" title="${this.translate.instant('actions.approve')}">${checkIcon}</button>`;
-          btns += `<button class="action-btn" data-action="reject" title="${this.translate.instant('actions.reject')}">${xIcon}</button>`;
+        if (canOperate && p.actionId && (p.actionStatus === 'PENDING_APPROVAL' || p.actionStatus === 'APPROVED')) {
+          btns += `<button class="action-btn" data-action="cancel" title="${this.translate.instant('promo.detail.action.cancel')}">${xIcon}</button>`;
         }
         return btns ? `<div class="flex items-center gap-0.5">${btns}</div>` : '';
       },
@@ -321,7 +380,23 @@ export class CampaignDetailPageComponent {
             if (product.actionId) this.approveMutation.mutate(product.actionId);
             break;
           case 'reject':
-            if (product.actionId) this.rejectMutation.mutate(product.actionId);
+            if (product.actionId) {
+              this.rejectTargetActionId.set(product.actionId);
+              this.rejectReason.set('');
+              this.showRejectPopup.set(true);
+            }
+            break;
+          case 'cancel':
+            if (product.actionId) {
+              this.cancelTargetActionId.set(product.actionId);
+              this.cancelReason.set('');
+              this.showCancelPopup.set(true);
+            }
+            break;
+          case 'deactivate':
+            this.deactivateTargetProductId.set(product.id);
+            this.deactivateReason.set('');
+            this.showDeactivatePopup.set(true);
             break;
         }
       },
@@ -335,6 +410,7 @@ export class CampaignDetailPageComponent {
     if (vals['participationStatus']?.length) f.participationStatus = vals['participationStatus'];
     if (vals['evaluationResult']?.length) f.evaluationResult = vals['evaluationResult'];
     if (vals['decisionType']?.length) f.decisionType = vals['decisionType'];
+    if (vals['actionStatus']?.length) f.actionStatus = vals['actionStatus'];
     if (vals['search']) f.search = vals['search'];
     return f;
   });
@@ -435,14 +511,90 @@ export class CampaignDetailPageComponent {
   }));
 
   private readonly rejectMutation = injectMutation(() => ({
-    mutationFn: (actionId: number) =>
-      lastValueFrom(this.promoApi.rejectAction(this.wsStore.currentWorkspaceId()!, actionId, { reason: 'Rejected' })),
+    mutationFn: (payload: { actionId: number; reason: string }) =>
+      lastValueFrom(this.promoApi.rejectAction(this.wsStore.currentWorkspaceId()!, payload.actionId, { reason: payload.reason })),
     onSuccess: () => {
+      this.showRejectPopup.set(false);
       this.toast.success(this.translate.instant('promo.detail.toast.reject_success'));
       this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
     },
     onError: () => this.toast.error(this.translate.instant('promo.detail.toast.reject_error')),
   }));
+
+  private readonly cancelMutation = injectMutation(() => ({
+    mutationFn: (payload: { actionId: number; reason: string }) =>
+      lastValueFrom(this.promoApi.cancelAction(this.wsStore.currentWorkspaceId()!, payload.actionId, { cancelReason: payload.reason })),
+    onSuccess: () => {
+      this.showCancelPopup.set(false);
+      this.toast.success(this.translate.instant('promo.detail.toast.cancel_success'));
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+    },
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.cancel_error')),
+  }));
+
+  private readonly deactivateMutation = injectMutation(() => ({
+    mutationFn: (payload: { productId: number; reason: string }) =>
+      lastValueFrom(this.promoApi.deactivate(this.wsStore.currentWorkspaceId()!, payload.productId, { reason: payload.reason })),
+    onSuccess: () => {
+      this.showDeactivatePopup.set(false);
+      this.toast.success(this.translate.instant('promo.detail.toast.deactivate_success'));
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+    },
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.deactivate_error')),
+  }));
+
+  private readonly bulkApproveMutation = injectMutation(() => ({
+    mutationFn: (actionIds: number[]) =>
+      lastValueFrom(this.promoApi.bulkApprove(this.wsStore.currentWorkspaceId()!, { actionIds })),
+    onSuccess: () => {
+      this.selectedActionIds.set([]);
+      this.toast.success(this.translate.instant('promo.detail.toast.bulk_approve_success'));
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+    },
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.bulk_approve_error')),
+  }));
+
+  private readonly bulkRejectMutation = injectMutation(() => ({
+    mutationFn: (payload: { actionIds: number[]; reason: string }) =>
+      lastValueFrom(this.promoApi.bulkReject(this.wsStore.currentWorkspaceId()!, payload)),
+    onSuccess: () => {
+      this.selectedActionIds.set([]);
+      this.toast.success(this.translate.instant('promo.detail.toast.bulk_reject_success'));
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+    },
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.bulk_reject_error')),
+  }));
+
+  readonly pendingApprovalIds = computed(() =>
+    this.rows()
+      .filter((p) => p.actionStatus === 'PENDING_APPROVAL' && p.actionId)
+      .map((p) => p.actionId!),
+  );
+
+  submitReject(): void {
+    const id = this.rejectTargetActionId();
+    if (id) this.rejectMutation.mutate({ actionId: id, reason: this.rejectReason() });
+  }
+
+  submitCancel(): void {
+    const id = this.cancelTargetActionId();
+    if (id) this.cancelMutation.mutate({ actionId: id, reason: this.cancelReason() });
+  }
+
+  submitDeactivate(): void {
+    const id = this.deactivateTargetProductId();
+    if (id) this.deactivateMutation.mutate({ productId: id, reason: this.deactivateReason() });
+  }
+
+  bulkApproveAll(): void {
+    const ids = this.pendingApprovalIds();
+    if (ids.length > 0) this.bulkApproveMutation.mutate(ids);
+  }
+
+  bulkRejectAll(): void {
+    const ids = this.pendingApprovalIds();
+    if (ids.length > 0) this.bulkRejectMutation.mutate({ actionIds: ids, reason: 'Bulk rejected' });
+  }
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);

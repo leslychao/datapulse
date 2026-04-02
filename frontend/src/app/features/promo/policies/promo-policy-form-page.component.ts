@@ -2,9 +2,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
-  OnInit,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -15,7 +15,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
-import { CreatePromoPolicyRequest, ParticipationMode } from '@core/models';
+import { CreatePromoPolicyRequest, ParticipationMode, PromoPolicy } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 
@@ -33,7 +33,7 @@ const MODES: { value: ParticipationMode; titleKey: string; descKey: string }[] =
   imports: [ReactiveFormsModule, TranslatePipe],
   templateUrl: './promo-policy-form-page.component.html',
 })
-export class PromoPolicyFormPageComponent implements OnInit {
+export class PromoPolicyFormPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
@@ -46,6 +46,7 @@ export class PromoPolicyFormPageComponent implements OnInit {
 
   readonly isEditMode = computed(() => !!this.policyId());
   readonly saving = signal(false);
+  readonly formDirty = signal(false);
   readonly modes = MODES;
 
   readonly form = this.fb.group({
@@ -54,6 +55,8 @@ export class PromoPolicyFormPageComponent implements OnInit {
     minMarginPct: [10, [Validators.required, Validators.min(0), Validators.max(100)]],
     minStockDaysOfCover: [7, [Validators.required, Validators.min(1)]],
     maxPromoDiscountPct: [null as number | null, [Validators.min(0), Validators.max(100)]],
+    autoParticipateCategories: [''],
+    autoDeclineCategories: [''],
   });
 
   readonly policyQuery = injectQuery(() => ({
@@ -68,18 +71,54 @@ export class PromoPolicyFormPageComponent implements OnInit {
     enabled: !!this.wsStore.currentWorkspaceId() && this.isEditMode(),
   }));
 
+  constructor() {
+    effect(() => {
+      const data = this.policyQuery.data();
+      if (data && this.isEditMode()) {
+        this.patchForm(data);
+      }
+    });
+  }
+
   private readonly createMutation = injectMutation(() => ({
     mutationFn: (req: CreatePromoPolicyRequest) =>
       lastValueFrom(this.promoApi.createPolicy(this.wsStore.currentWorkspaceId()!, req)),
     onSuccess: () => {
+      this.formDirty.set(false);
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
       this.toast.success(this.translate.instant('promo.form.toast.created'));
       this.navigateBack();
     },
-    onError: (err) =>
+    onError: (err) => {
+      this.saving.set(false);
       this.toast.error(
         translateApiErrorMessage(this.translate, err, 'promo.form.toast.create_error'),
-      ),
+      );
+    },
+  }));
+
+  private readonly createAndActivateMutation = injectMutation(() => ({
+    mutationFn: async (req: CreatePromoPolicyRequest) => {
+      const policy = await lastValueFrom(
+        this.promoApi.createPolicy(this.wsStore.currentWorkspaceId()!, req),
+      );
+      await lastValueFrom(
+        this.promoApi.activatePolicy(this.wsStore.currentWorkspaceId()!, policy.id),
+      );
+      return policy;
+    },
+    onSuccess: () => {
+      this.formDirty.set(false);
+      this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
+      this.toast.success(this.translate.instant('promo.form.toast.activated'));
+      this.navigateBack();
+    },
+    onError: (err) => {
+      this.saving.set(false);
+      this.toast.error(
+        translateApiErrorMessage(this.translate, err, 'promo.form.toast.create_error'),
+      );
+    },
   }));
 
   private readonly updateMutation = injectMutation(() => ({
@@ -92,61 +131,92 @@ export class PromoPolicyFormPageComponent implements OnInit {
         ),
       ),
     onSuccess: () => {
+      this.formDirty.set(false);
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
       this.queryClient.invalidateQueries({ queryKey: ['promo-policy'] });
       this.toast.success(this.translate.instant('promo.form.toast.updated'));
       this.navigateBack();
     },
-    onError: (err) =>
+    onError: (err) => {
+      this.saving.set(false);
       this.toast.error(
         translateApiErrorMessage(this.translate, err, 'promo.form.toast.update_error'),
-      ),
+      );
+    },
   }));
 
-  ngOnInit(): void {
-    if (this.isEditMode()) {
-      const data = this.policyQuery.data();
-      if (data) {
-        this.patchForm(data);
-      }
-    }
-  }
-
-  private patchForm(data: any): void {
+  private patchForm(data: PromoPolicy): void {
     this.form.patchValue({
       name: data.name,
       participationMode: data.participationMode,
       minMarginPct: data.minMarginPct,
       minStockDaysOfCover: data.minStockDaysOfCover,
       maxPromoDiscountPct: data.maxPromoDiscountPct,
+      autoParticipateCategories: data.autoParticipateCategories?.join(', ') ?? '',
+      autoDeclineCategories: data.autoDeclineCategories?.join(', ') ?? '',
     });
+    this.formDirty.set(false);
+  }
+
+  onFormChange(): void {
+    this.formDirty.set(true);
   }
 
   selectMode(mode: ParticipationMode): void {
     this.form.patchValue({ participationMode: mode });
+    this.formDirty.set(true);
   }
 
-  submit(): void {
-    if (this.form.invalid) return;
-
+  private buildRequest(): CreatePromoPolicyRequest {
     const val = this.form.getRawValue();
-    const req: CreatePromoPolicyRequest = {
+    const parseCategories = (str: string | null): number[] | null => {
+      if (!str?.trim()) return null;
+      return str
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n));
+    };
+    return {
       name: val.name!,
       participationMode: val.participationMode!,
       minMarginPct: val.minMarginPct!,
       minStockDaysOfCover: val.minStockDaysOfCover!,
       maxPromoDiscountPct: val.maxPromoDiscountPct,
-      autoParticipateCategories: null,
-      autoDeclineCategories: null,
+      autoParticipateCategories: parseCategories(val.autoParticipateCategories),
+      autoDeclineCategories: parseCategories(val.autoDeclineCategories),
       evaluationConfig: null,
     };
+  }
+
+  submit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.toast.warning(this.translate.instant('promo.form.validation_required'));
+      return;
+    }
 
     this.saving.set(true);
+    const req = this.buildRequest();
     if (this.isEditMode()) {
       this.updateMutation.mutate(req);
     } else {
       this.createMutation.mutate(req);
     }
+  }
+
+  submitAndActivate(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.toast.warning(this.translate.instant('promo.form.validation_required'));
+      return;
+    }
+
+    this.saving.set(true);
+    this.createAndActivateMutation.mutate(this.buildRequest());
+  }
+
+  canDeactivate(): boolean {
+    return !this.formDirty();
   }
 
   navigateBack(): void {

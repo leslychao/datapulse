@@ -17,6 +17,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import {
   CreatePromoAssignmentRequest,
   PromoAssignmentScopeType,
@@ -24,8 +25,10 @@ import {
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 
 
 const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
@@ -43,6 +46,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
     FormsModule,
     DataGridComponent,
     EmptyStateComponent,
+    ConfirmationModalComponent,
   ],
   template: `
     <div class="flex h-full flex-col">
@@ -83,14 +87,17 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
               <label class="mb-1 block text-[length:var(--text-xs)] text-[var(--text-secondary)]">
                 {{ 'promo.assignments.connection' | translate }}
               </label>
-              <input
-                type="number"
+              <select
                 [(ngModel)]="newConnectionId"
-                placeholder="Connection ID"
-                class="h-8 w-32 rounded-[var(--radius-md)] border border-[var(--border-default)]
+                class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)]
                        bg-[var(--bg-primary)] px-3 text-[length:var(--text-sm)]
                        text-[var(--text-primary)] outline-none"
-              />
+              >
+                <option [ngValue]="null" disabled>{{ 'promo.assignments.connection' | translate }}</option>
+                @for (conn of connections(); track conn.id) {
+                  <option [ngValue]="conn.id">{{ conn.name }} ({{ conn.marketplaceType }})</option>
+                }
+              </select>
             </div>
 
             <button
@@ -107,7 +114,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
               {{ 'common.cancel' | translate }}
             </button>
           </div>
-        } @else {
+        } @else if (rbac.canWritePromo()) {
           <div class="mb-3">
             <button
               (click)="showAddForm.set(true)"
@@ -132,7 +139,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="assignmentsQuery.isPending()"
             [pagination]="false"
@@ -142,68 +149,95 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
         }
       </div>
     </div>
+
+    <dp-confirmation-modal
+      [open]="showDeleteModal()"
+      [title]="'promo.assignments.delete_title' | translate"
+      [message]="'promo.assignments.delete_message' | translate"
+      [confirmLabel]="'promo.assignments.delete_confirm' | translate"
+      [danger]="true"
+      (confirmed)="executeDelete()"
+      (cancelled)="showDeleteModal.set(false)"
+    />
   `,
 })
 export class PromoPolicyAssignmentsPageComponent {
   private readonly promoApi = inject(PromoApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   readonly policyId = input.required<string>();
 
   readonly showAddForm = signal(false);
+  readonly showDeleteModal = signal(false);
+  readonly deleteTarget = signal<PromoPolicyAssignment | null>(null);
   newScopeType: PromoAssignmentScopeType = 'CONNECTION';
   newConnectionId: number | null = null;
 
-  readonly columnDefs = [
-    {
-      headerName: this.translate.instant('promo.assignments.col.connection'),
-      field: 'connectionName',
-      minWidth: 200,
-      sortable: true,
-    },
-    {
-      headerName: this.translate.instant('promo.assignments.col.scope_type'),
-      field: 'scopeType',
-      width: 140,
-      cellRenderer: (params: any) => {
-        const st = params.value as PromoAssignmentScopeType;
-        const label = this.translate.instant(`promo.assignments.scope.${st.toLowerCase()}`);
-        const color = SCOPE_TYPE_COLOR[st] ?? 'neutral';
-        const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          ${label}
-        </span>`;
+  readonly connectionsQuery = injectQuery(() => ({
+    queryKey: ['connections'],
+    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+  }));
+
+  readonly connections = computed(() => this.connectionsQuery.data() ?? []);
+
+  readonly columnDefs = computed(() => {
+    const cols: any[] = [
+      {
+        headerName: this.translate.instant('promo.assignments.col.connection'),
+        field: 'connectionName',
+        minWidth: 200,
+        sortable: true,
       },
-    },
-    {
-      headerName: this.translate.instant('promo.assignments.col.scope'),
-      field: 'scopeTargetName',
-      minWidth: 200,
-      valueFormatter: (params: any) =>
-        params.value ?? this.translate.instant('promo.assignments.whole_connection'),
-    },
-    {
-      headerName: '',
-      field: '_delete',
-      width: 60,
-      sortable: false,
-      cellRenderer: () => {
-        const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
-        return `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">${trashIcon}</button>`;
+      {
+        headerName: this.translate.instant('promo.assignments.col.scope_type'),
+        field: 'scopeType',
+        width: 140,
+        cellRenderer: (params: any) => {
+          const st = params.value as PromoAssignmentScopeType;
+          const label = this.translate.instant(`promo.assignments.scope.${st.toLowerCase()}`);
+          const color = SCOPE_TYPE_COLOR[st] ?? 'neutral';
+          const cssVar = `var(--status-${color})`;
+          return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                    style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+            ${label}
+          </span>`;
+        },
       },
-      onCellClicked: (params: any) => {
-        const target = params.event?.target as HTMLElement;
-        if (target?.closest('[data-action="delete"]') && params.data) {
-          this.deleteMutation.mutate(params.data.id);
-        }
+      {
+        headerName: this.translate.instant('promo.assignments.col.scope'),
+        field: 'scopeTargetName',
+        minWidth: 200,
+        valueFormatter: (params: any) =>
+          params.value ?? this.translate.instant('promo.assignments.whole_connection'),
       },
-    },
-  ];
+    ];
+    if (this.rbac.canWritePromo()) {
+      cols.push({
+        headerName: '',
+        field: '_delete',
+        width: 60,
+        sortable: false,
+        cellRenderer: () => {
+          const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+          return `<button class="action-btn" data-action="delete" title="${this.translate.instant('actions.delete')}">${trashIcon}</button>`;
+        },
+        onCellClicked: (params: any) => {
+          const target = params.event?.target as HTMLElement;
+          if (target?.closest('[data-action="delete"]') && params.data) {
+            this.deleteTarget.set(params.data);
+            this.showDeleteModal.set(true);
+          }
+        },
+      });
+    }
+    return cols;
+  });
 
   readonly assignmentsQuery = injectQuery(() => ({
     queryKey: ['promo-assignments', this.wsStore.currentWorkspaceId(), this.policyId()],
@@ -247,10 +281,15 @@ export class PromoPolicyAssignmentsPageComponent {
         ),
       ),
     onSuccess: () => {
+      this.showDeleteModal.set(false);
+      this.deleteTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['promo-assignments'] });
       this.toast.success(this.translate.instant('promo.assignments.toast.delete_success'));
     },
-    onError: () => this.toast.error(this.translate.instant('promo.assignments.toast.delete_error')),
+    onError: () => {
+      this.showDeleteModal.set(false);
+      this.toast.error(this.translate.instant('promo.assignments.toast.delete_error'));
+    },
   }));
 
   readonly getRowId = (params: any) => String(params.data.id);
@@ -262,6 +301,13 @@ export class PromoPolicyAssignmentsPageComponent {
       scopeType: this.newScopeType,
     };
     this.createMutation.mutate(req);
+  }
+
+  executeDelete(): void {
+    const target = this.deleteTarget();
+    if (target) {
+      this.deleteMutation.mutate(target.id);
+    }
   }
 
   navigateBack(): void {

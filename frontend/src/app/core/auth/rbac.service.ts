@@ -32,6 +32,18 @@ const SIMULATION_RESET_ROLES = new Set<WorkspaceRole>([
   'PRICING_MANAGER', 'ADMIN', 'OWNER',
 ]);
 
+const PROMO_WRITE_ROLES = new Set<WorkspaceRole>([
+  'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
+const PROMO_APPROVE_ROLES = new Set<WorkspaceRole>([
+  'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
+const PROMO_OPERATE_ROLES = new Set<WorkspaceRole>([
+  'OPERATOR', 'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
 @Injectable({ providedIn: 'root' })
 export class RbacService {
   private readonly auth = inject(AuthService);
@@ -71,6 +83,18 @@ export class RbacService {
 
   readonly canResetSimulation = computed(
     () => hasRole(this.currentRole(), SIMULATION_RESET_ROLES),
+  );
+
+  readonly canWritePromo = computed(
+    () => hasRole(this.currentRole(), PROMO_WRITE_ROLES),
+  );
+
+  readonly canApprovePromo = computed(
+    () => hasRole(this.currentRole(), PROMO_APPROVE_ROLES),
+  );
+
+  readonly canOperatePromo = computed(
+    () => hasRole(this.currentRole(), PROMO_OPERATE_ROLES),
   );
 }
 

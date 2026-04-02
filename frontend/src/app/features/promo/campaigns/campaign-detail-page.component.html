@@ -106,6 +106,27 @@
     />
   </div>
 
+  <!-- Bulk actions bar -->
+  @if (pendingApprovalIds().length > 0 && !isCampaignFrozenOrEnded() && rbac.canApprovePromo()) {
+    <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] px-4 py-2">
+      <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+        {{ pendingApprovalIds().length }} {{ 'promo.decisions.kpi.pending_review' | translate }}
+      </span>
+      <button
+        (click)="bulkApproveAll()"
+        class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-success)] px-3 py-1 text-[length:var(--text-sm)] font-medium text-white transition-colors hover:opacity-90"
+      >
+        {{ 'promo.detail.action.bulk_approve' | translate }}
+      </button>
+      <button
+        (click)="bulkRejectAll()"
+        class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-3 py-1 text-[length:var(--text-sm)] font-medium text-white transition-colors hover:opacity-90"
+      >
+        {{ 'promo.detail.action.bulk_reject' | translate }}
+      </button>
+    </div>
+  }
+
   <!-- Grid -->
   <div class="flex-1 px-4 py-2">
     @if (productsQuery.isError()) {
@@ -137,3 +158,75 @@
     }
   </div>
 </div>
+
+<!-- Reject popup -->
+@if (showRejectPopup()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="w-96 rounded-[var(--radius-lg)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]">
+      <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ 'promo.detail.popup.reject_title' | translate }}</h3>
+      <textarea
+        class="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        rows="3"
+        [placeholder]="'promo.detail.popup.reject_reason' | translate"
+        [value]="rejectReason()"
+        (input)="rejectReason.set($any($event.target).value)"
+      ></textarea>
+      <div class="mt-4 flex justify-end gap-2">
+        <button (click)="showRejectPopup.set(false)" class="cursor-pointer rounded-[var(--radius-md)] px-4 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitReject()" [disabled]="!rejectReason()" class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50">
+          {{ 'promo.detail.action.reject' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Cancel popup -->
+@if (showCancelPopup()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="w-96 rounded-[var(--radius-lg)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]">
+      <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ 'promo.detail.popup.cancel_title' | translate }}</h3>
+      <textarea
+        class="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        rows="3"
+        [placeholder]="'promo.detail.popup.cancel_reason' | translate"
+        [value]="cancelReason()"
+        (input)="cancelReason.set($any($event.target).value)"
+      ></textarea>
+      <div class="mt-4 flex justify-end gap-2">
+        <button (click)="showCancelPopup.set(false)" class="cursor-pointer rounded-[var(--radius-md)] px-4 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitCancel()" [disabled]="!cancelReason()" class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-warning)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50">
+          {{ 'promo.detail.action.cancel' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Deactivate popup -->
+@if (showDeactivatePopup()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="w-96 rounded-[var(--radius-lg)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]">
+      <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ 'promo.detail.popup.deactivate_title' | translate }}</h3>
+      <textarea
+        class="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        rows="3"
+        [placeholder]="'promo.detail.popup.deactivate_reason' | translate"
+        [value]="deactivateReason()"
+        (input)="deactivateReason.set($any($event.target).value)"
+      ></textarea>
+      <div class="mt-4 flex justify-end gap-2">
+        <button (click)="showDeactivatePopup.set(false)" class="cursor-pointer rounded-[var(--radius-md)] px-4 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitDeactivate()" class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:opacity-90">
+          {{ 'promo.detail.action.deactivate' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

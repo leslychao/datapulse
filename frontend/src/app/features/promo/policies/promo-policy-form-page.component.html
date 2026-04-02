@@ -22,7 +22,7 @@
     </div>
   } @else {
     <div class="flex-1 overflow-auto p-6">
-      <form [formGroup]="form" (ngSubmit)="submit()" class="mx-auto max-w-2xl space-y-8">
+      <form [formGroup]="form" (ngSubmit)="submit()" (input)="onFormChange()" class="mx-auto max-w-2xl space-y-8">
 
         <!-- Section 1: Basic -->
         <section>
@@ -97,7 +97,13 @@
                        bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
                        text-[var(--text-primary)] outline-none transition-colors
                        focus:border-[var(--accent-primary)]"
+                [class.border-[var(--status-error)]]="form.controls.minMarginPct.invalid && form.controls.minMarginPct.touched"
               />
+              @if (form.controls.minMarginPct.invalid && form.controls.minMarginPct.touched) {
+                <p class="mt-1 text-[length:var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'promo.form.validation_min_margin' | translate }}
+                </p>
+              }
             </div>
 
             <div>
@@ -113,7 +119,13 @@
                        bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
                        text-[var(--text-primary)] outline-none transition-colors
                        focus:border-[var(--accent-primary)]"
+                [class.border-[var(--status-error)]]="form.controls.minStockDaysOfCover.invalid && form.controls.minStockDaysOfCover.touched"
               />
+              @if (form.controls.minStockDaysOfCover.invalid && form.controls.minStockDaysOfCover.touched) {
+                <p class="mt-1 text-[length:var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'promo.form.validation_min_stock' | translate }}
+                </p>
+              }
             </div>
 
             <div>
@@ -129,29 +141,86 @@
                        bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
                        text-[var(--text-primary)] outline-none transition-colors
                        focus:border-[var(--accent-primary)]"
+                [class.border-[var(--status-error)]]="form.controls.maxPromoDiscountPct.invalid && form.controls.maxPromoDiscountPct.touched"
+              />
+              @if (form.controls.maxPromoDiscountPct.invalid && form.controls.maxPromoDiscountPct.touched) {
+                <p class="mt-1 text-[length:var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'promo.form.validation_max_discount' | translate }}
+                </p>
+              }
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Category filters -->
+        <section>
+          <h3 class="mb-4 text-sm font-semibold text-[var(--text-primary)]">
+            {{ 'promo.form.section_categories' | translate }}
+          </h3>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="mb-1 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ 'promo.form.auto_participate_categories' | translate }}
+              </label>
+              <input
+                formControlName="autoParticipateCategories"
+                type="text"
+                [placeholder]="'promo.form.categories_placeholder' | translate"
+                class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)]
+                       bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
+                       text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)]
+                       focus:border-[var(--accent-primary)]"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                {{ 'promo.form.auto_decline_categories' | translate }}
+              </label>
+              <input
+                formControlName="autoDeclineCategories"
+                type="text"
+                [placeholder]="'promo.form.categories_placeholder' | translate"
+                class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)]
+                       bg-[var(--bg-primary)] px-3 font-mono text-[length:var(--text-sm)]
+                       text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)]
+                       focus:border-[var(--accent-primary)]"
               />
             </div>
           </div>
         </section>
 
-        <!-- Sticky footer -->
-        <div class="flex items-center gap-3 border-t border-[var(--border-default)] pt-4">
-          <button
-            type="button"
-            (click)="navigateBack()"
-            class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-          >
-            {{ 'common.cancel' | translate }}
-          </button>
-          <button
-            type="submit"
-            [disabled]="form.invalid || saving()"
-            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {{ 'common.save' | translate }}
-          </button>
-        </div>
       </form>
+    </div>
+
+    <!-- Sticky footer -->
+    <div class="sticky bottom-0 flex items-center gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-3">
+      <button
+        type="button"
+        (click)="navigateBack()"
+        class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+      >
+        {{ 'common.cancel' | translate }}
+      </button>
+      <button
+        type="button"
+        (click)="submit()"
+        [disabled]="saving()"
+        class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {{ 'common.save' | translate }}
+      </button>
+      @if (!isEditMode()) {
+        <button
+          type="button"
+          (click)="submitAndActivate()"
+          [disabled]="saving()"
+          class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--status-success)] px-4 py-2 text-sm font-medium text-[var(--status-success)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-success)_8%,transparent)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {{ 'promo.form.save_and_activate' | translate }}
+        </button>
+      }
     </div>
   }
 </div>

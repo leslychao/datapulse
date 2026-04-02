@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 
 import { PromoLayoutComponent } from './promo-layout.component';
+import { promoUnsavedChangesGuard } from './unsaved-changes.guard';
+import { promoWriteGuard } from './promo-write.guard';
 
 const routes: Routes = [
   {
@@ -38,14 +40,18 @@ const routes: Routes = [
           import('./policies/promo-policy-form-page.component').then(
             (m) => m.PromoPolicyFormPageComponent,
           ),
+        canActivate: [promoWriteGuard],
+        canDeactivate: [promoUnsavedChangesGuard],
         data: { breadcrumb: 'Новая политика' },
       },
       {
-        path: 'policies/:policyId',
+        path: 'policies/:policyId/edit',
         loadComponent: () =>
           import('./policies/promo-policy-form-page.component').then(
             (m) => m.PromoPolicyFormPageComponent,
           ),
+        canActivate: [promoWriteGuard],
+        canDeactivate: [promoUnsavedChangesGuard],
         data: { breadcrumb: 'Редактирование' },
       },
       {

@@ -82,8 +82,8 @@ export class WebSocketService {
     this.reconnectAttempts = 0;
   }
 
-  subscribeTo<T>(destination: string, callback: (msg: T) => void): void {
-    if (!this.rxStomp) return;
+  subscribeTo<T>(destination: string, callback: (msg: T) => void): Subscription | null {
+    if (!this.rxStomp) return null;
     const sub = this.rxStomp.watch(destination).subscribe((message) => {
       this.zone.run(() => {
         const body = JSON.parse(message.body) as T;
@@ -91,6 +91,14 @@ export class WebSocketService {
       });
     });
     this.subscriptions.push(sub);
+    return sub;
+  }
+
+  subscribeToAction(workspaceId: number, actionId: number): Subscription | null {
+    const destination = `/topic/workspace/${workspaceId}/actions/${actionId}`;
+    return this.subscribeTo(destination, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['action', actionId] });
+    });
   }
 
   subscribeToWorkspace(workspaceId: number): void {
@@ -117,6 +125,7 @@ export class WebSocketService {
 
     this.subscribeTo(`${ws}/actions`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['actions'] });
+      this.queryClient.invalidateQueries({ queryKey: ['action'] });
     });
 
     this.subscribeTo(`${ws}/grid-updates`, () => {
@@ -152,14 +161,23 @@ export class WebSocketService {
 
     this.subscribeTo(`${ws}/promo-actions`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-actions'] });
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign'] });
     });
 
     this.subscribeTo(`${ws}/promo-evaluations`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-evaluations'] });
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
     });
 
     this.subscribeTo(`${ws}/promo-decisions`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-decisions'] });
+      this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
+    });
+
+    this.subscribeTo(`${ws}/promo-policies`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
+      this.queryClient.invalidateQueries({ queryKey: ['promo-policy'] });
     });
 
     this.subscribeTo(`${ws}/queues`, () => {

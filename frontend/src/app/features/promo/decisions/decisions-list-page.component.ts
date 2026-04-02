@@ -5,16 +5,16 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, startWith } from 'rxjs';
 
 import { CheckCircle, XCircle, Clock } from 'lucide-angular';
 
 import { PromoApiService } from '@core/api/promo-api.service';
-import { formatDateTime } from '@shared/utils/format.utils';
+import { formatDateTime, formatMoney } from '@shared/utils/format.utils';
 import {
-  ParticipationMode,
   PromoDecisionFilter,
   PromoDecisionType,
 } from '@core/models';
@@ -23,29 +23,35 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
-
-const DECISION_LABEL: Record<PromoDecisionType, string> = {
-  PARTICIPATE: 'Участвовать',
-  DECLINE: 'Отказать',
-  PENDING_REVIEW: 'На проверку',
-};
+import { DetailPanelService } from '@shared/services/detail-panel.service';
 
 const DECISION_COLOR: Record<PromoDecisionType, string> = {
   PARTICIPATE: 'success',
   DECLINE: 'neutral',
+  DEACTIVATE: 'error',
   PENDING_REVIEW: 'warning',
 };
 
-const MODE_LABEL: Record<ParticipationMode, string> = {
-  RECOMMENDATION: 'Рекомендация',
-  SEMI_AUTO: 'Полу-авто',
-  FULL_AUTO: 'Полный авто',
-  SIMULATED: 'Симуляция',
-};
+const DECISION_TYPES: PromoDecisionType[] = [
+  'PARTICIPATE', 'DECLINE', 'DEACTIVATE', 'PENDING_REVIEW',
+];
 
-const MP_BADGE: Record<string, { bg: string; label: string }> = {
-  WB: { bg: '#CB11AB', label: 'WB' },
-  OZON: { bg: '#005BFF', label: 'Ozon' },
+const MP_BADGE: Record<
+  string,
+  { bg: string; color: string; borderColor: string; label: string }
+> = {
+  WB: {
+    bg: 'var(--mp-wb-bg)',
+    color: 'var(--mp-wb)',
+    borderColor: 'var(--mp-wb)',
+    label: 'WB',
+  },
+  OZON: {
+    bg: 'var(--mp-ozon-bg)',
+    color: 'var(--mp-ozon)',
+    borderColor: 'var(--mp-ozon)',
+    label: 'Ozon',
+  },
 };
 
 @Component({
@@ -118,13 +124,14 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="decisionsQuery.isPending()"
             [pagination]="true"
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
+            (rowClicked)="onRowClicked($event)"
           />
         }
       </div>
@@ -134,6 +141,8 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
 export class DecisionsListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly translate = inject(TranslateService);
+  private readonly detailPanel = inject(DetailPanelService);
 
   protected readonly CheckCircleIcon = CheckCircle;
   protected readonly XCircleIcon = XCircle;
@@ -142,128 +151,136 @@ export class DecisionsListPageComponent {
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
 
+  private readonly translationChange = toSignal(
+    this.translate.onTranslationChange.pipe(startWith(null)),
+  );
+
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'decisionType',
-      label: 'grid.filter.decision',
+      label: 'promo.decisions.col.decision',
       type: 'multi-select',
-      options: (Object.keys(DECISION_LABEL) as PromoDecisionType[]).map((value) => ({
+      options: DECISION_TYPES.map((value) => ({
         value,
         label: `promo.decision_type.${value}`,
       })),
     },
-    { key: 'search', label: 'promo.filter.search_product', type: 'text' },
+    {
+      key: 'decidedBy',
+      label: 'promo.decisions.filter.decided_by',
+      type: 'single-select',
+      options: [
+        { value: 'all', label: 'promo.decisions.filter.decided_by_all' },
+        { value: 'auto', label: 'promo.decisions.filter.decided_by_auto' },
+        { value: 'manual', label: 'promo.decisions.filter.decided_by_manual' },
+      ],
+    },
+    { key: 'search', label: 'promo.decisions.filter.search', type: 'text' },
   ];
 
-  readonly columnDefs = [
-    {
-      headerName: 'Кампания',
-      field: 'campaignName',
-      minWidth: 200,
-      sortable: true,
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        return `<span class="font-medium" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+  readonly columnDefs = computed(() => {
+    this.translationChange();
+    return [
+      {
+        headerName: this.translate.instant('promo.decisions.col.campaign'),
+        field: 'campaignName',
+        minWidth: 200,
+        sortable: true,
+        cellRenderer: (params: any) => {
+          if (!params.data) return '';
+          return `<span class="font-medium" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+        },
       },
-    },
-    {
-      headerName: 'Маркетплейс',
-      field: 'sourcePlatform',
-      width: 100,
-      cellClass: 'text-center',
-      cellRenderer: (params: any) => {
-        const mp = MP_BADGE[params.value];
-        if (!mp) return params.value ?? '';
-        return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white" style="background:${mp.bg}">${mp.label}</span>`;
+      {
+        headerName: this.translate.instant('promo.decisions.col.marketplace'),
+        field: 'sourcePlatform',
+        width: 100,
+        cellClass: 'text-center',
+        cellRenderer: (params: any) => {
+          const mp = MP_BADGE[params.value];
+          if (!mp) return params.value ?? '';
+          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold" style="background-color:${mp.bg};color:${mp.color};border:1px solid ${mp.borderColor}">${mp.label}</span>`;
+        },
       },
-    },
-    {
-      headerName: 'Товар',
-      field: 'productName',
-      minWidth: 230,
-      sortable: true,
-    },
-    {
-      headerName: 'SKU',
-      field: 'marketplaceSku',
-      width: 120,
-      cellClass: 'font-mono',
-    },
-    {
-      headerName: 'Решение',
-      field: 'decisionType',
-      width: 130,
-      sortable: true,
-      cellRenderer: (params: any) => {
-        const val = params.value as PromoDecisionType;
-        if (!val) return '';
-        const label = DECISION_LABEL[val] ?? val;
-        const color = DECISION_COLOR[val] ?? 'neutral';
-        const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-          ${label}
-        </span>`;
+      {
+        headerName: this.translate.instant('promo.decisions.col.product'),
+        field: 'productName',
+        minWidth: 230,
+        sortable: true,
       },
-    },
-    {
-      headerName: 'Режим',
-      field: 'participationMode',
-      width: 120,
-      valueFormatter: (params: any) => MODE_LABEL[params.value as ParticipationMode] ?? params.value,
-    },
-    {
-      headerName: 'Целевая промо-цена',
-      field: 'targetPromoPrice',
-      width: 130,
-      cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) =>
-        params.value != null ? params.value.toLocaleString('ru-RU') + ' ₽' : '—',
-    },
-    {
-      headerName: 'Объяснение',
-      field: 'explanationSummary',
-      minWidth: 250,
-      cellRenderer: (params: any) => {
-        if (!params.value) return '—';
-        const truncated = params.value.length > 80
-          ? params.value.substring(0, 80) + '…'
-          : params.value;
-        return `<span title="${params.value}" class="text-[var(--text-secondary)]">${truncated}</span>`;
+      {
+        headerName: this.translate.instant('promo.decisions.col.sku'),
+        field: 'marketplaceSku',
+        width: 120,
+        cellClass: 'font-mono',
       },
-    },
-    {
-      headerName: 'Принято',
-      field: 'decidedByName',
-      width: 130,
-      valueFormatter: (params: any) => params.value ?? 'Автоматически',
-    },
-    {
-      headerName: 'Политика',
-      field: 'policyName',
-      width: 160,
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        const name = params.data.policyName ?? '';
-        const ver = params.data.policyVersion != null ? ` v${params.data.policyVersion}` : '';
-        return `${name}${ver}`;
+      {
+        headerName: this.translate.instant('promo.decisions.col.decision'),
+        field: 'decisionType',
+        width: 130,
+        sortable: true,
+        cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.decision_type', DECISION_COLOR),
       },
-    },
-    {
-      headerName: 'Дата',
-      field: 'createdAt',
-      width: 130,
-      sortable: true,
-      sort: 'desc' as const,
-      valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
-    },
-  ];
+      {
+        headerName: this.translate.instant('promo.decisions.col.mode'),
+        field: 'participationMode',
+        width: 120,
+        valueFormatter: (params: any) =>
+          this.translate.instant(`promo.participation_mode.${params.value}`),
+      },
+      {
+        headerName: this.translate.instant('promo.decisions.col.target_price'),
+        field: 'targetPromoPrice',
+        width: 130,
+        cellClass: 'font-mono text-right',
+        valueFormatter: (params: any) => formatMoney(params.value),
+      },
+      {
+        headerName: this.translate.instant('promo.decisions.col.explanation'),
+        field: 'explanationSummary',
+        minWidth: 250,
+        cellRenderer: (params: any) => {
+          if (!params.value) return '—';
+          const truncated = params.value.length > 80
+            ? params.value.substring(0, 80) + '…'
+            : params.value;
+          return `<span title="${params.value}" class="text-[var(--text-secondary)]">${truncated}</span>`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.decisions.col.decided_by'),
+        field: 'decidedByName',
+        width: 130,
+        valueFormatter: (params: any) =>
+          params.value ?? this.translate.instant('promo.decisions.col.decided_by_auto'),
+      },
+      {
+        headerName: this.translate.instant('promo.decisions.col.policy'),
+        field: 'policyName',
+        width: 160,
+        cellRenderer: (params: any) => {
+          if (!params.data) return '';
+          const name = params.data.policyName ?? '';
+          const ver = params.data.policyVersion != null ? ` v${params.data.policyVersion}` : '';
+          return `${name}${ver}`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.decisions.col.date'),
+        field: 'createdAt',
+        width: 130,
+        sortable: true,
+        sort: 'desc' as const,
+        valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
+      },
+    ];
+  });
 
   private readonly filter = computed<PromoDecisionFilter>(() => {
     const vals = this.filterValues();
     const f: PromoDecisionFilter = {};
     if (vals['decisionType']?.length) f.decisionType = vals['decisionType'];
+    if (vals['decidedBy'] && vals['decidedBy'] !== 'all') f.decidedBy = vals['decidedBy'];
     if (vals['search']) f.search = vals['search'];
     return f;
   });
@@ -313,4 +330,27 @@ export class DecisionsListPageComponent {
     this.currentPage.set(0);
   }
 
+  onRowClicked(row: any): void {
+    this.detailPanel.open({
+      type: 'promo-decision',
+      title: row.productName,
+      data: row,
+    });
+  }
+
+  private badgeCell(
+    value: string | null,
+    i18nPrefix: string,
+    colors: Record<string, string>,
+  ): string {
+    if (!value) return '';
+    const label = this.translate.instant(`${i18nPrefix}.${value}`);
+    const color = colors[value] ?? 'neutral';
+    const cssVar = `var(--status-${color})`;
+    return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+              style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+      <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
+      ${label}
+    </span>`;
+  }
 }

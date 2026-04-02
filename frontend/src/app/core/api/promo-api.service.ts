@@ -7,6 +7,8 @@ import {
   CreatePromoAssignmentRequest,
   CreatePromoPolicyRequest,
   Page,
+  PromoAction,
+  PromoActionFilter,
   PromoCampaign,
   PromoCampaignFilter,
   PromoCampaignSummary,
@@ -362,6 +364,68 @@ export class PromoApiService {
   ): Observable<void> {
     return this.http.post<void>(
       `${this.base}/workspaces/${workspaceId}/promo/actions/${actionId}/cancel`,
+      body,
+    );
+  }
+
+  deactivate(
+    workspaceId: number,
+    promoProductId: number,
+    body: { reason?: string },
+  ): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/promo/products/${promoProductId}/deactivate`,
+      body,
+    );
+  }
+
+  listActions(
+    workspaceId: number,
+    filter: PromoActionFilter,
+    page: number,
+    size: number,
+    sort = 'createdAt,desc',
+  ): Observable<Page<PromoAction>> {
+    let params = new HttpParams()
+      .set('page', page)
+      .set('size', size)
+      .set('sort', sort);
+
+    if (filter.campaignId) {
+      params = params.set('campaignId', filter.campaignId);
+    }
+    if (filter.status?.length) {
+      params = params.set('status', filter.status.join(','));
+    }
+    if (filter.actionType?.length) {
+      params = params.set('actionType', filter.actionType.join(','));
+    }
+    if (filter.search) {
+      params = params.set('search', filter.search);
+    }
+
+    return this.http.get<Page<PromoAction>>(
+      `${this.base}/workspaces/${workspaceId}/promo/actions`,
+      { params },
+    );
+  }
+
+  bulkApprove(
+    workspaceId: number,
+    body: { actionIds: number[] },
+  ): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/promo/actions/bulk-approve`,
+      body,
+    );
+  }
+
+  bulkReject(
+    workspaceId: number,
+    body: { actionIds: number[]; reason: string },
+  ): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/workspaces/${workspaceId}/promo/actions/bulk-reject`,
       body,
     );
   }

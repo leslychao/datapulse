@@ -188,6 +188,11 @@ export class CampaignListPageComponent {
       ],
     },
     {
+      key: 'promoType',
+      label: 'promo.campaigns.filter.type',
+      type: 'text',
+    },
+    {
       key: 'search',
       label: 'promo.campaigns.filter.search',
       type: 'text',
@@ -266,6 +271,20 @@ export class CampaignListPageComponent {
         valueFormatter: (params: any) => this.formatNumber(params.value),
       },
       {
+        headerName: this.translate.instant('promo.campaigns.col.freeze_at'),
+        field: 'freezeAt',
+        width: 110,
+        sortable: true,
+        valueFormatter: (params: any) =>
+          params.value ? this.formatDate(params.value) : '—',
+      },
+      {
+        headerName: this.translate.instant('promo.campaigns.col.connection'),
+        field: 'connectionName',
+        width: 140,
+        sortable: true,
+      },
+      {
         headerName: this.translate.instant('promo.campaigns.col.status'),
         field: 'status',
         width: 130,
@@ -290,6 +309,7 @@ export class CampaignListPageComponent {
     const f: PromoCampaignFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
     if (vals['marketplaceType']?.length) f.marketplaceType = vals['marketplaceType'];
+    if (vals['promoType']) f.promoType = vals['promoType'];
     if (vals['search']) f.search = vals['search'];
     return f;
   });
@@ -335,7 +355,12 @@ export class CampaignListPageComponent {
       .reduce((sum, c) => sum + c.participatedCount, 0);
   });
 
-  readonly kpiPendingDecisions = computed(() => 0);
+  readonly kpiPendingDecisions = computed(() => {
+    const data = this.rows();
+    return data
+      .filter((c) => c.status === 'ACTIVE' || c.status === 'UPCOMING')
+      .reduce((sum, c) => sum + (c.pendingReviewCount ?? 0), 0);
+  });
 
   readonly hasActiveFilters = computed(() =>
     Object.values(this.filterValues()).some(

@@ -5,9 +5,10 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, startWith } from 'rxjs';
 
 import { ClipboardList, TrendingUp, AlertCircle, TrendingDown } from 'lucide-angular';
 
@@ -19,14 +20,7 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
-
-const EVAL_LABEL: Record<EvaluationResult, string> = {
-  PROFITABLE: 'Прибыльно',
-  MARGINAL: 'Пограничный',
-  UNPROFITABLE: 'Убыточно',
-  INSUFFICIENT_STOCK: 'Мало остатков',
-  INSUFFICIENT_DATA: 'Нет данных',
-};
+import { DetailPanelService } from '@shared/services/detail-panel.service';
 
 const EVAL_COLOR: Record<EvaluationResult, string> = {
   PROFITABLE: 'success',
@@ -36,9 +30,26 @@ const EVAL_COLOR: Record<EvaluationResult, string> = {
   INSUFFICIENT_DATA: 'warning',
 };
 
-const MP_BADGE: Record<string, { bg: string; label: string }> = {
-  WB: { bg: '#CB11AB', label: 'WB' },
-  OZON: { bg: '#005BFF', label: 'Ozon' },
+const EVAL_VALUES: EvaluationResult[] = [
+  'PROFITABLE', 'MARGINAL', 'UNPROFITABLE', 'INSUFFICIENT_STOCK', 'INSUFFICIENT_DATA',
+];
+
+const MP_BADGE: Record<
+  string,
+  { bg: string; color: string; borderColor: string; label: string }
+> = {
+  WB: {
+    bg: 'var(--mp-wb-bg)',
+    color: 'var(--mp-wb)',
+    borderColor: 'var(--mp-wb)',
+    label: 'WB',
+  },
+  OZON: {
+    bg: 'var(--mp-ozon-bg)',
+    color: 'var(--mp-ozon)',
+    borderColor: 'var(--mp-ozon)',
+    label: 'Ozon',
+  },
 };
 
 @Component({
@@ -118,13 +129,14 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="evalsQuery.isPending()"
             [pagination]="true"
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
+            (rowClicked)="onRowClicked($event)"
           />
         }
       </div>
@@ -134,6 +146,8 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
 export class EvaluationsListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly translate = inject(TranslateService);
+  private readonly detailPanel = inject(DetailPanelService);
 
   protected readonly ClipboardListIcon = ClipboardList;
   protected readonly TrendingUpIcon = TrendingUp;
@@ -143,152 +157,195 @@ export class EvaluationsListPageComponent {
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
 
+  private readonly translationChange = toSignal(
+    this.translate.onTranslationChange.pipe(startWith(null)),
+  );
+
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'evaluationResult',
-      label: 'promo.filter.evaluation_result',
+      label: 'promo.evaluations.filter.result',
       type: 'multi-select',
-      options: (Object.keys(EVAL_LABEL) as EvaluationResult[]).map((value) => ({
+      options: EVAL_VALUES.map((value) => ({
         value,
         label: `promo.evaluation_result.${value}`,
       })),
     },
     {
       key: 'marketplaceType',
-      label: 'grid.filter.marketplace',
+      label: 'promo.evaluations.filter.marketplace',
       type: 'multi-select',
       options: [
         { value: 'WB', label: 'onboarding.connection.wb' },
         { value: 'OZON', label: 'onboarding.connection.ozon' },
       ],
     },
-    { key: 'search', label: 'promo.filter.search_product', type: 'text' },
+    { key: 'search', label: 'promo.evaluations.filter.search', type: 'text' },
   ];
 
-  readonly columnDefs = [
-    {
-      headerName: 'Кампания',
-      field: 'campaignName',
-      minWidth: 200,
-      sortable: true,
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        return `<span class="font-medium" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+  readonly columnDefs = computed(() => {
+    this.translationChange();
+    return [
+      {
+        headerName: this.translate.instant('promo.evaluations.col.campaign'),
+        field: 'campaignName',
+        minWidth: 200,
+        sortable: true,
+        cellRenderer: (params: any) => {
+          if (!params.data) return '';
+          return `<span class="font-medium" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+        },
       },
-    },
-    {
-      headerName: 'Маркетплейс',
-      field: 'sourcePlatform',
-      width: 100,
-      cellClass: 'text-center',
-      cellRenderer: (params: any) => {
-        const mp = MP_BADGE[params.value];
-        if (!mp) return params.value ?? '';
-        return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white" style="background:${mp.bg}">${mp.label}</span>`;
+      {
+        headerName: this.translate.instant('promo.evaluations.col.marketplace'),
+        field: 'sourcePlatform',
+        width: 100,
+        cellClass: 'text-center',
+        cellRenderer: (params: any) => {
+          const mp = MP_BADGE[params.value];
+          if (!mp) return params.value ?? '';
+          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold" style="background-color:${mp.bg};color:${mp.color};border:1px solid ${mp.borderColor}">${mp.label}</span>`;
+        },
       },
-    },
-    {
-      headerName: 'Товар',
-      field: 'productName',
-      minWidth: 230,
-      sortable: true,
-    },
-    {
-      headerName: 'SKU',
-      field: 'marketplaceSku',
-      width: 120,
-      cellClass: 'font-mono',
-    },
-    {
-      headerName: 'Промо-цена',
-      field: 'promoPrice',
-      width: 100,
-      cellClass: 'font-mono text-right',
-      sortable: true,
-      valueFormatter: (params: any) => formatMoney(params.value),
-    },
-    {
-      headerName: 'Обычная цена',
-      field: 'regularPrice',
-      width: 110,
-      cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => formatMoney(params.value),
-    },
-    {
-      headerName: 'Скидка',
-      field: 'discountPct',
-      width: 80,
-      cellClass: 'font-mono text-right',
-      sortable: true,
-      valueFormatter: (params: any) =>
-        params.value != null ? `${params.value.toFixed(1).replace('.', ',')}%` : '—',
-    },
-    {
-      headerName: 'Маржа (промо)',
-      field: 'marginAtPromoPrice',
-      width: 110,
-      cellClass: 'font-mono text-right',
-      sortable: true,
-      cellRenderer: (params: any) => {
-        if (params.value == null) return '—';
-        const color = params.value >= 0 ? 'var(--finance-positive)' : 'var(--finance-negative)';
-        return `<span style="color:${color}">${params.value.toFixed(1).replace('.', ',')}%</span>`;
+      {
+        headerName: this.translate.instant('promo.evaluations.col.product'),
+        field: 'productName',
+        minWidth: 230,
+        sortable: true,
       },
-    },
-    {
-      headerName: 'Дельта маржи',
-      field: 'marginDeltaPct',
-      width: 100,
-      cellClass: 'font-mono text-right',
-      cellRenderer: (params: any) => {
-        if (params.value == null) return '—';
-        const arrow = params.value < 0 ? '↓' : '↑';
-        const color = params.value < 0 ? 'var(--finance-negative)' : 'var(--finance-positive)';
-        return `<span style="color:${color}">${arrow} ${Math.abs(params.value).toFixed(1).replace('.', ',')} п.п.</span>`;
+      {
+        headerName: this.translate.instant('promo.evaluations.col.sku'),
+        field: 'marketplaceSku',
+        width: 120,
+        cellClass: 'font-mono',
       },
-    },
-    {
-      headerName: 'Остатки',
-      field: 'stockAvailable',
-      width: 80,
-      cellClass: 'font-mono text-right',
-      sortable: true,
-      valueFormatter: (params: any) =>
-        params.value != null ? params.value.toLocaleString('ru-RU') : '—',
-    },
-    {
-      headerName: 'Результат',
-      field: 'evaluationResult',
-      width: 140,
-      sortable: true,
-      cellRenderer: (params: any) => {
-        const val = params.value as EvaluationResult;
-        if (!val) return '';
-        const label = EVAL_LABEL[val] ?? val;
-        const color = EVAL_COLOR[val] ?? 'neutral';
-        const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-          ${label}
-        </span>`;
+      {
+        headerName: this.translate.instant('promo.evaluations.col.promo_price'),
+        field: 'promoPrice',
+        width: 100,
+        cellClass: 'font-mono text-right',
+        sortable: true,
+        valueFormatter: (params: any) => formatMoney(params.value),
       },
-    },
-    {
-      headerName: 'Политика',
-      field: 'policyName',
-      width: 150,
-      sortable: true,
-    },
-    {
-      headerName: 'Оценено',
-      field: 'evaluatedAt',
-      width: 130,
-      sortable: true,
-      sort: 'desc' as const,
-      valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
-    },
-  ];
+      {
+        headerName: this.translate.instant('promo.evaluations.col.regular_price'),
+        field: 'regularPrice',
+        width: 110,
+        cellClass: 'font-mono text-right',
+        valueFormatter: (params: any) => formatMoney(params.value),
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.discount'),
+        field: 'discountPct',
+        width: 80,
+        cellClass: 'font-mono text-right',
+        sortable: true,
+        valueFormatter: (params: any) =>
+          params.value != null ? `${params.value.toFixed(1).replace('.', ',')}%` : '—',
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.cogs'),
+        field: 'cogs',
+        width: 100,
+        cellClass: 'font-mono text-right',
+        valueFormatter: (params: any) => formatMoney(params.value),
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.margin_promo'),
+        field: 'marginAtPromoPrice',
+        width: 110,
+        cellClass: 'font-mono text-right',
+        sortable: true,
+        cellRenderer: (params: any) => {
+          if (params.value == null) return '—';
+          const color = params.value >= 0 ? 'var(--finance-positive)' : 'var(--finance-negative)';
+          return `<span style="color:${color}">${params.value.toFixed(1).replace('.', ',')}%</span>`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.margin_regular'),
+        field: 'marginAtRegularPrice',
+        width: 110,
+        cellClass: 'font-mono text-right',
+        cellRenderer: (params: any) => {
+          if (params.value == null) return '—';
+          const color = params.value >= 0 ? 'var(--finance-positive)' : 'var(--finance-negative)';
+          return `<span style="color:${color}">${params.value.toFixed(1).replace('.', ',')}%</span>`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.margin_delta'),
+        field: 'marginDeltaPct',
+        width: 100,
+        cellClass: 'font-mono text-right',
+        cellRenderer: (params: any) => {
+          if (params.value == null) return '—';
+          const arrow = params.value < 0 ? '↓' : '↑';
+          const color = params.value < 0 ? 'var(--finance-negative)' : 'var(--finance-positive)';
+          return `<span style="color:${color}">${arrow} ${Math.abs(params.value).toFixed(1).replace('.', ',')} п.п.</span>`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.stock'),
+        field: 'stockAvailable',
+        width: 80,
+        cellClass: 'font-mono text-right',
+        sortable: true,
+        valueFormatter: (params: any) =>
+          params.value != null ? params.value.toLocaleString('ru-RU') : '—',
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.stock_days'),
+        field: 'stockDaysOfCover',
+        width: 90,
+        cellClass: 'font-mono text-right',
+        valueFormatter: (params: any) =>
+          params.value != null ? `${params.value}` : '—',
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.stock_sufficient'),
+        field: 'stockSufficient',
+        width: 100,
+        cellRenderer: (params: any) => {
+          if (params.value == null) return '—';
+          const ok = params.value === true;
+          const cssVar = ok ? 'var(--status-success)' : 'var(--status-warning)';
+          const label = ok ? '✓' : '✗';
+          return `<span style="color:${cssVar}" class="font-bold">${label}</span>`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.result'),
+        field: 'evaluationResult',
+        width: 140,
+        sortable: true,
+        cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.evaluation_result', EVAL_COLOR),
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.skip_reason'),
+        field: 'skipReason',
+        width: 150,
+        cellRenderer: (params: any) => {
+          if (!params.value) return '';
+          return `<span class="text-[var(--text-secondary)]" title="${params.value}">${params.value}</span>`;
+        },
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.policy'),
+        field: 'policyName',
+        width: 150,
+        sortable: true,
+      },
+      {
+        headerName: this.translate.instant('promo.evaluations.col.evaluated_at'),
+        field: 'evaluatedAt',
+        width: 130,
+        sortable: true,
+        sort: 'desc' as const,
+        valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
+      },
+    ];
+  });
 
   private readonly filter = computed<PromoEvaluationFilter>(() => {
     const vals = this.filterValues();
@@ -347,4 +404,27 @@ export class EvaluationsListPageComponent {
     this.currentPage.set(0);
   }
 
+  onRowClicked(row: any): void {
+    this.detailPanel.open({
+      type: 'promo-evaluation',
+      title: row.productName,
+      data: row,
+    });
+  }
+
+  private badgeCell(
+    value: string | null,
+    i18nPrefix: string,
+    colors: Record<string, string>,
+  ): string {
+    if (!value) return '';
+    const label = this.translate.instant(`${i18nPrefix}.${value}`);
+    const color = colors[value] ?? 'neutral';
+    const cssVar = `var(--status-${color})`;
+    return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+              style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+      <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
+      ${label}
+    </span>`;
+  }
 }

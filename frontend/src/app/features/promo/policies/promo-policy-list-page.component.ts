@@ -24,6 +24,7 @@ import {
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { RbacService } from '@core/auth/rbac.service';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -61,12 +62,14 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
         <h2 class="text-base font-semibold text-[var(--text-primary)]">
           {{ 'promo.policies.title' | translate }}
         </h2>
-        <button
-          (click)="navigateToCreate()"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
-        >
-          {{ 'promo.policies.create' | translate }}
-        </button>
+        @if (rbac.canWritePromo()) {
+          <button
+            (click)="navigateToCreate()"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+          >
+            {{ 'promo.policies.create' | translate }}
+          </button>
+        }
       </div>
 
       <div class="px-6 pt-2">
@@ -96,7 +99,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="policiesQuery.isPending()"
             [pagination]="true"
@@ -127,6 +130,7 @@ export class PromoPolicyListPageComponent {
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
+  protected readonly rbac = inject(RbacService);
 
   readonly filterValues = signal<Record<string, any>>({
     status: ['DRAFT', 'ACTIVE', 'PAUSED'],
@@ -158,7 +162,7 @@ export class PromoPolicyListPageComponent {
     { key: 'search', label: 'promo.filter.search', type: 'text' },
   ];
 
-  readonly columnDefs = [
+  readonly columnDefs = computed(() => [
     {
       headerName: this.translate.instant('promo.policies.col.name'),
       field: 'name',
@@ -241,6 +245,12 @@ export class PromoPolicyListPageComponent {
       sortable: true,
     },
     {
+      headerName: this.translate.instant('promo.policies.col.created_by'),
+      field: 'createdByName',
+      width: 130,
+      sortable: true,
+    },
+    {
       headerName: this.translate.instant('promo.policies.col.updated_at'),
       field: 'updatedAt',
       width: 130,
@@ -294,7 +304,7 @@ export class PromoPolicyListPageComponent {
         }
       },
     },
-  ];
+  ].filter((col: any) => col.field !== '_actions' || this.rbac.canWritePromo()));
 
   private readonly filter = computed<PromoPolicyFilter>(() => {
     const vals = this.filterValues();
@@ -398,7 +408,7 @@ export class PromoPolicyListPageComponent {
 
   private navigateToEdit(policyId: number): void {
     const wsId = this.wsStore.currentWorkspaceId();
-    this.router.navigate(['/workspace', wsId, 'promo', 'policies', policyId]);
+    this.router.navigate(['/workspace', wsId, 'promo', 'policies', policyId, 'edit']);
   }
 
   private formatRelativeTime(iso: string | null): string {

@@ -33,6 +33,7 @@ export interface PromoCampaignSummary {
   freezeAt: string | null;
   eligibleCount: number;
   participatedCount: number;
+  pendingReviewCount: number;
   status: CampaignStatus;
   connectionId: number;
   connectionName: string;
@@ -198,6 +199,31 @@ export interface PromoEvaluationFilter {
   evaluationResult?: EvaluationResult[];
   from?: string;
   to?: string;
+  search?: string;
+}
+
+export type PromoActionType = 'ACTIVATE' | 'DEACTIVATE';
+
+export interface PromoAction {
+  id: number;
+  campaignId: number;
+  campaignName: string;
+  productName: string;
+  marketplaceSku: string;
+  actionType: PromoActionType;
+  status: PromoActionStatus;
+  executionMode: 'LIVE' | 'SIMULATED';
+  targetPromoPrice: number | null;
+  attemptCount: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromoActionFilter {
+  campaignId?: number;
+  status?: PromoActionStatus[];
+  actionType?: PromoActionType[];
   search?: string;
 }
 
