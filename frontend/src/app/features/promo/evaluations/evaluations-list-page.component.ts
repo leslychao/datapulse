@@ -131,20 +131,23 @@ export class EvaluationsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'evaluationResult',
-      label: 'Результат',
+      label: 'promo.filter.evaluation_result',
       type: 'multi-select',
-      options: Object.entries(EVAL_LABEL).map(([value, label]) => ({ value, label })),
+      options: (Object.keys(EVAL_LABEL) as EvaluationResult[]).map((value) => ({
+        value,
+        label: `promo.evaluation_result.${value}`,
+      })),
     },
     {
       key: 'marketplaceType',
-      label: 'Маркетплейс',
+      label: 'grid.filter.marketplace',
       type: 'multi-select',
       options: [
-        { value: 'WB', label: 'Wildberries' },
-        { value: 'OZON', label: 'Ozon' },
+        { value: 'WB', label: 'onboarding.connection.wb' },
+        { value: 'OZON', label: 'onboarding.connection.ozon' },
       ],
     },
-    { key: 'search', label: 'Поиск по товару', type: 'text' },
+    { key: 'search', label: 'promo.filter.search_product', type: 'text' },
   ];
 
   readonly columnDefs = [

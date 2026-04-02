@@ -40,6 +40,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule],
+  host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto' },
   templateUrl: './policy-form-page.component.html',
 })
 export class PolicyFormPageComponent {

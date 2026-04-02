@@ -12,6 +12,8 @@ public interface PromoPolicyRepository extends JpaRepository<PromoPolicyEntity, 
 
     List<PromoPolicyEntity> findAllByWorkspaceIdAndStatus(Long workspaceId, PromoPolicyStatus status);
 
+    List<PromoPolicyEntity> findAllByWorkspaceIdAndStatusIn(Long workspaceId, List<PromoPolicyStatus> statuses);
+
     Optional<PromoPolicyEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     boolean existsByWorkspaceIdAndStatus(Long workspaceId, PromoPolicyStatus status);

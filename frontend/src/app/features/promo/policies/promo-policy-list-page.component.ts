@@ -36,19 +36,13 @@ const POLICY_STATUS_COLOR: Record<PromoPolicyStatus, string> = {
   ARCHIVED: 'neutral',
 };
 
-const POLICY_STATUS_LABEL: Record<PromoPolicyStatus, string> = {
-  DRAFT: 'Черновик',
-  ACTIVE: 'Активна',
-  PAUSED: 'Приостановлена',
-  ARCHIVED: 'Архив',
-};
+const POLICY_STATUSES: PromoPolicyStatus[] = [
+  'DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED',
+];
 
-const MODE_LABEL: Record<ParticipationMode, string> = {
-  RECOMMENDATION: 'Рекомендация',
-  SEMI_AUTO: 'Полу-авто',
-  FULL_AUTO: 'Полный авто',
-  SIMULATED: 'Симуляция',
-};
+const PARTICIPATION_MODES: ParticipationMode[] = [
+  'RECOMMENDATION', 'SEMI_AUTO', 'FULL_AUTO', 'SIMULATED',
+];
 
 @Component({
   selector: 'dp-promo-policy-list-page',
@@ -145,22 +139,28 @@ export class PromoPolicyListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: 'Статус',
+      label: 'grid.filter.status',
       type: 'multi-select',
-      options: Object.entries(POLICY_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+      options: POLICY_STATUSES.map(value => ({
+        value,
+        label: `promo.policy_status.${value}`,
+      })),
     },
     {
       key: 'participationMode',
-      label: 'Режим',
+      label: 'promo.filter.mode',
       type: 'multi-select',
-      options: Object.entries(MODE_LABEL).map(([value, label]) => ({ value, label })),
+      options: PARTICIPATION_MODES.map(value => ({
+        value,
+        label: `promo.participation_mode.${value}`,
+      })),
     },
-    { key: 'search', label: 'Поиск', type: 'text' },
+    { key: 'search', label: 'promo.filter.search', type: 'text' },
   ];
 
   readonly columnDefs = [
     {
-      headerName: 'Название',
+      headerName: this.translate.instant('promo.policies.col.name'),
       field: 'name',
       minWidth: 250,
       pinned: 'left' as const,
@@ -171,13 +171,13 @@ export class PromoPolicyListPageComponent {
       },
     },
     {
-      headerName: 'Статус',
+      headerName: this.translate.instant('promo.policies.col.status'),
       field: 'status',
       width: 130,
       sortable: true,
       cellRenderer: (params: any) => {
         const st = params.value as PromoPolicyStatus;
-        const label = POLICY_STATUS_LABEL[st] ?? st;
+        const label = this.translate.instant(`promo.policy_status.${st}`);
         const color = POLICY_STATUS_COLOR[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -188,14 +188,15 @@ export class PromoPolicyListPageComponent {
       },
     },
     {
-      headerName: 'Режим участия',
+      headerName: this.translate.instant('promo.policies.col.mode'),
       field: 'participationMode',
       width: 140,
       sortable: true,
-      valueFormatter: (params: any) => MODE_LABEL[params.value as ParticipationMode] ?? params.value,
+      valueFormatter: (params: any) =>
+        this.translate.instant(`promo.participation_mode.${params.value}`),
     },
     {
-      headerName: 'Мин. маржа',
+      headerName: this.translate.instant('promo.policies.col.min_margin'),
       field: 'minMarginPct',
       width: 100,
       cellClass: 'font-mono text-right',
@@ -204,16 +205,18 @@ export class PromoPolicyListPageComponent {
         params.value != null ? `${params.value.toFixed(1).replace('.', ',')}%` : '—',
     },
     {
-      headerName: 'Мин. остатков (дн.)',
+      headerName: this.translate.instant('promo.policies.col.min_stock_days'),
       field: 'minStockDaysOfCover',
       width: 120,
       cellClass: 'font-mono text-right',
       sortable: true,
       valueFormatter: (params: any) =>
-        params.value != null ? `${params.value} д.` : '—',
+        params.value != null
+          ? `${params.value} ${this.translate.instant('common.days_short')}`
+          : '—',
     },
     {
-      headerName: 'Макс. скидка',
+      headerName: this.translate.instant('promo.policies.col.max_discount'),
       field: 'maxPromoDiscountPct',
       width: 110,
       cellClass: 'font-mono text-right',
@@ -222,7 +225,7 @@ export class PromoPolicyListPageComponent {
         params.value != null ? `${params.value.toFixed(1).replace('.', ',')}%` : '—',
     },
     {
-      headerName: 'Версия',
+      headerName: this.translate.instant('promo.policies.col.version'),
       field: 'version',
       width: 70,
       cellClass: 'font-mono text-center',
@@ -231,14 +234,14 @@ export class PromoPolicyListPageComponent {
         params.value != null ? `v${params.value}` : '',
     },
     {
-      headerName: 'Назначений',
+      headerName: this.translate.instant('promo.policies.col.assignments'),
       field: 'assignmentCount',
       width: 100,
       cellClass: 'font-mono text-center',
       sortable: true,
     },
     {
-      headerName: 'Обновлено',
+      headerName: this.translate.instant('promo.policies.col.updated_at'),
       field: 'updatedAt',
       width: 130,
       sortable: true,
@@ -328,7 +331,7 @@ export class PromoPolicyListPageComponent {
 
   readonly archiveMessage = computed(() => {
     const p = this.archiveTarget();
-    return p ? `Архивировать промо-политику «${p.name}»? Назначения будут деактивированы.` : '';
+    return p ? this.translate.instant('promo.policies.archive_message', { name: p.name }) : '';
   });
 
   private readonly activateMutation = injectMutation(() => ({
@@ -336,9 +339,9 @@ export class PromoPolicyListPageComponent {
       lastValueFrom(this.promoApi.activatePolicy(this.wsStore.currentWorkspaceId()!, policyId)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
-      this.toast.success('Промо-политика активирована');
+      this.toast.success(this.translate.instant('promo.policies.toast.activate_success'));
     },
-    onError: () => this.toast.error('Не удалось активировать промо-политику'),
+    onError: () => this.toast.error(this.translate.instant('promo.policies.toast.activate_error')),
   }));
 
   private readonly pauseMutation = injectMutation(() => ({
@@ -346,9 +349,9 @@ export class PromoPolicyListPageComponent {
       lastValueFrom(this.promoApi.pausePolicy(this.wsStore.currentWorkspaceId()!, policyId)),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
-      this.toast.success('Промо-политика приостановлена');
+      this.toast.success(this.translate.instant('promo.policies.toast.pause_success'));
     },
-    onError: () => this.toast.error('Не удалось приостановить промо-политику'),
+    onError: () => this.toast.error(this.translate.instant('promo.policies.toast.pause_error')),
   }));
 
   private readonly archiveMutation = injectMutation(() => ({
@@ -358,11 +361,11 @@ export class PromoPolicyListPageComponent {
       this.showArchiveModal.set(false);
       this.archiveTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['promo-policies'] });
-      this.toast.success('Промо-политика архивирована');
+      this.toast.success(this.translate.instant('promo.policies.toast.archive_success'));
     },
     onError: () => {
       this.showArchiveModal.set(false);
-      this.toast.error('Не удалось архивировать промо-политику');
+      this.toast.error(this.translate.instant('promo.policies.toast.archive_error'));
     },
   }));
 

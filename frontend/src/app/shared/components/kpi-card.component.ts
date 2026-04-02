@@ -16,8 +16,7 @@ const TREND_COLORS: Record<TrendDirection, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
-      class="flex min-w-[160px] flex-col justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]"
-      style="height: 80px; padding: var(--space-3)"
+      class="flex min-w-[160px] flex-col justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3.5 py-2.5"
     >
       @if (loading()) {
         <div class="dp-shimmer h-3 w-20 rounded-[var(--radius-sm)]"></div>

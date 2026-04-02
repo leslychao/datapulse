@@ -1,30 +1,32 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 @Component({
   selector: 'dp-pagination-bar',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex items-center justify-between border-t border-[var(--border-default)] px-4 py-2 text-[var(--text-sm)] text-[var(--text-secondary)]">
-      <span>Показано {{ from() }}–{{ to() }} из {{ formattedTotal() }}</span>
+    <div class="flex items-center justify-between border-t border-[var(--border-default)] px-4 py-2 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+      <span>{{ 'pagination.showing' | translate:{ from: from(), to: to(), total: formattedTotal() } }}</span>
 
       <div class="flex items-center gap-2">
         <button
           [disabled]="!canPrev()"
           (click)="goToPrev()"
           class="cursor-pointer rounded-[var(--radius-sm)] p-1 transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label="Предыдущая страница"
+          [attr.aria-label]="'pagination.prev' | translate"
         >
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
-        <span class="text-[var(--text-sm)]">{{ currentPage() + 1 }} / {{ totalPages() }}</span>
+        <span class="text-[length:var(--text-sm)]">{{ currentPage() + 1 }} / {{ totalPages() }}</span>
         <button
           [disabled]="!canNext()"
           (click)="goToNext()"
           class="cursor-pointer rounded-[var(--radius-sm)] p-1 transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label="Следующая страница"
+          [attr.aria-label]="'pagination.next' | translate"
         >
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m9 18 6-6-6-6" />
@@ -33,10 +35,10 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
       </div>
 
       <div class="flex items-center gap-2">
-        <span>Строк на странице</span>
+        <span>{{ 'pagination.rows_per_page' | translate }}</span>
         <select
           (change)="onPageSizeChange($event)"
-          class="h-7 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-[var(--text-sm)] text-[var(--text-primary)]"
+          class="h-7 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-[length:var(--text-sm)] text-[var(--text-primary)]"
         >
           @for (size of pageSizeOptions(); track size) {
             <option [value]="size" [selected]="size === pageSize()">{{ size }}</option>

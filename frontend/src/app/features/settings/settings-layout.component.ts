@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { TranslateService } from '@ngx-translate/core';
+import { TranslatePipe } from '@ngx-translate/core';
 import {
   LucideAngularModule,
   LucideIconData,
@@ -24,12 +24,12 @@ interface NavItem {
   selector: 'dp-settings-layout',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, TranslatePipe],
   template: `
     <div class="flex h-full">
       <nav class="w-52 shrink-0 border-r border-[var(--border-default)] bg-[var(--bg-secondary)] py-3 px-2">
         <h2 class="px-3 pb-2 text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-          {{ t('settings.nav.title') }}
+          {{ 'settings.nav.title' | translate }}
         </h2>
         @for (item of navItems; track item.path) {
           <a [routerLink]="item.path"
@@ -37,7 +37,7 @@ interface NavItem {
              class="nav-item flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-1.5 text-[var(--text-sm)]
                     text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors duration-[var(--transition-fast)]">
             <lucide-icon [img]="item.icon" [size]="16" />
-            {{ t(item.labelKey) }}
+            {{ item.labelKey | translate }}
           </a>
         }
       </nav>
@@ -56,7 +56,6 @@ interface NavItem {
   `],
 })
 export class SettingsLayoutComponent {
-  private readonly translate = inject(TranslateService);
 
   readonly navItems: NavItem[] = [
     { path: 'general', labelKey: 'settings.nav.general', icon: Settings },
@@ -68,8 +67,4 @@ export class SettingsLayoutComponent {
     { path: 'alert-rules', labelKey: 'settings.nav.alert_rules', icon: BellRing },
     { path: 'audit', labelKey: 'settings.nav.audit_log', icon: ScrollText },
   ];
-
-  t(key: string): string {
-    return this.translate.instant(key);
-  }
 }

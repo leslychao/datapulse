@@ -52,9 +52,10 @@ public class PromoPolicyService {
     }
 
     @Transactional(readOnly = true)
-    public List<PromoPolicySummaryResponse> listPolicies(long workspaceId, PromoPolicyStatus status) {
-        List<PromoPolicyEntity> entities = status != null
-                ? policyRepository.findAllByWorkspaceIdAndStatus(workspaceId, status)
+    public List<PromoPolicySummaryResponse> listPolicies(long workspaceId,
+                                                         List<PromoPolicyStatus> statuses) {
+        List<PromoPolicyEntity> entities = (statuses != null && !statuses.isEmpty())
+                ? policyRepository.findAllByWorkspaceIdAndStatusIn(workspaceId, statuses)
                 : policyRepository.findAllByWorkspaceId(workspaceId);
 
         return policyMapper.toSummaries(entities);

@@ -1,5 +1,8 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+
+import { TranslateService } from '@ngx-translate/core';
+
 import { ViewportGuardComponent } from './shared/layout/viewport-guard.component';
 
 @Component({
@@ -13,4 +16,8 @@ import { ViewportGuardComponent } from './shared/layout/viewport-guard.component
     </dp-viewport-guard>
   `,
 })
-export class AppComponent {}
+export class AppComponent {
+  constructor() {
+    inject(TranslateService).use('ru');
+  }
+}

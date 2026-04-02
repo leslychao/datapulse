@@ -133,11 +133,14 @@ export class DecisionsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'decisionType',
-      label: 'Решение',
+      label: 'grid.filter.decision',
       type: 'multi-select',
-      options: Object.entries(DECISION_LABEL).map(([value, label]) => ({ value, label })),
+      options: (Object.keys(DECISION_LABEL) as PromoDecisionType[]).map((value) => ({
+        value,
+        label: `promo.decision_type.${value}`,
+      })),
     },
-    { key: 'search', label: 'Поиск по товару', type: 'text' },
+    { key: 'search', label: 'promo.filter.search_product', type: 'text' },
   ];
 
   readonly columnDefs = [

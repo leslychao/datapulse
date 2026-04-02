@@ -31,12 +31,7 @@ const POLICY_STATUS_COLOR: Record<string, string> = {
   ARCHIVED: 'neutral',
 };
 
-const POLICY_STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Черновик',
-  ACTIVE: 'Активна',
-  PAUSED: 'Приостановлена',
-  ARCHIVED: 'В архиве',
-};
+const POLICY_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'] as const;
 
 const EXECUTION_MODE_COLOR: Record<string, string> = {
   RECOMMENDATION: 'info',
@@ -45,17 +40,9 @@ const EXECUTION_MODE_COLOR: Record<string, string> = {
   SIMULATED: 'neutral',
 };
 
-const EXECUTION_MODE_LABEL: Record<string, string> = {
-  RECOMMENDATION: 'Рекомендация',
-  SEMI_AUTO: 'Полуавто',
-  FULL_AUTO: 'Автомат',
-  SIMULATED: 'Симуляция',
-};
+const EXECUTION_MODES = ['RECOMMENDATION', 'SEMI_AUTO', 'FULL_AUTO', 'SIMULATED'] as const;
 
-const STRATEGY_TYPE_LABEL: Record<string, string> = {
-  TARGET_MARGIN: 'Целевая маржа',
-  PRICE_CORRIDOR: 'Ценовой коридор',
-};
+const STRATEGY_TYPES = ['TARGET_MARGIN', 'PRICE_CORRIDOR'] as const;
 
 @Component({
   selector: 'dp-policy-list-page',
@@ -68,6 +55,7 @@ const STRATEGY_TYPE_LABEL: Record<string, string> = {
     EmptyStateComponent,
     ConfirmationModalComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
@@ -179,36 +167,36 @@ export class PolicyListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: 'Статус',
+      label: this.translate.instant('pricing.policies.filter.status'),
       type: 'multi-select',
-      options: Object.entries(POLICY_STATUS_LABEL).map(([value, label]) => ({
+      options: POLICY_STATUSES.map(value => ({
         value,
-        label,
+        label: this.translate.instant('pricing.policies.status.' + value),
       })),
     },
     {
       key: 'strategyType',
-      label: 'Стратегия',
+      label: this.translate.instant('pricing.policies.filter.strategy_type'),
       type: 'select',
-      options: Object.entries(STRATEGY_TYPE_LABEL).map(([value, label]) => ({
+      options: STRATEGY_TYPES.map(value => ({
         value,
-        label,
+        label: this.translate.instant('pricing.policies.strategy.' + value),
       })),
     },
     {
       key: 'executionMode',
-      label: 'Режим',
+      label: this.translate.instant('pricing.policies.filter.execution_mode'),
       type: 'multi-select',
-      options: Object.entries(EXECUTION_MODE_LABEL).map(([value, label]) => ({
+      options: EXECUTION_MODES.map(value => ({
         value,
-        label,
+        label: this.translate.instant('pricing.policies.mode.' + value),
       })),
     },
   ];
 
   readonly columnDefs = [
     {
-      headerName: 'Название',
+      headerName: this.translate.instant('pricing.policies.col.name'),
       field: 'name',
       minWidth: 250,
       pinned: 'left' as const,
@@ -219,24 +207,24 @@ export class PolicyListPageComponent {
       },
     },
     {
-      headerName: 'Стратегия',
+      headerName: this.translate.instant('pricing.policies.col.strategy_type'),
       field: 'strategyType',
       width: 160,
       sortable: true,
       cellRenderer: (params: any) => {
         const val = params.value as string;
-        const label = STRATEGY_TYPE_LABEL[val] ?? val;
+        const label = this.translate.instant(`pricing.policies.strategy.${val}`);
         return `<span class="inline-flex items-center rounded-full bg-[var(--bg-tertiary)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">${label}</span>`;
       },
     },
     {
-      headerName: 'Режим',
+      headerName: this.translate.instant('pricing.policies.col.execution_mode'),
       field: 'executionMode',
       width: 130,
       sortable: true,
       cellRenderer: (params: any) => {
         const val = params.value as string;
-        const label = EXECUTION_MODE_LABEL[val] ?? val;
+        const label = this.translate.instant(`pricing.policies.mode.${val}`);
         const color = EXECUTION_MODE_COLOR[val] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -246,13 +234,13 @@ export class PolicyListPageComponent {
       },
     },
     {
-      headerName: 'Статус',
+      headerName: this.translate.instant('pricing.policies.col.status'),
       field: 'status',
       width: 150,
       sortable: true,
       cellRenderer: (params: any) => {
         const st = params.value as string;
-        const label = POLICY_STATUS_LABEL[st] ?? st;
+        const label = this.translate.instant(`pricing.policies.status.${st}`);
         const color = POLICY_STATUS_COLOR[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -263,14 +251,14 @@ export class PolicyListPageComponent {
       },
     },
     {
-      headerName: 'Приоритет',
+      headerName: this.translate.instant('pricing.policies.col.priority'),
       field: 'priority',
       width: 90,
       sortable: true,
       cellClass: 'font-mono text-center',
     },
     {
-      headerName: 'Версия',
+      headerName: this.translate.instant('pricing.policies.col.version'),
       field: 'version',
       width: 80,
       sortable: true,
@@ -279,14 +267,14 @@ export class PolicyListPageComponent {
         params.value != null ? `v${params.value}` : '',
     },
     {
-      headerName: 'Назначений',
+      headerName: this.translate.instant('pricing.policies.col.assignments_count'),
       field: 'assignmentsCount',
       width: 110,
       sortable: true,
       cellClass: 'font-mono text-center',
     },
     {
-      headerName: 'Создана',
+      headerName: this.translate.instant('pricing.policies.col.created_at'),
       field: 'createdAt',
       width: 120,
       sortable: true,
@@ -294,7 +282,7 @@ export class PolicyListPageComponent {
       valueFormatter: (params: any) => this.formatRelativeTime(params.value),
     },
     {
-      headerName: 'Обновлена',
+      headerName: this.translate.instant('pricing.policies.col.updated_at'),
       field: 'updatedAt',
       width: 120,
       sortable: true,
@@ -392,18 +380,22 @@ export class PolicyListPageComponent {
 
   readonly activateMessage = computed(() => {
     const p = this.activateTarget();
-    return p ? `Активировать политику «${p.name}»?` : '';
+    return p
+      ? this.translate.instant('pricing.policies.activate_message', { name: p.name })
+      : '';
   });
 
   readonly pauseMessage = computed(() => {
     const p = this.pauseTarget();
-    return p ? `Приостановить политику «${p.name}»?` : '';
+    return p
+      ? this.translate.instant('pricing.policies.pause_message', { name: p.name })
+      : '';
   });
 
   readonly archiveMessage = computed(() => {
     const p = this.archiveTarget();
     return p
-      ? `Архивировать политику «${p.name}»? Это действие нельзя отменить.`
+      ? this.translate.instant('pricing.policies.archive_message', { name: p.name })
       : '';
   });
 
@@ -419,11 +411,11 @@ export class PolicyListPageComponent {
       this.showActivateModal.set(false);
       this.activateTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['policies'] });
-      this.toast.success('Политика активирована');
+      this.toast.success(this.translate.instant('pricing.policies.activated'));
     },
     onError: () => {
       this.showActivateModal.set(false);
-      this.toast.error('Не удалось активировать политику');
+      this.toast.error(this.translate.instant('pricing.policies.activate_error'));
     },
   }));
 
@@ -439,11 +431,11 @@ export class PolicyListPageComponent {
       this.showPauseModal.set(false);
       this.pauseTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['policies'] });
-      this.toast.success('Политика приостановлена');
+      this.toast.success(this.translate.instant('pricing.policies.paused'));
     },
     onError: () => {
       this.showPauseModal.set(false);
-      this.toast.error('Не удалось приостановить политику');
+      this.toast.error(this.translate.instant('pricing.policies.pause_error'));
     },
   }));
 
@@ -459,11 +451,11 @@ export class PolicyListPageComponent {
       this.showArchiveModal.set(false);
       this.archiveTarget.set(null);
       this.queryClient.invalidateQueries({ queryKey: ['policies'] });
-      this.toast.success('Политика архивирована');
+      this.toast.success(this.translate.instant('pricing.policies.archived'));
     },
     onError: () => {
       this.showArchiveModal.set(false);
-      this.toast.error('Не удалось архивировать политику');
+      this.toast.error(this.translate.instant('pricing.policies.archive_error'));
     },
   }));
 

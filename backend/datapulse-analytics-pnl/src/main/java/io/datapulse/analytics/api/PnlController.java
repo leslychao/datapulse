@@ -24,9 +24,9 @@ public class PnlController {
 
     @GetMapping("/summary")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public List<PnlSummaryResponse> getSummary(
+    public PnlAggregatedSummaryResponse getSummary(
             @PathVariable("workspaceId") long workspaceId, PnlFilter filter) {
-        return pnlQueryService.getSummary(workspaceId, filter);
+        return pnlQueryService.getAggregatedSummary(workspaceId, filter);
     }
 
     @GetMapping("/by-product")

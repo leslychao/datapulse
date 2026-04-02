@@ -5,10 +5,11 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, startWith } from 'rxjs';
 
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatDateTime } from '@shared/utils/format.utils';
@@ -31,13 +32,9 @@ const CAMPAIGN_STATUS_COLOR: Record<CampaignStatus, string> = {
   CANCELLED: 'neutral',
 };
 
-const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
-  UPCOMING: 'Предстоящая',
-  ACTIVE: 'Активна',
-  FROZEN: 'Заморожена',
-  ENDED: 'Завершена',
-  CANCELLED: 'Отменена',
-};
+const CAMPAIGN_STATUSES: CampaignStatus[] = [
+  'UPCOMING', 'ACTIVE', 'FROZEN', 'ENDED', 'CANCELLED',
+];
 
 const MP_BADGE: Record<string, { bg: string; label: string }> = {
   WB: { bg: '#CB11AB', label: 'WB' },
@@ -113,7 +110,7 @@ const MP_BADGE: Record<string, { bg: string; label: string }> = {
           />
         } @else {
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="campaignsQuery.isPending()"
             [pagination]="true"
@@ -131,6 +128,7 @@ export class CampaignListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly translate = inject(TranslateService);
 
   readonly filterValues = signal<Record<string, any>>({
     status: ['UPCOMING', 'ACTIVE'],
@@ -138,116 +136,126 @@ export class CampaignListPageComponent {
   readonly currentPage = signal(0);
   readonly currentSort = signal('dateFrom,desc');
 
+  private readonly translationChange = toSignal(
+    this.translate.onTranslationChange.pipe(startWith(null)),
+  );
+
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: 'Статус',
+      label: 'promo.campaigns.filter.status',
       type: 'multi-select',
-      options: Object.entries(CAMPAIGN_STATUS_LABEL).map(([value, label]) => ({
+      options: CAMPAIGN_STATUSES.map((value) => ({
         value,
-        label,
+        label: `promo.campaigns.status.${value}`,
       })),
     },
     {
       key: 'marketplaceType',
-      label: 'Маркетплейс',
+      label: 'promo.campaigns.filter.marketplace',
       type: 'multi-select',
       options: [
-        { value: 'WB', label: 'Wildberries' },
-        { value: 'OZON', label: 'Ozon' },
+        { value: 'WB', label: 'onboarding.connection.wb' },
+        { value: 'OZON', label: 'onboarding.connection.ozon' },
       ],
     },
     {
       key: 'search',
-      label: 'Поиск по названию',
+      label: 'promo.campaigns.filter.search',
       type: 'text',
     },
   ];
 
-  readonly columnDefs = [
-    {
-      headerName: 'Название',
-      field: 'promoName',
-      minWidth: 250,
-      pinned: 'left' as const,
-      sortable: true,
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.data.promoName}</span>`;
+  readonly columnDefs = computed(() => {
+    this.translationChange();
+    return [
+      {
+        headerName: this.translate.instant('promo.campaigns.col.name'),
+        field: 'promoName',
+        minWidth: 250,
+        pinned: 'left' as const,
+        sortable: true,
+        cellRenderer: (params: any) => {
+          if (!params.data) return '';
+          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.data.promoName}</span>`;
+        },
       },
-    },
-    {
-      headerName: 'Маркетплейс',
-      field: 'sourcePlatform',
-      width: 100,
-      cellClass: 'text-center',
-      cellRenderer: (params: any) => {
-        const mp = MP_BADGE[params.value];
-        if (!mp) return params.value ?? '';
-        return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white" style="background:${mp.bg}">${mp.label}</span>`;
+      {
+        headerName: this.translate.instant('promo.campaigns.col.marketplace'),
+        field: 'sourcePlatform',
+        width: 100,
+        cellClass: 'text-center',
+        cellRenderer: (params: any) => {
+          const mp = MP_BADGE[params.value];
+          if (!mp) return params.value ?? '';
+          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold text-white" style="background:${mp.bg}">${mp.label}</span>`;
+        },
       },
-    },
-    {
-      headerName: 'Тип',
-      field: 'promoType',
-      width: 140,
-      sortable: true,
-    },
-    {
-      headerName: 'Механика',
-      field: 'mechanic',
-      width: 120,
-      sortable: true,
-    },
-    {
-      headerName: 'Начало',
-      field: 'dateFrom',
-      width: 110,
-      sortable: true,
-      sort: 'desc' as const,
-      valueFormatter: (params: any) => this.formatDate(params.value),
-    },
-    {
-      headerName: 'Окончание',
-      field: 'dateTo',
-      width: 110,
-      sortable: true,
-      valueFormatter: (params: any) => params.value ? this.formatDate(params.value) : 'Бессрочная',
-    },
-    {
-      headerName: 'Доступно',
-      field: 'eligibleCount',
-      width: 100,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => this.formatNumber(params.value),
-    },
-    {
-      headerName: 'Участвует',
-      field: 'participatedCount',
-      width: 100,
-      sortable: true,
-      cellClass: 'font-mono text-right',
-      valueFormatter: (params: any) => this.formatNumber(params.value),
-    },
-    {
-      headerName: 'Статус',
-      field: 'status',
-      width: 130,
-      sortable: true,
-      cellRenderer: (params: any) => {
-        const st = params.value as CampaignStatus;
-        const label = CAMPAIGN_STATUS_LABEL[st] ?? st;
-        const color = CAMPAIGN_STATUS_COLOR[st] ?? 'neutral';
-        const cssVar = `var(--status-${color})`;
-        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
-          <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
-          ${label}
-        </span>`;
+      {
+        headerName: this.translate.instant('promo.campaigns.col.type'),
+        field: 'promoType',
+        width: 140,
+        sortable: true,
       },
-    },
-  ];
+      {
+        headerName: this.translate.instant('promo.campaigns.col.mechanic'),
+        field: 'mechanic',
+        width: 120,
+        sortable: true,
+      },
+      {
+        headerName: this.translate.instant('promo.campaigns.col.date_from'),
+        field: 'dateFrom',
+        width: 110,
+        sortable: true,
+        sort: 'desc' as const,
+        valueFormatter: (params: any) => this.formatDate(params.value),
+      },
+      {
+        headerName: this.translate.instant('promo.campaigns.col.date_to'),
+        field: 'dateTo',
+        width: 110,
+        sortable: true,
+        valueFormatter: (params: any) =>
+          params.value
+            ? this.formatDate(params.value)
+            : this.translate.instant('promo.campaigns.indefinite'),
+      },
+      {
+        headerName: this.translate.instant('promo.campaigns.col.eligible'),
+        field: 'eligibleCount',
+        width: 100,
+        sortable: true,
+        cellClass: 'font-mono text-right',
+        valueFormatter: (params: any) => this.formatNumber(params.value),
+      },
+      {
+        headerName: this.translate.instant('promo.campaigns.col.participating'),
+        field: 'participatedCount',
+        width: 100,
+        sortable: true,
+        cellClass: 'font-mono text-right',
+        valueFormatter: (params: any) => this.formatNumber(params.value),
+      },
+      {
+        headerName: this.translate.instant('promo.campaigns.col.status'),
+        field: 'status',
+        width: 130,
+        sortable: true,
+        cellRenderer: (params: any) => {
+          const st = params.value as CampaignStatus;
+          const label = this.translate.instant(`promo.campaigns.status.${st}`);
+          const color = CAMPAIGN_STATUS_COLOR[st] ?? 'neutral';
+          const cssVar = `var(--status-${color})`;
+          return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                    style="background-color: color-mix(in srgb, ${cssVar} 12%, transparent); color: ${cssVar}">
+            <span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: ${cssVar}"></span>
+            ${label}
+          </span>`;
+        },
+      },
+    ];
+  });
 
   private readonly filter = computed<PromoCampaignFilter>(() => {
     const vals = this.filterValues();

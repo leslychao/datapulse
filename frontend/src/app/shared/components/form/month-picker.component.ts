@@ -54,7 +54,7 @@ export class MonthPickerComponent {
 
   protected readonly displayLabel = computed(() => {
     const [year, month] = this.value().split('-').map(Number);
-    const monthKey = `month.${month}`;
+    const monthKey = `month.${month - 1}`;
     return `${this.translate.instant(monthKey)} ${year}`;
   });
 

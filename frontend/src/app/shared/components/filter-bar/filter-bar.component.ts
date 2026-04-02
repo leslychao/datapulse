@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 export interface FilterConfig {
   key: string;
@@ -19,6 +20,7 @@ export interface FilterConfig {
 @Component({
   selector: 'dp-filter-bar',
   standalone: true,
+  imports: [TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-wrap items-center gap-2">
@@ -27,7 +29,7 @@ export interface FilterConfig {
           <input
             type="text"
             [value]="getValue(filter.key)"
-            [placeholder]="filter.label"
+            [placeholder]="filter.label | translate"
             (input)="onValueChange(filter.key, $event)"
             class="h-8 w-40 rounded-[var(--radius-md)] border border-[var(--border-default)]
                    bg-[var(--bg-primary)] px-3 text-[length:var(--text-sm)]
@@ -46,7 +48,7 @@ export interface FilterConfig {
                    text-[var(--text-primary)] outline-none transition-colors
                    focus:border-[var(--accent-primary)]"
           >
-            <option value="">{{ filter.label }}</option>
+            <option value="">{{ filter.label | translate }}</option>
             @for (opt of filter.options ?? []; track opt.value) {
               <option [value]="opt.value">{{ opt.label }}</option>
             }
@@ -64,7 +66,7 @@ export interface FilterConfig {
                 ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)] text-[var(--accent-primary)]'
                 : 'border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]'"
             >
-              {{ filter.label }}
+              {{ filter.label | translate }}
               @if (selectedCount(filter.key) > 0) {
                 <span
                   class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full
@@ -105,7 +107,7 @@ export interface FilterConfig {
                       (change)="onCheckboxChange(filter.key, opt.value, $event)"
                       class="h-3.5 w-3.5 accent-[var(--accent-primary)]"
                     />
-                    {{ opt.label }}
+                    {{ opt.label | translate }}
                   </label>
                 }
 
@@ -118,7 +120,7 @@ export interface FilterConfig {
                              text-[var(--text-tertiary)] transition-colors
                              hover:text-[var(--text-primary)]"
                     >
-                      Сбросить
+                      {{ 'filter_bar.reset' | translate }}
                     </button>
                   </div>
                 }
@@ -160,7 +162,7 @@ export interface FilterConfig {
                  text-[var(--text-tertiary)] transition-colors
                  hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
         >
-          Сбросить все
+          {{ 'filter_bar.reset_all' | translate }}
         </button>
       }
     </div>

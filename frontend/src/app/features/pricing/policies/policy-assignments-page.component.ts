@@ -45,6 +45,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
     EmptyStateComponent,
     ConfirmationModalComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->

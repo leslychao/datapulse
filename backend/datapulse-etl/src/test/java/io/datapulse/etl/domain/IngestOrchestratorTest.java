@@ -22,6 +22,7 @@ import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.platform.etl.PostIngestMaterializationHook;
 import io.datapulse.platform.outbox.OutboxService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +45,7 @@ class IngestOrchestratorTest {
   @Mock private IngestResultReporter resultReporter;
   @Mock private StaleCampaignDetector staleCampaignDetector;
   @Mock private TransactionTemplate transactionTemplate;
+  @Mock private PostIngestMaterializationHook postIngestMaterialization;
 
   private IngestOrchestrator orchestrator;
 
@@ -57,7 +59,7 @@ class IngestOrchestratorTest {
     orchestrator = new IngestOrchestrator(
         jobExecutionRepository, credentialResolver, checkpointManager,
         dagExecutor, outboxService, resultReporter, staleCampaignDetector,
-        ingestProperties, transactionTemplate);
+        ingestProperties, transactionTemplate, postIngestMaterialization);
 
     lenient().doAnswer(inv -> {
       Consumer<TransactionStatus> action = inv.getArgument(0);
@@ -89,6 +91,7 @@ class IngestOrchestratorTest {
       verify(dagExecutor).execute(any());
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED);
+      verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
 
     @Test
@@ -101,6 +104,7 @@ class IngestOrchestratorTest {
       orchestrator.processSync(1L);
 
       verify(dagExecutor, never()).execute(any());
+      verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
     }
 
     @Test
@@ -126,6 +130,7 @@ class IngestOrchestratorTest {
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.FAILED);
       verify(jobExecutionRepository).updateErrorDetails(eq(1L), anyString());
+      verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
     }
 
     @Test
@@ -148,6 +153,7 @@ class IngestOrchestratorTest {
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.RETRY_SCHEDULED);
       verify(outboxService).createEvent(any(), any(), anyLong(), any());
+      verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
     }
 
     @Test
@@ -170,6 +176,7 @@ class IngestOrchestratorTest {
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED_WITH_ERRORS);
       verify(outboxService, never()).createEvent(any(), any(), anyLong(), any());
+      verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
   }
 
@@ -197,6 +204,7 @@ class IngestOrchestratorTest {
 
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED);
+      verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
 
     @Test
@@ -213,6 +221,7 @@ class IngestOrchestratorTest {
 
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.COMPLETED_WITH_ERRORS);
+      verify(postIngestMaterialization).afterSuccessfulIngest(1L);
     }
 
     @Test
@@ -227,6 +236,7 @@ class IngestOrchestratorTest {
 
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.FAILED);
+      verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
     }
   }
 

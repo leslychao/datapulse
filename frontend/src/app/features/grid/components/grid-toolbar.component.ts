@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
 import { LucideAngularModule, Download, Columns3, AlignJustify, Pencil, X } from 'lucide-angular';
-import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { GridStore } from '@shared/stores/grid.store';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
@@ -65,7 +65,6 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
 })
 export class GridToolbarComponent {
   protected readonly gridStore = inject(GridStore);
-  private readonly translate = inject(TranslateService);
 
   protected readonly DownloadIcon = Download;
   protected readonly ColumnsIcon = Columns3;
@@ -78,7 +77,7 @@ export class GridToolbarComponent {
   protected readonly gridFilters: FilterConfig[] = [
     {
       key: 'marketplaceType',
-      label: this.translate.instant('grid.filter.marketplace'),
+      label: 'grid.filter.marketplace',
       type: 'multi-select',
       options: [
         { value: 'WB', label: 'Wildberries' },
@@ -87,33 +86,33 @@ export class GridToolbarComponent {
     },
     {
       key: 'status',
-      label: this.translate.instant('grid.filter.status'),
+      label: 'grid.filter.status',
       type: 'multi-select',
       options: [
-        { value: 'ACTIVE', label: this.translate.instant('grid.offer_status.ACTIVE') },
-        { value: 'ARCHIVED', label: this.translate.instant('grid.offer_status.ARCHIVED') },
-        { value: 'BLOCKED', label: this.translate.instant('grid.offer_status.BLOCKED') },
+        { value: 'ACTIVE', label: 'grid.offer_status.ACTIVE' },
+        { value: 'ARCHIVED', label: 'grid.offer_status.ARCHIVED' },
+        { value: 'BLOCKED', label: 'grid.offer_status.BLOCKED' },
       ],
     },
     {
       key: 'lastDecision',
-      label: this.translate.instant('grid.filter.decision'),
+      label: 'grid.filter.decision',
       type: 'multi-select',
       options: [
-        { value: 'CHANGE', label: this.translate.instant('grid.decision.CHANGE') },
-        { value: 'SKIP', label: this.translate.instant('grid.decision.SKIP') },
-        { value: 'HOLD', label: this.translate.instant('grid.decision.HOLD') },
+        { value: 'CHANGE', label: 'grid.decision.CHANGE' },
+        { value: 'SKIP', label: 'grid.decision.SKIP' },
+        { value: 'HOLD', label: 'grid.decision.HOLD' },
       ],
     },
     {
       key: 'lastActionStatus',
-      label: this.translate.instant('grid.filter.action_status'),
+      label: 'grid.filter.action_status',
       type: 'multi-select',
       options: [
-        { value: 'PENDING_APPROVAL', label: this.translate.instant('grid.action_status.PENDING_APPROVAL') },
-        { value: 'FAILED', label: this.translate.instant('grid.action_status.FAILED') },
-        { value: 'SUCCEEDED', label: this.translate.instant('grid.action_status.SUCCEEDED') },
-        { value: 'ON_HOLD', label: this.translate.instant('grid.action_status.ON_HOLD') },
+        { value: 'PENDING_APPROVAL', label: 'grid.action_status.PENDING_APPROVAL' },
+        { value: 'FAILED', label: 'grid.action_status.FAILED' },
+        { value: 'SUCCEEDED', label: 'grid.action_status.SUCCEEDED' },
+        { value: 'ON_HOLD', label: 'grid.action_status.ON_HOLD' },
       ],
     },
   ];

@@ -202,7 +202,10 @@ export class PnlSummaryPageComponent {
           radius: ['55%', '75%'],
           center: ['50%', '50%'],
           label: { show: false },
-          data: items.map((it) => ({ value: it.amount, name: it.category })),
+          data: items.map((it) => ({
+            value: it.amount,
+            name: this.t.instant(`analytics.pnl.cost_category.${it.category}`),
+          })),
           emphasis: {
             label: { show: true, fontSize: 12, fontWeight: 'bold' },
           },

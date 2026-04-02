@@ -200,22 +200,22 @@ export class AuditLogPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'actionType',
-      label: this.translate.instant('settings.audit_log.filter.action_type'),
+      label: 'settings.audit_log.filter.action_type',
       type: 'select',
       options: [
-        { value: 'connection', label: this.translate.instant('settings.audit_log.filter.action_group.connection') },
-        { value: 'credential', label: this.translate.instant('settings.audit_log.filter.action_group.credential') },
-        { value: 'member', label: this.translate.instant('settings.audit_log.filter.action_group.member') },
-        { value: 'workspace', label: this.translate.instant('settings.audit_log.filter.action_group.workspace') },
-        { value: 'policy', label: this.translate.instant('settings.audit_log.filter.action_group.policy') },
-        { value: 'action', label: this.translate.instant('settings.audit_log.filter.action_group.action') },
-        { value: 'promo', label: this.translate.instant('settings.audit_log.filter.action_group.promo') },
-        { value: 'alert', label: this.translate.instant('settings.audit_log.filter.action_group.alert') },
+        { value: 'connection', label: 'settings.audit_log.filter.action_group.connection' },
+        { value: 'credential', label: 'settings.audit_log.filter.action_group.credential' },
+        { value: 'member', label: 'settings.audit_log.filter.action_group.member' },
+        { value: 'workspace', label: 'settings.audit_log.filter.action_group.workspace' },
+        { value: 'policy', label: 'settings.audit_log.filter.action_group.policy' },
+        { value: 'action', label: 'settings.audit_log.filter.action_group.action' },
+        { value: 'promo', label: 'settings.audit_log.filter.action_group.promo' },
+        { value: 'alert', label: 'settings.audit_log.filter.action_group.alert' },
       ],
     },
     {
       key: 'entityType',
-      label: this.translate.instant('settings.audit_log.filter.entity_type'),
+      label: 'settings.audit_log.filter.entity_type',
       type: 'select',
       options: [
         { value: 'marketplace_connection', label: 'marketplace_connection' },
@@ -229,7 +229,7 @@ export class AuditLogPageComponent {
     },
     {
       key: 'period',
-      label: this.translate.instant('settings.audit_log.filter.period'),
+      label: 'settings.audit_log.filter.period',
       type: 'date-range',
     },
   ];

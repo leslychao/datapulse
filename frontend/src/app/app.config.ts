@@ -1,9 +1,9 @@
-import { ApplicationConfig, importProvidersFrom } from '@angular/core';
+import { ApplicationConfig } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { HttpClient } from '@angular/common/http';
-import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
+import { TranslateLoader, provideTranslateService } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 
@@ -26,15 +26,13 @@ export const appConfig: ApplicationConfig = {
         },
       }),
     ),
-    importProvidersFrom(
-      TranslateModule.forRoot({
-        defaultLanguage: 'ru',
-        loader: {
-          provide: TranslateLoader,
-          useFactory: createTranslateLoader,
-          deps: [HttpClient],
-        },
-      }),
-    ),
+    provideTranslateService({
+      defaultLanguage: 'ru',
+      loader: {
+        provide: TranslateLoader,
+        useFactory: createTranslateLoader,
+        deps: [HttpClient],
+      },
+    }),
   ],
 };

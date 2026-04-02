@@ -72,6 +72,36 @@ public class PnlReadRepository {
             WHERE connection_id IN (:connectionIds)
             """;
 
+    private static final String AGGREGATED_SUMMARY_SQL = """
+            SELECT
+                sum(revenue_amount) AS revenue_amount,
+                sum(marketplace_commission_amount) AS marketplace_commission_amount,
+                sum(acquiring_commission_amount) AS acquiring_commission_amount,
+                sum(logistics_cost_amount) AS logistics_cost_amount,
+                sum(storage_cost_amount) AS storage_cost_amount,
+                sum(penalties_amount) AS penalties_amount,
+                sum(marketing_cost_amount) AS marketing_cost_amount,
+                sum(acceptance_cost_amount) AS acceptance_cost_amount,
+                sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
+                sum(compensation_amount) AS compensation_amount,
+                sum(refund_amount) AS refund_amount,
+                sum(net_cogs) AS net_cogs,
+                sum(advertising_cost) AS advertising_cost,
+                sum(marketplace_pnl) AS marketplace_pnl,
+                sum(full_pnl) AS full_pnl
+            FROM mart_product_pnl
+            WHERE connection_id IN (:connectionIds)
+              AND period = :period
+            """;
+
+    private static final String AGGREGATED_RESIDUAL_SQL = """
+            SELECT
+                coalesce(sum(reconciliation_residual), 0) AS reconciliation_residual
+            FROM mart_posting_pnl
+            WHERE connection_id IN (:connectionIds)
+              AND toYYYYMM(finance_date) = :period
+            """;
+
     private static final String BY_PRODUCT_SQL = """
             SELECT
                 m.connection_id,
@@ -160,6 +190,30 @@ public class PnlReadRepository {
             SETTINGS final = 1
             """;
 
+    public PnlAggregatedRow findAggregatedSummary(List<Long> connectionIds, int period) {
+        var params = new MapSqlParameterSource()
+            .addValue("connectionIds", connectionIds)
+            .addValue("period", period);
+
+        var sb = new StringBuilder(AGGREGATED_SUMMARY_SQL);
+        sb.append(SETTINGS_FINAL);
+
+        List<PnlAggregatedRow> rows = jdbc.ch().query(sb.toString(), params,
+            this::mapAggregatedRow);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public BigDecimal findReconciliationResidual(List<Long> connectionIds, int period) {
+        var params = new MapSqlParameterSource()
+            .addValue("connectionIds", connectionIds)
+            .addValue("period", period);
+
+        var sb = new StringBuilder(AGGREGATED_RESIDUAL_SQL);
+        sb.append(SETTINGS_FINAL);
+
+        return jdbc.ch().queryForObject(sb.toString(), params, BigDecimal.class);
+    }
+
     public List<PnlSummaryResponse> findSummary(List<Long> connectionIds, PnlFilter filter) {
         var params = new MapSqlParameterSource("connectionIds", connectionIds);
         var sb = new StringBuilder(SUMMARY_SQL);
@@ -242,12 +296,10 @@ public class PnlReadRepository {
                     sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
                         + sum(logistics_cost_amount) + sum(storage_cost_amount)
                         + sum(penalties_amount) + sum(marketing_cost_amount)
-                        + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount) AS total_costs,
-                    sum(refund_amount) AS refund_amount,
-                    sum(compensation_amount) AS compensation_amount,
-                    sum(advertising_cost) AS advertising_cost,
-                    sum(net_cogs) AS net_cogs,
-                    sum(marketplace_pnl) AS marketplace_pnl,
+                        + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount)
+                        AS total_costs_amount,
+                    sum(net_cogs) AS cogs_amount,
+                    sum(advertising_cost) AS advertising_cost_amount,
                     sum(full_pnl) AS full_pnl
                 FROM mart_product_pnl
                 WHERE connection_id IN (:connectionIds)
@@ -261,12 +313,9 @@ public class PnlReadRepository {
         return jdbc.ch().query(sb.toString(), params, (rs, rowNum) -> new PnlTrendResponse(
                 rs.getString("period_label"),
                 rs.getBigDecimal("revenue_amount"),
-                rs.getBigDecimal("total_costs"),
-                rs.getBigDecimal("refund_amount"),
-                rs.getBigDecimal("compensation_amount"),
-                rs.getBigDecimal("advertising_cost"),
-                rs.getBigDecimal("net_cogs"),
-                rs.getBigDecimal("marketplace_pnl"),
+                rs.getBigDecimal("total_costs_amount"),
+                rs.getBigDecimal("cogs_amount"),
+                rs.getBigDecimal("advertising_cost_amount"),
                 rs.getBigDecimal("full_pnl")
         ));
     }
@@ -439,6 +488,26 @@ public class PnlReadRepository {
                 rs.getBigDecimal("refund_amount"),
                 rs.getBigDecimal("net_payout")
         );
+    }
+
+    private PnlAggregatedRow mapAggregatedRow(ResultSet rs, int rowNum) throws SQLException {
+        return PnlAggregatedRow.builder()
+            .revenueAmount(rs.getBigDecimal("revenue_amount"))
+            .marketplaceCommissionAmount(rs.getBigDecimal("marketplace_commission_amount"))
+            .acquiringCommissionAmount(rs.getBigDecimal("acquiring_commission_amount"))
+            .logisticsCostAmount(rs.getBigDecimal("logistics_cost_amount"))
+            .storageCostAmount(rs.getBigDecimal("storage_cost_amount"))
+            .penaltiesAmount(rs.getBigDecimal("penalties_amount"))
+            .marketingCostAmount(rs.getBigDecimal("marketing_cost_amount"))
+            .acceptanceCostAmount(rs.getBigDecimal("acceptance_cost_amount"))
+            .otherMarketplaceChargesAmount(rs.getBigDecimal("other_marketplace_charges_amount"))
+            .compensationAmount(rs.getBigDecimal("compensation_amount"))
+            .refundAmount(rs.getBigDecimal("refund_amount"))
+            .netCogs(rs.getBigDecimal("net_cogs"))
+            .advertisingCost(rs.getBigDecimal("advertising_cost"))
+            .marketplacePnl(rs.getBigDecimal("marketplace_pnl"))
+            .fullPnl(rs.getBigDecimal("full_pnl"))
+            .build();
     }
 
     private Long getBoxedLong(ResultSet rs, String column) throws SQLException {

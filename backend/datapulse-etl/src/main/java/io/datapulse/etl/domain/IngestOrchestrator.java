@@ -8,6 +8,7 @@ import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.platform.etl.PostIngestMaterializationHook;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>Execute DAG (level-based parallelism)</li>
  *   <li>Determine final status based on event results</li>
  *   <li>Publish outbox events (ETL_SYNC_COMPLETED or ETL_SYNC_RETRY)</li>
+ *   <li>Refresh ClickHouse mart tables (incremental materialization for this job)</li>
  * </ol>
  */
 @Slf4j
@@ -43,6 +45,7 @@ public class IngestOrchestrator {
     private final StaleCampaignDetector staleCampaignDetector;
     private final IngestProperties ingestProperties;
     private final TransactionTemplate transactionTemplate;
+    private final PostIngestMaterializationHook postIngestMaterialization;
 
     /**
      * Main entry point — processes a single sync job.
@@ -147,6 +150,15 @@ public class IngestOrchestrator {
                 }
             }
         });
+
+        if (finalStatus == JobExecutionStatus.COMPLETED
+                || finalStatus == JobExecutionStatus.COMPLETED_WITH_ERRORS) {
+            try {
+                postIngestMaterialization.afterSuccessfulIngest(jobId);
+            } catch (Exception e) {
+                log.error("Mart materialization failed after ingest: jobExecutionId={}", jobId, e);
+            }
+        }
 
         log.info("Ingest completed: jobExecutionId={}, status={}", jobId, finalStatus);
     }

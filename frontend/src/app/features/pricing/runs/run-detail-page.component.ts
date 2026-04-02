@@ -53,6 +53,7 @@ const DECISION_COLOR: Record<string, string> = {
     EmptyStateComponent,
     FilterBarComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <!-- Back button -->
@@ -273,11 +274,11 @@ export class RunDetailPageComponent {
   readonly decisionFilterConfigs: FilterConfig[] = [
     {
       key: 'decisionType',
-      label: this.translate.instant('pricing.runs.detail.filter.decision_type'),
+      label: 'pricing.runs.detail.filter.decision_type',
       type: 'multi-select',
       options: (['CHANGE', 'SKIP', 'HOLD'] as const).map(value => ({
         value,
-        label: this.translate.instant(`pricing.decisions.type.${value}`),
+        label: `pricing.decisions.type.${value}`,
       })),
     },
   ];

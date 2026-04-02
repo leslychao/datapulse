@@ -43,8 +43,8 @@ public class PromoPolicyController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<PromoPolicySummaryResponse> listPolicies(
             @PathVariable("workspaceId") long workspaceId,
-            @RequestParam(value = "status", required = false) PromoPolicyStatus status) {
-        return policyService.listPolicies(workspaceId, status);
+            @RequestParam(value = "status", required = false) List<PromoPolicyStatus> statuses) {
+        return policyService.listPolicies(workspaceId, statuses);
     }
 
     @GetMapping("/{policyId}")

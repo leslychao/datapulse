@@ -6,8 +6,10 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { startWith } from 'rxjs';
 import {
   injectQuery,
   injectMutation,
@@ -42,22 +44,9 @@ const CAMPAIGN_STATUS_COLOR: Record<CampaignStatus, StatusColor> = {
   CANCELLED: 'neutral',
 };
 
-const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
-  UPCOMING: 'Предстоящая',
-  ACTIVE: 'Активна',
-  FROZEN: 'Заморожена',
-  ENDED: 'Завершена',
-  CANCELLED: 'Отменена',
-};
-
-const PARTICIPATION_LABEL: Record<ParticipationStatus, string> = {
-  ELIGIBLE: 'Доступен',
-  PARTICIPATING: 'Участвует',
-  DECLINED: 'Отклонён',
-  REMOVED: 'Удалён',
-  BANNED: 'Заблокирован',
-  AUTO_DECLINED: 'Авто-отклонён',
-};
+const PARTICIPATION_STATUSES: ParticipationStatus[] = [
+  'ELIGIBLE', 'PARTICIPATING', 'DECLINED', 'REMOVED', 'BANNED', 'AUTO_DECLINED',
+];
 
 const PARTICIPATION_COLOR: Record<ParticipationStatus, string> = {
   ELIGIBLE: 'info',
@@ -68,13 +57,9 @@ const PARTICIPATION_COLOR: Record<ParticipationStatus, string> = {
   AUTO_DECLINED: 'neutral',
 };
 
-const EVAL_LABEL: Record<EvaluationResult, string> = {
-  PROFITABLE: 'Прибыльно',
-  MARGINAL: 'Пограничный',
-  UNPROFITABLE: 'Убыточно',
-  INSUFFICIENT_STOCK: 'Мало остатков',
-  INSUFFICIENT_DATA: 'Нет данных',
-};
+const EVALUATION_RESULTS: EvaluationResult[] = [
+  'PROFITABLE', 'MARGINAL', 'UNPROFITABLE', 'INSUFFICIENT_STOCK', 'INSUFFICIENT_DATA',
+];
 
 const EVAL_COLOR: Record<EvaluationResult, string> = {
   PROFITABLE: 'success',
@@ -84,11 +69,9 @@ const EVAL_COLOR: Record<EvaluationResult, string> = {
   INSUFFICIENT_DATA: 'warning',
 };
 
-const DECISION_LABEL: Record<PromoDecisionType, string> = {
-  PARTICIPATE: 'Участвовать',
-  DECLINE: 'Отказать',
-  PENDING_REVIEW: 'На проверку',
-};
+const DECISION_TYPES: PromoDecisionType[] = [
+  'PARTICIPATE', 'DECLINE', 'PENDING_REVIEW',
+];
 
 const DECISION_COLOR: Record<PromoDecisionType, string> = {
   PARTICIPATE: 'success',
@@ -96,15 +79,6 @@ const DECISION_COLOR: Record<PromoDecisionType, string> = {
   PENDING_REVIEW: 'warning',
 };
 
-const ACTION_LABEL: Record<PromoActionStatus, string> = {
-  PENDING_APPROVAL: 'Ожидает одобрения',
-  APPROVED: 'Одобрено',
-  EXECUTING: 'Выполняется',
-  SUCCEEDED: 'Выполнено',
-  FAILED: 'Ошибка',
-  EXPIRED: 'Истекло',
-  CANCELLED: 'Отменено',
-};
 
 const ACTION_COLOR: Record<PromoActionStatus, string> = {
   PENDING_APPROVAL: 'warning',
@@ -145,34 +119,49 @@ export class CampaignDetailPageComponent {
 
   readonly campaignId = input.required<string>();
 
+  private readonly translationChange = toSignal(
+    this.translate.onTranslationChange.pipe(startWith(null)),
+  );
+
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
 
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'participationStatus',
-      label: 'Статус участия',
+      label: 'promo.detail.filter.participation_status',
       type: 'multi-select',
-      options: Object.entries(PARTICIPATION_LABEL).map(([value, label]) => ({ value, label })),
+      options: PARTICIPATION_STATUSES.map(value => ({
+        value,
+        label: `promo.participation_status.${value}`,
+      })),
     },
     {
       key: 'evaluationResult',
-      label: 'Оценка',
+      label: 'promo.detail.filter.evaluation',
       type: 'multi-select',
-      options: Object.entries(EVAL_LABEL).map(([value, label]) => ({ value, label })),
+      options: EVALUATION_RESULTS.map(value => ({
+        value,
+        label: `promo.evaluation_result.${value}`,
+      })),
     },
     {
       key: 'decisionType',
-      label: 'Решение',
+      label: 'promo.detail.filter.decision',
       type: 'multi-select',
-      options: Object.entries(DECISION_LABEL).map(([value, label]) => ({ value, label })),
+      options: DECISION_TYPES.map(value => ({
+        value,
+        label: `promo.decision_type.${value}`,
+      })),
     },
-    { key: 'search', label: 'Поиск по товару', type: 'text' },
+    { key: 'search', label: 'promo.detail.filter.search', type: 'text' },
   ];
 
-  readonly columnDefs = [
+  readonly columnDefs = computed(() => {
+    this.translationChange();
+    return [
     {
-      headerName: 'Товар',
+      headerName: this.translate.instant('promo.detail.col.product'),
       field: 'productName',
       minWidth: 280,
       pinned: 'left' as const,
@@ -189,7 +178,7 @@ export class CampaignDetailPageComponent {
       cellClass: 'font-mono',
     },
     {
-      headerName: 'Промо-цена',
+      headerName: this.translate.instant('promo.detail.col.promo_price'),
       field: 'requiredPrice',
       width: 110,
       cellClass: 'font-mono text-right',
@@ -197,7 +186,7 @@ export class CampaignDetailPageComponent {
       valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
-      headerName: 'Текущая цена',
+      headerName: this.translate.instant('promo.detail.col.current_price'),
       field: 'currentPrice',
       width: 110,
       cellClass: 'font-mono text-right',
@@ -205,7 +194,7 @@ export class CampaignDetailPageComponent {
       valueFormatter: (params: any) => formatMoney(params.value),
     },
     {
-      headerName: 'Скидка',
+      headerName: this.translate.instant('promo.detail.col.discount'),
       field: 'discountPct',
       width: 80,
       cellClass: 'font-mono text-right',
@@ -216,7 +205,7 @@ export class CampaignDetailPageComponent {
       },
     },
     {
-      headerName: 'Маржа',
+      headerName: this.translate.instant('promo.detail.col.margin'),
       field: 'marginAtPromoPrice',
       width: 100,
       cellClass: 'font-mono text-right',
@@ -228,7 +217,7 @@ export class CampaignDetailPageComponent {
       },
     },
     {
-      headerName: 'Остатки',
+      headerName: this.translate.instant('promo.detail.col.stock'),
       field: 'stockAvailable',
       width: 80,
       cellClass: 'font-mono text-right',
@@ -236,31 +225,31 @@ export class CampaignDetailPageComponent {
       valueFormatter: (params: any) => this.formatNumber(params.value),
     },
     {
-      headerName: 'Оценка',
+      headerName: this.translate.instant('promo.detail.col.evaluation'),
       field: 'evaluationResult',
       width: 130,
       sortable: true,
-      cellRenderer: (params: any) => this.badgeCell(params.value, EVAL_LABEL, EVAL_COLOR),
+      cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.evaluation_result', EVAL_COLOR),
     },
     {
-      headerName: 'Решение',
+      headerName: this.translate.instant('promo.detail.col.decision'),
       field: 'decisionType',
       width: 130,
       sortable: true,
-      cellRenderer: (params: any) => this.badgeCell(params.value, DECISION_LABEL, DECISION_COLOR),
+      cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.decision_type', DECISION_COLOR),
     },
     {
-      headerName: 'Статус участия',
+      headerName: this.translate.instant('promo.detail.col.participation'),
       field: 'participationStatus',
       width: 140,
       sortable: true,
-      cellRenderer: (params: any) => this.badgeCell(params.value, PARTICIPATION_LABEL, PARTICIPATION_COLOR),
+      cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.participation_status', PARTICIPATION_COLOR),
     },
     {
-      headerName: 'Действие',
+      headerName: this.translate.instant('promo.detail.col.action_status'),
       field: 'actionStatus',
       width: 140,
-      cellRenderer: (params: any) => this.badgeCell(params.value, ACTION_LABEL, ACTION_COLOR),
+      cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.action_status', ACTION_COLOR),
     },
     {
       headerName: '',
@@ -314,6 +303,7 @@ export class CampaignDetailPageComponent {
       },
     },
   ];
+  });
 
   private readonly filter = computed<PromoProductFilter>(() => {
     const vals = this.filterValues();
@@ -364,7 +354,7 @@ export class CampaignDetailPageComponent {
 
   readonly campaignStatusLabel = computed(() => {
     const c = this.campaign();
-    return c ? CAMPAIGN_STATUS_LABEL[c.status] ?? c.status : '';
+    return c ? this.translate.instant(`promo.campaigns.status.${c.status}`) : '';
   });
 
   readonly campaignStatusColor = computed((): StatusColor => {
@@ -394,40 +384,40 @@ export class CampaignDetailPageComponent {
     mutationFn: (promoProductId: number) =>
       lastValueFrom(this.promoApi.participate(this.wsStore.currentWorkspaceId()!, promoProductId, {})),
     onSuccess: () => {
-      this.toast.success('Участие подтверждено');
+      this.toast.success(this.translate.instant('promo.detail.toast.participate_success'));
       this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
     },
-    onError: () => this.toast.error('Не удалось подтвердить участие'),
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.participate_error')),
   }));
 
   private readonly declineMutation = injectMutation(() => ({
     mutationFn: (promoProductId: number) =>
       lastValueFrom(this.promoApi.decline(this.wsStore.currentWorkspaceId()!, promoProductId, {})),
     onSuccess: () => {
-      this.toast.success('Товар отклонён');
+      this.toast.success(this.translate.instant('promo.detail.toast.decline_success'));
       this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
     },
-    onError: () => this.toast.error('Не удалось отклонить товар'),
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.decline_error')),
   }));
 
   private readonly approveMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
       lastValueFrom(this.promoApi.approveAction(this.wsStore.currentWorkspaceId()!, actionId)),
     onSuccess: () => {
-      this.toast.success('Действие одобрено');
+      this.toast.success(this.translate.instant('promo.detail.toast.approve_success'));
       this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
     },
-    onError: () => this.toast.error('Не удалось одобрить действие'),
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.approve_error')),
   }));
 
   private readonly rejectMutation = injectMutation(() => ({
     mutationFn: (actionId: number) =>
       lastValueFrom(this.promoApi.rejectAction(this.wsStore.currentWorkspaceId()!, actionId, { reason: 'Rejected' })),
     onSuccess: () => {
-      this.toast.success('Действие отклонено');
+      this.toast.success(this.translate.instant('promo.detail.toast.reject_success'));
       this.queryClient.invalidateQueries({ queryKey: ['promo-campaign-products'] });
     },
-    onError: () => this.toast.error('Не удалось отклонить действие'),
+    onError: () => this.toast.error(this.translate.instant('promo.detail.toast.reject_error')),
   }));
 
   onFiltersChanged(values: Record<string, any>): void {
@@ -451,11 +441,11 @@ export class CampaignDetailPageComponent {
 
   private badgeCell(
     value: string | null,
-    labels: Record<string, string>,
+    i18nPrefix: string,
     colors: Record<string, string>,
   ): string {
     if (!value) return '';
-    const label = labels[value] ?? value;
+    const label = this.translate.instant(`${i18nPrefix}.${value}`);
     const color = colors[value] ?? 'neutral';
     const cssVar = `var(--status-${color})`;
     return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium"

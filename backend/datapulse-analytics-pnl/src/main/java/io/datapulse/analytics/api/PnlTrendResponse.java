@@ -3,13 +3,10 @@ package io.datapulse.analytics.api;
 import java.math.BigDecimal;
 
 public record PnlTrendResponse(
-        String periodLabel,
+        String period,
         BigDecimal revenueAmount,
-        BigDecimal totalCosts,
-        BigDecimal refundAmount,
-        BigDecimal compensationAmount,
-        BigDecimal advertisingCost,
-        BigDecimal netCogs,
-        BigDecimal marketplacePnl,
+        BigDecimal totalCostsAmount,
+        BigDecimal cogsAmount,
+        BigDecimal advertisingCostAmount,
         BigDecimal fullPnl
 ) {}

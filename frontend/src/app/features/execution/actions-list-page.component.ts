@@ -175,30 +175,30 @@ export class ActionsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: this.translate.instant('execution.filter.status'),
+      label: 'execution.filter.status',
       type: 'multi-select',
       options: ACTION_STATUSES.map(value => ({
         value,
-        label: this.translate.instant(`grid.action_status.${value}`),
+        label: `grid.action_status.${value}`,
       })),
     },
     {
       key: 'executionMode',
-      label: this.translate.instant('execution.filter.execution_mode'),
+      label: 'execution.filter.execution_mode',
       type: 'select',
       options: (['LIVE', 'SIMULATED'] as const).map(value => ({
         value,
-        label: this.translate.instant(`pricing.decisions.execution_mode.${value}`),
+        label: `pricing.decisions.execution_mode.${value}`,
       })),
     },
     {
       key: 'search',
-      label: this.translate.instant('execution.filter.search'),
+      label: 'execution.filter.search',
       type: 'text',
     },
     {
       key: 'period',
-      label: this.translate.instant('execution.filter.period'),
+      label: 'execution.filter.period',
       type: 'date-range',
     },
   ];

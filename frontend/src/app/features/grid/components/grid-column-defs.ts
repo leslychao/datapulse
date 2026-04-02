@@ -72,7 +72,7 @@ export function buildGridColumnDefs(): ColDef[] {
     {
       field: 'skuCode',
       headerName: 'Артикул',
-      width: 120,
+      width: 130,
       pinned: 'left' as const,
       lockPosition: true,
       sortable: true,
@@ -81,7 +81,8 @@ export function buildGridColumnDefs(): ColDef[] {
     {
       field: 'productName',
       headerName: 'Название',
-      minWidth: 200,
+      minWidth: 220,
+      maxWidth: 400,
       flex: 1,
       sortable: true,
       tooltipField: 'productName',
@@ -90,7 +91,7 @@ export function buildGridColumnDefs(): ColDef[] {
     {
       field: 'marketplaceType',
       headerName: 'МП',
-      width: 60,
+      width: 65,
       sortable: false,
       cellClass: 'text-center',
       valueFormatter: (p: ValueFormatterParams) => MARKETPLACE_LABELS[p.value] ?? p.value,
@@ -98,7 +99,7 @@ export function buildGridColumnDefs(): ColDef[] {
     {
       field: 'currentPrice',
       headerName: 'Текущая цена',
-      width: 110,
+      width: 120,
       sortable: true,
       type: 'rightAligned',
       cellClass: 'font-mono text-[length:var(--text-sm)]',

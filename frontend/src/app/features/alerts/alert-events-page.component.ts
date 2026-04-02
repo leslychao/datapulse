@@ -169,41 +169,41 @@ export class AlertEventsPageComponent {
     return [
       {
         key: 'ruleType',
-        label: this.translate.instant('alerts.filter.rule_type'),
+        label: 'alerts.filter.rule_type',
         type: 'multi-select',
         options: RULE_TYPES.map((value) => ({
           value,
-          label: this.translate.instant(`alerts.rule_type.${value}`),
+          label: `alerts.rule_type.${value}`,
         })),
       },
       {
         key: 'severity',
-        label: this.translate.instant('alerts.filter.severity'),
+        label: 'alerts.filter.severity',
         type: 'multi-select',
         options: [
-          { value: 'CRITICAL', label: this.translate.instant('alerts.severity.CRITICAL') },
-          { value: 'WARNING', label: this.translate.instant('alerts.severity.WARNING') },
-          { value: 'INFO', label: this.translate.instant('alerts.severity.INFO') },
+          { value: 'CRITICAL', label: 'alerts.severity.CRITICAL' },
+          { value: 'WARNING', label: 'alerts.severity.WARNING' },
+          { value: 'INFO', label: 'alerts.severity.INFO' },
         ],
       },
       {
         key: 'connectionId',
-        label: this.translate.instant('alerts.filter.connection'),
+        label: 'alerts.filter.connection',
         type: 'select',
         options: [
-          { value: '', label: this.translate.instant('alerts.filter.all_connections') },
+          { value: '', label: 'alerts.filter.all_connections' },
           ...connOpts,
         ],
       },
       {
         key: 'status',
-        label: this.translate.instant('alerts.filter.status'),
+        label: 'alerts.filter.status',
         type: 'multi-select',
         options: [
-          { value: 'OPEN', label: this.translate.instant('alerts.status.OPEN') },
-          { value: 'ACKNOWLEDGED', label: this.translate.instant('alerts.status.ACKNOWLEDGED') },
-          { value: 'RESOLVED', label: this.translate.instant('alerts.status.RESOLVED') },
-          { value: 'AUTO_RESOLVED', label: this.translate.instant('alerts.status.AUTO_RESOLVED') },
+          { value: 'OPEN', label: 'alerts.status.OPEN' },
+          { value: 'ACKNOWLEDGED', label: 'alerts.status.ACKNOWLEDGED' },
+          { value: 'RESOLVED', label: 'alerts.status.RESOLVED' },
+          { value: 'AUTO_RESOLVED', label: 'alerts.status.AUTO_RESOLVED' },
         ],
       },
     ];

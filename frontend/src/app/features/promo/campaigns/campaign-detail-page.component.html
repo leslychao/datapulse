@@ -112,7 +112,7 @@
       />
     } @else {
       <dp-data-grid
-        [columnDefs]="columnDefs"
+        [columnDefs]="columnDefs()"
         [rowData]="rows()"
         [loading]="productsQuery.isPending()"
         [pagination]="true"

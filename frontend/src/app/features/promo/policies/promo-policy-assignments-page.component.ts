@@ -27,11 +27,6 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 
-const SCOPE_TYPE_LABEL: Record<PromoAssignmentScopeType, string> = {
-  CONNECTION: 'Подключение',
-  CATEGORY: 'Категория',
-  SKU: 'SKU',
-};
 
 const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
   CONNECTION: 'info',
@@ -165,18 +160,18 @@ export class PromoPolicyAssignmentsPageComponent {
 
   readonly columnDefs = [
     {
-      headerName: 'Подключение',
+      headerName: this.translate.instant('promo.assignments.col.connection'),
       field: 'connectionName',
       minWidth: 200,
       sortable: true,
     },
     {
-      headerName: 'Тип области',
+      headerName: this.translate.instant('promo.assignments.col.scope_type'),
       field: 'scopeType',
       width: 140,
       cellRenderer: (params: any) => {
         const st = params.value as PromoAssignmentScopeType;
-        const label = SCOPE_TYPE_LABEL[st] ?? st;
+        const label = this.translate.instant(`promo.assignments.scope.${st.toLowerCase()}`);
         const color = SCOPE_TYPE_COLOR[st] ?? 'neutral';
         const cssVar = `var(--status-${color})`;
         return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -186,10 +181,11 @@ export class PromoPolicyAssignmentsPageComponent {
       },
     },
     {
-      headerName: 'Область',
+      headerName: this.translate.instant('promo.assignments.col.scope'),
       field: 'scopeTargetName',
       minWidth: 200,
-      valueFormatter: (params: any) => params.value ?? 'Всё подключение',
+      valueFormatter: (params: any) =>
+        params.value ?? this.translate.instant('promo.assignments.whole_connection'),
     },
     {
       headerName: '',
@@ -233,9 +229,9 @@ export class PromoPolicyAssignmentsPageComponent {
       this.showAddForm.set(false);
       this.newConnectionId = null;
       this.queryClient.invalidateQueries({ queryKey: ['promo-assignments'] });
-      this.toast.success('Назначение добавлено');
+      this.toast.success(this.translate.instant('promo.assignments.toast.create_success'));
     },
-    onError: () => this.toast.error('Не удалось добавить назначение'),
+    onError: () => this.toast.error(this.translate.instant('promo.assignments.toast.create_error')),
   }));
 
   private readonly deleteMutation = injectMutation(() => ({
@@ -249,9 +245,9 @@ export class PromoPolicyAssignmentsPageComponent {
       ),
     onSuccess: () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-assignments'] });
-      this.toast.success('Назначение удалено');
+      this.toast.success(this.translate.instant('promo.assignments.toast.delete_success'));
     },
-    onError: () => this.toast.error('Не удалось удалить назначение'),
+    onError: () => this.toast.error(this.translate.instant('promo.assignments.toast.delete_error')),
   }));
 
   readonly getRowId = (params: any) => String(params.data.id);

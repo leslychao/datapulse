@@ -106,19 +106,32 @@ class PromoPolicyServiceTest {
       service.listPolicies(WORKSPACE_ID, null);
 
       verify(policyRepository).findAllByWorkspaceId(WORKSPACE_ID);
-      verify(policyRepository, never()).findAllByWorkspaceIdAndStatus(any(), any());
+      verify(policyRepository, never()).findAllByWorkspaceIdAndStatusIn(any(), any());
     }
 
     @Test
-    void should_filter_by_status_when_provided() {
+    void should_return_all_policies_when_empty_status_list() {
       var entities = List.of(buildPolicy(PromoPolicyStatus.ACTIVE, ParticipationMode.SEMI_AUTO));
-      when(policyRepository.findAllByWorkspaceIdAndStatus(WORKSPACE_ID, PromoPolicyStatus.ACTIVE))
+      when(policyRepository.findAllByWorkspaceId(WORKSPACE_ID)).thenReturn(entities);
+      when(policyMapper.toSummaries(entities)).thenReturn(List.of());
+
+      service.listPolicies(WORKSPACE_ID, List.of());
+
+      verify(policyRepository).findAllByWorkspaceId(WORKSPACE_ID);
+      verify(policyRepository, never()).findAllByWorkspaceIdAndStatusIn(any(), any());
+    }
+
+    @Test
+    void should_filter_by_statuses_when_provided() {
+      var statuses = List.of(PromoPolicyStatus.DRAFT, PromoPolicyStatus.ACTIVE);
+      var entities = List.of(buildPolicy(PromoPolicyStatus.ACTIVE, ParticipationMode.SEMI_AUTO));
+      when(policyRepository.findAllByWorkspaceIdAndStatusIn(WORKSPACE_ID, statuses))
           .thenReturn(entities);
       when(policyMapper.toSummaries(entities)).thenReturn(List.of());
 
-      service.listPolicies(WORKSPACE_ID, PromoPolicyStatus.ACTIVE);
+      service.listPolicies(WORKSPACE_ID, statuses);
 
-      verify(policyRepository).findAllByWorkspaceIdAndStatus(WORKSPACE_ID, PromoPolicyStatus.ACTIVE);
+      verify(policyRepository).findAllByWorkspaceIdAndStatusIn(WORKSPACE_ID, statuses);
     }
   }
 

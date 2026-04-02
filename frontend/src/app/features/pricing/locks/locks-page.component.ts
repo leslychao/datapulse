@@ -43,6 +43,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
     EmptyStateComponent,
     ConfirmationModalComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
@@ -192,7 +193,7 @@ export class LocksPageComponent {
   formExpiresAt = '';
 
   readonly filterConfigs: FilterConfig[] = [
-    { key: 'search', label: this.translate.instant('pricing.locks.filter.search'), type: 'text' },
+    { key: 'search', label: 'pricing.locks.filter.search', type: 'text' },
   ];
 
   readonly columnDefs = [

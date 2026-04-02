@@ -36,6 +36,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
     DataGridComponent,
     EmptyStateComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <dp-filter-bar
@@ -88,25 +89,25 @@ export class DecisionsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'decisionType',
-      label: this.translate.instant('pricing.decisions.filter.decision_type'),
+      label: 'pricing.decisions.filter.decision_type',
       type: 'multi-select',
       options: (['CHANGE', 'SKIP', 'HOLD'] as const).map(value => ({
         value,
-        label: this.translate.instant(`pricing.decisions.type.${value}`),
+        label: `pricing.decisions.type.${value}`,
       })),
     },
     {
       key: 'executionMode',
-      label: this.translate.instant('pricing.decisions.filter.execution_mode'),
+      label: 'pricing.decisions.filter.execution_mode',
       type: 'select',
       options: (['LIVE', 'SIMULATED'] as const).map(value => ({
         value,
-        label: this.translate.instant(`pricing.decisions.execution_mode.${value}`),
+        label: `pricing.decisions.execution_mode.${value}`,
       })),
     },
     {
       key: 'period',
-      label: this.translate.instant('pricing.decisions.filter.period'),
+      label: 'pricing.decisions.filter.period',
       type: 'date-range',
     },
   ];

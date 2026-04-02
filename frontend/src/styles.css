@@ -161,9 +161,9 @@ body {
   --ag-foreground-color: var(--text-primary);
   --ag-font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --ag-font-size: var(--text-sm);
-  --ag-header-height: 36px;
-  --ag-row-height: 32px;
-  --ag-cell-horizontal-padding: 8px;
+  --ag-header-height: 38px;
+  --ag-row-height: 36px;
+  --ag-cell-horizontal-padding: 10px;
   --ag-range-selection-border-color: var(--accent-primary);
   --ag-checkbox-checked-color: var(--accent-primary);
   --ag-input-focus-border-color: var(--accent-primary);

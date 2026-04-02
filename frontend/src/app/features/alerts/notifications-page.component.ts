@@ -114,42 +114,42 @@ export class NotificationsPageComponent {
   readonly filterConfigs = computed<FilterConfig[]>(() => [
     {
       key: 'severity',
-      label: this.translate.instant('alerts.filter.severity'),
+      label: 'alerts.filter.severity',
       type: 'multi-select',
       options: [
-        { value: 'CRITICAL', label: this.translate.instant('alerts.severity.CRITICAL') },
-        { value: 'WARNING', label: this.translate.instant('alerts.severity.WARNING') },
-        { value: 'INFO', label: this.translate.instant('alerts.severity.INFO') },
+        { value: 'CRITICAL', label: 'alerts.severity.CRITICAL' },
+        { value: 'WARNING', label: 'alerts.severity.WARNING' },
+        { value: 'INFO', label: 'alerts.severity.INFO' },
       ],
     },
     {
       key: 'read',
-      label: this.translate.instant('alerts.notifications.filter_read'),
+      label: 'alerts.notifications.filter_read',
       type: 'select',
       options: [
-        { value: '', label: this.translate.instant('alerts.notifications.read_all') },
-        { value: 'unread', label: this.translate.instant('alerts.notifications.read_unread') },
-        { value: 'read', label: this.translate.instant('alerts.notifications.read_read') },
+        { value: '', label: 'alerts.notifications.read_all' },
+        { value: 'unread', label: 'alerts.notifications.read_unread' },
+        { value: 'read', label: 'alerts.notifications.read_read' },
       ],
     },
     {
       key: 'period',
-      label: this.translate.instant('alerts.notifications.filter_period'),
+      label: 'alerts.notifications.filter_period',
       type: 'select',
       options: [
-        { value: '24h', label: this.translate.instant('alerts.notifications.period_24h') },
-        { value: '7d', label: this.translate.instant('alerts.notifications.period_7d') },
-        { value: '30d', label: this.translate.instant('alerts.notifications.period_30d') },
-        { value: 'all', label: this.translate.instant('alerts.notifications.period_all') },
+        { value: '24h', label: 'alerts.notifications.period_24h' },
+        { value: '7d', label: 'alerts.notifications.period_7d' },
+        { value: '30d', label: 'alerts.notifications.period_30d' },
+        { value: 'all', label: 'alerts.notifications.period_all' },
       ],
     },
     {
       key: 'notificationType',
-      label: this.translate.instant('alerts.notifications.filter_type'),
+      label: 'alerts.notifications.filter_type',
       type: 'multi-select',
       options: NOTIFICATION_TYPES.map((value) => ({
         value,
-        label: this.translate.instant(`alerts.notification_type.${value}`),
+        label: `alerts.notification_type.${value}`,
       })),
     },
   ]);

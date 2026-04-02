@@ -29,27 +29,12 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 
-const RUN_STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Ожидание',
-  IN_PROGRESS: 'Выполняется',
-  COMPLETED: 'Завершён',
-  COMPLETED_WITH_ERRORS: 'Завершён с ошибками',
-  FAILED: 'Ошибка',
-};
-
 const RUN_STATUS_COLOR: Record<string, string> = {
   PENDING: 'info',
   IN_PROGRESS: 'info',
   COMPLETED: 'success',
   COMPLETED_WITH_ERRORS: 'warning',
   FAILED: 'error',
-};
-
-const TRIGGER_LABEL: Record<string, string> = {
-  POST_SYNC: 'После синхронизации',
-  MANUAL: 'Вручную',
-  SCHEDULED: 'По расписанию',
-  POLICY_CHANGE: 'Изменение политики',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {
@@ -70,6 +55,7 @@ const TRIGGER_COLOR: Record<string, string> = {
     DataGridComponent,
     EmptyStateComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
       <!-- Toolbar -->
@@ -200,25 +186,25 @@ export class RunsListPageComponent {
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
-      label: this.translate.instant('pricing.runs.filter.status'),
+      label: 'pricing.runs.filter.status',
       type: 'multi-select',
       options: (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED'] as const).map(value => ({
         value,
-        label: this.translate.instant(`pricing.runs.status.${value}`),
+        label: `pricing.runs.status.${value}`,
       })),
     },
     {
       key: 'triggerType',
-      label: this.translate.instant('pricing.runs.filter.trigger'),
+      label: 'pricing.runs.filter.trigger',
       type: 'multi-select',
       options: (['POST_SYNC', 'MANUAL', 'SCHEDULED', 'POLICY_CHANGE'] as const).map(value => ({
         value,
-        label: this.translate.instant(`pricing.runs.trigger.${value}`),
+        label: `pricing.runs.trigger.${value}`,
       })),
     },
     {
       key: 'period',
-      label: this.translate.instant('pricing.runs.filter.period'),
+      label: 'pricing.runs.filter.period',
       type: 'date-range',
     },
   ];

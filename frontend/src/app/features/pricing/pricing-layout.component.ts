@@ -30,7 +30,7 @@ interface PricingTab {
           </a>
         }
       </div>
-      <div class="flex-1 overflow-auto">
+      <div class="flex flex-1 flex-col overflow-hidden min-h-0">
         <router-outlet />
       </div>
     </div>
