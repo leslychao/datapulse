@@ -3,6 +3,7 @@ package io.datapulse.api.execution;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.api.config.RabbitTopologyConfig;
+import io.datapulse.pricing.domain.PricingRunApiService;
 import io.datapulse.promotions.domain.StaleCampaignListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import java.util.Map;
 public class EtlEventsPricingConsumer {
 
   private final StaleCampaignListener staleCampaignListener;
+  private final PricingRunApiService pricingRunApiService;
   private final ObjectMapper objectMapper;
 
   @RabbitListener(queues = RabbitTopologyConfig.ETL_EVENTS_PRICING_QUEUE)
@@ -26,13 +28,32 @@ public class EtlEventsPricingConsumer {
     try {
       String eventType = extractHeader(message, "x-event-type");
 
-      if ("ETL_PROMO_CAMPAIGN_STALE".equals(eventType)) {
-        handleStaleCampaign(message);
+      switch (eventType != null ? eventType : "") {
+        case "ETL_SYNC_COMPLETED" -> handleSyncCompleted(message);
+        case "ETL_PROMO_CAMPAIGN_STALE" -> handleStaleCampaign(message);
+        default -> log.debug("Ignoring unhandled ETL event: type={}", eventType);
       }
     } catch (Exception e) {
       log.error("Error processing ETL event on pricing queue: messageId={}, error={}",
           message.getMessageProperties().getMessageId(), e.getMessage(), e);
     }
+  }
+
+  private void handleSyncCompleted(Message message) throws Exception {
+    Map<String, Object> payload = objectMapper.readValue(
+        message.getBody(), new TypeReference<>() {});
+
+    Long connectionId = toLong(payload.get("connectionId"));
+    Long workspaceId = toLong(payload.get("workspaceId"));
+    Long jobExecutionId = toLong(payload.get("jobExecutionId"));
+
+    if (connectionId == null || workspaceId == null || jobExecutionId == null) {
+      log.warn("ETL_SYNC_COMPLETED missing required fields, skipping pricing trigger");
+      return;
+    }
+
+    log.info("ETL_SYNC_COMPLETED received: connectionId={}, triggering pricing run", connectionId);
+    pricingRunApiService.triggerPostSyncRun(connectionId, workspaceId, jobExecutionId);
   }
 
   private void handleStaleCampaign(Message message) throws Exception {
@@ -55,5 +76,12 @@ public class EtlEventsPricingConsumer {
   private String extractHeader(Message message, String headerName) {
     Object value = message.getMessageProperties().getHeader(headerName);
     return value != null ? value.toString() : null;
+  }
+
+  private Long toLong(Object value) {
+    if (value instanceof Number num) {
+      return num.longValue();
+    }
+    return null;
   }
 }

@@ -48,7 +48,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | [Tenancy & IAM](modules/tenancy-iam.md) | `tenant`, `workspace`, `app_user`, `workspace_member`, `workspace_invitation` |
 | [Integration](modules/integration.md) | `marketplace_connection`, `secret_reference`, `marketplace_sync_state`, `integration_call_log` |
 | [ETL Pipeline](modules/etl-pipeline.md) | `category`, `warehouse`, `product_master`, `seller_sku`, `marketplace_offer`, `cost_profile`, `canonical_price_current`, `canonical_stock_current`, `canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`, `canonical_promo_product`, `job_execution`, `job_item` |
-| [Pricing](modules/pricing.md) | `price_policy` (versioned), `price_policy_assignment`, `price_decision` (policy_snapshot, explanation format, strategy_type `MANUAL_OVERRIDE` for bulk), `pricing_run` (trigger_type incl. `MANUAL_BULK`, `request_hash`), `manual_price_lock` |
+| [Pricing](modules/pricing.md) | `price_policy` (versioned, `last_preview_version` for mandatory preview gate), `price_policy_assignment`, `price_decision` (policy_snapshot, explanation format, strategy_type `MANUAL_OVERRIDE` for bulk), `pricing_run` (trigger_type incl. `MANUAL_BULK`, `request_hash`; statuses: PENDING, IN_PROGRESS, COMPLETED, COMPLETED_WITH_ERRORS, FAILED, PAUSED, CANCELLED), `manual_price_lock` |
 | [Execution](modules/execution.md) | `price_action` (extended: decision FK, audit fields, reconciliation_source), `price_action_attempt` (provider request/response summaries, reconciliation read), `deferred_action`, `outbox_event`, `simulated_offer_state` |
 | [Promotions](modules/promotions.md) | `promo_policy` (versioned), `promo_policy_assignment`, `promo_evaluation_run`, `promo_evaluation`, `promo_decision` (policy_snapshot), `promo_action`, `promo_action_attempt`. Canonical truth: `canonical_promo_campaign`, `canonical_promo_product` (owned by ETL, read + updated by Promotions) |
 | [Seller Operations](modules/seller-operations.md) | `saved_view`, `working_queue_definition`, `working_queue_assignment` |
@@ -95,7 +95,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | 1 | Pipeline строго последовательный: Raw → Normalized → Canonical → Analytics |
 | 2 | Бизнес-логика работает только с canonical и analytics |
 | 3 | PostgreSQL — единственный source of truth для business state |
-| 4 | ClickHouse — read-only для бизнес-логики |
+| 4 | ClickHouse — read-only для бизнес-логики. Pricing signal assembler читает derived signals из ClickHouse (transitive dependency). При ClickHouse unavailability — graceful degradation per signal criticality ([Pricing §Signal criticality](modules/pricing.md#signal-criticality-и-clickhouse-fallback)): REQUIRED signals cascade fallback → per-SKU HOLD; OPTIONAL signals → safe default; pricing run = COMPLETED_WITH_ERRORS (не FAILED). Полный ClickHouse failure при TARGET_MARGIN → все offers = HOLD. PRICE_CORRIDOR — не зависит от ClickHouse. Не кэширует stale signals |
 | 5 | Provider DTO не протекают за границу adapter |
 | 6 | Каждая каноническая запись прослеживаема до raw source |
 | 7 | fact_finance материализуется 1:1 из canonical_finance_entry (composite row per entry, без группировки). Sorting key: `(connection_id, source_platform, entry_id)` |

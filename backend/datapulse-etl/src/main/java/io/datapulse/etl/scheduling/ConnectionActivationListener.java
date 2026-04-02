@@ -2,6 +2,7 @@ package io.datapulse.etl.scheduling;
 
 import java.util.Map;
 
+import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.integration.domain.ConnectionStatus;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
@@ -20,6 +21,7 @@ public class ConnectionActivationListener {
 
   private final JobExecutionRepository jobExecutionRepository;
   private final OutboxService outboxService;
+  private final IngestResultReporter resultReporter;
 
   @EventListener
   @Transactional
@@ -46,6 +48,8 @@ public class ConnectionActivationListener {
         "job_execution",
         jobId,
         Map.of("jobExecutionId", jobId, "connectionId", connectionId));
+
+    resultReporter.updateSyncStateSyncing(connectionId);
 
     log.info("FULL_SYNC dispatched for activated connection: connectionId={}, jobExecutionId={}",
         connectionId, jobId);

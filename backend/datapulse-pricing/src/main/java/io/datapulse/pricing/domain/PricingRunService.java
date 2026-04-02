@@ -143,7 +143,8 @@ public class PricingRunService {
 
             PricePolicyEntity policy = offer.policy();
             PolicySnapshot snapshot = buildSnapshot(policy);
-            GuardConfig guardConfig = parseGuardConfig(policy.getGuardConfig());
+            GuardConfig guardConfig = parseGuardConfig(policy.getGuardConfig())
+                    .withMinMarginPct(policy.getMinMarginPct());
 
             PriceDecisionEntity decision = processSingleOffer(
                     run, offer, signalSet, policy, snapshot, guardConfig);

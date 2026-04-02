@@ -61,6 +61,7 @@
 |----------|-------|------|---------------|
 | `PARTICIPATE` | `--status-success` | Зелёная точка | Участвовать |
 | `DECLINE` | `--status-neutral` | Серая точка | Отказать |
+| `DEACTIVATE` | `--status-error` | Красная точка | Деактивировать |
 | `PENDING_REVIEW` | `--status-warning` | Жёлтая точка | На проверку |
 
 ### Promo action status (promo_action.status)
@@ -491,8 +492,8 @@ AG Grid. Дефолтная сортировка: `participation_status ASC` (EL
 
 | Действие | Условие | Роли | API |
 |----------|---------|------|-----|
-| Одобрить все | Все выбранные имеют promo_action в `PENDING_APPROVAL` | PRICING_MANAGER+ | Batch `POST /api/promo/actions/{id}/approve` per action |
-| Отклонить все | Все выбранные имеют promo_action в `PENDING_APPROVAL` | PRICING_MANAGER+ | Batch `POST /api/promo/actions/{id}/reject` per action. Модальное подтверждение с полем «Причина» |
+| Одобрить все | Все выбранные имеют promo_action в `PENDING_APPROVAL` | PRICING_MANAGER+ | `POST /api/promo/actions/bulk-approve` Body: `{ actionIds: [...] }` |
+| Отклонить все | Все выбранные имеют promo_action в `PENDING_APPROVAL` | PRICING_MANAGER+ | `POST /api/promo/actions/bulk-reject` Body: `{ actionIds: [...], reason }`. Модальное подтверждение с полем «Причина» |
 | Экспорт | Любое выделение | ANALYST+ | CSV export |
 
 Если выборка смешанная (часть с PENDING_APPROVAL, часть без): кнопки «Одобрить/Отклонить» показывают count рядом — «Одобрить (8 из 12)». Применяется только к eligible строкам.
@@ -1346,7 +1347,7 @@ Read-only экран. Все write-действия — через Экран 2 
 | `ELIGIBLE`, action `PENDING_APPROVAL` | PENDING_APPROVAL | [Одобрить] [Отклонить] [Отменить] | [Участвовать] — «Действие уже создано» |
 | `ELIGIBLE`, action `APPROVED` | APPROVED | [Отменить] | [Участвовать] [Одобрить] |
 | `ELIGIBLE`, action `EXECUTING` | EXECUTING | — (все disabled) | «Действие выполняется» |
-| `PARTICIPATING` | any terminal | [Отклонить (удалить из акции)] | [Участвовать] — «Уже участвует» |
+| `PARTICIPATING` | any terminal | [Удалить из акции] | [Участвовать] — «Уже участвует» |
 | `DECLINED` / `AUTO_DECLINED` | — | [Участвовать] | [Отклонить] — «Уже отклонён» |
 | `BANNED` | — | — (все disabled) | «Заблокирован маркетплейсом» |
 | Campaign `FROZEN` | any | — (все disabled) | «Кампания заморожена» |
@@ -1399,11 +1400,23 @@ Read-only экран. Все write-действия — через Экран 2 
 |----------|----------|
 | Кнопка | Ghost (compact), icon `x-circle` + текст «Отклонить» |
 | Роли | PRICING_MANAGER, ADMIN, OWNER |
-| Условие | participation_status = ELIGIBLE или PARTICIPATING, campaign не FROZEN/ENDED |
+| Условие | participation_status = ELIGIBLE, campaign не FROZEN/ENDED |
 | UI | Click → popup form |
 | Форма | Причина (Text input, optional но рекомендуемо). Placeholder: «Укажите причину отклонения» |
 | API | `POST /api/promo/products/{promoProductId}/decline` Body: `{ reason? }` |
 | Feedback | Toast (success): «Товар отклонён.» Строка обновляется: participation_status → DECLINED |
+
+#### Действие: Удалить из акции (Deactivate participating product)
+
+| Свойство | Значение |
+|----------|----------|
+| Кнопка | Danger (compact), icon `log-out` + текст «Удалить из акции» |
+| Роли | PRICING_MANAGER, ADMIN, OWNER |
+| Условие | participation_status = PARTICIPATING, campaign не FROZEN/ENDED |
+| UI | Click → popup form |
+| Форма | Причина (Text input, optional но рекомендуемо). Placeholder: «Укажите причину выхода из акции» |
+| API | `POST /api/promo/products/{promoProductId}/deactivate` Body: `{ reason? }` |
+| Feedback | Toast (success): «Товар удалён из акции. Действие создано.» Строка: action_status → APPROVED (DEACTIVATE) |
 
 #### Действие: Одобрить (Approve pending action)
 
@@ -1483,6 +1496,7 @@ Read-only экран. Все write-действия — через Экран 2 
 |----------|----------|-------|------|
 | Participate | `POST /api/promo/products/{promoProductId}/participate` | POST | `{ targetPromoPrice?, reason? }` |
 | Decline | `POST /api/promo/products/{promoProductId}/decline` | POST | `{ reason? }` |
+| Deactivate | `POST /api/promo/products/{promoProductId}/deactivate` | POST | `{ reason? }` |
 | Approve | `POST /api/promo/actions/{actionId}/approve` | POST | — |
 | Reject | `POST /api/promo/actions/{actionId}/reject` | POST | `{ reason }` |
 | Cancel | `POST /api/promo/actions/{actionId}/cancel` | POST | `{ cancelReason }` |

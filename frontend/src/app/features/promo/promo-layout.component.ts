@@ -16,7 +16,8 @@ interface PromoTab {
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe],
   template: `
     <div class="flex h-full min-h-0 flex-col">
-      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6">
+      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6
+                  [&>a:first-child]:pl-0">
         @for (tab of tabs; track tab.path) {
           <a
             [routerLink]="getTabRoute(tab.path)"

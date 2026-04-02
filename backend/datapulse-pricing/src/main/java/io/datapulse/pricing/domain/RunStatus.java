@@ -5,9 +5,16 @@ public enum RunStatus {
     IN_PROGRESS,
     COMPLETED,
     COMPLETED_WITH_ERRORS,
-    FAILED;
+    FAILED,
+    PAUSED,
+    CANCELLED;
 
     public boolean isTerminal() {
-        return this == COMPLETED || this == COMPLETED_WITH_ERRORS || this == FAILED;
+        return this == COMPLETED || this == COMPLETED_WITH_ERRORS
+                || this == FAILED || this == CANCELLED;
+    }
+
+    public boolean isResumable() {
+        return this == PAUSED;
     }
 }

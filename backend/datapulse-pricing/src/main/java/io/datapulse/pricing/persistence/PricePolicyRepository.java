@@ -6,6 +6,8 @@ import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,4 +37,11 @@ public interface PricePolicyRepository extends JpaRepository<PricePolicyEntity, 
             PolicyType strategyType, Pageable pageable);
 
     Optional<PricePolicyEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
+
+    @Query("""
+        SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END
+        FROM PricePolicyAssignmentEntity a
+        WHERE a.pricePolicyId = :policyId AND a.scopeType = 'CONNECTION'
+        """)
+    boolean existsConnectionScopeAssignment(@Param("policyId") Long policyId);
 }

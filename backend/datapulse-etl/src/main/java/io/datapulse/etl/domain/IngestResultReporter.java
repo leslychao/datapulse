@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import io.datapulse.etl.persistence.JobExecutionRow;
+import io.datapulse.integration.domain.SyncStatus;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.platform.outbox.OutboxEventType;
@@ -30,12 +31,40 @@ public class IngestResultReporter {
     private final MarketplaceSyncStateRepository syncStateRepository;
     private final ObjectMapper objectMapper;
 
+    public void updateSyncStateSyncing(long connectionId) {
+        List<MarketplaceSyncStateEntity> states =
+                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+        OffsetDateTime now = OffsetDateTime.now();
+        for (MarketplaceSyncStateEntity state : states) {
+            state.setStatus(SyncStatus.SYNCING.name());
+            state.setLastSyncAt(now);
+            state.setErrorMessage(null);
+        }
+        syncStateRepository.saveAll(states);
+    }
+
     public void updateSyncStateSuccess(long connectionId) {
         List<MarketplaceSyncStateEntity> states =
                 syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+        OffsetDateTime now = OffsetDateTime.now();
         for (MarketplaceSyncStateEntity state : states) {
-            state.setLastSuccessAt(OffsetDateTime.now());
-            state.setStatus("IDLE");
+            state.setStatus(SyncStatus.IDLE.name());
+            state.setLastSuccessAt(now);
+            state.setNextScheduledAt(now.plusHours(6));
+            state.setErrorMessage(null);
+        }
+        syncStateRepository.saveAll(states);
+    }
+
+    public void updateSyncStateError(long connectionId, String errorMessage) {
+        List<MarketplaceSyncStateEntity> states =
+                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+        for (MarketplaceSyncStateEntity state : states) {
+            state.setStatus(SyncStatus.ERROR.name());
+            if (errorMessage != null) {
+                state.setErrorMessage(
+                        errorMessage.length() > 1000 ? errorMessage.substring(0, 1000) : errorMessage);
+            }
         }
         syncStateRepository.saveAll(states);
     }

@@ -551,6 +551,7 @@
 
   "promo.decision_type.PARTICIPATE": "Участие",
   "promo.decision_type.DECLINE": "Отказ",
+  "promo.decision_type.DEACTIVATE": "Деактивация",
   "promo.decision_type.PENDING_REVIEW": "На проверке",
 
   "promo.action_status.PENDING_APPROVAL": "Ожидает",
@@ -613,6 +614,10 @@
   "promo.detail.toast.approve_error": "Не удалось одобрить действие",
   "promo.detail.toast.reject_success": "Действие отклонено",
   "promo.detail.toast.reject_error": "Не удалось отклонить действие",
+  "promo.detail.toast.deactivate_success": "Товар удалён из акции",
+  "promo.detail.toast.deactivate_error": "Не удалось удалить товар из акции",
+  "promo.detail.toast.cancel_success": "Действие отменено",
+  "promo.detail.toast.cancel_error": "Не удалось отменить действие",
 
   "promo.policies.title": "Промо-политики",
   "promo.policies.create": "Создать политику",
@@ -716,6 +721,7 @@
   "promo.product.not_eligible": "Товар не может участвовать в данной акции.",
   "promo.product.not_participating": "Товар не участвует в данной акции.",
   "promo.campaign.frozen": "Срок подачи заявки на участие в акции истёк.",
+  "promo.wb.write_unavailable": "Автоматическое управление промо для WB временно недоступно. Используйте ЛК Wildberries.",
 
   "grid.export.too_many_rows": "Слишком много строк для экспорта ({{count}}). Максимум: {{max}}. Сузьте фильтры.",
   "saved_view.not_found": "Сохранённый вид не найден.",
@@ -910,6 +916,7 @@
   "detail.promo.decision": "Решение",
   "detail.promo.decision_PARTICIPATE": "Участие",
   "detail.promo.decision_DECLINE": "Отказ",
+  "detail.promo.decision_DEACTIVATE": "Деактивация",
   "detail.promo.decision_PENDING_REVIEW": "На рассмотрении",
   "detail.promo.promo_price": "Промо-цена",
   "detail.promo.margin_at_promo": "Маржа при промо",
@@ -1959,6 +1966,10 @@
   "analytics.reconciliation.residual": "Расхождение",
   "analytics.reconciliation.residual_pct": "Расхождение, %",
   "analytics.reconciliation.baseline_pct": "Базовый уровень, %",
+
+  "analytics.clickhouse.unavailable": "Аналитика временно недоступна. Повторная попытка через несколько секунд.",
+  "analytics.unavailable.banner": "Аналитика временно недоступна. Данные обновятся автоматически.",
+  "analytics.unavailable.last_updated": "Последнее обновление: {{time}}",
 
   "mismatches.title": "Расхождения",
   "mismatches.kpi.active": "Активные",

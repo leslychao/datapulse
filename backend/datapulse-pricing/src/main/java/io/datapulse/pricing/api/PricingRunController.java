@@ -49,4 +49,22 @@ public class PricingRunController {
             @PathVariable("runId") Long runId) {
         return runApiService.getRun(runId, workspaceId);
     }
+
+    @PostMapping("/{runId}/resume")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    public void resumeRun(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("runId") long runId) {
+        runApiService.resumeRun(runId, workspaceId);
+    }
+
+    @PostMapping("/{runId}/cancel")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    public void cancelRun(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("runId") long runId) {
+        runApiService.cancelRun(runId, workspaceId);
+    }
 }

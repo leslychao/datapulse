@@ -1,5 +1,8 @@
 package io.datapulse.pricing.domain;
 
+import java.math.BigDecimal;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -13,12 +16,33 @@ public record GuardConfig(
         @JsonProperty("volatility_guard_period_days") Integer volatilityGuardPeriodDays,
         @JsonProperty("promo_guard_enabled") Boolean promoGuardEnabled,
         @JsonProperty("stock_out_guard_enabled") Boolean stockOutGuardEnabled,
-        @JsonProperty("stale_data_guard_hours") Integer staleDataGuardHours
+        @JsonProperty("stale_data_guard_hours") Integer staleDataGuardHours,
+        @JsonIgnore BigDecimal minMarginPct
 ) {
 
+    public GuardConfig(Boolean marginGuardEnabled, Boolean frequencyGuardEnabled,
+                       Integer frequencyGuardHours, Boolean volatilityGuardEnabled,
+                       Integer volatilityGuardReversals, Integer volatilityGuardPeriodDays,
+                       Boolean promoGuardEnabled, Boolean stockOutGuardEnabled,
+                       Integer staleDataGuardHours) {
+        this(marginGuardEnabled, frequencyGuardEnabled, frequencyGuardHours,
+                volatilityGuardEnabled, volatilityGuardReversals, volatilityGuardPeriodDays,
+                promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours, null);
+    }
+
     public static final GuardConfig DEFAULTS = new GuardConfig(
-            true, true, 24, true, 3, 7, true, true, 24
+            true, true, 24, true, 3, 7, true, true, 24, null
     );
+
+    public GuardConfig withMinMarginPct(BigDecimal pct) {
+        return new GuardConfig(marginGuardEnabled, frequencyGuardEnabled, frequencyGuardHours,
+                volatilityGuardEnabled, volatilityGuardReversals, volatilityGuardPeriodDays,
+                promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours, pct);
+    }
+
+    public BigDecimal effectiveMinMarginPct() {
+        return minMarginPct;
+    }
 
     public boolean isMarginGuardEnabled() {
         return marginGuardEnabled == null || marginGuardEnabled;

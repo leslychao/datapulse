@@ -3,6 +3,7 @@ package io.datapulse.etl.scheduling;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.integration.domain.event.SyncTriggeredEvent;
 import io.datapulse.platform.outbox.OutboxEventType;
@@ -20,6 +21,7 @@ public class SyncTriggeredListener {
 
   private final JobExecutionRepository jobExecutionRepository;
   private final OutboxService outboxService;
+  private final IngestResultReporter resultReporter;
 
   @EventListener
   @Transactional
@@ -46,6 +48,8 @@ public class SyncTriggeredListener {
         "job_execution",
         jobId,
         payload);
+
+    resultReporter.updateSyncStateSyncing(connectionId);
 
     log.info("MANUAL_SYNC dispatched: connectionId={}, jobExecutionId={}, domains={}",
         connectionId, jobId, event.domains());

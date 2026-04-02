@@ -18,8 +18,8 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
   imports: [LucideAngularModule, TranslatePipe, FormModalComponent, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex items-center border-b border-[var(--border-default)] px-3">
-      <div class="flex items-center gap-0.5 overflow-x-auto">
+    <div class="flex items-center border-b border-[var(--border-default)] px-6">
+      <div class="flex items-center gap-0.5 overflow-x-auto [&>button:first-child]:pl-0">
         @for (view of viewsQuery.data() ?? []; track view.id) {
           <button
             (click)="selectView(view)"
@@ -41,7 +41,7 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
 
       <button
         (click)="showCreateModal.set(true)"
-        class="ml-1 flex cursor-pointer items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        class="flex cursor-pointer items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
         [attr.aria-label]="'grid.views.create' | translate"
       >
         <lucide-icon [img]="PlusIcon" [size]="14"></lucide-icon>

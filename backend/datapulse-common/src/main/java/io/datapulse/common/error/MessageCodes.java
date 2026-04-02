@@ -85,6 +85,7 @@ public final class MessageCodes {
     public static final String PRICING_GUARD_STALE_DATA_STALE = "pricing.guard.stale_data.stale";
     public static final String PRICING_GUARD_STOCK_OUT = "pricing.guard.stock_out";
     public static final String PRICING_GUARD_MARGIN_NEGATIVE = "pricing.guard.margin_negative";
+    public static final String PRICING_GUARD_MARGIN_BELOW_THRESHOLD = "pricing.guard.margin_below_threshold";
     public static final String PRICING_GUARD_FREQUENCY = "pricing.guard.frequency";
     public static final String PRICING_GUARD_VOLATILITY = "pricing.guard.volatility";
     public static final String PRICING_GUARD_PROMO_ACTIVE = "pricing.guard.promo_active";
@@ -107,6 +108,12 @@ public final class MessageCodes {
     public static final String PRICING_BULK_DUPLICATE = "pricing.bulk.duplicate";
     public static final String PRICING_BULK_TOO_LARGE = "pricing.bulk.too_large";
     public static final String PRICING_AUTOMATION_BLOCKED = "pricing.automation.blocked";
+    public static final String PRICING_RUN_NOT_RESUMABLE = "pricing.run.not_resumable";
+    public static final String PRICING_RUN_NOT_CANCELLABLE = "pricing.run.not_cancellable";
+    public static final String PRICING_POLICY_FULL_AUTO_GATE_FAILED = "pricing.policy.full_auto_gate_failed";
+    public static final String PRICING_POLICY_FULL_AUTO_CONFIRM_REQUIRED = "pricing.policy.full_auto_confirm_required";
+    public static final String PRICING_POLICY_PREVIEW_REQUIRED = "pricing.policy.preview_required_for_full_auto";
+    public static final String PRICING_RUN_BLAST_RADIUS_BREACHED = "pricing.run.blast_radius_breached";
 
     // --- Pricing: Impact Preview ---
     public static final String PRICING_PREVIEW_OFFER_INACTIVE = "pricing.preview.offer_inactive";
@@ -150,11 +157,15 @@ public final class MessageCodes {
     public static final String PROMO_PRODUCT_NOT_ELIGIBLE = "promo.product.not_eligible";
     public static final String PROMO_PRODUCT_NOT_PARTICIPATING = "promo.product.not_participating";
     public static final String PROMO_CAMPAIGN_FROZEN = "promo.campaign.frozen";
+    public static final String PROMO_WB_WRITE_UNAVAILABLE = "promo.wb.write_unavailable";
 
     // --- Seller Operations ---
     public static final String GRID_EXPORT_TOO_MANY_ROWS = "grid.export.too_many_rows";
     public static final String SAVED_VIEW_NOT_FOUND = "saved_view.not_found";
     public static final String SAVED_VIEW_SYSTEM_READONLY = "saved_view.system_readonly";
+
+    // --- Analytics ---
+    public static final String ANALYTICS_CLICKHOUSE_UNAVAILABLE = "analytics.clickhouse.unavailable";
 
     // --- Seller Operations: Working Queues ---
     public static final String QUEUE_NOT_FOUND = "queue.not_found";

@@ -17,7 +17,7 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex items-center justify-between border-b border-[var(--border-default)] px-3 py-2">
+    <div class="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-2">
       <div class="flex items-center gap-3">
         <dp-search-input
           [placeholder]="'grid.search_placeholder' | translate"

@@ -392,9 +392,10 @@ export class ConnectionDetailPageComponent {
       field: 'status',
       flex: 1,
       cellStyle: (params) => {
-        if (params.value === 'OK') return { color: 'var(--status-success)' };
+        if (params.value === 'IDLE') return { color: 'var(--status-success)' };
+        if (params.value === 'SYNCING') return { color: 'var(--status-info)' };
         if (params.value === 'ERROR') return { color: 'var(--status-error)' };
-        return { color: 'var(--status-warning)' };
+        return { color: 'var(--text-secondary)' };
       },
     },
     {

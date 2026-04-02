@@ -32,7 +32,8 @@ public class PricingConstraintResolver {
         price = applyMinPrice(price, policy.minPrice(), applied);
         price = applyMaxPrice(price, policy.maxPrice(), applied);
         price = applyMaxPriceChange(price, signals.currentPrice(), policy.maxPriceChangePct(), applied);
-        price = applyMinMargin(price, signals.cogs(), policy.minMarginPct(), applied);
+        price = applyMinMargin(price, signals, policy.minMarginPct(), applied);
+        price = applyMarketplaceMinPrice(price, signals.marketplaceMinPrice(), applied);
         price = applyRounding(price, policy, applied);
 
         return new ConstraintResolution(price, applied);
@@ -79,13 +80,16 @@ public class PricingConstraintResolver {
         return price;
     }
 
-    private BigDecimal applyMinMargin(BigDecimal price, BigDecimal cogs, BigDecimal minMarginPct,
+    private BigDecimal applyMinMargin(BigDecimal price, PricingSignalSet signals,
+                                      BigDecimal minMarginPct,
                                       List<ConstraintRecord> applied) {
+        BigDecimal cogs = signals.cogs();
         if (minMarginPct == null || cogs == null || cogs.compareTo(BigDecimal.ZERO) <= 0) {
             return price;
         }
 
-        BigDecimal denominator = BigDecimal.ONE.subtract(minMarginPct);
+        BigDecimal effectiveCostRate = computeEffectiveCostRate(signals);
+        BigDecimal denominator = BigDecimal.ONE.subtract(minMarginPct).subtract(effectiveCostRate);
         if (denominator.compareTo(BigDecimal.ZERO) <= 0) {
             return price;
         }
@@ -96,6 +100,34 @@ public class PricingConstraintResolver {
             return marginFloor;
         }
         return price;
+    }
+
+    private BigDecimal applyMarketplaceMinPrice(BigDecimal price, BigDecimal marketplaceMinPrice,
+                                                 List<ConstraintRecord> applied) {
+        if (marketplaceMinPrice != null && price.compareTo(marketplaceMinPrice) < 0) {
+            applied.add(new ConstraintRecord("marketplace_min_price", price, marketplaceMinPrice));
+            return marketplaceMinPrice;
+        }
+        return price;
+    }
+
+    private BigDecimal computeEffectiveCostRate(PricingSignalSet signals) {
+        BigDecimal rate = BigDecimal.ZERO;
+        if (signals.avgCommissionPct() != null) {
+            rate = rate.add(signals.avgCommissionPct());
+        }
+        if (signals.avgLogisticsPerUnit() != null && signals.currentPrice() != null
+                && signals.currentPrice().compareTo(BigDecimal.ZERO) > 0) {
+            rate = rate.add(signals.avgLogisticsPerUnit()
+                    .divide(signals.currentPrice(), 4, RoundingMode.HALF_UP));
+        }
+        if (signals.returnRatePct() != null) {
+            rate = rate.add(signals.returnRatePct());
+        }
+        if (signals.adCostRatio() != null) {
+            rate = rate.add(signals.adCostRatio());
+        }
+        return rate;
     }
 
     private BigDecimal applyRounding(BigDecimal price, PolicySnapshot policy,

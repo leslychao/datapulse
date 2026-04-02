@@ -351,6 +351,9 @@ CanonicalOffer реализована как три таблицы: `product_mas
 | `price` | `price` | C | |
 | `discountPrice` | `discount_price` | C (Ozon) / A (WB) | Ozon: `marketing_seller_price`; WB: computed |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
+| `discountPercent` | `discount_pct` | C (WB) / B (Ozon) | WB: `discount` (seller discount %). Ozon: computed `((old_price - price) / old_price * 100)` if `old_price > 0`, else NULL |
+| `minPrice` | `min_price` | C (Ozon) / — (WB) | Ozon: `price.min_price` (marketplace-enforced floor). WB: NULL (нет аналога в API) |
+| `maxPrice` | `max_price` | — | Neither provider exposes max price constraint. Reserved for future use. Always NULL |
 | (ingestion time) | `captured_at` | C | Set from rawArtifact.capturedAt |
 
 ---
@@ -456,6 +459,8 @@ For product-level stock: `SUM(quantity) GROUP BY nmId, warehouseId`.
 | `currency` | `currency` | C (Ozon) / A (WB) | |
 | `orderDate` | `order_date` | C | |
 | `status` | `status` | C (Ozon) / A (WB) | |
+| `fulfillmentType` | `fulfillment_type` | C (Ozon) / B (WB) | Ozon: derived from endpoint (`/v2/posting/fbo/list` → `FBO`, `/v3/posting/fbs/list` → `FBS`). WB: inferred from `warehouseType` or hardcoded per endpoint; less reliable |
+| `region` | `region` | C (Ozon) / — (WB) | Ozon: `analytics_data.city` (FBS) / `analytics_data.region` (FBO). WB: NULL (not available in orders API) |
 
 ---
 
@@ -572,6 +577,8 @@ SPP не включается в формулу P&L как отдельная с
 | `commission` | `commission` | C (Ozon) / C-docs (WB) | WB: `ppvz_sales_commission` from finance report (positive, DEBIT) |
 | `currency` | `currency` | C (Ozon) / C-docs (WB) | |
 | `saleDate` | `sale_date` | C (Ozon) / C-docs (WB) | WB: `sale_dt` from finance report |
+| (resolved) | `canonical_order_id` (FK → canonical_order) | B | Resolved post-persist: lookup `canonical_order` by `(connection_id, external_order_id)` where `external_order_id` = WB `srid` / Ozon `posting_number`. NULL if order not yet ingested |
+| `postingId` | `posting_id` | C | WB: `srid` (same as `external_sale_id`, DD-18). Ozon: `posting_number`. Join key for order ↔ sale reconciliation |
 
 ---
 
@@ -653,6 +660,8 @@ Must combine with `reportDetailByPeriod` for monetary values.
 | `returnReason` | `return_reason` | C | |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
 | `returnDate` | `return_date` | C (Ozon) / U (WB) | |
+| (resolved) | `canonical_order_id` (FK → canonical_order) | B | Resolved post-persist: lookup `canonical_order` by `(connection_id, external_order_id)`. WB: via `srid` / `order_id` from goods-return. Ozon: via `order_number`. NULL if order not yet ingested |
+| `status` | `status` | C (Ozon) / A (WB) | WB: `status` from goods-return (e.g. `"На складе продавца"`). Ozon: `visual.status.sys_name` (e.g. `"ReturnedToOzon"`) |
 
 ---
 
@@ -875,6 +884,7 @@ Canonical DDL содержит per-measure columns (DD-8 composite row model). N
 | (resolved) | `seller_sku_id` (FK → seller_sku) | C | Via offer lookup; NULL if SKU not found |
 | `currency` | `currency` | C (Ozon) / A (WB) | |
 | `entryDate` | `entry_date` | C (Ozon) / A (WB) | Ozon: custom format! |
+| (resolved) | `warehouse_id` (FK → warehouse) | B (WB) / B (Ozon) | WB: `ppvz_office_id` → lookup `warehouse.external_warehouse_id`. Ozon: `posting.warehouse_id` → lookup `warehouse.external_warehouse_id`. NULL for standalone operations (no warehouse context) |
 
 **Per-measure mapping (WB):**
 

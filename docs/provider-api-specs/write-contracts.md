@@ -412,7 +412,17 @@ CMD_WB_PRICE_UPLOAD_DETAILS:
 - WB: async poll result (`historyGoods[].errorText` empty = success)
 - Ozon: synchronous `result[].updated: true`
 
-The architecture (ADR-016) explicitly requires `RECONCILIATION_PENDING` → `RECONCILED` / `RECONCILIATION_FAILED` lifecycle, but the current implementation goes directly to `SUCCESS`.
+The architecture requires `RECONCILIATION_PENDING` → `SUCCEEDED` / `FAILED` lifecycle with read-after-write verification, but the current implementation goes directly to `SUCCEEDED` based on primary evidence only.
+
+**Architecture status (2026-04-02):** Reconciliation fully specified in [Execution §Reconciliation](../modules/execution.md#reconciliation):
+- Evidence hierarchy (primary write confirmation + secondary read-after-write)
+- Reconciliation tolerance (exact match for both WB and Ozon)
+- Primary-secondary conflict resolution with SLA
+- Deferred reconciliation flow through outbox (30s → 60s → 120s backoff, max 3 attempts, 10min timeout)
+- WB poll error handling (poll failure ≠ write failure → RECONCILIATION_PENDING)
+- Stuck-state detector self-monitoring
+
+**Implementation priority:** Phase D. Risk: R-08 (ложный SUCCEEDED).
 
 ### F-5: WB Price Truncation Risk (MEDIUM)
 

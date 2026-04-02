@@ -21,6 +21,7 @@ public record PricingSignalSet(
         BigDecimal adCostRatio,
         OffsetDateTime lastPriceChangeAt,
         Integer priceReversalsInPeriod,
-        OffsetDateTime dataFreshnessAt
+        OffsetDateTime dataFreshnessAt,
+        BigDecimal marketplaceMinPrice
 ) {
 }

@@ -17,6 +17,7 @@ public record PricingRunResponse(
         Integer holdCount,
         OffsetDateTime startedAt,
         OffsetDateTime completedAt,
+        Object errorDetails,
         OffsetDateTime createdAt
 ) {
 }

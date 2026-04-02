@@ -79,6 +79,7 @@ public class IngestOrchestrator {
                     jobExecutionId, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.FAILED);
             jobExecutionRepository.updateErrorDetails(jobExecutionId,
                     "{\"error\": \"%s\"}".formatted(escapeJson(e.getMessage())));
+            resultReporter.updateSyncStateError(job.getConnectionId(), e.getMessage());
         }
     }
 
@@ -144,6 +145,8 @@ public class IngestOrchestrator {
                         resultReporter.buildErrorDetails(results));
                 jobExecutionRepository.updateCheckpoint(jobId,
                         checkpointManager.serialize(results, retryCount));
+                resultReporter.updateSyncStateError(job.getConnectionId(),
+                        "Sync failed: all domains returned errors");
             });
             log.info("Ingest completed: jobExecutionId={}, status={}", jobId, ingestStatus);
             return;

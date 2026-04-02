@@ -27,11 +27,7 @@ public class PricingRunApiService {
 
     @Transactional
     public PricingRunResponse triggerManualRun(long connectionId, long workspaceId) {
-        boolean inProgress = runRepository.existsByConnectionIdAndStatus(
-                connectionId, RunStatus.IN_PROGRESS);
-        if (inProgress) {
-            throw BadRequestException.of(MessageCodes.PRICING_RUN_ALREADY_IN_PROGRESS);
-        }
+        ensureNoRunInProgress(connectionId);
 
         var run = new PricingRunEntity();
         run.setWorkspaceId(workspaceId);
@@ -44,6 +40,71 @@ public class PricingRunApiService {
                 saved.getId(), connectionId, workspaceId);
 
         return runMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public void triggerPostSyncRun(long connectionId, long workspaceId,
+                                   long sourceJobExecutionId) {
+        if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)
+                || runRepository.existsBySourceJobExecutionId(sourceJobExecutionId)) {
+            log.debug("POST_SYNC run skipped: connectionId={}, jobId={} (in-progress or duplicate)",
+                    connectionId, sourceJobExecutionId);
+            return;
+        }
+
+        var run = new PricingRunEntity();
+        run.setWorkspaceId(workspaceId);
+        run.setConnectionId(connectionId);
+        run.setTriggerType(RunTriggerType.POST_SYNC);
+        run.setSourceJobExecutionId(sourceJobExecutionId);
+        run.setStatus(RunStatus.PENDING);
+
+        PricingRunEntity saved = runRepository.save(run);
+        log.info("POST_SYNC pricing run triggered: id={}, connectionId={}, jobId={}",
+                saved.getId(), connectionId, sourceJobExecutionId);
+    }
+
+    @Transactional
+    public void triggerScheduledRun(long connectionId, long workspaceId) {
+        if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)) {
+            log.debug("Scheduled run skipped: connectionId={} (run in progress)", connectionId);
+            return;
+        }
+
+        var run = new PricingRunEntity();
+        run.setWorkspaceId(workspaceId);
+        run.setConnectionId(connectionId);
+        run.setTriggerType(RunTriggerType.SCHEDULED);
+        run.setStatus(RunStatus.PENDING);
+
+        PricingRunEntity saved = runRepository.save(run);
+        log.info("Scheduled pricing run triggered: id={}, connectionId={}", saved.getId(), connectionId);
+    }
+
+    @Transactional
+    public void triggerPolicyChangeRun(long connectionId, long workspaceId) {
+        if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)) {
+            log.debug("Policy change run skipped: connectionId={} (run in progress)", connectionId);
+            return;
+        }
+
+        var run = new PricingRunEntity();
+        run.setWorkspaceId(workspaceId);
+        run.setConnectionId(connectionId);
+        run.setTriggerType(RunTriggerType.POLICY_CHANGE);
+        run.setStatus(RunStatus.PENDING);
+
+        PricingRunEntity saved = runRepository.save(run);
+        log.info("Policy change pricing run triggered: id={}, connectionId={}",
+                saved.getId(), connectionId);
+    }
+
+    private void ensureNoRunInProgress(long connectionId) {
+        boolean inProgress = runRepository.existsByConnectionIdAndStatus(
+                connectionId, RunStatus.IN_PROGRESS);
+        if (inProgress) {
+            throw BadRequestException.of(MessageCodes.PRICING_RUN_ALREADY_IN_PROGRESS);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -59,5 +120,35 @@ public class PricingRunApiService {
         PricingRunEntity entity = runRepository.findByIdAndWorkspaceId(runId, workspaceId)
                 .orElseThrow(() -> NotFoundException.entity("PricingRun", runId));
         return runMapper.toResponse(entity);
+    }
+
+    @Transactional
+    public void resumeRun(long runId, long workspaceId) {
+        PricingRunEntity entity = runRepository.findByIdAndWorkspaceId(runId, workspaceId)
+                .orElseThrow(() -> NotFoundException.entity("PricingRun", runId));
+
+        if (!entity.getStatus().isResumable()) {
+            throw BadRequestException.of(MessageCodes.PRICING_RUN_NOT_RESUMABLE,
+                    entity.getStatus().name());
+        }
+
+        entity.setStatus(RunStatus.IN_PROGRESS);
+        runRepository.save(entity);
+        log.info("Pricing run resumed: id={}, workspaceId={}", runId, workspaceId);
+    }
+
+    @Transactional
+    public void cancelRun(long runId, long workspaceId) {
+        PricingRunEntity entity = runRepository.findByIdAndWorkspaceId(runId, workspaceId)
+                .orElseThrow(() -> NotFoundException.entity("PricingRun", runId));
+
+        if (entity.getStatus() != RunStatus.PAUSED) {
+            throw BadRequestException.of(MessageCodes.PRICING_RUN_NOT_CANCELLABLE,
+                    entity.getStatus().name());
+        }
+
+        entity.setStatus(RunStatus.CANCELLED);
+        runRepository.save(entity);
+        log.info("Pricing run cancelled: id={}, workspaceId={}", runId, workspaceId);
     }
 }

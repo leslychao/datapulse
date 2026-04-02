@@ -41,8 +41,9 @@
 | `outbox_event` | Backlog PENDING/ERROR | `SELECT status, COUNT(*) FROM outbox_event GROUP BY status` |
 | `job_execution` | Длительные IN_PROGRESS / зависшие RETRY_SCHEDULED | `SELECT * FROM job_execution WHERE (status = 'IN_PROGRESS' AND started_at < now() - interval '2 hours') OR (status = 'RETRY_SCHEDULED' AND (checkpoint->>'last_retry_at')::timestamptz < now() - interval '1 hour')` |
 | `job_item` | Накопление FAILED | `SELECT * FROM job_item WHERE status IN ('FAILED', 'RETRY_SCHEDULED')` |
-| `price_action` | Actions застряли в нетерминальных статусах | `SELECT status, COUNT(*) FROM price_action WHERE status NOT IN ('SUCCEEDED','FAILED') GROUP BY status` |
-| `price_action_attempt` | Retry exhaustion | `SELECT * FROM price_action_attempt WHERE status = 'FAILED' ORDER BY completed_at DESC` |
+| `price_action` | Actions застряли в нетерминальных статусах | `SELECT status, COUNT(*) FROM price_action WHERE status NOT IN ('SUCCEEDED','FAILED','EXPIRED','CANCELLED','SUPERSEDED') GROUP BY status` |
+| `price_action_attempt` | Retry exhaustion | `SELECT * FROM price_action_attempt WHERE outcome = 'NON_RETRIABLE_FAILURE' ORDER BY completed_at DESC` |
+| `deferred_action` | Deferred actions не обработаны | `SELECT * FROM deferred_action WHERE expires_at < now()` |
 
 ## Критичные интеграции
 
@@ -120,11 +121,32 @@
 
 ### FM-8: Price action uncertain outcome
 
-**Симптомы:** Price action в RECONCILIATION_PENDING дольше ожидаемого.
+**Симптомы:** Price action в RECONCILIATION_PENDING дольше ожидаемого. Stuck-state detector (каждые 5 мин) логирует предупреждения для actions с `updated_at + 10 min < NOW()`.
 
-**Восстановление:** Reconciliation worker проверяет фактическое состояние через provider read API. При timeout → manual investigation.
+**Автоматическое восстановление:**
 
-**Действие:** `SELECT * FROM price_action WHERE status = 'RECONCILIATION_PENDING' AND updated_at < now() - interval '30 minutes'`.
+1. Reconciliation worker (deferred) проверяет фактическое состояние через provider read API:
+   - WB: `GET /api/v2/list/goods/filter` → сравнение `sizes[].price` с `target_price`
+   - Ozon: `POST /v5/product/info/prices` → сравнение `price.price` с `target_price`
+2. При match (`price_match = true`) → CAS: RECONCILIATION_PENDING → SUCCEEDED
+3. При mismatch + attempts < `max_reconciliation_attempts` (3) → новая проверка через outbox с backoff (30s → 60s → 120s)
+4. При mismatch + attempts exhausted → CAS: RECONCILIATION_PENDING → FAILED + alert `reconciliation.failed`
+5. При абсолютном timeout (`reconciliation_timeout` = 10 min) → stuck-state detector → FAILED + alert
+
+**Диагностика:**
+
+1. `SELECT id, status, updated_at, marketplace_offer_id, target_price FROM price_action WHERE status = 'RECONCILIATION_PENDING' AND updated_at < now() - interval '10 minutes'` — какие actions застряли
+2. `SELECT * FROM price_action_attempt WHERE price_action_id = :id ORDER BY attempt_number DESC` — последний attempt, reconciliation snapshot, actual_price, price_match
+3. Проверить `reconciliation_snapshot` (JSONB) — raw ответ от provider read API
+4. Проверить доступность provider read API (FM-1, FM-2)
+5. Проверить `outbox_event WHERE aggregate_id = :actionId AND event_type = 'RECONCILIATION_CHECK'` — есть ли pending reconciliation messages
+
+**Ручное разрешение (если автоматика не справилась):**
+
+1. Вручную проверить цену в кабинете маркетплейса
+2. Если цена соответствует target → `POST /api/workspaces/{id}/actions/{actionId}/reconcile` с `outcome: "SUCCEEDED"`, `manualOverrideReason: "Verified in marketplace cabinet"`
+3. Если цена не соответствует → `POST .../reconcile` с `outcome: "FAILED"`, `manualOverrideReason: "Price mismatch confirmed manually: expected={target}, actual={actual}"`
+4. Если нужно повторить → cancel + manual retry: `POST .../cancel` → `POST .../retry`
 
 ### FM-9: Vault недоступен
 
@@ -157,19 +179,40 @@
 
 ### FM-11: Price actions застряли в промежуточном статусе
 
-**Симптомы:** Price actions в EXECUTING или SCHEDULED дольше ожидаемого. Stuck-state detector (каждые 5 мин) логирует предупреждения.
+**Симптомы:** Price actions в EXECUTING, SCHEDULED, RETRY_SCHEDULED или RECONCILIATION_PENDING дольше ожидаемого. Stuck-state detector (каждые 5 мин) логирует предупреждения.
+
+**Автоматическая эскалация stuck-state detector:**
+
+| Состояние | TTL | Эскалация | Обоснование |
+|-----------|-----|-----------|-------------|
+| `SCHEDULED` | 5 min | → FAILED + alert | Outbox delivery failure — message не дошёл до worker |
+| `EXECUTING` | 5 min | → RECONCILIATION_PENDING + alert | Provider call мог быть выполнен — нужна reconciliation |
+| `RETRY_SCHEDULED` | `next_attempt_at` + 5 min | → FAILED + alert | DLX message потерялось — retry не произойдёт |
+| `RECONCILIATION_PENDING` | 10 min | → FAILED + alert | Reconciliation exhausted — manual investigation |
 
 **Диагностика:**
-1. `SELECT id, status, updated_at FROM price_action WHERE status IN ('EXECUTING', 'SCHEDULED') AND updated_at < now() - interval '15 minutes'`
-2. Проверить `price_action_attempt` — есть ли зависшие попытки
-3. Проверить логи executor-worker на marketplace API timeouts
 
-**Восстановление:**
-1. Stuck-state detector автоматически переводит застрявшие actions в `RECONCILIATION_PENDING`
-2. Reconciliation worker проверяет фактическое состояние через provider read API
-3. При подтверждении неизвестного исхода — manual investigation
+1. `SELECT id, status, updated_at, attempt_count, next_attempt_at FROM price_action WHERE status IN ('EXECUTING', 'SCHEDULED', 'RETRY_SCHEDULED', 'RECONCILIATION_PENDING') AND updated_at < now() - interval '15 minutes'` — все stuck actions
+2. `SELECT * FROM price_action_attempt WHERE price_action_id = :id ORDER BY attempt_number DESC LIMIT 1` — последний attempt: timing, outcome, error_message, provider_response_summary
+3. Логи executor-worker: `grep "action_id=:id"` — полный trace выполнения
+4. `SELECT * FROM outbox_event WHERE aggregate_id = :id ORDER BY created_at DESC` — есть ли pending/failed outbox messages
 
-**Действие:** Если проблема массовая — проверить доступность marketplace API (FM-1, FM-2). Если единичная — проверить конкретный action через `price_action_attempt.response_payload`.
+**Восстановление по типу проблемы:**
+
+| Причина | Признаки | Действие |
+|---------|----------|----------|
+| Worker не работает | Все actions в SCHEDULED, нет attempt records | Проверить executor-worker pod: `kubectl get pods -l app=executor-worker`. Рестартовать если CrashLoopBackOff |
+| Provider API timeout | attempt с `outcome = UNCERTAIN`, `error_classification = UNCERTAIN_TIMEOUT` | Stuck detector → RECONCILIATION_PENDING → FM-8. Проверить provider status page |
+| RabbitMQ delivery failure | SCHEDULED actions, outbox_event в FAILED | FM-6 (RabbitMQ недоступен). Проверить `outbox_event.last_error` |
+| Rate limit exhaustion | EXECUTING actions, worker blocked на `rateLimiter.acquire()` | Проверить Redis `rate:{connection_id}:{group}`. Если rate слишком низкий — скорректировать config |
+| Poison pill | Один конкретный action stuck, остальные Ok | Consumer consumed message без requeue. Проверить `outbox_event.last_error` для action. Manual retry после fix |
+| Массовый stuck | 10+ actions одновременно | Проверить: 1) executor-worker alive? 2) RabbitMQ connectivity? 3) Provider API? 4) Rate limit config |
+
+**Мониторинг stuck detector:**
+
+- Метрика `execution_stuck_detector_last_run_at` — если > 15 мин → alert «Stuck detector not running» (critical)
+- Метрика `execution_stuck_actions_escalated_total{state="..."}` — количество эскалированных actions per state
+- Alert: `execution_stuck_actions_escalated_total` increase > 5 за 1 час → «Mass stuck escalation» (high)
 
 ## Конфигурация
 
@@ -280,8 +323,11 @@ Consumer: AcknowledgeMode.AUTO, prefetchCount=1, defaultRequeueRejected=false
 | Очистка кеша | Configurable | Вытеснение устаревших кешей |
 | Очистка инвайтов | Configurable | Удаление просроченных инвайтов |
 | Сверка алертов | Configurable | Переоценка условий алертов |
-| Stale job detector | Каждые 15 мин | Перевод зависших `job_execution` (IN_PROGRESS > 2h, RETRY_SCHEDULED > 1h) в STALE |
+| Stale job detector (ETL) | Каждые 15 мин | Перевод зависших `job_execution` (IN_PROGRESS > 2h, RETRY_SCHEDULED > 1h) в STALE |
 | Raw retention cleanup | Ежедневно | Удаление S3 objects по retention policy, обновление `job_item.status` → EXPIRED |
+| **Stuck-state detector (Execution)** | Каждые 5 мин | Эскалация stuck `price_action`: EXECUTING (5m) → RECONCILIATION_PENDING, SCHEDULED/RETRY_SCHEDULED (5m) → FAILED, RECONCILIATION_PENDING (10m) → FAILED. Метрика: `execution_stuck_detector_last_run_at`. Alert при > 15 мин без запуска |
+| **Expiration job (Execution)** | Каждый 1 час | `PENDING_APPROVAL` → `EXPIRED` при `created_at + approval_timeout_hours < NOW()`. Метрика: `execution_expiration_job_last_run_at`. Alert при > 2 часа без запуска |
+| **Deferred action processor** | Каждые 30 сек | Проверка `deferred_action` WHERE нет active action для offer → создание нового `price_action` |
 
 ## Чеклист production readiness
 

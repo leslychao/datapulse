@@ -23,6 +23,7 @@
 | Финансы | Транзакции, комиссии, логистика, компенсации, штрафы |
 | Промо | Акции маркетплейсов, участие товаров |
 | Реклама | Кампании, статистика (показы, клики, расход). Phase B extended |
+| Поставки | Поставки на склады маркетплейсов (FBO/FBS). **Stub (Phase B).** WB only, см. G-3 |
 
 ## Обязательные свойства
 
@@ -405,6 +406,11 @@ cost_profile:
 
 `external_*_id` — provider-specific идентификатор, уникальный в рамках connection. Для WB finance: `rrd_id`; для Ozon finance: `operation_id`.
 
+**Finance corrections и идемпотентность:** провайдеры WB и Ozon не мутируют существующие finance entries — корректировки создаются как **новые записи** с новыми `rrd_id` (WB) / `operation_id` (Ozon) и противоположным знаком или специальным `entry_type`. Поэтому UPSERT по `(connection_id, source_platform, external_entry_id)` с `IS DISTINCT FROM` корректно обрабатывает все сценарии:
+- **Повторная загрузка** (overlap window) → `IS DISTINCT FROM` отсекает unchanged rows (no-churn)
+- **Новая корректировка** → новый `external_entry_id` → INSERT (не конфликтует с исходной записью)
+- **Гипотетическая мутация провайдером** (не документирована, но возможна) → UPSERT обновит row, `IS DISTINCT FROM` сработает только если данные изменились
+
 **Naming convention для marketplace identifier:** dictionary tables (`category`, `warehouse`) используют поле `marketplace_type`, flow entities (`canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`) — `source_platform`. Оба содержат одинаковые значения (`'ozon'` / `'wb'`). Разделение намеренное: `marketplace_type` — атрибут справочника (к какому маркетплейсу относится), `source_platform` — denormalized provenance field (откуда пришла запись).
 
 ### Связи каталожных сущностей
@@ -478,6 +484,7 @@ warehouse:
 | `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list |
 | `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | WB: `WbPromoSyncSource` → calendar/promotions + nomenclatures; Ozon: `OzonPromoSyncSource` → actions + products/candidates |
 | `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | **Stub (Phase B).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Blocked by F-1/F-2/F-3 |
+| `SUPPLY` | `SUPPLY_FACT` | — (no canonical entity, see G-3) | **Stub (Phase B).** WB only. `WbSupplyFactSource` registered as no-op stub. Pending `/api/v1/supplier/incomes` deprecation June 2026 |
 
 **Примечание**: WB sales и returns извлекаются из отдельных statistics/analytics endpoints (`/api/v1/supplier/sales` и `/api/v1/analytics/goods-return`) в рамках `SALES_FACT`, а не из `FACT_FINANCE`. `FACT_FINANCE` создаёт только `canonical_finance_entry`. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) обеспечивает, что canonical orders/sales/returns доступны для SKU resolution при финансовой нормализации.
 
@@ -490,7 +497,8 @@ CATEGORY_DICT ───────────────────┘      
                                          ├→ PRICE_SNAPSHOT
                                          ├→ INVENTORY_FACT
                                          ├→ ADVERTISING_FACT
-                                         └→ PROMO_SYNC
+                                         ├→ PROMO_SYNC
+                                         └→ SUPPLY_FACT (stub)
 ```
 
 | Event | Зависимости |
@@ -503,6 +511,7 @@ CATEGORY_DICT ───────────────────┘      
 | `ADVERTISING_FACT` | `PRODUCT_DICT` |
 | `FACT_FINANCE` | `SALES_FACT` |
 | `PROMO_SYNC` | `PRODUCT_DICT` |
+| `SUPPLY_FACT` | `PRODUCT_DICT`, `WAREHOUSE_DICT`. **Stub (no-op)** — см. G-3 |
 
 ## Материализация по доменам
 
@@ -519,6 +528,7 @@ CATEGORY_DICT ───────────────────┘      
 | Финансы (WB) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
 | Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below). **Stub (Phase B)** |
 | Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. Implemented |
+| Поставки | `SUPPLY_FACT` | — | — (no canonical entity, see G-3). **Stub (Phase B).** WB only |
 
 ### Pipeline invariant exception: Advertising (DD-AD-1)
 
@@ -567,6 +577,28 @@ Advertising data (`ADVERTISING_FACT`) flows **Raw (S3) → Normalized (in-proces
 | Ozon (финансы) | `yyyy-MM-dd HH:mm:ss` | Не ISO 8601; timezone — **Moscow (UTC+3), empirically confirmed 2026-03-31** |
 | WB (финансы) | Dual-format | date-only или ISO 8601; parser обязан поддерживать оба |
 | Ozon (прочие) | ISO 8601 | Стандартный формат |
+
+### Timezone normalization per domain
+
+Все canonical timestamps хранятся как `TIMESTAMPTZ` (UTC). ClickHouse `Date` / `DateTime` используют Moscow TZ для бизнес-дат. Ниже — полная таблица нормализации:
+
+| Domain | Провайдер | Source timestamp | Source TZ | Canonical conversion | Notes |
+|--------|-----------|-----------------|-----------|---------------------|-------|
+| Заказы | WB | `lastChangeDate` (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | WB orders timestamps — UTC |
+| Заказы | Ozon | `in_process_at`, `shipment_date` (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | |
+| Продажи | WB | `sale_dt` from finance (ISO 8601 / date-only) | UTC (ISO) / Moscow (date-only) | Dual-format parser: date-only → Moscow midnight → UTC (DD-9) | |
+| Продажи | Ozon | `created_at` from posting (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | |
+| Возвраты | WB | `dt` from goods-return (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | `completedDt` — аналогично, UTC |
+| Возвраты | Ozon | `returned_moment` (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | |
+| Финансы | WB | `rr_dt` (dual-format) | UTC (ISO) / Moscow (date-only) | Dual-format parser (DD-9) | |
+| Финансы | Ozon | `operation_date` (`yyyy-MM-dd HH:mm:ss`) | **Moscow (UTC+3)** | Parse as Moscow → convert to UTC | Empirically confirmed |
+| Цены | WB / Ozon | `captured_at` (ingestion time) | UTC | `TIMESTAMPTZ` as-is | Set by ETL, not provider |
+| Остатки | WB / Ozon | `captured_at` (ingestion time) | UTC | `TIMESTAMPTZ` as-is | Set by ETL, not provider |
+| Каталог | WB | `updateAt` from cards (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | |
+| Каталог | Ozon | `created_at`, `updated_at` (ISO 8601) | UTC | `TIMESTAMPTZ` as-is | |
+| Промо | WB / Ozon | `startDateTime`, `endDateTime` (ISO 8601) | UTC / Moscow | WB: Moscow → UTC; Ozon: UTC as-is | |
+
+**ClickHouse materialization:** все `Date`-колонки в ClickHouse fact/dim tables хранят дату в **Moscow TZ** (`toDate(canonical_timestamp, 'Europe/Moscow')`). Reason: бизнес-отчёты ориентированы на московское время (рабочий день продавца).
 
 ## Join keys
 
@@ -690,8 +722,8 @@ Level 0:  CATEGORY_DICT ║ WAREHOUSE_DICT              ← параллельн
               ──────── barrier: ждём оба ─────────
 Level 1:            PRODUCT_DICT                      ← один event
               ──────── barrier ────────────────────
-Level 2:  PRICE_SNAPSHOT ║ INVENTORY_FACT ║ SALES_FACT ║ ADVERTISING_FACT ║ PROMO_SYNC
-                                                        ← до 5 events параллельно
+Level 2:  PRICE_SNAPSHOT ║ INVENTORY_FACT ║ SALES_FACT ║ ADVERTISING_FACT ║ PROMO_SYNC ║ SUPPLY_FACT
+                                                        ← до 6 events параллельно (SUPPLY_FACT — stub)
               ──────── barrier: ждём SALES_FACT ──────
 Level 3:            FACT_FINANCE                      ← один event (soft dep на SALES_FACT)
 ```
@@ -709,6 +741,8 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 | Hard dependency failed (PRODUCT_DICT failed → PRICE_SNAPSHOT) | Зависимый event **пропускается**. Нет каталога = невозможен SKU resolution |
 | Soft dependency failed (SALES_FACT failed → FACT_FINANCE) | Зависимый event **выполняется** с warning. Результат может быть менее обогащённым |
 | Один event на уровне failed, другие OK | Barrier дожидается всех. Успешные events на следующем уровне выполняются, если их hard dependencies OK |
+
+**Per-event timeout:** каждый ETL event имеет configurable timeout (`datapulse.etl.event-timeout`, default: **30 минут**). Если event не завершился за это время, executor прерывает его `CompletableFuture` и маркирует event как `FAILED` с `error_type = TIMEOUT`. Уже обработанные pages сохранены (raw + canonical). Общий job timeout (default: 2 часа, `datapulse.etl.stale-job-threshold`) служит страховкой для зависших workers — stale detector переводит такие jobs в `STALE` (см. G-10).
 
 **Страницы внутри event:** обрабатываются строго последовательно (page за page). Причина — cursor-based pagination (следующая page зависит от курсора предыдущей), rate limits, memory management (streaming по одной page).
 
@@ -735,6 +769,7 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 | `SALES_FACT` | 1. `GET /api/v1/supplier/orders` 2. `GET /api/v1/supplier/sales` 3. `GET /api/v1/analytics/goods-return` | 1. `POST /v2/posting/fbo/list` 2. `POST /v3/posting/fbs/list` 3. `POST /v1/returns/list` (Ozon returns) | WB: (1), (2), (3) **последовательно**; Ozon: (1), (2), (3) **независимы** |
 | `FACT_FINANCE` | `GET /api/v5/supplier/reportDetailByPeriod` | `POST /v3/finance/transaction/list` | — |
 | `PROMO_SYNC` | 1. `GET /api/v1/calendar/promotions` 2. `GET /api/v1/calendar/promotions/nomenclatures` (per promo) | 1. `GET /v1/actions` 2. `POST /v1/actions/products` + `POST /v1/actions/candidates` (per action) | (2) зависит от promo_id из (1) — **hard**. Implemented: `WbPromoSyncSource`, `OzonPromoSyncSource` |
+| `SUPPLY_FACT` | `GET /api/v1/supplier/incomes` (deprecated June 2026) | — (Ozon: нет аналога) | **Stub (no-op).** Post-deprecation: FBS → `/api/v3/supplies` (см. G-3) |
 
 **Error handling на уровне sub-sources:**
 
@@ -755,6 +790,18 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 | Offset-based (WB Orders/Sales/Returns, Ozon Orders/Returns) | Page N пропускается, worker **продолжает** с page N+1 | Пропущенные записи подхватит следующий sync через `overlap_buffer` | Offset вычисляется арифметически, не зависит от предыдущего ответа |
 
 **Invariant:** независимо от типа pagination, все **уже обработанные** pages (1..N-1) сохранены в raw layer (S3) и canonical layer (PostgreSQL). Потеря страницы не откатывает предыдущую работу.
+
+### Pagination consistency для full-scan domains
+
+State-based full scans (prices, stocks) используют offset-based pagination. Если underlying data изменяется между page fetches (товар добавлен / удалён / цена изменилась), возможны:
+
+| Сценарий | Последствие | Mitigation |
+|----------|-------------|------------|
+| Товар добавлен между pages | Может быть пропущен (offset shift) | UPSERT следующего full scan подхватит его |
+| Товар удалён между pages | Может быть получен дважды или пропущен | Canonical хранит last-known state; orphaned records не вредят (eventual cleanup через full re-sync) |
+| Данные изменились (цена) | Получена старая или новая версия — non-deterministic | UPSERT `IS DISTINCT FROM` обновит при следующем sync |
+
+**Design rationale:** full scan domains (prices, stocks) синхронизируются каждые 15–60 минут. Transient inconsistencies между pages **не накапливаются** — каждый новый sync пересканирует полный dataset и UPSERT приводит canonical state в соответствие. Это **eventually consistent** по design, не дефект. Гарантия strong consistency для одного snapshot невозможна без transactional API на стороне провайдера (которого нет).
 
 ### Completion
 
@@ -1046,9 +1093,43 @@ PENDING → IN_PROGRESS → COMPLETED
 
 `POST /v1/description-category/tree` с `{"language":"DEFAULT"}`. Возвращает иерархию: `description_category_id` + `category_name` + `children[]`.
 
-### G-3: fact_supply (WB incomes) — RESOLVED
+### G-3: fact_supply (WB incomes) — MIGRATION PLAN
 
-WB old incomes API `/api/v1/supplier/incomes` deprecated (June 2026). **Phase A/B**: использовать endpoint. **Post-deprecation**: FBS через `/api/v3/supplies`; FBO — manual import.
+WB old incomes API `GET /api/v1/supplier/incomes` **deprecated June 2026**. Данные о поставках на склады WB полезны для inventory tracking, но не являются частью core P&L flow.
+
+**Current state (Phase A/B):**
+- Endpoint доступен, данные описаны в `wb-read-contracts.md` §Incomes capability
+- `NormalizedSupplyItem` определён в `mapping-spec.md` §8
+- Canonical entity **не определена** — данные не попадают в canonical layer
+- ETL event **не зарегистрирован** в dependency graph
+
+**Migration timeline:**
+
+| Фаза | Срок | Действие |
+|------|------|----------|
+| **Phase A** (сейчас) | До June 2026 | `SUPPLY_FACT` зарегистрирован как **stub** (no-op). Приоритет ниже core domains. Endpoint доступен, но не интегрирован |
+| **Phase B.1** | June 2026 (deprecation) | Endpoint отключается WB. FBS-поставки мигрируют на `/api/v3/supplies` |
+| **Phase B.2** | Post-deprecation | FBO-поставки — manual CSV import или расчёт через inventory delta (stock snapshots) |
+
+**FBS alternative: `POST /api/v3/supplies`**
+- Возвращает список поставок FBS (сборочные задания)
+- Пагинация: cursor-based (`next` token)
+- Ключевые поля: `id` (supply ID), `name`, `createdAt`, `closedAt`, `scanDt`, `done` (boolean), `orders[]`
+- **Read contract не детализирован** — требуется верификация response structure перед реализацией (см. `provider-api-verification.mdc`)
+
+**FBO: нет API-альтернативы**
+- FBO incomes (приёмки на склады WB) — данные доступны только через личный кабинет WB (CSV export)
+- Альтернатива: расчёт FBO incomes через delta inventory snapshots (`canonical_stock_current` diff между sync-ами)
+- Точность inventory delta ниже, чем прямой API — приемлемо для аналитических целей
+
+**Impact assessment:**
+- **P&L**: нулевой impact — supply data не участвует в P&L расчётах
+- **Inventory analytics**: LOW impact — stock levels доступны через `INVENTORY_FACT`; supply history теряется, но компенсируется snapshot delta
+- **Downstream consumers**: нет canonical entity → нет потребителей → нет breaking changes
+
+**Blocker / risk:**
+- **R-14**: если `/api/v3/supplies` не покрывает нужные FBS-данные — потеря FBS supply history после deprecation
+- **Mitigation**: верифицировать `/api/v3/supplies` response до May 2026, зафиксировать в `wb-read-contracts.md`
 
 ### G-7: dim_warehouse для WB — RESOLVED
 

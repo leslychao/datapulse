@@ -59,7 +59,8 @@ public class PricingSignalCollector {
                     null,
                     lastChanges.get(offerId),
                     reversals.get(offerId),
-                    dataFreshness
+                    dataFreshness,
+                    null
             ));
         }
 

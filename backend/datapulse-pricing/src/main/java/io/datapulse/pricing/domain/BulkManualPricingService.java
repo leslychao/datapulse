@@ -279,7 +279,7 @@ public class BulkManualPricingService {
                 currentPrice, offer.cogs(), offer.status(), null,
                 false, false,
                 null, null, null, null,
-                null, null, null);
+                null, null, null, null);
     }
 
     private void ensureNotDuplicate(String hash) {

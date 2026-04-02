@@ -22,7 +22,7 @@
   - Evaluation fails (no COGS / stale P&L) → `PENDING_REVIEW` → manual decision.
   - Activate API fails → retry → `FAILED` → alert.
   - Promo guard stale data → pricing runs despite promo → price conflict.
-  - WB promo → write API TBD → participation not possible (blocker).
+  - WB promo → write API недоступен (P-4) → pipeline работает в recommendation-only режиме (evaluation + UI рекомендации, без promo_action). Оператор выполняет activate/deactivate вручную через ЛК WB.
 - **Почему обязательный:** Полный promo lifecycle. Координация с Pricing — критична для предотвращения price conflicts.
 
 ### E2E-PR-02: Promo ends → pricing resumes

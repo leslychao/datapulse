@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.datapulse.etl.persistence.JobExecutionRepository;
+import io.datapulse.integration.domain.SyncStatus;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.platform.outbox.OutboxEventType;
@@ -77,9 +78,12 @@ public class SyncScheduler {
     private void updateNextScheduledAt(Long connectionId) {
         List<MarketplaceSyncStateEntity> states =
                 syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+        OffsetDateTime now = OffsetDateTime.now();
         for (MarketplaceSyncStateEntity state : states) {
-            state.setLastSyncAt(OffsetDateTime.now());
-            state.setNextScheduledAt(OffsetDateTime.now().plusHours(6));
+            state.setStatus(SyncStatus.SYNCING.name());
+            state.setLastSyncAt(now);
+            state.setNextScheduledAt(now.plusHours(6));
+            state.setErrorMessage(null);
         }
         syncStateRepository.saveAll(states);
     }

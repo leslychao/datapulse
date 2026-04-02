@@ -79,7 +79,7 @@ const DECISION_COLOR: Record<string, string> = {
           ></span>
         </div>
       } @else if (runQuery.isError()) {
-        <div class="p-4">
+        <div class="px-6 py-4">
           <dp-empty-state
             [message]="'pricing.runs.detail_error' | translate"
             [actionLabel]="'actions.retry' | translate"

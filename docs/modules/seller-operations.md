@@ -29,7 +29,30 @@
 
 Один `seller_sku` с предложениями на WB и Ozon → **две строки** в гриде. Столбец «Маркетплейс» + «Подключение» — обязательные visible columns.
 
-Группировка по `seller_sku` доступна через saved view с group-by.
+Группировка по `seller_sku` доступна через saved view с `group_by_sku = true`.
+
+### Group-by SKU mode
+
+Когда saved view имеет `group_by_sku = true`, грид показывает **expandable rows**: одна строка на `seller_sku`, с вложенными строками per `marketplace_offer`.
+
+**Агрегация parent row (SKU level):**
+
+| Колонка | Агрегация | Описание |
+|---------|-----------|----------|
+| `sku_code` | Прямое значение | Артикул |
+| `product_name` | Первое `marketplace_offer.name` | Название |
+| `marketplace_type` | Список: "WB, Ozon" | Маркетплейсы с предложениями |
+| `current_price` | MIN — MAX (range) | Диапазон цен |
+| `margin_pct` | MIN — MAX (range) | Диапазон маржи |
+| `available_stock` | SUM | Суммарный остаток |
+| `revenue_30d` | SUM | Суммарная выручка |
+| `velocity_14d` | SUM | Суммарные продажи |
+| `stock_risk` | MAX severity (CRITICAL > WARNING > NORMAL) | Наихудший stock risk |
+| Остальные | `—` (dash) | Не агрегируются на parent level |
+
+**Реализация:** AG Grid [Row Grouping](https://www.ag-grid.com/angular-data-grid/grouping/) (community feature — `groupDisplayType: 'groupRows'`). Данные приходят плоскими (per-offer), группировка — клиентская. Пагинация — по offers, не по SKU-группам.
+
+**Ограничение MVP:** group-by SKU работает корректно только в пределах текущей страницы (клиентская группировка). Если один SKU имеет offers на разных страницах — они не группируются. Для MVP это допустимо (workspace редко имеет > 200 offers/page).
 
 ### Grid columns
 
@@ -60,7 +83,7 @@
 | `simulated_price` | `simulated_offer_state.simulated_price` | PostgreSQL | Симулированная цена (Phase F; nullable) |
 | `simulated_delta_pct` | `simulated_offer_state.price_delta_pct` | PostgreSQL | Разница simulated vs canonical (%) |
 | `last_sync_at` | `marketplace_sync_state.last_success_at` | PostgreSQL | Время последней синхронизации |
-| `data_freshness` | Computed: stale if > threshold | Computed | FRESH / STALE |
+| `data_freshness` | Computed: `STALE` if `NOW() - last_sync_at > staleness_threshold` | Computed | FRESH / STALE. Default threshold: 4 hours (configurable via `datapulse.grid.staleness-threshold=PT4H`) |
 
 ### Read model
 
@@ -74,7 +97,6 @@ Grid query structure:
   PostgreSQL (main query):
     marketplace_offer
     LEFT JOIN seller_sku
-    LEFT JOIN product_master
     LEFT JOIN marketplace_connection
     LEFT JOIN canonical_price_current
     LEFT JOIN canonical_stock_current (aggregated)
@@ -110,7 +132,7 @@ Grid query structure:
 | `sku_code` | Text (ILIKE) | `seller_sku.sku_code` |
 | `product_name` | Text (ILIKE) | `marketplace_offer.name` |
 | `margin_min` / `margin_max` | Range | Computed |
-| `stock_risk` | Enum | ClickHouse-enriched (post-filter) |
+| `stock_risk` | Enum | ClickHouse-enriched (pre-filter, см. ниже) |
 | `has_manual_lock` | Boolean | `manual_price_lock EXISTS` |
 | `has_active_promo` | Boolean | `canonical_promo_product EXISTS` |
 | `last_decision` | Enum | Latest `price_decision.decision_type` |
@@ -119,17 +141,46 @@ Grid query structure:
 **Dynamic sorting whitelist:**
 
 ```java
-Map<String, String> SORT_WHITELIST = Map.of(
-    "sku_code",       "ss.sku_code",
-    "product_name",   "mo.name",
-    "current_price",  "cpc.price",
-    "margin_pct",     "(cpc.price - cp.cost_price) / NULLIF(cpc.price, 0)",
-    "available_stock", "stock_agg.total_available",
-    "last_sync_at",   "mss.last_success_at"
+Map<String, String> SORT_WHITELIST = Map.ofEntries(
+    Map.entry("sku_code",         "ss.sku_code"),
+    Map.entry("product_name",     "mo.name"),
+    Map.entry("marketplace_type", "mc.marketplace_type"),
+    Map.entry("connection_name",  "mc.name"),
+    Map.entry("status",           "mo.status"),
+    Map.entry("category",         "cat.name"),
+    Map.entry("current_price",    "cpc.price"),
+    Map.entry("discount_price",   "cpc.discount_price"),
+    Map.entry("cost_price",       "cp.cost_price"),
+    Map.entry("margin_pct",       "(cpc.price - cp.cost_price) / NULLIF(cpc.price, 0)"),
+    Map.entry("available_stock",  "stock_agg.total_available"),
+    Map.entry("last_decision",    "pd_latest.decision_type"),
+    Map.entry("last_action_status", "pa_latest.status"),
+    Map.entry("last_sync_at",     "mss.last_success_at")
+);
+```
+
+**Несортируемые PG-колонки:** `active_policy` (требует дополнительного JOIN), `promo_status` (subquery), `manual_lock` (EXISTS), `simulated_price` (Phase F). При необходимости — добавлять в whitelist по мере реализации.
+
+**CH-sortable колонки** (отдельный whitelist, обрабатываются через ClickHouse sort strategy):
+
+```java
+Set<String> CH_SORT_COLUMNS = Set.of(
+    "revenue_30d", "net_pnl_30d", "velocity_14d",
+    "return_rate_pct", "days_of_cover", "stock_risk"
 );
 ```
 
 ClickHouse-sourced columns (revenue_30d, velocity_14d, etc.) — post-sort в application layer. Если primary sort = ClickHouse column → pre-fetch sorted IDs из ClickHouse, затем join в PostgreSQL.
+
+**ClickHouse-based filtering (stock_risk и другие CH-колонки):**
+
+Фильтр по `stock_risk` (и любому CH-enriched полю) нельзя выполнить post-filter на странице — это сломает пагинацию (страница вернёт < `size` элементов). Поэтому CH-фильтры работают как **pre-filter**:
+
+1. ClickHouse query: `SELECT marketplace_offer_id FROM mart_inventory_analysis WHERE workspace_id = ? AND stock_out_risk = ?` → set of matching IDs
+2. PostgreSQL query: добавляет `AND mo.id IN (?)` к основному WHERE — ID set от ClickHouse становится дополнительным PG-фильтром
+3. Пагинация работает корректно — PostgreSQL видит полный набор отфильтрованных строк
+
+**Pre-filter ID set limit:** max 10 000 IDs. Если CH возвращает больше → log.warn, берутся первые 10 000 (по order CH-запроса). Для MVP допустимо — workspace с > 10 000 critical stock offers маловероятен.
 
 ## Saved Views
 
@@ -166,6 +217,18 @@ saved_view:
 }
 ```
 
+### Limits
+
+| Параметр | Лимит | Обоснование |
+|----------|-------|-------------|
+| Max views per user per workspace | 50 | Предотвращает мусорное накопление; достаточно для реальных сценариев |
+| `filters` JSONB max size | 10 KB | Валидация на API-уровне; JSON с 15 фильтрами ≈ 1 KB |
+| `visible_columns` max items | 26 (= total grid columns) | Нельзя показать колонок больше, чем есть |
+| `name` max length | 200 chars (VARCHAR constraint) | — |
+| System views | Не редактируемые, не удаляемые | `is_system = true` seeded при создании workspace |
+
+Shared views (видимые другим пользователям workspace) — **out of scope** для текущей фазы. Все custom views — per-user.
+
 **Default views (seeded per workspace):**
 - "Все товары" — no filters, all columns
 - "Требуют внимания" — `stock_risk IN [CRITICAL, WARNING]` OR `last_action_status = FAILED`
@@ -198,7 +261,7 @@ working_queue_definition:
 working_queue_assignment:
   id                    BIGSERIAL PK
   queue_definition_id   BIGINT FK → working_queue_definition      NOT NULL
-  entity_type           VARCHAR(60) NOT NULL                      -- 'marketplace_offer', 'price_action', 'promo_action'
+  entity_type           VARCHAR(60) NOT NULL                      -- 'marketplace_offer', 'price_action', 'promo_action', 'alert_event'
   entity_id             BIGINT NOT NULL                           -- FK to respective entity
   status                VARCHAR(20) NOT NULL DEFAULT 'PENDING'    -- PENDING, IN_PROGRESS, DONE, DISMISSED
   assigned_to_user_id   BIGINT FK → app_user                      (nullable — unassigned)
@@ -217,6 +280,16 @@ working_queue_assignment:
 | Pending Approvals | DECISION | `price_action.status = 'PENDING_APPROVAL'` | Ожидают ручного одобрения |
 | Stock Critical | ATTENTION | `mart_inventory_analysis.stock_out_risk = 'CRITICAL'` | Критический stock-out risk |
 | Promo Deadlines | DECISION | `canonical_promo_product.participation_status = 'ELIGIBLE'` AND `promo_campaign.participation_deadline < NOW() + interval '48 hours'` | Промо с приближающимся дедлайном |
+| Price Mismatches | ATTENTION | `alert_event.rule_type = 'MISMATCH'` AND `alert_event.mismatch_type = 'PRICE'` AND `alert_event.status = 'ACTIVE'` | Расхождения цен (Mismatch Monitor) |
+| Failed Promo Actions | ATTENTION | `promo_action.status = 'FAILED'` | Неуспешные promo-действия |
+
+### Limits
+
+| Параметр | Лимит | Обоснование |
+|----------|-------|-------------|
+| Max custom queues per workspace | 20 | Системные (6) + custom. Достаточно для реальных workflow |
+| Max active assignments per queue | 10 000 | Assignment cleanup (DONE/DISMISSED → archive) предотвращает рост |
+| Max manual assignments per user per day | 100 | Предотвращает массовый мусор |
 
 ### Queue lifecycle
 
@@ -225,6 +298,30 @@ PENDING → IN_PROGRESS → DONE
                       → DISMISSED
 PENDING → DISMISSED
 ```
+
+### Assignment cleanup
+
+DONE и DISMISSED assignments накапливаются. Scheduled cleanup job:
+
+```sql
+DELETE FROM working_queue_assignment
+WHERE status IN ('DONE', 'DISMISSED')
+  AND updated_at < NOW() - interval '30 days'
+```
+
+Schedule: ежедневно, `@SchedulerLock`. Retention configurable: `datapulse.queues.assignment-retention-days=30`.
+
+### Claim concurrency
+
+Claim = CAS-операция. Два оператора одновременно claim-ят один item → только один успешно:
+
+```sql
+UPDATE working_queue_assignment
+SET status = 'IN_PROGRESS', assigned_to_user_id = :userId, updated_at = now()
+WHERE id = :itemId AND status = 'PENDING'
+```
+
+`WHERE status = 'PENDING'` гарантирует: если item уже claim-нут (status = IN_PROGRESS), UPDATE затронет 0 строк → сервис возвращает 409 Conflict с message key `queues.item.already_claimed`. Frontend показывает toast и обновляет список.
 
 ### auto_criteria JSONB structure
 
@@ -248,9 +345,31 @@ PENDING → DISMISSED
 
 Supported operators: `eq`, `neq`, `in`, `gt`, `lt`, `gte`, `lte`. `source: "clickhouse"` — для ClickHouse-enriched полей (requires pre-query). Default source: PostgreSQL.
 
-Auto-population job (scheduled, 5 min): evaluates `auto_criteria` → INSERT new assignments для matching entities. Idempotent — `ON CONFLICT DO NOTHING` на unique index.
+### Auto-population job
 
-Auto-resolution: когда condition больше не матчит (e.g. action перешёл из FAILED в SUCCEEDED через retry) → next auto-population run помечает assignment как DONE.
+**Schedule:** каждые 5 минут (`@Scheduled`, `@SchedulerLock`).
+
+**Алгоритм per queue:**
+
+1. Evaluate `auto_criteria` → SELECT matching entity IDs
+2. INSERT new assignments: `ON CONFLICT DO NOTHING` (idempotent на unique partial index)
+3. Auto-resolution: SELECT all PENDING assignments для данной queue → re-evaluate criteria → если entity больше не матчит → UPDATE status = `DONE`. IN_PROGRESS assignments **не** auto-resolve'ятся (оператор уже взял в работу)
+
+**Batch и транзакции:**
+
+| Параметр | Значение |
+|----------|----------|
+| Batch size (entities per evaluation) | 1 000 |
+| Transaction scope | Per-queue (одна транзакция на queue definition) |
+| Total execution budget | 60s (`@SchedulerLock(lockAtMostFor = "PT2M")`) |
+
+**Error handling:**
+
+| Ошибка | Поведение |
+|--------|-----------|
+| ClickHouse недоступен (cross-store criteria) | Skip queues с CH-criteria до следующего run. PG-only queues обрабатываются нормально. `log.warn` |
+| Exception при обработке одной queue | Catch + `log.error`, переход к следующей queue. Partial success допускается |
+| Entity не существует (stale reference) | `ON CONFLICT DO NOTHING` — assignment не создаётся |
 
 ### Cross-store auto-criteria evaluation
 
@@ -300,6 +419,10 @@ ORDER BY price_decision.created_at DESC
 | `reconciliation_source` | `price_action_attempt.reconciliation_source` | IMMEDIATE / DEFERRED / MANUAL |
 | `explanation_summary` | `price_decision.explanation → summary` | Краткое объяснение решения |
 
+### Retention
+
+Price journal читает из `price_decision` + `price_action` + `price_action_attempt`. Retention этих таблиц управляется модулем Pricing. Для MVP — без архивации (все записи хранятся бессрочно). При росте > 1M decisions per workspace — рассмотреть партиционирование `price_decision` по `created_at` (monthly partitions).
+
 ### REST API
 
 `GET /api/workspaces/{workspaceId}/offers/{offerId}/price-journal?page=0&size=20`
@@ -335,6 +458,10 @@ ORDER BY promo_decision.created_at DESC
 | `margin_delta_pct` | `promo_evaluation.margin_delta_pct` | Потеря маржи vs обычная цена (nullable) |
 | `explanation_summary` | `promo_decision.explanation_summary` | Объяснение решения |
 
+### Retention
+
+Promo journal читает из `promo_decision` + `promo_evaluation` + `promo_action` + `canonical_promo_product` + `canonical_promo_campaign`. Retention управляется модулем Promotions. Для MVP — без архивации. Аналогично Price Journal: при росте > 1M decisions — партиционирование `promo_decision` по `created_at`.
+
 ## Mismatch Monitor
 
 Визуализация расхождений между связанными data domains.
@@ -363,6 +490,8 @@ Thresholds — configurable через `@ConfigurationProperties`.
 
 Mismatch checker (scheduled, after each sync) записывает результаты в `alert_event` (rule_type = MISMATCH). UI отображает active mismatches с drill-down к конкретным offers.
 
+**Cross-module dependency:** `alert_event` — таблица, принадлежащая модулю [Audit & Alerting](audit-alerting.md). Mismatch checker использует `AlertEventRepository` (persistence API модуля Audit) для записи и обновления mismatch events. Направление зависимости: `Seller Operations → Audit & Alerting` (допустимо — периферийный модуль зависит от инфраструктурного). Seller Operations **не** владеет таблицей `alert_event` и не создаёт миграции для неё.
+
 ### Resolution workflow
 
 ```
@@ -385,6 +514,21 @@ ACTIVE → ACKNOWLEDGED → RESOLVED
 
 **Auto-resolution:** при каждом sync mismatch checker перепроверяет все ACTIVE mismatches. Если condition больше не матчит → статус = AUTO_RESOLVED. ACKNOWLEDGED mismatches не auto-resolve'ятся (оператор уже взял в работу).
 
+### Schedule и fallback
+
+Mismatch checker запускается:
+1. **After each ETL sync** — event-driven (`@TransactionalEventListener` на `EtlSyncCompletedEvent`)
+2. **Fallback schedule** — `@Scheduled` каждые 2 часа. Если sync не было > 2h (например, ETL сбой) — checker всё равно перепроверяет active mismatches на случай auto-resolution или появления новых через другие каналы (manual price set, promo status change).
+
+### Retention
+
+| Статус | Retention | Механизм |
+|--------|-----------|----------|
+| ACTIVE, ACKNOWLEDGED | Бессрочно | Оператор должен обработать |
+| RESOLVED, AUTO_RESOLVED | 90 дней | Scheduled cleanup job: `DELETE FROM alert_event WHERE status IN ('RESOLVED', 'AUTO_RESOLVED') AND updated_at < NOW() - interval '90 days'` |
+
+Retention configurable через `@ConfigurationProperties` (`datapulse.mismatches.retention-days=90`).
+
 ## REST API contracts
 
 ### Grid
@@ -392,7 +536,8 @@ ACTIVE → ACKNOWLEDGED → RESOLVED
 | Endpoint | Method | Описание |
 |----------|--------|----------|
 | `/api/workspaces/{workspaceId}/grid` | GET | Paginated grid с фильтрами и сортировкой |
-| `/api/workspaces/{workspaceId}/grid/export` | GET | CSV export (streaming, `Content-Disposition: attachment`) |
+| `/api/workspaces/{workspaceId}/grid/matching-ids` | GET | Список offer IDs, matching текущим фильтрам (для Select All, max 500) |
+| `/api/workspaces/{workspaceId}/grid/export` | GET | CSV export (streaming, `Content-Disposition: attachment`; PG-only колонки) |
 
 **Query parameters для grid:**
 
@@ -473,7 +618,11 @@ ACTIVE → ACKNOWLEDGED → RESOLVED
 - PostgreSQL filters могут отсечь часть IDs из ClickHouse-window, уменьшив totalElements. Компенсация: `totalElements` показывает фактическое число после фильтрации.
 - Performance: ClickHouse query < 100ms, PostgreSQL `IN (5000)` с index scan < 200ms.
 
-**Fallback:** если `sort` column не в PostgreSQL whitelist и не в ClickHouse list → 400 Bad Request.
+**Fallback при невалидной колонке:** если `sort` column не в PostgreSQL whitelist и не в ClickHouse list → 400 Bad Request.
+
+**Fallback при ClickHouse unavailable:**
+- Запрос с sort по CH-колонке + CH недоступен → ответ 200 с fallback: сортировка заменяется на `last_sync_at DESC` (дефолтная PG-сортировка). Response header `X-Sort-Fallback: true`. Frontend показывает info-toast: «Сортировка по аналитическим данным временно недоступна, применена сортировка по умолчанию».
+- Запрос с sort по PG-колонке + CH недоступен → CH-enriched поля = `null`, сортировка работает нормально (graceful degradation).
 
 ### Offer Detail
 
@@ -539,6 +688,8 @@ ACTIVE → ACKNOWLEDGED → RESOLVED
 
 Composite query: PostgreSQL (canonical state, pricing, execution, promo) + ClickHouse (analytics enrichment). Аналогична grid query, но для одного offer с полным набором полей.
 
+**Response shape convention:** Grid response — **flat** (все поля на верхнем уровне, строки для AG Grid). Detail response — **nested** (вложенные объекты `activePolicy`, `lastDecision`, `lastAction`, `promoStatus` с расширенными полями). Разные DTO: `GridRowResponse` (flat) и `OfferDetailResponse` (nested). MapStruct маппит из одних и тех же domain-сущностей в два разных формата.
+
 ### Saved Views
 
 | Endpoint | Method | Описание |
@@ -598,9 +749,10 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 | `/api/workspaces/{workspaceId}/queues/{queueId}` | PUT | Обновить очередь (name, auto_criteria, enabled) |
 | `/api/workspaces/{workspaceId}/queues/{queueId}` | DELETE | Удалить очередь (каскадно удаляет assignments) |
 | `/api/workspaces/{workspaceId}/queues/{queueId}/items` | GET | Paginated items в очереди. Filters: `?status=PENDING&assignedToMe=true` |
-| `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/claim` | POST | Взять item в работу (assign to current user) |
+| `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/claim` | POST | Взять item в работу (assign to current user). CAS: `WHERE status = 'PENDING'` |
 | `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/done` | POST | Отметить item как done |
 | `/api/workspaces/{workspaceId}/queues/{queueId}/items/{itemId}/dismiss` | POST | Отклонить item |
+| `/api/workspaces/{workspaceId}/queues/{queueId}/items` | POST | Вручную добавить entity в очередь. Body: `{ entityType, entityId, note }` |
 
 **Queue list response (GET /queues):**
 
@@ -722,6 +874,9 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 | `/api/workspaces/{workspaceId}/offers/{offerId}/lock` | POST | Ручная блокировка цены | [Pricing](pricing.md) |
 | `/api/workspaces/{workspaceId}/offers/{offerId}/unlock` | POST | Снять блокировку | [Pricing](pricing.md) |
 | `/api/workspaces/{workspaceId}/pricing/runs` | POST | Запустить pricing run | [Pricing](pricing.md) |
+| `/api/workspaces/{workspaceId}/promo/products/{promoProductId}/participate` | POST | Принять участие в промо | [Promotions](promotions.md) |
+| `/api/workspaces/{workspaceId}/promo/products/{promoProductId}/decline` | POST | Отклонить участие в промо | [Promotions](promotions.md) |
+| `/api/workspaces/{workspaceId}/promo/products/{promoProductId}/deactivate` | POST | Удалить из акции (PARTICIPATING → DEACTIVATE) | [Promotions](promotions.md) |
 
 ## Модель данных
 
@@ -793,6 +948,18 @@ Apply flow:
 
 Draft **не** persisted на сервере. `beforeunload` warning при несохранённых изменениях.
 
+### Select all matching
+
+При работе с bulk operations пользователь может выбрать все строки, matching текущим фильтрам (не только текущую страницу).
+
+**Endpoint:** `GET /api/workspaces/{workspaceId}/grid/matching-ids?[filters]`
+
+Response: `{ "offerIds": [1, 2, 3, ...], "totalCount": 347 }`
+
+**Limits:** max 500 offer IDs в ответе. Если matching > 500 → response включает `"truncated": true` и `"totalCount"` с полным числом. UI показывает warning: «Выбрано 500 из 1 234 товаров. Сузьте фильтры для выбора всех.»
+
+**Связь с bulk operations:** `matching-ids` endpoint возвращает PG-only offer IDs (без CH enrichment). Полученные IDs используются как input для formula panel / draft mode. Limit 500 синхронизирован с лимитом bulk-manual API (max 500 offers per request).
+
 ### Permissions
 
 | Операция | Roles |
@@ -811,6 +978,23 @@ Draft **не** persisted на сервере. `beforeunload` warning при не
 6. Нажимает «Применить» → server-side dry-run → confirmation modal
 7. Подтверждает → pricing_run создаётся → actions отправляются на исполнение
 8. Grid обновляется: `lastActionStatus` = APPROVED → SCHEDULED → SUCCEEDED (WebSocket push)
+
+## Real-time updates (WebSocket)
+
+Grid и queues получают real-time обновления через STOMP/WebSocket (инфраструктура — модуль `datapulse-platform`).
+
+### Topics
+
+| Topic | Payload | Описание |
+|-------|---------|----------|
+| `/topic/workspaces/{workspaceId}/actions` | `{ actionId, offerId, status, updatedAt }` | Статус price/promo action изменился (APPROVED → SCHEDULED → SUCCEEDED / FAILED) |
+| `/topic/workspaces/{workspaceId}/sync` | `{ connectionId, status, completedAt }` | ETL sync завершён — grid может обновить данные |
+| `/topic/workspaces/{workspaceId}/queues` | `{ queueId, pendingDelta, inProgressDelta }` | Изменение counts в очереди (new assignment, claim, done) |
+
+**Frontend-реакция:**
+- Action status → обновить `lastActionStatus` в grid row (optimistic update по `offerId`). При SUCCEEDED/FAILED — invalidate TanStack Query для grid page.
+- Sync completed → invalidate grid query (refetch текущей страницы), обновить `lastSyncAt` / `dataFreshness`.
+- Queue delta → обновить badge counts в sidebar queue list.
 
 ## Обязательные свойства
 
@@ -859,6 +1043,17 @@ GET /api/workspaces/{workspaceId}/grid/export?[filters]
 ```
 
 Реализация: `StreamingResponseBody`. Cursor-based iteration (JDBC `fetchSize = 500`). Не загружает весь dataset в память.
+
+### ClickHouse-enriched columns в export
+
+CSV export включает **только PostgreSQL-sourced колонки**. ClickHouse-enriched колонки (`revenue_30d`, `net_pnl_30d`, `velocity_14d`, `return_rate_pct`, `days_of_cover`, `stock_risk`) **исключены** из streaming export.
+
+**Обоснование:**
+- Streaming export итерирует JDBC cursor по PostgreSQL (fetchSize = 500). Параллельный batch-enrichment из ClickHouse для 100 000 строк создаёт 200 CH-запросов, увеличивает latency в 3–5× и создаёт risk timeout.
+- PG-only export покрывает основной сценарий: выгрузка каталога с ценами, маржой, остатками, статусами.
+- Если пользователю нужна аналитика (revenue, velocity) — аналитический экспорт из модуля Analytics & P&L (future phase).
+
+**Исключённые колонки в CSV header:** колонки `days_of_cover`, `stock_risk`, `revenue_30d`, `net_pnl_30d`, `velocity_14d`, `return_rate_pct` не включаются в CSV. Это отражено в visible_columns export mapping.
 
 ### Limits
 

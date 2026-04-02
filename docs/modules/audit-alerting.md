@@ -78,7 +78,7 @@ audit_log:
 | `workspace.*` | `workspace.create`, `workspace.suspend`, `workspace.reactivate`, `workspace.archive`, `workspace.transfer_ownership` | [Tenancy & IAM](tenancy-iam.md) |
 | `user.*` | `user.provision`, `user.deactivate`, `user.reactivate` | [Tenancy & IAM](tenancy-iam.md) |
 | `member.*` | `member.invite`, `member.accept_invitation`, `member.cancel_invitation`, `member.change_role`, `member.remove` | [Tenancy & IAM](tenancy-iam.md) |
-| `promo.*` | `promo.participation.override`, `promo.activate`, `promo.deactivate` | [Promotions](promotions.md) |
+| `promo.*` / `promo_action.*` | `promo.participate`, `promo.decline`, `promo.deactivate`, `promo_action.approve`, `promo_action.reject`, `promo_action.cancel` | [Promotions](promotions.md) |
 | `alert.*` | `alert.rule.create`, `alert.rule.update`, `alert.acknowledge`, `alert.resolve` | Audit & Alerting |
 
 ### Audit write mechanism
@@ -358,6 +358,9 @@ Thresholds и calibration описаны в [Analytics & P&L](analytics-pnl.md) 
 | Reconciliation failed | [Execution](execution.md) | WARNING | Deferred reconciliation не подтвердила write |
 | Poison pill detected | [Execution](execution.md) | CRITICAL | Unhandled exception в consumer; message consumed без обработки |
 | Promo reconciliation mismatch | [Promotions](promotions.md) | WARNING | PROMO_SYNC показал расхождение с ожидаемым participation_status |
+| Promo campaign stale | [ETL Pipeline](etl-pipeline.md) → [Promotions](promotions.md) | WARNING | Кампания не возвращалась в PROMO_SYNC > 48h; pending promo_actions → EXPIRED |
+| Promo action failed | [Promotions](promotions.md) | CRITICAL | promo_action перешёл в FAILED (max attempts exhausted или non-retriable error) |
+| Promo action stuck | [Promotions](promotions.md) | WARNING | promo_action застрял в EXECUTING/APPROVED > TTL (shared stuck-state detector) |
 | Action deferred | [Pricing](pricing.md) | INFO | Создание price_action отложено из-за in-flight action |
 
 Эти alerts не требуют `alert_rule` — они event-driven (publish `AlertTriggeredEvent` → Audit & Alerting listener → INSERT `alert_event` с `alert_rule_id = NULL`). Auto-resolve не применяется — lifecycle управляется оператором (ACKNOWLEDGED → RESOLVED) или module-specific logic.

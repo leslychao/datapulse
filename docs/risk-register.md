@@ -93,8 +93,9 @@
 | Риск        | Price action помечается SUCCEEDED до подтверждения эффекта маркетплейсом                                      |
 | Вероятность | Средняя (при некорректной реализации)                                                                         |
 | Влияние     | Высокое — подрыв доверия к системе                                                                            |
-| Митигация   | SUCCEEDED = confirmed final effect only; uncertain outcomes → RECONCILIATION_PENDING; обязательные flow tests |
-| Detection   | Mismatch между action intent и фактическим состоянием провайдера                                              |
+| Митигация   | SUCCEEDED = confirmed final effect only; uncertain outcomes → RECONCILIATION_PENDING; evidence hierarchy (primary write confirmation + secondary read-after-write); reconciliation tolerance (exact match WB/Ozon); gateway defence-in-depth assertion (execution_mode check); stuck-state detector self-monitoring; обязательные flow tests. Детали: [Execution §Reconciliation](modules/execution.md#reconciliation) |
+| Detection   | Mismatch между action intent и фактическим состоянием провайдера; alert `reconciliation.read_mismatch_after_confirmed_write`; метрика `execution_cas_conflict_total`; alert `execution_stuck_detector_last_run_at` stale |
+| Status      | Архитектура полностью специфицирована (evidence hierarchy, tolerance, conflict resolution SLA, stuck detector self-monitoring). Read-after-write verification code — NOT IMPLEMENTED (write-contracts.md F-4). Приоритет: Phase D implementation |
 
 
 ### R-09: Stale truth блокирует автоматизацию
@@ -105,8 +106,8 @@
 | Риск        | Stale или некорректные данные приводят к ошибочным pricing decisions                                                             |
 | Вероятность | Средняя                                                                                                                          |
 | Влияние     | Среднее — продукт не работает или принимает ошибочные решения                                                                    |
-| Митигация   | Data quality controls: stale data guards, missing sync detection, spike detection; stale truth блокирует automated price actions |
-| Detection   | Stale data alerts; guard hit rates; automation blocker events                                                                    |
+| Митигация   | Data quality controls: stale data guards, missing sync detection, spike detection; stale truth блокирует automated price actions. Signal criticality classification ([Pricing §Signal criticality](modules/pricing.md#signal-criticality-и-clickhouse-fallback)): CRITICAL/REQUIRED/OPTIONAL per signal; per-signal ClickHouse fallback; REQUIRED signals cascade (per-SKU → per-category → manual); 5s query timeout; partial ClickHouse failure → per-SKU HOLD, не FAILED run |
+| Detection   | Stale data alerts; guard hit rates; automation blocker events; `pricing_signal_unavailable_total` counter per signal type        |
 
 
 ### R-10: Несогласованность форматов timestamps
@@ -129,7 +130,7 @@
 | Риск        | Simulated execution ошибочно мутирует авторитетные данные                                                                                      |
 | Вероятность | Низкая (при корректной реализации)                                                                                                             |
 | Влияние     | Высокое — потеря целостности канонической модели                                                                                               |
-| Митигация   | Отдельная таблица `simulated_offer_state`; simulated mode не имеет права мутировать каноническую модель; parity tests; execution_mode tracking |
+| Митигация   | **Pricing:** отдельная таблица `simulated_offer_state`; executor-worker проверяет `execution_mode` и пропускает canonical write для SIMULATED. **Promotions:** executor-worker при `execution_mode = SIMULATED` пропускает marketplace API call и CAS-update `canonical_promo_product.participation_status`; partial unique index `idx_promo_action_active_simulated` изолирует simulated от live actions. Общее: parity tests; execution_mode tracking; simulated mode не имеет права мутировать каноническую модель |
 | Detection   | Parity test failures; integrity checks                                                                                                         |
 
 
@@ -203,8 +204,8 @@
 | Риск        | Ошибка в конфигурации `price_policy` с `scope_type = CONNECTION` массово меняет цены по всему ассортименту подключения                                                                              |
 | Вероятность | Средняя (человеческая ошибка: неверный `target_margin_pct`, забытый constraint)                                                                                                                     |
 | Влияние     | Высокое — массовая потеря маржи, штрафы маркетплейса за некорректные цены, репутационный ущерб                                                                                                      |
-| Митигация   | 1) `SEMI_AUTO` default — все actions через approval; 2) `max_price_change_pct` ограничивает разовое изменение; 3) Safety gate для `FULL_AUTO` (минимум 7 дней в SEMI_AUTO, 0 FAILED actions); 4) Validation constraints на strategy_params при создании policy; 5) **Impact preview** (Phase E): dry-run pipeline показывает масштаб и направление изменений до активации policy (см. [Pricing → Impact preview](modules/pricing.md#impact-preview-phase-e)) |
-| Detection   | Резкий рост CHANGE decisions в pricing run; аномальный `avg_price_change_pct`; alert при > N% offers с change > threshold за один run                                                               |
+| Митигация   | 1) `SEMI_AUTO` default — все actions через approval; 2) `max_price_change_pct` ограничивает per-SKU изменение; 3) Safety gate для `FULL_AUTO` (минимум 7 дней в SEMI_AUTO, 0 FAILED actions, runtime re-check — см. [Pricing §Safety gate enforcement](modules/pricing.md#safety-gate--enforcement)); 4) Validation constraints на strategy_params при создании policy; 5) **Impact preview** (Phase E): dry-run pipeline показывает масштаб и направление изменений до активации policy (см. [Pricing → Impact preview](modules/pricing.md#impact-preview-phase-e)); 6) **Aggregate blast radius circuit breaker** (FULL_AUTO only): `change_ratio > 30%` или `max_abs_change_pct > 25%` → pricing run PAUSED, actions ON_HOLD, manual resume/cancel (см. [Pricing §Aggregate blast radius](modules/pricing.md#aggregate-blast-radius-protection)); 7) **Mandatory impact preview** для CONNECTION-scope FULL_AUTO policies при активации |
+| Detection   | Резкий рост CHANGE decisions в pricing run; аномальный `avg_price_change_pct`; alert `pricing.run.blast_radius_breached` при breach aggregate thresholds; `pricing_approval_expired_total` counter   |
 
 
 ### R-18: Ozon Performance OAuth2 задерживает advertising ingestion
@@ -231,6 +232,32 @@
 | Detection   | HTTP 404/410 от advert-api; рост ошибок в integration_call_log                                                 |
 
 
+### R-20: ClickHouse unavailability останавливает аналитику и pricing
+
+
+| Параметр    | Значение                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Риск        | ClickHouse недоступен — аналитические страницы и pricing signal assembler деградируют                          |
+| Вероятность | Низкая (single-node Phase B; средняя при росте нагрузки)                                                       |
+| Влияние     | Среднее — аналитика недоступна; pricing pipeline skip-and-retry (не принимает stale decisions); core ops работают |
+| Митигация   | Circuit breaker (Resilience4j) на analytics API endpoints; signal assembler fail-fast + pricing run FAILED с retry; двухфазный swap (staging table) для materialization; health indicator в `/actuator/health`; UI banner «Аналитика временно недоступна»; stale data guard блокирует automation при prolonged outage (>24h). Детали: [Analytics & P&L](modules/analytics-pnl.md) §Graceful degradation |
+| Detection   | ClickHouse health indicator DOWN; circuit breaker open events; `materialization_run_status = FAILED`; pricing run `reason = ANALYTICS_UNAVAILABLE` |
+
+
+### R-21: WB Promo Write недоступен (P-4)
+
+
+| Параметр    | Значение                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Риск        | WB Promo activate/deactivate API недоступен: требуется Promotion-scoped токен, формат запроса не подтверждён   |
+| Вероятность | Подтверждён (P-4 OPEN)                                                                                         |
+| Влияние     | Среднее — WB promo pipeline работает в recommendation-only режиме; Ozon promo execution не затронут            |
+| Митигация   | Graceful degradation: `participation_mode` принудительно RECOMMENDATION для WB; evaluation pipeline работает; UI показывает рекомендации с `promo.wb.write_unavailable`; оператор выполняет действия вручную через ЛК WB. Детали: [Promotions §P-4 Graceful degradation](modules/promotions.md) |
+| Detection   | P-4 status в promotions.md; отсутствие SUCCEEDED promo_actions для WB connections                              |
+| Blocking    | Phase D (Promo Execution) для WB                                                                               |
+| Not blocking | WB evaluation, Ozon full pipeline, Phase A-C                                                                   |
+
+
 ## Сводка рисков
 
 
@@ -255,6 +282,8 @@
 | R-17 Blast radius широкой policy               | Средняя     | Высокое | Высокий         |
 | R-18 Ozon OAuth2 задерживает ads ingestion     | Средняя     | Среднее | Средний         |
 | R-19 WB Advertising API breaking changes       | Средняя     | Среднее | Средний         |
+| R-20 ClickHouse unavailability                 | Низкая      | Среднее | Средний         |
+| R-21 WB Promo Write недоступен (P-4)          | Подтверждён | Среднее | Средний         |
 
 
 ## Связанные документы

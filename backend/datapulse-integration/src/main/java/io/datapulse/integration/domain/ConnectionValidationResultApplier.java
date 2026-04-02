@@ -72,6 +72,7 @@ public class ConnectionValidationResultApplier {
         .collect(Collectors.toSet());
 
     int created = 0;
+    OffsetDateTime nextSync = OffsetDateTime.now().plusHours(6);
     for (DataDomain domain : DataDomain.values()) {
       if (existingDomains.contains(domain.name())) {
         continue;
@@ -80,6 +81,7 @@ public class ConnectionValidationResultApplier {
       syncState.setMarketplaceConnectionId(connection.getId());
       syncState.setDataDomain(domain.name());
       syncState.setStatus(SyncStatus.IDLE.name());
+      syncState.setNextScheduledAt(nextSync);
       syncStateRepository.save(syncState);
       created++;
     }

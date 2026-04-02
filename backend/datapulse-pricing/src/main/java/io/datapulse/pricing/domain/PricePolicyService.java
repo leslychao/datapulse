@@ -14,6 +14,7 @@ import io.datapulse.pricing.persistence.PricePolicyEntity;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class PricePolicyService {
     private final PricePolicyRepository policyRepository;
     private final PricePolicyMapper policyMapper;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PricePolicyResponse createPolicy(CreatePricePolicyRequest request,
@@ -52,6 +54,7 @@ public class PricePolicyService {
                 : request.executionMode() == ExecutionMode.SEMI_AUTO ? 72 : 0);
         entity.setPriority(request.priority() != null ? request.priority() : 0);
         entity.setVersion(1);
+        entity.setLastPreviewVersion(0);
         entity.setCreatedBy(userId);
 
         PricePolicyEntity saved = policyRepository.save(entity);
@@ -144,6 +147,11 @@ public class PricePolicyService {
         log.info("Policy updated: id={}, version={}, logicChanged={}",
                 saved.getId(), saved.getVersion(), logicChanged);
 
+        if (logicChanged && saved.getStatus() == PolicyStatus.ACTIVE) {
+            eventPublisher.publishEvent(new PolicyLogicChangedEvent(
+                    saved.getId(), workspaceId, saved.getVersion()));
+        }
+
         return policyMapper.toResponse(saved);
     }
 
@@ -156,9 +164,34 @@ public class PricePolicyService {
                     entity.getStatus().name(), "ACTIVE");
         }
 
+        enforceMandatoryPreviewGate(entity);
+
         entity.setStatus(PolicyStatus.ACTIVE);
         policyRepository.save(entity);
         log.info("Policy activated: id={}", policyId);
+
+        eventPublisher.publishEvent(new PolicyActivatedEvent(policyId, workspaceId));
+    }
+
+    @Transactional
+    public void markPreviewExecuted(long policyId, long workspaceId) {
+        PricePolicyEntity entity = findPolicyOrThrow(policyId, workspaceId);
+        entity.setLastPreviewVersion(entity.getVersion());
+        policyRepository.save(entity);
+    }
+
+    private void enforceMandatoryPreviewGate(PricePolicyEntity entity) {
+        if (entity.getExecutionMode() != ExecutionMode.FULL_AUTO) {
+            return;
+        }
+        boolean hasConnectionScope = policyRepository.existsConnectionScopeAssignment(entity.getId());
+        if (!hasConnectionScope) {
+            return;
+        }
+        if (entity.getLastPreviewVersion() == null
+                || entity.getLastPreviewVersion() < entity.getVersion()) {
+            throw BadRequestException.of(MessageCodes.PRICING_POLICY_PREVIEW_REQUIRED);
+        }
     }
 
     @Transactional
@@ -226,12 +259,54 @@ public class PricePolicyService {
 
         try {
             switch (strategyType) {
-                case TARGET_MARGIN -> objectMapper.readValue(strategyParamsJson, TargetMarginParams.class);
-                case PRICE_CORRIDOR -> objectMapper.readValue(strategyParamsJson, PriceCorridorParams.class);
+                case TARGET_MARGIN -> validateTargetMarginParams(
+                        objectMapper.readValue(strategyParamsJson, TargetMarginParams.class));
+                case PRICE_CORRIDOR -> validatePriceCorridorParams(
+                        objectMapper.readValue(strategyParamsJson, PriceCorridorParams.class));
                 case MANUAL_OVERRIDE -> throw new IllegalStateException("unreachable");
             }
         } catch (JsonProcessingException e) {
             throw BadRequestException.of(MessageCodes.VALIDATION_FAILED, e, "strategyParams");
+        }
+    }
+
+    private void validateTargetMarginParams(TargetMarginParams params) {
+        if (params.targetMarginPct() == null) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.targetMarginPct is required");
+        }
+        java.math.BigDecimal pct = params.targetMarginPct();
+        if (pct.compareTo(java.math.BigDecimal.ZERO) < 0
+                || pct.compareTo(java.math.BigDecimal.ONE) >= 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.targetMarginPct must be in [0, 1)");
+        }
+        if (params.commissionSource() == TargetMarginParams.CommissionSource.MANUAL
+                && params.commissionManualPct() == null) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.commissionManualPct required when commissionSource=MANUAL");
+        }
+        if (params.logisticsSource() == TargetMarginParams.LogisticsSource.MANUAL
+                && params.logisticsManualAmount() == null) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.logisticsManualAmount required when logisticsSource=MANUAL");
+        }
+        if (params.roundingStep() != null
+                && params.roundingStep().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.roundingStep must be > 0");
+        }
+    }
+
+    private void validatePriceCorridorParams(PriceCorridorParams params) {
+        if (params.minPrice() == null && params.maxPrice() == null) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams must have at least minPrice or maxPrice");
+        }
+        if (params.minPrice() != null && params.maxPrice() != null
+                && params.minPrice().compareTo(params.maxPrice()) > 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.minPrice must be <= maxPrice");
         }
     }
 }

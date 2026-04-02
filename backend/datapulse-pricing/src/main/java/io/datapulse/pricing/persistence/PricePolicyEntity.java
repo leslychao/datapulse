@@ -70,6 +70,9 @@ public class PricePolicyEntity extends BaseEntity {
     @Column(nullable = false)
     private Integer version;
 
+    @Column(name = "last_preview_version", nullable = false)
+    private Integer lastPreviewVersion;
+
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 
