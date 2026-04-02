@@ -50,6 +50,14 @@ public class PriceActionController {
                 .map(this::toSummaryResponse);
     }
 
+    @GetMapping("/kpi")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PriceActionKpiResponse getKpi(@PathVariable("workspaceId") long workspaceId) {
+        var row = actionService.getActionsKpi(workspaceId);
+        return new PriceActionKpiResponse(
+            row.total(), row.pending(), row.executing(), row.failed());
+    }
+
     @GetMapping("/{actionId}")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public PriceActionDetailResponse get(

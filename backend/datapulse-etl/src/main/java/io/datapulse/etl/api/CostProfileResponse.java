@@ -8,6 +8,7 @@ public record CostProfileResponse(
         long id,
         long sellerSkuId,
         String skuCode,
+        String productName,
         BigDecimal costPrice,
         String currency,
         LocalDate validFrom,

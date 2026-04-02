@@ -7,18 +7,22 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
 import { LucideAngularModule, ChevronDown, User, LogOut } from 'lucide-angular';
 
 import { AuthService } from '@core/auth/auth.service';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
 @Component({
   selector: 'dp-user-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, TranslatePipe],
   template: `
     <div class="relative">
       <button
+        type="button"
         (click)="toggle()"
         aria-label="Меню пользователя"
         class="flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] p-0.5 transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -42,18 +46,21 @@ import { AuthService } from '@core/auth/auth.service';
 
           <div class="py-1">
             <button
+              type="button"
+              (click)="onProfile()"
               class="flex h-9 w-full cursor-pointer items-center gap-2 px-3 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
             >
               <lucide-icon [img]="User" [size]="16" class="text-[var(--text-secondary)]" />
-              Профиль
+              {{ 'user_menu.profile' | translate }}
             </button>
 
             <button
+              type="button"
               (click)="onLogout()"
               class="flex h-9 w-full cursor-pointer items-center gap-2 px-3 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
             >
               <lucide-icon [img]="LogOut" [size]="16" class="text-[var(--text-secondary)]" />
-              Выйти
+              {{ 'user_menu.logout' | translate }}
             </button>
           </div>
         </div>
@@ -67,6 +74,8 @@ export class UserMenuComponent {
   protected readonly LogOut = LogOut;
 
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly wsStore = inject(WorkspaceContextStore);
   private readonly elementRef = inject(ElementRef);
 
   protected readonly open = signal(false);
@@ -105,6 +114,15 @@ export class UserMenuComponent {
 
   protected close(): void {
     this.open.set(false);
+  }
+
+  protected onProfile(): void {
+    const wsId = this.wsStore.currentWorkspaceId();
+    if (!wsId) {
+      return;
+    }
+    this.close();
+    void this.router.navigate(['/workspace', wsId, 'settings', 'profile']);
   }
 
   protected onLogout(): void {

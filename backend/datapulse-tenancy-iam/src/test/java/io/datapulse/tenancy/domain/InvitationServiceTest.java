@@ -4,9 +4,6 @@ import io.datapulse.common.exception.AppException;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.AcceptInvitationResponse;
-import io.datapulse.tenancy.api.CreateInvitationRequest;
-import io.datapulse.tenancy.api.InvitationResponse;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
@@ -32,7 +29,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -83,13 +79,12 @@ class InvitationServiceTest {
             return e;
           });
 
-      InvitationResponse response = invitationService.createInvitation(
-          1L, 10L, "OWNER",
-          new CreateInvitationRequest("user@example.com", MemberRole.ANALYST));
+      WorkspaceInvitationEntity response = invitationService.createInvitation(
+          1L, 10L, "OWNER", "user@example.com", MemberRole.ANALYST);
 
-      assertThat(response.id()).isEqualTo(50L);
-      assertThat(response.role()).isEqualTo(MemberRole.ANALYST);
-      assertThat(response.status()).isEqualTo(InvitationStatus.PENDING);
+      assertThat(response.getId()).isEqualTo(50L);
+      assertThat(response.getRole()).isEqualTo(MemberRole.ANALYST);
+      assertThat(response.getStatus()).isEqualTo(InvitationStatus.PENDING);
       verify(auditPublisher).publish(eq("member.invite"), eq("workspace_invitation"), anyString());
     }
 
@@ -97,8 +92,7 @@ class InvitationServiceTest {
     @DisplayName("should_throw_when_inviting_as_owner_role")
     void should_throw_when_inviting_as_owner_role() {
       assertThatThrownBy(() -> invitationService.createInvitation(
-          1L, 10L, "OWNER",
-          new CreateInvitationRequest("u@e.com", MemberRole.OWNER)))
+          1L, 10L, "OWNER", "u@e.com", MemberRole.OWNER))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("invitation.cannot.assign.owner");
     }
@@ -107,8 +101,7 @@ class InvitationServiceTest {
     @DisplayName("should_throw_when_admin_invites_admin")
     void should_throw_when_admin_invites_admin() {
       assertThatThrownBy(() -> invitationService.createInvitation(
-          1L, 10L, "ADMIN",
-          new CreateInvitationRequest("u@e.com", MemberRole.ADMIN)))
+          1L, 10L, "ADMIN", "u@e.com", MemberRole.ADMIN))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("invitation.admin.cannot.invite.admin");
     }
@@ -124,8 +117,7 @@ class InvitationServiceTest {
           1L, 20L, MemberStatus.ACTIVE)).thenReturn(true);
 
       assertThatThrownBy(() -> invitationService.createInvitation(
-          1L, 10L, "OWNER",
-          new CreateInvitationRequest("user@example.com", MemberRole.ANALYST)))
+          1L, 10L, "OWNER", "user@example.com", MemberRole.ANALYST))
           .isInstanceOf(ConflictException.class)
           .hasMessage("invitation.user.already.member");
     }
@@ -149,11 +141,10 @@ class InvitationServiceTest {
           .thenReturn(Optional.of(existing));
       when(invitationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      InvitationResponse response = invitationService.createInvitation(
-          1L, 10L, "OWNER",
-          new CreateInvitationRequest("u@e.com", MemberRole.ADMIN));
+      WorkspaceInvitationEntity response = invitationService.createInvitation(
+          1L, 10L, "OWNER", "u@e.com", MemberRole.ADMIN);
 
-      assertThat(response.role()).isEqualTo(MemberRole.ADMIN);
+      assertThat(response.getRole()).isEqualTo(MemberRole.ADMIN);
       verify(auditPublisher, never()).publish(anyString(), anyString(), anyString());
     }
   }
@@ -226,11 +217,11 @@ class InvitationServiceTest {
           .thenReturn(Optional.of(inv));
       when(invitationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-      InvitationResponse response = invitationService.resendInvitation(10L, 1L);
+      WorkspaceInvitationEntity response = invitationService.resendInvitation(10L, 1L);
 
       assertThat(inv.getTokenHash()).isNotEqualTo("old-hash");
       assertThat(inv.getExpiresAt()).isAfter(OffsetDateTime.now());
-      assertThat(response.id()).isEqualTo(1L);
+      assertThat(response.getId()).isEqualTo(1L);
     }
 
     @Test
@@ -277,12 +268,12 @@ class InvitationServiceTest {
       when(memberRepository.save(any())).thenAnswer(i -> i.getArgument(0));
       when(invitationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-      AcceptInvitationResponse response = invitationService.acceptInvitation(
+      WorkspaceInvitationEntity response = invitationService.acceptInvitation(
           "some-raw-token", 50L);
 
-      assertThat(response.workspaceId()).isEqualTo(1L);
-      assertThat(response.workspaceName()).isEqualTo("Main WS");
-      assertThat(response.role()).isEqualTo(MemberRole.ANALYST);
+      assertThat(response.getWorkspace().getId()).isEqualTo(1L);
+      assertThat(response.getWorkspace().getName()).isEqualTo("Main WS");
+      assertThat(response.getRole()).isEqualTo(MemberRole.ANALYST);
       assertThat(inv.getStatus()).isEqualTo(InvitationStatus.ACCEPTED);
       assertThat(inv.getAcceptedByUserId()).isEqualTo(50L);
 
@@ -415,10 +406,10 @@ class InvitationServiceTest {
       when(invitationRepository.findByWorkspace_IdOrderByCreatedAtDesc(5L))
           .thenReturn(List.of(inv1));
 
-      List<InvitationResponse> result = invitationService.listInvitations(5L);
+      List<WorkspaceInvitationEntity> result = invitationService.listInvitations(5L);
 
       assertThat(result).hasSize(1);
-      assertThat(result.get(0).email()).isEqualTo("a@b.com");
+      assertThat(result.get(0).getEmail()).isEqualTo("a@b.com");
     }
   }
 }

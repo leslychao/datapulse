@@ -1,6 +1,7 @@
 package io.datapulse.etl.domain;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import io.datapulse.common.exception.BadRequestException;
@@ -22,6 +24,7 @@ import io.datapulse.etl.api.BulkUpdateCostProfileResponse;
 import io.datapulse.etl.api.CostProfileFilter;
 import io.datapulse.etl.api.CostProfileResponse;
 import io.datapulse.etl.api.CreateCostProfileRequest;
+import io.datapulse.etl.api.SellerSkuSuggestionResponse;
 import io.datapulse.etl.api.UpdateCostProfileRequest;
 import io.datapulse.etl.domain.CostProfileCsvParser.CsvRow;
 import io.datapulse.etl.domain.CostProfileCsvParser.ParseResult;
@@ -40,6 +43,8 @@ public class CostProfileService {
     private static final int MAX_BULK_ROWS = 10_000;
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
     private static final String REQUIRED_CURRENCY = "RUB";
+    private static final int SKU_SUGGESTION_MIN_QUERY = 3;
+    private static final int SKU_SUGGESTION_MAX_RESULTS = 30;
 
     private final CostProfileRepository costProfileRepository;
     private final SellerSkuReadRepository sellerSkuReadRepository;
@@ -49,13 +54,30 @@ public class CostProfileService {
                                                          Pageable pageable) {
         List<CostProfileRow> rows = costProfileRepository.findCurrentProfiles(
                 workspaceId, filter.sellerSkuId(), filter.search(),
-                pageable.getPageSize(), pageable.getOffset());
+                pageable.getSort(), pageable.getPageSize(), pageable.getOffset());
 
         long total = costProfileRepository.countCurrentProfiles(
                 workspaceId, filter.sellerSkuId(), filter.search());
 
         List<CostProfileResponse> content = rows.stream().map(this::toResponse).toList();
         return new PageImpl<>(content, pageable, total);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerSkuSuggestionResponse> listSkuSuggestions(long workspaceId, String search) {
+        if (!StringUtils.hasText(search)) {
+            return List.of();
+        }
+        String trimmed = search.trim();
+        if (trimmed.length() < SKU_SUGGESTION_MIN_QUERY) {
+            return List.of();
+        }
+        var pattern = "%" + trimmed + "%";
+        return sellerSkuReadRepository
+                .searchByWorkspaceAndPattern(workspaceId, pattern, SKU_SUGGESTION_MAX_RESULTS)
+                .stream()
+                .map(r -> new SellerSkuSuggestionResponse(r.sellerSkuId(), r.skuCode(), r.productName()))
+                .toList();
     }
 
     @Transactional
@@ -71,13 +93,14 @@ public class CostProfileService {
 
         costProfileRepository.createVersion(entity);
 
-        String skuCode = sellerSkuReadRepository.findSkuCodeById(request.sellerSkuId())
-                .orElse(null);
+        String skuCode = sellerSkuReadRepository.findSkuCodeById(request.sellerSkuId()).orElse("");
+        String productName = sellerSkuReadRepository.findProductNameBySellerSkuId(request.sellerSkuId())
+                .orElse("");
 
         log.info("Cost profile created: sellerSkuId={}, validFrom={}, costPrice={}, userId={}",
                 request.sellerSkuId(), request.validFrom(), request.costPrice(), userId);
 
-        return toResponse(entity, skuCode);
+        return toResponse(entity, skuCode, productName);
     }
 
     @Transactional
@@ -207,15 +230,30 @@ public class CostProfileService {
 
     @Transactional(readOnly = true)
     public byte[] exportCsv(long workspaceId) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        List<CostProfileRow> rows = costProfileRepository.findAllCurrentProfilesForExport(workspaceId);
+        StringBuilder sb = new StringBuilder(rows.size() * 48 + 48);
+        sb.append("sku_code,cost_price,currency,valid_from\n");
+        for (CostProfileRow row : rows) {
+            if (row.getSkuCode() == null || row.getCostPrice() == null
+                    || row.getCurrency() == null || row.getValidFrom() == null) {
+                log.warn("Skipping cost profile export row with incomplete data: id={}", row.getId());
+                continue;
+            }
+            sb.append(row.getSkuCode().trim()).append(',');
+            sb.append(row.getCostPrice().stripTrailingZeros().toPlainString()).append(',');
+            sb.append(row.getCurrency().trim().toUpperCase()).append(',');
+            sb.append(row.getValidFrom()).append('\n');
+        }
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Transactional(readOnly = true)
     public List<CostProfileResponse> getHistory(long sellerSkuId) {
-        String skuCode = sellerSkuReadRepository.findSkuCodeById(sellerSkuId).orElse(null);
+        String skuCode = sellerSkuReadRepository.findSkuCodeById(sellerSkuId).orElse("");
+        String productName = sellerSkuReadRepository.findProductNameBySellerSkuId(sellerSkuId).orElse("");
 
         return costProfileRepository.findHistoryBySku(sellerSkuId).stream()
-                .map(entity -> toResponse(entity, skuCode))
+                .map(entity -> toResponse(entity, skuCode, productName))
                 .toList();
     }
 
@@ -237,10 +275,13 @@ public class CostProfileService {
     }
 
     private CostProfileResponse toResponse(CostProfileRow row) {
+        long id = row.getId() != null ? row.getId() : 0L;
+        String productName = row.getProductName() != null ? row.getProductName() : "";
         return new CostProfileResponse(
-                row.getId(),
+                id,
                 row.getSellerSkuId(),
                 row.getSkuCode(),
+                productName,
                 row.getCostPrice(),
                 row.getCurrency(),
                 row.getValidFrom(),
@@ -250,11 +291,14 @@ public class CostProfileService {
                 row.getUpdatedAt());
     }
 
-    private CostProfileResponse toResponse(CostProfileEntity entity, String skuCode) {
+    private CostProfileResponse toResponse(CostProfileEntity entity, String skuCode, String productName) {
+        String safeSku = skuCode != null ? skuCode : "";
+        String safeName = productName != null ? productName : "";
         return new CostProfileResponse(
                 entity.getId() != null ? entity.getId() : 0L,
                 entity.getSellerSkuId(),
-                skuCode,
+                safeSku,
+                safeName,
                 entity.getCostPrice(),
                 entity.getCurrency(),
                 entity.getValidFrom(),

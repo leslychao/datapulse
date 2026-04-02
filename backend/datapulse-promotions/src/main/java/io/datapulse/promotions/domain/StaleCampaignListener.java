@@ -1,5 +1,6 @@
 package io.datapulse.promotions.domain;
 
+import io.datapulse.common.promo.StalePromoCampaignHandler;
 import io.datapulse.promotions.persistence.PromoActionEntity;
 import io.datapulse.promotions.persistence.PromoActionRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,10 +13,11 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class StaleCampaignListener {
+public class StaleCampaignListener implements StalePromoCampaignHandler {
 
     private final PromoActionRepository actionRepository;
 
+    @Override
     public void onCampaignsStale(List<Long> campaignIds) {
         for (long campaignId : campaignIds) {
             expirePendingActions(campaignId);

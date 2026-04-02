@@ -8,6 +8,7 @@ import {
   CostProfileImportResult,
   CostProfilePage,
   CreateCostProfileRequest,
+  SellerSkuSuggestion,
   UpdateCostProfileRequest,
 } from '@core/models';
 
@@ -16,12 +17,28 @@ export class CostProfileApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
-  listCostProfiles(search?: string, page = 0, size = 50): Observable<CostProfilePage> {
-    let params = new HttpParams().set('page', page).set('size', size);
+  listCostProfiles(
+    search?: string,
+    page = 0,
+    size = 50,
+    sortProperty = 'skuCode',
+    sortDirection: 'asc' | 'desc' = 'asc',
+  ): Observable<CostProfilePage> {
+    let params = new HttpParams()
+      .set('page', page)
+      .set('size', size)
+      .set('sort', `${sortProperty},${sortDirection}`);
     if (search) {
       params = params.set('search', search);
     }
     return this.http.get<CostProfilePage>(`${this.base}/cost-profiles`, { params });
+  }
+
+  searchSkuSuggestions(search: string): Observable<SellerSkuSuggestion[]> {
+    const params = new HttpParams().set('search', search);
+    return this.http.get<SellerSkuSuggestion[]>(`${this.base}/cost-profiles/sku-suggestions`, {
+      params,
+    });
   }
 
   createCostProfile(req: CreateCostProfileRequest): Observable<CostProfile> {

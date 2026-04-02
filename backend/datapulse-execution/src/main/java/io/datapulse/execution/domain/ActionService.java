@@ -14,6 +14,7 @@ import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionCasRepository;
 import io.datapulse.execution.persistence.PriceActionDetailRow;
 import io.datapulse.execution.persistence.PriceActionEntity;
+import io.datapulse.execution.persistence.PriceActionKpiRow;
 import io.datapulse.execution.persistence.PriceActionQueryRepository;
 import io.datapulse.execution.persistence.PriceActionRepository;
 import io.datapulse.execution.persistence.PriceActionStateTransitionEntity;
@@ -62,6 +63,11 @@ public class ActionService {
                                                     PriceActionFilter filter,
                                                     Pageable pageable) {
         return queryRepository.findAll(workspaceId, filter, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PriceActionKpiRow getActionsKpi(long workspaceId) {
+        return queryRepository.findKpi(workspaceId);
     }
 
     @Transactional(readOnly = true)

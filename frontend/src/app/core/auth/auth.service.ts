@@ -57,4 +57,9 @@ export class AuthService {
       localStorage.setItem(LAST_WORKSPACE_KEY, lastWorkspaceId);
     }
   }
+
+  /** Updates in-memory user after profile changes (e.g. PUT /users/me). */
+  applyCachedUser(profile: UserProfile): void {
+    this._user.set(profile);
+  }
 }

@@ -2,10 +2,6 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.CreateTenantRequest;
-import io.datapulse.tenancy.api.CreateWorkspaceRequest;
-import io.datapulse.tenancy.api.TenantResponse;
-import io.datapulse.tenancy.api.WorkspaceListResponse;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.TenantEntity;
@@ -65,11 +61,10 @@ class OnboardingServiceTest {
         return t;
       });
 
-      TenantResponse response = onboardingService.createTenant(
-          new CreateTenantRequest("My Store"), 1L);
+      TenantEntity response = onboardingService.createTenant("My Store", 1L);
 
-      assertThat(response.name()).isEqualTo("My Store");
-      assertThat(response.slug()).isEqualTo("my-store");
+      assertThat(response.getName()).isEqualTo("My Store");
+      assertThat(response.getSlug()).isEqualTo("my-store");
       verify(auditPublisher).publish("tenant.create", "tenant", "10");
     }
 
@@ -78,8 +73,7 @@ class OnboardingServiceTest {
     void should_throw_when_tenant_limit_exceeded() {
       when(tenantRepository.countByOwnerUserId(1L)).thenReturn(3L);
 
-      assertThatThrownBy(() ->
-          onboardingService.createTenant(new CreateTenantRequest("New"), 1L))
+      assertThatThrownBy(() -> onboardingService.createTenant("New", 1L))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("tenant.limit.exceeded");
 
@@ -100,11 +94,10 @@ class OnboardingServiceTest {
         return t;
       });
 
-      TenantResponse response = onboardingService.createTenant(
-          new CreateTenantRequest("My Store"), 1L);
+      TenantEntity response = onboardingService.createTenant("My Store", 1L);
 
-      assertThat(response.slug()).isNotEqualTo("my-store");
-      assertThat(response.slug()).startsWith("my-store-");
+      assertThat(response.getSlug()).isNotEqualTo("my-store");
+      assertThat(response.getSlug()).startsWith("my-store-");
     }
 
     @Test
@@ -113,8 +106,7 @@ class OnboardingServiceTest {
       when(tenantRepository.countByOwnerUserId(1L)).thenReturn(0L);
       when(tenantRepository.existsBySlug(anyString())).thenReturn(true);
 
-      assertThatThrownBy(() ->
-          onboardingService.createTenant(new CreateTenantRequest("Test"), 1L))
+      assertThatThrownBy(() -> onboardingService.createTenant("Test", 1L))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("Failed to generate unique slug");
     }
@@ -130,10 +122,9 @@ class OnboardingServiceTest {
         return t;
       });
 
-      TenantResponse response = onboardingService.createTenant(
-          new CreateTenantRequest("  My Store  "), 1L);
+      TenantEntity response = onboardingService.createTenant("  My Store  ", 1L);
 
-      assertThat(response.name()).isEqualTo("My Store");
+      assertThat(response.getName()).isEqualTo("My Store");
     }
   }
 
@@ -150,10 +141,10 @@ class OnboardingServiceTest {
       tenant.setSlug("acme");
       when(tenantRepository.findById(5L)).thenReturn(Optional.of(tenant));
 
-      TenantResponse response = onboardingService.getTenant(5L);
+      TenantEntity response = onboardingService.getTenant(5L);
 
-      assertThat(response.id()).isEqualTo(5L);
-      assertThat(response.name()).isEqualTo("Acme");
+      assertThat(response.getId()).isEqualTo(5L);
+      assertThat(response.getName()).isEqualTo("Acme");
     }
 
     @Test
@@ -193,8 +184,7 @@ class OnboardingServiceTest {
       when(memberRepository.save(any(WorkspaceMemberEntity.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
-      WorkspaceListResponse response = onboardingService.createWorkspace(
-          1L, new CreateWorkspaceRequest("Main Shop"), 10L);
+      WorkspaceSummary response = onboardingService.createWorkspace(1L, "Main Shop", 10L);
 
       assertThat(response.name()).isEqualTo("Main Shop");
       assertThat(response.membersCount()).isEqualTo(1);
@@ -212,8 +202,7 @@ class OnboardingServiceTest {
     void should_throw_when_tenant_not_found() {
       when(tenantRepository.findById(99L)).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() ->
-          onboardingService.createWorkspace(99L, new CreateWorkspaceRequest("X"), 1L))
+      assertThatThrownBy(() -> onboardingService.createWorkspace(99L, "X", 1L))
           .isInstanceOf(NotFoundException.class);
     }
 
@@ -225,8 +214,7 @@ class OnboardingServiceTest {
       tenant.setOwnerUserId(10L);
       when(tenantRepository.findById(1L)).thenReturn(Optional.of(tenant));
 
-      assertThatThrownBy(() ->
-          onboardingService.createWorkspace(1L, new CreateWorkspaceRequest("X"), 99L))
+      assertThatThrownBy(() -> onboardingService.createWorkspace(1L, "X", 99L))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("tenant.not.owner");
     }

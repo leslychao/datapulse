@@ -35,8 +35,8 @@
     />
   </div>
 
-  <!-- Content -->
-  <div class="flex-1 overflow-y-auto">
+  <!-- Content: table width follows content (w-max), scroll horizontally if needed -->
+  <div class="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
     @if (policiesQuery.isError()) {
       <div class="p-6">
         <dp-empty-state
@@ -47,40 +47,40 @@
       </div>
     } @else if (policiesQuery.isPending()) {
       <!-- Skeleton -->
-      <table class="w-full">
+      <table class="w-max max-w-full table-auto">
         <thead>
           <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-            <th class="py-2 pl-5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap py-2 pl-4 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.name' | translate }}
             </th>
-            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.status' | translate }}
             </th>
-            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.strategy_type' | translate }}
             </th>
-            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.execution_mode' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.priority' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.assignments_count' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.version' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.updated_at' | translate }}
             </th>
-            <th class="w-[100px] py-2 pl-3 pr-4"></th>
+            <th class="whitespace-nowrap py-2 pl-3 pr-4"></th>
           </tr>
         </thead>
         <tbody>
           @for (i of [1,2,3,4]; track i) {
             <tr class="border-b border-[var(--border-subtle)]">
-              <td class="py-3 pl-5 pr-3"><div class="h-4 w-36 rounded dp-shimmer"></div></td>
+              <td class="py-3 pl-4 pr-3"><div class="h-4 w-36 rounded dp-shimmer"></div></td>
               <td class="px-3 py-3"><div class="h-5 w-20 rounded-full dp-shimmer"></div></td>
               <td class="px-3 py-3"><div class="h-5 w-24 rounded-full dp-shimmer"></div></td>
               <td class="px-3 py-3"><div class="h-5 w-24 rounded-full dp-shimmer"></div></td>
@@ -111,34 +111,34 @@
       </div>
     } @else {
       <!-- Policy table -->
-      <table class="w-full">
+      <table class="w-max max-w-full table-auto">
         <thead>
           <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-            <th class="py-2 pl-5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="py-2 pl-4 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.name' | translate }}
             </th>
-            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.status' | translate }}
             </th>
-            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.strategy_type' | translate }}
             </th>
-            <th class="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.execution_mode' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.priority' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.assignments_count' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.version' | translate }}
             </th>
-            <th class="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+            <th class="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
               {{ 'pricing.policies.col.updated_at' | translate }}
             </th>
-            <th class="w-[100px] py-2 pl-3 pr-4"></th>
+            <th class="whitespace-nowrap py-2 pl-3 pr-4"></th>
           </tr>
         </thead>
         <tbody>
@@ -156,7 +156,7 @@
               </td>
 
               <!-- Status -->
-              <td class="px-3 py-3">
+              <td class="whitespace-nowrap px-3 py-3">
                 <span
                   class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
                   [style.color]="statusColor(p.status)"
@@ -172,14 +172,14 @@
               </td>
 
               <!-- Strategy -->
-              <td class="px-3 py-3">
+              <td class="whitespace-nowrap px-3 py-3">
                 <span class="inline-flex rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
                   {{ 'pricing.policies.strategy.' + p.strategyType | translate }}
                 </span>
               </td>
 
               <!-- Mode -->
-              <td class="px-3 py-3">
+              <td class="whitespace-nowrap px-3 py-3">
                 <span
                   class="inline-flex rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-medium"
                   [style.color]="modeColor(p.executionMode)"
@@ -190,27 +190,27 @@
               </td>
 
               <!-- Priority -->
-              <td class="px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+              <td class="whitespace-nowrap px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
                 {{ p.priority }}
               </td>
 
               <!-- Assignments -->
-              <td class="px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+              <td class="whitespace-nowrap px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
                 {{ p.assignmentsCount }}
               </td>
 
               <!-- Version -->
-              <td class="px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+              <td class="whitespace-nowrap px-3 py-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
                 v{{ p.version }}
               </td>
 
               <!-- Updated -->
-              <td class="px-3 py-3 text-right text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+              <td class="whitespace-nowrap px-3 py-3 text-right text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
                 {{ relativeTime(p.updatedAt) }}
               </td>
 
               <!-- Actions (hover-reveal) -->
-              <td class="py-2 pl-3 pr-4">
+              <td class="whitespace-nowrap py-2 pl-3 pr-4">
                 @if (rbac.canWritePolicies()) {
                   <div class="row-actions flex items-center justify-end gap-0.5">
                     <!-- Edit -->

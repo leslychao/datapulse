@@ -97,6 +97,7 @@ export class GridToolbarComponent {
         { value: 'ACTIVE', label: 'grid.offer_status.ACTIVE' },
         { value: 'ARCHIVED', label: 'grid.offer_status.ARCHIVED' },
         { value: 'BLOCKED', label: 'grid.offer_status.BLOCKED' },
+        { value: 'INACTIVE', label: 'grid.offer_status.INACTIVE' },
       ],
     },
     {

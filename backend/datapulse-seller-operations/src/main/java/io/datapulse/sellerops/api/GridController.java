@@ -2,6 +2,7 @@ package io.datapulse.sellerops.api;
 
 import io.datapulse.sellerops.config.GridProperties;
 import io.datapulse.sellerops.domain.GridExportService;
+import io.datapulse.sellerops.domain.GridFilter;
 import io.datapulse.sellerops.domain.GridService;
 import io.datapulse.sellerops.domain.SavedViewService;
 import io.datapulse.sellerops.persistence.SavedViewEntity;
@@ -108,7 +109,8 @@ public class GridController {
             @RequestParam(value = "margin_min", required = false) BigDecimal marginMin,
             @RequestParam(value = "margin_max", required = false) BigDecimal marginMax,
             @RequestParam(value = "has_manual_lock", required = false) Boolean hasManualLock,
-            @RequestParam(value = "has_active_promo", required = false) Boolean hasActivePromo) {
+            @RequestParam(value = "has_active_promo", required = false) Boolean hasActivePromo,
+            @RequestParam(value = "offer_id", required = false) List<Long> offerId) {
 
         GridFilter filter = new GridFilter(
                 marketplaceType, connectionId, status, skuCode, productName,
@@ -119,8 +121,14 @@ public class GridController {
         String filename = "datapulse-export-"
                 + LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) + ".csv";
 
-        StreamingResponseBody body = out ->
+        boolean exportSelection = offerId != null && !offerId.isEmpty();
+        StreamingResponseBody body = out -> {
+            if (exportSelection) {
+                exportService.exportCsvByOfferIds(workspaceId, offerId, out);
+            } else {
                 exportService.exportCsv(workspaceId, filter, out);
+            }
+        };
 
         return ResponseEntity.ok()
                 .header("Content-Type", "text/csv; charset=UTF-8")

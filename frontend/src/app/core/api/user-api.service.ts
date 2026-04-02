@@ -13,4 +13,8 @@ export class UserApiService {
   getMe(): Observable<UserProfile> {
     return this.http.get<UserProfile>(`${this.base}/users/me`);
   }
+
+  updateMe(request: { name: string }): Observable<UserProfile> {
+    return this.http.put<UserProfile>(`${this.base}/users/me`, request);
+  }
 }

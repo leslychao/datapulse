@@ -1,6 +1,5 @@
 package io.datapulse.sellerops.domain;
 
-import io.datapulse.sellerops.api.GridFilter;
 import io.datapulse.sellerops.api.GridRowResponse;
 import io.datapulse.sellerops.config.GridProperties;
 import io.datapulse.sellerops.persistence.ClickHouseEnrichment;

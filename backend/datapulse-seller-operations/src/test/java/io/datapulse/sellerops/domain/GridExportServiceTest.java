@@ -1,6 +1,5 @@
 package io.datapulse.sellerops.domain;
 
-import io.datapulse.sellerops.api.GridFilter;
 import io.datapulse.sellerops.config.GridProperties;
 import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
 import io.datapulse.sellerops.persistence.GridRow;
@@ -174,6 +173,35 @@ class GridExportServiceTest {
 
       String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("Да");
+    }
+  }
+
+  @Nested
+  @DisplayName("exportCsvByOfferIds")
+  class ExportCsvByOfferIds {
+
+    @Test
+    void should_fetch_rows_by_id_and_skip_batch_export() {
+      when(gridProperties.getExportMaxRows()).thenReturn(100_000);
+      when(gridProperties.getExportTimeoutSeconds()).thenReturn(60);
+
+      var row = GridRow.builder()
+          .offerId(1L).skuCode("SKU-001").productName("P1")
+          .marketplaceType("WB").connectionName("C1")
+          .status("ACTIVE").manualLock(false)
+          .build();
+
+      when(pgRepository.findByOrderedIds(eq(WORKSPACE_ID), eq(List.of(1L))))
+          .thenReturn(List.of(row));
+
+      var out = new ByteArrayOutputStream();
+      service.exportCsvByOfferIds(WORKSPACE_ID, List.of(1L), out);
+
+      verify(pgRepository, never())
+          .findBatchForExport(any(), any(), anyInt(), anyInt());
+      String csv = out.toString(StandardCharsets.UTF_8);
+      assertThat(csv).contains("Артикул");
+      assertThat(csv).contains("SKU-001");
     }
   }
 

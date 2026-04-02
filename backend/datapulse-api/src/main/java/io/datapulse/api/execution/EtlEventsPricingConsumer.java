@@ -3,8 +3,8 @@ package io.datapulse.api.execution;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.api.config.RabbitTopologyConfig;
+import io.datapulse.common.promo.StalePromoCampaignHandler;
 import io.datapulse.pricing.domain.PricingRunApiService;
-import io.datapulse.promotions.domain.StaleCampaignListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -19,7 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EtlEventsPricingConsumer {
 
-  private final StaleCampaignListener staleCampaignListener;
+  private final StalePromoCampaignHandler stalePromoCampaignHandler;
   private final PricingRunApiService pricingRunApiService;
   private final ObjectMapper objectMapper;
 
@@ -70,7 +70,7 @@ public class EtlEventsPricingConsumer {
 
     List<Long> campaignIds = rawIds.stream().map(Number::longValue).toList();
     log.info("Processing stale campaigns: count={}", campaignIds.size());
-    staleCampaignListener.onCampaignsStale(campaignIds);
+    stalePromoCampaignHandler.onCampaignsStale(campaignIds);
   }
 
   private String extractHeader(Message message, String headerName) {

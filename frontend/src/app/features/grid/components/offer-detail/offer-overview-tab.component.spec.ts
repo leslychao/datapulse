@@ -54,9 +54,6 @@ function buildOffer(overrides: Partial<OfferDetail> = {}): OfferDetail {
     lastDecisionExplanation: 'Margin below target',
     lastActionDate: new Date().toISOString(),
     lastActionMode: 'LIVE',
-    promoName: null,
-    promoPrice: null,
-    promoEndDate: null,
     warehouses: [],
     ...overrides,
   };
@@ -145,9 +142,12 @@ describe('OfferOverviewTabComponent', () => {
 
   it('should show promo section when participating', () => {
     host.offerSignal.set(buildOffer({
-      promoStatus: 'PARTICIPATING',
-      promoName: 'Spring Sale',
-      promoPrice: 850,
+      promoStatus: {
+        participating: true,
+        campaignName: 'Spring Sale',
+        promoPrice: 850,
+        endsAt: null,
+      },
     }));
     fixture.detectChanges();
     expect(el.textContent).toContain('Spring Sale');

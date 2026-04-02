@@ -8,6 +8,12 @@ const routes: Routes = [
     children: [
       { path: '', redirectTo: 'general', pathMatch: 'full' },
       {
+        path: 'profile',
+        loadComponent: () =>
+          import('./profile/profile-page.component').then((m) => m.ProfilePageComponent),
+        data: { breadcrumb: 'Профиль' },
+      },
+      {
         path: 'connections',
         loadComponent: () =>
           import('./connections/connections-page.component').then((m) => m.ConnectionsPageComponent),

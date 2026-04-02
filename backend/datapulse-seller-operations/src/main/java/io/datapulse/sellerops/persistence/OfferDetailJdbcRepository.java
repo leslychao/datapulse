@@ -87,11 +87,10 @@ public class OfferDetailJdbcRepository {
       LEFT JOIN LATERAL (
           SELECT pp2.id    AS policy_id,
                  pp2.name  AS policy_name,
-                 ps.strategy_type,
+                 pp2.strategy_type,
                  pp2.execution_mode AS policy_execution_mode
           FROM price_policy_assignment ppa
           JOIN price_policy pp2 ON pp2.id = ppa.price_policy_id AND pp2.status = 'ACTIVE'
-          JOIN pricing_strategy ps ON ps.id = pp2.pricing_strategy_id
           WHERE ppa.marketplace_connection_id = mc.id
             AND (ppa.marketplace_offer_id = mo.id
                  OR (ppa.scope_type = 'CATEGORY' AND ppa.category_id = mo.category_id)
@@ -145,7 +144,7 @@ public class OfferDetailJdbcRepository {
           SELECT lock2.id         AS lock_id,
                  lock2.locked_price,
                  lock2.reason     AS lock_reason,
-                 lock2.created_at AS locked_at
+                 lock2.locked_at  AS locked_at
           FROM manual_price_lock lock2
           WHERE lock2.marketplace_offer_id = mo.id
             AND lock2.unlocked_at IS NULL

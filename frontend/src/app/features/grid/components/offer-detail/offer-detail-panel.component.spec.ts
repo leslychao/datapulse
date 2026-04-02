@@ -34,7 +34,6 @@ function buildOfferDetail(overrides: Partial<OfferDetail> = {}): OfferDetail {
     policyMode: 'SEMI_AUTO', lastDecisionDate: new Date().toISOString(),
     lastDecisionExplanation: 'Margin below target',
     lastActionDate: new Date().toISOString(), lastActionMode: 'LIVE',
-    promoName: null, promoPrice: null, promoEndDate: null,
     warehouses: [],
     ...overrides,
   };

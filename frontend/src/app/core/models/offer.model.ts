@@ -1,10 +1,18 @@
 import { MarketplaceType } from './connection.model';
 
-export type OfferStatus = 'ACTIVE' | 'ARCHIVED' | 'BLOCKED';
+export type OfferStatus = 'ACTIVE' | 'ARCHIVED' | 'BLOCKED' | 'INACTIVE';
 export type StockRisk = 'CRITICAL' | 'WARNING' | 'NORMAL';
 export type DataFreshness = 'FRESH' | 'STALE';
 export type DecisionType = 'CHANGE' | 'SKIP' | 'HOLD';
 export type PromoStatus = 'PARTICIPATING' | 'ELIGIBLE' | null;
+
+/** Promo block on offer detail API ({@code OfferDetailResponse.PromoInfo}). */
+export interface OfferPromoDetail {
+  participating: boolean;
+  campaignName: string | null;
+  promoPrice: number | null;
+  endsAt: string | null;
+}
 
 export type ActionStatus =
   | 'PENDING_APPROVAL'
@@ -18,7 +26,9 @@ export type ActionStatus =
   | 'CANCELLED'
   | 'SUPERSEDED'
   | 'RETRY_SCHEDULED'
-  | 'RECONCILIATION_PENDING';
+  | 'RECONCILIATION_PENDING'
+  | 'REJECTED'
+  | 'IN_PROGRESS';
 
 export interface OfferSummary {
   offerId: number;
@@ -51,7 +61,8 @@ export interface OfferSummary {
   dataFreshness: DataFreshness | null;
 }
 
-export interface OfferDetail extends OfferSummary {
+export interface OfferDetail extends Omit<OfferSummary, 'promoStatus'> {
+  promoStatus: OfferPromoDetail | null;
   categoryId: number | null;
   brand: string | null;
   lockedPrice: number | null;
@@ -64,9 +75,6 @@ export interface OfferDetail extends OfferSummary {
   lastDecisionExplanation: string | null;
   lastActionDate: string | null;
   lastActionMode: string | null;
-  promoName: string | null;
-  promoPrice: number | null;
-  promoEndDate: string | null;
   warehouses: WarehouseStock[];
 }
 

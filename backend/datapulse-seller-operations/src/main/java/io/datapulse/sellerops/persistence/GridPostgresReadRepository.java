@@ -1,6 +1,6 @@
 package io.datapulse.sellerops.persistence;
 
-import io.datapulse.sellerops.api.GridFilter;
+import io.datapulse.sellerops.domain.GridFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -315,14 +315,16 @@ public class GridPostgresReadRepository {
         return jdbc.queryForList(sql, params, Long.class);
     }
 
-    public List<GridRow> findByOrderedIds(List<Long> orderedOfferIds) {
+    public List<GridRow> findByOrderedIds(long workspaceId, List<Long> orderedOfferIds) {
         if (orderedOfferIds == null || orderedOfferIds.isEmpty()) {
             return List.of();
         }
         String sql = BASE_SELECT + FROM_JOINS
-                + " WHERE mo.id IN (:offerIds)"
+                + " WHERE mc.workspace_id = :workspaceId AND mo.id IN (:offerIds)"
                 + " ORDER BY array_position(ARRAY[" + joinIds(orderedOfferIds) + "], mo.id)";
-        var params = new MapSqlParameterSource("offerIds", orderedOfferIds);
+        var params = new MapSqlParameterSource()
+                .addValue("workspaceId", workspaceId)
+                .addValue("offerIds", orderedOfferIds);
         return jdbc.query(sql, params, this::mapGridRow);
     }
 

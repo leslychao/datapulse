@@ -26,7 +26,6 @@ function buildOffer(overrides: Partial<OfferDetail> = {}): OfferDetail {
     policyName: null, policyStrategy: null, policyMode: null,
     lastDecisionDate: null, lastDecisionExplanation: null,
     lastActionDate: null, lastActionMode: null,
-    promoName: null, promoPrice: null, promoEndDate: null,
     warehouses: [],
     ...overrides,
   };

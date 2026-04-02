@@ -1,6 +1,5 @@
 package io.datapulse.sellerops.domain;
 
-import io.datapulse.sellerops.api.GridFilter;
 import io.datapulse.sellerops.api.GridKpiResponse;
 import io.datapulse.sellerops.api.GridRowResponse;
 import io.datapulse.sellerops.api.MatchingIdsResponse;
@@ -90,7 +89,7 @@ public class GridService {
         int toIdx = (int) Math.min(pageable.getOffset() + pageable.getPageSize(), sortedIds.size());
         List<Long> pageIds = sortedIds.subList(fromIdx, toIdx);
 
-        List<GridRow> pgRows = pgRepository.findByOrderedIds(pageIds);
+        List<GridRow> pgRows = pgRepository.findByOrderedIds(workspaceId, pageIds);
         Map<Long, ClickHouseEnrichment> enrichment = fetchEnrichmentSafely(pageIds);
 
         List<GridRowResponse> enrichedRows = pgRows.stream()
