@@ -133,7 +133,7 @@ export class DataQualityStatusPageComponent {
   private readonly t = inject(TranslateService);
 
   readonly statusQuery = injectQuery(() => ({
-    queryKey: ['data-quality-status', this.wsStore.currentWorkspaceId()],
+    queryKey: ['analytics', 'data-quality-status', this.wsStore.currentWorkspaceId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getDataQualityStatus(

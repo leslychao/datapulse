@@ -11,6 +11,7 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { AnalyticsFilter, Granularity } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
@@ -97,7 +98,7 @@ export class ReturnsTrendPageComponent {
 
   readonly dateFrom = signal(defaultDateFrom());
   readonly dateTo = signal(defaultDateTo());
-  readonly granularity = signal<Granularity>('DAILY');
+  readonly granularity = signal<Granularity>('MONTHLY');
   readonly granularityOptions = GRANULARITY_OPTIONS;
 
   private readonly filter = computed<AnalyticsFilter>(() => ({
@@ -107,7 +108,7 @@ export class ReturnsTrendPageComponent {
   }));
 
   readonly trendQuery = injectQuery(() => ({
-    queryKey: ['returns-trend', this.wsStore.currentWorkspaceId(), this.filter()],
+    queryKey: ['analytics', 'returns-trend', this.wsStore.currentWorkspaceId(), this.filter()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getReturnsTrend(

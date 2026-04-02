@@ -2,10 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -27,10 +28,11 @@ import {
   injectMutation,
   QueryClient,
 } from '@tanstack/angular-query-experimental';
-import { lastValueFrom } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { lastValueFrom, Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, map } from 'rxjs/operators';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import type { EChartsOption } from 'echarts';
 
 import { LucideAngularModule, Activity, AlertTriangle, Clock, CheckCircle } from 'lucide-angular';
 
@@ -48,14 +50,15 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { ChartComponent } from '@shared/components/chart/chart.component';
 import { MismatchDetailPanelComponent } from './mismatch-detail-panel.component';
 
 const DEFAULT_PAGE_SIZE = 50;
 const PAGE_SIZES = [50, 100, 200] as const;
 
 const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'info' | 'neutral'> = {
-  ACTIVE: 'warning',
-  ACKNOWLEDGED: 'info',
+  ACTIVE: 'error',
+  ACKNOWLEDGED: 'warning',
   RESOLVED: 'success',
   AUTO_RESOLVED: 'success',
   IGNORED: 'neutral',
@@ -68,8 +71,6 @@ const TYPE_COLORS: Record<MismatchType, { bg: string; text: string }> = {
   FINANCE: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
 };
 
-const TERMINAL_STATUSES: MismatchStatus[] = ['RESOLVED', 'AUTO_RESOLVED', 'IGNORED'];
-
 @Component({
   selector: 'dp-mismatch-dashboard-page',
   standalone: true,
@@ -81,6 +82,7 @@ const TERMINAL_STATUSES: MismatchStatus[] = ['RESOLVED', 'AUTO_RESOLVED', 'IGNOR
     LucideAngularModule,
     KpiCardComponent,
     EmptyStateComponent,
+    ChartComponent,
     MismatchDetailPanelComponent,
   ],
   templateUrl: './mismatch-dashboard-page.component.html',
@@ -103,6 +105,7 @@ export class MismatchDashboardPageComponent {
   protected readonly pageSizes = PAGE_SIZES;
 
   private gridApi: GridApi<Mismatch> | null = null;
+  private readonly searchSubject = new Subject<string>();
 
   readonly selectedFromQuery = toSignal(
     this.route.queryParamMap.pipe(map((m) => m.get('selected'))),
@@ -132,6 +135,7 @@ export class MismatchDashboardPageComponent {
 
   readonly showBulkIgnoreModal = signal(false);
   readonly bulkIgnoreReason = signal('');
+  readonly showColumnsPanel = signal(false);
 
   readonly typeOptions: MismatchType[] = ['PRICE', 'STOCK', 'PROMO', 'FINANCE'];
   readonly statusOptions: MismatchStatus[] = [
@@ -202,6 +206,15 @@ export class MismatchDashboardPageComponent {
   readonly totalPages = computed(() => this.listQuery.data()?.totalPages ?? 0);
   readonly totalElements = computed(() => this.listQuery.data()?.totalElements ?? 0);
 
+  readonly paginationLabel = computed(() => {
+    const page = this.currentPage();
+    const size = this.pageSize();
+    const total = this.totalElements();
+    const from = page * size + 1;
+    const to = Math.min((page + 1) * size, total);
+    return total > 0 ? `${from}\u2013${to}` : '0';
+  });
+
   readonly avgHoursDisplay = computed(() => {
     const v = this.summaryQuery.data()?.avgHoursUnresolved;
     if (v == null) return null;
@@ -217,6 +230,77 @@ export class MismatchDashboardPageComponent {
       this.periodFrom().trim() !== '' ||
       this.periodTo().trim() !== '' ||
       this.searchQuery().trim() !== '',
+  );
+
+  readonly donutOptions = computed((): EChartsOption => {
+    const dist = this.summaryQuery.data()?.distributionByType ?? [];
+    const colorMap: Record<string, string> = {
+      PRICE: '#2563EB', STOCK: '#D97706', PROMO: '#7C3AED', FINANCE: '#4338CA',
+    };
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { fontSize: 12 } },
+      series: [{
+        type: 'pie',
+        radius: ['45%', '75%'],
+        avoidLabelOverlap: false,
+        label: { show: false },
+        emphasis: { label: { show: false } },
+        data: dist.map(d => ({
+          value: d.count,
+          name: this.translate.instant('mismatches.type.' + d.type),
+          itemStyle: { color: colorMap[d.type] ?? '#6B7280' },
+        })),
+      }],
+    };
+  });
+
+  readonly timelineOptions = computed((): EChartsOption => {
+    const tl = this.summaryQuery.data()?.timeline ?? [];
+    return {
+      tooltip: { trigger: 'axis' },
+      legend: {
+        data: [
+          this.translate.instant('mismatches.charts.new'),
+          this.translate.instant('mismatches.charts.resolved'),
+        ],
+        bottom: 0,
+        textStyle: { fontSize: 11 },
+      },
+      grid: { left: 40, right: 16, top: 8, bottom: 32 },
+      xAxis: {
+        type: 'category',
+        data: tl.map(d => d.date.slice(5).replace('-', '.')),
+        axisLabel: { fontSize: 10 },
+      },
+      yAxis: { type: 'value', minInterval: 1 },
+      series: [
+        {
+          name: this.translate.instant('mismatches.charts.new'),
+          type: 'bar',
+          stack: 'a',
+          data: tl.map(d => d.newCount),
+          itemStyle: { color: 'rgba(220,38,38,0.5)' },
+        },
+        {
+          name: this.translate.instant('mismatches.charts.resolved'),
+          type: 'bar',
+          stack: 'a',
+          data: tl.map(d => d.resolvedCount),
+          itemStyle: { color: 'rgba(5,150,105,0.5)' },
+        },
+      ],
+    };
+  });
+
+  readonly toggleableColumns = computed(() =>
+    this.columnDefs
+      .filter(c => c.colId && c.colId !== 'selection')
+      .map(c => ({
+        colId: c.colId!,
+        headerName: c.headerName ?? c.colId ?? '',
+        visible: !c.hide,
+      })),
   );
 
   readonly columnDefs!: ColDef<Mismatch>[];
@@ -264,6 +348,15 @@ export class MismatchDashboardPageComponent {
   }));
 
   constructor() {
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      takeUntilDestroyed(),
+    ).subscribe(q => {
+      this.searchQuery.set(q);
+      this.applyFilters();
+    });
+
     const tr = this.translate;
     this.columnDefs = [
       {
@@ -360,7 +453,7 @@ export class MismatchDashboardPageComponent {
         sortable: true,
         cellRenderer: (p: ICellRendererParams<Mismatch>) => {
           const v = p.data?.detectedAt;
-          if (!v) return '—';
+          if (!v) return '\u2014';
           const abs = new Date(v).toLocaleString('ru-RU');
           const rel = formatDistanceToNow(new Date(v), { locale: ru, addSuffix: true });
           return `<span title="${escapeHtml(abs)}">${escapeHtml(rel)}</span>`;
@@ -389,7 +482,7 @@ export class MismatchDashboardPageComponent {
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<Mismatch>) => {
           const r = p.value as string | null;
-          if (!r) return '—';
+          if (!r) return '\u2014';
           return tr.instant(`mismatches.resolution.${r}`);
         },
       },
@@ -412,7 +505,7 @@ export class MismatchDashboardPageComponent {
           const sev = p.data?.severity;
           if (!sev) return '';
           const color = sev === 'CRITICAL' ? 'var(--status-error)' : 'var(--status-warning)';
-          return `<span style="color:${color}">⚠</span>`;
+          return `<span style="color:${color}">\u26A0</span>`;
         },
       },
     ];
@@ -425,6 +518,10 @@ export class MismatchDashboardPageComponent {
   onConnectionChange(value: number | null): void {
     this.connectionId.set(value);
     this.applyFilters();
+  }
+
+  onSearchInput(value: string): void {
+    this.searchSubject.next(value);
   }
 
   onRowClicked(e: RowClickedEvent<Mismatch>): void {
@@ -464,6 +561,49 @@ export class MismatchDashboardPageComponent {
     const dir = c.sort === 'asc' ? 'asc' : 'desc';
     this.sortParam.set(`${apiField},${dir}`);
     this.currentPage.set(0);
+  }
+
+  onChartClick(params: Record<string, unknown>): void {
+    const seriesType = params['seriesType'] as string;
+    if (seriesType === 'pie') {
+      const name = params['name'] as string;
+      const typeMap: Record<string, MismatchType> = {};
+      for (const t of this.typeOptions) {
+        typeMap[this.translate.instant('mismatches.type.' + t)] = t;
+      }
+      const matched = typeMap[name];
+      if (matched) {
+        this.filterTypes.set([matched]);
+        this.applyFilters();
+      }
+    }
+  }
+
+  exportCsv(): void {
+    const ws = this.ws.currentWorkspaceId();
+    if (!ws) return;
+    lastValueFrom(this.api.exportCsv(ws, this.mismatchFilter())).then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mismatches.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  toggleColumn(colId: string): void {
+    if (!this.gridApi) return;
+    const col = this.gridApi.getColumn(colId);
+    if (!col) return;
+    const visible = col.isVisible();
+    this.gridApi.setColumnsVisible([colId], !visible);
+  }
+
+  isColumnVisible(colId: string): boolean {
+    if (!this.gridApi) return true;
+    const col = this.gridApi.getColumn(colId);
+    return col ? col.isVisible() : true;
   }
 
   closeDetail(): void {
@@ -580,8 +720,8 @@ function escapeHtml(s: string): string {
 }
 
 function formatDelta(v: unknown): string {
-  if (v === null || v === undefined) return '—';
+  if (v === null || v === undefined) return '\u2014';
   const n = Number(v);
-  if (Number.isNaN(n)) return '—';
+  if (Number.isNaN(n)) return '\u2014';
   return `${n > 0 ? '+' : ''}${n.toFixed(1).replace('.', ',')}%`;
 }

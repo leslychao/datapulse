@@ -10,14 +10,10 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { formatMoney } from '@shared/utils/format.utils';
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { formatMoney, currentMonth } from '@shared/utils/format.utils';
 
 function monthStart(period: string): string {
   return `${period}-01`;
@@ -162,7 +158,7 @@ export class PnlByPostingPageComponent {
   readonly period = signal(currentMonth());
   readonly search = signal('');
   readonly currentPage = signal(0);
-  readonly pageSize = signal(20);
+  readonly pageSize = signal(50);
 
   readonly shimmerRows = Array.from({ length: 8 });
 
@@ -170,7 +166,7 @@ export class PnlByPostingPageComponent {
 
   readonly postingsQuery = injectQuery(() => ({
     queryKey: [
-      'pnl-by-posting',
+      'analytics', 'pnl-by-posting',
       this.wsStore.currentWorkspaceId(),
       this.period(),
       this.search(),
@@ -204,7 +200,7 @@ export class PnlByPostingPageComponent {
     this.searchTimer = setTimeout(() => {
       this.search.set(input.value);
       this.currentPage.set(0);
-    }, 400);
+    }, 300);
   }
 
   openPosting(postingId: string): void {
@@ -225,8 +221,12 @@ export class PnlByPostingPageComponent {
 
   formatDate(iso: string): string {
     if (!iso) return '—';
-    const [y, m, d] = iso.split('-');
-    return `${d}.${m}.${y}`;
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return iso;
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    }).format(date);
   }
 
   residualColorClass(value: number): string {

@@ -139,7 +139,7 @@ export class StockHistoryPageComponent {
   });
 
   readonly historyQuery = injectQuery(() => ({
-    queryKey: ['stock-history', this.wsStore.currentWorkspaceId(), this.historyFilter()],
+    queryKey: ['analytics', 'stock-history', this.wsStore.currentWorkspaceId(), this.historyFilter()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getStockHistory(
@@ -152,7 +152,7 @@ export class StockHistoryPageComponent {
   }));
 
   readonly inventoryQuery = injectQuery(() => ({
-    queryKey: ['inventory-product-summary', this.wsStore.currentWorkspaceId(), this.productId()],
+    queryKey: ['analytics', 'inventory-product-summary', this.wsStore.currentWorkspaceId(), this.productId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.listInventoryByProduct(
@@ -213,7 +213,7 @@ export class StockHistoryPageComponent {
                 { offset: 0, color: 'rgba(59, 130, 246, 0.15)' },
                 { offset: 1, color: 'rgba(59, 130, 246, 0.02)' },
               ],
-            } as any,
+            } as Record<string, unknown>,
           },
           symbol: 'none',
         },

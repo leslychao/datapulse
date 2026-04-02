@@ -40,6 +40,7 @@
         <minio.version>9.0.0</minio.version>
         <okhttp.version>5.2.1</okhttp.version>
         <shedlock.version>7.7.0</shedlock.version>
+        <resilience4j.version>2.2.0</resilience4j.version>
         <spring-vault.version>3.1.2</spring-vault.version>
         <testcontainers.version>1.20.4</testcontainers.version>
     </properties>
@@ -143,6 +144,11 @@
                 <groupId>net.javacrumbs.shedlock</groupId>
                 <artifactId>shedlock-provider-jdbc-template</artifactId>
                 <version>${shedlock.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-circuitbreaker</artifactId>
+                <version>${resilience4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.vault</groupId>

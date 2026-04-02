@@ -158,25 +158,24 @@ class WorkingQueueServiceTest {
   class ClaimItem {
 
     @Test
-    void should_claim_pending_item() {
+    void should_claim_pending_item_via_cas() {
       mockQueueExists();
-      var item = buildItem(QueueAssignmentStatus.PENDING);
+      when(assignmentRepository.casClaim(ITEM_ID, QUEUE_ID, USER_ID)).thenReturn(1);
+      var item = buildItem(QueueAssignmentStatus.IN_PROGRESS);
+      item.setAssignedToUserId(USER_ID);
       when(assignmentRepository.findByIdAndQueueDefinitionId(ITEM_ID, QUEUE_ID))
           .thenReturn(Optional.of(item));
 
-      service.claimItem(WORKSPACE_ID, QUEUE_ID, ITEM_ID, USER_ID);
+      var result = service.claimItem(WORKSPACE_ID, QUEUE_ID, ITEM_ID, USER_ID);
 
-      assertThat(item.getStatus()).isEqualTo(QueueAssignmentStatus.IN_PROGRESS.name());
-      assertThat(item.getAssignedToUserId()).isEqualTo(USER_ID);
-      verify(assignmentRepository).save(item);
+      assertThat(result.status()).isEqualTo(QueueAssignmentStatus.IN_PROGRESS.name());
+      verify(assignmentRepository).casClaim(ITEM_ID, QUEUE_ID, USER_ID);
     }
 
     @Test
-    void should_throw_when_item_not_pending() {
+    void should_throw_when_cas_claim_fails() {
       mockQueueExists();
-      var item = buildItem(QueueAssignmentStatus.IN_PROGRESS);
-      when(assignmentRepository.findByIdAndQueueDefinitionId(ITEM_ID, QUEUE_ID))
-          .thenReturn(Optional.of(item));
+      when(assignmentRepository.casClaim(ITEM_ID, QUEUE_ID, USER_ID)).thenReturn(0);
 
       assertThatThrownBy(() ->
           service.claimItem(WORKSPACE_ID, QUEUE_ID, ITEM_ID, USER_ID))

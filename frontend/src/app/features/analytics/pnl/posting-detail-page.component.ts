@@ -51,7 +51,7 @@ export class PostingDetailPageComponent {
   readonly measureColumns = MEASURE_COLUMNS;
 
   readonly detailQuery = injectQuery(() => ({
-    queryKey: ['posting-detail', this.wsStore.currentWorkspaceId(), this.postingId()],
+    queryKey: ['analytics', 'posting-detail', this.wsStore.currentWorkspaceId(), this.postingId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getPostingDetail(

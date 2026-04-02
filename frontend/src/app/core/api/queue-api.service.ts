@@ -42,6 +42,10 @@ export class QueueApiService {
     if (filter.marketplaceType?.length) params = params.set('marketplaceType', filter.marketplaceType.join(','));
     if (filter.connectionId?.length) params = params.set('connectionId', filter.connectionId.join(','));
     if (filter.query) params = params.set('query', filter.query);
+    if (filter.severity?.length) params = params.set('severity', filter.severity.join(','));
+    if (filter.mismatchType?.length) params = params.set('mismatchType', filter.mismatchType.join(','));
+    if (filter.decisionType?.length) params = params.set('decisionType', filter.decisionType.join(','));
+    if (filter.actionStatus?.length) params = params.set('actionStatus', filter.actionStatus.join(','));
 
     return this.http.get<Page<QueueItem>>(`${this.base}/workspaces/${workspaceId}/queues/${queueId}/items`, { params });
   }

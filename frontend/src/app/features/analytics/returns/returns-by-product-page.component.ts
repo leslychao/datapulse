@@ -10,14 +10,10 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { ReturnsByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { formatMoney, formatPercent } from '@shared/utils/format.utils';
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-returns-by-product-page',
@@ -265,7 +261,7 @@ export class ReturnsByProductPageComponent {
 
   readonly returnsQuery = injectQuery(() => ({
     queryKey: [
-      'returns-by-product',
+      'analytics', 'returns-by-product',
       this.wsStore.currentWorkspaceId(),
       this.period(),
       this.search(),
@@ -296,7 +292,7 @@ export class ReturnsByProductPageComponent {
     this.searchTimer = setTimeout(() => {
       this.search.set(input.value);
       this.currentPage.set(0);
-    }, 400);
+    }, 300);
   }
 
   onRowClicked(row: ReturnsByProduct): void {

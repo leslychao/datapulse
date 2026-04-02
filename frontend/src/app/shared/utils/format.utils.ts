@@ -91,6 +91,11 @@ export function formatRelativeTime(iso: string | null | undefined): string {
   return formatDateTime(iso, 'date');
 }
 
+export function formatInteger(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+}
+
 export function financeColor(value: number | null | undefined): string {
   if (value === null || value === undefined || value === 0) return 'var(--finance-zero)';
   return value > 0 ? 'var(--finance-positive)' : 'var(--finance-negative)';

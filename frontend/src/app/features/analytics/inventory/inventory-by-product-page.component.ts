@@ -302,7 +302,7 @@ export class InventoryByProductPageComponent {
 
   readonly productsQuery = injectQuery(() => ({
     queryKey: [
-      'inventory-by-product',
+      'analytics', 'inventory-by-product',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
       this.page(),

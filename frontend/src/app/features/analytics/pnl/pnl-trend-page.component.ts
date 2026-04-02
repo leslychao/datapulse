@@ -11,6 +11,7 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { Granularity, PnlTrendPoint } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
@@ -136,7 +137,7 @@ export class PnlTrendPageComponent {
 
   readonly trendQuery = injectQuery(() => ({
     queryKey: [
-      'pnl-trend-page',
+      'analytics', 'pnl-trend-page',
       this.wsStore.currentWorkspaceId(),
       this.dateFrom(),
       this.dateTo(),

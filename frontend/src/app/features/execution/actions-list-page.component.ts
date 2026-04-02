@@ -3,12 +3,10 @@ import {
   Component,
   computed,
   effect,
-  ElementRef,
   HostListener,
   inject,
   OnInit,
   signal,
-  viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -120,14 +118,14 @@ interface ContextMenuState {
         </div>
         <div class="relative">
           <button
-            (click)="toggleColumnsPopover()"
+            (click)="toggleColumnsPopover(); $event.stopPropagation()"
             class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
             [attr.aria-label]="'execution.list.columns' | translate"
           >
             <lucide-icon [img]="ColumnsIcon" [size]="16" />
           </button>
           @if (showColumnsPopover()) {
-            <div class="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2 shadow-[var(--shadow-md)]">
+            <div (click)="$event.stopPropagation()" class="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2 shadow-[var(--shadow-md)]">
               @for (col of toggleableColumns(); track col.field) {
                 <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]">
                   <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col.field)" class="accent-[var(--accent-primary)]" />
@@ -886,7 +884,7 @@ export class ActionsListPageComponent implements OnInit {
 
   ctxOpenFullPage(): void {
     const row = this.ctxMenu().row;
-    this.closeContextMenu();
+    this.closeOverlays();
     if (row) {
       this.router.navigate(['/workspace', this.wsStore.currentWorkspaceId(), 'execution', 'actions', row.id]);
     }
@@ -894,13 +892,13 @@ export class ActionsListPageComponent implements OnInit {
 
   ctxApprove(): void {
     const row = this.ctxMenu().row;
-    this.closeContextMenu();
+    this.closeOverlays();
     if (row) this.ctxApproveMutation.mutate(row.id);
   }
 
   ctxHold(): void {
     const row = this.ctxMenu().row;
-    this.closeContextMenu();
+    this.closeOverlays();
     if (row) {
       this.detailPanel.open('action', row.id);
     }
@@ -908,7 +906,7 @@ export class ActionsListPageComponent implements OnInit {
 
   ctxCancel(): void {
     const row = this.ctxMenu().row;
-    this.closeContextMenu();
+    this.closeOverlays();
     if (row) {
       this.detailPanel.open('action', row.id);
     }
@@ -916,7 +914,7 @@ export class ActionsListPageComponent implements OnInit {
 
   ctxCopySku(): void {
     const row = this.ctxMenu().row;
-    this.closeContextMenu();
+    this.closeOverlays();
     if (row) {
       navigator.clipboard.writeText(row.sku).then(() => {
         this.toast.info(this.translate.instant('common.copied'));

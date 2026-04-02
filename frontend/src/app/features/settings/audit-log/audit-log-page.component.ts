@@ -265,6 +265,7 @@ export class AuditLogPageComponent {
       queryFn: () =>
         lastValueFrom(
           this.auditLogApi.listAuditLog({
+            actorName: filters['actorName'] || undefined,
             actionType: filters['actionType'] || undefined,
             entityType: filters['entityType'] || undefined,
             from: period?.from || undefined,

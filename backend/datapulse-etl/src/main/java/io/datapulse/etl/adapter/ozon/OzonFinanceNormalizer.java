@@ -97,15 +97,15 @@ public class OzonFinanceNormalizer {
         switch (entryType) {
             case SALE_ACCRUAL -> {
                 m.revenue = accruals;
-                m.marketplaceCommission = commission.negate();
+                m.marketplaceCommission = commission;
             }
             case RETURN_REVERSAL -> {
                 m.refund = accruals;
-                m.marketplaceCommission = commission.negate();
+                m.marketplaceCommission = commission;
             }
             case STORNO_CORRECTION -> {
                 m.refund = accruals;
-                m.marketplaceCommission = commission.negate();
+                m.marketplaceCommission = commission;
             }
             default -> m.revenue = accruals;
         }

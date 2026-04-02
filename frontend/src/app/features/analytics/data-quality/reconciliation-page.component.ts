@@ -14,12 +14,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReconciliationConnection } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
-import { formatMoney, formatPercent } from '@shared/utils/format.utils';
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
 
 type ReconStatus = ReconciliationConnection['status'];
 
@@ -156,7 +151,7 @@ export class ReconciliationPageComponent {
   readonly period = signal(currentMonth());
 
   readonly reconQuery = injectQuery(() => ({
-    queryKey: ['reconciliation', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'reconciliation', this.wsStore.currentWorkspaceId(), this.period()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getReconciliation(

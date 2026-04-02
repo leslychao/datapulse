@@ -11,14 +11,10 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
-import { formatMoney, formatPercent } from '@shared/utils/format.utils';
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-returns-summary-page',
@@ -142,7 +138,7 @@ export class ReturnsSummaryPageComponent {
   readonly period = signal(currentMonth());
 
   readonly summaryQuery = injectQuery(() => ({
-    queryKey: ['returns-summary', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'returns-summary', this.wsStore.currentWorkspaceId(), this.period()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getReturnsSummary(

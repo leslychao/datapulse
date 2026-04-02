@@ -47,9 +47,9 @@ function mp(t: string): MarketplaceType {
 }
 
 function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' | 'neutral' {
-  if (st === 'ACTIVE') return 'warning';
+  if (st === 'ACTIVE') return 'error';
   if (st === 'RESOLVED' || st === 'AUTO_RESOLVED') return 'success';
-  if (st === 'ACKNOWLEDGED') return 'info';
+  if (st === 'ACKNOWLEDGED') return 'warning';
   return 'neutral';
 }
 
@@ -154,7 +154,14 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
               <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.action_status' | translate }}</dt><dd>{{ d.relatedAction.status }}</dd></div>
               <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.target_price' | translate }}</dt><dd class="font-mono">{{ d.relatedAction.targetPrice }}</dd></div>
               <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.executed_at' | translate }}</dt><dd>{{ d.relatedAction.executedAt | dpDateFormat }}</dd></div>
+              <div class="flex justify-between gap-2"><dt class="text-[var(--text-secondary)]">{{ 'mismatches.detail.reconciliation' | translate }}</dt><dd>{{ d.relatedAction.reconciliationSource }}</dd></div>
             </dl>
+
+            <div class="mt-3">
+              <a class="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)] hover:underline" [attr.href]="'/workspace/' + ws.currentWorkspaceId() + '/execution?selected=' + d.relatedAction.actionId">
+                {{ 'mismatches.detail.open_action' | translate }} →
+              </a>
+            </div>
           }
         }
       </div>
@@ -209,7 +216,7 @@ export class MismatchDetailPanelComponent {
   private readonly api = inject(MismatchApiService);
   private readonly actionApi = inject(ActionApiService);
   private readonly alertApi = inject(AlertApiService);
-  private readonly ws = inject(WorkspaceContextStore);
+  protected readonly ws = inject(WorkspaceContextStore);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);

@@ -1,19 +1,22 @@
 package io.datapulse.sellerops.domain;
 
+import io.datapulse.sellerops.persistence.GridClickHouseReadRepository;
+import io.datapulse.sellerops.persistence.GridPostgresReadRepository;
 import io.datapulse.sellerops.persistence.WorkingQueueAssignmentEntity;
 import io.datapulse.sellerops.persistence.WorkingQueueAssignmentRepository;
 import io.datapulse.sellerops.persistence.WorkingQueueDefinitionEntity;
 import io.datapulse.sellerops.persistence.WorkingQueueDefinitionRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -24,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,9 +45,27 @@ class QueueAutoPopulationServiceTest {
   private WorkingQueueAssignmentRepository assignmentRepository;
   @Mock
   private NamedParameterJdbcTemplate jdbc;
+  @Mock
+  private TransactionTemplate transactionTemplate;
+  @Mock
+  private GridClickHouseReadRepository chRepository;
+  @Mock
+  private GridPostgresReadRepository pgRepository;
 
-  @InjectMocks
   private QueueAutoPopulationService service;
+
+  @BeforeEach
+  void setUp() {
+    doAnswer(invocation -> {
+      invocation.getArgument(0, java.util.function.Consumer.class)
+          .accept(null);
+      return null;
+    }).when(transactionTemplate).executeWithoutResult(any());
+
+    service = new QueueAutoPopulationService(
+        definitionRepository, assignmentRepository, jdbc,
+        transactionTemplate, chRepository, pgRepository);
+  }
 
   @Nested
   @DisplayName("populateAllQueues")
@@ -93,6 +115,7 @@ class QueueAutoPopulationServiceTest {
           .thenReturn(List.of(1L, 2L));
       when(assignmentRepository.findActiveAssignment(eq(QUEUE_ID), eq("price_action"), anyLong()))
           .thenReturn(Optional.empty());
+      when(assignmentRepository.countActiveByQueue(QUEUE_ID)).thenReturn(0L);
       when(assignmentRepository.findAllActiveByQueue(QUEUE_ID))
           .thenReturn(List.of());
 

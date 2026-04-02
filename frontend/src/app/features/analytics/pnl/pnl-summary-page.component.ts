@@ -20,6 +20,7 @@ import {
 } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { KpiCardComponent, KpiAccent } from '@shared/components/kpi-card.component';
@@ -54,8 +55,18 @@ interface KpiItem {
   template: `
     <div class="flex flex-col gap-5">
       <!-- Filter bar -->
-      <div class="flex items-center">
+      <div class="flex items-center gap-3">
         <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
+        <select
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          [value]="connectionId()"
+          (change)="onConnectionChange($event)"
+        >
+          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
+          @for (conn of connectionsQuery.data() ?? []; track conn.id) {
+            <option [value]="conn.id">{{ conn.name }}</option>
+          }
+        </select>
       </div>
 
       @if (summaryQuery.isPending()) {
@@ -116,29 +127,38 @@ interface KpiItem {
 })
 export class PnlSummaryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
+  readonly connectionId = signal(0);
   readonly shimmerCards = Array.from({ length: 6 });
 
+  readonly connectionsQuery = injectQuery(() => ({
+    queryKey: ['connections'],
+    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+  }));
+
   readonly summaryQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'pnl-summary', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'pnl-summary', this.wsStore.currentWorkspaceId(), this.period(), this.connectionId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getPnlSummary(this.wsStore.currentWorkspaceId()!, {
           period: this.period(),
+          connectionId: this.connectionId() || undefined,
         }),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
   readonly trendQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'pnl-trend', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'pnl-trend', this.wsStore.currentWorkspaceId(), this.period(), this.connectionId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getPnlTrend(this.wsStore.currentWorkspaceId()!, {
           period: this.period(),
+          connectionId: this.connectionId() || undefined,
         }),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -233,6 +253,10 @@ export class PnlSummaryPageComponent {
       icon,
       accent,
     };
+  }
+
+  onConnectionChange(event: Event): void {
+    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
   }
 
   private trendDir(delta: number | null): TrendDir {

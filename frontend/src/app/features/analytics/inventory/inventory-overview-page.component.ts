@@ -183,7 +183,7 @@ export class InventoryOverviewPageComponent {
   });
 
   readonly overviewQuery = injectQuery(() => ({
-    queryKey: ['inventory-overview', this.wsStore.currentWorkspaceId(), this.filter()],
+    queryKey: ['analytics', 'inventory-overview', this.wsStore.currentWorkspaceId(), this.filter()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getInventoryOverview(

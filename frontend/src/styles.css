@@ -160,6 +160,29 @@ router-outlet + * {
   border-left: 2px solid var(--status-error) !important;
 }
 
+/* Pulse animations for WebSocket-updated rows */
+@keyframes dp-pulse-new {
+  0% { background-color: rgba(59, 130, 246, 0.12); }
+  100% { background-color: transparent; }
+}
+@keyframes dp-pulse-resolved {
+  0% { background-color: rgba(5, 150, 105, 0.12); }
+  100% { background-color: transparent; }
+}
+@keyframes dp-pulse-acknowledged {
+  0% { background-color: rgba(217, 119, 6, 0.12); }
+  100% { background-color: transparent; }
+}
+.dp-pulse-new {
+  animation: dp-pulse-new 2s ease-out;
+}
+.dp-pulse-resolved {
+  animation: dp-pulse-resolved 2s ease-out;
+}
+.dp-pulse-acknowledged {
+  animation: dp-pulse-acknowledged 2s ease-out;
+}
+
 /* Background flash for WS updates */
 @keyframes dp-flash {
   0% { background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent); }

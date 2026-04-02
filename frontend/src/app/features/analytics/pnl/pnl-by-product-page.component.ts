@@ -10,6 +10,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { PnlByProduct } from '@core/models';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -37,6 +38,16 @@ const COGS_STATUS_COLOR: Record<string, string> = {
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <dp-month-picker [value]="period()" (valueChange)="onPeriodChange($event)" />
+        <select
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          [value]="connectionId()"
+          (change)="onConnectionChange($event)"
+        >
+          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
+          @for (conn of connectionsQuery.data() ?? []; track conn.id) {
+            <option [value]="conn.id">{{ conn.name }}</option>
+          }
+        </select>
         <input
           type="text"
           [value]="search()"
@@ -157,10 +168,12 @@ const COGS_STATUS_COLOR: Record<string, string> = {
 })
 export class PnlByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
   readonly period = signal(currentMonth());
+  readonly connectionId = signal(0);
   readonly search = signal('');
   readonly currentPage = signal(0);
   readonly pageSize = signal(50);

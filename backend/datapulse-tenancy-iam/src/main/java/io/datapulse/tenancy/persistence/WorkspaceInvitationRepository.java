@@ -1,6 +1,7 @@
 package io.datapulse.tenancy.persistence;
 
 import io.datapulse.tenancy.domain.InvitationStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +13,7 @@ import java.util.Optional;
 
 public interface WorkspaceInvitationRepository extends JpaRepository<WorkspaceInvitationEntity, Long> {
 
+    @EntityGraph(attributePaths = {"workspace"})
     Optional<WorkspaceInvitationEntity> findByTokenHash(String tokenHash);
 
     List<WorkspaceInvitationEntity> findByWorkspace_IdOrderByCreatedAtDesc(Long workspaceId);
