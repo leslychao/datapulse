@@ -328,7 +328,7 @@ export class CampaignDetailPageComponent {
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const p = params.data as PromoProductSummary;
-        const frozen = this.isCampaignFrozenOrEnded();
+        const frozen = this.isCampaignEnded();
         if (frozen) return '';
         const canOperate = this.rbac.canOperatePromo();
         const canApprove = this.rbac.canApprovePromo();
