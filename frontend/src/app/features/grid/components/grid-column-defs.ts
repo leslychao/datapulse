@@ -74,9 +74,8 @@ export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
     {
       field: 'productName',
       headerName: 'Название',
-      minWidth: 220,
-      maxWidth: 400,
-      flex: 1,
+      width: 250,
+      minWidth: 150,
       sortable: true,
       tooltipField: 'productName',
       cellClass: 'text-[length:var(--text-sm)]',

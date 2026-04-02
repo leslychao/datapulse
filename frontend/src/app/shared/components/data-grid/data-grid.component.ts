@@ -23,6 +23,10 @@ import {
 
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
+const DEFAULT_COL_DEF: ColDef = {
+  resizable: true,
+};
+
 @Component({
   selector: 'dp-data-grid',
   standalone: true,
@@ -41,12 +45,14 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
         <ag-grid-angular
           #agGrid
           class="ag-theme-alpine h-full w-full"
+          [defaultColDef]="defaultColDef"
           [columnDefs]="columnDefs()"
           [rowData]="rowData()"
           [pagination]="pagination()"
           [paginationPageSize]="pageSize()"
           [rowSelection]="rowSelection()"
           [getRowId]="getRowId()"
+          [selectionColumnDef]="selectionColumnDef"
           [suppressCellFocus]="true"
           [suppressRowClickSelection]="true"
           [alwaysShowVerticalScroll]="true"
@@ -90,7 +96,9 @@ export class DataGridComponent {
   readonly contextMenu = output<{ event: MouseEvent; data: any }>();
   readonly gridReady = output<GridApi>();
 
+  protected readonly defaultColDef = DEFAULT_COL_DEF;
   protected readonly localeText = AG_GRID_LOCALE_RU;
+  protected readonly selectionColumnDef = { pinned: 'left' as const, lockPosition: true };
   private previousRowIds = new Set<string>();
   private gridApi: GridApi | null = null;
 
