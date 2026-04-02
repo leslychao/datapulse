@@ -372,6 +372,7 @@ public class PromoActionService {
       throw ConflictException.of(MessageCodes.PROMO_ACTION_CAS_CONFLICT, actionId);
     }
 
+    action.setStatus(PromoActionStatus.CANCELLED);
     action.setCancelReason(reason);
     actionRepository.save(action);
 
@@ -395,6 +396,7 @@ public class PromoActionService {
       throw ConflictException.of(MessageCodes.PROMO_ACTION_CAS_CONFLICT, actionId);
     }
 
+    action.setStatus(PromoActionStatus.CANCELLED);
     action.setCancelReason(cancelReason);
     actionRepository.save(action);
 
@@ -453,6 +455,7 @@ public class PromoActionService {
           action.getId(), PromoActionStatus.PENDING_APPROVAL, PromoActionStatus.CANCELLED);
 
       if (updated > 0) {
+        action.setStatus(PromoActionStatus.CANCELLED);
         action.setCancelReason(reason);
         actionRepository.save(action);
         succeeded.add(action.getId());

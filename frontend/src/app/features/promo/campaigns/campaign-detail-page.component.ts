@@ -320,9 +320,9 @@ export class CampaignDetailPageComponent {
       cellRenderer: (params: any) => this.badgeCell(params.value, 'promo.action_status', ACTION_COLOR),
     },
     {
-      headerName: '',
+      headerName: this.translate.instant('promo.detail.col.actions'),
       colId: 'actions',
-      width: 200,
+      width: 120,
       sortable: false,
       suppressMovable: true,
       valueGetter: (params: any) => {
@@ -496,12 +496,19 @@ export class CampaignDetailPageComponent {
   }
 
   private refreshData(): void {
-    Promise.all([
-      this.productsQuery.refetch(),
-      this.campaignQuery.refetch(),
-    ]).then(([productsResult]) => {
-      const freshRows = productsResult.data?.content ?? [];
-      this.gridApi?.setGridOption('rowData', freshRows);
+    this.campaignQuery.refetch();
+
+    lastValueFrom(
+      this.promoApi.listCampaignProducts(
+        this.wsStore.currentWorkspaceId()!,
+        Number(this.campaignId()),
+        this.filter(),
+        this.currentPage(),
+        50,
+      ),
+    ).then((page) => {
+      this.gridApi?.setGridOption('rowData', page.content);
+      this.productsQuery.refetch();
     });
   }
 
