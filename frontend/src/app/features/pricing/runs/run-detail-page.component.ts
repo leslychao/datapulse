@@ -226,7 +226,6 @@ export class RunDetailPageComponent {
       ),
     enabled: !!this.wsStore.currentWorkspaceId() && !isNaN(this.numericRunId()),
     staleTime: 15_000,
-    refetchInterval: 30_000,
   }));
 
   readonly run = computed(() => this.runQuery.data() ?? null);

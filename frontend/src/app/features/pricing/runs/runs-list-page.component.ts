@@ -232,7 +232,6 @@ export class RunsListPageComponent {
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
     staleTime: 30_000,
-    refetchInterval: 60_000,
   }));
 
   readonly connectionsQuery = injectQuery(() => ({

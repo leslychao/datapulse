@@ -39,7 +39,7 @@ export class AutomationBlockerBannerComponent {
     queryKey: ['alerts', 'blocker', this.wsStore.currentWorkspaceId()],
     queryFn: () => lastValueFrom(this.alertApi.getSummary()),
     enabled: !!this.wsStore.currentWorkspaceId(),
-    refetchInterval: 30_000,
+    staleTime: 60_000,
   }));
 
   protected readonly isBlocked = computed(() => {

@@ -72,32 +72,6 @@ describe('OfferApiService', () => {
     req.flush({ content: [], totalElements: 0 });
   });
 
-  it('approveAction should POST to correct URL', () => {
-    service.approveAction(1, 42).subscribe();
-
-    const req = httpMock.expectOne(`${base}/workspaces/1/actions/42/approve`);
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({});
-    req.flush(null);
-  });
-
-  it('rejectAction should POST with cancelReason body', () => {
-    service.rejectAction(1, 42, 'Too expensive').subscribe();
-
-    const req = httpMock.expectOne(`${base}/workspaces/1/actions/42/reject`);
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ cancelReason: 'Too expensive' });
-    req.flush(null);
-  });
-
-  it('resumeAction should POST to correct URL', () => {
-    service.resumeAction(1, 42).subscribe();
-
-    const req = httpMock.expectOne(`${base}/workspaces/1/actions/42/resume`);
-    expect(req.request.method).toBe('POST');
-    req.flush(null);
-  });
-
   it('lockOffer should POST with lock request body', () => {
     const lockReq = { lockedPrice: 999, reason: 'Hold for promo' };
     service.lockOffer(1, 100, lockReq).subscribe();

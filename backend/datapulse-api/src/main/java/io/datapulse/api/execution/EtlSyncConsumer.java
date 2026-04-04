@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.analytics.domain.MaterializationService;
 import io.datapulse.api.config.RabbitTopologyConfig;
 import io.datapulse.etl.domain.IngestOrchestrator;
+import io.datapulse.etl.domain.PostIngestMaterializationMessageHandler;
 import io.datapulse.platform.outbox.OutboxEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,13 +14,15 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Consumes ETL_SYNC_EXECUTE, ETL_SYNC_RETRY and REMATERIALIZATION_REQUESTED
+ * Consumes ETL_SYNC_EXECUTE, ETL_SYNC_RETRY, ETL_POST_INGEST_MATERIALIZE and
+ * REMATERIALIZATION_REQUESTED
  * messages from RabbitMQ.
  *
  * <p>All event types end up in the same {@code etl.sync} queue:
  * <ul>
  *   <li>ETL_SYNC_EXECUTE — published directly from outbox (manual or scheduled sync)</li>
  *   <li>ETL_SYNC_RETRY — published to {@code etl.sync.wait} with TTL, then DLX-forwarded here</li>
+ *   <li>ETL_POST_INGEST_MATERIALIZE — deferred mart materialization after a successful DAG</li>
  *   <li>REMATERIALIZATION_REQUESTED — triggers ClickHouse re-materialization</li>
  * </ul>
  *
@@ -32,6 +35,7 @@ import org.springframework.stereotype.Component;
 public class EtlSyncConsumer {
 
   private final IngestOrchestrator ingestOrchestrator;
+  private final PostIngestMaterializationMessageHandler postIngestMaterializationMessageHandler;
   private final MaterializationService materializationService;
   private final ObjectMapper objectMapper;
 
@@ -46,6 +50,12 @@ public class EtlSyncConsumer {
       }
 
       JsonNode payload = objectMapper.readTree(message.getBody());
+
+      if (OutboxEventType.ETL_POST_INGEST_MATERIALIZE.name().equals(eventType)) {
+        postIngestMaterializationMessageHandler.handle(payload);
+        return;
+      }
+
       long jobExecutionId = payload.path("jobExecutionId").asLong();
 
       if (jobExecutionId <= 0) {

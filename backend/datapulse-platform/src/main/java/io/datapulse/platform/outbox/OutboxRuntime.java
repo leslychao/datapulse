@@ -13,6 +13,7 @@ public enum OutboxRuntime {
     INGEST(EnumSet.of(
             OutboxEventType.ETL_SYNC_EXECUTE,
             OutboxEventType.ETL_SYNC_RETRY,
+            OutboxEventType.ETL_POST_INGEST_MATERIALIZE,
             OutboxEventType.ETL_SYNC_COMPLETED,
             OutboxEventType.ETL_PROMO_CAMPAIGN_STALE,
             OutboxEventType.REMATERIALIZATION_REQUESTED

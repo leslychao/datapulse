@@ -41,6 +41,7 @@ public class SubSourceRunner {
         int totalRecordsProcessed = 0;
         int totalRecordsSkipped = 0;
         List<String> errors = new ArrayList<>();
+        String firstFailureResumeToken = null;
 
         for (CaptureResult page : capturedPages) {
             try {
@@ -54,15 +55,23 @@ public class SubSourceRunner {
                         sourceId, page.s3Key(), e.getMessage(), e);
                 errors.add("Page %s: %s".formatted(page.s3Key(), e.getMessage()));
 
+                if (firstFailureResumeToken == null) {
+                    if (page.listResumeKey() != null && !page.listResumeKey().isBlank()) {
+                        firstFailureResumeToken = page.listResumeKey().trim();
+                    } else if (page.listRequestOffset() != null) {
+                        firstFailureResumeToken = String.valueOf(page.listRequestOffset());
+                    }
+                }
+
                 jobItemRepository.updateStatus(page.jobItemId(), JobItemStatus.FAILED);
             }
         }
 
         if (!errors.isEmpty() && totalRecordsProcessed == 0) {
-            return SubSourceResult.failed(sourceId, errors.get(0));
+            return SubSourceResult.failed(sourceId, errors.get(0), firstFailureResumeToken);
         }
         if (!errors.isEmpty()) {
-            return SubSourceResult.partial(sourceId, null,
+            return SubSourceResult.partial(sourceId, firstFailureResumeToken,
                     capturedPages.size(), totalRecordsProcessed, totalRecordsSkipped, errors);
         }
 

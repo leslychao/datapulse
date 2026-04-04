@@ -166,8 +166,10 @@ public class InvitationService {
                 .orElseThrow(() -> NotFoundException.of("invitation.not.found"));
 
         log.info("Invitation found: invitationId={}, email={}, status={}, workspaceId={}",
-            invitation.getId(), invitation.getEmail(), invitation.getStatus(),
-            invitation.getWorkspace().getId());
+            invitation.getId(),
+            invitation.getEmail(),
+            invitation.getStatus(),
+            invitation.getWorkspace() != null ? invitation.getWorkspace().getId() : null);
 
         if (invitation.getStatus() == InvitationStatus.ACCEPTED) {
             throw ConflictException.of("invitation.already.accepted");

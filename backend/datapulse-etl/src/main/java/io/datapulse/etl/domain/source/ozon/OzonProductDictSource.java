@@ -15,6 +15,7 @@ import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
+import io.datapulse.etl.domain.EtlSubSourceResume;
 import io.datapulse.etl.domain.EventSource;
 import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
@@ -76,7 +77,10 @@ public class OzonProductDictSource implements EventSource {
     List<SubSourceResult> results = new ArrayList<>();
 
     var listCtx = CaptureContextFactory.build(ctx, eventType(), "OzonProductListReadAdapter");
-    List<CaptureResult> listPages = listAdapter.captureAllPages(listCtx, clientId, apiKey);
+    String listLastId =
+        EtlSubSourceResume.lastIdOrEmpty(ctx, eventType(), "OzonProductListReadAdapter");
+    List<CaptureResult> listPages =
+        listAdapter.captureAllPages(listCtx, clientId, apiKey, listLastId);
 
     List<Long> productIds = new ArrayList<>();
     SubSourceResult listResult = subSourceRunner.processPages(
@@ -89,8 +93,10 @@ public class OzonProductDictSource implements EventSource {
     }
 
     var infoCtx = CaptureContextFactory.build(ctx, eventType(), "OzonProductInfoReadAdapter");
+    int infoBatchStart = EtlSubSourceResume.ozonProductInfoStartBatchIndex(
+        ctx, eventType(), "OzonProductInfoReadAdapter");
     List<CaptureResult> infoPages = infoAdapter.captureAllBatches(
-        infoCtx, clientId, apiKey, productIds);
+        infoCtx, clientId, apiKey, productIds, infoBatchStart);
     SubSourceResult infoResult = subSourceRunner.processPages(
         "OzonProductInfoReadAdapter", infoPages, OzonProductInfo.class,
         batch -> processInfoBatch(batch, ctx));
@@ -98,8 +104,10 @@ public class OzonProductDictSource implements EventSource {
 
     try {
       var attrCtx = CaptureContextFactory.build(ctx, eventType(), "OzonAttributesReadAdapter");
+      String attrLastId =
+          EtlSubSourceResume.lastIdOrEmpty(ctx, eventType(), "OzonAttributesReadAdapter");
       List<CaptureResult> attrPages = attributesAdapter.captureAllPages(
-          attrCtx, clientId, apiKey, productIds);
+          attrCtx, clientId, apiKey, productIds, attrLastId);
       SubSourceResult attrResult = subSourceRunner.processPages(
           "OzonAttributesReadAdapter", attrPages,
           OzonAttributeResponse.OzonAttributeResult.class,

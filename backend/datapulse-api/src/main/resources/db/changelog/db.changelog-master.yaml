@@ -47,3 +47,9 @@ databaseChangeLog:
   - include:
       file: changes/0019-pricing-audit-fixes.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0020-job-execution-params.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0021-job-execution-materializing-at.sql
+      relativeToChangelogFile: true

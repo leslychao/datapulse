@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  effect,
   EventEmitter,
   inject,
   Input,
@@ -10,16 +11,17 @@ import {
 } from '@angular/core';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { injectQuery } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
+import { WebSocketService } from '@core/websocket/websocket.service';
 import { MarketplaceType, ConnectionStatus } from '@core/models';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 
-type ConnectionStep = 'select' | 'form';
 type ValidationState = 'idle' | 'submitting' | 'validating' | 'success' | 'failure' | 'timeout';
 
-const POLL_INTERVAL = 3000;
-const POLL_TIMEOUT = 30000;
+const POLL_TIMEOUT_MS = 30_000;
 const SUCCESS_REDIRECT_DELAY = 2000;
 
 @Component({
@@ -197,6 +199,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
 })
 export class StepConnectionComponent implements OnDestroy {
   private readonly connectionApi = inject(ConnectionApiService);
+  private readonly webSocket = inject(WebSocketService);
   private readonly translate = inject(TranslateService);
 
   @Input() workspaceId!: number;
@@ -208,9 +211,8 @@ export class StepConnectionComponent implements OnDestroy {
   protected readonly errorMessage = signal('');
   protected readonly showToken = signal(false);
 
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private pollStart = 0;
-  private connectionId: number | null = null;
+  private readonly validatingConnectionId = signal<number | null>(null);
+  private timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
   private wbForm = new FormGroup({
     name: new FormControl('', [Validators.required]),
@@ -227,15 +229,36 @@ export class StepConnectionComponent implements OnDestroy {
 
   protected canSubmit = signal(true);
 
+  private readonly validationConnectionQuery = injectQuery(() => ({
+    queryKey: ['connection', this.validatingConnectionId() ?? -1],
+    queryFn: () =>
+      lastValueFrom(this.connectionApi.getConnection(this.validatingConnectionId()!)),
+    enabled:
+      this.validationState() === 'validating' &&
+      this.validatingConnectionId() != null &&
+      this.validatingConnectionId()! > 0,
+    staleTime: 0,
+  }));
+
+  constructor() {
+    effect(() => {
+      const conn = this.validationConnectionQuery.data();
+      if (this.validationState() !== 'validating' || !conn) {
+        return;
+      }
+      this.handlePollResult(conn.status, conn.lastErrorCode);
+    });
+  }
+
   ngOnDestroy(): void {
-    this.stopPolling();
+    this.stopValidationWatch();
   }
 
   protected onSelectMarketplace(type: MarketplaceType): void {
     this.selectedMarketplace.set(type);
     this.validationState.set('idle');
     this.errorMessage.set('');
-    this.stopPolling();
+    this.stopValidationWatch();
 
     if (type === 'WB') {
       this.form.set(this.wbForm);
@@ -259,55 +282,53 @@ export class StepConnectionComponent implements OnDestroy {
 
     const name = currentForm.get('name')!.value!;
 
-    const credentials = marketplace === 'WB'
-      ? { apiToken: currentForm.get('apiToken')!.value! }
-      : { clientId: currentForm.get('clientId')!.value!, apiKey: currentForm.get('apiKey')!.value! };
+    const credentials =
+      marketplace === 'WB'
+        ? { apiToken: currentForm.get('apiToken')!.value! }
+        : { clientId: currentForm.get('clientId')!.value!, apiKey: currentForm.get('apiKey')!.value! };
 
-    this.connectionApi.createConnection({
-      marketplaceType: marketplace,
-      name,
-      credentials,
-    }).subscribe({
-      next: (connection) => {
-        this.connectionId = connection.id;
-        this.validationState.set('validating');
-        this.updateCanSubmit();
-        this.startPolling(connection.id);
-      },
-      error: () => {
-        this.validationState.set('failure');
-        this.errorMessage.set(this.translate.instant('onboarding.connection.create_error'));
-        this.updateCanSubmit();
-      },
-    });
-  }
-
-  private startPolling(connectionId: number): void {
-    this.pollStart = Date.now();
-
-    this.pollTimer = setInterval(() => {
-      if (Date.now() - this.pollStart > POLL_TIMEOUT) {
-        this.stopPolling();
-        this.validationState.set('timeout');
-        this.updateCanSubmit();
-        return;
-      }
-
-      this.connectionApi.getConnection(connectionId).subscribe({
-        next: (conn) => this.handlePollResult(conn.status, conn.lastErrorCode),
+    this.connectionApi
+      .createConnection({
+        marketplaceType: marketplace,
+        name,
+        credentials,
+      })
+      .subscribe({
+        next: (connection) => {
+          this.startValidationWatch(connection.id);
+        },
         error: () => {
-          this.stopPolling();
           this.validationState.set('failure');
-          this.errorMessage.set(this.translate.instant('onboarding.connection.validation_error'));
+          this.errorMessage.set(this.translate.instant('onboarding.connection.create_error'));
           this.updateCanSubmit();
         },
       });
-    }, POLL_INTERVAL);
+  }
+
+  private startValidationWatch(connectionId: number): void {
+    this.validatingConnectionId.set(connectionId);
+    this.validationState.set('validating');
+    this.updateCanSubmit();
+
+    this.webSocket.connect(this.workspaceId);
+    this.webSocket.subscribeToWorkspace(this.workspaceId);
+
+    this.timeoutHandle = setTimeout(() => {
+      if (this.validationState() === 'validating') {
+        this.stopValidationWatch();
+        this.validationState.set('timeout');
+        this.updateCanSubmit();
+      }
+    }, POLL_TIMEOUT_MS);
   }
 
   private handlePollResult(status: ConnectionStatus, errorCode: string | null): void {
+    if (this.validationState() !== 'validating') {
+      return;
+    }
+
     if (status === 'ACTIVE') {
-      this.stopPolling();
+      this.stopValidationWatch();
       this.validationState.set('success');
       this.updateCanSubmit();
       setTimeout(() => this.completed.emit(), SUCCESS_REDIRECT_DELAY);
@@ -315,7 +336,7 @@ export class StepConnectionComponent implements OnDestroy {
     }
 
     if (status === 'AUTH_FAILED') {
-      this.stopPolling();
+      this.stopValidationWatch();
       this.validationState.set('failure');
       this.errorMessage.set(
         errorCode
@@ -326,11 +347,13 @@ export class StepConnectionComponent implements OnDestroy {
     }
   }
 
-  private stopPolling(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
+  private stopValidationWatch(): void {
+    if (this.timeoutHandle !== null) {
+      clearTimeout(this.timeoutHandle);
+      this.timeoutHandle = null;
     }
+    this.validatingConnectionId.set(null);
+    this.webSocket.disconnect();
   }
 
   private updateCanSubmit(): void {

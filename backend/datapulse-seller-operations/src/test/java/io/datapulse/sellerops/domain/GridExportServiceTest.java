@@ -20,6 +20,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -198,7 +199,7 @@ class GridExportServiceTest {
       service.exportCsvByOfferIds(WORKSPACE_ID, List.of(1L), out);
 
       verify(pgRepository, never())
-          .findBatchForExport(any(), any(), anyInt(), anyInt());
+          .findBatchForExport(anyLong(), any(), anyInt(), anyInt());
       String csv = out.toString(StandardCharsets.UTF_8);
       assertThat(csv).contains("Артикул");
       assertThat(csv).contains("SKU-001");

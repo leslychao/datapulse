@@ -14,6 +14,11 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Same transactional coupling as {@link SyncTriggeredListener}: {@link EventListener} +
+ * {@link Transactional}({@code REQUIRED}) participates in the publisher transaction so
+ * {@code job_execution} + outbox + sync state updates are atomic with connection activation.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

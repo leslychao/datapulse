@@ -12,6 +12,7 @@ import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
+import io.datapulse.etl.domain.EtlSubSourceResume;
 import io.datapulse.etl.domain.EventSource;
 import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
@@ -53,7 +54,10 @@ public class OzonInventoryFactSource implements EventSource {
     String apiKey = ctx.credentials().get("apiKey");
 
     var captureCtx = CaptureContextFactory.build(ctx, eventType(), "OzonStocksReadAdapter");
-    List<CaptureResult> pages = adapter.captureAllPages(captureCtx, clientId, apiKey);
+    String stocksLastId =
+        EtlSubSourceResume.lastIdOrEmpty(ctx, eventType(), "OzonStocksReadAdapter");
+    List<CaptureResult> pages =
+        adapter.captureAllPages(captureCtx, clientId, apiKey, stocksLastId);
 
     Map<String, Long> offerIdMap = skuLookup.findAllOfferIdsByConnection(ctx.connectionId());
     Map<String, Long> warehouseIdMap = warehouseLookup.findAllIdsByConnection(ctx.connectionId());

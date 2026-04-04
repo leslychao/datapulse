@@ -95,7 +95,8 @@ class ActionServiceTest {
     @Test
     @DisplayName("should create action with PENDING_APPROVAL when autoApprove is false")
     void should_createPendingApproval_when_notAutoApproved() {
-      when(actionRepository.findActiveByOfferAndMode(eq(OFFER_ID), any()))
+      when(actionRepository.findActiveByOfferAndModeForUpdate(
+          eq(OFFER_ID), eq(ActionExecutionMode.LIVE.name())))
           .thenReturn(Optional.empty());
       when(properties.getMaxAttempts()).thenReturn(3);
       when(actionRepository.save(any())).thenAnswer(inv -> {
@@ -118,7 +119,8 @@ class ActionServiceTest {
     @Test
     @DisplayName("should create action with APPROVED and schedule when autoApprove is true")
     void should_createApproved_when_autoApproved() {
-      when(actionRepository.findActiveByOfferAndMode(eq(OFFER_ID), any()))
+      when(actionRepository.findActiveByOfferAndModeForUpdate(
+          eq(OFFER_ID), eq(ActionExecutionMode.LIVE.name())))
           .thenReturn(Optional.empty());
       when(properties.getMaxAttempts()).thenReturn(3);
       when(actionRepository.save(any())).thenAnswer(inv -> {
@@ -145,9 +147,11 @@ class ActionServiceTest {
     void should_supersede_when_existingPreExecutionAction() {
       var existing = actionEntity(ActionStatus.APPROVED);
       existing.setId(99L);
-      when(actionRepository.findActiveByOfferAndMode(OFFER_ID, ActionExecutionMode.LIVE))
+      when(actionRepository.findActiveByOfferAndModeForUpdate(
+          OFFER_ID, ActionExecutionMode.LIVE.name()))
           .thenReturn(Optional.of(existing));
-      when(casRepository.casSupersede(99L, ActionStatus.APPROVED, 0)).thenReturn(1);
+      when(casRepository.casSupersede(eq(99L), eq(ActionStatus.APPROVED), anyLong()))
+          .thenReturn(1);
       when(properties.getMaxAttempts()).thenReturn(3);
       when(actionRepository.save(any())).thenAnswer(inv -> {
         PriceActionEntity e = inv.getArgument(0);
@@ -161,7 +165,7 @@ class ActionServiceTest {
           BigDecimal.valueOf(999), BigDecimal.valueOf(800),
           24, false);
 
-      verify(casRepository).casSupersede(99L, ActionStatus.APPROVED, 0);
+      verify(casRepository).casSupersede(99L, ActionStatus.APPROVED, ACTION_ID);
       assertThat(result).isNotNull();
     }
 
@@ -170,7 +174,8 @@ class ActionServiceTest {
     void should_deferAction_when_existingInFlightAction() {
       var existing = actionEntity(ActionStatus.EXECUTING);
       existing.setId(99L);
-      when(actionRepository.findActiveByOfferAndMode(OFFER_ID, ActionExecutionMode.LIVE))
+      when(actionRepository.findActiveByOfferAndModeForUpdate(
+          OFFER_ID, ActionExecutionMode.LIVE.name()))
           .thenReturn(Optional.of(existing));
       when(deferredActionRepository.findByMarketplaceOfferIdAndExecutionMode(
           OFFER_ID, ActionExecutionMode.LIVE)).thenReturn(Optional.empty());
@@ -462,6 +467,9 @@ class ActionServiceTest {
     void should_transitionAndCreateEvent_when_valid() {
       when(casRepository.casTransition(ACTION_ID, ActionStatus.EXECUTING,
           ActionStatus.RECONCILIATION_PENDING)).thenReturn(1);
+      when(properties.getReconciliation())
+          .thenReturn(new ExecutionProperties.Reconciliation(
+              Duration.ofSeconds(30), 2, 3, Duration.ofMinutes(10)));
 
       service.casReconciliationPending(ACTION_ID);
 

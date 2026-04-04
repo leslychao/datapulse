@@ -33,9 +33,10 @@ public class OzonReturnsReadAdapter {
 
     public List<CaptureResult> captureAllPages(CaptureContext context,
                                                String clientId, String apiKey,
-                                               OffsetDateTime since, OffsetDateTime to) {
+                                               OffsetDateTime since, OffsetDateTime to,
+                                               long initialLastId) {
         List<CaptureResult> results = new ArrayList<>();
-        long lastId = 0;
+        long lastId = Math.max(0L, initialLastId);
         int pageNumber = 0;
         boolean hasMore = true;
 
@@ -53,7 +54,8 @@ public class OzonReturnsReadAdapter {
                     clientId, apiKey);
 
             PageCaptureResult page = pageCapture.capture(
-                    body, context, pageNumber, LAST_ID_EXTRACTOR);
+                    body, context, pageNumber, LAST_ID_EXTRACTOR, null,
+                    String.valueOf(currentLastId));
             results.add(page.captureResult());
 
             pageNumber++;

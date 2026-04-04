@@ -1,13 +1,11 @@
 package io.datapulse.audit.domain;
 
 import java.util.List;
-import java.util.Map;
 
 import io.datapulse.audit.domain.event.AlertEventCreatedEvent;
 import io.datapulse.audit.domain.event.AlertResolvedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -26,7 +24,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class NotificationFanOutListener {
 
     private final NotificationService notificationService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final UserNotificationStompPublisher userNotificationStompPublisher;
+    private final WorkspaceAlertTopicStompPublisher workspaceAlertTopicStompPublisher;
 
     /**
      * AFTER_COMMIT: {@code user_notification} FK requires {@code alert_event} row visible
@@ -40,14 +39,20 @@ public class NotificationFanOutListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAlertCreated(AlertEventCreatedEvent event) {
         try {
-            pushAlertToWorkspace(event);
+            workspaceAlertTopicStompPublisher.publishAlertCreated(event);
 
             List<long[]> notifications = notificationService.fanOut(
                     event.workspaceId(), event.alertEventId(),
                     NotificationType.ALERT.name(), event.title(), null,
                     event.severity());
 
-            pushNotificationsToUsers(notifications, event);
+            userNotificationStompPublisher.publish(
+                    notifications,
+                    NotificationType.ALERT.name(),
+                    event.title(),
+                    null,
+                    event.severity(),
+                    event.alertEventId());
 
             log.debug("Notification fan-out completed: alertEventId={}, notificationsCreated={}",
                     event.alertEventId(), notifications.size());
@@ -65,14 +70,7 @@ public class NotificationFanOutListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAlertResolved(AlertResolvedEvent event) {
         try {
-            String destination = "/topic/workspace/%d/alerts".formatted(event.workspaceId());
-            messagingTemplate.convertAndSend(destination, Map.of(
-                    "alertEventId", event.alertEventId(),
-                    "severity", event.severity(),
-                    "title", event.title(),
-                    "status", "AUTO".equals(event.resolvedReason()) ? "AUTO_RESOLVED" : "RESOLVED",
-                    "resolvedReason", event.resolvedReason()
-            ));
+            workspaceAlertTopicStompPublisher.publishAlertResolved(event);
 
             log.debug("Alert resolved push sent: alertEventId={}, resolvedReason={}",
                     event.alertEventId(), event.resolvedReason());
@@ -83,33 +81,5 @@ public class NotificationFanOutListener {
         }
     }
 
-    private void pushAlertToWorkspace(AlertEventCreatedEvent event) {
-        String destination = "/topic/workspace/%d/alerts".formatted(event.workspaceId());
-        messagingTemplate.convertAndSend(destination, Map.of(
-                "alertEventId", event.alertEventId(),
-                "ruleType", String.valueOf(event.ruleType()),
-                "severity", event.severity(),
-                "title", event.title(),
-                "status", event.status(),
-                "connectionId", event.connectionId() != null ? event.connectionId() : ""
-        ));
-    }
-
-    private void pushNotificationsToUsers(List<long[]> notifications, AlertEventCreatedEvent event) {
-        for (long[] pair : notifications) {
-            long userId = pair[0];
-            long notificationId = pair[1];
-
-            messagingTemplate.convertAndSendToUser(
-                    String.valueOf(userId),
-                    "/queue/notifications",
-                    Map.of(
-                            "notificationId", notificationId,
-                            "notificationType", NotificationType.ALERT.name(),
-                            "title", event.title(),
-                            "severity", event.severity(),
-                            "alertEventId", event.alertEventId()
-                    ));
-        }
-    }
 }
+

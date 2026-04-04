@@ -11,19 +11,27 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.datapulse.etl.config.IngestProperties;
+import io.datapulse.etl.config.PostIngestMaterializationMode;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;
 import io.datapulse.platform.etl.PostIngestMaterializationResult;
+import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,6 +55,7 @@ class IngestOrchestratorTest {
   @Mock private StaleCampaignDetector staleCampaignDetector;
   @Mock private TransactionTemplate transactionTemplate;
   @Mock private PostIngestMaterializationHook postIngestMaterialization;
+  @Mock private MarketplaceSyncStateRepository marketplaceSyncStateRepository;
 
   private IngestOrchestrator orchestrator;
 
@@ -54,14 +63,45 @@ class IngestOrchestratorTest {
       500, 5000, Duration.ofHours(2), 3,
       Duration.ofMinutes(5), Duration.ofMinutes(20), 2,
       Duration.ofHours(1), Duration.ofHours(48), 30,
-      Duration.ofMinutes(15));
+      365, Duration.ofHours(1),
+      Duration.ofMinutes(15),
+      Duration.ofHours(1),
+      PostIngestMaterializationMode.SYNC);
+
+  private final Clock ingestClock =
+      Clock.fixed(Instant.parse("2024-06-15T12:00:00Z"), ZoneOffset.UTC);
 
   @BeforeEach
   void setUp() {
+    IngestJobAcquisitionService acquisition =
+        new IngestJobAcquisitionService(jobExecutionRepository);
+    lenient().when(marketplaceSyncStateRepository.findAllByMarketplaceConnectionId(anyLong()))
+        .thenReturn(List.of());
+    IngestSyncContextBuilder contextBuilder =
+        new IngestSyncContextBuilder(
+            credentialResolver,
+            checkpointManager,
+            new ObjectMapper(),
+            marketplaceSyncStateRepository,
+            ingestProperties,
+            ingestClock);
+    IngestJobCompletionCoordinator completion = new IngestJobCompletionCoordinator(
+        jobExecutionRepository,
+        checkpointManager,
+        resultReporter,
+        staleCampaignDetector,
+        ingestProperties,
+        transactionTemplate,
+        postIngestMaterialization,
+        outboxService);
+
     orchestrator = new IngestOrchestrator(
-        jobExecutionRepository, credentialResolver, checkpointManager,
-        dagExecutor, outboxService, resultReporter, staleCampaignDetector,
-        ingestProperties, transactionTemplate, postIngestMaterialization);
+        jobExecutionRepository,
+        dagExecutor,
+        resultReporter,
+        acquisition,
+        contextBuilder,
+        completion);
 
     lenient().doAnswer(inv -> {
       Consumer<TransactionStatus> action = inv.getArgument(0);
@@ -274,6 +314,77 @@ class IngestOrchestratorTest {
       verify(jobExecutionRepository).casStatus(
           1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.FAILED);
       verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
+    }
+  }
+
+  @Nested
+  @DisplayName("post-ingest materialization ASYNC_OUTBOX")
+  class AsyncPostIngestMaterialization {
+
+    private IngestOrchestrator asyncOrchestrator;
+
+    @BeforeEach
+    void setUpAsync() {
+      IngestProperties asyncProps = new IngestProperties(
+          500, 5000, Duration.ofHours(2), 3,
+          Duration.ofMinutes(5), Duration.ofMinutes(20), 2,
+          Duration.ofHours(1), Duration.ofHours(48), 30,
+          365, Duration.ofHours(1),
+          Duration.ofMinutes(15),
+          Duration.ofHours(1),
+          PostIngestMaterializationMode.ASYNC_OUTBOX);
+      IngestJobAcquisitionService acquisition =
+          new IngestJobAcquisitionService(jobExecutionRepository);
+      IngestSyncContextBuilder contextBuilder =
+          new IngestSyncContextBuilder(
+              credentialResolver,
+              checkpointManager,
+              new ObjectMapper(),
+              marketplaceSyncStateRepository,
+              asyncProps,
+              ingestClock);
+      IngestJobCompletionCoordinator completion = new IngestJobCompletionCoordinator(
+          jobExecutionRepository,
+          checkpointManager,
+          resultReporter,
+          staleCampaignDetector,
+          asyncProps,
+          transactionTemplate,
+          postIngestMaterialization,
+          outboxService);
+      asyncOrchestrator = new IngestOrchestrator(
+          jobExecutionRepository,
+          dagExecutor,
+          resultReporter,
+          acquisition,
+          contextBuilder,
+          completion);
+    }
+
+    @Test
+    void should_enqueuePostIngestMaterialize_and_notFinalizeInline_when_asyncMode() {
+      JobExecutionRow job = buildJob(1L, "PENDING");
+      when(jobExecutionRepository.findById(1L)).thenReturn(Optional.of(job));
+      when(jobExecutionRepository.casStatus(1L, JobExecutionStatus.PENDING,
+          JobExecutionStatus.IN_PROGRESS)).thenReturn(true);
+      when(credentialResolver.resolve(100L)).thenReturn(buildCredentials());
+      when(checkpointManager.parse(any())).thenReturn(Map.of());
+      when(checkpointManager.extractRetryCount(any())).thenReturn(0);
+      when(dagExecutor.execute(any())).thenReturn(allCompletedResults());
+      when(resultReporter.buildErrorDetails(any())).thenReturn("{}");
+
+      asyncOrchestrator.processSync(1L);
+
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+      verify(outboxService).createEvent(
+          eq(OutboxEventType.ETL_POST_INGEST_MATERIALIZE),
+          eq("job_execution"),
+          eq(1L),
+          any());
+      verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
+      verify(jobExecutionRepository, never()).casStatus(
+          eq(1L), eq(JobExecutionStatus.MATERIALIZING), any());
     }
   }
 

@@ -7,7 +7,6 @@ import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -18,12 +17,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class ConnectionSyncHealthPushListener {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final WorkspaceTopicStompPublisher workspaceTopicStompPublisher;
     private final MarketplaceConnectionRepository connectionRepository;
     private final ConnectionSyncHealthService connectionSyncHealthService;
 
     @Async("notificationExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(
+            phase = TransactionPhase.AFTER_COMMIT,
+            fallbackExecution = true)
     public void onConnectionSyncHealthInvalidated(ConnectionSyncHealthInvalidatedEvent event) {
         try {
             Long workspaceId = connectionRepository
@@ -42,8 +43,8 @@ public class ConnectionSyncHealthPushListener {
                     .summarize(event.connectionId())
                     .ifPresent(
                             dto ->
-                                    messagingTemplate.convertAndSend(
-                                            "/topic/workspace/%d/sync-status".formatted(workspaceId),
+                                    workspaceTopicStompPublisher.publishSyncStatus(
+                                            workspaceId,
                                             new WorkspaceSyncStatusPush(event.reason(), dto)));
 
             log.debug(

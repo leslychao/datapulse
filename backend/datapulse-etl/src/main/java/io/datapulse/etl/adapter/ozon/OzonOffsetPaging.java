@@ -9,6 +9,17 @@ import java.util.Objects;
  */
 public final class OzonOffsetPaging {
 
+    /**
+     * Hard cap on offset pages per adapter run — safety rail even if API ignores {@code offset} and
+     * duplicate-page detection misses an edge case.
+     */
+    public static final int MAX_OFFSET_PAGES_PER_RUN = 5_000;
+
+    /**
+     * Ozon posting list responses below this size are treated as last page (legacy heuristic).
+     */
+    public static final int SMALL_PAGE_THRESHOLD_BYTES = 200;
+
     private OzonOffsetPaging() {}
 
     /**

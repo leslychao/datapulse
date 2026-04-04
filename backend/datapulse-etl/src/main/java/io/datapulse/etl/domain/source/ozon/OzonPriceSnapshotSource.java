@@ -12,6 +12,7 @@ import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
+import io.datapulse.etl.domain.EtlSubSourceResume;
 import io.datapulse.etl.domain.EventSource;
 import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
@@ -51,7 +52,10 @@ public class OzonPriceSnapshotSource implements EventSource {
     String apiKey = ctx.credentials().get("apiKey");
 
     var captureCtx = CaptureContextFactory.build(ctx, eventType(), "OzonPricesReadAdapter");
-    List<CaptureResult> pages = adapter.captureAllPages(captureCtx, clientId, apiKey);
+    String pricesLastId =
+        EtlSubSourceResume.lastIdOrEmpty(ctx, eventType(), "OzonPricesReadAdapter");
+    List<CaptureResult> pages =
+        adapter.captureAllPages(captureCtx, clientId, apiKey, pricesLastId);
 
     Map<String, Long> offerIdMap = skuLookup.findAllOfferIdsByConnection(ctx.connectionId());
     OffsetDateTime capturedAt = OffsetDateTime.now();

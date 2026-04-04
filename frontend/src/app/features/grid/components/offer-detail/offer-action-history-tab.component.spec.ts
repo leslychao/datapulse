@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Component, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -8,6 +8,7 @@ import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experi
 
 import { OfferActionHistoryTabComponent } from './offer-action-history-tab.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { ActionApiService } from '@core/api/action-api.service';
 import { OfferApiService } from '@core/api/offer-api.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { ActionHistoryEntry, Page } from '@core/models';
@@ -44,45 +45,60 @@ function buildPage(
     totalPages,
     number,
     size: 20,
-    first: number === 0,
-    last: number === totalPages - 1,
   };
 }
 
-@Component({
-  standalone: true,
-  imports: [OfferActionHistoryTabComponent],
-  template: `<dp-offer-action-history-tab [offerId]="offerId()" />`,
-})
-class TestHostComponent {
-  offerId = signal(100);
+/** Collapse spaces/NBSP so formatted money like "1 100,00" still matches substring "1100". */
+function compactForDigitMatch(text: string | null): string {
+  return (text ?? '').replace(/\u00a0/g, '').replace(/\s/g, '');
 }
 
 describe('OfferActionHistoryTabComponent', () => {
-  let fixture: ComponentFixture<TestHostComponent>;
+  let fixture: ComponentFixture<OfferActionHistoryTabComponent>;
   let el: HTMLElement;
   let offerApiSpy: jasmine.SpyObj<OfferApiService>;
+  let actionApiSpy: jasmine.SpyObj<ActionApiService>;
   let toastSpy: jasmine.SpyObj<ToastService>;
 
-  beforeEach(async () => {
-    offerApiSpy = jasmine.createSpyObj('OfferApiService', [
-      'getActionHistory', 'approveAction', 'rejectAction', 'resumeAction',
-    ]);
-    toastSpy = jasmine.createSpyObj('ToastService', ['success', 'error']);
+  async function settleHistoryQuery(fixtureRef: ComponentFixture<OfferActionHistoryTabComponent>): Promise<void> {
+    for (let i = 0; i < 30; i++) {
+      fixtureRef.detectChanges();
+      TestBed.flushEffects();
+      if (!fixtureRef.componentInstance.historyQuery.isPending()) {
+        return;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
 
-    offerApiSpy.getActionHistory.and.returnValue(
-      of(buildPage([
-        buildEntry({ id: 1, status: 'PENDING_APPROVAL', targetPrice: 1100 }),
-        buildEntry({ id: 2, status: 'SUCCEEDED', targetPrice: 900, actualPrice: 900 }),
-        buildEntry({ id: 3, status: 'ON_HOLD', reason: 'Waiting for approval' }),
-      ])),
-    );
+  async function settleAfterUiWork(
+    fixtureRef: ComponentFixture<OfferActionHistoryTabComponent>,
+    done: () => boolean,
+  ): Promise<void> {
+    for (let i = 0; i < 50; i++) {
+      fixtureRef.detectChanges();
+      TestBed.flushEffects();
+      if (done()) {
+        return;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  async function mountTab(historyPage: Page<ActionHistoryEntry>): Promise<void> {
+    TestBed.resetTestingModule();
+    actionApiSpy = jasmine.createSpyObj('ActionApiService', [
+      'approveAction', 'rejectAction', 'resumeAction',
+    ]);
+    offerApiSpy = jasmine.createSpyObj('OfferApiService', ['getActionHistory']);
+    toastSpy = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    offerApiSpy.getActionHistory.and.returnValue(of(historyPage));
 
     const wsStore = { currentWorkspaceId: signal(1) };
 
     await TestBed.configureTestingModule({
       imports: [
-        TestHostComponent,
+        OfferActionHistoryTabComponent,
         TranslateModule.forRoot({ loader: { provide: TranslateLoader, useClass: FakeLoader } }),
       ],
       providers: [
@@ -92,16 +108,27 @@ describe('OfferActionHistoryTabComponent', () => {
           defaultOptions: { queries: { retry: false } },
         })),
         { provide: OfferApiService, useValue: offerApiSpy },
+        { provide: ActionApiService, useValue: actionApiSpy },
         { provide: WorkspaceContextStore, useValue: wsStore },
         { provide: ToastService, useValue: toastSpy },
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(TestHostComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+    fixture = TestBed.createComponent(OfferActionHistoryTabComponent);
+    fixture.componentRef.setInput('offerId', 100);
+    await settleHistoryQuery(fixture);
     fixture.detectChanges();
     el = fixture.nativeElement;
+  }
+
+  beforeEach(async () => {
+    await mountTab(
+      buildPage([
+        buildEntry({ id: 1, status: 'PENDING_APPROVAL', targetPrice: 1100 }),
+        buildEntry({ id: 2, status: 'SUCCEEDED', targetPrice: 900, actualPrice: 900 }),
+        buildEntry({ id: 3, status: 'ON_HOLD', reason: 'Waiting for approval' }),
+      ]),
+    );
   });
 
   it('should render action entries', () => {
@@ -116,11 +143,11 @@ describe('OfferActionHistoryTabComponent', () => {
   });
 
   it('should show target price when present', () => {
-    expect(el.textContent).toContain('1100');
+    expect(compactForDigitMatch(el.textContent)).toContain('1100');
   });
 
   it('should show actual price when present', () => {
-    expect(el.textContent).toContain('900');
+    expect(compactForDigitMatch(el.textContent)).toContain('900');
   });
 
   it('should show execution mode', () => {
@@ -153,17 +180,16 @@ describe('OfferActionHistoryTabComponent', () => {
 
   it('should not show approve/reject for SUCCEEDED entries', () => {
     const succeededCard = el.querySelectorAll('.border.border-\\[var\\(--border-default\\)\\]')[1];
-    if (succeededCard) {
-      const buttons = succeededCard.querySelectorAll('button');
-      const approveBtn = Array.from(buttons).find(b =>
-        b.textContent?.includes('detail.actions.approve'),
-      );
-      expect(approveBtn).toBeFalsy();
-    }
+    expect(succeededCard).toBeTruthy();
+    const buttons = succeededCard!.querySelectorAll('button');
+    const approveBtn = Array.from(buttons).find(b =>
+      b.textContent?.includes('detail.actions.approve'),
+    );
+    expect(approveBtn).toBeFalsy();
   });
 
   it('should call approveAction on approve click', async () => {
-    offerApiSpy.approveAction.and.returnValue(of(void 0));
+    actionApiSpy.approveAction.and.returnValue(of(void 0));
 
     const buttons = el.querySelectorAll('button');
     const approveBtn = Array.from(buttons).find(b =>
@@ -171,12 +197,12 @@ describe('OfferActionHistoryTabComponent', () => {
     );
     approveBtn?.click();
 
-    await fixture.whenStable();
-    expect(offerApiSpy.approveAction).toHaveBeenCalledWith(1);
+    await settleAfterUiWork(fixture, () => actionApiSpy.approveAction.calls.count() > 0);
+    expect(actionApiSpy.approveAction).toHaveBeenCalledWith(1, 1);
   });
 
   it('should show success toast after approve', async () => {
-    offerApiSpy.approveAction.and.returnValue(of(void 0));
+    actionApiSpy.approveAction.and.returnValue(of(void 0));
 
     const buttons = el.querySelectorAll('button');
     const approveBtn = Array.from(buttons).find(b =>
@@ -184,14 +210,12 @@ describe('OfferActionHistoryTabComponent', () => {
     );
     approveBtn?.click();
 
-    await fixture.whenStable();
-    fixture.detectChanges();
-
+    await settleAfterUiWork(fixture, () => toastSpy.success.calls.count() > 0);
     expect(toastSpy.success).toHaveBeenCalled();
   });
 
   it('should show error toast on approve failure', async () => {
-    offerApiSpy.approveAction.and.returnValue(throwError(() => new Error('fail')));
+    actionApiSpy.approveAction.and.returnValue(throwError(() => new Error('fail')));
 
     const buttons = el.querySelectorAll('button');
     const approveBtn = Array.from(buttons).find(b =>
@@ -199,14 +223,12 @@ describe('OfferActionHistoryTabComponent', () => {
     );
     approveBtn?.click();
 
-    await fixture.whenStable();
-    fixture.detectChanges();
-
+    await settleAfterUiWork(fixture, () => toastSpy.error.calls.count() > 0);
     expect(toastSpy.error).toHaveBeenCalled();
   });
 
   it('should call rejectAction on reject click', async () => {
-    offerApiSpy.rejectAction.and.returnValue(of(void 0));
+    actionApiSpy.rejectAction.and.returnValue(of(void 0));
 
     const buttons = el.querySelectorAll('button');
     const rejectBtn = Array.from(buttons).find(b =>
@@ -214,12 +236,12 @@ describe('OfferActionHistoryTabComponent', () => {
     );
     rejectBtn?.click();
 
-    await fixture.whenStable();
-    expect(offerApiSpy.rejectAction).toHaveBeenCalledWith(1, '');
+    await settleAfterUiWork(fixture, () => actionApiSpy.rejectAction.calls.count() > 0);
+    expect(actionApiSpy.rejectAction).toHaveBeenCalledWith(1, 1, '');
   });
 
   it('should call resumeAction on resume click', async () => {
-    offerApiSpy.resumeAction.and.returnValue(of(void 0));
+    actionApiSpy.resumeAction.and.returnValue(of(void 0));
 
     const buttons = el.querySelectorAll('button');
     const resumeBtn = Array.from(buttons).find(b =>
@@ -227,18 +249,15 @@ describe('OfferActionHistoryTabComponent', () => {
     );
     resumeBtn?.click();
 
-    await fixture.whenStable();
-    expect(offerApiSpy.resumeAction).toHaveBeenCalledWith(3);
+    await settleAfterUiWork(fixture, () => actionApiSpy.resumeAction.calls.count() > 0);
+    expect(actionApiSpy.resumeAction).toHaveBeenCalledWith(1, 3);
   });
 
   describe('component methods', () => {
     let component: OfferActionHistoryTabComponent;
 
     beforeEach(() => {
-      const debugEl = fixture.debugElement.query(
-        (de) => de.componentInstance instanceof OfferActionHistoryTabComponent,
-      );
-      component = debugEl.componentInstance;
+      component = fixture.componentInstance;
     });
 
     it('statusColor returns success for SUCCEEDED', () => {
@@ -286,13 +305,7 @@ describe('OfferActionHistoryTabComponent', () => {
 
   describe('empty state', () => {
     beforeEach(async () => {
-      offerApiSpy.getActionHistory.and.returnValue(of(buildPage([])));
-
-      fixture = TestBed.createComponent(TestHostComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      el = fixture.nativeElement;
+      await mountTab(buildPage([]));
     });
 
     it('should show empty state message', () => {

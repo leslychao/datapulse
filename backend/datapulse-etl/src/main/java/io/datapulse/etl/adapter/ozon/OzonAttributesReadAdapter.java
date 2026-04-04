@@ -32,9 +32,10 @@ public class OzonAttributesReadAdapter {
 
     public List<CaptureResult> captureAllPages(CaptureContext context,
                                                String clientId, String apiKey,
-                                               List<Long> productIds) {
+                                               List<Long> productIds,
+                                               String initialLastId) {
         List<CaptureResult> results = new ArrayList<>();
-        String lastId = "";
+        String lastId = initialLastId == null ? "" : initialLastId;
         int pageNumber = 0;
         boolean hasMore = true;
 
@@ -49,7 +50,9 @@ public class OzonAttributesReadAdapter {
                     context.connectionId(), RateLimitGroup.OZON_DEFAULT,
                     clientId, apiKey);
 
-            PageCaptureResult page = pageCapture.capture(body, context, pageNumber, CURSOR_EXTRACTOR);
+            PageCaptureResult page = pageCapture.capture(
+                    body, context, pageNumber, CURSOR_EXTRACTOR, null,
+                    currentLastId.isEmpty() ? null : currentLastId);
             results.add(page.captureResult());
 
             lastId = page.cursor();

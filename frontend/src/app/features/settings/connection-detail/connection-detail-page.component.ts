@@ -331,8 +331,6 @@ export class ConnectionDetailPageComponent {
   protected readonly rbac = inject(RbacService);
   private readonly zone = inject(NgZone);
 
-  private readonly isPendingValidation = signal(false);
-
   readonly editingName = signal(false);
   editNameValue = '';
 
@@ -340,7 +338,6 @@ export class ConnectionDetailPageComponent {
     effect(() => {
       const conn = this.connectionQuery.data();
       if (!conn) return;
-      this.isPendingValidation.set(conn.status === 'PENDING_VALIDATION');
       const wsId = this.wsStore.currentWorkspaceId();
       const base = `/workspace/${wsId}/settings`;
       this.breadcrumbs.setSegments([
@@ -365,7 +362,7 @@ export class ConnectionDetailPageComponent {
   readonly connectionQuery = injectQuery(() => ({
     queryKey: ['connection', this.connectionId()],
     queryFn: () => lastValueFrom(this.connectionApi.getConnection(this.connId)),
-    refetchInterval: this.isPendingValidation() ? 3000 : false,
+    staleTime: 30_000,
   }));
 
   readonly syncStateQuery = injectQuery(() => ({

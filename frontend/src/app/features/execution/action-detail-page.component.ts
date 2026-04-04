@@ -48,10 +48,6 @@ const BRANCH_STATES: Record<string, string[]> = {
   RECONCILIATION_PENDING: ['CANCELLED'],
 };
 
-const TERMINAL_STATES = new Set([
-  'SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED', 'SUPERSEDED',
-]);
-
 const CANCEL_DESTRUCTIVE_STATUSES = new Set(['RECONCILIATION_PENDING']);
 
 const OUTCOME_COLOR: Record<string, StatusColor> = {
@@ -124,10 +120,6 @@ export class ActionDetailPageComponent implements OnInit, OnDestroy {
       ),
     enabled: !!this.wsStore.currentWorkspaceId() && !isNaN(this.numericId()),
     staleTime: 10_000,
-    refetchInterval: (query: { state: { data?: ActionDetail } }) => {
-      const data = query.state.data;
-      return data && TERMINAL_STATES.has(data.status) ? false : 15_000;
-    },
   }));
 
   readonly action = computed<ActionDetail | null>(() => this.actionQuery.data() ?? null);

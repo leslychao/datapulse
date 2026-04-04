@@ -144,6 +144,7 @@ export class WebSocketService {
     this.subscribeTo<Record<string, unknown>>(`/user/queue/notifications`, (raw) => {
       this.notificationStore.addNotification(this.mapQueueNotification(raw));
       this.lastMessageTimestamp = new Date().toISOString();
+      this.queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
 
     this.subscribeTo(`${ws}/alerts`, () => {
@@ -173,6 +174,7 @@ export class WebSocketService {
 
     this.subscribeTo(`${ws}/pricing-runs`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['pricing-runs'] });
+      this.queryClient.invalidateQueries({ queryKey: ['pricing-run'] });
     });
 
     this.subscribeTo(`${ws}/pricing-decisions`, () => {
@@ -265,6 +267,7 @@ export class WebSocketService {
         this.notificationStore.setNotifications(notifications);
         const unreadCount = notifications.filter((n) => !n.read).length;
         this.notificationStore.setUnreadCount(unreadCount);
+        this.queryClient.invalidateQueries({ queryKey: ['notifications'] });
       },
     });
   }

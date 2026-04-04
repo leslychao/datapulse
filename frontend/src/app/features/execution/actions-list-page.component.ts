@@ -439,7 +439,6 @@ export class ActionsListPageComponent implements OnInit {
       lastValueFrom(this.actionApi.getActionsKpi(this.wsStore.currentWorkspaceId()!)),
     enabled: !!this.wsStore.currentWorkspaceId(),
     staleTime: 30_000,
-    refetchInterval: 60_000,
   }));
 
   readonly filterConfigs = computed<FilterConfig[]>(() => {
@@ -625,7 +624,6 @@ export class ActionsListPageComponent implements OnInit {
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
     staleTime: 30_000,
-    refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   }));
 

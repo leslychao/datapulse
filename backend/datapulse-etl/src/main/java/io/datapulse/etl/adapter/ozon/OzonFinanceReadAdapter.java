@@ -34,9 +34,10 @@ public class OzonFinanceReadAdapter {
 
     public List<CaptureResult> captureAllPages(CaptureContext context,
                                                String clientId, String apiKey,
-                                               OffsetDateTime dateFrom, OffsetDateTime dateTo) {
+                                               OffsetDateTime dateFrom, OffsetDateTime dateTo,
+                                               int startPageInclusive) {
         List<CaptureResult> results = new ArrayList<>();
-        int page = 1;
+        int page = Math.max(1, startPageInclusive);
         int totalPages = Integer.MAX_VALUE;
 
         while (page <= totalPages) {
@@ -57,7 +58,8 @@ public class OzonFinanceReadAdapter {
 
             int pageNumber = page - 1;
             PageCaptureResult captured = pageCapture.capture(
-                    body, context, pageNumber, PAGE_COUNT_EXTRACTOR);
+                    body, context, pageNumber, PAGE_COUNT_EXTRACTOR, null,
+                    String.valueOf(currentPage));
             results.add(captured.captureResult());
 
             String pageCountStr = captured.cursor();

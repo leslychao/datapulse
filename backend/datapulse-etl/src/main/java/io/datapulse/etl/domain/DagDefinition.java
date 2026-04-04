@@ -117,9 +117,32 @@ public final class DagDefinition {
     }
 
     /**
-     * Full FULL_SYNC scope: all events in the DAG.
+     * All {@link EtlEventType} nodes that appear in the static DAG (excludes enum members not on any level).
      */
     public static Set<EtlEventType> fullSyncScope() {
-        return EnumSet.allOf(EtlEventType.class);
+        EnumSet<EtlEventType> scope = EnumSet.noneOf(EtlEventType.class);
+        for (DagLevel level : LEVELS) {
+            scope.addAll(level.events());
+        }
+        return scope;
+    }
+
+    /**
+     * Expands the given seed events by recursively adding all hard dependencies from the DAG.
+     */
+    public static Set<EtlEventType> scopeWithHardDependencyClosure(Set<EtlEventType> seeds) {
+        EnumSet<EtlEventType> result = EnumSet.copyOf(seeds);
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (EtlEventType event : EnumSet.copyOf(result)) {
+                for (EtlEventType dep : hardDependenciesOf(event)) {
+                    if (result.add(dep)) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return result;
     }
 }

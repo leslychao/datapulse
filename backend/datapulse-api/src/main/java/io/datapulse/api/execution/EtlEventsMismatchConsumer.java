@@ -18,7 +18,7 @@ import java.util.Map;
 public class EtlEventsMismatchConsumer {
 
   private final MismatchMonitorService mismatchMonitorService;
-  private final EtlSyncCompletedWorkspaceResolver workspaceResolver;
+  private final EtlSyncCompletedPayloadResolver etlSyncCompletedPayloadResolver;
   private final ObjectMapper objectMapper;
 
   @RabbitListener(queues = RabbitTopologyConfig.ETL_EVENTS_MISMATCH_QUEUE)
@@ -32,7 +32,8 @@ public class EtlEventsMismatchConsumer {
       Map<String, Object> payload = objectMapper.readValue(
           message.getBody(), new TypeReference<>() {});
 
-      Long workspaceId = workspaceResolver.resolveWorkspaceId(payload);
+      Long workspaceId =
+          etlSyncCompletedPayloadResolver.resolveWorkspaceId(payload).orElse(null);
       if (workspaceId == null) {
         log.warn(
             "ETL_SYNC_COMPLETED missing workspaceId (and could not resolve from connectionId),"

@@ -6,23 +6,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-
 import java.util.List;
-import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,7 +26,9 @@ class NotificationFanOutListenerTest {
   @Mock
   private NotificationService notificationService;
   @Mock
-  private SimpMessagingTemplate messagingTemplate;
+  private UserNotificationStompPublisher userNotificationStompPublisher;
+  @Mock
+  private WorkspaceAlertTopicStompPublisher workspaceAlertTopicStompPublisher;
 
   @InjectMocks
   private NotificationFanOutListener listener;
@@ -55,10 +51,21 @@ class NotificationFanOutListenerTest {
 
       listener.onAlertCreated(event);
 
-      verify(messagingTemplate).convertAndSend(
-          eq("/topic/workspace/1/alerts"), any(Map.class));
-      verify(messagingTemplate, times(2))
-          .convertAndSendToUser(anyString(), eq("/queue/notifications"), any(Map.class));
+      verify(workspaceAlertTopicStompPublisher).publishAlertCreated(event);
+      verify(userNotificationStompPublisher)
+          .publish(
+              argThat(
+                  (List<long[]> pairs) ->
+                      pairs.size() == 2
+                          && pairs.get(0)[0] == 10L
+                          && pairs.get(0)[1] == 100L
+                          && pairs.get(1)[0] == 20L
+                          && pairs.get(1)[1] == 101L),
+              eq("ALERT"),
+              eq("Stale data detected"),
+              isNull(),
+              eq("WARNING"),
+              eq(42L));
     }
 
     @Test
@@ -69,7 +76,7 @@ class NotificationFanOutListenerTest {
           "CRITICAL", "Error", "OPEN", true);
 
       doThrow(new RuntimeException("WS down"))
-          .when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
+          .when(workspaceAlertTopicStompPublisher).publishAlertCreated(any());
 
       assertThatCode(() -> listener.onAlertCreated(event))
           .doesNotThrowAnyException();
@@ -88,14 +95,7 @@ class NotificationFanOutListenerTest {
 
       listener.onAlertResolved(event);
 
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Map<String, Object>> captor =
-          ArgumentCaptor.forClass(Map.class);
-      verify(messagingTemplate).convertAndSend(
-          eq("/topic/workspace/1/alerts"), captor.capture());
-
-      assertThat(captor.getValue().get("status")).isEqualTo("RESOLVED");
-      assertThat(captor.getValue().get("resolvedReason")).isEqualTo("MANUAL");
+      verify(workspaceAlertTopicStompPublisher).publishAlertResolved(event);
     }
 
     @Test
@@ -106,13 +106,7 @@ class NotificationFanOutListenerTest {
 
       listener.onAlertResolved(event);
 
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Map<String, Object>> captor =
-          ArgumentCaptor.forClass(Map.class);
-      verify(messagingTemplate).convertAndSend(
-          eq("/topic/workspace/1/alerts"), captor.capture());
-
-      assertThat(captor.getValue().get("status")).isEqualTo("AUTO_RESOLVED");
+      verify(workspaceAlertTopicStompPublisher).publishAlertResolved(event);
     }
 
     @Test
@@ -122,7 +116,7 @@ class NotificationFanOutListenerTest {
           42L, 1L, 10L, "WARNING", "Test", "MANUAL");
 
       doThrow(new RuntimeException("WS down"))
-          .when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
+          .when(workspaceAlertTopicStompPublisher).publishAlertResolved(any());
 
       assertThatCode(() -> listener.onAlertResolved(event))
           .doesNotThrowAnyException();

@@ -201,7 +201,6 @@ export class ActionDetailPanelComponent {
     ),
     enabled: !!this.wsStore.currentWorkspaceId() && this.actionId() > 0,
     staleTime: 10_000,
-    refetchInterval: 15_000,
   }));
 
   readonly action = computed(() => this.actionQuery.data() ?? null);

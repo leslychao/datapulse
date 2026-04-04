@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -21,7 +22,7 @@ public class EtlEventsPricingConsumer {
 
   private final StalePromoCampaignHandler stalePromoCampaignHandler;
   private final PricingRunApiService pricingRunApiService;
-  private final EtlSyncCompletedWorkspaceResolver workspaceResolver;
+  private final EtlSyncCompletedPayloadResolver etlSyncCompletedPayloadResolver;
   private final ObjectMapper objectMapper;
 
   @RabbitListener(queues = RabbitTopologyConfig.ETL_EVENTS_PRICING_QUEUE)
@@ -44,19 +45,18 @@ public class EtlEventsPricingConsumer {
     Map<String, Object> payload = objectMapper.readValue(
         message.getBody(), new TypeReference<>() {});
 
-    Long connectionId = toLong(payload.get("connectionId"));
-    Long workspaceId = workspaceResolver.resolveWorkspaceId(payload);
-    Long jobExecutionId = toLong(payload.get("jobExecutionId"));
-
-    if (connectionId == null || workspaceId == null || jobExecutionId == null) {
+    Optional<EtlSyncCompletedPayload> resolved =
+        etlSyncCompletedPayloadResolver.resolveForPostSyncTriggers(payload);
+    if (resolved.isEmpty()) {
       log.warn(
           "ETL_SYNC_COMPLETED missing required fields (connectionId, resolvable workspaceId,"
               + " jobExecutionId), skipping pricing trigger");
       return;
     }
 
-    log.info("ETL_SYNC_COMPLETED received: connectionId={}, triggering pricing run", connectionId);
-    pricingRunApiService.triggerPostSyncRun(connectionId, workspaceId, jobExecutionId);
+    EtlSyncCompletedPayload p = resolved.get();
+    log.info("ETL_SYNC_COMPLETED received: connectionId={}, triggering pricing run", p.connectionId());
+    pricingRunApiService.triggerPostSyncRun(p.connectionId(), p.workspaceId(), p.jobExecutionId());
   }
 
   private void handleStaleCampaign(Message message) throws Exception {
@@ -79,12 +79,5 @@ public class EtlEventsPricingConsumer {
   private String extractHeader(Message message, String headerName) {
     Object value = message.getMessageProperties().getHeader(headerName);
     return value != null ? value.toString() : null;
-  }
-
-  private Long toLong(Object value) {
-    if (value instanceof Number num) {
-      return num.longValue();
-    }
-    return null;
   }
 }

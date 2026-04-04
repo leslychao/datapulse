@@ -11,6 +11,7 @@ import io.datapulse.promotions.persistence.PromoEvaluationRunEntity;
 import io.datapulse.promotions.persistence.PromoEvaluationRunRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
 import io.datapulse.promotions.persistence.PromoProductRow;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +59,8 @@ class PromoEvaluationServiceTest {
   private ObjectMapper objectMapper;
   @Mock
   private ApplicationEventPublisher eventPublisher;
+  @Mock
+  private PromoSignalAssembler signalAssembler;
 
   @Captor
   private ArgumentCaptor<List<PromoEvaluationEntity>> evalCaptor;
@@ -70,10 +74,22 @@ class PromoEvaluationServiceTest {
   @DisplayName("executeRun")
   class ExecuteRun {
 
+    @BeforeEach
+    void stubClaimRunAndSignals() {
+      lenient().when(runRepository.casUpdateStatus(
+          eq(RUN_ID), eq(PromoRunStatus.PENDING), eq(PromoRunStatus.IN_PROGRESS)))
+          .thenReturn(1);
+      lenient().when(signalAssembler.enrichWithSignals(anyList()))
+          .thenAnswer(inv -> inv.getArgument(0));
+    }
+
     @Test
     void should_skip_when_run_is_not_pending() {
       var run = buildRun(PromoRunStatus.IN_PROGRESS);
       when(runRepository.findById(RUN_ID)).thenReturn(Optional.of(run));
+      when(runRepository.casUpdateStatus(
+          eq(RUN_ID), eq(PromoRunStatus.PENDING), eq(PromoRunStatus.IN_PROGRESS)))
+          .thenReturn(0);
 
       service.executeRun(RUN_ID);
 

@@ -92,7 +92,7 @@ public class OzonFinanceNormalizer {
                                                       OzonFinanceTransaction tx) {
         var m = new MeasureAccumulator();
         BigDecimal accruals = safe(tx.accrualsForSale());
-        BigDecimal commission = safe(tx.saleCommission());
+        BigDecimal commission = safe(tx.saleCommission()).negate();
 
         switch (entryType) {
             case SALE_ACCRUAL -> {

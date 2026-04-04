@@ -57,8 +57,30 @@ public class IngestResultReporter {
      */
     public void recordSuccessfulTerminalSync(
             JobExecutionRow job, long workspaceId, Map<EtlEventType, EventResult> results) {
+        List<String> completedDomains =
+                results.entrySet().stream()
+                        .filter(e -> e.getValue().isSuccess())
+                        .map(e -> e.getKey().name())
+                        .toList();
+        List<String> failedDomains =
+                results.entrySet().stream()
+                        .filter(e -> e.getValue().isFailed())
+                        .map(e -> e.getKey().name())
+                        .toList();
+        recordSuccessfulTerminalSyncLists(job, workspaceId, completedDomains, failedDomains);
+    }
+
+    /**
+     * Same as {@link #recordSuccessfulTerminalSync} but uses precomputed domain lists (e.g. async
+     * materialization handler that no longer has the full {@link EventResult} map).
+     */
+    public void recordSuccessfulTerminalSyncLists(
+            JobExecutionRow job,
+            long workspaceId,
+            List<String> completedDomains,
+            List<String> failedDomains) {
         applySuccessfulSyncState(job.getConnectionId());
-        writeCompletionOutboxEvent(job, workspaceId, results);
+        writeCompletionOutboxLists(job, workspaceId, completedDomains, failedDomains);
         publishSyncHealthInvalidated(job.getConnectionId(), SyncStatusPushReason.ETL_JOB_COMPLETED);
     }
 
@@ -92,17 +114,11 @@ public class IngestResultReporter {
         publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
     }
 
-    private void writeCompletionOutboxEvent(
-            JobExecutionRow job, long workspaceId, Map<EtlEventType, EventResult> results) {
-        List<String> completedDomains = results.entrySet().stream()
-                .filter(e -> e.getValue().isSuccess())
-                .map(e -> e.getKey().name())
-                .toList();
-        List<String> failedDomains = results.entrySet().stream()
-                .filter(e -> e.getValue().isFailed())
-                .map(e -> e.getKey().name())
-                .toList();
-
+    private void writeCompletionOutboxLists(
+            JobExecutionRow job,
+            long workspaceId,
+            List<String> completedDomains,
+            List<String> failedDomains) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("workspaceId", workspaceId);
         payload.put("connectionId", job.getConnectionId());

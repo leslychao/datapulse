@@ -28,10 +28,12 @@ public class OzonProductInfoReadAdapter {
 
     public List<CaptureResult> captureAllBatches(CaptureContext context,
                                                  String clientId, String apiKey,
-                                                 List<Long> productIds) {
+                                                 List<Long> productIds,
+                                                 int startBatchIndex) {
         List<CaptureResult> results = new ArrayList<>();
+        int start = Math.max(0, startBatchIndex);
 
-        for (int i = 0; i < productIds.size(); i += BATCH_SIZE) {
+        for (int i = start * BATCH_SIZE; i < productIds.size(); i += BATCH_SIZE) {
             List<Long> batch = productIds.subList(i, Math.min(i + BATCH_SIZE, productIds.size()));
             int pageNumber = i / BATCH_SIZE;
 
@@ -40,7 +42,8 @@ public class OzonProductInfoReadAdapter {
                     context.connectionId(), RateLimitGroup.OZON_DEFAULT,
                     clientId, apiKey);
 
-            var page = pageCapture.capture(body, context, pageNumber, NoCursorExtractor.INSTANCE);
+            var page = pageCapture.capture(body, context, pageNumber, NoCursorExtractor.INSTANCE,
+                    null, String.valueOf(pageNumber));
             results.add(page.captureResult());
 
             log.debug("Ozon product info batch captured: connectionId={}, batchSize={}, page={}",

@@ -45,6 +45,7 @@ class DagDefinitionTest {
       assertThat(level2.events()).containsExactlyInAnyOrder(
           EtlEventType.PRICE_SNAPSHOT,
           EtlEventType.INVENTORY_FACT,
+          EtlEventType.SUPPLY_FACT,
           EtlEventType.SALES_FACT,
           EtlEventType.ADVERTISING_FACT,
           EtlEventType.PROMO_SYNC);
@@ -119,6 +120,48 @@ class DagDefinitionTest {
 
       assertThat(deps).containsExactlyInAnyOrder(
           EtlEventType.PRODUCT_DICT, EtlEventType.WAREHOUSE_DICT);
+    }
+  }
+
+  @Nested
+  @DisplayName("fullSyncScope()")
+  class FullSyncScope {
+
+    @Test
+    void should_equalUnionOfAllDagLevels() {
+      EnumSet<EtlEventType> expected = EnumSet.noneOf(EtlEventType.class);
+      for (DagLevel level : DagDefinition.levels()) {
+        expected.addAll(level.events());
+      }
+      assertThat(DagDefinition.fullSyncScope()).isEqualTo(expected);
+    }
+  }
+
+  @Nested
+  @DisplayName("scopeWithHardDependencyClosure()")
+  class HardDependencyClosure {
+
+    @Test
+    void should_addProductDict_when_seedIsSalesFact() {
+      var scope = DagDefinition.scopeWithHardDependencyClosure(
+          EnumSet.of(EtlEventType.SALES_FACT));
+
+      assertThat(scope).containsExactlyInAnyOrder(
+          EtlEventType.SALES_FACT,
+          EtlEventType.PRODUCT_DICT,
+          EtlEventType.CATEGORY_DICT,
+          EtlEventType.WAREHOUSE_DICT);
+    }
+
+    @Test
+    void should_addCategoryAndWarehouse_when_seedIsProductDict() {
+      var scope = DagDefinition.scopeWithHardDependencyClosure(
+          EnumSet.of(EtlEventType.PRODUCT_DICT));
+
+      assertThat(scope).containsExactlyInAnyOrder(
+          EtlEventType.PRODUCT_DICT,
+          EtlEventType.CATEGORY_DICT,
+          EtlEventType.WAREHOUSE_DICT);
     }
   }
 }

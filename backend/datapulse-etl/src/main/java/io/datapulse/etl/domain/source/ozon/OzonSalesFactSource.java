@@ -1,6 +1,5 @@
 package io.datapulse.etl.domain.source.ozon;
 
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,11 +10,11 @@ import io.datapulse.etl.adapter.ozon.OzonReturnsReadAdapter;
 import io.datapulse.etl.adapter.ozon.dto.OzonFboPosting;
 import io.datapulse.etl.adapter.ozon.dto.OzonFbsPosting;
 import io.datapulse.etl.adapter.ozon.dto.OzonReturnItem;
-import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
+import io.datapulse.etl.domain.EtlSubSourceResume;
 import io.datapulse.etl.domain.EventSource;
 import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
@@ -31,7 +30,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OzonSalesFactSource implements EventSource {
 
-    private final IngestProperties ingestProperties;
     private final OzonFboOrdersReadAdapter fboAdapter;
     private final OzonFbsOrdersReadAdapter fbsAdapter;
     private final OzonReturnsReadAdapter returnsAdapter;
@@ -56,25 +54,33 @@ public class OzonSalesFactSource implements EventSource {
     public List<SubSourceResult> execute(IngestContext ctx) {
         String clientId = ctx.credentials().get("clientId");
         String apiKey = ctx.credentials().get("apiKey");
-        int lookbackDays = ingestProperties.incrementalFactLookbackDays();
-        OffsetDateTime since = OffsetDateTime.now().minusDays(lookbackDays);
-        OffsetDateTime to = OffsetDateTime.now();
+        var since = ctx.ozonFactSince();
+        var to = ctx.ozonFactTo();
         List<SubSourceResult> results = new ArrayList<>();
 
         var fboCtx = CaptureContextFactory.build(ctx, eventType(), "OzonFboOrdersReadAdapter");
-        List<CaptureResult> fboPages = fboAdapter.captureAllPages(fboCtx, clientId, apiKey, since, to);
+        long fboStart =
+            EtlSubSourceResume.nonNegativeLong(ctx, eventType(), "OzonFboOrdersReadAdapter");
+        List<CaptureResult> fboPages =
+            fboAdapter.captureAllPages(fboCtx, clientId, apiKey, since, to, fboStart);
         results.add(subSourceRunner.processPages(
                 "OzonFboOrdersReadAdapter", fboPages, OzonFboPosting.class,
                 batch -> processFboBatch(batch, ctx)));
 
         var fbsCtx = CaptureContextFactory.build(ctx, eventType(), "OzonFbsOrdersReadAdapter");
-        List<CaptureResult> fbsPages = fbsAdapter.captureAllPages(fbsCtx, clientId, apiKey, since, to);
+        long fbsStart =
+            EtlSubSourceResume.nonNegativeLong(ctx, eventType(), "OzonFbsOrdersReadAdapter");
+        List<CaptureResult> fbsPages =
+            fbsAdapter.captureAllPages(fbsCtx, clientId, apiKey, since, to, fbsStart);
         results.add(subSourceRunner.processPages(
                 "OzonFbsOrdersReadAdapter", fbsPages, OzonFbsPosting.class,
                 batch -> processFbsBatch(batch, ctx)));
 
         var returnsCtx = CaptureContextFactory.build(ctx, eventType(), "OzonReturnsReadAdapter");
-        List<CaptureResult> returnsPages = returnsAdapter.captureAllPages(returnsCtx, clientId, apiKey, since, to);
+        long returnsStart =
+            EtlSubSourceResume.nonNegativeLong(ctx, eventType(), "OzonReturnsReadAdapter");
+        List<CaptureResult> returnsPages =
+            returnsAdapter.captureAllPages(returnsCtx, clientId, apiKey, since, to, returnsStart);
         results.add(subSourceRunner.processPages(
                 "OzonReturnsReadAdapter", returnsPages, OzonReturnItem.class,
                 batch -> returnRepo.batchUpsert(batch.stream()

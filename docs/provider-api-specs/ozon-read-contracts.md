@@ -414,6 +414,7 @@ FBO endpoint fully verified.
 | FBO filter    | `since`, `to` (date range, ISO 8601 UTC), `dir`    | confirmed  |
 | `with` params | `analytics_data`, `financial_data` (boolean flags) | confirmed  |
 | Loop guard    | Observed (2026-04-03): successive pages may return **byte-identical** JSON while `offset` increases — treat as end of pagination (same pattern as non-advancing `last_id` on cursor endpoints) | confirmed |
+| Datapulse safety cap | Ingest adapters stop after **5000** offset pages per run (`OzonOffsetPaging.MAX_OFFSET_PAGES_PER_RUN`) in addition to duplicate-body and small-response heuristics — avoids unbounded capture if API misbehaves | assumed (client policy) |
 
 
 ### Identifier Semantics

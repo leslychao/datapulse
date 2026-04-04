@@ -1,7 +1,5 @@
 package io.datapulse.api.websocket;
 
-import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.api.config.RabbitTopologyConfig;
 import io.datapulse.audit.domain.NotificationService;
 import io.datapulse.audit.domain.NotificationType;
+import io.datapulse.audit.domain.UserNotificationStompPublisher;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
@@ -17,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,10 +28,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SyncStatusPushListener {
 
-    private final SimpMessagingTemplate messagingTemplate;
     private final MarketplaceConnectionRepository connectionRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
+    private final UserNotificationStompPublisher userNotificationStompPublisher;
 
     @RabbitListener(queues = RabbitTopologyConfig.ETL_EVENTS_API_QUEUE)
     public void onEtlEvent(Message message) {
@@ -70,7 +68,13 @@ public class SyncStatusPushListener {
                             MessageCodes.INTEGRATION_NOTIFICATION_SYNC_COMPLETED_TITLE,
                             MessageCodes.INTEGRATION_NOTIFICATION_SYNC_COMPLETED_BODY,
                             "INFO");
-                    pushSyncNotificationsToUsers(created);
+                    userNotificationStompPublisher.publish(
+                            created,
+                            NotificationType.SYNC_COMPLETED.name(),
+                            MessageCodes.INTEGRATION_NOTIFICATION_SYNC_COMPLETED_TITLE,
+                            MessageCodes.INTEGRATION_NOTIFICATION_SYNC_COMPLETED_BODY,
+                            "INFO",
+                            null);
                 } catch (Exception ex) {
                     log.warn(
                             "Sync-completed user notification fan-out failed: workspaceId={}, connectionId={}, error={}",
@@ -97,33 +101,6 @@ public class SyncStatusPushListener {
             return false;
         }
         return list.isEmpty();
-    }
-
-    private void pushSyncNotificationsToUsers(List<long[]> userIdNotificationIdPairs) {
-        String createdAt = OffsetDateTime.now().toString();
-        for (long[] pair : userIdNotificationIdPairs) {
-            long userId = pair[0];
-            long notificationId = pair[1];
-            messagingTemplate.convertAndSendToUser(
-                    String.valueOf(userId),
-                    "/queue/notifications",
-                    syncCompletedNotificationPayload(notificationId, createdAt));
-        }
-    }
-
-    private static Map<String, Object> syncCompletedNotificationPayload(
-            long notificationId, String createdAt) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("id", notificationId);
-        body.put("notificationId", notificationId);
-        body.put("notificationType", NotificationType.SYNC_COMPLETED.name());
-        body.put("alertEventId", null);
-        body.put("severity", "INFO");
-        body.put("title", MessageCodes.INTEGRATION_NOTIFICATION_SYNC_COMPLETED_TITLE);
-        body.put("body", MessageCodes.INTEGRATION_NOTIFICATION_SYNC_COMPLETED_BODY);
-        body.put("createdAt", createdAt);
-        body.put("read", false);
-        return body;
     }
 
     private Long toLong(Object value) {

@@ -422,19 +422,23 @@ user_notification:
 | `/topic/workspace/{workspaceId}/alerts` | Topic (broadcast) | Новые alert_events (OPEN), auto-resolution | `{ alertEventId, ruleType, severity, title, status, connectionId }` |
 | `/topic/workspace/{workspaceId}/sync-status` | Topic | Агрегированный health синка по подключению (как REST `GET /api/connections/sync-health`) | `WorkspaceSyncStatusPush`: `{ reason: STATE_CHANGED \| ETL_JOB_COMPLETED, connection: { connectionId, connectionName, lastSuccessAt, status: OK\|STALE\|ERROR } }` |
 | `/topic/workspace/{workspaceId}/actions` | Topic | Изменения статуса price/promo actions | `{ actionId, actionType, status, offerId }` |
-| `/user/queue/notifications` | User-specific | Персональные уведомления | `{ notificationId, notificationType, title, severity, createdAt }` |
+| `/user/queue/notifications` | User-specific | Персональные уведомления | `{ id, notificationId, notificationType, alertEventId, severity, title, body, createdAt, read }` |
+
+#### Единый push в user queue
+
+После `NotificationService.fanOut` персональная доставка в STOMP идёт только через **`UserNotificationStompPublisher`** (`datapulse-audit-alerting`): один формат payload для всех типов. Вызывается из **`NotificationFanOutListener`** (алерты, `AlertEventCreatedEvent`) и из **`SyncStatusPushListener`** в `datapulse-api` (Rabbit `ETL_SYNC_COMPLETED` → `SYNC_COMPLETED`). Прямых дублирующих вызовов `convertAndSendToUser` для `/queue/notifications` вне этого компонента нет.
 
 #### Message flow
 
 ```
 Business event (alert_event INSERT, action status change, sync completion)
-  → Spring ApplicationEvent
-  → @EventListener in WebSocket notification service
+  → Spring ApplicationEvent / Rabbit consumer
+  → @EventListener or API listener
   → SimpMessagingTemplate.convertAndSend("/topic/workspace/{id}/...")
   → Connected STOMP clients receive message
 ```
 
-При создании `user_notification` → push через `SimpMessagingTemplate.convertAndSendToUser(userId, "/queue/notifications", payload)`.
+При создании `user_notification` → `NotificationService.fanOut` → **`UserNotificationStompPublisher.publish`** → `SimpMessagingTemplate.convertAndSendToUser(userId, "/queue/notifications", payload)`.
 
 #### Authentication
 

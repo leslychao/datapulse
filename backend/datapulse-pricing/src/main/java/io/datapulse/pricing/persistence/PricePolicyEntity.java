@@ -71,7 +71,7 @@ public class PricePolicyEntity extends BaseEntity {
     private Integer version;
 
     @Column(name = "last_preview_version", nullable = false)
-    private Integer lastPreviewVersion;
+    private Integer lastPreviewVersion = 0;
 
     @Column(name = "execution_mode_changed_at")
     private java.time.OffsetDateTime executionModeChangedAt;

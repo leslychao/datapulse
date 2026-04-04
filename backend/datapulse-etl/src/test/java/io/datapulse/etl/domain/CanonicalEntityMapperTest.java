@@ -26,7 +26,8 @@ class CanonicalEntityMapperTest {
   private final CanonicalEntityMapper mapper = new CanonicalEntityMapper();
 
   private IngestContext buildContext() {
-    return new IngestContext(1L, 100L, 1L, MarketplaceType.WB,
+    return IngestContextFixtures.any(
+        1L, 100L, 1L, MarketplaceType.WB,
         Map.of(), "FULL_SYNC", EnumSet.allOf(EtlEventType.class), Map.of());
   }
 

@@ -63,6 +63,36 @@ class SubSourceRunnerTest {
     }
 
     @Test
+    void should_attachResumeToken_when_pageFails_and_listRequestOffsetPresent() {
+      List<CaptureResult> pages = List.of(
+          new CaptureResult(1L, "s3://bucket/key1", "sha256", 1024L, 5000L, null));
+
+      doThrow(new RuntimeException("S3 error"))
+          .when(rawPageReader).readBatched(eq("s3://bucket/key1"), eq(String.class), any());
+
+      SubSourceResult result = runner.processPages(
+          "TestSource", pages, String.class, batch -> {});
+
+      assertThat(result.status()).isEqualTo(EventResultStatus.FAILED);
+      assertThat(result.lastCursor()).isEqualTo("5000");
+    }
+
+    @Test
+    void should_attachResumeToken_when_pageFails_and_listResumeKeyPresent() {
+      List<CaptureResult> pages = List.of(
+          new CaptureResult(1L, "s3://bucket/key1", "sha256", 1024L, null, "abc-token"));
+
+      doThrow(new RuntimeException("S3 error"))
+          .when(rawPageReader).readBatched(eq("s3://bucket/key1"), eq(String.class), any());
+
+      SubSourceResult result = runner.processPages(
+          "TestSource", pages, String.class, batch -> {});
+
+      assertThat(result.status()).isEqualTo(EventResultStatus.FAILED);
+      assertThat(result.lastCursor()).isEqualTo("abc-token");
+    }
+
+    @Test
     void should_returnPartial_when_somePagesFail() {
       List<CaptureResult> pages = List.of(
           new CaptureResult(1L, "s3://bucket/key1", "sha256", 1024L),

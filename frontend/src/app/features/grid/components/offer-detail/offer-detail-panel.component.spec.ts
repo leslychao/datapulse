@@ -1,8 +1,9 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { of, signal } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { provideAngularQuery, QueryClient } from '@tanstack/angular-query-experimental';
 
 import { OfferDetailPanelComponent } from './offer-detail-panel.component';
@@ -46,18 +47,30 @@ describe('OfferDetailPanelComponent', () => {
   let offerApiSpy: jasmine.SpyObj<OfferApiService>;
   let panelService: DetailPanelService;
 
+  async function settleOfferQuery(fixtureRef: ComponentFixture<OfferDetailPanelComponent>): Promise<void> {
+    for (let i = 0; i < 30; i++) {
+      fixtureRef.detectChanges();
+      TestBed.flushEffects();
+      if (!fixtureRef.componentInstance.offerQuery.isPending()) {
+        return;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
   function setup(offerOverrides: Partial<OfferDetail> = {}) {
+    TestBed.resetTestingModule();
     offerApiSpy = jasmine.createSpyObj('OfferApiService', [
       'getOffer', 'getPriceJournal', 'getPromoJournal', 'getActionHistory',
-      'approveAction', 'rejectAction', 'resumeAction',
     ]);
+    const emptyPage = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 };
     offerApiSpy.getOffer.and.returnValue(of(buildOfferDetail(offerOverrides)));
-    offerApiSpy.getPriceJournal.and.returnValue(of({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, first: true, last: true }));
-    offerApiSpy.getPromoJournal.and.returnValue(of({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, first: true, last: true }));
-    offerApiSpy.getActionHistory.and.returnValue(of({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, first: true, last: true }));
+    offerApiSpy.getPriceJournal.and.returnValue(of(emptyPage));
+    offerApiSpy.getPromoJournal.and.returnValue(of(emptyPage));
+    offerApiSpy.getActionHistory.and.returnValue(of(emptyPage));
 
     const toastSpy = jasmine.createSpyObj('ToastService', ['success', 'error']);
-    const wsStore = { currentWorkspaceId: () => 1 };
+    const wsStore = { currentWorkspaceId: signal(1) };
 
     panelService = new DetailPanelService();
     panelService.open('offer', 100);
@@ -88,7 +101,7 @@ describe('OfferDetailPanelComponent', () => {
   describe('with loaded offer', () => {
     beforeEach(async () => {
       setup();
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
     });
@@ -118,8 +131,9 @@ describe('OfferDetailPanelComponent', () => {
       const priceJournalTab = Array.from(tabButtons).find(b =>
         b.textContent?.includes('detail.tab.price_journal'),
       );
-      priceJournalTab?.dispatchEvent(new Event('click'));
+      (priceJournalTab as HTMLButtonElement | undefined)?.click();
       fixture.detectChanges();
+      TestBed.flushEffects();
 
       expect(component.activeTab()).toBe('price-journal');
       expect(el.querySelector('dp-offer-price-journal-tab')).toBeTruthy();
@@ -130,8 +144,9 @@ describe('OfferDetailPanelComponent', () => {
       const tab = Array.from(tabButtons).find(b =>
         b.textContent?.includes('detail.tab.promo_journal'),
       );
-      tab?.dispatchEvent(new Event('click'));
+      (tab as HTMLButtonElement | undefined)?.click();
       fixture.detectChanges();
+      TestBed.flushEffects();
 
       expect(component.activeTab()).toBe('promo-journal');
     });
@@ -141,8 +156,9 @@ describe('OfferDetailPanelComponent', () => {
       const tab = Array.from(tabButtons).find(b =>
         b.textContent?.includes('detail.tab.action_history'),
       );
-      tab?.dispatchEvent(new Event('click'));
+      (tab as HTMLButtonElement | undefined)?.click();
       fixture.detectChanges();
+      TestBed.flushEffects();
 
       expect(component.activeTab()).toBe('action-history');
     });
@@ -152,8 +168,9 @@ describe('OfferDetailPanelComponent', () => {
       const tab = Array.from(tabButtons).find(b =>
         b.textContent?.includes('detail.tab.stock'),
       );
-      tab?.dispatchEvent(new Event('click'));
+      (tab as HTMLButtonElement | undefined)?.click();
       fixture.detectChanges();
+      TestBed.flushEffects();
 
       expect(component.activeTab()).toBe('stock');
     });
@@ -176,7 +193,7 @@ describe('OfferDetailPanelComponent', () => {
   describe('action buttons visibility', () => {
     it('should show approve and reject when PENDING_APPROVAL', async () => {
       setup({ lastActionStatus: 'PENDING_APPROVAL' });
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
 
@@ -193,7 +210,7 @@ describe('OfferDetailPanelComponent', () => {
 
     it('should show hold when APPROVED', async () => {
       setup({ lastActionStatus: 'APPROVED' });
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
 
@@ -206,7 +223,7 @@ describe('OfferDetailPanelComponent', () => {
 
     it('should show resume when ON_HOLD', async () => {
       setup({ lastActionStatus: 'ON_HOLD' });
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
 
@@ -219,7 +236,7 @@ describe('OfferDetailPanelComponent', () => {
 
     it('should hide action buttons for SUCCEEDED', async () => {
       setup({ lastActionStatus: 'SUCCEEDED' });
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
 
@@ -236,7 +253,7 @@ describe('OfferDetailPanelComponent', () => {
 
     it('should show lock button when not locked', async () => {
       setup({ manualLock: false });
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
 
@@ -249,7 +266,7 @@ describe('OfferDetailPanelComponent', () => {
 
     it('should show unlock button when locked', async () => {
       setup({ manualLock: true });
-      await fixture.whenStable();
+      await settleOfferQuery(fixture);
       fixture.detectChanges();
       el = fixture.nativeElement;
 
@@ -267,14 +284,14 @@ describe('OfferDetailPanelComponent', () => {
       panelService.open('connection', 5);
       fixture.detectChanges();
 
-      expect(component.offerQuery.isDisabled).toBeTruthy();
+      expect(component.offerQuery.isEnabled()).toBe(false);
     });
   });
 
   describe('loading state', () => {
     it('should show spinner when query is pending', () => {
       offerApiSpy = jasmine.createSpyObj('OfferApiService', ['getOffer']);
-      offerApiSpy.getOffer.and.returnValue(new Promise(() => {})); // never resolves
+      offerApiSpy.getOffer.and.returnValue(NEVER);
 
       panelService = new DetailPanelService();
       panelService.open('offer', 100);
@@ -293,7 +310,7 @@ describe('OfferDetailPanelComponent', () => {
           })),
           { provide: OfferApiService, useValue: offerApiSpy },
           { provide: DetailPanelService, useValue: panelService },
-          { provide: WorkspaceContextStore, useValue: { currentWorkspaceId: () => 1 } },
+          { provide: WorkspaceContextStore, useValue: { currentWorkspaceId: signal(1) } },
           { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         ],
       });

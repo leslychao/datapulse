@@ -22,8 +22,12 @@ public record SubSourceResult(
     }
 
     public static SubSourceResult failed(String sourceId, String error) {
+        return failed(sourceId, error, null);
+    }
+
+    public static SubSourceResult failed(String sourceId, String error, String lastCursor) {
         return new SubSourceResult(sourceId, EventResultStatus.FAILED,
-                null, 0, 0, 0, List.of(error));
+                lastCursor, 0, 0, 0, List.of(error));
     }
 
     public static SubSourceResult partial(String sourceId, String lastCursor,

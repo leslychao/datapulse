@@ -32,11 +32,7 @@ public record EventResult(
     }
 
     public static EventResult failed(EtlEventType eventType, List<SubSourceResult> subSources) {
-        String cursor = subSources.stream()
-                .filter(s -> s.lastCursor() != null)
-                .reduce((first, second) -> second)
-                .map(SubSourceResult::lastCursor)
-                .orElse(null);
+        String cursor = SubSourceCursorCodec.mergeSubSourceLastCursors(subSources);
         return new EventResult(eventType, EventResultStatus.FAILED, cursor, null, subSources);
     }
 
