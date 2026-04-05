@@ -115,13 +115,30 @@ Streaming JSON parse через Jackson streaming API (batch=500 records, memory
 
 ### Cursor extraction
 
-Три семейства pagination определяют стратегию cursor extraction:
+Четыре семейства cursor extraction определяют, как из ответа API извлекается маркер следующей страницы:
 
 | Семейство | Endpoints | Стратегия | Overhead |
 |-----------|-----------|-----------|----------|
-| 1: Externally-paged | ~11 endpoints (WB Orders/Sales/Returns/Incomes/Offices, WB Prices/Stocks offset, Ozon Orders/Returns/Catalog info) | `NoCursorExtractor` — нет extraction | 0 |
-| 2: Metadata cursor | ~5 endpoints (WB Catalog, Ozon Catalog list, Ozon Stocks/Prices/Finance) | `JsonPathCursorExtractor` — парсит temp file post-write | < 1 ms |
-| 3: Data-derived cursor | 1 endpoint (WB Finance) | `TailFieldExtractor` — читает tail 32 KB из temp file | < 1 ms |
+| 1: No cursor (offset-based) | WB Prices/Stocks/Promo offset, Ozon FBO/FBS/Promo offset | `NoCursorExtractor` — пагинация через арифметический offset | 0 |
+| 2: String cursor (last_id) | Ozon Product List, Ozon Prices, Ozon Stocks, Ozon Attributes, Ozon Returns | `JsonPathCursorExtractor` — парсит temp file post-write | < 1 ms |
+| 3: Composite cursor (WB Catalog) | WB Catalog (`/content/v2/get/cards/list`) | `WbCatalogCursorExtractor` — извлекает `updatedAt`, `nmID`, `total` | < 1 ms |
+| 4: Data-derived cursor (WB Finance) | WB Finance (`reportDetailByPeriod`) | `TailFieldExtractor` — читает tail 32 KB, последний `rrd_id` | < 1 ms |
+
+### Pagination orchestration
+
+Два marketplace-agnostic класса в `adapter/util/` централизуют pagination loop:
+
+| Класс | Паттерн | Safety guards | Используется |
+|-------|---------|---------------|--------------|
+| `OffsetPagedCapture` | offset/limit | SHA-256 duplicate detection, max page cap, small-page threshold | WB Prices, WB Stocks, WB Promo, Ozon FBO, Ozon FBS, Ozon Promo products/candidates |
+| `CursorPagedCapture` | opaque string cursor | Non-advancing cursor detection (same cursor = stop), null/empty = stop | Ozon Product List, Ozon Prices, Ozon Stocks, Ozon Attributes, Ozon Returns |
+
+Два адаптера используют собственный pagination loop из-за уникальных termination conditions:
+
+| Адаптер | Причина собственного loop |
+|---------|--------------------------|
+| `WbCatalogReadAdapter` | Составной cursor (`updatedAt` + `nmID`), termination по `cursor.total < limit` |
+| `WbFinanceReadAdapter` | `rrdid` cursor + HTTP 204 empty response termination + `byteSize < 10` filter |
 
 Post-write extraction (Вариант B) — единый write path для всех endpoints, cursor extraction — отдельная фаза.
 
