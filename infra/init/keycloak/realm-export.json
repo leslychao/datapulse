@@ -117,7 +117,8 @@
         "https://datapulse.example.com"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost/*##http://localhost:8880/*##https://mydatapulse.ru/*##https://datapulse.example.com/*"
+        "post.logout.redirect.uris": "http://localhost/*##http://localhost:8880/*##https://mydatapulse.ru/*##https://datapulse.example.com/*",
+        "access.token.lifespan": "600"
       },
       "defaultClientScopes": ["openid", "email", "profile"],
       "protocolMappers": [

@@ -1,5 +1,6 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 
 import { TranslateService } from '@ngx-translate/core';
@@ -7,6 +8,9 @@ import { TranslateService } from '@ngx-translate/core';
 import { AuthService } from './auth.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+
+/** Avoid N parallel API 401s each starting an OAuth redirect (full reload resets this). */
+let oauthLoginRedirectPending = false;
 
 const WORKSPACE_HEADER_SKIP_PATHS = [
   '/api/users/me',
@@ -17,6 +21,7 @@ const WORKSPACE_HEADER_SKIP_PATHS = [
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
+  const router = inject(Router);
   const toast = inject(ToastService);
   const translate = inject(TranslateService);
   const workspaceStore = inject(WorkspaceContextStore, { optional: true });
@@ -46,7 +51,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((error) => {
       if (error instanceof HttpErrorResponse) {
         if (error.status === 401) {
-          authService.login();
+          if (!oauthLoginRedirectPending) {
+            oauthLoginRedirectPending = true;
+            authService.login(router.url.length > 0 ? router.url : undefined);
+          }
         } else if (error.status === 403) {
           toast.error(translate.instant('auth.forbidden'));
         }
