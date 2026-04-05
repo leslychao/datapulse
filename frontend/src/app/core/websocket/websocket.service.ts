@@ -1,11 +1,17 @@
 import { Injectable, inject, signal, NgZone } from '@angular/core';
 import { RxStomp, RxStompConfig } from '@stomp/rx-stomp';
-import { Subscription } from 'rxjs';
+import { Subscription, lastValueFrom } from 'rxjs';
 import { QueryClient } from '@tanstack/angular-query-experimental';
 
 import { environment } from '@env';
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { NotificationApiService } from '@core/api/notification-api.service';
-import { AppNotification, ConnectionSyncStatus, MismatchWsEvent } from '@core/models';
+import {
+  AppNotification,
+  MismatchWsEvent,
+  NotificationType,
+  WorkspaceSyncStatusPush,
+} from '@core/models';
 import { SyncStatusStore } from '@shared/stores/sync-status.store';
 import { NotificationStore } from '@shared/stores/notification.store';
 
@@ -18,6 +24,7 @@ export class WebSocketService {
   private readonly syncStore = inject(SyncStatusStore);
   private readonly notificationStore = inject(NotificationStore);
   private readonly notificationApi = inject(NotificationApiService);
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly queryClient = inject(QueryClient);
   private rxStomp: RxStomp | null = null;
   private subscriptions: Subscription[] = [];
@@ -114,18 +121,30 @@ export class WebSocketService {
   subscribeToWorkspace(workspaceId: number): void {
     const ws = `/topic/workspace/${workspaceId}`;
 
-    this.subscribeTo<ConnectionSyncStatus>(`${ws}/sync-status`, (msg) => {
-      this.syncStore.updateConnection(msg.connectionId, {
-        connectionName: msg.connectionName,
-        lastSuccessAt: msg.lastSuccessAt,
-        status: msg.status,
+    this.subscribeTo<WorkspaceSyncStatusPush>(`${ws}/sync-status`, (msg) => {
+      if (!msg?.connection) {
+        return;
+      }
+      const c = msg.connection;
+      this.syncStore.upsertConnection({
+        connectionId: c.connectionId,
+        connectionName: c.connectionName,
+        lastSuccessAt: c.lastSuccessAt ?? null,
+        status: c.status,
       });
       this.syncStore.setLastUpdated(new Date().toISOString());
+      this.queryClient.invalidateQueries({ queryKey: ['connection-sync-state'] });
+      if (msg.reason === 'ETL_JOB_COMPLETED') {
+        this.queryClient.invalidateQueries({ queryKey: ['sync-status'] });
+        this.queryClient.invalidateQueries({ queryKey: ['offers'] });
+        this.queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      }
     });
 
-    this.subscribeTo<AppNotification>(`/user/queue/notifications`, (msg) => {
-      this.notificationStore.addNotification(msg);
+    this.subscribeTo<Record<string, unknown>>(`/user/queue/notifications`, (raw) => {
+      this.notificationStore.addNotification(this.mapQueueNotification(raw));
       this.lastMessageTimestamp = new Date().toISOString();
+      this.queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
 
     this.subscribeTo(`${ws}/alerts`, () => {
@@ -155,6 +174,7 @@ export class WebSocketService {
 
     this.subscribeTo(`${ws}/pricing-runs`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['pricing-runs'] });
+      this.queryClient.invalidateQueries({ queryKey: ['pricing-run'] });
     });
 
     this.subscribeTo(`${ws}/pricing-decisions`, () => {
@@ -206,17 +226,38 @@ export class WebSocketService {
       this.queryClient.invalidateQueries({ queryKey: ['analytics'] });
     });
 
-    this.subscribeTo(`${ws}/sync-completed`, () => {
-      this.queryClient.invalidateQueries({ queryKey: ['sync-status'] });
-      this.queryClient.invalidateQueries({ queryKey: ['offers'] });
-      this.queryClient.invalidateQueries({ queryKey: ['analytics'] });
-    });
-
     this.subscribeTo(`${ws}/connection-updates`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['connections'] });
       this.queryClient.invalidateQueries({ queryKey: ['connection'] });
       this.queryClient.invalidateQueries({ queryKey: ['connection-sync-state'] });
+      this.queryClient.invalidateQueries({ queryKey: ['sync-status'] });
+      void lastValueFrom(this.connectionApi.listSyncHealth())
+        .then((rows) => this.syncStore.setConnections(rows))
+        .catch(() => {});
     });
+  }
+
+  private mapQueueNotification(raw: Record<string, unknown>): AppNotification {
+    const idRaw = raw['id'] ?? raw['notificationId'];
+    const id = typeof idRaw === 'number' ? idRaw : Number(idRaw);
+    const alertRaw = raw['alertEventId'];
+    const notificationType = raw['notificationType'] as NotificationType | undefined;
+    const severity = (raw['severity'] as AppNotification['severity']) ?? 'INFO';
+    return {
+      id: Number.isFinite(id) ? id : 0,
+      notificationType: notificationType ?? 'ALERT',
+      alertEventId:
+        alertRaw != null && alertRaw !== ''
+          ? typeof alertRaw === 'number'
+            ? alertRaw
+            : Number(alertRaw)
+          : null,
+      severity,
+      title: String(raw['title'] ?? ''),
+      body: String(raw['body'] ?? ''),
+      createdAt: String(raw['createdAt'] ?? new Date().toISOString()),
+      read: Boolean(raw['read']),
+    };
   }
 
   private syncMissedNotifications(): void {
@@ -226,6 +267,7 @@ export class WebSocketService {
         this.notificationStore.setNotifications(notifications);
         const unreadCount = notifications.filter((n) => !n.read).length;
         this.notificationStore.setUnreadCount(unreadCount);
+        this.queryClient.invalidateQueries({ queryKey: ['notifications'] });
       },
     });
   }

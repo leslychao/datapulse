@@ -37,7 +37,12 @@ function stockFormatter(params: ValueFormatterParams): string {
 }
 
 const MARKETPLACE_LABELS: Record<string, string> = { WB: 'WB', OZON: 'Ozon' };
-const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Активный', ARCHIVED: 'Архив', BLOCKED: 'Заблокирован' };
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Активный',
+  ARCHIVED: 'Архив',
+  BLOCKED: 'Заблокирован',
+  INACTIVE: 'Неактивен',
+};
 const DECISION_LABELS: Record<string, string> = { CHANGE: 'Изменение', SKIP: 'Пропуск', HOLD: 'Удержание' };
 const ACTION_STATUS_LABELS: Record<string, string> = {
   PENDING_APPROVAL: 'Ожидает',

@@ -18,7 +18,8 @@ class CaptureContextFactoryTest {
 
     @Test
     void should_buildContext_with_allFields() {
-      var ctx = new IngestContext(1L, 100L, 1L, MarketplaceType.WB,
+      var ctx = IngestContextFixtures.any(
+          1L, 100L, 1L, MarketplaceType.WB,
           Map.of(), "FULL_SYNC", EnumSet.allOf(EtlEventType.class), Map.of());
 
       var result = CaptureContextFactory.build(

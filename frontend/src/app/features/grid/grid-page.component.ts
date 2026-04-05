@@ -235,14 +235,21 @@ export class GridPageComponent implements OnInit, OnDestroy {
     const wsId = this.wsStore.currentWorkspaceId();
     if (!wsId) return;
 
-    this.offerApi.exportOffers(wsId, this.gridStore.filters()).subscribe((blob) => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const dateStr = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `datapulse-export-${dateStr}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+    const offerIds = this.gridStore.hasSelection()
+      ? Array.from(this.gridStore.selectedOfferIds())
+      : undefined;
+
+    this.offerApi.exportOffers(wsId, this.gridStore.filters(), { offerIds }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `datapulse-export-${dateStr}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => this.toast.error(this.translate.instant('grid.export_failed')),
     });
   }
 

@@ -19,7 +19,11 @@ public class JobExecutionRow {
     private String status;
     private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
+    /** When the job entered MATERIALIZING; null otherwise. */
+    private OffsetDateTime materializingAt;
     private String errorDetails;
     private String checkpoint;
+    /** Optional JSON: domains, sourceJobId, trigger, etc. */
+    private String params;
     private OffsetDateTime createdAt;
 }

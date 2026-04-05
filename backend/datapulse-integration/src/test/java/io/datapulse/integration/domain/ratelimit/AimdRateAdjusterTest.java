@@ -10,10 +10,10 @@ import java.util.HashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AimdRateControllerTest {
+class AimdRateAdjusterTest {
 
   private RateLimitProperties properties;
-  private AimdRateController controller;
+  private AimdRateAdjuster controller;
 
   @BeforeEach
   void setUp() {
@@ -23,7 +23,7 @@ class AimdRateControllerTest {
     properties.setStabilityWindow(3);
     properties.setMinRate(0.01);
     properties.setGroups(new HashMap<>());
-    controller = new AimdRateController(properties);
+    controller = new AimdRateAdjuster(properties);
   }
 
   @Nested

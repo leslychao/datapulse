@@ -18,6 +18,7 @@ public class CostProfileRow {
     private Long id;
     private long sellerSkuId;
     private String skuCode;
+    private String productName;
     private BigDecimal costPrice;
     private String currency;
     private LocalDate validFrom;

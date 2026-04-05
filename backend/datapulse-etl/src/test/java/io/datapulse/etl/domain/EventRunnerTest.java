@@ -43,12 +43,12 @@ class EventRunnerTest {
     }
 
     @Test
-    void should_returnFailed_when_noSourceRegistered() {
+    void should_returnSkipped_when_noSourceRegistered() {
       when(registry.resolve(any(), any())).thenReturn(Optional.empty());
 
       EventResult result = eventRunner.run(EtlEventType.PRICE_SNAPSHOT, buildContext());
 
-      assertThat(result.status()).isEqualTo(EventResultStatus.FAILED);
+      assertThat(result.status()).isEqualTo(EventResultStatus.SKIPPED);
     }
 
     @Test
@@ -80,9 +80,9 @@ class EventRunnerTest {
   }
 
   private IngestContext buildContext() {
-    return new IngestContext(
+    return IngestContextFixtures.any(
         1L, 100L, 1L, MarketplaceType.WB,
-        Map.of("token", "test"), "FULL_SYNC",
+        Map.of("apiToken", "test"), "FULL_SYNC",
         EnumSet.allOf(EtlEventType.class), Map.of());
   }
 

@@ -1,0 +1,91 @@
+# Event Publishing — Spring Events vs Outbox
+
+## Два механизма, разные гарантии
+
+| Механизм | Гарантия | Область | Когда |
+|---|---|---|---|
+| **Spring `ApplicationEventPublisher`** | In-process, best-effort | Внутри одного процесса | Audit, notifications, cache invalidation |
+| **Outbox → RabbitMQ** | At-least-once, durable | Между процессами, critical path | Price execution, ETL sync, reconciliation, promo execution |
+
+## Spring Events (`ApplicationEventPublisher`)
+
+### Когда использовать
+
+- **Audit logging** — через `AuditPublisher` (единый фасад)
+- **WebSocket push** — уведомления в UI
+- **Cache invalidation** — после write-операций
+- **In-process side effects** — которые допускают потерю при crash
+
+### Как использовать
+
+```java
+// ✅ Через AuditPublisher (для аудита)
+auditPublisher.publish("CREATE", "connection", String.valueOf(id));
+
+// ✅ Через ApplicationEventPublisher (для доменных событий)
+eventPublisher.publishEvent(new ConnectionStatusChangedEvent(connectionId, newStatus));
+
+// ✅ Listener
+@Component
+@RequiredArgsConstructor
+public class ConnectionStatusPushListener {
+
+  @TransactionalEventListener(phase = AFTER_COMMIT)
+  public void onStatusChanged(ConnectionStatusChangedEvent event) {
+    // push to WebSocket
+  }
+}
+```
+
+### Правила
+
+- **`@TransactionalEventListener(phase = AFTER_COMMIT)`** — для side effects, которые должны выполняться только после успешного коммита (email, push, external calls)
+- **`@EventListener`** — для side effects без привязки к транзакции
+- **`@Async`** на listener — для неблокирующей обработки; обязательно с явным executor (`@Async("notificationExecutor")`)
+- **Audit events** — только через `AuditPublisher`, не через прямой `publishEvent(new AuditEvent(...))`
+
+## Outbox → RabbitMQ
+
+### Когда использовать
+
+- **Price action execution** — `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`
+- **ETL sync** — `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`
+- **Reconciliation** — `RECONCILIATION_CHECK`
+- **Promo execution** — `PROMO_ACTION_EXECUTE`, `PROMO_EVALUATION_EXECUTE`
+- **Post-ingest materialization** — `ETL_POST_INGEST_MATERIALIZE`
+
+### Как использовать
+
+```java
+// ✅ Создание outbox события
+outboxService.createEvent(
+    OutboxEventType.PRICE_ACTION_EXECUTE,
+    "price_action",
+    actionId,
+    Map.of("actionId", actionId, "connectionId", connectionId)
+);
+```
+
+### Правила
+
+- **`OutboxService.createEvent()`** — единственный способ создания outbox событий
+- **Outbox event создаётся в той же транзакции**, что и бизнес-операция (transactional outbox pattern)
+- **Consumer** живёт в `datapulse-api` (composition root), должен быть **тонким**: parse → validate → delegate to domain service
+- **Retry** — через outbox re-publish с delay (`delay_ms` в payload), не через RabbitMQ native retry
+
+## Как выбрать
+
+```
+Действие нужно гарантированно выполнить даже при crash?
+├── Да → Outbox → RabbitMQ
+└── Нет
+    ├── Действие в том же процессе? → Spring Event
+    └── Действие в другом процессе? → Outbox → RabbitMQ
+```
+
+## Запрещено
+
+- **`ApplicationEventPublisher` для critical business actions** (price write, ETL sync) — используй outbox
+- **Прямой `rabbitTemplate.send()`** из доменных сервисов — используй `OutboxService`
+- **`AuditEvent` напрямую через `publishEvent`** — используй `AuditPublisher`
+- **`@Async` без явного executor** — дефолтный `SimpleAsyncTaskExecutor` создаёт unbounded threads

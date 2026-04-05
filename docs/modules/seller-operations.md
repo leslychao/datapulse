@@ -82,6 +82,10 @@
 | `manual_lock` | `manual_price_lock EXISTS` | PostgreSQL | Ручная блокировка |
 | `simulated_price` | `simulated_offer_state.simulated_price` | PostgreSQL | Симулированная цена (Phase F; nullable) |
 | `simulated_delta_pct` | `simulated_offer_state.price_delta_pct` | PostgreSQL | Разница simulated vs canonical (%) |
+| `ad_spend_30d` | `mart_advertising_product.spend` (latest period) | ClickHouse | Расход на рекламу за 30 дней (Phase A; hidden by default, visible in system view "Реклама") |
+| `drr_30d_pct` | `mart_advertising_product.drr_pct` | ClickHouse | ДРР за 30 дней (Phase A; hidden by default) |
+| `ad_cpo` | `mart_advertising_product.cpo` | ClickHouse | Cost Per Order (Phase A; hidden by default) |
+| `ad_roas` | `mart_advertising_product.roas` | ClickHouse | ROAS (Phase A; hidden by default) |
 | `last_sync_at` | `marketplace_sync_state.last_success_at` | PostgreSQL | Время последней синхронизации |
 | `data_freshness` | Computed: `STALE` if `NOW() - last_sync_at > staleness_threshold` | Computed | FRESH / STALE. Default threshold: 4 hours (configurable via `datapulse.grid.staleness-threshold=PT4H`) |
 
@@ -223,7 +227,7 @@ saved_view:
 |----------|-------|-------------|
 | Max views per user per workspace | 50 | Предотвращает мусорное накопление; достаточно для реальных сценариев |
 | `filters` JSONB max size | 10 KB | Валидация на API-уровне; JSON с 15 фильтрами ≈ 1 KB |
-| `visible_columns` max items | 26 (= total grid columns) | Нельзя показать колонок больше, чем есть |
+| `visible_columns` max items | 30 (= total grid columns) | Нельзя показать колонок больше, чем есть |
 | `name` max length | 200 chars (VARCHAR constraint) | — |
 | System views | Не редактируемые, не удаляемые | `is_system = true` seeded при создании workspace |
 

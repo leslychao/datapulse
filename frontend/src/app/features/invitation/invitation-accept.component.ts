@@ -135,9 +135,13 @@ export class InvitationAcceptComponent implements OnInit {
   }
 
   protected onGoToWorkspace(): void {
-    if (this.result) {
-      this.router.navigate(['/workspace', this.result.workspaceId, 'grid']);
+    const workspaceId = this.result?.workspaceId;
+    if (workspaceId != null && Number.isFinite(workspaceId)) {
+      void this.router.navigate(['/workspace', workspaceId, 'grid']);
+      return;
     }
+    // 409 from API is ErrorResponse (messageKey only) — no workspaceId; root guard picks workspace.
+    void this.router.navigate(['/']);
   }
 
   protected onGoHome(): void {
@@ -151,6 +155,19 @@ export class InvitationAcceptComponent implements OnInit {
 
   protected onLogout(): void {
     this.authService.logout();
+  }
+
+  private isAcceptInvitationPayload(body: unknown): body is AcceptInvitationResponse {
+    if (!body || typeof body !== 'object') {
+      return false;
+    }
+    const o = body as Record<string, unknown>;
+    return (
+      typeof o['workspaceId'] === 'number' &&
+      Number.isFinite(o['workspaceId']) &&
+      typeof o['workspaceName'] === 'string' &&
+      typeof o['role'] === 'string'
+    );
   }
 
   private acceptInvitation(): void {
@@ -167,10 +184,16 @@ export class InvitationAcceptComponent implements OnInit {
           case 404:
             this.state.set('notFound');
             break;
-          case 409:
-            this.result = err.error as AcceptInvitationResponse;
+          case 409: {
+            const body = err.error;
+            if (this.isAcceptInvitationPayload(body)) {
+              this.result = body;
+            } else {
+              this.result = null;
+            }
             this.state.set('alreadyAccepted');
             break;
+          }
           case 410:
             this.state.set('expired');
             break;

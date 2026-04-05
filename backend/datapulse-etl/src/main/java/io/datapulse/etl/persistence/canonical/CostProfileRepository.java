@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -22,9 +23,15 @@ public class CostProfileRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
 
+    private static final Map<String, String> SORT_WHITELIST = Map.of(
+            "skuCode", "ss.sku_code",
+            "productName", "COALESCE(pm.name, '')",
+            "costPrice", "cp.cost_price",
+            "updatedAt", "cp.updated_at");
+
     private static final String CLOSE_CURRENT_VERSION = """
             UPDATE cost_profile
-            SET valid_to = :newValidFrom - INTERVAL '1 day',
+            SET valid_to = :closedValidTo,
                 updated_at = now()
             WHERE seller_sku_id = :sellerSkuId
               AND valid_to IS NULL
@@ -71,7 +78,9 @@ public class CostProfileRepository {
             """;
 
     private static final String FIND_BY_ID_AND_WORKSPACE = """
-            SELECT cp.id, cp.seller_sku_id, ss.sku_code, cp.cost_price, cp.currency,
+            SELECT cp.id, cp.seller_sku_id, ss.sku_code,
+                   COALESCE(pm.name, '') AS product_name,
+                   cp.cost_price, cp.currency,
                    cp.valid_from, cp.valid_to, cp.updated_by_user_id,
                    cp.created_at, cp.updated_at
             FROM cost_profile cp
@@ -96,10 +105,11 @@ public class CostProfileRepository {
             """;
 
     public void closeCurrentVersion(long sellerSkuId, LocalDate newValidFrom) {
+        LocalDate closedValidTo = newValidFrom.minusDays(1);
         jdbc.update(CLOSE_CURRENT_VERSION, Map.of(
                 "sellerSkuId", sellerSkuId,
-                "newValidFrom", Date.valueOf(newValidFrom)
-        ));
+                "newValidFrom", Date.valueOf(newValidFrom),
+                "closedValidTo", Date.valueOf(closedValidTo)));
     }
 
     public void upsertVersion(long sellerSkuId, CostProfileEntity entity) {
@@ -169,18 +179,20 @@ public class CostProfileRepository {
     }
 
     public List<CostProfileRow> findCurrentProfiles(long workspaceId, Long sellerSkuId,
-                                                    String search, int limit, long offset) {
+                                                    String search, Sort sort, int limit, long offset) {
         var params = buildProfileFilterParams(workspaceId, sellerSkuId, search);
         params.addValue("limit", limit);
         params.addValue("offset", offset);
 
         String sql = """
-                SELECT cp.id, cp.seller_sku_id, ss.sku_code, cp.cost_price, cp.currency,
+                SELECT cp.id, cp.seller_sku_id, ss.sku_code,
+                       COALESCE(pm.name, '') AS product_name,
+                       cp.cost_price, cp.currency,
                        cp.valid_from, cp.valid_to, cp.updated_by_user_id,
                        cp.created_at, cp.updated_at
                 """ + BASE_CURRENT_PROFILES
-                + buildProfileFilterClause(sellerSkuId, search) + """
-                ORDER BY ss.sku_code
+                + buildProfileFilterClause(sellerSkuId, search)
+                + buildOrderByClause(sort) + """
                 LIMIT :limit OFFSET :offset
                 """;
 
@@ -194,6 +206,22 @@ public class CostProfileRepository {
                 + buildProfileFilterClause(sellerSkuId, search);
 
         return jdbc.queryForObject(sql, params, Long.class);
+    }
+
+    /**
+     * All current cost profiles for a workspace, ordered by SKU (CSV export / round-trip with bulk import).
+     */
+    public List<CostProfileRow> findAllCurrentProfilesForExport(long workspaceId) {
+        String sql = """
+                SELECT cp.id, cp.seller_sku_id, ss.sku_code,
+                       COALESCE(pm.name, '') AS product_name,
+                       cp.cost_price, cp.currency,
+                       cp.valid_from, cp.valid_to, cp.updated_by_user_id,
+                       cp.created_at, cp.updated_at
+                """ + BASE_CURRENT_PROFILES + """
+                ORDER BY ss.sku_code
+                """;
+        return jdbc.query(sql, Map.of("workspaceId", workspaceId), this::mapRow);
     }
 
     private MapSqlParameterSource buildProfileFilterParams(long workspaceId, Long sellerSkuId,
@@ -214,9 +242,27 @@ public class CostProfileRepository {
             sb.append(" AND cp.seller_sku_id = :sellerSkuId");
         }
         if (search != null && !search.isBlank()) {
-            sb.append(" AND ss.sku_code ILIKE :search");
+            sb.append(" AND (ss.sku_code ILIKE :search OR COALESCE(pm.name, '') ILIKE :search)");
         }
         sb.append('\n');
+        return sb.toString();
+    }
+
+    private String buildOrderByClause(Sort sort) {
+        if (sort == null || sort.isUnsorted()) {
+            return " ORDER BY ss.sku_code ASC NULLS LAST ";
+        }
+        var sb = new StringBuilder(" ORDER BY ");
+        var orders = sort.stream().toList();
+        for (int i = 0; i < orders.size(); i++) {
+            Sort.Order order = orders.get(i);
+            String column = SORT_WHITELIST.getOrDefault(order.getProperty(), "ss.sku_code");
+            sb.append(column).append(' ').append(order.getDirection().name()).append(" NULLS LAST");
+            if (i < orders.size() - 1) {
+                sb.append(", ");
+            }
+        }
+        sb.append(' ');
         return sb.toString();
     }
 
@@ -241,6 +287,7 @@ public class CostProfileRepository {
                 .id(rs.getLong("id"))
                 .sellerSkuId(rs.getLong("seller_sku_id"))
                 .skuCode(rs.getString("sku_code"))
+                .productName(rs.getString("product_name"))
                 .costPrice(rs.getBigDecimal("cost_price"))
                 .currency(rs.getString("currency"))
                 .validFrom(rs.getDate("valid_from").toLocalDate())

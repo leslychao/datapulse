@@ -25,8 +25,11 @@ import org.springframework.data.domain.Pageable;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 
 import io.datapulse.common.exception.BadRequestException;
+import io.datapulse.platform.outbox.OutboxEventType;
+import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
@@ -41,6 +44,7 @@ class PricingRunApiServiceTest {
   @Mock private PricingRunRepository runRepository;
   @Mock private PricingRunReadRepository runReadRepository;
   @Mock private PricingRunMapper runMapper;
+  @Mock private OutboxService outboxService;
 
   @InjectMocks
   private PricingRunApiService service;
@@ -75,6 +79,13 @@ class PricingRunApiServiceTest {
       assertThat(saved.getConnectionId()).isEqualTo(CONNECTION_ID);
       assertThat(saved.getStatus()).isEqualTo(RunStatus.PENDING);
       assertThat(saved.getTriggerType()).isEqualTo(RunTriggerType.MANUAL);
+
+      verify(outboxService)
+          .createEvent(
+              eq(OutboxEventType.PRICING_RUN_EXECUTE),
+              eq("pricing_run"),
+              eq(1L),
+              eq(Map.of("runId", 1L)));
     }
 
     @Test

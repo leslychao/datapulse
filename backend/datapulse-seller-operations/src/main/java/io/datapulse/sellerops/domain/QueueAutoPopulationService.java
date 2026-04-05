@@ -151,7 +151,7 @@ public class QueueAutoPopulationService {
     }
 
     private Set<Long> evaluateChCriteria(long workspaceId, List<MatchRule> chRules) {
-        try {
+        return ChSafeQuery.getOrFallback(() -> {
             List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
             Set<Long> result = new HashSet<>();
             for (MatchRule rule : chRules) {
@@ -160,10 +160,7 @@ public class QueueAutoPopulationService {
                 }
             }
             return result;
-        } catch (Exception e) {
-            log.warn("CH criteria evaluation failed, skipping CH filter: error={}", e.getMessage());
-            return Set.of();
-        }
+        }, Set.of(), "criteria/stockRisk");
     }
 
     private Set<Long> evaluatePriceActionCriteria(long workspaceId,

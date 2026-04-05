@@ -21,11 +21,11 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class SimulationComparisonService {
 
     private final SimulationComparisonRepository comparisonRepository;
 
-    @Transactional(readOnly = true)
     public SimulationComparisonReport buildReport(long workspaceId, long connectionId) {
         SimulationSummaryRow summary = comparisonRepository.findSummary(workspaceId, connectionId);
         CoverageRow coverage = comparisonRepository.findCoverage(workspaceId, connectionId);
@@ -54,7 +54,6 @@ public class SimulationComparisonService {
         );
     }
 
-    @Transactional(readOnly = true)
     public List<SimulationComparisonRow> previewByDecision(long workspaceId, long decisionId) {
         return comparisonRepository.findByDecision(workspaceId, decisionId);
     }

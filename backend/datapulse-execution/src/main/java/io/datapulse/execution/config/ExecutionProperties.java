@@ -18,8 +18,13 @@ public class ExecutionProperties {
     private final Duration maxBackoff;
     private final int backoffMultiplier;
     private final int approvalTimeoutHours;
+    private final Duration readAfterWriteDelay;
     private final Reconciliation reconciliation;
     private final StuckState stuckState;
+
+    public Duration getReadAfterWriteDelay() {
+        return readAfterWriteDelay != null ? readAfterWriteDelay : Duration.ofSeconds(2);
+    }
 
     public int getMaxAttempts() {
         return maxAttempts > 0 ? maxAttempts : 3;

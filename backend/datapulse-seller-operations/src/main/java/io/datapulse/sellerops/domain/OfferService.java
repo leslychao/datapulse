@@ -144,6 +144,10 @@ public class OfferService {
         ch != null ? ch.getNetPnl30d() : null,
         ch != null ? ch.getVelocity14d() : null,
         ch != null ? ch.getReturnRatePct() : null,
+        ch != null ? ch.getAdSpend30d() : null,
+        ch != null ? ch.getDrr30dPct() : null,
+        ch != null ? ch.getAdCpo() : null,
+        ch != null ? ch.getAdRoas() : null,
         policyInfo,
         decisionInfo,
         actionInfo,
@@ -189,12 +193,8 @@ public class OfferService {
   }
 
   private Map<Long, ClickHouseEnrichment> fetchEnrichmentSafely(List<Long> offerIds) {
-    try {
-      return chRepository.findEnrichment(offerIds);
-    } catch (Exception e) {
-      log.warn("ClickHouse enrichment failed for offer detail: error={}",
-          e.getMessage());
-      return Map.of();
-    }
+    return ChSafeQuery.getOrFallback(
+        () -> chRepository.findEnrichment(offerIds),
+        Map.of(), "enrichment/offerDetail");
   }
 }

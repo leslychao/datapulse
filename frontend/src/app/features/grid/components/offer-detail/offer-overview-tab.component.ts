@@ -146,27 +146,28 @@ import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.
       }
 
       <!-- Промо -->
-      @if (offer().promoStatus) {
+      @if (offer().promoStatus; as promo) {
         <section>
           <h4 class="mb-2 text-[length:var(--text-base)] font-semibold text-[var(--text-primary)]">
             {{ 'detail.overview.promo' | translate }}
           </h4>
           <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
             <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.promo_status' | translate }}</span>
-            <dp-status-badge [label]="'grid.promo.' + offer().promoStatus | translate"
-                             [color]="offer().promoStatus === 'PARTICIPATING' ? 'success' : 'info'" />
+            <dp-status-badge
+              [label]="(promo.participating ? 'grid.promo.PARTICIPATING' : 'grid.promo.ELIGIBLE') | translate"
+              [color]="promo.participating ? 'success' : 'info'" />
 
-            @if (offer().promoName) {
+            @if (promo.campaignName) {
               <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.promo_name' | translate }}</span>
-              <span class="text-[length:var(--text-sm)] text-[var(--text-primary)]">{{ offer().promoName }}</span>
+              <span class="text-[length:var(--text-sm)] text-[var(--text-primary)]">{{ promo.campaignName }}</span>
             }
-            @if (offer().promoPrice !== null) {
+            @if (promo.promoPrice !== null) {
               <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.promo_price' | translate }}</span>
-              <dp-money-display [value]="offer().promoPrice" />
+              <dp-money-display [value]="promo.promoPrice" />
             }
-            @if (offer().promoEndDate) {
+            @if (promo.endsAt) {
               <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.promo_end' | translate }}</span>
-              <dp-date-display [date]="offer().promoEndDate" [mode]="'absolute'" />
+              <dp-date-display [date]="promo.endsAt" [mode]="'absolute'" />
             }
           </div>
         </section>
@@ -181,7 +182,7 @@ import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.
           <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.revenue' | translate }}</span>
           <dp-money-display [value]="offer().revenue30d" />
 
-          <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">P&L</span>
+          <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.net_pnl' | translate }}</span>
           <dp-money-display [value]="offer().netPnl30d" [sign]="true" />
 
           <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.velocity' | translate }}</span>
@@ -253,6 +254,7 @@ export class OfferOverviewTabComponent {
     switch (this.offer().status) {
       case 'ACTIVE': return 'success';
       case 'BLOCKED': return 'error';
+      case 'INACTIVE': return 'neutral';
       default: return 'neutral';
     }
   }

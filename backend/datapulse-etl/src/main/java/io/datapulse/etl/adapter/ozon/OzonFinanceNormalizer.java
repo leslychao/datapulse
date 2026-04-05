@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.regex.Pattern;
 
+import io.datapulse.etl.adapter.ozon.dto.OzonFinancePosting;
 import io.datapulse.etl.adapter.ozon.dto.OzonFinanceTransaction;
 import io.datapulse.etl.adapter.util.OzonTimestampParser;
 import io.datapulse.etl.domain.FinanceEntryType;
@@ -54,6 +55,8 @@ public class OzonFinanceNormalizer {
             marketplaceSku = String.valueOf(tx.items().get(0).sku());
         }
 
+        String fulfillmentType = resolveOzonFulfillment(tx.posting());
+
         MeasureAccumulator measures = entryType.hasOzonBreakdown()
                 ? buildBreakdownMeasures(entryType, tx)
                 : buildStandaloneMeasures(entryType, safe(tx.amount()));
@@ -66,6 +69,7 @@ public class OzonFinanceNormalizer {
                 null,
                 marketplaceSku,
                 warehouseExternalId,
+                fulfillmentType,
                 measures.revenue,
                 measures.marketplaceCommission,
                 measures.acquiring,
@@ -92,7 +96,7 @@ public class OzonFinanceNormalizer {
                                                       OzonFinanceTransaction tx) {
         var m = new MeasureAccumulator();
         BigDecimal accruals = safe(tx.accrualsForSale());
-        BigDecimal commission = safe(tx.saleCommission());
+        BigDecimal commission = safe(tx.saleCommission()).negate();
 
         switch (entryType) {
             case SALE_ACCRUAL -> {
@@ -144,6 +148,14 @@ public class OzonFinanceNormalizer {
             case COMPENSATION -> m.compensation = m.compensation.add(value);
             case OTHER -> m.other = m.other.add(value);
         }
+    }
+
+    private static String resolveOzonFulfillment(OzonFinancePosting posting) {
+        if (posting == null || posting.deliverySchema() == null
+                || posting.deliverySchema().isBlank()) {
+            return null;
+        }
+        return posting.deliverySchema().toUpperCase();
     }
 
     /**

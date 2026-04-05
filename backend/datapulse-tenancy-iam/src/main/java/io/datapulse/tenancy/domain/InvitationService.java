@@ -4,6 +4,7 @@ import io.datapulse.common.exception.AppException;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
@@ -40,7 +41,7 @@ public class InvitationService {
     private final WorkspaceRepository workspaceRepository;
     private final AppUserRepository appUserRepository;
     private final Optional<InvitationMailService> mailService;
-    private final TenancyAuditPublisher auditPublisher;
+    private final AuditPublisher auditPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional(readOnly = true)
@@ -166,8 +167,10 @@ public class InvitationService {
                 .orElseThrow(() -> NotFoundException.of("invitation.not.found"));
 
         log.info("Invitation found: invitationId={}, email={}, status={}, workspaceId={}",
-            invitation.getId(), invitation.getEmail(), invitation.getStatus(),
-            invitation.getWorkspace().getId());
+            invitation.getId(),
+            invitation.getEmail(),
+            invitation.getStatus(),
+            invitation.getWorkspace() != null ? invitation.getWorkspace().getId() : null);
 
         if (invitation.getStatus() == InvitationStatus.ACCEPTED) {
             throw ConflictException.of("invitation.already.accepted");

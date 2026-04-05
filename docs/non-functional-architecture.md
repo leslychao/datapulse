@@ -186,6 +186,59 @@
 - `defaultRequeueRejected = false` — rejected messages не возвращаются в очередь (предотвращение poison message loop).
 - `Jackson2JsonMessageConverter` — JSON сериализация/десериализация.
 
+**Уточнение по ACK:** при `AcknowledgeMode.AUTO` Spring ACK-ит сообщение, если listener-метод завершился без исключения. В `datapulse-api` большинство `@RabbitListener` оборачивают тело в `try/catch` и логируют ошибку (poison pill pattern) — фактически сообщение **всё равно ACK-ится**, очередь не блокируется; повторы обеспечиваются **доменом** (outbox retry, wait/DLX, CAS), а не requeue в Rabbit.
+
+### Internal event delivery: текущий код и целевая модель
+
+Цель — не «одна шина на всё», а **три слоя с явными гарантиями** и едиными правилами размещения кода.
+
+#### Слои (target)
+
+| Слой | Транспорт | Когда использовать | Гарантии |
+|------|-----------|-------------------|----------|
+| **A — Durable integration** | `outbox_event` → `OutboxPoller` → RabbitMQ (`OutboxEventPublisher`) | Межпроцессная работа, retry, отложенный dispatch, fan-out в несколько воркеров | At-least-once в брокер; идемпотентность на consumer; после `max-retry-count` запись остаётся `FAILED` в БД (нужен мониторинг) |
+| **B — In-process domain** | `ApplicationEventPublisher` + `@TransactionalEventListener(AFTER_COMMIT)` / `@EventListener` | Реакция в том же JVM после коммита (аудит, инвалидация кэша/UI-триггеры, валидация) | Согласованность с транзакцией БД (для AFTER_COMMIT); без доставки в другой процесс |
+| **C — Real-time UI** | `SimpMessagingTemplate` только через **`*StompPublisher`**: `WorkspaceTopicStompPublisher` (`datapulse-api`); `WorkspaceAlertTopicStompPublisher`, `UserNotificationStompPublisher` (`datapulse-audit-alerting`) | STOMP topics/user queues | Best-effort; дубликаты допустимы; REST — источник истины при reconnect |
+
+#### Инвентаризация по коду (актуальное состояние)
+
+**A — Outbox (`OutboxService.createEvent`) и типы (`OutboxEventType`):**
+
+| Тип | Назначение (кратко) |
+|-----|---------------------|
+| `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `REMATERIALIZATION_REQUESTED` | Очередь `etl.sync` / wait+DLX для retry |
+| `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE` | Fanout `datapulse.etl.events` → pricing-worker queue + api queue |
+| `PRICING_RUN_EXECUTE` | `pricing.run` |
+| `PRICE_ACTION_EXECUTE`, `PRICE_ACTION_RETRY`, `RECONCILIATION_CHECK` | Execution + wait/DLX для retry/reconciliation |
+| `PROMO_ACTION_EXECUTE`, `PROMO_EVALUATION_EXECUTE` | Promo execution / evaluation |
+
+Источники записи: `SyncScheduler`, `SyncTriggeredListener`, `ConnectionActivationListener`, `JobMonitoringService`, `IngestJobCompletionCoordinator`, `IngestResultReporter`, `StaleCampaignDetector`, `PricingRunApiService`, `PricingActionScheduler`, `ActionService`, `ReconciliationService`, и др.
+
+**Поллер:** `OutboxPoller` + `OutboxEventPollerRepository` (`FOR UPDATE SKIP LOCKED`, `markFailed` с backoff, `OutboxRuntime` фильтрует типы по роли процесса).
+
+**Rabbit consumers (`datapulse-api`, `@RabbitListener`):** `EtlSyncConsumer`, `EtlEventsPricingConsumer`, `EtlEventsMismatchConsumer`, `SyncStatusPushListener`, `PricingRunConsumer`, `PriceActionExecuteConsumer`, `PriceActionReconcileConsumer`, `PromoActionExecuteConsumer`, `PromoEvaluationConsumer` — в основном **try/catch + log** (poison pill), см. уточнение про ACK выше.
+
+**B — Spring events:** публикация из доменных сервисов (`publishEvent`): integration (`ConnectionService`, validation, health), ETL (`IngestResultReporter`, `SyncDispatcher`), execution (`ActionService`, credentials), pricing (`PricingRunService`, `PricePolicyService`), promotions, audit-alerting (`AlertEventService`, `AlertEventListener`), seller-ops (`MismatchMonitorService`), tenancy (`TenancyAuditPublisher`, `WorkspaceContextFilter`). События живут в модулях (`*.domain.event`, `platform.audit`, и т.д.) — **пакет `domain/event/` везде ещё не выровнен**.
+
+**Listeners:** `AuditEventListener`, `NotificationFanOutListener`, `ConnectionValidationListener`, `PolicyChangeRunListener`, `ConnectionSyncHealthPushListener`, `ConnectionStatusPushListener` — `@TransactionalEventListener(AFTER_COMMIT)` + часто `@Async("notificationExecutor")`. `AlertEventListener`, `SyncTriggeredListener`, `ConnectionActivationListener` — намеренный `@EventListener` (см. javadoc: операционные алерты vs атомарность с источником; ETL dispatch в той же TX, что и publisher).
+
+**C — STOMP:** `WorkspaceTopicStompPublisher` (`connection-updates`, `sync-status`), `WorkspaceAlertTopicStompPublisher` (`/topic/.../alerts`), `UserNotificationStompPublisher` (`/user/.../notifications`). Listener-ы только маппят событие → вызов publisher-а.
+
+**Гибрид A+B (намеренно):** после успешного terminal sync `IngestResultReporter.recordSuccessfulTerminalSync[Lists]` пишет outbox `ETL_SYNC_COMPLETED` **и** публикует `ConnectionSyncHealthInvalidatedEvent` — разные потребители (downstream pricing/mismatch + мгновенный `sync-status` WS без дубля с fan-out нотификаций). `IngestResultReporter` использует injectable `Clock` и `IngestProperties.syncInterval()` для `nextScheduledAt`; `SyncScheduler` делегирует dispatch в `SyncDispatcher` (отдельный `@Service` для корректного `@Transactional` через AOP proxy).
+
+#### План внедрения целевого решения (по шагам)
+
+1. **Зафиксировать decision table** (1 страница): для новой фичи — чеклист «A vs B vs C»; запрет новых прямых вызовов `SimpMessagingTemplate` вне `datapulse-api` и вне `*StompPublisher` / согласованных push-listener-ов.
+2. **Выровнять пакеты событий:** новые domain events — в `domain/event/` модуля-владельца; при касании старых классов — перенос без изменения поведения (малыми PR).
+3. **Слой C:** вынести оставшиеся STOMP payload-ы в один-два publisher-а по типу канала (`WorkspaceTopicStompPublisher` для `/topic/workspace/...` vs user queue), оставить listener-ы тонкими (маппинг события → DTO → publisher).
+4. **Слой B:** пройтись по `@EventListener` без `AFTER_COMMIT` — документировать исключение или перевести на `@TransactionalEventListener`, если есть гонка с БД.
+5. **Наблюдаемость:** алерт на `outbox_event` в `FAILED` с `retry_count >= max`; опционально метрики по poller и по catch-блокам Rabbit listeners (счётчик «silent drop» для оценки transient errors).
+6. **По необходимости (отдельное решение):** DLQ-очереди для выбранных main queues, если нужен повторный replay без лезания в БД — не смешивать с доменным retry execution/ETL.
+
+**Статус реализации (целевой план):** (1) decision table — этот раздел; (2) новые события — в `domain/event/` (integration уже там); массовый перенос остальных — по мере касания файлов; (3) слой C — `WorkspaceTopicStompPublisher`, `WorkspaceAlertTopicStompPublisher`; (4) `ConnectionStatusPushListener` → `AFTER_COMMIT`; ETL listeners и `AlertEventListener` задокументированы в javadoc; (5) Micrometer: `outbox.publish.success`, `outbox.publish.retry_scheduled`, `outbox.publish.exhausted` в `OutboxPoller`; алерт по SQL на `FAILED` — вне кода (ops); (6) DLQ — TBD.
+
+Детали state machine, CAS и retry execution — по-прежнему в [Execution](modules/execution.md); ETL retry/DLX — [ETL Pipeline](modules/etl-pipeline.md).
+
 ### ClickHouse unavailability handling
 
 ClickHouse используется только для analytics (read-only для бизнес-логики). При недоступности ClickHouse:
@@ -419,11 +472,11 @@ Validation errors (`400`) содержат `fieldErrors[]`: `field`, `messageKey
 - `WorkspaceChannelInterceptor` (`ChannelInterceptor`) — перехватывает STOMP `SUBSCRIBE`. Проверяет, что destination `/topic/workspace/{id}/*` доступен пользователю (workspace ID есть в `ws.workspaceIds` из session). Отклоняет подписку `MessageDeliveryException` при нарушении.
 - Destinations вне паттерна `/topic/workspace/{id}/*` — не ограничиваются workspace-проверкой.
 
-**ETL sync status push:**
-- `SyncStatusPushListener` (`@RabbitListener(queues = "etl.events.api")`) — слушает `ETL_SYNC_COMPLETED` из fanout exchange `datapulse.etl.events`.
-- Извлекает `connectionId` из payload, резолвит `workspaceId` через `MarketplaceConnectionRepository`.
-- Пушит в `/topic/workspace/{workspaceId}/sync-status`.
-- Это позволяет UI обновлять статус синхронизации в реальном времени без polling REST API.
+**ETL sync status push (единый топик, один JSON-контракт):**
+- `ConnectionSyncHealthPushListener` — `@TransactionalEventListener(AFTER_COMMIT)` на `ConnectionSyncHealthInvalidatedEvent`. Делегирует в `WorkspaceTopicStompPublisher.publishSyncStatus` → `/topic/workspace/{workspaceId}/sync-status`; `reason` из события: обычно `STATE_CHANGED`, при успешном завершении ingest в той же транзакции, что и outbox `ETL_SYNC_COMPLETED`, — `ETL_JOB_COMPLETED` (один WS-кадр: снимок + подсказка инвалидации offers/analytics, без дубля из Rabbit).
+- `ConnectionStatusPushListener` — `AFTER_COMMIT` + async на `ConnectionStatusChangedEvent` → `WorkspaceTopicStompPublisher` → `/topic/workspace/{id}/connection-updates`.
+- `SyncStatusPushListener` — `@RabbitListener` на `ETL_SYNC_COMPLETED`: только fan-out уведомлений в `/user/queue/notifications`, без повторного пуша в `sync-status`.
+- Initial load в shell: `GET /api/connections/sync-health` (список `ConnectionSyncHealthResponse`).
 
 ### Email (scope ограничен)
 

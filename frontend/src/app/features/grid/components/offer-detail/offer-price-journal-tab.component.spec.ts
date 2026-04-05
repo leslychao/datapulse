@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Component, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -46,26 +46,27 @@ function buildPage(
     totalPages,
     number,
     size: 20,
-    first: number === 0,
-    last: number === totalPages - 1,
   };
 }
 
-@Component({
-  standalone: true,
-  imports: [OfferPriceJournalTabComponent],
-  template: `<dp-offer-price-journal-tab [offerId]="offerId()" />`,
-})
-class TestHostComponent {
-  offerId = signal(100);
-}
-
 describe('OfferPriceJournalTabComponent', () => {
-  let fixture: ComponentFixture<TestHostComponent>;
+  let fixture: ComponentFixture<OfferPriceJournalTabComponent>;
   let el: HTMLElement;
   let offerApiSpy: jasmine.SpyObj<OfferApiService>;
 
+  async function settleJournalQuery(fixtureRef: ComponentFixture<OfferPriceJournalTabComponent>): Promise<void> {
+    for (let i = 0; i < 30; i++) {
+      fixtureRef.detectChanges();
+      TestBed.flushEffects();
+      if (!fixtureRef.componentInstance.journalQuery.isPending()) {
+        return;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
   beforeEach(async () => {
+    TestBed.resetTestingModule();
     offerApiSpy = jasmine.createSpyObj('OfferApiService', ['getPriceJournal']);
     offerApiSpy.getPriceJournal.and.returnValue(
       of(buildPage([buildEntry(), buildEntry({ id: 2, decisionType: 'SKIP' })])),
@@ -77,7 +78,7 @@ describe('OfferPriceJournalTabComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [
-        TestHostComponent,
+        OfferPriceJournalTabComponent,
         TranslateModule.forRoot({ loader: { provide: TranslateLoader, useClass: FakeLoader } }),
       ],
       providers: [
@@ -91,9 +92,9 @@ describe('OfferPriceJournalTabComponent', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(TestHostComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+    fixture = TestBed.createComponent(OfferPriceJournalTabComponent);
+    fixture.componentRef.setInput('offerId', 100);
+    await settleJournalQuery(fixture);
     fixture.detectChanges();
     el = fixture.nativeElement;
   });
@@ -120,10 +121,7 @@ describe('OfferPriceJournalTabComponent', () => {
     let component: OfferPriceJournalTabComponent;
 
     beforeEach(() => {
-      const debugEl = fixture.debugElement.query(
-        (de) => de.componentInstance instanceof OfferPriceJournalTabComponent,
-      );
-      component = debugEl.componentInstance;
+      component = fixture.componentInstance;
     });
 
     it('decisionColor returns info for CHANGE', () => {

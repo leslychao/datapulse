@@ -1,8 +1,10 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { environment } from '@env';
+import { mapOfferDetailApiResponse, OfferDetailApiJson } from './offer-detail.mapper';
 import {
   ActionHistoryEntry,
   BulkActionResponse,
@@ -85,9 +87,11 @@ export class OfferApiService {
   }
 
   getOffer(workspaceId: number, offerId: number): Observable<OfferDetail> {
-    return this.http.get<OfferDetail>(
-      `${this.base}/workspaces/${workspaceId}/offers/${offerId}`,
-    );
+    return this.http
+      .get<OfferDetailApiJson>(
+        `${this.base}/workspaces/${workspaceId}/offers/${offerId}`,
+      )
+      .pipe(map(mapOfferDetailApiResponse));
   }
 
   getGridKpi(workspaceId: number): Observable<GridKpi> {
@@ -99,8 +103,9 @@ export class OfferApiService {
   exportOffers(
       workspaceId: number,
       filter: OfferFilter,
-      format: 'csv' | 'xlsx' = 'csv',
+      options?: { format?: 'csv' | 'xlsx'; offerIds?: number[] },
   ): Observable<Blob> {
+    const format = options?.format ?? 'csv';
     let params = new HttpParams().set('format', format);
 
     if (filter.marketplaceType?.length) {
@@ -114,6 +119,13 @@ export class OfferApiService {
     }
     if (filter.productName) {
       params = params.set('product_name', filter.productName);
+    }
+
+    const ids = options?.offerIds;
+    if (ids?.length) {
+      for (const id of ids) {
+        params = params.append('offer_id', String(id));
+      }
     }
 
     return this.http.get(

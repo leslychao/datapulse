@@ -37,6 +37,23 @@ public class StreamingPageCapture {
                                      CaptureContext context,
                                      int pageNumber,
                                      CursorExtractor cursorExtractor) {
+        return capture(responseBody, context, pageNumber, cursorExtractor, null, null);
+    }
+
+    public PageCaptureResult capture(Flux<DataBuffer> responseBody,
+                                     CaptureContext context,
+                                     int pageNumber,
+                                     CursorExtractor cursorExtractor,
+                                     Long listRequestOffset) {
+        return capture(responseBody, context, pageNumber, cursorExtractor, listRequestOffset, null);
+    }
+
+    public PageCaptureResult capture(Flux<DataBuffer> responseBody,
+                                     CaptureContext context,
+                                     int pageNumber,
+                                     CursorExtractor cursorExtractor,
+                                     Long listRequestOffset,
+                                     String listResumeKey) {
         TempFileWriteResult writeResult = responseWriter.writeToTempFile(
                 responseBody, context.requestId(), pageNumber);
 
@@ -45,7 +62,7 @@ public class StreamingPageCapture {
 
             CaptureResult captureResult = s3RawStorage.captureFromFile(
                     writeResult.path(), writeResult.sha256(), writeResult.byteSize(),
-                    context, pageNumber);
+                    context, pageNumber, listRequestOffset, listResumeKey);
 
             log.debug("Page captured: requestId={}, page={}, cursor={}, byteSize={}",
                     context.requestId(), pageNumber, cursor, writeResult.byteSize());

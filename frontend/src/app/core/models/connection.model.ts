@@ -1,6 +1,6 @@
 export type MarketplaceType = 'WB' | 'OZON';
 export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'DISABLED' | 'ARCHIVED';
-export type SyncHealth = 'OK' | 'STALE' | 'ERROR';
+export type SyncHealth = 'OK' | 'SYNCING' | 'STALE' | 'ERROR';
 
 export interface ConnectionSummary {
   id: number;
@@ -59,6 +59,14 @@ export interface ConnectionSyncStatus {
   connectionName: string;
   lastSuccessAt: string | null;
   status: SyncHealth;
+}
+
+/** WebSocket envelope for `/topic/workspace/{id}/sync-status` (backend `WorkspaceSyncStatusPush`). */
+export type SyncStatusPushReason = 'STATE_CHANGED' | 'ETL_JOB_COMPLETED';
+
+export interface WorkspaceSyncStatusPush {
+  reason: SyncStatusPushReason;
+  connection: ConnectionSyncStatus;
 }
 
 export interface CallLogEntry {

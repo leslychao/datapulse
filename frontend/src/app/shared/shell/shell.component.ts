@@ -19,8 +19,11 @@ import { AutomationBlockerBannerComponent } from './automation-blocker-banner.co
 import { ConnectionLostBannerComponent } from './connection-lost-banner.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { SyncStatusStore } from '@shared/stores/sync-status.store';
 import { ShortcutService } from '@shared/services/shortcut.service';
 import { WebSocketService } from '@core/websocket/websocket.service';
+import { ConnectionApiService } from '@core/api/connection-api.service';
+import { lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'dp-shell',
@@ -108,6 +111,8 @@ export class ShellComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly shortcuts = inject(ShortcutService);
   private readonly webSocket = inject(WebSocketService);
+  private readonly connectionApi = inject(ConnectionApiService);
+  private readonly syncStore = inject(SyncStatusStore);
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
@@ -125,6 +130,9 @@ export class ShellComponent implements OnInit, OnDestroy {
         this.workspaceStore.setWorkspace(wsId, '');
         this.webSocket.connect(wsId);
         this.webSocket.subscribeToWorkspace(wsId);
+        void lastValueFrom(this.connectionApi.listSyncHealth())
+          .then((rows) => this.syncStore.setConnections(rows))
+          .catch(() => {});
       }
     });
   }

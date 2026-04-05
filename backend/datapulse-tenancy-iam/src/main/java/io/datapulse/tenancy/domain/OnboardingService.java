@@ -2,6 +2,7 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.TenantEntity;
@@ -25,7 +26,7 @@ public class OnboardingService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final AppUserRepository appUserRepository;
-    private final TenancyAuditPublisher auditPublisher;
+    private final AuditPublisher auditPublisher;
 
     @Transactional
     public TenantEntity createTenant(String name, Long ownerUserId) {

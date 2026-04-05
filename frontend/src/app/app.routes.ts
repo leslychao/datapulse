@@ -4,22 +4,19 @@ import { rootRedirectGuard } from './core/auth/root-redirect.guard';
 import { onboardingGuard } from './core/auth/onboarding.guard';
 import { workspaceGuard } from './core/auth/workspace.guard';
 
+const loadCallbackComponent = () =>
+  import('./features/callback/callback.component').then((m) => m.CallbackComponent);
+
 export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
     canActivate: [rootRedirectGuard],
-    loadComponent: () =>
-      import('./features/callback/callback.component').then(
-        (m) => m.CallbackComponent,
-      ),
+    loadComponent: loadCallbackComponent,
   },
   {
     path: 'callback',
-    loadComponent: () =>
-      import('./features/callback/callback.component').then(
-        (m) => m.CallbackComponent,
-      ),
+    loadComponent: loadCallbackComponent,
   },
   {
     path: 'workspaces',
@@ -73,9 +70,29 @@ export const routes: Routes = [
         data: { breadcrumb: 'Промо' },
       },
       {
+        path: 'advertising',
+        loadChildren: () => import('./features/advertising/advertising.routes'),
+        data: { breadcrumb: 'Реклама' },
+      },
+      {
+        path: 'execution/actions/:actionId',
+        redirectTo: 'pricing/price-actions/:actionId',
+        pathMatch: 'full',
+      },
+      {
+        path: 'execution/actions',
+        redirectTo: 'pricing/price-actions',
+        pathMatch: 'full',
+      },
+      {
+        path: 'execution/simulation',
+        redirectTo: 'pricing/simulation',
+        pathMatch: 'full',
+      },
+      {
         path: 'execution',
-        loadChildren: () => import('./features/execution/execution.routes'),
-        data: { breadcrumb: 'Исполнение' },
+        redirectTo: 'pricing/price-actions',
+        pathMatch: 'full',
       },
       {
         path: 'mismatches',

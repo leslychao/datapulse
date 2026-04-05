@@ -111,7 +111,7 @@ class MarginGuardTest {
       PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000"));
       BigDecimal targetPrice = new BigDecimal("500");
       GuardConfig config = new GuardConfig(
-          false, null, null, null, null, null, null, null, null);
+          false, null, null, null, null, null, null, null, null, null, null);
 
       GuardResult result = guard.check(signals, targetPrice, config);
 

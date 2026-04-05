@@ -15,6 +15,7 @@ import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
 import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
+import io.datapulse.etl.domain.EtlSubSourceResume;
 import io.datapulse.etl.domain.EventSource;
 import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
@@ -28,6 +29,7 @@ import io.datapulse.etl.persistence.canonical.ProductMasterUpsertRepository.Bran
 import io.datapulse.etl.persistence.canonical.SellerSkuEntity;
 import io.datapulse.etl.persistence.canonical.SellerSkuUpsertRepository;
 import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,12 +73,15 @@ public class OzonProductDictSource implements EventSource {
 
   @Override
   public List<SubSourceResult> execute(IngestContext ctx) {
-    String clientId = ctx.credentials().get("clientId");
-    String apiKey = ctx.credentials().get("apiKey");
+    String clientId = ctx.credentials().get(CredentialKeys.OZON_CLIENT_ID);
+    String apiKey = ctx.credentials().get(CredentialKeys.OZON_API_KEY);
     List<SubSourceResult> results = new ArrayList<>();
 
     var listCtx = CaptureContextFactory.build(ctx, eventType(), "OzonProductListReadAdapter");
-    List<CaptureResult> listPages = listAdapter.captureAllPages(listCtx, clientId, apiKey);
+    String listLastId =
+        EtlSubSourceResume.lastIdOrEmpty(ctx, eventType(), "OzonProductListReadAdapter");
+    List<CaptureResult> listPages =
+        listAdapter.captureAllPages(listCtx, clientId, apiKey, listLastId);
 
     List<Long> productIds = new ArrayList<>();
     SubSourceResult listResult = subSourceRunner.processPages(
@@ -89,8 +94,10 @@ public class OzonProductDictSource implements EventSource {
     }
 
     var infoCtx = CaptureContextFactory.build(ctx, eventType(), "OzonProductInfoReadAdapter");
+    int infoBatchStart = EtlSubSourceResume.ozonProductInfoStartBatchIndex(
+        ctx, eventType(), "OzonProductInfoReadAdapter");
     List<CaptureResult> infoPages = infoAdapter.captureAllBatches(
-        infoCtx, clientId, apiKey, productIds);
+        infoCtx, clientId, apiKey, productIds, infoBatchStart);
     SubSourceResult infoResult = subSourceRunner.processPages(
         "OzonProductInfoReadAdapter", infoPages, OzonProductInfo.class,
         batch -> processInfoBatch(batch, ctx));
@@ -98,8 +105,10 @@ public class OzonProductDictSource implements EventSource {
 
     try {
       var attrCtx = CaptureContextFactory.build(ctx, eventType(), "OzonAttributesReadAdapter");
+      String attrLastId =
+          EtlSubSourceResume.lastIdOrEmpty(ctx, eventType(), "OzonAttributesReadAdapter");
       List<CaptureResult> attrPages = attributesAdapter.captureAllPages(
-          attrCtx, clientId, apiKey, productIds);
+          attrCtx, clientId, apiKey, productIds, attrLastId);
       SubSourceResult attrResult = subSourceRunner.processPages(
           "OzonAttributesReadAdapter", attrPages,
           OzonAttributeResponse.OzonAttributeResult.class,

@@ -115,13 +115,30 @@ Streaming JSON parse через Jackson streaming API (batch=500 records, memory
 
 ### Cursor extraction
 
-Три семейства pagination определяют стратегию cursor extraction:
+Четыре семейства cursor extraction определяют, как из ответа API извлекается маркер следующей страницы:
 
 | Семейство | Endpoints | Стратегия | Overhead |
 |-----------|-----------|-----------|----------|
-| 1: Externally-paged | ~11 endpoints (WB Orders/Sales/Returns/Incomes/Offices, WB Prices/Stocks offset, Ozon Orders/Returns/Catalog info) | `NoCursorExtractor` — нет extraction | 0 |
-| 2: Metadata cursor | ~5 endpoints (WB Catalog, Ozon Catalog list, Ozon Stocks/Prices/Finance) | `JsonPathCursorExtractor` — парсит temp file post-write | < 1 ms |
-| 3: Data-derived cursor | 1 endpoint (WB Finance) | `TailFieldExtractor` — читает tail 32 KB из temp file | < 1 ms |
+| 1: No cursor (offset-based) | WB Prices/Stocks/Promo offset, Ozon FBO/FBS/Promo offset | `NoCursorExtractor` — пагинация через арифметический offset | 0 |
+| 2: String cursor (last_id) | Ozon Product List, Ozon Prices, Ozon Stocks, Ozon Attributes, Ozon Returns | `JsonPathCursorExtractor` — парсит temp file post-write | < 1 ms |
+| 3: Composite cursor (WB Catalog) | WB Catalog (`/content/v2/get/cards/list`) | `WbCatalogCursorExtractor` — извлекает `updatedAt`, `nmID`, `total` | < 1 ms |
+| 4: Data-derived cursor (WB Finance) | WB Finance (`reportDetailByPeriod`) | `TailFieldExtractor` — читает tail 32 KB, последний `rrd_id` | < 1 ms |
+
+### Pagination orchestration
+
+Два marketplace-agnostic класса в `adapter/util/` централизуют pagination loop:
+
+| Класс | Паттерн | Safety guards | Используется |
+|-------|---------|---------------|--------------|
+| `OffsetPagedCapture` | offset/limit | SHA-256 duplicate detection, max page cap, small-page threshold | WB Prices, WB Stocks, WB Promo, Ozon FBO, Ozon FBS, Ozon Promo products/candidates |
+| `CursorPagedCapture` | opaque string cursor | Non-advancing cursor detection (same cursor = stop), null/empty = stop | Ozon Product List, Ozon Prices, Ozon Stocks, Ozon Attributes, Ozon Returns |
+
+Два адаптера используют собственный pagination loop из-за уникальных termination conditions:
+
+| Адаптер | Причина собственного loop |
+|---------|--------------------------|
+| `WbCatalogReadAdapter` | Составной cursor (`updatedAt` + `nmID`), termination по `cursor.total < limit` |
+| `WbFinanceReadAdapter` | `rrdid` cursor + HTTP 204 empty response termination + `byteSize < 10` filter |
 
 Post-write extraction (Вариант B) — единый write path для всех endpoints, cursor extraction — отдельная фаза.
 
@@ -483,7 +500,7 @@ warehouse:
 | `RETURNS` | `SALES_FACT` | canonical_return | WB: analytics goods-return endpoint; Ozon: через returns/list |
 | `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list |
 | `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | WB: `WbPromoSyncSource` → calendar/promotions + nomenclatures; Ozon: `OzonPromoSyncSource` → actions + products/candidates |
-| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | **Stub (Phase B).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Blocked by F-1/F-2/F-3 |
+| `ADVERTISING` | `ADVERTISING_FACT` | `canonical_advertising_campaign` (DD-AD-1 revised: partial canonical) | **Stub (Phase A).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | `SUPPLY` | `SUPPLY_FACT` | — (no canonical entity, see G-3) | **Stub (Phase B).** WB only. `WbSupplyFactSource` registered as no-op stub. Pending `/api/v1/supplier/incomes` deprecation June 2026 |
 
 **Примечание**: WB sales и returns извлекаются из отдельных statistics/analytics endpoints (`/api/v1/supplier/sales` и `/api/v1/analytics/goods-return`) в рамках `SALES_FACT`, а не из `FACT_FINANCE`. `FACT_FINANCE` создаёт только `canonical_finance_entry`. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) обеспечивает, что canonical orders/sales/returns доступны для SKU resolution при финансовой нормализации.
@@ -526,21 +543,24 @@ CATEGORY_DICT ───────────────────┘      
 | Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_current` |
 | Финансы (Ozon) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
 | Финансы (WB) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
-| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below). **Stub (Phase B)** |
+| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | `canonical_advertising_campaign` (DD-AD-1 revised: partial canonical — campaigns in PG, facts directly to CH). **Stub (Phase A).** Full spec: [Advertising](advertising.md) |
 | Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. Implemented |
 | Поставки | `SUPPLY_FACT` | — | — (no canonical entity, see G-3). **Stub (Phase B).** WB only |
 
-### Pipeline invariant exception: Advertising (DD-AD-1)
+### Pipeline invariant exception: Advertising (DD-AD-1 revised)
 
-> **Implementation status:** `ADVERTISING_FACT` EventSource зарегистрирован как **no-op stub** (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Описание ниже — target design для Phase B.
+> **Implementation status:** `ADVERTISING_FACT` EventSource зарегистрирован как **no-op stub** (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Полная спецификация реализации — [Advertising](advertising.md) §ETL Pipeline.
 
-Advertising data (`ADVERTISING_FACT`) flows **Raw (S3) → Normalized (in-process) → ClickHouse** directly, без промежуточного canonical entity в PostgreSQL. Это единственное исключение из инварианта «Raw → Normalized → Canonical → Analytics». Raw payload сохраняется в S3 (как и все остальные domains), но canonical layer пропускается.
+Advertising data (`ADVERTISING_FACT`) использует **частичный canonical слой**:
 
-**Обоснование:** рекламные данные используются исключительно для аналитики (P&L allocation, pricing signal `ad_cost_ratio`). Ни один decision flow не читает advertising state из PostgreSQL. Ни один action lifecycle не зависит от advertising canonical truth.
+- **Кампании** (справочник) → PostgreSQL `canonical_advertising_campaign` (UPSERT) + ClickHouse `dim_advertising_campaign` (материализация). Это аналог промо-паттерна: `canonical_promo_campaign` (PG) → `dim_promo_campaign` (CH).
+- **Факты** (статистика) → ClickHouse `fact_advertising` напрямую, без canonical в PostgreSQL. Исключение из инварианта «Raw → Canonical → Analytics» — рекламная статистика не является бизнес-состоянием.
 
-**Data provenance:** обеспечивается через `job_execution_id` в `fact_advertising` (ClickHouse column). Drill-down: `fact_advertising.job_execution_id` → `job_item.s3_key` → S3 raw payload.
+**Обоснование partial canonical:** кампании — бизнес-состояние: алерты join-ят кампании с остатками в PostgreSQL, дашборд требует pagination/sorting, рекомендации join-ят с ценами/маржей. Факты — чистая аналитика с большим объёмом, агрегации выполняются в ClickHouse.
 
-**Dedup:** ReplacingMergeTree с `ver` обеспечивает upsert-семантику при re-materialization. Dedup key: `(connection_id, source_platform, campaign_id, ad_date, marketplace_sku)`.
+**Data provenance (facts):** обеспечивается через `job_execution_id` в `fact_advertising` (ClickHouse column). Drill-down: `fact_advertising.job_execution_id` → `job_item.s3_key` → S3 raw payload.
+
+**Dedup:** Campaigns: PostgreSQL UPSERT с `ON CONFLICT (connection_id, external_campaign_id) DO UPDATE`. Facts: ReplacingMergeTree с `ver`. Dedup key: `(connection_id, source_platform, campaign_id, ad_date, marketplace_sku)`.
 
 ### Platform-specific правила
 
@@ -667,23 +687,26 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 
 | Sync type | `event_type` в job_execution | Domains included | Когда |
 |-----------|------------------------------|------------------|-------|
-| `FULL_SYNC` | `FULL_SYNC` | Все domains в dependency graph | Initial load, manual full sync, recovery after prolonged outage |
-| `INCREMENTAL` | `INCREMENTAL` | Зависит от domain (см. ниже) | Regular scheduled syncs |
+| `FULL_SYNC` | `FULL_SYNC` | Все узлы DAG (`DagDefinition`) | Initial load при активации подключения |
+| `INCREMENTAL` | `INCREMENTAL` | Все узлы DAG (см. ниже про time-window) | Scheduled sync |
+| `MANUAL_SYNC` | `MANUAL_SYNC` | Все узлы DAG, либо подмножество из `params.domains` + транзитивные hard-deps | Ручной запуск из UI/API |
+
+**`job_execution.params` (JSONB):** источник правды для опций run (не только outbox payload). Примеры: `domains` — массив имён `EtlEventType` для частичного manual sync; `sourceJobId` + `trigger` — при retry из API. Пустой/NULL `params` — полный DAG для данного `event_type`.
 
 **Incremental strategy per domain (target design):**
 
-> **Current implementation (Phase A):** все date-range domains используют упрощённую стратегию `now() - N days` (`datapulse.etl.ingest.incremental-fact-lookback-days`, default **30**) вместо `last_success_at - overlap_buffer`. UPSERT с `IS DISTINCT FROM` обеспечивает идемпотентность при повторной загрузке этого окна. `rrdid`-based cursor для WB finance и Ozon date-range chunking **не реализованы** — используется то же configurable N-day window.
+> **Current implementation:** окно fact-capture задаётся в `IngestSyncContextBuilder` и прокидывается в `IngestContext` (`wbFactDateFrom` / `wbFactDateTo`, `ozonFactSince` / `ozonFactTo`). **FULL_SYNC** и **MANUAL_SYNC:** старт = `now - full-fact-lookback-days` (default **365**, `datapulse.etl.ingest.full-fact-lookback-days`). **INCREMENTAL:** если у подключения есть `marketplace_sync_state.last_success_at`, старт = `max(last_success_at - fact-sync-overlap, now - incremental-fact-lookback-days)` (`fact-sync-overlap` default **PT1H**, cap **30** дней через `incremental-fact-lookback-days`); если успешной синхронизации ещё не было — тот же широкий интервал, что и FULL (365d по умолчанию). Часы: `java.time.Clock` (bean `ingestClock`). UPSERT с `IS DISTINCT FROM` сохраняет идемпотентность при overlap. `rrdid`-based cursor для WB finance и Ozon month chunking — **по-прежнему не реализованы** (см. ниже).
 
 | Domain | Incremental strategy (target) | Cursor / pagination | Current impl |
 |--------|------------------------------|---------------------|--------------|
 | Каталог | Full scan (catalog small, no incremental API) | Offset-based / cursor pagination | Implemented |
 | Цены | Full scan per connection (no incremental API) | Offset-based pagination | Implemented |
 | Остатки | Full scan per connection (real-time state, no delta) | Offset-based pagination | Implemented |
-| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination | `now - Nd` (default 30d, `incremental-fact-lookback-days`) |
-| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination | `now - Nd` (default 30d) |
-| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination | `now - Nd` (default 30d) |
-| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination | `now - Nd` (default 30d) |
-| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) | `now - Nd` (default 30d) |
+| Заказы | Date-range: `updated_since = last_success_at - overlap_buffer` | Date filter + offset pagination | `IngestContext` fact window (см. выше) |
+| Продажи | Date-range: `date_from = last_success_at - overlap_buffer` | Date filter + pagination | `IngestContext` fact window |
+| Возвраты | Date-range: `last_change_date >= last_success_at - overlap_buffer` | Date filter + pagination | `IngestContext` fact window |
+| Финансы (Ozon) | Date-range: `date >= last_success_at - overlap_buffer` | Cursor-based pagination | `IngestContext` fact window |
+| Финансы (WB) | Date-range: `dateFrom = last_rrd_id based` | `rrdid`-based cursor (WB-specific) | `IngestContext` fact window (`dateFrom`/`dateTo` по календарю) |
 | Промо | Full scan (promo list small per connection) | Offset-based pagination | Implemented (full scan per sync) |
 | Реклама | Date-range: `date_from = last_success_at - overlap_buffer` | Date-based | Stub (Phase B) |
 
@@ -708,6 +731,8 @@ Lookup: items[].sku → catalog sources[].sku → product_id → offer_id
 2. Outbox poller → RabbitMQ → ingest-worker picks up message
 3. Worker: CAS job_execution PENDING → IN_PROGRESS
 ```
+
+Далее в worker: выполнение DAG, затем фаза завершения (§Completion) — при успешном исходе ingest **`IN_PROGRESS` → `MATERIALIZING` → терминальный статус**, outbox `ETL_SYNC_COMPLETED` только после финального CAS (см. §job_execution lifecycle).
 
 Параллелизм между маркетплейсами — естественный: разные connections порождают разные `job_execution`, разные RabbitMQ messages, которые обрабатываются разными worker-ами (или одним — по очереди). Lane isolation работает автоматически: сбой WB API не влияет на Ozon sync, т.к. это полностью независимые job_execution.
 
@@ -806,28 +831,35 @@ State-based full scans (prices, stocks) используют offset-based pagina
 ### Completion
 
 ```
-8. Определяем финальный статус:
-   a. Все events OK → CAS IN_PROGRESS → COMPLETED
-   b. Partial success + non-retriable errors → CAS IN_PROGRESS → COMPLETED_WITH_ERRORS
-   c. Retriable failure + retry_count < max_job_retries →
+8. Определяем исход ingest (результаты DAG) и retriable-порог:
+   a. Retriable failure + retry_count < max_job_retries →
       CAS IN_PROGRESS → RETRY_SCHEDULED,
       UPDATE checkpoint,
       INSERT outbox_event (ETL_SYNC_RETRY, delay = backoff)
       → DLX доставит message обратно, worker возобновит с checkpoint (goto step 1)
-   d. Все events failed или retry исчерпан → CAS IN_PROGRESS → FAILED
-9. При COMPLETED / COMPLETED_WITH_ERRORS:
-   Update marketplace_sync_state.last_success_at
-10. INSERT outbox_event (ETL_SYNC_COMPLETED) → downstream consumers
+   b. Все events failed/skipped или retry исчерпан при retriable → CAS IN_PROGRESS → FAILED
+      (sync state → ERROR, без MATERIALIZING и без ETL_SYNC_COMPLETED)
+9. Иначе (есть хотя бы один успешный домен): CAS IN_PROGRESS → MATERIALIZING,
+   сохранить checkpoint + error_details по доменам
+   (опционально в одной TX с шагом 9: `ETL_POST_INGEST_MATERIALIZE` → очередь `etl.sync`, см. `post-ingest-materialization-mode`)
+10. Post-ingest materialization (ClickHouse / marts): SYNC — вне первой транзакции в ingest worker;
+    ASYNC_OUTBOX — в `EtlSyncConsumer` после доставки `ETL_POST_INGEST_MATERIALIZE`
+11. CAS MATERIALIZING → COMPLETED или COMPLETED_WITH_ERRORS
+    (если материализация не fullySucceeded — терминальный статус COMPLETED_WITH_ERRORS)
+12. Только при шаге 11 и статусе COMPLETED / COMPLETED_WITH_ERRORS:
+    Update marketplace_sync_state (IDLE, last_success_at),
+    INSERT outbox_event (ETL_SYNC_COMPLETED) → downstream consumers
+    См. §job_execution lifecycle — инварианты и `IngestJobCompletionCoordinator`.
 ```
 
 ### Post-sync outbox events
 
-После завершения sync (step 8a/8b → COMPLETED или COMPLETED_WITH_ERRORS) ETL pipeline публикует outbox event для downstream consumers. **Не** публикуется при RETRY_SCHEDULED (step 8c) — downstream ждёт финального результата:
+После **финального** успешного терминала (`MATERIALIZING` → `COMPLETED` или `COMPLETED_WITH_ERRORS`, шаг 11–12 выше) ETL pipeline публикует outbox event для downstream consumers. **Не** публикуется при `RETRY_SCHEDULED` (step 8c) и не публикуется при `FAILED` (step 8d) — downstream ждёт финального результата:
 
 | Event type | Payload | Consumer | Действие |
 |------------|---------|----------|----------|
-| `ETL_SYNC_COMPLETED` | `{ connection_id, job_execution_id, sync_scope, completed_domains[], failed_domains[], completed_at }` | `datapulse-pricing-worker` | Запускает pricing run (если FINANCE ∈ completed_domains и есть active price_policies) |
-|| `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-pricing-worker` | Запускает promo evaluation (если PROMO ∈ completed_domains и есть active promo_policies). См. [Promotions](promotions.md) §Post-sync promo evaluation trigger |
+| `ETL_SYNC_COMPLETED` | `{ workspaceId, connectionId, jobExecutionId, syncScope, completedDomains[], failedDomains[] }` (+ прочие поля по мере эволюции) | `datapulse-pricing-worker` | Запускает pricing run (если FINANCE ∈ completedDomains и есть active price_policies) |
+| `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-pricing-worker` | Запускает promo evaluation (если PROMO ∈ completed_domains и есть active promo_policies). См. [Promotions](promotions.md) §Post-sync promo evaluation trigger |
 | `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-api` | Обновляет UI через WebSocket (sync status badge) |
 | `ETL_PROMO_CAMPAIGN_STALE` | `{ connection_id, campaign_ids: [...] }` | `datapulse-pricing-worker` | Expires pending promo_actions для stale campaigns. См. [Promotions](promotions.md) §Stale campaign detection |
 
@@ -957,6 +989,8 @@ Consumer config: `AcknowledgeMode.AUTO`, `prefetchCount=1`, `defaultRequeueRejec
 `checkpoint.events[].status`: `COMPLETED` / `FAILED` / `SKIPPED`.
 `checkpoint.events[].last_cursor`: cursor/offset для resume (cursor-based: rrdid, metadata cursor; offset-based: offset). Nullable — если cursor не получен, event re-runs from start.
 
+Если у одного `EtlEventType` несколько sub-sources (например Ozon `SALES_FACT`: FBO, FBS, returns) и в checkpoint нужно хранить **несколько** независимых токенов, `last_cursor` — JSON-строка вида `{"o":{"OzonFboOrdersReadAdapter":"1000","OzonFbsOrdersReadAdapter":"0"}}` (ключ `o` = map `sourceId` → токен). Один sub-source с токеном по-прежнему может хранить plain string (например `"5000"`). `IngestContext.resumeSubSourceCursor(event, sourceId)` разбирает оба формата. В raw capture на `CaptureResult` задаётся `listRequestOffset` (числовой `offset` списков Ozon) и/или `listResumeKey` (opaque: `last_id`, номер страницы finance, индекс батча product info, строковый `last_id` returns); при падении на normalize/UPSERT DLX retry продолжает с того же запроса. Парсинг в адаптерах — через `EtlSubSourceResume` (`nonNegativeLong`, `lastIdOrEmpty`, `ozonFinanceStartPage`, `ozonProductInfoStartBatchIndex`).
+
 **Worker resume logic:**
 
 ```
@@ -1013,32 +1047,43 @@ Worker получает message:
 |---------|------------|
 | `job_execution` | ETL run: connection, event type, status, timing, error_details |
 | `job_item` | Index raw payload в S3: s3_key, sha256, byte_size, status |
-| `outbox_event` (shared) | Outbox для ETL step dispatch: `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE`. Авторитетная DDL — [Data Model](../data-model.md) §outbox_event |
+| `outbox_event` (shared) | Outbox для ETL step dispatch: `ETL_SYNC_EXECUTE`, `ETL_SYNC_RETRY`, `ETL_POST_INGEST_MATERIALIZE`, `ETL_SYNC_COMPLETED`, `ETL_PROMO_CAMPAIGN_STALE`. Авторитетная DDL — [Data Model](../data-model.md) §outbox_event |
 
 ### job_execution lifecycle
 
 ```
-PENDING → IN_PROGRESS → COMPLETED
-                      → COMPLETED_WITH_ERRORS
-                      → RETRY_SCHEDULED → IN_PROGRESS → ... (цикл до max_job_retries)
-                      → FAILED
+PENDING → IN_PROGRESS → MATERIALIZING → COMPLETED
+                                      → COMPLETED_WITH_ERRORS
+         IN_PROGRESS → FAILED  (все домены failed / исчерпан retry по retriable)
+         IN_PROGRESS → RETRY_SCHEDULED → IN_PROGRESS → ... (цикл до max_job_retries)
          STALE (set by timeout job)
 ```
+
+**Инварианты (реализация `IngestOrchestrator` + `IngestJobCompletionCoordinator` + `PostIngestMaterializationMessageHandler`):**
+
+1. Событие outbox **`ETL_SYNC_COMPLETED`** и обновление sync state в **IDLE** выполняются **только** в одной транзакции с финальным CAS **`MATERIALIZING` → `COMPLETED` или `COMPLETED_WITH_ERRORS`** — не раньше материализации и не при `FAILED`.
+2. Переход **`IN_PROGRESS` → `MATERIALIZING`** фиксирует checkpoint и `error_details` по результатам DAG. По умолчанию (`datapulse.etl.ingest.post-ingest-materialization-mode=SYNC`) post-ingest materialization (ClickHouse / marts) вызывается **вне** первой транзакции синхронно в ingest worker; финальный CAS и fan-out — вторая транзакция. В режиме **`ASYNC_OUTBOX`** в **той же** транзакции с `IN_PROGRESS` → `MATERIALIZING` пишется outbox **`ETL_POST_INGEST_MATERIALIZE`** (exchange/routing как у `ETL_SYNC_EXECUTE` → очередь `etl.sync`); материализация и финальный CAS выполняет `PostIngestMaterializationMessageHandler` из `EtlSyncConsumer`. Идемпотентность: если job уже не в `MATERIALIZING`, обработчик no-op (повторная доставка сообщения).
+3. Payload `ETL_SYNC_COMPLETED` всегда содержит **`workspaceId`** (из контекста инжеста), **`connectionId`**, **`jobExecutionId`** для downstream consumers.
 
 | Переход | Условие | Guard |
 |---------|---------|-------|
 | PENDING → IN_PROGRESS | Worker picks up message (first attempt) | CAS: `UPDATE ... WHERE id = ? AND status = 'PENDING'` |
-| IN_PROGRESS → COMPLETED | Все events обработаны | CAS: `WHERE status = 'IN_PROGRESS'` |
-| IN_PROGRESS → COMPLETED_WITH_ERRORS | Часть events failed (non-retriable), часть succeeded | CAS: `WHERE status = 'IN_PROGRESS'` |
+| IN_PROGRESS (resume) | В БД уже `IN_PROGRESS` и выполняется **одно из**: **(a)** RabbitMQ `redelivered=true` (предыдущий consumer не ack — crash, обрыв канала); **(b)** `redelivered=false`, но `started_at` старше `datapulse.etl.ingest.in-progress-orphan-reclaim-threshold` (дефолт `PT15M`) — смягчает редкий случай дубликата/квирка брокера без `redelivered` + `AcknowledgeMode.AUTO` (иначе no-op + ack → «мёртвый» job до stale-detector). `PT0S` отключает ветку (b), остаётся только redelivery | `UPDATE ... SET started_at = now() WHERE id = ? AND status = 'IN_PROGRESS'` — обновление lease + разрешение снова выполнить DAG (checkpoint / идемпотентность canonical) |
+| IN_PROGRESS → MATERIALIZING | Ingest не полностью failed и не ушёл в retry; DAG завершён | CAS: `WHERE status = 'IN_PROGRESS'` |
+| MATERIALIZING → COMPLETED | Все events успешны + материализация успешна | CAS: `WHERE status = 'MATERIALIZING'` |
+| MATERIALIZING → COMPLETED_WITH_ERRORS | Часть events failed/partial **или** материализация с ошибками | CAS: `WHERE status = 'MATERIALIZING'` |
+| IN_PROGRESS → FAILED | Все domains failed/skipped (без успешного пути в MATERIALIZING) или иной терминальный failed-путь | CAS: `WHERE status = 'IN_PROGRESS'` |
 | IN_PROGRESS → RETRY_SCHEDULED | Retriable failure + retry_count < max_job_retries | CAS: `WHERE status = 'IN_PROGRESS'` |
-| IN_PROGRESS → FAILED | Non-retriable failure, все events failed, или max_job_retries исчерпан | CAS: `WHERE status = 'IN_PROGRESS'` |
 | RETRY_SCHEDULED → IN_PROGRESS | Worker picks up retry message from DLX | CAS: `UPDATE ... WHERE id = ? AND status = 'RETRY_SCHEDULED'` |
 | IN_PROGRESS → STALE | `started_at < now() - stale_threshold` | Scheduled stale job detector |
 | RETRY_SCHEDULED → STALE | `checkpoint->>'last_retry_at' < now() - interval '1 hour'` | Scheduled stale job detector |
+| MATERIALIZING → STALE | Фаза post-ingest / ClickHouse дольше `datapulse.etl.ingest.materializing-stale-threshold` (дефолт 1h); учёт по `job_execution.materializing_at`, иначе fallback `started_at` для старых строк | `StaleJobDetector` → `markStaleMaterializing` |
 
-`STALE` — терминальный статус. Recovery path: stale job detector помечает зависший job как STALE → INSERT alert (business alert: "ETL sync stale for connection {name}") → следующий scheduled sync создаёт новый `job_execution` (concurrency guard пропускает STALE jobs). `stale_threshold`: configurable (default: 2 часа для IN_PROGRESS, 1 час для RETRY_SCHEDULED).
+`STALE` — терминальный статус. Recovery path: `StaleJobDetector` помечает зависший job как STALE → `IngestResultReporter.reconcileAllConnectionsStuckInSyncingWithoutActiveJob()` сбрасывает `marketplace_sync_state.status` SYNCING → IDLE для connections без активных jobs → следующий scheduled sync создаёт новый `job_execution` (concurrency guard пропускает STALE jobs). `stale_threshold`: configurable (default: 2 часа для IN_PROGRESS, 1 час для RETRY_SCHEDULED, 1 час для MATERIALIZING).
 
-Все переходы защищены CAS (optimistic lock). Двойная обработка невозможна: если CAS не прошёл, worker отбрасывает message.
+**Eager reconcile per connection:** перед проверкой «есть ли активный job» для данного `connection_id` (ручной sync, `SyncTriggeredListener`, активация подключения, scheduled sync, API retry) выполняется тот же набор порогов, что и у `StaleJobDetector`, но scoped `WHERE connection_id = ?` (`ConnectionStaleJobReconciler`). Так `job.active.exists` / skip в listener не блокируют новый dispatch до следующего тика детектора (до 15 минут зазора). Это не заменяет orphan-reclaim по Rabbit: там нужна доставка сообщения; здесь — путь «пользователь/планировщик инициирует новый job».
+
+Почти все переходы защищены CAS (optimistic lock). Исключение: **resume** — тот же guarded `UPDATE` по `id` + `status = IN_PROGRESS`, когда либо `redelivered=true`, либо сработал orphan-порог по `started_at` (`in-progress-orphan-reclaim-threshold`, см. строку выше). При `AcknowledgeMode.AUTO` сообщение ack-ится после успешного return из listener: без resume redelivery после crash дала бы no-op, ack и «вечный» `IN_PROGRESS` до stale-detector; без orphan-порога при `redelivered=false` та же логика для редкого дубликата. Если CAS / acquire не прошёл и **не** было основания для resume (нет `redelivered` и job не старше порога), worker всё равно ack-ит сообщение (duplicate / гонка) — защита от двойного параллельного ingest на одном job по-прежнему через статус в БД.
 
 **Retry — тот же job_execution.** DLX retry не создаёт новый `job_execution`. Это продолжение того же run: ID сохраняется, checkpoint накапливает прогресс, provenance цельная (`canonical.job_execution_id` одинаков для всех attempt-ов).
 
@@ -1048,12 +1093,14 @@ PENDING → IN_PROGRESS → COMPLETED
 |------|-----|------------|
 | `id` | BIGSERIAL | PK |
 | `connection_id` | BIGINT FK | marketplace_connection |
-| `event_type` | VARCHAR(64) | Тип sync (FULL_SYNC, INCREMENTAL) |
-| `status` | VARCHAR(32) | PENDING / IN_PROGRESS / COMPLETED / COMPLETED_WITH_ERRORS / RETRY_SCHEDULED / FAILED / STALE |
+| `event_type` | VARCHAR(64) | Тип sync (`FULL_SYNC`, `INCREMENTAL`, `MANUAL_SYNC`, …) |
+| `status` | VARCHAR(32) | PENDING / IN_PROGRESS / **MATERIALIZING** / COMPLETED / COMPLETED_WITH_ERRORS / RETRY_SCHEDULED / FAILED / STALE |
 | `started_at` | TIMESTAMPTZ | Время начала (первого attempt) |
 | `completed_at` | TIMESTAMPTZ | Время завершения (финального attempt) |
+| `materializing_at` | TIMESTAMPTZ | Время входа в `MATERIALIZING`; `NULL` в остальных статусах; stale по фазе ClickHouse |
 | `error_details` | JSONB | Структурированные детали ошибок (nullable) |
 | `checkpoint` | JSONB | Per-event progress для DLX retry resume (nullable — NULL при первом attempt). См. §Checkpoint structure |
+| `params` | JSONB | Опции run: `domains[]`, `sourceJobId`, `trigger`, … (nullable) |
 | `created_at` | TIMESTAMPTZ | Время создания записи |
 
 **`error_details` JSON structure:**
@@ -1495,7 +1542,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Ozon adapters (7 EventSources, 13 ReadAdapters) | Implemented |
 | Normalized model (9 records) | Implemented |
 | Canonical persistence (JDBC batch upsert, IS DISTINCT FROM) | Implemented |
-| Scheduling (SyncScheduler, StaleJobDetector, ShedLock) | Implemented |
+| Scheduling (SyncScheduler → SyncDispatcher, StaleJobDetector, ShedLock) | Implemented |
 | Job monitoring API (JobController, CostProfileController) | Implemented |
 | Retention (RetentionService, RetentionScheduler) | Implemented |
 | Cost profile SCD2 (CRUD + bulk CSV import) | Implemented |
@@ -1505,7 +1552,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Area | Current (Phase A) | Target (Phase B) |
 |------|-------------------|------------------|
 | Date-range strategy | Hardcoded `now() - 7 days` for all date-range domains | `last_success_at - overlap_buffer` per domain |
-| Scheduling interval | Uniform 6h for all domains per connection | Per-domain cron (4x/day finance, 2x/day catalog) |
+| Scheduling interval | Configurable via `datapulse.etl.ingest.sync-interval` (default 6h), uniform for all domains per connection | Per-domain cron (4x/day finance, 2x/day catalog) |
 | WB finance cursor | Same N-day window (default 30d) | `rrdid`-based monotonic cursor |
 | Ozon finance chunking | Same N-day window (default 30d) | Automatic monthly chunk splitting for long gaps |
 | ClickHouse materializer | Stub (logs calls, no actual writes) | Full batch INSERT via ClickHouse JDBC |
@@ -1517,15 +1564,21 @@ Summary of gaps between this document (target design) and the current codebase.
 | Area | Notes |
 |------|-------|
 | `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
-| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Phase B |
-| Post-sync outbox events | `IngestResultReporter.publishCompletionEvent()` publishes `ETL_SYNC_COMPLETED` via outbox. Consumer routing via RabbitMQ topic exchange |
+| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Full spec: [Advertising](advertising.md) §ETL Pipeline |
+| Ingest orchestration decomposition | `IngestOrchestrator` → thin shell; `IngestJobAcquisitionService` (CAS/reclaim), `IngestSyncContextBuilder` (context), `IngestJobCompletionCoordinator` (retry/fail/materialize), `SyncDispatcher` (scheduled dispatch with `@Transactional` via AOP proxy) |
+| Async post-ingest materialization | `PostIngestMaterializationMessageHandler` processes `ETL_POST_INGEST_MATERIALIZE` via `etl.sync` queue; CAS failure reconciles sync state |
+| `IngestResultReporter` consolidation | Unified sync state transitions (SYNCING/IDLE/ERROR), configurable `syncInterval` (replaces hardcoded 6h), injectable `Clock` for testability |
+| `SyncHealth.SYNCING` | Backend enum + frontend type; `ConnectionSyncHealthService` correctly maps SYNCING (was erroneously mapped to STALE) |
+| Eager reconcile | `ConnectionStaleJobReconciler` for per-connection staleness before dispatch; reconciles sync state after stale detection |
+| Poison pill recovery | `EtlSyncConsumer` catch block attempts `reconcileSyncingWhenNoActiveJob` with best-effort `connectionId` extraction |
+| Post-sync outbox events | `IngestResultReporter.recordSuccessfulTerminalSync()` writes `ETL_SYNC_COMPLETED` to outbox (with sync state IDLE) in one transactional step. Consumer routing via RabbitMQ |
 | Stale campaign detection | `StaleCampaignDetector` marks campaigns with `synced_at` older than threshold as ENDED and publishes `ETL_PROMO_CAMPAIGN_STALE` outbox event |
 
 ### Not yet implemented
 
 | Area | Notes |
 |------|-------|
-| `ADVERTISING_FACT` full implementation | v2→v3 migration (F-1/F-2), Ozon OAuth2 (F-3), DTO expansion (F-4). Phase B |
+| `ADVERTISING_FACT` full implementation | v2→v3 migration, Ozon OAuth2 token service, credential resolution. Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | ClickHouse materialization | `ClickHouseMaterializer` is a stub. ClickHouse schema (`0001-initial.sql`) created but not populated |
 
 ## Связанные модули

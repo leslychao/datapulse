@@ -26,7 +26,8 @@ class CanonicalEntityMapperTest {
   private final CanonicalEntityMapper mapper = new CanonicalEntityMapper();
 
   private IngestContext buildContext() {
-    return new IngestContext(1L, 100L, 1L, MarketplaceType.WB,
+    return IngestContextFixtures.any(
+        1L, 100L, 1L, MarketplaceType.WB,
         Map.of(), "FULL_SYNC", EnumSet.allOf(EtlEventType.class), Map.of());
   }
 
@@ -109,7 +110,7 @@ class CanonicalEntityMapperTest {
       var norm = new NormalizedSaleItem(
           "SALE-1", "SKU-1", 2,
           BigDecimal.valueOf(1000), BigDecimal.valueOf(150),
-          "RUB", saleDate);
+          "RUB", saleDate, "FBW");
       var ctx = buildContext();
 
       var entity = mapper.toSale(norm, ctx);
@@ -121,6 +122,7 @@ class CanonicalEntityMapperTest {
       assertThat(entity.getSaleAmount()).isEqualByComparingTo(BigDecimal.valueOf(1000));
       assertThat(entity.getCommission()).isEqualByComparingTo(BigDecimal.valueOf(150));
       assertThat(entity.getQuantity()).isEqualTo(2);
+      assertThat(entity.getFulfillmentType()).isEqualTo("FBW");
       assertThat(entity.getJobExecutionId()).isEqualTo(1L);
     }
   }
@@ -200,7 +202,7 @@ class CanonicalEntityMapperTest {
       var entryDate = OffsetDateTime.now();
       var norm = new NormalizedFinanceItem(
           "FE-1", FinanceEntryType.SALE_ACCRUAL,
-          "POST-1", "ORD-1", "SKU-1", "MSKU-1", "WH-1",
+          "POST-1", "ORD-1", "SKU-1", "MSKU-1", "WH-1", "FBW",
           BigDecimal.valueOf(1000),
           BigDecimal.valueOf(100),
           BigDecimal.valueOf(50),
@@ -241,6 +243,7 @@ class CanonicalEntityMapperTest {
       assertThat(entity.getCurrency()).isEqualTo("RUB");
       assertThat(entity.getEntryDate()).isEqualTo(entryDate);
       assertThat(entity.getAttributionLevel()).isEqualTo("POSTING");
+      assertThat(entity.getFulfillmentType()).isEqualTo("FBW");
       assertThat(entity.getJobExecutionId()).isEqualTo(1L);
     }
   }

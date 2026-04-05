@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import io.datapulse.execution.config.ExecutionProperties;
 import io.datapulse.execution.domain.ActionExecutionMode;
 import io.datapulse.execution.domain.ActionStatus;
 import io.datapulse.execution.domain.AttemptOutcome;
@@ -32,21 +34,27 @@ import io.datapulse.execution.domain.PriceWriteResult;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.integration.domain.MarketplaceType;
 
+import java.time.Duration;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LivePriceActionGateway")
 class LivePriceActionGatewayTest {
 
   @Mock private PriceWriteAdapter wbAdapter;
   @Mock private PriceWriteAdapter ozonAdapter;
+  @Mock private ExecutionProperties executionProperties;
 
   private LivePriceActionGateway gateway;
   private final ErrorClassifier errorClassifier = new ErrorClassifier();
 
   @BeforeEach
   void setUp() {
-    when(wbAdapter.marketplace()).thenReturn(MarketplaceType.WB);
-    when(ozonAdapter.marketplace()).thenReturn(MarketplaceType.OZON);
-    gateway = new LivePriceActionGateway(List.of(wbAdapter, ozonAdapter), errorClassifier);
+    lenient().when(wbAdapter.marketplace()).thenReturn(MarketplaceType.WB);
+    lenient().when(ozonAdapter.marketplace()).thenReturn(MarketplaceType.OZON);
+    lenient().when(executionProperties.getReadAfterWriteDelay()).thenReturn(Duration.ZERO);
+    gateway = new LivePriceActionGateway(
+        List.of(wbAdapter, ozonAdapter), List.of(),
+        errorClassifier, executionProperties);
   }
 
   @Nested
@@ -197,7 +205,7 @@ class LivePriceActionGatewayTest {
           "SKU-123", null, Map.of());
 
       var gatewayWithNoAdapters = new LivePriceActionGateway(
-          List.of(), errorClassifier);
+          List.of(), List.of(), errorClassifier, executionProperties);
 
       GatewayResult result = gatewayWithNoAdapters.execute(action, context);
 

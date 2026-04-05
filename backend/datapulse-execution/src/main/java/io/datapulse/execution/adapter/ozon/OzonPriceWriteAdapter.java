@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.execution.domain.PriceWriteAdapter;
 import io.datapulse.execution.domain.PriceWriteResult;
 import io.datapulse.integration.config.IntegrationProperties;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.OzonProductRateLimiter;
@@ -52,9 +53,9 @@ public class OzonPriceWriteAdapter implements PriceWriteAdapter {
                     "Per-product rate limit exhausted (10 updates/hour)");
         }
 
-        String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
-        String clientId = credentials.get("client_id");
-        String apiKey = credentials.get("api_key");
+        String baseUrl = integrationProperties.getOzon().getSellerWriteBaseUrl();
+        String clientId = credentials.get(CredentialKeys.OZON_CLIENT_ID);
+        String apiKey = credentials.get(CredentialKeys.OZON_API_KEY);
 
         var priceItem = Map.of(
                 "offer_id", marketplaceSku,

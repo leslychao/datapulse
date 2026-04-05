@@ -55,7 +55,7 @@ public class BulkManualPricingService {
     private final ObjectMapper objectMapper;
 
     private static final GuardConfig BULK_GUARD_CONFIG = new GuardConfig(
-            true, false, null, false, null, null, true, false, null
+            true, false, null, false, null, null, true, false, null, null, null
     );
 
     @Transactional(readOnly = true)

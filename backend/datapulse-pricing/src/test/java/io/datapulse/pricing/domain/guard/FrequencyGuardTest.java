@@ -75,7 +75,7 @@ class FrequencyGuardTest {
       PricingSignalSet signals = signalsWithLastChange(recentChange);
 
       GuardConfig strictConfig = new GuardConfig(
-          null, true, 6, null, null, null, null, null, null);
+          null, true, 6, null, null, null, null, null, null, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, strictConfig);
 
@@ -93,7 +93,7 @@ class FrequencyGuardTest {
       OffsetDateTime justNow = OffsetDateTime.now().minusMinutes(1);
       PricingSignalSet signals = signalsWithLastChange(justNow);
       GuardConfig config = new GuardConfig(
-          null, false, null, null, null, null, null, null, null);
+          null, false, null, null, null, null, null, null, null, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, config);
 

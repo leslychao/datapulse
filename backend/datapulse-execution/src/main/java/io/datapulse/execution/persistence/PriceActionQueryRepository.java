@@ -79,6 +79,15 @@ public class PriceActionQueryRepository {
             JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             """;
 
+    private static final String KPI_SELECT = """
+            SELECT COUNT(*)::bigint AS total,
+                   COUNT(*) FILTER (WHERE pa.status = 'PENDING_APPROVAL')::bigint AS pending,
+                   COUNT(*) FILTER (WHERE pa.status = 'EXECUTING')::bigint AS executing,
+                   COUNT(*) FILTER (WHERE pa.status = 'FAILED')::bigint AS failed
+            FROM price_action pa
+            WHERE pa.workspace_id = :workspaceId
+            """;
+
     public Page<PriceActionSummaryRow> findAll(long workspaceId,
                                                 PriceActionFilter filter,
                                                 Pageable pageable) {
@@ -118,6 +127,18 @@ public class PriceActionQueryRepository {
                 ));
 
         return new PageImpl<>(content, pageable, total);
+    }
+
+    public PriceActionKpiRow findKpi(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        return jdbc.queryForObject(
+            KPI_SELECT,
+            params,
+            (rs, rowNum) -> new PriceActionKpiRow(
+                rs.getLong("total"),
+                rs.getLong("pending"),
+                rs.getLong("executing"),
+                rs.getLong("failed")));
     }
 
     private void appendFilters(PriceActionFilter filter, StringBuilder where,

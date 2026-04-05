@@ -30,7 +30,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
                    logistics_cost_amount, storage_cost_amount, penalties_amount,
                    acceptance_cost_amount, marketing_cost_amount, other_marketplace_charges_amount,
                    compensation_amount, refund_amount, net_payout,
-                   entry_date, attribution_level, job_execution_id
+                   entry_date, attribution_level, fulfillment_type, job_execution_id
             FROM canonical_finance_entry
             ORDER BY id
             LIMIT :limit OFFSET :offset
@@ -43,7 +43,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
                    logistics_cost_amount, storage_cost_amount, penalties_amount,
                    acceptance_cost_amount, marketing_cost_amount, other_marketplace_charges_amount,
                    compensation_amount, refund_amount, net_payout,
-                   entry_date, attribution_level, job_execution_id
+                   entry_date, attribution_level, fulfillment_type, job_execution_id
             FROM canonical_finance_entry
             WHERE job_execution_id = :jobExecutionId
             """;
@@ -52,12 +52,13 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
             INSERT INTO %s
             (connection_id, source_platform, entry_id, posting_id, order_id,
              seller_sku_id, warehouse_id, finance_date, entry_type, attribution_level,
+             fulfillment_type,
              revenue_amount, marketplace_commission_amount, acquiring_commission_amount,
              logistics_cost_amount, storage_cost_amount, penalties_amount,
              marketing_cost_amount, acceptance_cost_amount, other_marketplace_charges_amount,
              compensation_amount, refund_amount, net_payout,
              job_execution_id, ver, materialized_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -130,25 +131,26 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
             ps.setDate(8, Date.valueOf(entryDate.toLocalDateTime().toLocalDate()));
             ps.setString(9, (String) row.get("entry_type"));
             ps.setString(10, (String) row.get("attribution_level"));
+            ps.setString(11, (String) row.get("fulfillment_type"));
 
-            ps.setBigDecimal(11, (BigDecimal) row.get("revenue_amount"));
-            ps.setBigDecimal(12, (BigDecimal) row.get("marketplace_commission_amount"));
-            ps.setBigDecimal(13, (BigDecimal) row.get("acquiring_commission_amount"));
-            ps.setBigDecimal(14, (BigDecimal) row.get("logistics_cost_amount"));
-            ps.setBigDecimal(15, (BigDecimal) row.get("storage_cost_amount"));
-            ps.setBigDecimal(16, (BigDecimal) row.get("penalties_amount"));
-            ps.setBigDecimal(17, (BigDecimal) row.get("marketing_cost_amount"));
-            ps.setBigDecimal(18, (BigDecimal) row.get("acceptance_cost_amount"));
-            ps.setBigDecimal(19, (BigDecimal) row.get("other_marketplace_charges_amount"));
-            ps.setBigDecimal(20, (BigDecimal) row.get("compensation_amount"));
-            ps.setBigDecimal(21, (BigDecimal) row.get("refund_amount"));
+            ps.setBigDecimal(12, (BigDecimal) row.get("revenue_amount"));
+            ps.setBigDecimal(13, (BigDecimal) row.get("marketplace_commission_amount"));
+            ps.setBigDecimal(14, (BigDecimal) row.get("acquiring_commission_amount"));
+            ps.setBigDecimal(15, (BigDecimal) row.get("logistics_cost_amount"));
+            ps.setBigDecimal(16, (BigDecimal) row.get("storage_cost_amount"));
+            ps.setBigDecimal(17, (BigDecimal) row.get("penalties_amount"));
+            ps.setBigDecimal(18, (BigDecimal) row.get("marketing_cost_amount"));
+            ps.setBigDecimal(19, (BigDecimal) row.get("acceptance_cost_amount"));
+            ps.setBigDecimal(20, (BigDecimal) row.get("other_marketplace_charges_amount"));
+            ps.setBigDecimal(21, (BigDecimal) row.get("compensation_amount"));
+            ps.setBigDecimal(22, (BigDecimal) row.get("refund_amount"));
 
             BigDecimal netPayout = (BigDecimal) row.get("net_payout");
-            ps.setBigDecimal(22, netPayout != null ? netPayout : BigDecimal.ZERO);
+            ps.setBigDecimal(23, netPayout != null ? netPayout : BigDecimal.ZERO);
 
-            ps.setLong(23, ((Number) row.get("job_execution_id")).longValue());
-            ps.setLong(24, ver);
-            ps.setTimestamp(25, materializedAt);
+            ps.setLong(24, ((Number) row.get("job_execution_id")).longValue());
+            ps.setLong(25, ver);
+            ps.setTimestamp(26, materializedAt);
         });
     }
 

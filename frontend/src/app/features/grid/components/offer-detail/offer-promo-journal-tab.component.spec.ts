@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Component, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -46,26 +46,27 @@ function buildPage(
     totalPages,
     number,
     size: 20,
-    first: number === 0,
-    last: number === totalPages - 1,
   };
 }
 
-@Component({
-  standalone: true,
-  imports: [OfferPromoJournalTabComponent],
-  template: `<dp-offer-promo-journal-tab [offerId]="offerId()" />`,
-})
-class TestHostComponent {
-  offerId = signal(100);
-}
-
 describe('OfferPromoJournalTabComponent', () => {
-  let fixture: ComponentFixture<TestHostComponent>;
+  let fixture: ComponentFixture<OfferPromoJournalTabComponent>;
   let el: HTMLElement;
   let offerApiSpy: jasmine.SpyObj<OfferApiService>;
 
+  async function settlePromoQuery(fixtureRef: ComponentFixture<OfferPromoJournalTabComponent>): Promise<void> {
+    for (let i = 0; i < 30; i++) {
+      fixtureRef.detectChanges();
+      TestBed.flushEffects();
+      if (!fixtureRef.componentInstance.promoQuery.isPending()) {
+        return;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
   beforeEach(async () => {
+    TestBed.resetTestingModule();
     offerApiSpy = jasmine.createSpyObj('OfferApiService', ['getPromoJournal']);
     offerApiSpy.getPromoJournal.and.returnValue(
       of(buildPage([
@@ -78,7 +79,7 @@ describe('OfferPromoJournalTabComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [
-        TestHostComponent,
+        OfferPromoJournalTabComponent,
         TranslateModule.forRoot({ loader: { provide: TranslateLoader, useClass: FakeLoader } }),
       ],
       providers: [
@@ -92,9 +93,9 @@ describe('OfferPromoJournalTabComponent', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(TestHostComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+    fixture = TestBed.createComponent(OfferPromoJournalTabComponent);
+    fixture.componentRef.setInput('offerId', 100);
+    await settlePromoQuery(fixture);
     fixture.detectChanges();
     el = fixture.nativeElement;
   });
@@ -122,10 +123,7 @@ describe('OfferPromoJournalTabComponent', () => {
     let component: OfferPromoJournalTabComponent;
 
     beforeEach(() => {
-      const debugEl = fixture.debugElement.query(
-        (de) => de.componentInstance instanceof OfferPromoJournalTabComponent,
-      );
-      component = debugEl.componentInstance;
+      component = fixture.componentInstance;
     });
 
     it('participationColor returns success for PARTICIPATE', () => {

@@ -19,6 +19,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
+import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { CallLogEntry, SyncState } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -330,8 +331,6 @@ export class ConnectionDetailPageComponent {
   protected readonly rbac = inject(RbacService);
   private readonly zone = inject(NgZone);
 
-  private readonly isPendingValidation = signal(false);
-
   readonly editingName = signal(false);
   editNameValue = '';
 
@@ -339,7 +338,6 @@ export class ConnectionDetailPageComponent {
     effect(() => {
       const conn = this.connectionQuery.data();
       if (!conn) return;
-      this.isPendingValidation.set(conn.status === 'PENDING_VALIDATION');
       const wsId = this.wsStore.currentWorkspaceId();
       const base = `/workspace/${wsId}/settings`;
       this.breadcrumbs.setSegments([
@@ -364,7 +362,7 @@ export class ConnectionDetailPageComponent {
   readonly connectionQuery = injectQuery(() => ({
     queryKey: ['connection', this.connectionId()],
     queryFn: () => lastValueFrom(this.connectionApi.getConnection(this.connId)),
-    refetchInterval: this.isPendingValidation() ? 3000 : false,
+    staleTime: 30_000,
   }));
 
   readonly syncStateQuery = injectQuery(() => ({
@@ -411,7 +409,14 @@ export class ConnectionDetailPageComponent {
       this.toast.success(this.translate.instant('settings.connection_detail.sync_started'));
       this.syncStateQuery.refetch();
     },
-    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.sync_start_error')),
+    onError: (error: unknown) =>
+      this.toast.error(
+        translateApiErrorMessage(
+          this.translate,
+          error,
+          'settings.connection_detail.sync_start_error',
+        ),
+      ),
   }));
 
   readonly disableMutation = injectMutation(() => ({
@@ -558,24 +563,11 @@ export class ConnectionDetailPageComponent {
   }
 
   triggerSyncAll(): void {
-    if (this.hasActiveSyncing()) {
-      this.toast.info(this.translate.instant('settings.connection_detail.sync_already_running'));
-      return;
-    }
     this.triggerSyncMutation.mutate(undefined);
   }
 
   triggerSyncDomain(domain: string): void {
-    if (this.hasActiveSyncing()) {
-      this.toast.info(this.translate.instant('settings.connection_detail.sync_already_running'));
-      return;
-    }
     this.triggerSyncMutation.mutate([domain]);
-  }
-
-  private hasActiveSyncing(): boolean {
-    const states = this.syncStateQuery.data();
-    return states?.some(s => s.status === 'SYNCING') ?? false;
   }
 
   goBack(): void {

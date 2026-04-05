@@ -8,23 +8,18 @@ import {
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { LucideAngularModule, Plus, Upload, Download } from 'lucide-angular';
+import { LucideAngularModule, Plus, Upload, Download, ArrowUp, ArrowDown } from 'lucide-angular';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { AgGridAngular } from 'ag-grid-angular';
-import {
-  ColDef,
-  CellValueChangedEvent,
-  GetRowIdParams,
-} from 'ag-grid-community';
 
 import { CostProfileApiService } from '@core/api/cost-profile-api.service';
 import { RbacService } from '@core/auth/rbac.service';
-import { CostProfile, CostProfilePage, CostProfileImportResult } from '@core/models';
+import { CostProfile, CostProfileImportResult } from '@core/models';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { FormModalComponent } from '@shared/components/form-modal.component';
-import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
+
+type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt';
 
 @Component({
   selector: 'dp-cost-profiles-page',
@@ -34,7 +29,6 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
     FormsModule,
     LucideAngularModule,
     TranslatePipe,
-    AgGridAngular,
     SpinnerComponent,
     EmptyStateComponent,
     FormModalComponent,
@@ -80,7 +74,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearch()"
           [placeholder]="'settings.cost_profiles.search_placeholder' | translate"
-          class="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+          class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
         />
       </div>
 
@@ -95,39 +89,155 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
             [hint]="'settings.cost_profiles.empty_hint' | translate"
           />
         } @else {
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]" style="height: 520px">
-            <ag-grid-angular
-              class="ag-theme-alpine h-full w-full"
-              [columnDefs]="colDefs()"
-              [rowData]="page.content"
-              [pagination]="false"
-              [getRowId]="getRowId"
-              [suppressCellFocus]="false"
-              [animateRows]="false"
-              [localeText]="localeText"
-              [singleClickEdit]="false"
-              (cellValueChanged)="onCellValueChanged($event)"
-            ></ag-grid-angular>
+          <div
+            class="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)]"
+          >
+            <table class="table-auto w-full border-collapse text-sm">
+              <thead>
+                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
+                  <th
+                    class="w-0 border-r border-[var(--border-default)] p-0 last:border-r-0"
+                    [attr.aria-sort]="sortAriaSort('skuCode')"
+                  >
+                    <button
+                      type="button"
+                      class="flex w-full cursor-pointer items-center gap-1 whitespace-nowrap px-4 py-2.5 text-left text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                      (click)="toggleSort('skuCode')"
+                    >
+                      <span>{{ 'settings.cost_profiles.col_sku' | translate }}</span>
+                      @if (sortField() === 'skuCode') {
+                        <lucide-icon
+                          [img]="sortDir() === 'asc' ? ArrowUpIcon : ArrowDownIcon"
+                          [size]="14"
+                          class="shrink-0 text-[var(--text-tertiary)]"
+                        />
+                      }
+                    </button>
+                  </th>
+                  <th
+                    class="border-r border-[var(--border-default)] p-0 last:border-r-0"
+                    [attr.aria-sort]="sortAriaSort('productName')"
+                  >
+                    <button
+                      type="button"
+                      class="flex w-full cursor-pointer items-center gap-1 px-4 py-2.5 text-left text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                      (click)="toggleSort('productName')"
+                    >
+                      <span>{{ 'settings.cost_profiles.col_product_name' | translate }}</span>
+                      @if (sortField() === 'productName') {
+                        <lucide-icon
+                          [img]="sortDir() === 'asc' ? ArrowUpIcon : ArrowDownIcon"
+                          [size]="14"
+                          class="shrink-0 text-[var(--text-tertiary)]"
+                        />
+                      }
+                    </button>
+                  </th>
+                  <th
+                    class="w-0 border-r border-[var(--border-default)] p-0 last:border-r-0"
+                    [attr.aria-sort]="sortAriaSort('costPrice')"
+                  >
+                    <button
+                      type="button"
+                      class="flex w-full cursor-pointer items-center justify-end gap-1 whitespace-nowrap px-4 py-2.5 text-right text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                      (click)="toggleSort('costPrice')"
+                    >
+                      @if (sortField() === 'costPrice') {
+                        <lucide-icon
+                          [img]="sortDir() === 'asc' ? ArrowUpIcon : ArrowDownIcon"
+                          [size]="14"
+                          class="shrink-0 text-[var(--text-tertiary)]"
+                        />
+                      }
+                      <span>{{ 'settings.cost_profiles.col_cost_price' | translate }}</span>
+                    </button>
+                  </th>
+                  <th class="w-0 p-0" [attr.aria-sort]="sortAriaSort('updatedAt')">
+                    <button
+                      type="button"
+                      class="flex w-full cursor-pointer items-center justify-end gap-1 whitespace-nowrap px-4 py-2.5 text-right text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                      (click)="toggleSort('updatedAt')"
+                    >
+                      @if (sortField() === 'updatedAt') {
+                        <lucide-icon
+                          [img]="sortDir() === 'asc' ? ArrowUpIcon : ArrowDownIcon"
+                          [size]="14"
+                          class="shrink-0 text-[var(--text-tertiary)]"
+                        />
+                      }
+                      <span>{{ 'settings.cost_profiles.col_updated_at' | translate }}</span>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of page.content; track row.id) {
+                  <tr class="border-b border-[var(--border-subtle)] transition-colors last:border-b-0 hover:bg-[var(--bg-secondary)]">
+                    <td class="whitespace-nowrap px-4 py-2.5 font-mono text-[var(--text-primary)]">
+                      {{ row.skuCode }}
+                    </td>
+                    <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ row.productName }}</td>
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono align-top">
+                      @if (editingRowId() === row.id && rbac.canEditCostProfiles()) {
+                        <input
+                          type="number"
+                          [(ngModel)]="draftCostValue"
+                          step="0.01"
+                          min="0.01"
+                          (blur)="commitCostEdit(row)"
+                          (keydown.enter)="blurCostInput($event)"
+                          (keydown.escape)="cancelCostEdit($event)"
+                          class="box-border min-w-[5.5rem] rounded-[var(--radius-sm)] border border-[var(--accent-primary)] bg-[var(--bg-primary)] px-2 py-1 text-right text-sm font-mono text-[var(--text-primary)] outline-none"
+                        />
+                      } @else {
+                        <span
+                          class="inline-block min-h-[1.25rem]"
+                          [class.cursor-text]="rbac.canEditCostProfiles()"
+                          [class.select-none]="rbac.canEditCostProfiles()"
+                          [title]="
+                            rbac.canEditCostProfiles()
+                              ? ('settings.cost_profiles.edit_cost_hint' | translate)
+                              : ''
+                          "
+                          (dblclick)="beginCostEdit(row)"
+                        >
+                          @if (row.costPrice != null) {
+                            {{ row.costPrice }} ₽
+                          } @else {
+                            <span class="text-[var(--text-tertiary)]">{{
+                              'settings.cost_profiles.not_set' | translate
+                            }}</span>
+                          }
+                        </span>
+                      }
+                    </td>
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right text-[var(--text-secondary)]">
+                      {{ formatUpdatedAt(row.updatedAt) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
 
-          <div class="mt-3 flex items-center justify-between text-sm text-[var(--text-secondary)]">
-            <span>
-              {{ pageRangeLabel() }}
-            </span>
+          <div class="mt-4 flex items-center justify-between text-sm text-[var(--text-secondary)]">
+            <span>{{ 'pagination.showing' | translate: paginationSummary() }}</span>
             <div class="flex items-center gap-2">
               <button
+                type="button"
                 [disabled]="currentPage() === 0"
                 (click)="goToPage(currentPage() - 1)"
-                class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-default disabled:opacity-40"
+                class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                ← {{ 'common.prev' | translate }}
+                ← {{ 'pagination.prev' | translate }}
               </button>
               <button
+                type="button"
                 [disabled]="currentPage() >= page.totalPages - 1"
                 (click)="goToPage(currentPage() + 1)"
-                class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-default disabled:opacity-40"
+                class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {{ 'common.next' | translate }} →
+                {{ 'pagination.next' | translate }} →
               </button>
             </div>
           </div>
@@ -227,6 +337,8 @@ export class CostProfilesPageComponent {
   protected readonly PlusIcon = Plus;
   protected readonly UploadIcon = Upload;
   protected readonly DownloadIcon = Download;
+  protected readonly ArrowUpIcon = ArrowUp;
+  protected readonly ArrowDownIcon = ArrowDown;
 
   private readonly costProfileApi = inject(CostProfileApiService);
   private readonly toast = inject(ToastService);
@@ -253,79 +365,61 @@ export class CostProfilesPageComponent {
   readonly skuSuggestions = signal<{ sellerSkuId: number; skuCode: string; productName: string }[]>([]);
   private skuSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  protected readonly localeText = AG_GRID_LOCALE_RU;
+  readonly editingRowId = signal<number | null>(null);
+  draftCostValue: string | number = '';
 
-  readonly getRowId = (params: GetRowIdParams<CostProfile>) =>
-    String(params.data.id);
-
-  readonly colDefs = computed<ColDef<CostProfile>[]>(() => {
-    const canEdit = this.rbac.canEditCostProfiles();
-    return [
-      {
-        headerName: this.translate.instant('settings.cost_profiles.col_sku'),
-        field: 'skuCode',
-        width: 140,
-        cellClass: 'font-mono',
-        sortable: true,
-      },
-      {
-        headerName: this.translate.instant('settings.cost_profiles.col_product_name'),
-        field: 'productName',
-        flex: 1,
-        sortable: true,
-      },
-      {
-        headerName: this.translate.instant('settings.cost_profiles.col_cost_price'),
-        field: 'costPrice',
-        width: 120,
-        cellClass: 'font-mono text-right',
-        headerClass: 'ag-right-aligned-header',
-        editable: canEdit,
-        singleClickEdit: false,
-        valueFormatter: (p) =>
-          p.value != null
-            ? `${p.value} ₽`
-            : this.translate.instant('settings.cost_profiles.not_set'),
-        valueParser: (p) => {
-          const val = parseFloat(p.newValue);
-          return isNaN(val) || val <= 0 ? p.oldValue : val;
-        },
-        sortable: true,
-      },
-      {
-        headerName: this.translate.instant('settings.cost_profiles.col_updated_at'),
-        field: 'updatedAt',
-        width: 100,
-        headerClass: 'ag-right-aligned-header',
-        cellClass: 'text-right text-[var(--text-secondary)]',
-        valueFormatter: (p) => {
-          if (!p.value) return '—';
-          const d = new Date(p.value);
-          return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-        },
-        sortable: true,
-      },
-    ];
-  });
+  readonly sortField = signal<CostProfileSortField>('skuCode');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
 
   readonly profilesQuery = injectQuery(() => ({
-    queryKey: ['cost-profiles', this.searchQuery, this.currentPage()],
+    queryKey: [
+      'cost-profiles',
+      this.searchQuery,
+      this.currentPage(),
+      this.sortField(),
+      this.sortDir(),
+    ],
     queryFn: () =>
       lastValueFrom(
         this.costProfileApi.listCostProfiles(
           this.searchQuery || undefined,
           this.currentPage(),
           this.pageSize,
+          this.sortField(),
+          this.sortDir(),
         ),
       ),
   }));
 
-  readonly pageRangeLabel = computed(() => {
+  toggleSort(field: CostProfileSortField): void {
+    if (this.sortField() === field) {
+      this.sortDir.update((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set('asc');
+    }
+    this.editingRowId.set(null);
+    this.currentPage.set(0);
+  }
+
+  sortAriaSort(field: CostProfileSortField): 'ascending' | 'descending' | 'none' {
+    if (this.sortField() !== field) {
+      return 'none';
+    }
+    return this.sortDir() === 'asc' ? 'ascending' : 'descending';
+  }
+
+  readonly paginationSummary = computed(() => {
     const page = this.profilesQuery.data();
-    if (!page) return '';
-    const start = page.number * page.size + 1;
-    const end = Math.min(start + page.content.length - 1, page.totalElements);
-    return `${start}–${end} из ${page.totalElements}`;
+    if (!page) {
+      return { from: 0, to: 0, total: 0 };
+    }
+    if (page.content.length === 0) {
+      return { from: 0, to: 0, total: page.totalElements };
+    }
+    const from = page.number * page.size + 1;
+    const to = Math.min(from + page.content.length - 1, page.totalElements);
+    return { from, to, total: page.totalElements };
   });
 
   readonly createMutation = injectMutation(() => ({
@@ -385,43 +479,74 @@ export class CostProfilesPageComponent {
   onSearch(): void {
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
+      this.editingRowId.set(null);
       this.currentPage.set(0);
       this.profilesQuery.refetch();
     }, 300);
   }
 
   goToPage(page: number): void {
+    this.editingRowId.set(null);
     this.currentPage.set(page);
   }
 
-  onCellValueChanged(event: CellValueChangedEvent<CostProfile>): void {
-    if (event.colDef.field !== 'costPrice') return;
-    const row = event.data;
-    const newVal = event.newValue;
-    if (newVal == null || newVal <= 0 || newVal === event.oldValue) {
+  formatUpdatedAt(iso: string | null): string {
+    if (!iso) {
+      return '—';
+    }
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  }
+
+  beginCostEdit(row: CostProfile): void {
+    if (!this.rbac.canEditCostProfiles()) {
+      return;
+    }
+    this.editingRowId.set(row.id);
+    this.draftCostValue = row.costPrice != null ? row.costPrice : '';
+  }
+
+  blurCostInput(event: Event): void {
+    const el = event.target;
+    if (el instanceof HTMLInputElement) {
+      el.blur();
+    }
+  }
+
+  cancelCostEdit(event: Event): void {
+    event.preventDefault();
+    this.editingRowId.set(null);
+    this.profilesQuery.refetch();
+  }
+
+  commitCostEdit(row: CostProfile): void {
+    if (this.editingRowId() !== row.id) {
+      return;
+    }
+    this.editingRowId.set(null);
+    const raw = String(this.draftCostValue).trim().replace(',', '.');
+    const val = parseFloat(raw);
+    if (Number.isNaN(val) || val <= 0) {
       this.profilesQuery.refetch();
       return;
     }
-    this.updateMutation.mutate({ id: row.id, costPrice: newVal });
+    if (val === row.costPrice) {
+      return;
+    }
+    this.updateMutation.mutate({ id: row.id, costPrice: val });
   }
 
   onSkuSearch(query: string): void {
     this.addForm.sellerSkuId = null;
     if (this.skuSearchTimeout) clearTimeout(this.skuSearchTimeout);
-    if (!query || query.length < 2) {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 3) {
       this.skuSuggestions.set([]);
       return;
     }
     this.skuSearchTimeout = setTimeout(() => {
-      lastValueFrom(this.costProfileApi.listCostProfiles(query, 0, 10)).then(
-        (page) =>
-          this.skuSuggestions.set(
-            page.content.map((cp) => ({
-              sellerSkuId: cp.sellerSkuId,
-              skuCode: cp.skuCode,
-              productName: cp.productName,
-            })),
-          ),
+      lastValueFrom(this.costProfileApi.searchSkuSuggestions(trimmed)).then(
+        (rows) => this.skuSuggestions.set(rows),
         () => this.skuSuggestions.set([]),
       );
     }, 200);
@@ -429,7 +554,7 @@ export class CostProfilesPageComponent {
 
   selectSku(s: { sellerSkuId: number; skuCode: string; productName: string }): void {
     this.addForm.sellerSkuId = s.sellerSkuId;
-    this.addForm.skuSearch = `${s.skuCode} — ${s.productName}`;
+    this.addForm.skuSearch = s.skuCode;
     this.skuSuggestions.set([]);
   }
 

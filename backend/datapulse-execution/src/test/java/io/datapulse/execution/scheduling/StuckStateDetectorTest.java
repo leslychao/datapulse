@@ -31,6 +31,7 @@ import io.datapulse.execution.domain.ActionStatus;
 import io.datapulse.execution.domain.ErrorClassification;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.platform.observability.MetricsFacade;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StuckStateDetector")
@@ -39,6 +40,7 @@ class StuckStateDetectorTest {
   @Mock private PriceActionRepository actionRepository;
   @Mock private ActionService actionService;
   @Mock private ExecutionProperties properties;
+  @Mock private MetricsFacade metrics;
 
   @InjectMocks
   private StuckStateDetector detector;

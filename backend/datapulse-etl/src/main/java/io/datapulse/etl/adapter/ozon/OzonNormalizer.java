@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -50,7 +51,7 @@ public class OzonNormalizer {
 
     public NormalizedCatalogItem normalizeProductInfo(OzonProductInfo info) {
         String marketplaceSku = String.valueOf(info.id());
-        String marketplaceSkuAlt = extractFirstSourceSku(info);
+        String marketplaceSkuAlt = extractSourceSkus(info);
         String barcode = info.barcodes() != null && !info.barcodes().isEmpty()
                 ? info.barcodes().get(0)
                 : info.barcode();
@@ -212,7 +213,8 @@ public class OzonNormalizer {
                 saleAmount,
                 null,
                 product.currencyCode(),
-                saleDate
+                saleDate,
+                "FBO"
         );
     }
 
@@ -237,7 +239,8 @@ public class OzonNormalizer {
                 saleAmount,
                 null,
                 product.currencyCode(),
-                saleDate
+                saleDate,
+                "FBS"
         );
     }
 
@@ -429,15 +432,16 @@ public class OzonNormalizer {
         }
     }
 
-    private static String extractFirstSourceSku(OzonProductInfo info) {
+    private static String extractSourceSkus(OzonProductInfo info) {
         if (info.sources() == null || info.sources().isEmpty()) {
             return null;
         }
-        return info.sources().stream()
+        String joined = info.sources().stream()
                 .filter(s -> s.sku() != null && !s.sku().isBlank())
                 .map(OzonProductInfo.OzonProductSource::sku)
-                .findFirst()
-                .orElse(null);
+                .distinct()
+                .collect(Collectors.joining(","));
+        return joined.isEmpty() ? null : joined;
     }
 
     private static String resolveProductStatus(OzonProductInfo info) {

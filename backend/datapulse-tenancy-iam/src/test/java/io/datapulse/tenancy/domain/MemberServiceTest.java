@@ -2,8 +2,7 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.MemberResponse;
-import io.datapulse.tenancy.api.UpdateMemberRoleRequest;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
@@ -36,7 +35,7 @@ class MemberServiceTest {
   @Mock
   private WorkspaceRepository workspaceRepository;
   @Mock
-  private TenancyAuditPublisher auditPublisher;
+  private AuditPublisher auditPublisher;
 
   @InjectMocks
   private MemberService memberService;
@@ -66,8 +65,7 @@ class MemberServiceTest {
           .thenReturn(Optional.of(member));
       when(memberRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-      MemberResponse response = memberService.changeRole(
-          1L, 20L, 10L, "OWNER", new UpdateMemberRoleRequest(MemberRole.ANALYST));
+      memberService.changeRole(1L, 20L, 10L, "OWNER", MemberRole.ANALYST);
 
       assertThat(member.getRole()).isEqualTo(MemberRole.ANALYST);
       verify(auditPublisher).publish(
@@ -82,7 +80,7 @@ class MemberServiceTest {
           .thenReturn(Optional.of(member));
 
       assertThatThrownBy(() -> memberService.changeRole(
-          1L, 20L, 10L, "OWNER", new UpdateMemberRoleRequest(MemberRole.ADMIN)))
+          1L, 20L, 10L, "OWNER", MemberRole.ADMIN))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("member.role.cannot.change.owner");
     }
@@ -95,7 +93,7 @@ class MemberServiceTest {
           .thenReturn(Optional.of(member));
 
       assertThatThrownBy(() -> memberService.changeRole(
-          1L, 10L, 10L, "OWNER", new UpdateMemberRoleRequest(MemberRole.VIEWER)))
+          1L, 10L, 10L, "OWNER", MemberRole.VIEWER))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("member.role.cannot.change.self");
     }
@@ -108,7 +106,7 @@ class MemberServiceTest {
           .thenReturn(Optional.of(member));
 
       assertThatThrownBy(() -> memberService.changeRole(
-          1L, 20L, 10L, "OWNER", new UpdateMemberRoleRequest(MemberRole.OWNER)))
+          1L, 20L, 10L, "OWNER", MemberRole.OWNER))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("member.role.cannot.assign.owner");
     }
@@ -121,7 +119,7 @@ class MemberServiceTest {
           .thenReturn(Optional.of(member));
 
       assertThatThrownBy(() -> memberService.changeRole(
-          1L, 20L, 10L, "ADMIN", new UpdateMemberRoleRequest(MemberRole.ADMIN)))
+          1L, 20L, 10L, "ADMIN", MemberRole.ADMIN))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("member.role.admin.cannot.assign.admin");
     }
@@ -133,7 +131,7 @@ class MemberServiceTest {
           .thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> memberService.changeRole(
-          1L, 99L, 10L, "OWNER", new UpdateMemberRoleRequest(MemberRole.VIEWER)))
+          1L, 99L, 10L, "OWNER", MemberRole.VIEWER))
           .isInstanceOf(NotFoundException.class);
     }
   }
@@ -241,10 +239,10 @@ class MemberServiceTest {
       when(memberRepository.findByWorkspace_IdAndStatus(5L, MemberStatus.ACTIVE))
           .thenReturn(List.of(m1, m2));
 
-      List<MemberResponse> result = memberService.listMembers(5L);
+      List<WorkspaceMemberEntity> result = memberService.listMembers(5L);
 
       assertThat(result).hasSize(2);
-      assertThat(result.get(0).role()).isEqualTo(MemberRole.OWNER);
+      assertThat(result.get(0).getRole()).isEqualTo(MemberRole.OWNER);
     }
   }
 }

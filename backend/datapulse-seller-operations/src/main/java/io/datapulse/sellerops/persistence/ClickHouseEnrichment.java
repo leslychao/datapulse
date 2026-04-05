@@ -20,4 +20,8 @@ public class ClickHouseEnrichment {
     private BigDecimal netPnl30d;
     private BigDecimal velocity14d;
     private BigDecimal returnRatePct;
+    private BigDecimal adSpend30d;
+    private BigDecimal drr30dPct;
+    private BigDecimal adCpo;
+    private BigDecimal adRoas;
 }

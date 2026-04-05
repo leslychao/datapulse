@@ -9,6 +9,8 @@ public enum OutboxEventType {
 
     ETL_SYNC_EXECUTE("etl.sync", "etl.sync"),
     ETL_SYNC_RETRY("etl.sync.wait", "etl.sync.wait"),
+    /** Post-DAG mart materialization; same routing as {@link #ETL_SYNC_EXECUTE}. */
+    ETL_POST_INGEST_MATERIALIZE("etl.sync", "etl.sync"),
     ETL_SYNC_COMPLETED("datapulse.etl.events", ""),
     PRICING_RUN_EXECUTE("pricing.run", "pricing.run"),
     PRICE_ACTION_EXECUTE("price.execution", "price.execution"),

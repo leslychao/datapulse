@@ -44,7 +44,7 @@ class DataQualityServiceTest {
 
   @BeforeEach
   void setUp() {
-    var dqProps = new DataQualityProperties(24, 48, 72, 2, 100, 3, 30, 0.05, 30);
+    var dqProps = new DataQualityProperties(24, 48, 2, 100, 3, 30, 0.05, 30);
     var queryProps = new AnalyticsQueryProperties(null, dqProps);
     service = new DataQualityService(
         dataQualityReadRepository, syncStateReadRepository,
@@ -139,7 +139,7 @@ class DataQualityServiceTest {
     void should_notCreateBlocker_when_nonFinanceDomainIsStale() {
       OffsetDateTime staleTime = OffsetDateTime.now().minusHours(100);
       var row = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "advertising", staleTime);
+          10L, "WB Connection", "WB", "orders", staleTime);
 
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
           .thenReturn(List.of(row));
@@ -156,26 +156,21 @@ class DataQualityServiceTest {
       OffsetDateTime time = OffsetDateTime.now().minusHours(50);
       var financeRow = new SyncFreshnessRow(
           10L, "WB Connection", "WB", "finance", time);
-      var advertisingRow = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "advertising", time);
       var otherRow = new SyncFreshnessRow(
           10L, "WB Connection", "WB", "orders", time);
 
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
-          .thenReturn(List.of(financeRow, advertisingRow, otherRow));
+          .thenReturn(List.of(financeRow, otherRow));
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.syncFreshness()).hasSize(3);
+      assertThat(result.syncFreshness()).hasSize(2);
       // finance: threshold=24, 50h > 24h → stale
       assertThat(result.syncFreshness().get(0).stale()).isTrue();
       assertThat(result.syncFreshness().get(0).thresholdHours()).isEqualTo(24);
-      // advertising: threshold=72, 50h < 72h → fresh
-      assertThat(result.syncFreshness().get(1).stale()).isFalse();
-      assertThat(result.syncFreshness().get(1).thresholdHours()).isEqualTo(72);
       // orders (default): threshold=48, 50h > 48h → stale
-      assertThat(result.syncFreshness().get(2).stale()).isTrue();
-      assertThat(result.syncFreshness().get(2).thresholdHours()).isEqualTo(48);
+      assertThat(result.syncFreshness().get(1).stale()).isTrue();
+      assertThat(result.syncFreshness().get(1).thresholdHours()).isEqualTo(48);
     }
 
     @Test

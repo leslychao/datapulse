@@ -13,7 +13,7 @@ import java.util.Set;
  * <pre>
  * Level 0:  CATEGORY_DICT ║ WAREHOUSE_DICT
  * Level 1:  PRODUCT_DICT
- * Level 2:  PRICE_SNAPSHOT ║ INVENTORY_FACT ║ SUPPLY_FACT ║ SALES_FACT ║ ADVERTISING_FACT ║ PROMO_SYNC
+ * Level 2:  PRICE_SNAPSHOT ║ INVENTORY_FACT ║ SUPPLY_FACT ║ SALES_FACT ║ PROMO_SYNC ║ ADVERTISING_FACT
  * Level 3:  FACT_FINANCE (soft dep on SALES_FACT)
  * </pre>
  */
@@ -50,10 +50,11 @@ public final class DagDefinition {
         DEPENDENCIES.put(EtlEventType.SALES_FACT, List.of(
                 EventDependency.hard(EtlEventType.PRODUCT_DICT)
         ));
-        DEPENDENCIES.put(EtlEventType.ADVERTISING_FACT, List.of(
+        DEPENDENCIES.put(EtlEventType.PROMO_SYNC, List.of(
                 EventDependency.hard(EtlEventType.PRODUCT_DICT)
         ));
-        DEPENDENCIES.put(EtlEventType.PROMO_SYNC, List.of(
+
+        DEPENDENCIES.put(EtlEventType.ADVERTISING_FACT, List.of(
                 EventDependency.hard(EtlEventType.PRODUCT_DICT)
         ));
 
@@ -70,8 +71,8 @@ public final class DagDefinition {
                         EtlEventType.INVENTORY_FACT,
                         EtlEventType.SUPPLY_FACT,
                         EtlEventType.SALES_FACT,
-                        EtlEventType.ADVERTISING_FACT,
-                        EtlEventType.PROMO_SYNC
+                        EtlEventType.PROMO_SYNC,
+                        EtlEventType.ADVERTISING_FACT
                 )),
                 new DagLevel(3, EnumSet.of(EtlEventType.FACT_FINANCE))
         );
@@ -117,9 +118,32 @@ public final class DagDefinition {
     }
 
     /**
-     * Full FULL_SYNC scope: all events in the DAG.
+     * All {@link EtlEventType} nodes that appear in the static DAG (excludes enum members not on any level).
      */
     public static Set<EtlEventType> fullSyncScope() {
-        return EnumSet.allOf(EtlEventType.class);
+        EnumSet<EtlEventType> scope = EnumSet.noneOf(EtlEventType.class);
+        for (DagLevel level : LEVELS) {
+            scope.addAll(level.events());
+        }
+        return scope;
+    }
+
+    /**
+     * Expands the given seed events by recursively adding all hard dependencies from the DAG.
+     */
+    public static Set<EtlEventType> scopeWithHardDependencyClosure(Set<EtlEventType> seeds) {
+        EnumSet<EtlEventType> result = EnumSet.copyOf(seeds);
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (EtlEventType event : EnumSet.copyOf(result)) {
+                for (EtlEventType dep : hardDependenciesOf(event)) {
+                    if (result.add(dep)) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return result;
     }
 }

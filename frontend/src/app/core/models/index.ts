@@ -13,6 +13,7 @@ export * from './action.model';
 export * from './pricing.model';
 export * from './promo.model';
 export * from './analytics.model';
+export * from './advertising.model';
 export * from './alert.model';
 export * from './mismatch.model';
 export * from './queue.model';

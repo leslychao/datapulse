@@ -1,8 +1,12 @@
 package io.datapulse.pricing.domain;
 
+import java.util.Map;
+
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.outbox.OutboxEventType;
+import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
@@ -21,9 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PricingRunApiService {
 
+    private static final String PRICING_RUN_AGGREGATE_TYPE = "pricing_run";
+
     private final PricingRunRepository runRepository;
     private final PricingRunReadRepository runReadRepository;
     private final PricingRunMapper runMapper;
+    private final OutboxService outboxService;
 
     @Transactional
     public PricingRunResponse triggerManualRun(long connectionId, long workspaceId) {
@@ -36,6 +43,7 @@ public class PricingRunApiService {
         run.setStatus(RunStatus.PENDING);
 
         PricingRunEntity saved = runRepository.save(run);
+        enqueuePricingRunExecute(saved.getId());
         log.info("Manual pricing run triggered: id={}, connectionId={}, workspaceId={}",
                 saved.getId(), connectionId, workspaceId);
 
@@ -60,6 +68,7 @@ public class PricingRunApiService {
         run.setStatus(RunStatus.PENDING);
 
         PricingRunEntity saved = runRepository.save(run);
+        enqueuePricingRunExecute(saved.getId());
         log.info("POST_SYNC pricing run triggered: id={}, connectionId={}, jobId={}",
                 saved.getId(), connectionId, sourceJobExecutionId);
     }
@@ -78,6 +87,7 @@ public class PricingRunApiService {
         run.setStatus(RunStatus.PENDING);
 
         PricingRunEntity saved = runRepository.save(run);
+        enqueuePricingRunExecute(saved.getId());
         log.info("Scheduled pricing run triggered: id={}, connectionId={}", saved.getId(), connectionId);
     }
 
@@ -95,8 +105,17 @@ public class PricingRunApiService {
         run.setStatus(RunStatus.PENDING);
 
         PricingRunEntity saved = runRepository.save(run);
+        enqueuePricingRunExecute(saved.getId());
         log.info("Policy change pricing run triggered: id={}, connectionId={}",
                 saved.getId(), connectionId);
+    }
+
+    private void enqueuePricingRunExecute(long pricingRunId) {
+        outboxService.createEvent(
+                OutboxEventType.PRICING_RUN_EXECUTE,
+                PRICING_RUN_AGGREGATE_TYPE,
+                pricingRunId,
+                Map.of("runId", pricingRunId));
     }
 
     private void ensureNoRunInProgress(long connectionId) {

@@ -6,6 +6,7 @@ import {
   LucideIconData,
   Plug,
   Users,
+  User,
   MailPlus,
   Building2,
   Calculator,
@@ -67,6 +68,7 @@ export class SettingsLayoutComponent {
   private readonly rbac = inject(RbacService);
 
   private readonly allNavItems: NavItem[] = [
+    { path: 'profile', labelKey: 'settings.nav.profile', icon: User },
     { path: 'general', labelKey: 'settings.nav.general', icon: Building2 },
     { path: 'connections', labelKey: 'settings.nav.connections', icon: Plug },
     { path: 'cost-profiles', labelKey: 'settings.nav.cost_profiles', icon: Calculator },

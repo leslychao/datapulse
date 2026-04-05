@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
@@ -44,6 +45,7 @@ public class JobMonitoringService {
     private static final String INCREMENTAL_EVENT_TYPE = "INCREMENTAL";
 
     private final JobExecutionRepository jobExecutionRepository;
+    private final ConnectionStaleJobReconciler connectionStaleJobReconciler;
     private final JobItemRepository jobItemRepository;
     private final MarketplaceConnectionRepository connectionRepository;
     private final OutboxService outboxService;
@@ -92,11 +94,14 @@ public class JobMonitoringService {
             throw BadRequestException.of(MessageCodes.JOB_NOT_RETRYABLE, jobId, job.getStatus());
         }
 
+        connectionStaleJobReconciler.reconcileForDispatch(job.getConnectionId());
         if (jobExecutionRepository.existsActiveForConnection(job.getConnectionId())) {
             throw ConflictException.of(MessageCodes.JOB_ACTIVE_EXISTS, job.getConnectionId());
         }
 
-        long newJobId = jobExecutionRepository.insert(job.getConnectionId(), INCREMENTAL_EVENT_TYPE);
+        String paramsJson = buildRetryParamsJson(jobId);
+        long newJobId = jobExecutionRepository.insert(
+                job.getConnectionId(), INCREMENTAL_EVENT_TYPE, paramsJson);
 
         outboxService.createEvent(
                 OutboxEventType.ETL_SYNC_EXECUTE,
@@ -111,6 +116,17 @@ public class JobMonitoringService {
                 newJobId, jobId, job.getConnectionId());
 
         return new JobRetryResponse(newJobId, "Retry job created");
+    }
+
+    private String buildRetryParamsJson(long sourceJobId) {
+        try {
+            ObjectNode root = objectMapper.createObjectNode();
+            root.put("sourceJobId", sourceJobId);
+            root.put("trigger", "manual_retry");
+            return objectMapper.writeValueAsString(root);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize retry job params", e);
+        }
     }
 
     private JobExecutionRow findJobOrThrow(long jobId) {

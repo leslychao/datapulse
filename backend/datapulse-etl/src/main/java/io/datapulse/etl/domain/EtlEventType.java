@@ -21,7 +21,8 @@ public enum EtlEventType {
     );
 
     private static final Set<EtlEventType> FLOW_EVENTS = EnumSet.of(
-            SALES_FACT, ADVERTISING_FACT
+            SALES_FACT,
+            ADVERTISING_FACT
     );
 
     private static final Set<EtlEventType> FINANCE_EVENTS = EnumSet.of(

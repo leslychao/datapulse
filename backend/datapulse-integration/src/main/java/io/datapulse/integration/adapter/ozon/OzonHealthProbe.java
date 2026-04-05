@@ -1,6 +1,7 @@
 package io.datapulse.integration.adapter.ozon;
 
 import io.datapulse.integration.config.IntegrationProperties;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.HealthProbeResult;
 import io.datapulse.integration.domain.MarketplaceHealthProbe;
 import io.datapulse.integration.domain.MarketplaceType;
@@ -25,8 +26,8 @@ public class OzonHealthProbe implements MarketplaceHealthProbe {
 
     @Override
     public HealthProbeResult probe(Map<String, String> credentials) {
-        String clientId = credentials.get("clientId");
-        String apiKey = credentials.get("apiKey");
+        String clientId = credentials.get(CredentialKeys.OZON_CLIENT_ID);
+        String apiKey = credentials.get(CredentialKeys.OZON_API_KEY);
         String baseUrl = properties.getOzon().getSellerBaseUrl();
         try {
             webClientBuilder.baseUrl(baseUrl).build()

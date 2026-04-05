@@ -947,11 +947,10 @@ Toast-ы триггерятся WebSocket сообщениями. Mapping:
 |-------------------|-----------|---------------|----------------|-------------|
 | `/topic/workspace/{id}/alerts` | New alert (OPEN) | По `severity` alert | `{title}` | «Подробнее» → alerts page |
 | `/topic/workspace/{id}/alerts` | Alert auto-resolved | SUCCESS | «Алерт закрыт: {title}» | — |
-| `/topic/workspace/{id}/sync-status` | Sync completed | INFO | «Синхронизация завершена» | «Подробнее» → connection |
-| `/topic/workspace/{id}/sync-status` | Sync failed | WARNING | «Ошибка синхронизации» | «Подробнее» → connection |
+| `/topic/workspace/{id}/sync-status` | `WorkspaceSyncStatusPush` | — | (status bar / `SyncStatusStore`; toast не из этого топика) | — |
 | `/topic/workspace/{id}/actions` | Action completed | SUCCESS | «Действие выполнено: {offerId}» | — |
 | `/topic/workspace/{id}/actions` | Action failed | CRITICAL | «Ошибка действия: {offerId}» | «Подробнее» → execution |
-| `/user/queue/notifications` | Any new notification | По `severity` | `{title}` | «Открыть» → по типу |
+| `/user/queue/notifications` | Любая нотификация (в т.ч. `SYNC_COMPLETED` после ETL) | По `severity` | `{title}` / ключи `MessageCodes` | «Открыть» → по типу |
 
 **WebSocket message format (alerts topic):**
 ```json
@@ -968,12 +967,16 @@ Toast-ы триггерятся WebSocket сообщениями. Mapping:
 **WebSocket message format (sync-status topic):**
 ```json
 {
-  "connectionId": 5,
-  "jobExecutionId": 789,
-  "status": "COMPLETED",
-  "completedDomains": ["SALES", "RETURNS"]
+  "reason": "STATE_CHANGED",
+  "connection": {
+    "connectionId": 5,
+    "connectionName": "Ozon main",
+    "lastSuccessAt": "2026-04-03T10:00:00+03:00",
+    "status": "OK"
+  }
 }
 ```
+(`reason`: `STATE_CHANGED` | `ETL_JOB_COMPLETED`; `connection` — тот же контракт, что `GET /api/connections/sync-health`.)
 
 **WebSocket message format (actions topic):**
 ```json
@@ -1292,7 +1295,7 @@ RxStompService → configure(url, token) → activate()
 | Destination | Тип | Consumers |
 |-------------|-----|-----------|
 | `/topic/workspace/{workspaceId}/alerts` | Broadcast | Alert Events table, Toast, Banner, Bell badge |
-| `/topic/workspace/{workspaceId}/sync-status` | Broadcast | Toast, Status Bar sync indicators |
+| `/topic/workspace/{workspaceId}/sync-status` | Broadcast | Status bar (`SyncStatusStore`); при `ETL_JOB_COMPLETED` — инвалидация offers/analytics (TanStack) |
 | `/topic/workspace/{workspaceId}/actions` | Broadcast | Toast, Execution queue (другая страница) |
 | `/user/queue/notifications` | User-specific | Bell badge, Notification dropdown, Toast |
 
@@ -1347,7 +1350,7 @@ RxStompService → configure(url, token) → activate()
 | Destination | eventType values |
 |-------------|-----------------|
 | alerts | `ALERT_OPENED`, `ALERT_ACKNOWLEDGED`, `ALERT_RESOLVED`, `ALERT_AUTO_RESOLVED` |
-| sync-status | `SYNC_STARTED`, `SYNC_COMPLETED`, `SYNC_FAILED` |
+| sync-status | `WorkspaceSyncStatusPush.reason`: `STATE_CHANGED`, `ETL_JOB_COMPLETED` |
 | actions | `ACTION_CREATED`, `ACTION_CONFIRMED`, `ACTION_FAILED`, `ACTION_EXPIRED` |
 | notifications | `NOTIFICATION_CREATED` |
 

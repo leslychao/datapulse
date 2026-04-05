@@ -13,6 +13,7 @@ import { DatePipe } from '@angular/common';
 
 import { NotificationStore } from '@shared/stores/notification.store';
 import { AppNotification, NotificationSeverity } from '@core/models';
+import { TranslateService } from '@ngx-translate/core';
 
 const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
   CRITICAL: 'bg-red-500',
@@ -68,8 +69,12 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
                 <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" [class]="severityDot(n.severity)"></span>
 
                 <div class="flex flex-1 flex-col gap-0.5 overflow-hidden">
-                  <span class="truncate text-sm font-medium text-[var(--text-primary)]">{{ n.title }}</span>
-                  <span class="line-clamp-2 text-xs text-[var(--text-secondary)]">{{ n.body }}</span>
+                  <span class="truncate text-sm font-medium text-[var(--text-primary)]">{{
+                    displayTitle(n)
+                  }}</span>
+                  <span class="line-clamp-2 text-xs text-[var(--text-secondary)]">{{
+                    displayBody(n)
+                  }}</span>
                   <span class="mt-0.5 text-xs text-[var(--text-tertiary)]">{{ n.createdAt | date:'short' }}</span>
                 </div>
               </button>
@@ -95,6 +100,7 @@ export class NotificationBellComponent {
   protected readonly Bell = Bell;
 
   protected readonly store = inject(NotificationStore);
+  private readonly translate = inject(TranslateService);
   private readonly elementRef = inject(ElementRef);
 
   protected readonly open = signal(false);
@@ -123,6 +129,22 @@ export class NotificationBellComponent {
 
   protected severityDot(severity: NotificationSeverity): string {
     return SEVERITY_COLORS[severity];
+  }
+
+  protected displayTitle(n: AppNotification): string {
+    return this.localizedNotificationField(n, 'title');
+  }
+
+  protected displayBody(n: AppNotification): string {
+    return this.localizedNotificationField(n, 'body');
+  }
+
+  private localizedNotificationField(n: AppNotification, field: 'title' | 'body'): string {
+    const raw = field === 'title' ? n.title : n.body;
+    if (n.notificationType === 'SYNC_COMPLETED') {
+      return this.translate.instant(raw);
+    }
+    return raw;
   }
 
   protected onMarkAllRead(): void {

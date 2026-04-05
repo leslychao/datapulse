@@ -172,7 +172,7 @@
               <div>
                 <span class="text-[var(--text-tertiary)]">{{ 'execution.detail.superseded_label' | translate }}</span>
                 <p>
-                  <a [routerLink]="['/workspace', wsStore.currentWorkspaceId(), 'execution', 'actions', a.supersedingActionId]"
+                  <a [routerLink]="['/workspace', wsStore.currentWorkspaceId(), 'pricing', 'price-actions', a.supersedingActionId]"
                      class="text-sm font-medium text-[var(--accent-primary)] hover:underline">
                     {{ 'execution.detail.superseded_link' | translate:{ id: a.supersedingActionId } }}
                   </a>

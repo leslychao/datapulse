@@ -1,19 +1,16 @@
 package io.datapulse.etl.adapter.ozon;
 
-import io.datapulse.etl.adapter.util.StreamingPageCapture;
+import io.datapulse.etl.adapter.util.CursorPagedCapture;
+import io.datapulse.etl.adapter.util.CursorPagedCapture.CursorPageSpec;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
-import io.datapulse.etl.domain.PageCaptureResult;
 import io.datapulse.etl.domain.cursor.JsonPathCursorExtractor;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 
 @Slf4j
 @Service
@@ -27,40 +24,33 @@ public class OzonProductListReadAdapter {
       new JsonPathCursorExtractor("result.last_id");
 
   private final OzonApiCaller apiCaller;
-  private final StreamingPageCapture pageCapture;
+  private final CursorPagedCapture cursorPagedCapture;
 
-  public List<CaptureResult> captureAllPages(CaptureContext context,
-      String clientId, String apiKey) {
-    List<CaptureResult> results = new ArrayList<>();
-    String lastId = "";
-    int pageNumber = 0;
-    boolean hasMore = true;
+  public List<CaptureResult> captureAllPages(
+      CaptureContext context, String clientId, String apiKey, String initialLastId) {
+    CursorPageSpec spec = new CursorPageSpec(
+        CURSOR_EXTRACTOR,
+        "Ozon product list",
+        (currentLastId, pageNumber) -> apiCaller.post(
+            PRODUCT_LIST_PATH,
+            Map.of(
+                "filter", Map.of("visibility", "ALL"),
+                "last_id", currentLastId,
+                "limit", PAGE_LIMIT),
+            context.connectionId(), RateLimitGroup.OZON_DEFAULT,
+            clientId, apiKey));
 
-    while (hasMore) {
-      String currentLastId = lastId;
-      Flux<DataBuffer> body = apiCaller.post(PRODUCT_LIST_PATH,
-          Map.of(
-              "filter", Map.of("visibility", "ALL"),
-              "last_id", currentLastId,
-              "limit", PAGE_LIMIT),
-          context.connectionId(), RateLimitGroup.OZON_DEFAULT,
-          clientId, apiKey);
-
-      PageCaptureResult page = pageCapture.capture(body, context, pageNumber, CURSOR_EXTRACTOR);
-      results.add(page.captureResult());
-
-      lastId = page.cursor();
-      if (lastId == null || lastId.isEmpty() || page.captureResult().byteSize() < 200) {
-        hasMore = false;
-      }
-
-      pageNumber++;
-      log.debug("Ozon product list page captured: connectionId={}, page={}",
-          context.connectionId(), pageNumber);
-    }
-
-    log.info("Ozon product list capture completed: connectionId={}, totalPages={}",
-        context.connectionId(), results.size());
-    return results;
+    return cursorPagedCapture.captureAllPages(
+        context, initialLastId, spec,
+        (pageIndex, ctx, outcome) -> {
+          if (outcome.stop() && outcome.nonAdvancingCursor()) {
+            log.debug(
+                "Ozon product list pagination stopped: non-advancing last_id,"
+                    + " connectionId={}",
+                ctx.connectionId());
+          }
+          log.debug("Ozon product list page captured: connectionId={}, page={}",
+              ctx.connectionId(), pageIndex + 1);
+        });
   }
 }

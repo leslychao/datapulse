@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, HostListener, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
+
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
 import { AnalyticsHealthService } from './analytics-health.service';
 
@@ -107,6 +109,16 @@ export class AnalyticsLayoutComponent {
   readonly healthService = inject(AnalyticsHealthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly wsStore = inject(WorkspaceContextStore);
+
+  constructor() {
+    effect(() => {
+      const wsId = this.wsStore.currentWorkspaceId();
+      if (wsId) {
+        this.healthService.checkHealth(wsId);
+      }
+    });
+  }
 
   readonly sectionTabs = SECTION_TABS;
 

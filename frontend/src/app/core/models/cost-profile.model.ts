@@ -1,3 +1,10 @@
+/** SKU autocomplete for adding cost (catalog seller_sku, not only existing profiles). */
+export interface SellerSkuSuggestion {
+  sellerSkuId: number;
+  skuCode: string;
+  productName: string;
+}
+
 export interface CostProfile {
   id: number;
   sellerSkuId: number;

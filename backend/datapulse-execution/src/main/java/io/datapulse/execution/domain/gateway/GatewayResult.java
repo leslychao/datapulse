@@ -29,6 +29,18 @@ public record GatewayResult(
         );
     }
 
+    public static GatewayResult confirmedWithVerification(
+            String requestSummary, String responseSummary,
+            BigDecimal actualPrice, boolean priceMatch) {
+        return new GatewayResult(
+                priceMatch ? AttemptOutcome.SUCCESS : AttemptOutcome.UNCERTAIN,
+                priceMatch ? null : ErrorClassification.UNCERTAIN_TIMEOUT,
+                priceMatch ? null : "Read-after-write mismatch",
+                requestSummary, responseSummary,
+                ReconciliationSource.IMMEDIATE, actualPrice, priceMatch
+        );
+    }
+
     public static GatewayResult uncertain(String requestSummary, String responseSummary) {
         return new GatewayResult(
                 AttemptOutcome.UNCERTAIN, ErrorClassification.UNCERTAIN_TIMEOUT, null,

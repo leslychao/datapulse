@@ -1316,7 +1316,7 @@ Trend arrows в KPI strip (§7) — текстовые, не chart-based.
 |---------------------------|---------|-----------|
 | `/topic/workspace/{id}/grid-updates` | `{ offerId, changedFields: { field: newValue, ... } }` | Update specific cells in-place. Green flash animation on changed cells |
 | `/topic/workspace/{id}/action-updates` | `{ actionId, offerId, newStatus }` | Update `last_action_status` badge. If detail panel open for this offer → refresh action state |
-| `/topic/workspace/{id}/sync-status` | `{ connectionId, lastSyncAt, freshness }` | Update status bar sync indicators. Update `data_freshness` column |
+| `/topic/workspace/{id}/sync-status` | `WorkspaceSyncStatusPush` (`reason` + `connection` health DTO, same as sync-health REST) | Status bar: `upsertConnection`. При `reason === ETL_JOB_COMPLETED` — инвалидация offers/analytics (один WS-кадр после коммита успеха; без дубля из Rabbit) |
 | `/topic/workspace/{id}/kpi-updates` | `{ kpiKey, newValue, trend }` | Update KPI strip card values |
 
 ### Update behavior

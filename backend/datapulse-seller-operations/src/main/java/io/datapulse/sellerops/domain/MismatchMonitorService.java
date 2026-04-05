@@ -152,12 +152,10 @@ public class MismatchMonitorService {
         }
 
         List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
-        Map<Long, Integer> chStocks;
-        try {
-            chStocks = chRepository.findLatestSnapshotStocks(connectionIds);
-        } catch (Exception e) {
-            log.warn("CH unavailable for stock mismatch check, skipping: workspaceId={}, error={}",
-                    workspaceId, e.getMessage());
+        Map<Long, Integer> chStocks = ChSafeQuery.getOrFallback(
+                () -> chRepository.findLatestSnapshotStocks(connectionIds),
+                null, "stockMismatch");
+        if (chStocks == null) {
             return;
         }
 

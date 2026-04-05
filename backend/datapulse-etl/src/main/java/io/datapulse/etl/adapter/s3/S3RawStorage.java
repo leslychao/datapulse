@@ -43,6 +43,21 @@ public class S3RawStorage {
      */
     public CaptureResult captureFromFile(Path existingTempFile, String sha256, long byteSize,
                                          CaptureContext context, int pageNumber) {
+        return captureFromFile(
+                existingTempFile, sha256, byteSize, context, pageNumber, null, null);
+    }
+
+    public CaptureResult captureFromFile(Path existingTempFile, String sha256, long byteSize,
+                                         CaptureContext context, int pageNumber,
+                                         Long listRequestOffset) {
+        return captureFromFile(
+                existingTempFile, sha256, byteSize, context, pageNumber, listRequestOffset, null);
+    }
+
+    public CaptureResult captureFromFile(Path existingTempFile, String sha256, long byteSize,
+                                         CaptureContext context, int pageNumber,
+                                         Long listRequestOffset,
+                                         String listResumeKey) {
         try {
             String s3Key = buildS3Key(
                     context.connectionId(), context.etlEvent().name(),
@@ -56,7 +71,8 @@ public class S3RawStorage {
             log.info("Raw page captured: s3Key={}, byteSize={}, sha256={}",
                     s3Key, byteSize, sha256);
 
-            return new CaptureResult(jobItemId, s3Key, sha256, byteSize);
+            return new CaptureResult(jobItemId, s3Key, sha256, byteSize, listRequestOffset,
+                    listResumeKey);
         } catch (Exception e) {
             throw new IllegalStateException(
                     "Failed to capture from file: requestId=%s, page=%d"
@@ -86,7 +102,7 @@ public class S3RawStorage {
             log.info("Raw page captured: s3Key={}, byteSize={}, sha256={}",
                     s3Key, byteSize, sha256);
 
-            return new CaptureResult(jobItemId, s3Key, sha256, byteSize);
+            return new CaptureResult(jobItemId, s3Key, sha256, byteSize, null, null);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to capture raw page: requestId=%s, page=%d"
                     .formatted(request.requestId(), request.pageNumber()), e);

@@ -159,6 +159,10 @@ services:
       OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
       OAUTH2_PROXY_SCOPE: openid email profile
       OAUTH2_PROXY_COOKIE_CSRF_PER_REQUEST: "true"
+      # Max cookie age; align with long SSO — proxy session dies when refresh fails at IdP.
+      OAUTH2_PROXY_COOKIE_EXPIRE: ${OAUTH2_PROXY_COOKIE_EXPIRE:-168h}
+      # Sliding refresh: extend encrypted session cookie while OIDC session is valid (less surprise logouts).
+      OAUTH2_PROXY_COOKIE_REFRESH: ${OAUTH2_PROXY_COOKIE_REFRESH:-30m}
     depends_on:
       - keycloak
 

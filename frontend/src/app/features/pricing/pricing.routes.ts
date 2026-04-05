@@ -79,6 +79,30 @@ const routes: Routes = [
         data: { breadcrumb: 'Решение' },
       },
       {
+        path: 'price-actions',
+        loadComponent: () =>
+          import('../execution/actions-list-page.component').then(
+            (m) => m.ActionsListPageComponent,
+          ),
+        data: { breadcrumb: 'Применение цен' },
+      },
+      {
+        path: 'price-actions/:actionId',
+        loadComponent: () =>
+          import('../execution/action-detail-page.component').then(
+            (m) => m.ActionDetailPageComponent,
+          ),
+        data: { breadcrumb: 'Детали действия' },
+      },
+      {
+        path: 'simulation',
+        loadComponent: () =>
+          import('../execution/simulation-page.component').then(
+            (m) => m.SimulationPageComponent,
+          ),
+        data: { breadcrumb: 'Симуляция' },
+      },
+      {
         path: 'locks',
         loadComponent: () =>
           import('./locks/locks-page.component').then(

@@ -1,14 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 
-type StockRisk = 'CRITICAL' | 'LOW' | 'NORMAL' | 'OVERSTOCK' | 'NO_STOCK';
+export type StockRisk = 'CRITICAL' | 'WARNING' | 'NORMAL';
 
 const RISK_CONFIG: Record<StockRisk, { color: string; bg: string }> = {
   CRITICAL: { color: 'var(--status-error)', bg: 'color-mix(in srgb, var(--status-error) 12%, transparent)' },
-  LOW: { color: 'var(--status-warning)', bg: 'color-mix(in srgb, var(--status-warning) 12%, transparent)' },
+  WARNING: { color: 'var(--status-warning)', bg: 'color-mix(in srgb, var(--status-warning) 12%, transparent)' },
   NORMAL: { color: 'var(--status-success)', bg: 'color-mix(in srgb, var(--status-success) 12%, transparent)' },
-  OVERSTOCK: { color: 'var(--status-info)', bg: 'color-mix(in srgb, var(--status-info) 12%, transparent)' },
-  NO_STOCK: { color: 'var(--status-neutral)', bg: 'color-mix(in srgb, var(--status-neutral) 12%, transparent)' },
 };
 
 @Component({

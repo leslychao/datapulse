@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 
 /**
  * Unified finance entry type enum mapping Ozon operation_type values and WB doc_type_name.
- * 44 Ozon types (23 empirical + 21 from official enum) + WB composite types.
+ * 48 Ozon types (27 empirical + 21 from official enum) + WB composite types.
  *
  * <p>{@link #canonicalName()} maps WB-specific types to canonical entry type names
  * stored in {@code canonical_finance_entry.entry_type}.</p>
@@ -16,7 +16,7 @@ import java.util.stream.Stream;
  */
 public enum FinanceEntryType {
 
-    // --- Ozon empirical (23 types, confirmed from real API) ---
+    // --- Ozon empirical (27 types, confirmed from real API) ---
     SALE_ACCRUAL("OperationAgentDeliveredToCustomer", MeasureColumn.REVENUE),
     RETURN_REVERSAL("ClientReturnAgentOperation", MeasureColumn.REFUND),
     STORNO_CORRECTION("OperationAgentStornoDeliveredToCustomer", MeasureColumn.REFUND),
@@ -41,6 +41,10 @@ public enum FinanceEntryType {
     SHIPMENT_DELAY_FINE("DefectFineShipmentDelayRated", MeasureColumn.PENALTIES),
     CANCELLATION_FINE("DefectFineCancellation", MeasureColumn.PENALTIES),
     INSURANCE_SELLER("InsuranceServiceSellerItem", MeasureColumn.OTHER),
+    GETTING_TO_TOP("OperationGettingToTheTop", MeasureColumn.MARKETING),
+    SUPPLY_CARGO_SHORTAGE("OperationMarketplaceServiceSupplyInboundCargoShortage", MeasureColumn.PENALTIES),
+    DEFECT_RATE_DETAILED("DefectRateDetailed", MeasureColumn.PENALTIES),
+    TEMPORARY_STORAGE("TemporaryStorage", MeasureColumn.STORAGE),
 
     // --- Ozon official enum (21 types, C-docs, not yet observed) ---
     DELIVERY_CANCEL_ACCRUAL("OperationAgentDeliveredToCustomerCanceled", MeasureColumn.REFUND),

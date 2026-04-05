@@ -14,6 +14,7 @@ import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
 import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.WarehouseUpsertRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -40,7 +41,7 @@ public class WbWarehouseDictSource implements EventSource {
 
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
-        String token = ctx.credentials().get("apiToken");
+        String token = ctx.credentials().get(CredentialKeys.WB_API_TOKEN);
         var captureCtx = CaptureContextFactory.build(ctx, eventType(), "WbWarehousesReadAdapter");
         CaptureResult page = adapter.capturePage(captureCtx, token);
 

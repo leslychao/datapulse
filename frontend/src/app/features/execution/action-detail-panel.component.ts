@@ -201,7 +201,6 @@ export class ActionDetailPanelComponent {
     ),
     enabled: !!this.wsStore.currentWorkspaceId() && this.actionId() > 0,
     staleTime: 10_000,
-    refetchInterval: 15_000,
   }));
 
   readonly action = computed(() => this.actionQuery.data() ?? null);
@@ -257,7 +256,7 @@ export class ActionDetailPanelComponent {
   openFullPage(): void {
     const wsId = this.wsStore.currentWorkspaceId();
     this.panel.close();
-    this.router.navigate(['/workspace', wsId, 'execution', 'actions', this.actionId()]);
+    this.router.navigate(['/workspace', wsId, 'pricing', 'price-actions', this.actionId()]);
   }
 
   toggleAttempt(n: number): void {

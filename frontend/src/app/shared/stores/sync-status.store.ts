@@ -26,6 +26,17 @@ export const SyncStatusStore = signalStore(
         ),
       });
     },
+    upsertConnection(conn: ConnectionSyncStatus): void {
+      const list = store.connections();
+      const idx = list.findIndex((c) => c.connectionId === conn.connectionId);
+      if (idx === -1) {
+        patchState(store, { connections: [...list, conn] });
+      } else {
+        patchState(store, {
+          connections: list.map((c, i) => (i === idx ? { ...c, ...conn } : c)),
+        });
+      }
+    },
     setLastUpdated(lastUpdated: string): void {
       patchState(store, { lastUpdated });
     },

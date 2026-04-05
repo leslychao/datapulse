@@ -9,7 +9,8 @@ import java.util.Optional;
  * Three families match three pagination families in the ETL spec.
  */
 public sealed interface CursorExtractor
-        permits NoCursorExtractor, JsonPathCursorExtractor, TailFieldExtractor {
+        permits NoCursorExtractor, JsonPathCursorExtractor, TailFieldExtractor,
+                WbCatalogCursorExtractor {
 
     Optional<String> extract(Path tempFile) throws IOException;
 }

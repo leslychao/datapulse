@@ -16,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Listens for {@link AlertTriggeredEvent} (event-driven alerts from other modules)
  * and persists them to {@code alert_event} with {@code alert_rule_id = NULL}.
  *
- * <p>Uses {@code @EventListener} (not {@code @TransactionalEventListener}) so that
- * the alert is created even if the source transaction rolls back — operational alerts
- * are more important than transactional consistency.
+ * <p><strong>Layer B — intentional {@code @EventListener}:</strong> not
+ * {@code @TransactionalEventListener(AFTER_COMMIT)} so the alert is still created when the
+ * <em>source</em> business transaction rolls back. Operational visibility is prioritized over strict
+ * atomicity with the failing command. See {@code docs/non-functional-architecture.md} § Internal
+ * event delivery.
  */
 @Slf4j
 @Component

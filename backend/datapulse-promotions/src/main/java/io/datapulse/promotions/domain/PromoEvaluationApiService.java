@@ -13,13 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PromoEvaluationApiService {
 
     private final PromoEvaluationRepository evaluationRepository;
     private final PromoEvaluationQueryRepository evaluationQueryRepository;
     private final PromoEvaluationMapper evaluationMapper;
 
-    @Transactional(readOnly = true)
     public Page<PromoEvaluationResponse> listEvaluations(long workspaceId, Long runId,
                                                           Long campaignId, Long marketplaceOfferId,
                                                           PromoEvaluationResult evaluationResult,

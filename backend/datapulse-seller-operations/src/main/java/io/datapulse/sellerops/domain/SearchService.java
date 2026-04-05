@@ -5,9 +5,11 @@ import io.datapulse.sellerops.persistence.SearchReadRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class SearchService {
 
   private static final int SECONDARY_LIMIT = 5;

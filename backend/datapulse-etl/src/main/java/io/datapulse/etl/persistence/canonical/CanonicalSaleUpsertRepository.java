@@ -20,9 +20,9 @@ public class CanonicalSaleUpsertRepository {
             INSERT INTO canonical_sale (connection_id, source_platform, external_sale_id,
                                         canonical_order_id, marketplace_offer_id, posting_id,
                                         seller_sku_id, sale_date, sale_amount, commission,
-                                        quantity, currency,
+                                        quantity, currency, fulfillment_type,
                                         job_execution_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
             ON CONFLICT (connection_id, external_sale_id) DO UPDATE SET
                 canonical_order_id = EXCLUDED.canonical_order_id,
                 marketplace_offer_id = EXCLUDED.marketplace_offer_id,
@@ -33,19 +33,20 @@ public class CanonicalSaleUpsertRepository {
                 commission = EXCLUDED.commission,
                 quantity = EXCLUDED.quantity,
                 currency = EXCLUDED.currency,
+                fulfillment_type = EXCLUDED.fulfillment_type,
                 job_execution_id = EXCLUDED.job_execution_id,
                 updated_at = now()
             WHERE (canonical_sale.canonical_order_id, canonical_sale.marketplace_offer_id,
                    canonical_sale.posting_id, canonical_sale.seller_sku_id,
                    canonical_sale.sale_date, canonical_sale.sale_amount,
                    canonical_sale.commission, canonical_sale.quantity,
-                   canonical_sale.currency)
+                   canonical_sale.currency, canonical_sale.fulfillment_type)
                 IS DISTINCT FROM
                   (EXCLUDED.canonical_order_id, EXCLUDED.marketplace_offer_id,
                    EXCLUDED.posting_id, EXCLUDED.seller_sku_id,
                    EXCLUDED.sale_date, EXCLUDED.sale_amount,
                    EXCLUDED.commission, EXCLUDED.quantity,
-                   EXCLUDED.currency)
+                   EXCLUDED.currency, EXCLUDED.fulfillment_type)
             """;
 
     public void batchUpsert(List<CanonicalSaleEntity> entities) {
@@ -63,7 +64,8 @@ public class CanonicalSaleUpsertRepository {
                     ps.setBigDecimal(10, e.getCommission());
                     ps.setInt(11, e.getQuantity());
                     ps.setString(12, e.getCurrency());
-                    ps.setLong(13, e.getJobExecutionId());
+                    ps.setString(13, e.getFulfillmentType());
+                    ps.setLong(14, e.getJobExecutionId());
                 });
     }
 }

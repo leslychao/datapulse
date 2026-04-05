@@ -29,6 +29,8 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/actuator/prometheus",
+                                "/favicon.ico",
+                                "/favicon.svg",
                                 "/ws/**"
                         ).permitAll()
                         .anyRequest().authenticated()

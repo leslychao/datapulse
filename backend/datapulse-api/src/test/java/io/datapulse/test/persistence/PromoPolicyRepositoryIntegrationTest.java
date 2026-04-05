@@ -18,6 +18,7 @@ import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
 import io.datapulse.promotions.domain.ParticipationMode;
 import io.datapulse.promotions.domain.PromoDecisionType;
+import io.datapulse.promotions.domain.PromoExecutionMode;
 import io.datapulse.promotions.domain.PromoPolicyStatus;
 import io.datapulse.promotions.persistence.PromoDecisionEntity;
 import io.datapulse.promotions.persistence.PromoDecisionRepository;
@@ -213,7 +214,7 @@ class PromoPolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
       d.setPolicySnapshot("{}");
       d.setDecisionType(type);
       d.setParticipationMode(ParticipationMode.RECOMMENDATION);
-      d.setExecutionMode("RECOMMENDATION");
+      d.setExecutionMode(PromoExecutionMode.LIVE);
       return decisionRepository.save(d);
     }
   }

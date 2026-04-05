@@ -15,13 +15,14 @@ import { ConnectionApiService } from '@core/api/connection-api.service';
 import { AnalyticsFilter, InventoryByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { formatMoney } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-stock-history-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent],
+  imports: [TranslatePipe, ChartComponent, StockRiskBadgeComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
@@ -102,13 +103,7 @@ import { formatMoney } from '@shared/utils/format.utils';
               {{ 'analytics.inventory.col.risk' | translate }}
             </p>
             <p class="mt-1">
-              <span class="inline-flex items-center gap-1.5 text-sm">
-                <span
-                  class="h-1.5 w-1.5 rounded-full"
-                  [class]="riskDotClass(product.stockOutRisk)"
-                ></span>
-                {{ riskLabel(product.stockOutRisk) }}
-              </span>
+              <dp-stock-risk-badge [risk]="product.stockOutRisk" />
             </p>
           </div>
           <div>
@@ -286,17 +281,5 @@ export class StockHistoryPageComponent {
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);
-  }
-
-  riskDotClass(risk: string): string {
-    switch (risk) {
-      case 'CRITICAL': return 'bg-[var(--status-error)]';
-      case 'WARNING': return 'bg-[var(--status-warning)]';
-      default: return 'bg-[var(--status-success)]';
-    }
-  }
-
-  riskLabel(risk: string): string {
-    return this.t.instant(`analytics.inventory.risk.${risk.toLowerCase()}`);
   }
 }

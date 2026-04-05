@@ -85,14 +85,27 @@
         ></span>
       </div>
     } @else if (totalElements() === 0) {
-      <div
-        class="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)] py-16 text-center"
-      >
-        <lucide-icon [img]="checkCircleIcon" [size]="40" class="text-[var(--status-success)]" />
-        <p class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-          {{ 'alerts.events.empty_ok' | translate }}
-        </p>
-      </div>
+      @if (hasActiveFilters()) {
+        <dp-empty-state
+          [message]="'alerts.events.empty_filtered' | translate"
+          [hint]="
+            (summaryQuery.data()?.openCritical ?? 0) > 0
+              ? ('alerts.events.empty_filtered_blocker_hint' | translate)
+              : ''
+          "
+          [actionLabel]="'filter_bar.reset_all' | translate"
+          (action)="resetFilters()"
+        />
+      } @else {
+        <div
+          class="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)] py-16 text-center"
+        >
+          <lucide-icon [img]="checkCircleIcon" [size]="40" class="text-[var(--status-success)]" />
+          <p class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+            {{ 'alerts.events.empty_ok' | translate }}
+          </p>
+        </div>
+      }
     } @else {
       <ag-grid-angular
         class="ag-theme-alpine min-h-[360px] w-full flex-1"

@@ -10,5 +10,6 @@ public record NormalizedSaleItem(
         BigDecimal saleAmount,
         BigDecimal commission,
         String currency,
-        OffsetDateTime saleDate
+        OffsetDateTime saleDate,
+        String fulfillmentType
 ) {}

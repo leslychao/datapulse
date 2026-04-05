@@ -23,20 +23,18 @@ public record EventResult(
     }
 
     public static EventResult completed(EtlEventType eventType, List<SubSourceResult> subSources) {
-        return new EventResult(eventType, EventResultStatus.COMPLETED, null, null, subSources);
+        String cursor = SubSourceCursorCodec.mergeSubSourceLastCursors(subSources);
+        return new EventResult(eventType, EventResultStatus.COMPLETED, cursor, null, subSources);
     }
 
     public static EventResult completedWithErrors(EtlEventType eventType,
                                                    List<SubSourceResult> subSources) {
-        return new EventResult(eventType, EventResultStatus.COMPLETED_WITH_ERRORS, null, null, subSources);
+        String cursor = SubSourceCursorCodec.mergeSubSourceLastCursors(subSources);
+        return new EventResult(eventType, EventResultStatus.COMPLETED_WITH_ERRORS, cursor, null, subSources);
     }
 
     public static EventResult failed(EtlEventType eventType, List<SubSourceResult> subSources) {
-        String cursor = subSources.stream()
-                .filter(s -> s.lastCursor() != null)
-                .reduce((first, second) -> second)
-                .map(SubSourceResult::lastCursor)
-                .orElse(null);
+        String cursor = SubSourceCursorCodec.mergeSubSourceLastCursors(subSources);
         return new EventResult(eventType, EventResultStatus.FAILED, cursor, null, subSources);
     }
 

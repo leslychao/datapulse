@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '@core/auth/auth.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -198,9 +199,15 @@ export class OnboardingWizardComponent {
     const wsId = this.workspaceId();
     if (wsId) {
       localStorage.setItem(LAST_WORKSPACE_KEY, String(wsId));
-      this.router.navigate(['/workspace', wsId, 'grid']);
+      void firstValueFrom(this.authService.checkSession()).then((ok) => {
+        if (ok) {
+          void this.router.navigate(['/workspace', wsId, 'grid']);
+        } else {
+          void this.router.navigate(['/workspaces']);
+        }
+      });
     } else {
-      this.router.navigate(['/workspaces']);
+      void this.router.navigate(['/workspaces']);
     }
   }
 }

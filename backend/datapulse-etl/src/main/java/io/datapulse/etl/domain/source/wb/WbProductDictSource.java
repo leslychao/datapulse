@@ -23,6 +23,7 @@ import io.datapulse.etl.persistence.canonical.ProductMasterUpsertRepository;
 import io.datapulse.etl.persistence.canonical.SellerSkuEntity;
 import io.datapulse.etl.persistence.canonical.SellerSkuUpsertRepository;
 import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +56,7 @@ public class WbProductDictSource implements EventSource {
 
   @Override
   public List<SubSourceResult> execute(IngestContext ctx) {
-    String token = ctx.credentials().get("apiToken");
+    String token = ctx.credentials().get(CredentialKeys.WB_API_TOKEN);
     var captureCtx = CaptureContextFactory.build(ctx, eventType(), "WbCatalogReadAdapter");
     List<CaptureResult> pages = adapter.captureAllPages(captureCtx, token);
 

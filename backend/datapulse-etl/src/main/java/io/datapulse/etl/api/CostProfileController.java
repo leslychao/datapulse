@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -36,27 +38,40 @@ public class CostProfileController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public Page<CostProfileResponse> listCostProfiles(CostProfileFilter filter, Pageable pageable) {
+    public Page<CostProfileResponse> listCostProfiles(
+            CostProfileFilter filter,
+            @PageableDefault(size = 50, sort = "skuCode", direction = Sort.Direction.ASC) Pageable pageable) {
         return costProfileService.listCurrentProfiles(
                 workspaceContext.getWorkspaceId(), filter, pageable);
     }
 
+    @GetMapping("/sku-suggestions")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
+    public List<SellerSkuSuggestionResponse> listSkuSuggestions(
+            @RequestParam(value = "search", required = false) String search) {
+        return costProfileService.listSkuSuggestions(workspaceContext.getWorkspaceId(), search);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
     public CostProfileResponse createCostProfile(@Valid @RequestBody CreateCostProfileRequest request) {
         return costProfileService.createProfile(request, workspaceContext.getUserId());
     }
 
     @PostMapping(value = "/bulk-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
     public BulkImportResponse bulkImport(@RequestParam("file") MultipartFile file) {
         return costProfileService.bulkImport(file,
                 workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
     public CostProfileResponse updateCostProfile(
         @PathVariable("id") long id,
         @Valid @RequestBody UpdateCostProfileRequest request) {
@@ -66,13 +81,15 @@ public class CostProfileController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
     public void deleteCostProfile(@PathVariable("id") long id) {
         costProfileService.deleteProfile(id, workspaceContext.getWorkspaceId());
     }
 
     @GetMapping(value = "/export", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
     public ResponseEntity<byte[]> exportCsv() {
         byte[] csv = costProfileService.exportCsv(workspaceContext.getWorkspaceId());
         return ResponseEntity.ok()
@@ -82,7 +99,8 @@ public class CostProfileController {
     }
 
     @PostMapping("/bulk-update")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PRICING_MANAGER')")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
     public BulkUpdateCostProfileResponse bulkUpdate(
             @Valid @RequestBody BulkUpdateCostProfileRequest request) {
         return costProfileService.bulkUpdate(

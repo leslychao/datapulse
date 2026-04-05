@@ -13,7 +13,7 @@ public record AnalyticsQueryProperties(
             inventory = new InventoryProperties(14, 30, 7);
         }
         if (dataQuality == null) {
-            dataQuality = new DataQualityProperties(24, 48, 72, 2, 100, 3, 30, 0.05, 30);
+            dataQuality = new DataQualityProperties(24, 48, 2, 100, 3, 30, 0.05, 30);
         }
     }
 
@@ -26,7 +26,6 @@ public record AnalyticsQueryProperties(
     public record DataQualityProperties(
             int staleFinanceThresholdHours,
             int staleStateThresholdHours,
-            int staleAdvertisingThresholdHours,
             int residualAnomalyStdMultiplier,
             int residualMinSampleSize,
             int spikeMedianMultiplier,

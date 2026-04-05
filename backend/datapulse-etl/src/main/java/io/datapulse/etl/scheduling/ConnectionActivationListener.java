@@ -2,6 +2,7 @@ package io.datapulse.etl.scheduling;
 
 import java.util.Map;
 
+import io.datapulse.etl.domain.ConnectionStaleJobReconciler;
 import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.integration.domain.ConnectionStatus;
@@ -14,12 +15,18 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Same transactional coupling as {@link SyncTriggeredListener}: {@link EventListener} +
+ * {@link Transactional}({@code REQUIRED}) participates in the publisher transaction so
+ * {@code job_execution} + outbox + sync state updates are atomic with connection activation.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConnectionActivationListener {
 
   private final JobExecutionRepository jobExecutionRepository;
+  private final ConnectionStaleJobReconciler connectionStaleJobReconciler;
   private final OutboxService outboxService;
   private final IngestResultReporter resultReporter;
 
@@ -35,6 +42,7 @@ public class ConnectionActivationListener {
 
     Long connectionId = event.connectionId();
 
+    connectionStaleJobReconciler.reconcileForDispatch(connectionId);
     if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
       log.info("Active job already exists for activated connection, skipping FULL_SYNC: connectionId={}",
           connectionId);

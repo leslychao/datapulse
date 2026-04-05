@@ -40,6 +40,7 @@
 | ----------------------- | ------------------------------------------------- | ---------- |
 | `/v3/product/list`      | Cursor (`last_id` + `limit`), `total` in response | confirmed  |
 | `last_id` format        | Base64-encoded cursor string                      | confirmed  |
+| Terminal page           | `last_id` may **repeat** the value sent in the request (often with empty `items`); clients must stop when cursor is missing/empty or does not advance — **do not** infer end-of-list from small HTTP body size (risks truncating valid pages) | confirmed (2026-04-03; `OzonCursorPaging` + list adapters) |
 | `/v3/product/info/list` | Batch by `product_id` list                        | confirmed  |
 | Typical flow            | List IDs first, then fetch info in batches        | confirmed  |
 
@@ -412,6 +413,8 @@ FBO endpoint fully verified.
 | Type          | Offset-based (`offset` + `limit`)                  | confirmed  |
 | FBO filter    | `since`, `to` (date range, ISO 8601 UTC), `dir`    | confirmed  |
 | `with` params | `analytics_data`, `financial_data` (boolean flags) | confirmed  |
+| Loop guard    | Observed (2026-04-03): successive pages may return **byte-identical** JSON while `offset` increases — treat as end of pagination (same pattern as non-advancing `last_id` on cursor endpoints) | confirmed |
+| Datapulse safety cap | Ingest adapters stop after **5000** offset pages per run (`OzonOffsetPaging.MAX_OFFSET_PAGES_PER_RUN`) in addition to duplicate-body and small-response heuristics — avoids unbounded capture if API misbehaves | assumed (client policy) |
 
 
 ### Identifier Semantics
@@ -849,7 +852,24 @@ Join to catalog requires `sku` → `product_id` → `offer_id` lookup.
 | `DefectFineCancellation`             | services          | Cancellation fine (posting-linked)   | 1                | -150          | confirmed  |
 
 
-**23 operation types verified from real data (Jan 2025: 7590 ops + Feb 2026: 589 ops).**
+**New operations (discovered Apr 2026):**
+
+
+| `operation_type`                                            | `type` (category) | Semantics                                     | Confidence |
+| ----------------------------------------------------------- | ----------------- | --------------------------------------------- | ---------- |
+| `OperationGettingToTheTop`                                  | services          | Promotion "getting to the top" charge         | confirmed  |
+| `OperationMarketplaceServiceSupplyInboundCargoShortage`     | services          | Supply inbound cargo shortage penalty         | confirmed  |
+| `DefectRateDetailed`                                        | services          | Detailed defect rate penalty                  | confirmed  |
+| `TemporaryStorage`                                          | services          | Temporary warehouse storage                   | confirmed  |
+
+**New service names (discovered Apr 2026):**
+
+| `services[].name`                                           | Measure column  | Semantics                     | Confidence |
+| ----------------------------------------------------------- | --------------- | ----------------------------- | ---------- |
+| `MarketplaceServiceItemRedistributionLastMilePVZ`           | LOGISTICS       | Last mile redistribution PVZ  | confirmed  |
+
+
+**27 operation types verified from real data (Jan 2025 + Feb 2026 + Apr 2026).**
 
 **Additional 21 types from official Ozon OpenAPI enum (C-docs, not yet observed in our data):**
 
@@ -877,7 +897,7 @@ Join to catalog requires `sku` → `product_id` → `offer_id` lookup.
 | `OperationElectronicServicesPromotionInSearch` | services | Search promotion service | Official enum |
 | `OperationMarketplaceServiceItemElectronicServicesBrandShelf` | services | Brand shelf service | Official enum |
 
-**Total: 44 operation types known (23 empirical + 21 from official enum).** Mapping to FinanceEntryType and fact_finance measures — see mapping-spec.md §7.
+**Total: 48 operation types known (27 empirical + 21 from official enum).** Mapping to FinanceEntryType and fact_finance measures — see mapping-spec.md §7.
 
 **NOTE:** 11 of our 23 empirical types are NOT in the official enum (added after Sept 2024 enum update). This confirms Ozon adds types without updating the public enum. Adapter MUST default unmapped types to OTHER with logging.
 

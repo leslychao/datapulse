@@ -1,6 +1,7 @@
 package io.datapulse.integration.adapter.wb;
 
 import io.datapulse.integration.config.IntegrationProperties;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.HealthProbeResult;
 import io.datapulse.integration.domain.MarketplaceHealthProbe;
 import io.datapulse.integration.domain.MarketplaceType;
@@ -25,7 +26,7 @@ public class WbHealthProbe implements MarketplaceHealthProbe {
 
     @Override
     public HealthProbeResult probe(Map<String, String> credentials) {
-        String apiToken = credentials.get("apiToken");
+        String apiToken = credentials.get(CredentialKeys.WB_API_TOKEN);
         String baseUrl = properties.getWildberries().getContentBaseUrl();
         try {
             webClientBuilder.baseUrl(baseUrl).build()

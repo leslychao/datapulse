@@ -1,6 +1,8 @@
 package io.datapulse.etl.domain;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.domain.CredentialStore;
@@ -61,6 +63,63 @@ public class CredentialResolver {
                 marketplace,
                 credentials
         );
+    }
+
+    /**
+     * Resolves Ozon Performance API credentials from {@code perfSecretReferenceId}.
+     * Returns empty if the connection has no performance credentials configured.
+     */
+    public Optional<Map<String, String>> resolvePerformanceCredentials(long connectionId) {
+        MarketplaceConnectionEntity connection = connectionRepository.findById(connectionId)
+                .orElseThrow(() -> NotFoundException.connection(connectionId));
+
+        if (connection.getPerfSecretReferenceId() == null) {
+            return Optional.empty();
+        }
+
+        SecretReferenceEntity perfSecretRef = secretReferenceRepository
+                .findById(connection.getPerfSecretReferenceId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Performance SecretReference not found: id=%d, connectionId=%d"
+                                .formatted(connection.getPerfSecretReferenceId(),
+                                        connection.getId())));
+
+        Map<String, String> perfCredentials = credentialStore.read(
+                perfSecretRef.getVaultPath(), perfSecretRef.getVaultKey());
+
+        log.debug("Performance credentials resolved: connectionId={}", connectionId);
+        return Optional.of(perfCredentials);
+    }
+
+    /**
+     * Resolves base credentials merged with Ozon Performance credentials.
+     * Returns empty if the connection has no performance credentials configured.
+     */
+    public Optional<Map<String, String>> resolveWithPerformanceCredentials(long connectionId) {
+        MarketplaceConnectionEntity connection = connectionRepository.findById(connectionId)
+                .orElseThrow(() -> NotFoundException.connection(connectionId));
+
+        if (connection.getPerfSecretReferenceId() == null) {
+            return Optional.empty();
+        }
+
+        ResolvedCredentials base = resolve(connection);
+
+        SecretReferenceEntity perfSecretRef = secretReferenceRepository
+                .findById(connection.getPerfSecretReferenceId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Performance SecretReference not found: id=%d, connectionId=%d"
+                                .formatted(connection.getPerfSecretReferenceId(),
+                                        connection.getId())));
+
+        Map<String, String> perfCredentials = credentialStore.read(
+                perfSecretRef.getVaultPath(), perfSecretRef.getVaultKey());
+
+        Map<String, String> merged = new HashMap<>(base.credentials());
+        merged.putAll(perfCredentials);
+
+        log.debug("Credentials with performance merged: connectionId={}", connectionId);
+        return Optional.of(merged);
     }
 
     public record ResolvedCredentials(

@@ -56,8 +56,10 @@ describe('DetailPanelService', () => {
   });
 
   it('should accept width within valid range', () => {
-    service.resize(500);
-    expect(service.width()).toBe(500);
+    const maxAllowed = Math.floor(window.innerWidth * 0.5);
+    const target = Math.floor((320 + maxAllowed) / 2);
+    service.resize(target);
+    expect(service.width()).toBe(target);
   });
 
   it('should update entity when opened with different id', () => {

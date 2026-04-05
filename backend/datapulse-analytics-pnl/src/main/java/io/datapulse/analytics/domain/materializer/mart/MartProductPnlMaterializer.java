@@ -24,7 +24,8 @@ import org.springframework.stereotype.Component;
  * </ul>
  *
  * <p>COGS at product-month level uses cross-posting revenue-ratio netting (T-4/T-7).</p>
- * <p>Advertising cost = 0 in Phase B core (fallback until advertising ingestion).</p>
+ * <p>Advertising cost: LEFT JOIN from fact_advertising via dim_product (Phase A-3).
+ * Join path: fact_advertising.marketplace_sku → dim_product.seller_sku_id → base.seller_sku_id.</p>
  *
  * <p>Product labels (sku_code, product_name, marketplace_sku) are resolved here via dim_product
  * so read queries use only marts + facts.</p>
@@ -61,9 +62,13 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           base.product_refund_ratio,
           base.net_cogs,
           base.cogs_status,
-          base.advertising_cost,
+          coalesce(ad_agg.ad_spend, toDecimal64(0, 2)) AS advertising_cost,
           base.marketplace_pnl,
-          base.full_pnl,
+          if(base.net_cogs IS NOT NULL,
+             base.marketplace_pnl
+                 - coalesce(ad_agg.ad_spend, toDecimal64(0, 2))
+                 - base.net_cogs,
+             NULL) AS full_pnl,
           coalesce(
               nullIf(trim(p_by_id.sku_code), ''),
               nullIf(trim(p_by_sku.sku_code), ''),
@@ -116,30 +121,12 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
              NULL) AS net_cogs,
           -- cogs_status: worst of posting statuses
           cogs_status,
-          -- advertising_cost: Phase B core = 0
-          toDecimal64(0, 2) AS advertising_cost,
           -- marketplace_pnl = sum of all 11 signed measures
           revenue_amount + marketplace_commission_amount + acquiring_commission_amount
               + logistics_cost_amount + storage_cost_amount + penalties_amount
               + marketing_cost_amount + acceptance_cost_amount
               + other_marketplace_charges_amount + compensation_amount
               + refund_amount AS marketplace_pnl,
-          -- full_pnl = marketplace_pnl - advertising - net_cogs
-          if(gross_cogs IS NOT NULL,
-             (revenue_amount + marketplace_commission_amount + acquiring_commission_amount
-                 + logistics_cost_amount + storage_cost_amount + penalties_amount
-                 + marketing_cost_amount + acceptance_cost_amount
-                 + other_marketplace_charges_amount + compensation_amount
-                 + refund_amount)
-             - toDecimal64(0, 2)
-             - (gross_cogs * greatest(
-                 toDecimal128(0, 4),
-                 toDecimal128(1, 4) - coalesce(
-                     if(revenue_amount != 0,
-                        toDecimal128(abs(refund_amount) / revenue_amount, 4),
-                        toDecimal128(0, 4)),
-                     toDecimal128(0, 4)))),
-             NULL) AS full_pnl,
           %d AS ver
       FROM (
       SELECT
@@ -354,6 +341,21 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
       ) AS p_by_sku
           ON base.seller_sku_id = p_by_sku.seller_sku_id
           AND base.connection_id = p_by_sku.connection_id
+      LEFT JOIN (
+          SELECT
+              fa.connection_id,
+              dp.seller_sku_id,
+              toYYYYMM(fa.ad_date) AS period,
+              sum(fa.spend) AS ad_spend
+          FROM fact_advertising AS fa
+          INNER JOIN dim_product AS dp
+              ON fa.connection_id = dp.connection_id
+              AND fa.marketplace_sku = dp.marketplace_sku
+          GROUP BY fa.connection_id, dp.seller_sku_id, period
+      ) AS ad_agg
+          ON base.connection_id = ad_agg.connection_id
+          AND base.seller_sku_id = ad_agg.seller_sku_id
+          AND base.period = ad_agg.period
       SETTINGS final = 1
       """;
 

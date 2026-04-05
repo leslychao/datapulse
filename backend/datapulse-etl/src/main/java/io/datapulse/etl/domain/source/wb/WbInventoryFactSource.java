@@ -19,6 +19,7 @@ import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalStockCurrentUpsertRepository;
 import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
 import io.datapulse.etl.persistence.canonical.WarehouseLookupRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +50,7 @@ public class WbInventoryFactSource implements EventSource {
 
   @Override
   public List<SubSourceResult> execute(IngestContext ctx) {
-    String token = ctx.credentials().get("apiToken");
+    String token = ctx.credentials().get(CredentialKeys.WB_API_TOKEN);
     var captureCtx = CaptureContextFactory.build(ctx, eventType(), "WbStocksReadAdapter");
     List<CaptureResult> pages = adapter.captureAllPages(captureCtx, token);
 

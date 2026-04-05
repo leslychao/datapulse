@@ -1,8 +1,6 @@
 package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.tenancy.api.UpdateUserProfileRequest;
-import io.datapulse.tenancy.api.UserProfileResponse;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.TenantEntity;
@@ -72,7 +70,7 @@ class UserProfileServiceTest {
       when(memberRepository.findByUser_IdAndStatus(1L, MemberStatus.ACTIVE))
           .thenReturn(List.of(member));
 
-      UserProfileResponse profile = userProfileService.getProfile(1L);
+      UserProfile profile = userProfileService.getProfile(1L);
 
       assertThat(profile.id()).isEqualTo(1L);
       assertThat(profile.email()).isEqualTo("user@test.com");
@@ -90,7 +88,7 @@ class UserProfileServiceTest {
       when(memberRepository.findByUser_IdAndStatus(1L, MemberStatus.ACTIVE))
           .thenReturn(List.of());
 
-      UserProfileResponse profile = userProfileService.getProfile(1L);
+      UserProfile profile = userProfileService.getProfile(1L);
 
       assertThat(profile.needsOnboarding()).isTrue();
       assertThat(profile.memberships()).isEmpty();
@@ -119,8 +117,7 @@ class UserProfileServiceTest {
       when(memberRepository.findByUser_IdAndStatus(1L, MemberStatus.ACTIVE))
           .thenReturn(List.of());
 
-      UserProfileResponse profile = userProfileService.updateProfile(
-          1L, new UpdateUserProfileRequest("  New Name  "));
+      userProfileService.updateProfile(1L, "  New Name  ");
 
       verify(appUserRepository).save(user);
       assertThat(user.getName()).isEqualTo("New Name");
@@ -131,8 +128,7 @@ class UserProfileServiceTest {
     void should_throw_not_found_when_user_missing() {
       when(appUserRepository.findById(99L)).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> userProfileService.updateProfile(
-          99L, new UpdateUserProfileRequest("Name")))
+      assertThatThrownBy(() -> userProfileService.updateProfile(99L, "Name"))
           .isInstanceOf(NotFoundException.class);
     }
   }

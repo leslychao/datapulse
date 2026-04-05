@@ -95,9 +95,9 @@ class DagExecutorTest {
           EtlEventType.CATEGORY_DICT,
           new IngestContext.CheckpointEntry(EventResultStatus.COMPLETED, null, null, null));
 
-      IngestContext context = new IngestContext(
+      IngestContext context = IngestContextFixtures.any(
           1L, 100L, 1L, MarketplaceType.WB,
-          Map.of("token", "test"), "FULL_SYNC",
+          Map.of("apiToken", "test"), "FULL_SYNC",
           EnumSet.allOf(EtlEventType.class), checkpoint);
 
       when(eventRunner.run(any(EtlEventType.class), any(IngestContext.class)))
@@ -136,9 +136,9 @@ class DagExecutorTest {
   }
 
   private IngestContext buildContext() {
-    return new IngestContext(
+    return IngestContextFixtures.any(
         1L, 100L, 1L, MarketplaceType.WB,
-        Map.of("token", "test"), "FULL_SYNC",
+        Map.of("apiToken", "test"), "FULL_SYNC",
         EnumSet.allOf(EtlEventType.class), Map.of());
   }
 }

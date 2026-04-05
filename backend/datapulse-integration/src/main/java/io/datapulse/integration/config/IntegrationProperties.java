@@ -30,6 +30,8 @@ public class IntegrationProperties {
         @NotBlank
         private final String pricesBaseUrl;
 
+        private final String pricesWriteBaseUrl;
+
         @NotBlank
         private final String statisticsBaseUrl;
 
@@ -40,10 +42,16 @@ public class IntegrationProperties {
         private final String marketplaceBaseUrl;
 
         @NotBlank
-        private final String advertBaseUrl;
+        private final String promoBaseUrl;
 
         @NotBlank
-        private final String promoBaseUrl;
+        private final String advertBaseUrl;
+
+        private final String sandboxApiToken;
+
+        public String getPricesWriteBaseUrl() {
+            return pricesWriteBaseUrl != null ? pricesWriteBaseUrl : pricesBaseUrl;
+        }
     }
 
     @Validated
@@ -54,8 +62,14 @@ public class IntegrationProperties {
         @NotBlank
         private final String sellerBaseUrl;
 
+        private final String sellerWriteBaseUrl;
+
         @NotBlank
         private final String performanceBaseUrl;
+
+        public String getSellerWriteBaseUrl() {
+            return sellerWriteBaseUrl != null ? sellerWriteBaseUrl : sellerBaseUrl;
+        }
     }
 
     @Validated

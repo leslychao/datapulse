@@ -124,7 +124,8 @@ public class WbNormalizer {
                 saleAmount,
                 commission,
                 "RUB",
-                saleDate
+                saleDate,
+                "FBW"
         );
     }
 
@@ -162,6 +163,8 @@ public class WbNormalizer {
                 ? String.valueOf(row.ppvzOfficeId())
                 : null;
 
+        String fulfillmentType = Boolean.TRUE.equals(row.srvDbs()) ? "DBS" : "FBW";
+
         return new NormalizedFinanceItem(
                 String.valueOf(row.rrdId()),
                 entryType,
@@ -170,6 +173,7 @@ public class WbNormalizer {
                 row.saName(),
                 String.valueOf(row.nmId()),
                 warehouseExternalId,
+                fulfillmentType,
                 revenueAmount,
                 marketplaceCommission,
                 negate(safe(row.acquiringFee())),

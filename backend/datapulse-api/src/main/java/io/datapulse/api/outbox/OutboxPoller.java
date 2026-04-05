@@ -1,6 +1,7 @@
 package io.datapulse.api.outbox;
 
 import io.datapulse.api.config.OutboxPollerProperties;
+import io.datapulse.platform.observability.MetricsFacade;
 import io.datapulse.platform.outbox.OutboxEvent;
 import io.datapulse.platform.outbox.OutboxEventPollerRepository;
 import io.datapulse.platform.outbox.OutboxEventType;
@@ -27,6 +28,7 @@ public class OutboxPoller {
   private final OutboxEventPublisher publisher;
   private final OutboxPollerProperties properties;
   private final TransactionTemplate transactionTemplate;
+  private final MetricsFacade metricsFacade;
 
   @Scheduled(fixedDelayString = "${datapulse.outbox.poll-interval:PT1S}")
   @SchedulerLock(name = "outbox-poller", lockAtMostFor = "PT5M")
@@ -69,6 +71,19 @@ public class OutboxPoller {
         log.warn("Failed to publish outbox event: id={}, type={}, retryCount={}, error={}",
             event.getId(), event.getEventType(), event.getRetryCount(), e.getMessage(), e);
 
+        int attemptsAfterThisFailure = event.getRetryCount() + 1;
+        if (attemptsAfterThisFailure >= properties.getMaxRetryCount()) {
+          metricsFacade.incrementCounter(
+              "outbox.publish.exhausted",
+              "event_type",
+              event.getEventType().name());
+        } else {
+          metricsFacade.incrementCounter(
+              "outbox.publish.retry_scheduled",
+              "event_type",
+              event.getEventType().name());
+        }
+
         OffsetDateTime nextRetry = OffsetDateTime.now()
             .plus(properties.getRetryBackoff().multipliedBy(event.getRetryCount() + 1));
         pollerRepository.markFailed(event.getId(), nextRetry);
@@ -77,6 +92,12 @@ public class OutboxPoller {
 
     if (!publishedIds.isEmpty()) {
       pollerRepository.markPublished(publishedIds);
+      for (OutboxEvent event : events) {
+        if (publishedIds.contains(event.getId())) {
+          metricsFacade.incrementCounter(
+              "outbox.publish.success", "event_type", event.getEventType().name());
+        }
+      }
       log.info("Outbox events published: count={}", publishedIds.size());
     }
   }

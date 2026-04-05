@@ -1,0 +1,64 @@
+# JPA vs JDBC — когда что использовать
+
+## Текущее состояние проекта
+
+Проект использует **смешанный подход**: JPA (Spring Data) для write-path и простого CRUD, JDBC (`JdbcTemplate` / `NamedParameterJdbcTemplate`) для read-path с аналитикой и сложными запросами. ClickHouse доступен **только** через JDBC.
+
+## Правила выбора
+
+### JPA (Spring Data JPA)
+
+Используй когда:
+
+| Сценарий | Почему JPA |
+|---|---|
+| CRUD-операции на одну сущность | `save()`, `findById()`, `deleteById()` — zero boilerplate |
+| Навигация по связям (`@ManyToOne`, `@OneToMany`) | JPA fetch join, lazy loading |
+| Оптимистичная блокировка (`@Version`) | Встроенная поддержка |
+| Аудит (`@PrePersist`, `@PreUpdate`) | Lifecycle hooks |
+| Простые derived queries | `findByWorkspaceIdAndStatus()` |
+| CAS-операции (Compare-And-Set) | `@Modifying @Query("UPDATE ...")` с `WHERE status = :expected` |
+
+**Типичные модули:** `tenancy-iam`, `integration`, `execution`, `pricing` (write-path).
+
+### JDBC (JdbcTemplate / NamedParameterJdbcTemplate)
+
+Используй когда:
+
+| Сценарий | Почему JDBC |
+|---|---|
+| Сложные аналитические запросы | JOIN 3+ таблиц, window functions, CTE |
+| Read-модели (проекции) | `*Row` DTO без JPA overhead |
+| Динамическая сортировка / фильтрация | Whitelist-based `ORDER BY`, динамические `WHERE` |
+| Bulk read с пагинацией | `LIMIT :limit OFFSET :offset` + count query |
+| ClickHouse запросы | JPA не поддерживает ClickHouse |
+| Batch write (ETL, canonical) | `batchUpdate()` с позиционными параметрами |
+| Запросы к нескольким схемам | Cross-schema JOIN невозможен через JPA entities |
+
+**Типичные модули:** `analytics-pnl` (полностью JDBC+CH), `seller-operations` (read-path через JDBC), `etl` (canonical write через batch JDBC).
+
+### ClickHouse
+
+**Всегда JDBC.** JPA не совместим с ClickHouse.
+
+- Используй отдельный `clickhouseJdbcTemplate` бин
+- Запросы в `private static final String` text blocks
+- RowMapper как лямбда
+- Деградация через `ChSafeQuery.getOrFallback()` для read-path
+
+## Запрещено
+
+- **JPA entity для ClickHouse** — ClickHouse не поддерживает JPA dialect
+- **JPA entity для read-only проекций** — используй JDBC `*Row` record/DTO
+- **`@Query(nativeQuery = true)` в JPA-репозиториях** — если нужен native SQL, используй JDBC напрямую
+- **Смешение JPA и JDBC для одной сущности** без явной причины (write через JPA, read через JDBC — допускается для разных use case)
+
+## Naming
+
+| Тип | Пакет | Naming |
+|---|---|---|
+| JPA repository | `persistence/` | `*Repository extends JpaRepository<E, ID>` |
+| JDBC read repository | `persistence/` | `*ReadRepository` или `*Repository` с `@Repository` |
+| JDBC write repository | `persistence/` | `*UpsertRepository`, `*WriteRepository` |
+| Read-модель (JDBC) | `persistence/` | `*Row` (record или `@Data @Builder` class) |
+| JPA entity | `persistence/` | `*Entity` |

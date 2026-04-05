@@ -123,7 +123,7 @@ import { formatDateTime } from '@shared/utils/format.utils';
               }
               @if (alert.ruleType === 'ACTION_FAILED' || alert.ruleType === 'STUCK_STATE') {
                 <a
-                  [routerLink]="['/workspace', workspaceId(), 'execution', 'actions']"
+                  [routerLink]="['/workspace', workspaceId(), 'pricing', 'price-actions']"
                   class="inline-flex items-center gap-2 text-[length:var(--text-sm)] text-[var(--accent-primary)] hover:underline"
                 >
                   <lucide-icon [img]="linkIcon" [size]="14" />

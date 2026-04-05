@@ -16,6 +16,11 @@ public class DataQualityReadRepository {
 
     private final ClickHouseReadJdbc jdbc;
 
+    public boolean pingClickHouse() {
+        jdbc.ch().getJdbcTemplate().queryForObject("SELECT 1", Integer.class);
+        return true;
+    }
+
     private static final String RECONCILIATION_SQL = """
             SELECT
                 connection_id,

@@ -5,8 +5,7 @@ import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.platform.audit.AuditEvent;
-import io.datapulse.platform.security.WorkspaceContext;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.promotions.adapter.ozon.OzonPromoWriteAdapter;
 import io.datapulse.promotions.adapter.simulated.SimulatedPromoWriteAdapter;
 import io.datapulse.promotions.api.BulkPromoActionRequest;
@@ -24,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -42,8 +40,7 @@ public class PromoActionService {
   private final PromoActionRepository actionRepository;
   private final PromoActionQueryRepository actionQueryRepository;
   private final PromoActionMapper actionMapper;
-  private final ApplicationEventPublisher eventPublisher;
-  private final WorkspaceContext workspaceContext;
+  private final AuditPublisher auditPublisher;
   private final PromoActionAttemptRepository attemptRepository;
   private final OzonPromoWriteAdapter ozonAdapter;
   private final SimulatedPromoWriteAdapter simulatedAdapter;
@@ -475,21 +472,7 @@ public class PromoActionService {
   }
 
   private void publishAudit(String actionType, long actionId, long workspaceId, String outcome) {
-    Long userId = null;
-    try {
-      userId = workspaceContext.getUserId();
-    } catch (Exception e) {
-      log.warn("Failed to resolve userId for audit: actionId={}, error={}",
-          actionId, e.getMessage());
-    }
-    try {
-      eventPublisher.publishEvent(new AuditEvent(
-          workspaceId, "USER", userId, actionType,
-          ENTITY_TYPE, String.valueOf(actionId),
-          outcome, null, null, null));
-    } catch (Exception e) {
-      log.error("Failed to publish audit event: actionType={}, actionId={}, error={}",
-          actionType, actionId, e.getMessage(), e);
-    }
+    auditPublisher.publish(actionType, ENTITY_TYPE,
+        String.valueOf(actionId), outcome, null);
   }
 }

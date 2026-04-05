@@ -19,7 +19,7 @@ public final class OzonServiceClassifier {
 
   private static final Map<String, MeasureColumn> SERVICE_LOOKUP =
       Map.ofEntries(
-          // Logistics (8 known services)
+          // Logistics (10 known services)
           Map.entry("MarketplaceServiceItemDirectFlowLogistic", MeasureColumn.LOGISTICS),
           Map.entry("MarketplaceServiceItemDelivToCustomer", MeasureColumn.LOGISTICS),
           Map.entry("MarketplaceServiceItemReturnFlowLogistic", MeasureColumn.LOGISTICS),
@@ -29,6 +29,7 @@ public final class OzonServiceClassifier {
           Map.entry("MarketplaceServiceItemRedistributionDropOffApvz", MeasureColumn.LOGISTICS),
           Map.entry("MarketplaceServiceItemDropoffPVZ", MeasureColumn.LOGISTICS),
           Map.entry("MarketplaceServiceItemRedistributionLastMileCourier", MeasureColumn.LOGISTICS),
+          Map.entry("MarketplaceServiceItemRedistributionLastMilePVZ", MeasureColumn.LOGISTICS),
 
           // Acquiring (embedded in sale operation services[])
           Map.entry("MarketplaceRedistributionOfAcquiringOperation", MeasureColumn.ACQUIRING),

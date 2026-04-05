@@ -34,7 +34,11 @@ public class GridClickHouseReadRepository {
                 fin.revenue_30d,
                 fin.net_pnl_30d,
                 sales.velocity_14d,
-                ret.return_rate_pct
+                ret.return_rate_pct,
+                ad.ad_spend_30d,
+                ad.drr_30d_pct,
+                ad.ad_cpo,
+                ad.ad_roas
             FROM (
                 SELECT product_id, days_of_cover, stock_out_risk
                 FROM mart_inventory_analysis
@@ -76,6 +80,22 @@ public class GridClickHouseReadRepository {
                       WHERE product_id IN (:offerIds)
                   )
             ) ret ON inv.product_id = ret.product_id
+            LEFT JOIN (
+                SELECT
+                    dp.product_id,
+                    map.spend       AS ad_spend_30d,
+                    map.drr_pct     AS drr_30d_pct,
+                    map.cpo         AS ad_cpo,
+                    map.roas        AS ad_roas
+                FROM mart_advertising_product AS map
+                INNER JOIN dim_product AS dp
+                    ON map.connection_id = dp.connection_id
+                    AND map.marketplace_sku = dp.marketplace_sku
+                WHERE dp.product_id IN (:offerIds)
+                  AND map.period = (
+                      SELECT max(period) FROM mart_advertising_product
+                  )
+            ) ad ON inv.product_id = ad.product_id
             SETTINGS final = 1
             """;
 
@@ -245,6 +265,10 @@ public class GridClickHouseReadRepository {
                 .netPnl30d(rs.getBigDecimal("net_pnl_30d"))
                 .velocity14d(rs.getBigDecimal("velocity_14d"))
                 .returnRatePct(rs.getBigDecimal("return_rate_pct"))
+                .adSpend30d(rs.getBigDecimal("ad_spend_30d"))
+                .drr30dPct(rs.getBigDecimal("drr_30d_pct"))
+                .adCpo(rs.getBigDecimal("ad_cpo"))
+                .adRoas(rs.getBigDecimal("ad_roas"))
                 .build();
     }
 

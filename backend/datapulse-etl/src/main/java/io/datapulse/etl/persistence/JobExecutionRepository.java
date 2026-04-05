@@ -22,14 +22,19 @@ public class JobExecutionRepository {
     private final NamedParameterJdbcTemplate jdbc;
 
     private static final String INSERT = """
-            INSERT INTO job_execution (connection_id, event_type, status)
-            VALUES (:connectionId, :eventType, :status)
+            INSERT INTO job_execution (connection_id, event_type, status, params)
+            VALUES (:connectionId, :eventType, :status, CAST(:params AS jsonb))
             """;
 
     private static final String CAS_STATUS = """
             UPDATE job_execution
             SET status = :target, started_at = CASE WHEN :target = 'IN_PROGRESS' AND started_at IS NULL THEN now() ELSE started_at END,
-                completed_at = CASE WHEN :target IN ('COMPLETED','COMPLETED_WITH_ERRORS','FAILED','STALE') THEN now() ELSE completed_at END
+                completed_at = CASE WHEN :target IN ('COMPLETED','COMPLETED_WITH_ERRORS','FAILED','STALE') THEN now() ELSE completed_at END,
+                materializing_at = CASE
+                  WHEN :target = 'MATERIALIZING' THEN now()
+                  WHEN :target IN ('COMPLETED','COMPLETED_WITH_ERRORS','FAILED','STALE') THEN NULL
+                  ELSE materializing_at
+                END
             WHERE id = :id AND status = :expected
             """;
 
@@ -46,8 +51,8 @@ public class JobExecutionRepository {
             """;
 
     private static final String FIND_BY_ID = """
-            SELECT id, connection_id, event_type, status, started_at, completed_at,
-                   error_details::text, checkpoint::text, created_at
+            SELECT id, connection_id, event_type, status, started_at, completed_at, materializing_at,
+                   error_details::text, checkpoint::text, params::text, created_at
             FROM job_execution
             WHERE id = :id
             """;
@@ -62,14 +67,21 @@ public class JobExecutionRepository {
 
     private static final String MARK_STALE_IN_PROGRESS = """
             UPDATE job_execution
-            SET status = 'STALE', completed_at = now()
-            WHERE status IN ('IN_PROGRESS', 'MATERIALIZING')
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE status = 'IN_PROGRESS'
               AND started_at < :threshold
+            """;
+
+    private static final String MARK_STALE_MATERIALIZING = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE status = 'MATERIALIZING'
+              AND COALESCE(materializing_at, started_at) < :threshold
             """;
 
     private static final String MARK_STALE_RETRY_SCHEDULED = """
             UPDATE job_execution
-            SET status = 'STALE', completed_at = now()
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
             WHERE status = 'RETRY_SCHEDULED'
               AND COALESCE(
                   (checkpoint->>'last_retry_at')::timestamptz,
@@ -78,12 +90,69 @@ public class JobExecutionRepository {
               ) < :threshold
             """;
 
+    private static final String MARK_STALE_IN_PROGRESS_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'IN_PROGRESS'
+              AND started_at < :threshold
+            """;
+
+    private static final String MARK_STALE_MATERIALIZING_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'MATERIALIZING'
+              AND COALESCE(materializing_at, started_at) < :threshold
+            """;
+
+    private static final String MARK_STALE_RETRY_SCHEDULED_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'RETRY_SCHEDULED'
+              AND COALESCE(
+                  (checkpoint->>'last_retry_at')::timestamptz,
+                  started_at,
+                  created_at
+              ) < :threshold
+            """;
+
+    private static final String MARK_STALE_PENDING_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'PENDING'
+              AND created_at < :threshold
+            """;
+
+    /**
+     * Refreshes {@code started_at} for an {@code IN_PROGRESS} job so a new worker can resume after
+     * RabbitMQ redelivery (previous consumer died before ack). Does not change {@code status}.
+     *
+     * @return {@code true} if exactly one row matched
+     */
+    private static final String RECLAIM_IN_PROGRESS_AFTER_REDELIVERY = """
+            UPDATE job_execution
+            SET started_at = now()
+            WHERE id = :id AND status = 'IN_PROGRESS'
+            """;
+
     public long insert(long connectionId, String eventType) {
+        return insert(connectionId, eventType, null);
+    }
+
+    /**
+     * @param paramsJson optional JSON string for {@code job_execution.params} (e.g. domains, sourceJobId);
+     *                   {@code null} stores SQL NULL
+     */
+    public long insert(long connectionId, String eventType, String paramsJson) {
         var keyHolder = new GeneratedKeyHolder();
         var params = new MapSqlParameterSource()
                 .addValue("connectionId", connectionId)
                 .addValue("eventType", eventType)
-                .addValue("status", JobExecutionStatus.PENDING.name());
+                .addValue("status", JobExecutionStatus.PENDING.name())
+                .addValue("params", paramsJson);
 
         jdbc.update(INSERT, params, keyHolder, new String[]{"id"});
         return keyHolder.getKey().longValue();
@@ -95,6 +164,14 @@ public class JobExecutionRepository {
                 "expected", expected.name(),
                 "target", target.name()
         ));
+        return updated == 1;
+    }
+
+    /**
+     * See {@link #RECLAIM_IN_PROGRESS_AFTER_REDELIVERY}.
+     */
+    public boolean reclaimInProgressAfterBrokerRedelivery(long id) {
+        int updated = jdbc.update(RECLAIM_IN_PROGRESS_AFTER_REDELIVERY, Map.of("id", id));
         return updated == 1;
     }
 
@@ -119,8 +196,8 @@ public class JobExecutionRepository {
         params.addValue("offset", offset);
 
         String sql = """
-                SELECT id, connection_id, event_type, status, started_at, completed_at,
-                       error_details::text, checkpoint::text, created_at
+                SELECT id, connection_id, event_type, status, started_at, completed_at, materializing_at,
+                       error_details::text, checkpoint::text, params::text, created_at
                 FROM job_execution
                 """ + buildWhereClause(status, from, to) + """
                 ORDER BY created_at DESC
@@ -177,12 +254,23 @@ public class JobExecutionRepository {
     }
 
     /**
-     * Marks IN_PROGRESS jobs as STALE when started_at is older than the given threshold.
+     * Marks IN_PROGRESS jobs as STALE when {@code started_at} is older than the given threshold.
+     * Does not include {@code MATERIALIZING} — use {@link #markStaleMaterializing}.
      *
      * @return number of rows affected
      */
     public int markStaleInProgress(OffsetDateTime threshold) {
         return jdbc.update(MARK_STALE_IN_PROGRESS, Map.of("threshold", threshold));
+    }
+
+    /**
+     * Marks MATERIALIZING jobs as STALE when {@code materializing_at} (or {@code started_at} if null)
+     * is older than the given threshold.
+     *
+     * @return number of rows affected
+     */
+    public int markStaleMaterializing(OffsetDateTime threshold) {
+        return jdbc.update(MARK_STALE_MATERIALIZING, Map.of("threshold", threshold));
     }
 
     /**
@@ -196,6 +284,43 @@ public class JobExecutionRepository {
         return jdbc.update(MARK_STALE_RETRY_SCHEDULED, Map.of("threshold", threshold));
     }
 
+    /**
+     * Same rules as {@link #markStaleInProgress(OffsetDateTime)} but scoped to one connection
+     * (eager reconcile before dispatch / manual sync).
+     */
+    public int markStaleInProgressForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_IN_PROGRESS_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
+    /**
+     * Same rules as {@link #markStaleMaterializing(OffsetDateTime)} but scoped to one connection.
+     */
+    public int markStaleMaterializingForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_MATERIALIZING_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
+    /**
+     * Same rules as {@link #markStaleRetryScheduled(OffsetDateTime)} but scoped to one connection.
+     */
+    public int markStaleRetryScheduledForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_RETRY_SCHEDULED_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
+    /**
+     * {@code PENDING} rows never picked up (lost queue message) older than the threshold.
+     */
+    public int markStalePendingForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_PENDING_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
     private JobExecutionRow mapRow(ResultSet rs, int rowNum) throws SQLException {
         return JobExecutionRow.builder()
                 .id(rs.getLong("id"))
@@ -204,8 +329,10 @@ public class JobExecutionRepository {
                 .status(rs.getString("status"))
                 .startedAt(rs.getObject("started_at", OffsetDateTime.class))
                 .completedAt(rs.getObject("completed_at", OffsetDateTime.class))
+                .materializingAt(rs.getObject("materializing_at", OffsetDateTime.class))
                 .errorDetails(rs.getString("error_details"))
                 .checkpoint(rs.getString("checkpoint"))
+                .params(rs.getString("params"))
                 .createdAt(rs.getObject("created_at", OffsetDateTime.class))
                 .build();
     }

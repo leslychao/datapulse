@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.execution.domain.PriceReadAdapter;
 import io.datapulse.execution.domain.PriceReadResult;
 import io.datapulse.integration.config.IntegrationProperties;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
@@ -39,7 +40,7 @@ public class WbPriceReadAdapter implements PriceReadAdapter {
     public PriceReadResult readCurrentPrice(long connectionId, String marketplaceSku,
                                             Map<String, String> credentials) {
         String baseUrl = integrationProperties.getWildberries().getPricesBaseUrl();
-        String token = credentials.get("token");
+        String token = credentials.get(CredentialKeys.WB_API_TOKEN);
         long nmId = Long.parseLong(marketplaceSku);
 
         var requestBody = Map.of(

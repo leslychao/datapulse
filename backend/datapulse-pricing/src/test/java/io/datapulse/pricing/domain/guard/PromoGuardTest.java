@@ -78,6 +78,6 @@ class PromoGuardTest {
   }
 
   private GuardConfig disabledConfig() {
-    return new GuardConfig(null, null, null, null, null, null, false, null, null);
+    return new GuardConfig(null, null, null, null, null, null, false, null, null, null, null);
   }
 }

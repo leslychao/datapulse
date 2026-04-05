@@ -444,11 +444,12 @@ Response:
 
 #### Dot color semantics
 
-| Цвет | CSS token | Условие | Tooltip |
-|------|-----------|---------|---------|
-| Зелёный | `--status-success` (`#059669`) | `last_success_at` < 1 час назад | `"Синхронизировано {absolute_time}"` |
-| Жёлтый | `--status-warning` (`#D97706`) | `last_success_at` 1–24 часа назад | `"Данные устаревают. Последняя синхронизация: {absolute_time}"` |
-| Красный | `--status-error` (`#DC2626`) | `last_success_at` > 24 часов назад ИЛИ `sync_state.status = ERROR` | `"Синхронизация не удалась. Последняя успешная: {absolute_time}"` |
+| Цвет | CSS token | SyncHealth | Условие | Визуал |
+|------|-----------|------------|---------|--------|
+| Зелёный | `--status-success` | `OK` | `last_success_at` < 24 часов и нет ERROR/SYNCING | Статичная точка |
+| Синий (accent) | `--accent-primary` | `SYNCING` | Хотя бы один `sync_state.status = SYNCING` | Пульсирующая точка (`animate-pulse`) + текст «синхронизация...» |
+| Жёлтый | `--status-warning` | `STALE` | `last_success_at` > 24 часов (или отсутствует), нет ERROR, нет SYNCING | Статичная точка |
+| Красный | `--status-error` | `ERROR` | `sync_state.status = ERROR` | Статичная точка |
 
 Если нет ни одного connection → left zone пуста (скрыта).
 
@@ -460,7 +461,7 @@ Response:
 
 #### Data source
 
-WebSocket topic `/topic/workspace/{workspaceId}/sync-status` обновляет status в реальном времени. Initial load: `GET /api/connections` (список connections с `lastSuccessAt`).
+WebSocket topic `/topic/workspace/{workspaceId}/sync-status` обновляет индикаторы в реальном времени (тело: `WorkspaceSyncStatusPush` — см. integration API). Initial load: `GET /api/connections/sync-health` (агрегированный health по подключениям).
 
 ### Center zone: Workspace name
 

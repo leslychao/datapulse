@@ -1,27 +1,30 @@
 package io.datapulse.api.websocket;
 
-import java.util.Map;
-
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
+/**
+ * Pushes connection status changes to workspace subscribers. Uses {@link TransactionPhase#AFTER_COMMIT}
+ * so {@link MarketplaceConnectionRepository} sees committed rows when this runs {@link Async} (same
+ * pattern as {@link ConnectionSyncHealthPushListener}).
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConnectionStatusPushListener {
 
-  private final SimpMessagingTemplate messagingTemplate;
+  private final WorkspaceTopicStompPublisher workspaceTopicStompPublisher;
   private final MarketplaceConnectionRepository connectionRepository;
 
   @Async("notificationExecutor")
-  @EventListener
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
   public void onConnectionStatusChanged(ConnectionStatusChangedEvent event) {
     try {
       Long workspaceId = connectionRepository.findById(event.connectionId())
@@ -34,12 +37,11 @@ public class ConnectionStatusPushListener {
         return;
       }
 
-      String destination =
-          "/topic/workspace/%d/connection-updates".formatted(workspaceId);
-      messagingTemplate.convertAndSend(destination, Map.of(
-          "connectionId", event.connectionId(),
-          "newStatus", event.newStatus(),
-          "trigger", event.trigger()));
+      workspaceTopicStompPublisher.publishConnectionStatusUpdate(
+          workspaceId,
+          event.connectionId(),
+          event.newStatus(),
+          event.trigger());
 
       log.debug("Connection status pushed: workspaceId={}, connectionId={}, newStatus={}",
           workspaceId, event.connectionId(), event.newStatus());

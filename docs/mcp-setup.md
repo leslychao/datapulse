@@ -1,6 +1,6 @@
 # MCP (Model Context Protocol) для локальной отладки
 
-В корне проекта — `.cursor/mcp.json` (dev без паролей в БД). Шаблон с плейсхолдерами: **`.cursor/mcp.json.example`** (скопируйте в `mcp.json` и подставьте значения из `infra/.env`). Агент в Cursor может выполнять **read-only** SQL к **PostgreSQL** и **ClickHouse**.
+В корне проекта — `.cursor/mcp.json`. Секреты **не** хранятся в `mcp.json`: оба сервера стартуют через `node scripts/mcp-*-launcher.mjs`, которые читают **`infra/.env`** (те же `POSTGRES_*` / `DB_*` и `CH_*`, что у Spring). Агент в Cursor может выполнять **read-only** SQL к **PostgreSQL** и **ClickHouse**.
 
 ## Что подключено
 
@@ -18,21 +18,15 @@ ClickHouse-сервер принудительно **readonly** (только б
 - PostgreSQL: `localhost:5432`, БД `datapulse`, пользователь `datapulse`, **пустой пароль**, `search_path=datapulse`.
 - ClickHouse: `localhost:8123`, пользователь `default`, БД `datapulse`, без TLS (`CLICKHOUSE_SECURE=false`).
 
-Если у вас заданы `POSTGRES_PASSWORD` или `CH_PASSWORD`, отредактируйте `.cursor/mcp.json` вручную (строка подключения Postgres или `CLICKHOUSE_PASSWORD` в `env`).
+Опционально для Postgres можно задать полный URI в **`POSTGRES_MCP_URL`** в `infra/.env` (перекрывает сборку из отдельных переменных).
 
-### Стек с `infra/.env` (как в `docker-compose.local.yml`)
+### Пути и Cursor
 
-Cursor **не подхватывает** `infra/.env` для MCP автоматически: переменные нужно **один раз перенести** в конфиг MCP вручную или держать отдельный локальный файл, который не коммитится.
+В `mcp.json` заданы **`cwd`** и **`${workspaceFolder}`** в `args`, чтобы скрипты находились при открытой папке репозитория. После правок — **полный перезапуск Cursor**.
 
-1. **PostgreSQL** — в `args` последним аргументом идёт URI. Формат:
-   `postgresql://POSTGRES_USER:POSTGRES_PASSWORD@DB_HOST:DB_PORT/POSTGRES_DB?options=-csearch_path%3DDB_SCHEMA`  
-   Если в пароле есть символы `@`, `:`, `/`, `#` и т.п., их нужно **URL-encode** в компоненте пароля.
+### ClickHouse и пустой пароль
 
-2. **ClickHouse** — в блоке `env` для `datapulse-clickhouse` задайте `CLICKHOUSE_PASSWORD` значением из **`CH_PASSWORD`** в вашем `.env`. Пакет требует непустой строки (`min(1)`); если пароль в окружении пустой, используйте один пробел `" "` (см. ниже).
-
-3. После правки — перезапуск Cursor.
-
-Имеет смысл держать **редактируемую только у себя** копию настроек MCP (например `%USERPROFILE%\.cursor\mcp.json` для пользовательских серверов или локальный override), а в репозитории — шаблон без секретов.
+Пакет требует непустой `CLICKHOUSE_PASSWORD`. Если **`CH_PASSWORD`** в `infra/.env` пустой, launcher подставляет один пробел (как раньше вручную в `mcp.json`).
 
 ## Как включить
 
@@ -57,14 +51,16 @@ SELECT count() AS c FROM mart_posting_pnl SETTINGS final = 1;
 ## Безопасность
 
 - Файл **`infra/.env`** уже в `.gitignore` — не добавляйте его в git и не вставляйте содержимое (пароли, токены Vault, OAuth, почты) в тикеты, чаты и публичные репозитории. При утечке — **смените пароли и токены** в инфраструктуре.
-- Не коммитьте `.cursor/mcp.json`, если в нём прописаны реальные `POSTGRES_PASSWORD` / `CH_PASSWORD` — используйте шаблон в репозитории и секреты только локально.
+- Коммитить `.cursor/mcp.json` безопасно: пароли только в **`infra/.env`** (в git не попадает).
 
 ## Устранение неполадок
 
+### Windows: `spawn EINVAL` в логах MCP
+
+Лаунчеры вызывают `npx` с **`shell: true`** только на Windows: иначе `spawn('npx.cmd', …)` без оболочки даёт `Error: spawn EINVAL` (ограничение Node). После обновления скриптов перезапустите Cursor.
+
 ### ClickHouse: `Client closed` / сервер не поднимается
 
-Пакет `@dmkozloff/clickhouse-mcp` в `env.js` задаёт **`CLICKHOUSE_PASSWORD` как обязательное поле с `min(1)`** — пустая строка `""` в конфиге Cursor **не подходит**, процесс падает при старте (в логах MCP нет текста ошибки, только «Client closed»).
+Частая причина — неверный **`CH_PASSWORD`** в `infra/.env` или ClickHouse не слушает `CH_HOST`/`CH_PORT`. Убедитесь, что `infra/.env` существует и совпадает с docker-compose. Пакет требует непустой пароль в переменной окружения; при пустом `CH_PASSWORD` launcher подставляет пробел.
 
-Для локального ClickHouse с пользователем `default` и **пустым паролем** в `.cursor/mcp.json` задан один пробел: `"CLICKHOUSE_PASSWORD": " "` (см. репозиторий). Если запросы к CH начинают отвечать ошибкой аутентификации — укажите реальный пароль вместо пробела.
-
-Перезапустите Cursor после правки `mcp.json`.
+Перезапустите Cursor после правки `infra/.env`.

@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DataQualityService {
 
   private final DataQualityReadRepository dataQualityReadRepository;
@@ -26,7 +27,6 @@ public class DataQualityService {
   private final WorkspaceConnectionRepository connectionRepository;
   private final AnalyticsQueryProperties properties;
 
-  @Transactional(readOnly = true)
   public DataQualityStatusResponse getStatus(long workspaceId) {
     List<SyncFreshnessRow> rows = syncStateReadRepository.findSyncFreshness(workspaceId);
 
@@ -64,11 +64,18 @@ public class DataQualityService {
         connectionIds, properties.dataQuality().residualAnomalyStdMultiplier());
   }
 
+  public boolean isClickHouseAvailable() {
+    try {
+      return dataQualityReadRepository.pingClickHouse();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   private int resolveThresholdHours(String domain,
       AnalyticsQueryProperties.DataQualityProperties dqProps) {
     return switch (domain.toLowerCase()) {
       case "finance" -> dqProps.staleFinanceThresholdHours();
-      case "advertising" -> dqProps.staleAdvertisingThresholdHours();
       default -> dqProps.staleStateThresholdHours();
     };
   }

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.analytics.domain.MaterializationService;
 import io.datapulse.api.config.RabbitTopologyConfig;
 import io.datapulse.etl.domain.IngestOrchestrator;
+import io.datapulse.etl.domain.IngestResultReporter;
+import io.datapulse.etl.domain.PostIngestMaterializationMessageHandler;
 import io.datapulse.platform.outbox.OutboxEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,13 +15,15 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Consumes ETL_SYNC_EXECUTE, ETL_SYNC_RETRY and REMATERIALIZATION_REQUESTED
+ * Consumes ETL_SYNC_EXECUTE, ETL_SYNC_RETRY, ETL_POST_INGEST_MATERIALIZE and
+ * REMATERIALIZATION_REQUESTED
  * messages from RabbitMQ.
  *
  * <p>All event types end up in the same {@code etl.sync} queue:
  * <ul>
  *   <li>ETL_SYNC_EXECUTE — published directly from outbox (manual or scheduled sync)</li>
  *   <li>ETL_SYNC_RETRY — published to {@code etl.sync.wait} with TTL, then DLX-forwarded here</li>
+ *   <li>ETL_POST_INGEST_MATERIALIZE — deferred mart materialization after a successful DAG</li>
  *   <li>REMATERIALIZATION_REQUESTED — triggers ClickHouse re-materialization</li>
  * </ul>
  *
@@ -32,6 +36,8 @@ import org.springframework.stereotype.Component;
 public class EtlSyncConsumer {
 
   private final IngestOrchestrator ingestOrchestrator;
+  private final PostIngestMaterializationMessageHandler postIngestMaterializationMessageHandler;
+  private final IngestResultReporter ingestResultReporter;
   private final MaterializationService materializationService;
   private final ObjectMapper objectMapper;
 
@@ -46,6 +52,12 @@ public class EtlSyncConsumer {
       }
 
       JsonNode payload = objectMapper.readTree(message.getBody());
+
+      if (OutboxEventType.ETL_POST_INGEST_MATERIALIZE.name().equals(eventType)) {
+        postIngestMaterializationMessageHandler.handle(payload);
+        return;
+      }
+
       long jobExecutionId = payload.path("jobExecutionId").asLong();
 
       if (jobExecutionId <= 0) {
@@ -54,11 +66,18 @@ public class EtlSyncConsumer {
         return;
       }
 
-      log.info("Processing ETL sync: jobExecutionId={}, eventType={}", jobExecutionId, eventType);
-      ingestOrchestrator.processSync(jobExecutionId);
+      boolean redelivered =
+          Boolean.TRUE.equals(message.getMessageProperties().getRedelivered());
+      log.info(
+          "Processing ETL sync: jobExecutionId={}, eventType={}, redelivered={}",
+          jobExecutionId,
+          eventType,
+          redelivered);
+      ingestOrchestrator.processSync(jobExecutionId, redelivered);
     } catch (Exception e) {
       log.error("Poison pill detected in etl.sync queue: messageId={}, error={}",
           message.getMessageProperties().getMessageId(), e.getMessage(), e);
+      tryReconcileSyncStateFromPoisonPill(message);
     }
   }
 
@@ -75,6 +94,18 @@ public class EtlSyncConsumer {
     } catch (Exception e) {
       log.error("Rematerialization failed: messageId={}", 
           message.getMessageProperties().getMessageId(), e);
+    }
+  }
+
+  private void tryReconcileSyncStateFromPoisonPill(Message message) {
+    try {
+      JsonNode payload = objectMapper.readTree(message.getBody());
+      long connectionId = payload.path("connectionId").asLong();
+      if (connectionId > 0) {
+        ingestResultReporter.reconcileSyncingWhenNoActiveJob(connectionId);
+      }
+    } catch (Exception ignored) {
+      // payload is completely unparseable — reconciliation will happen via StaleJobDetector
     }
   }
 

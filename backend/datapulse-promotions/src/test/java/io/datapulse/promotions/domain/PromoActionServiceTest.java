@@ -3,7 +3,6 @@ package io.datapulse.promotions.domain;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.promotions.api.BulkPromoActionRequest;
 import io.datapulse.promotions.api.BulkPromoActionResponse;
 import io.datapulse.promotions.api.PromoActionMapper;
@@ -17,7 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import io.datapulse.platform.audit.AuditPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,9 +42,7 @@ class PromoActionServiceTest {
   @Mock
   private PromoActionMapper actionMapper;
   @Mock
-  private ApplicationEventPublisher eventPublisher;
-  @Mock
-  private WorkspaceContext workspaceContext;
+  private AuditPublisher auditPublisher;
 
   @InjectMocks
   private PromoActionService service;

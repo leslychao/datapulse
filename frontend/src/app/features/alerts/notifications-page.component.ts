@@ -266,6 +266,20 @@ export class NotificationsPageComponent {
     }
   }
 
+  private resolveI18nNotificationField(
+    data: AppNotification | undefined,
+    field: 'title' | 'body',
+  ): string {
+    if (!data) {
+      return '';
+    }
+    const raw = field === 'title' ? data.title : data.body;
+    if (data.notificationType === 'SYNC_COMPLETED') {
+      return this.translate.instant(raw);
+    }
+    return raw;
+  }
+
   private buildColumnDefs(): ColDef<AppNotification>[] {
     return [
       {
@@ -294,6 +308,7 @@ export class NotificationsPageComponent {
         headerValueGetter: () => this.translate.instant('alerts.notifications.col.title'),
         flex: 1,
         minWidth: 140,
+        valueGetter: (p) => this.resolveI18nNotificationField(p.data, 'title'),
       },
       {
         colId: 'body',
@@ -306,7 +321,7 @@ export class NotificationsPageComponent {
         cellRenderer: (params: ICellRendererParams<AppNotification>) => {
           const wrap = document.createElement('div');
           const id = params.data?.id;
-          const body = params.data?.body ?? '';
+          const body = this.resolveI18nNotificationField(params.data, 'body');
           if (id == null) {
             wrap.textContent = body;
             return wrap;

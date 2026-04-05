@@ -146,6 +146,8 @@ export class WorkspaceSelectorComponent implements OnInit {
       next: (profile) => {
         this.userEmail.set(profile.email);
 
+        this.authService.applyCachedUser(profile);
+
         this.workspaceApi.listWorkspaces().subscribe({
           next: (details) => {
             const cards = this.mergeData(profile.memberships, details);

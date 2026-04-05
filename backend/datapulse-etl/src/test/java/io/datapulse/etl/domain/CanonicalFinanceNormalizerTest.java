@@ -42,7 +42,8 @@ class CanonicalFinanceNormalizerTest {
   private CanonicalFinanceNormalizer normalizer;
 
   private IngestContext buildContext() {
-    return new IngestContext(1L, 100L, 1L, MarketplaceType.WB,
+    return IngestContextFixtures.any(
+        1L, 100L, 1L, MarketplaceType.WB,
         Map.of(), "FULL_SYNC", EnumSet.allOf(EtlEventType.class), Map.of());
   }
 
@@ -51,7 +52,7 @@ class CanonicalFinanceNormalizerTest {
                                           String warehouseExternalId) {
     return new NormalizedFinanceItem(
         "entry-1", FinanceEntryType.SALE_ACCRUAL, postingId, orderId,
-        sellerSku, marketplaceSku, warehouseExternalId,
+        sellerSku, marketplaceSku, warehouseExternalId, null,
         BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO,
         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.valueOf(100),

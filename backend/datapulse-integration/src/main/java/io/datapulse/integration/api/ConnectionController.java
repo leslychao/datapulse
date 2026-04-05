@@ -44,6 +44,12 @@ public class ConnectionController {
         return connectionService.listConnections(workspaceContext.getWorkspaceId());
     }
 
+    @GetMapping("/sync-health")
+    @PreAuthorize("isAuthenticated()")
+    public List<ConnectionSyncHealthResponse> listSyncHealth() {
+        return connectionService.listSyncHealth(workspaceContext.getWorkspaceId());
+    }
+
     @GetMapping("/{connectionId}")
     @PreAuthorize("isAuthenticated()")
     public ConnectionResponse getConnection(@PathVariable("connectionId") Long connectionId) {

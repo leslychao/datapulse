@@ -6,7 +6,7 @@ import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.platform.audit.AuditEvent;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.promotions.api.PromoDecisionMapper;
 import io.datapulse.promotions.api.PromoDecisionResponse;
 import io.datapulse.promotions.persistence.PromoActionEntity;
@@ -17,7 +17,6 @@ import io.datapulse.promotions.persistence.PromoDecisionRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -40,7 +39,7 @@ public class PromoDecisionService {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final PromoDecisionMapper decisionMapper;
-    private final ApplicationEventPublisher eventPublisher;
+    private final AuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
     public PromoDecisionResponse getDecision(long decisionId, long workspaceId) {
@@ -331,10 +330,7 @@ public class PromoDecisionService {
 
     private void publishAudit(String actionType, long workspaceId, long userId,
                                String entityType, long entityId) {
-        eventPublisher.publishEvent(new AuditEvent(
-                workspaceId, "USER", userId, actionType,
-                entityType, String.valueOf(entityId),
-                "SUCCESS", null, null, null));
+        auditPublisher.publish(actionType, entityType, String.valueOf(entityId));
     }
 
     private record PromoProductInfo(long id, long campaignId, long marketplaceOfferId,
