@@ -1,22 +1,14 @@
 package io.datapulse.etl.adapter.ozon;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import io.datapulse.etl.adapter.util.StreamingPageCapture;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
-import io.datapulse.etl.domain.PageCaptureResult;
 import io.datapulse.etl.domain.cursor.JsonPathCursorExtractor;
-import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OzonStocksReadAdapter {
@@ -27,42 +19,28 @@ public class OzonStocksReadAdapter {
     private static final JsonPathCursorExtractor CURSOR_EXTRACTOR =
             new JsonPathCursorExtractor("result.last_id");
 
-    private final OzonApiCaller apiCaller;
-    private final StreamingPageCapture pageCapture;
+    private static final OzonLastIdPagedListCapture.OzonLastIdListSpec SPEC =
+            new OzonLastIdPagedListCapture.OzonLastIdListSpec(
+                    STOCKS_PATH,
+                    PAGE_LIMIT,
+                    CURSOR_EXTRACTOR,
+                    "stocks",
+                    currentLastId ->
+                            Map.of(
+                                    "filter", Map.of("visibility", "ALL"),
+                                    "last_id", currentLastId,
+                                    "limit", PAGE_LIMIT));
 
-    public List<CaptureResult> captureAllPages(CaptureContext context,
-                                               String clientId, String apiKey,
-                                               String initialLastId) {
-        List<CaptureResult> results = new ArrayList<>();
-        String lastId = initialLastId == null ? "" : initialLastId;
-        int pageNumber = 0;
-        boolean hasMore = true;
+    private final OzonLastIdPagedListCapture lastIdPagedCapture;
 
-        while (hasMore) {
-            String currentLastId = lastId;
-            Flux<DataBuffer> body = apiCaller.post(STOCKS_PATH,
-                    Map.of(
-                            "filter", Map.of("visibility", "ALL"),
-                            "last_id", currentLastId,
-                            "limit", PAGE_LIMIT),
-                    context.connectionId(), RateLimitGroup.OZON_DEFAULT,
-                    clientId, apiKey);
-
-            PageCaptureResult page = pageCapture.capture(
-                    body, context, pageNumber, CURSOR_EXTRACTOR, null,
-                    currentLastId.isEmpty() ? null : currentLastId);
-            results.add(page.captureResult());
-
-            lastId = page.cursor();
-            if (OzonCursorPaging.shouldStopAfterStringPage(lastId, currentLastId)) {
-                hasMore = false;
-            }
-
-            pageNumber++;
-        }
-
-        log.info("Ozon stocks capture completed: connectionId={}, totalPages={}",
-                context.connectionId(), results.size());
-        return results;
+    public List<CaptureResult> captureAllPages(
+            CaptureContext context, String clientId, String apiKey, String initialLastId) {
+        return lastIdPagedCapture.captureAllPages(
+                context,
+                clientId,
+                apiKey,
+                initialLastId,
+                SPEC,
+                OzonLastIdPagedListCapture.NO_OP);
     }
 }

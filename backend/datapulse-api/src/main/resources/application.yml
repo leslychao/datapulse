@@ -90,6 +90,10 @@ datapulse:
     health-check:
       interval: ${HEALTH_CHECK_INTERVAL:PT15M}
       failure-threshold: ${HEALTH_CHECK_FAILURE_THRESHOLD:3}
+    # Full request URI + JSON body (POST) for ETL marketplace adapters; pagination lives in query/body.
+    marketplace-http-logging:
+      enabled: ${INTEGRATION_MARKETPLACE_HTTP_LOGGING_ENABLED:false}
+      max-body-chars: ${INTEGRATION_MARKETPLACE_HTTP_LOGGING_MAX_BODY_CHARS:8192}
   clickhouse:
     url: jdbc:clickhouse://${CH_HOST:localhost}:${CH_PORT:8123}/${CH_DATABASE:datapulse}
     username: ${CH_USERNAME:default}

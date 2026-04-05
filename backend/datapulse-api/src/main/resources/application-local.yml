@@ -24,4 +24,8 @@ management:
 logging:
   level:
     io.datapulse: DEBUG
+    # Broad security DEBUG is very noisy on frequent unauthenticated calls (e.g. Prometheus scrape).
     org.springframework.security: DEBUG
+    org.springframework.security.web.FilterChainProxy: INFO
+    org.springframework.security.web.authentication.AnonymousAuthenticationFilter: INFO
+    io.datapulse.tenancy.config.WorkspaceContextFilter: INFO

@@ -11,20 +11,21 @@ public final class OzonCursorPaging {
     private OzonCursorPaging() {}
 
     /**
-     * True when the page should be treated as the last one: missing cursor, or the API echoed the
-     * same {@code last_id} as in the request (pagination did not advance). Deliberately does not use
+     * Outcome after one list page: whether to stop crawling, and whether stop was due to a
+     * non-advancing cursor (non-empty response {@code last_id} equal to the request), useful for
+     * diagnostics.
+     */
+    public record StringCursorPageOutcome(boolean stop, boolean nonAdvancingCursor) {}
+
+    /**
+     * Decides pagination continuation from response vs request {@code last_id}. Does not use
      * response byte size — small valid JSON pages must not truncate the crawl.
      */
-    public static boolean shouldStopAfterStringPage(String responseLastId, String requestLastId) {
-        return responseLastId == null
-                || responseLastId.isEmpty()
-                || Objects.equals(responseLastId, requestLastId);
-    }
-
-    /** Cursor present and identical to the value sent in the request (pagination did not advance). */
-    public static boolean isNonAdvancingStringCursor(String responseLastId, String requestLastId) {
-        return responseLastId != null
-                && !responseLastId.isEmpty()
-                && Objects.equals(responseLastId, requestLastId);
+    public static StringCursorPageOutcome afterPage(String responseLastId, String requestLastId) {
+        boolean sameCursor = Objects.equals(responseLastId, requestLastId);
+        boolean stop = responseLastId == null || responseLastId.isEmpty() || sameCursor;
+        boolean nonAdvancing =
+                responseLastId != null && !responseLastId.isEmpty() && sameCursor;
+        return new StringCursorPageOutcome(stop, nonAdvancing);
     }
 }

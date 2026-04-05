@@ -8,7 +8,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 @Configuration
-@EnableConfigurationProperties({IntegrationProperties.class, RateLimitProperties.class})
+@EnableConfigurationProperties({
+    IntegrationProperties.class,
+    RateLimitProperties.class,
+    MarketplaceHttpLoggingProperties.class
+})
 public class IntegrationRedisConfig {
 
     @Bean("rateLimitScheduler")

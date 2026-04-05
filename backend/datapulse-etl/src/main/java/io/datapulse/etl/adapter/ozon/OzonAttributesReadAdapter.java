@@ -1,20 +1,14 @@
 package io.datapulse.etl.adapter.ozon;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import io.datapulse.etl.adapter.util.StreamingPageCapture;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
-import io.datapulse.etl.domain.PageCaptureResult;
 import io.datapulse.etl.domain.cursor.JsonPathCursorExtractor;
-import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 
 @Slf4j
 @Service
@@ -27,46 +21,38 @@ public class OzonAttributesReadAdapter {
     private static final JsonPathCursorExtractor CURSOR_EXTRACTOR =
             new JsonPathCursorExtractor("last_id");
 
-    private final OzonApiCaller apiCaller;
-    private final StreamingPageCapture pageCapture;
+    private final OzonLastIdPagedListCapture lastIdPagedCapture;
 
-    public List<CaptureResult> captureAllPages(CaptureContext context,
-                                               String clientId, String apiKey,
-                                               List<Long> productIds,
-                                               String initialLastId) {
-        List<CaptureResult> results = new ArrayList<>();
-        String lastId = initialLastId == null ? "" : initialLastId;
-        int pageNumber = 0;
-        boolean hasMore = true;
+    public List<CaptureResult> captureAllPages(
+            CaptureContext context,
+            String clientId,
+            String apiKey,
+            List<Long> productIds,
+            String initialLastId) {
+        OzonLastIdPagedListCapture.OzonLastIdListSpec spec =
+                new OzonLastIdPagedListCapture.OzonLastIdListSpec(
+                        ATTRIBUTES_PATH,
+                        PAGE_LIMIT,
+                        CURSOR_EXTRACTOR,
+                        "attributes",
+                        currentLastId ->
+                                Map.of(
+                                        "filter",
+                                        Map.of("product_id", productIds, "visibility", "ALL"),
+                                        "last_id", currentLastId,
+                                        "limit", PAGE_LIMIT,
+                                        "sort_dir", "ASC"));
 
-        while (hasMore) {
-            String currentLastId = lastId;
-            Flux<DataBuffer> body = apiCaller.post(ATTRIBUTES_PATH,
-                    Map.of(
-                            "filter", Map.of("product_id", productIds, "visibility", "ALL"),
-                            "last_id", currentLastId,
-                            "limit", PAGE_LIMIT,
-                            "sort_dir", "ASC"),
-                    context.connectionId(), RateLimitGroup.OZON_DEFAULT,
-                    clientId, apiKey);
-
-            PageCaptureResult page = pageCapture.capture(
-                    body, context, pageNumber, CURSOR_EXTRACTOR, null,
-                    currentLastId.isEmpty() ? null : currentLastId);
-            results.add(page.captureResult());
-
-            lastId = page.cursor();
-            if (OzonCursorPaging.shouldStopAfterStringPage(lastId, currentLastId)) {
-                hasMore = false;
-            }
-
-            pageNumber++;
-            log.debug("Ozon attributes page captured: connectionId={}, page={}",
-                    context.connectionId(), pageNumber);
-        }
-
-        log.info("Ozon attributes capture completed: connectionId={}, totalPages={}",
-                context.connectionId(), results.size());
-        return results;
+        return lastIdPagedCapture.captureAllPages(
+                context,
+                clientId,
+                apiKey,
+                initialLastId,
+                spec,
+                (pageIndex, ctx, outcome) ->
+                        log.debug(
+                                "Ozon attributes page captured: connectionId={}, page={}",
+                                ctx.connectionId(),
+                                pageIndex + 1));
     }
 }
