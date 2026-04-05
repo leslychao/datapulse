@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.List;
@@ -66,7 +67,8 @@ class IngestOrchestratorTest {
       365, Duration.ofHours(1),
       Duration.ofMinutes(15),
       Duration.ofHours(1),
-      PostIngestMaterializationMode.SYNC);
+      PostIngestMaterializationMode.SYNC,
+      Duration.ofMinutes(15));
 
   private final Clock ingestClock =
       Clock.fixed(Instant.parse("2024-06-15T12:00:00Z"), ZoneOffset.UTC);
@@ -74,7 +76,7 @@ class IngestOrchestratorTest {
   @BeforeEach
   void setUp() {
     IngestJobAcquisitionService acquisition =
-        new IngestJobAcquisitionService(jobExecutionRepository);
+        new IngestJobAcquisitionService(jobExecutionRepository, ingestProperties, ingestClock);
     lenient().when(marketplaceSyncStateRepository.findAllByMarketplaceConnectionId(anyLong()))
         .thenReturn(List.of());
     IngestSyncContextBuilder contextBuilder =
@@ -176,6 +178,66 @@ class IngestOrchestratorTest {
 
       verify(dagExecutor, never()).execute(any());
       verify(postIngestMaterialization, never()).afterSuccessfulIngest(anyLong());
+    }
+
+    @Test
+    void should_skipProcessing_when_inProgressAndNotRedelivered_and_startedRecently() {
+      JobExecutionRow job = JobExecutionRow.builder()
+          .id(1L)
+          .connectionId(100L)
+          .eventType("FULL_SYNC")
+          .status("IN_PROGRESS")
+          .startedAt(OffsetDateTime.parse("2024-06-15T11:50:00Z"))
+          .build();
+      when(jobExecutionRepository.findById(1L)).thenReturn(Optional.of(job));
+
+      orchestrator.processSync(1L, false);
+
+      verify(dagExecutor, never()).execute(any());
+      verify(jobExecutionRepository, never()).reclaimInProgressAfterBrokerRedelivery(anyLong());
+    }
+
+    @Test
+    void should_resumeAndExecuteDag_when_inProgressAndRabbitRedelivered() {
+      JobExecutionRow job = buildJob(1L, "IN_PROGRESS");
+      when(jobExecutionRepository.findById(1L)).thenReturn(Optional.of(job));
+      when(jobExecutionRepository.reclaimInProgressAfterBrokerRedelivery(1L)).thenReturn(true);
+      when(credentialResolver.resolve(100L)).thenReturn(buildCredentials());
+      when(checkpointManager.parse(any())).thenReturn(Map.of());
+      when(checkpointManager.extractRetryCount(any())).thenReturn(0);
+      Map<EtlEventType, EventResult> results = allCompletedResults();
+      when(dagExecutor.execute(any())).thenReturn(results);
+      when(resultReporter.buildErrorDetails(any())).thenReturn("{}");
+
+      orchestrator.processSync(1L, true);
+
+      verify(jobExecutionRepository).reclaimInProgressAfterBrokerRedelivery(1L);
+      verify(dagExecutor).execute(any());
+      verify(jobExecutionRepository).casStatus(
+          1L, JobExecutionStatus.IN_PROGRESS, JobExecutionStatus.MATERIALIZING);
+    }
+
+    @Test
+    void should_resume_when_inProgressOrphanOlderThanThresholdWithoutRedelivery() {
+      JobExecutionRow job = JobExecutionRow.builder()
+          .id(1L)
+          .connectionId(100L)
+          .eventType("FULL_SYNC")
+          .status("IN_PROGRESS")
+          .startedAt(OffsetDateTime.parse("2024-06-15T11:30:00Z"))
+          .build();
+      when(jobExecutionRepository.findById(1L)).thenReturn(Optional.of(job));
+      when(jobExecutionRepository.reclaimInProgressAfterBrokerRedelivery(1L)).thenReturn(true);
+      when(credentialResolver.resolve(100L)).thenReturn(buildCredentials());
+      when(checkpointManager.parse(any())).thenReturn(Map.of());
+      when(checkpointManager.extractRetryCount(any())).thenReturn(0);
+      when(dagExecutor.execute(any())).thenReturn(allCompletedResults());
+      when(resultReporter.buildErrorDetails(any())).thenReturn("{}");
+
+      orchestrator.processSync(1L, false);
+
+      verify(jobExecutionRepository).reclaimInProgressAfterBrokerRedelivery(1L);
+      verify(dagExecutor).execute(any());
     }
 
     @Test
@@ -332,9 +394,10 @@ class IngestOrchestratorTest {
           365, Duration.ofHours(1),
           Duration.ofMinutes(15),
           Duration.ofHours(1),
-          PostIngestMaterializationMode.ASYNC_OUTBOX);
+          PostIngestMaterializationMode.ASYNC_OUTBOX,
+          Duration.ofMinutes(15));
       IngestJobAcquisitionService acquisition =
-          new IngestJobAcquisitionService(jobExecutionRepository);
+          new IngestJobAcquisitionService(jobExecutionRepository, asyncProps, ingestClock);
       IngestSyncContextBuilder contextBuilder =
           new IngestSyncContextBuilder(
               credentialResolver,

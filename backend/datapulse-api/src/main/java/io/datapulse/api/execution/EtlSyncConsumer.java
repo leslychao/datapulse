@@ -64,8 +64,14 @@ public class EtlSyncConsumer {
         return;
       }
 
-      log.info("Processing ETL sync: jobExecutionId={}, eventType={}", jobExecutionId, eventType);
-      ingestOrchestrator.processSync(jobExecutionId);
+      boolean redelivered =
+          Boolean.TRUE.equals(message.getMessageProperties().getRedelivered());
+      log.info(
+          "Processing ETL sync: jobExecutionId={}, eventType={}, redelivered={}",
+          jobExecutionId,
+          eventType,
+          redelivered);
+      ingestOrchestrator.processSync(jobExecutionId, redelivered);
     } catch (Exception e) {
       log.error("Poison pill detected in etl.sync queue: messageId={}, error={}",
           message.getMessageProperties().getMessageId(), e.getMessage(), e);

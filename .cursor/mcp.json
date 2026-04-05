@@ -1,25 +1,14 @@
 {
   "mcpServers": {
     "datapulse-postgres": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://datapulse@localhost:5432/datapulse?options=-csearch_path%3Ddatapulse"
-      ]
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/mcp-postgres-launcher.mjs"],
+      "cwd": "${workspaceFolder}"
     },
     "datapulse-clickhouse": {
-      "command": "npx",
-      "args": ["-y", "@dmkozloff/clickhouse-mcp"],
-      "env": {
-        "CLICKHOUSE_HOST": "localhost",
-        "CLICKHOUSE_PORT": "8123",
-        "CLICKHOUSE_USER": "default",
-        "CLICKHOUSE_PASSWORD": " ",
-        "CLICKHOUSE_DATABASE": "datapulse",
-        "CLICKHOUSE_SECURE": "false",
-        "CLICKHOUSE_VERIFY": "false"
-      }
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/mcp-clickhouse-launcher.mjs"],
+      "cwd": "${workspaceFolder}"
     }
   }
 }

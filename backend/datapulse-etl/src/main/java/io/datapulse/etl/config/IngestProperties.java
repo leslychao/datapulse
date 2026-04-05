@@ -39,5 +39,12 @@ public record IngestProperties(
          * falls back to {@code started_at} for legacy rows.
          */
         @DefaultValue("PT1H") Duration materializingStaleThreshold,
-        @DefaultValue("SYNC") PostIngestMaterializationMode postIngestMaterializationMode
+        @DefaultValue("SYNC") PostIngestMaterializationMode postIngestMaterializationMode,
+        /**
+         * When job is already {@code IN_PROGRESS} and Rabbit reports {@code redelivered=false}, still
+         * allow the same reclaim {@code UPDATE} as for redelivery if {@code started_at} is older than
+         * this threshold. Mitigates silent ack + stuck job when the broker does not set redelivered.
+         * Set to {@code PT0S} to disable (only {@code redelivered=true} reclaims).
+         */
+        @DefaultValue("PT15M") Duration inProgressOrphanReclaimThreshold
 ) {}

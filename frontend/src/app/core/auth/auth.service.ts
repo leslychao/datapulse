@@ -46,7 +46,10 @@ export class AuthService {
   }
 
   login(returnUrl?: string): void {
-    const rd = returnUrl ?? window.location.pathname;
+    const rd =
+      returnUrl != null && returnUrl.length > 0
+        ? returnUrl
+        : `${window.location.pathname}${window.location.search}`;
     window.location.href = `${environment.oauth2.loginUrl}?rd=${encodeURIComponent(rd)}`;
   }
 

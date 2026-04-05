@@ -90,6 +90,18 @@ public class JobExecutionRepository {
               ) < :threshold
             """;
 
+    /**
+     * Refreshes {@code started_at} for an {@code IN_PROGRESS} job so a new worker can resume after
+     * RabbitMQ redelivery (previous consumer died before ack). Does not change {@code status}.
+     *
+     * @return {@code true} if exactly one row matched
+     */
+    private static final String RECLAIM_IN_PROGRESS_AFTER_REDELIVERY = """
+            UPDATE job_execution
+            SET started_at = now()
+            WHERE id = :id AND status = 'IN_PROGRESS'
+            """;
+
     public long insert(long connectionId, String eventType) {
         return insert(connectionId, eventType, null);
     }
@@ -116,6 +128,14 @@ public class JobExecutionRepository {
                 "expected", expected.name(),
                 "target", target.name()
         ));
+        return updated == 1;
+    }
+
+    /**
+     * See {@link #RECLAIM_IN_PROGRESS_AFTER_REDELIVERY}.
+     */
+    public boolean reclaimInProgressAfterBrokerRedelivery(long id) {
+        int updated = jdbc.update(RECLAIM_IN_PROGRESS_AFTER_REDELIVERY, Map.of("id", id));
         return updated == 1;
     }
 

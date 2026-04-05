@@ -27,20 +27,30 @@ public class IngestOrchestrator {
   private final IngestJobCompletionCoordinator jobCompletion;
 
   /**
+   * Same as {@link #processSync(long, boolean)} with {@code rabbitMqRedelivered=false} (tests,
+   * non-Rabbit callers).
+   */
+  public void processSync(long jobExecutionId) {
+    processSync(jobExecutionId, false);
+  }
+
+  /**
    * Main entry point — processes a single sync job.
    *
    * @param jobExecutionId PK of job_execution record
+   * @param rabbitMqRedelivered pass {@code MessageProperties#getRedelivered()} from the AMQP message
    */
-  public void processSync(long jobExecutionId) {
+  public void processSync(long jobExecutionId, boolean rabbitMqRedelivered) {
     log.info("Ingest started: jobExecutionId={}", jobExecutionId);
 
     JobExecutionRow job = jobExecutionRepository.findById(jobExecutionId)
         .orElseThrow(() -> new IllegalStateException(
             "job_execution not found: id=%d".formatted(jobExecutionId)));
 
-    if (!jobAcquisition.tryAcquire(job)) {
-      log.warn("Could not acquire job (CAS failed): jobExecutionId={}, currentStatus={}",
-          jobExecutionId, job.getStatus());
+    if (!jobAcquisition.tryAcquire(job, rabbitMqRedelivered)) {
+      log.warn(
+          "Could not acquire job (CAS failed): jobExecutionId={}, currentStatus={}, redelivered={}",
+          jobExecutionId, job.getStatus(), rabbitMqRedelivered);
       return;
     }
 

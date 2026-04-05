@@ -48,7 +48,8 @@ class IngestSyncContextBuilderTest {
       Duration.ofHours(1),
       Duration.ofMinutes(15),
       Duration.ofHours(1),
-      PostIngestMaterializationMode.SYNC);
+      PostIngestMaterializationMode.SYNC,
+      Duration.ofMinutes(15));
 
   private IngestSyncContextBuilder builder;
 

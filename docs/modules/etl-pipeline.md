@@ -1049,6 +1049,7 @@ PENDING → IN_PROGRESS → MATERIALIZING → COMPLETED
 | Переход | Условие | Guard |
 |---------|---------|-------|
 | PENDING → IN_PROGRESS | Worker picks up message (first attempt) | CAS: `UPDATE ... WHERE id = ? AND status = 'PENDING'` |
+| IN_PROGRESS (resume) | В БД уже `IN_PROGRESS` и выполняется **одно из**: **(a)** RabbitMQ `redelivered=true` (предыдущий consumer не ack — crash, обрыв канала); **(b)** `redelivered=false`, но `started_at` старше `datapulse.etl.ingest.in-progress-orphan-reclaim-threshold` (дефолт `PT15M`) — смягчает редкий случай дубликата/квирка брокера без `redelivered` + `AcknowledgeMode.AUTO` (иначе no-op + ack → «мёртвый» job до stale-detector). `PT0S` отключает ветку (b), остаётся только redelivery | `UPDATE ... SET started_at = now() WHERE id = ? AND status = 'IN_PROGRESS'` — обновление lease + разрешение снова выполнить DAG (checkpoint / идемпотентность canonical) |
 | IN_PROGRESS → MATERIALIZING | Ingest не полностью failed и не ушёл в retry; DAG завершён | CAS: `WHERE status = 'IN_PROGRESS'` |
 | MATERIALIZING → COMPLETED | Все events успешны + материализация успешна | CAS: `WHERE status = 'MATERIALIZING'` |
 | MATERIALIZING → COMPLETED_WITH_ERRORS | Часть events failed/partial **или** материализация с ошибками | CAS: `WHERE status = 'MATERIALIZING'` |
@@ -1061,7 +1062,7 @@ PENDING → IN_PROGRESS → MATERIALIZING → COMPLETED
 
 `STALE` — терминальный статус. Recovery path: stale job detector помечает зависший job как STALE → INSERT alert (business alert: "ETL sync stale for connection {name}") → следующий scheduled sync создаёт новый `job_execution` (concurrency guard пропускает STALE jobs). `stale_threshold`: configurable (default: 2 часа для IN_PROGRESS, 1 час для RETRY_SCHEDULED).
 
-Все переходы защищены CAS (optimistic lock). Двойная обработка невозможна: если CAS не прошёл, worker отбрасывает message.
+Почти все переходы защищены CAS (optimistic lock). Исключение: **resume** — тот же guarded `UPDATE` по `id` + `status = IN_PROGRESS`, когда либо `redelivered=true`, либо сработал orphan-порог по `started_at` (`in-progress-orphan-reclaim-threshold`, см. строку выше). При `AcknowledgeMode.AUTO` сообщение ack-ится после успешного return из listener: без resume redelivery после crash дала бы no-op, ack и «вечный» `IN_PROGRESS` до stale-detector; без orphan-порога при `redelivered=false` та же логика для редкого дубликата. Если CAS / acquire не прошёл и **не** было основания для resume (нет `redelivered` и job не старше порога), worker всё равно ack-ит сообщение (duplicate / гонка) — защита от двойного параллельного ingest на одном job по-прежнему через статус в БД.
 
 **Retry — тот же job_execution.** DLX retry не создаёт новый `job_execution`. Это продолжение того же run: ID сохраняется, checkpoint накапливает прогресс, provenance цельная (`canonical.job_execution_id` одинаков для всех attempt-ов).
 
