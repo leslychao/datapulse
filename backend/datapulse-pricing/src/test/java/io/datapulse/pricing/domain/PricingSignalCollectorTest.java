@@ -2,7 +2,12 @@ package io.datapulse.pricing.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -11,7 +16,6 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import io.datapulse.pricing.persistence.PricingClickHouseReadRepository;
+import io.datapulse.pricing.persistence.PricingClickHouseReadRepository.CommissionResult;
 import io.datapulse.pricing.persistence.PricingDataReadRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +68,7 @@ class PricingSignalCollectorTest {
     @DisplayName("assembles signals for each offer from repository data")
     void should_assembleSignals_when_offersProvided() {
       List<Long> offerIds = List.of(100L, 200L);
+      stubPgRepos(offerIds);
 
       when(dataReadRepository.findCurrentPrices(offerIds))
           .thenReturn(Map.of(100L, new BigDecimal("999"), 200L, new BigDecimal("1500")));
@@ -72,14 +78,6 @@ class PricingSignalCollectorTest {
           .thenReturn(Map.of(100L, 50, 200L, 0));
       when(dataReadRepository.findLockedOfferIds(offerIds))
           .thenReturn(List.of(200L));
-      when(dataReadRepository.findDataFreshness(CONNECTION_ID))
-          .thenReturn(OffsetDateTime.now());
-      when(dataReadRepository.findLatestChangeDecisions(offerIds))
-          .thenReturn(Map.of());
-      when(dataReadRepository.findPriceReversals(eq(offerIds), any()))
-          .thenReturn(Map.of());
-      when(dataReadRepository.findMarketplaceSkus(offerIds))
-          .thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -103,15 +101,8 @@ class PricingSignalCollectorTest {
     @DisplayName("handles null COGS and null stock gracefully")
     void should_handleNullSignals_when_dataNotAvailable() {
       List<Long> offerIds = List.of(300L);
-
-      when(dataReadRepository.findCurrentPrices(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findCurrentCogs(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findTotalStock(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findLockedOfferIds(offerIds)).thenReturn(List.of());
+      stubPgRepos(offerIds);
       when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(null);
-      when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
-      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -125,46 +116,14 @@ class PricingSignalCollectorTest {
     }
 
     @Test
-    @DisplayName("calls all repository methods with correct offer IDs")
-    void should_callAllRepositoryMethods_when_offersProvided() {
-      List<Long> offerIds = List.of(1L);
-
-      when(dataReadRepository.findCurrentPrices(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findCurrentCogs(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findTotalStock(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findLockedOfferIds(offerIds)).thenReturn(List.of());
-      when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(null);
-      when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
-      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
-
-      collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
-
-      verify(dataReadRepository).findCurrentPrices(offerIds);
-      verify(dataReadRepository).findCurrentCogs(offerIds);
-      verify(dataReadRepository).findTotalStock(offerIds);
-      verify(dataReadRepository).findLockedOfferIds(offerIds);
-      verify(dataReadRepository).findDataFreshness(CONNECTION_ID);
-      verify(dataReadRepository).findLatestChangeDecisions(offerIds);
-      verify(dataReadRepository).findPriceReversals(eq(offerIds), any());
-      verify(dataReadRepository).findMarketplaceSkus(offerIds);
-    }
-
-    @Test
     @DisplayName("populates lastPriceChangeAt from latest change decisions")
     void should_populateLastChange_when_decisionExists() {
       List<Long> offerIds = List.of(100L);
       OffsetDateTime lastChange = OffsetDateTime.now().minusHours(12);
 
-      when(dataReadRepository.findCurrentPrices(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findCurrentCogs(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findTotalStock(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findLockedOfferIds(offerIds)).thenReturn(List.of());
-      when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(null);
+      stubPgRepos(offerIds);
       when(dataReadRepository.findLatestChangeDecisions(offerIds))
           .thenReturn(Map.of(100L, lastChange));
-      when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
-      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -177,15 +136,9 @@ class PricingSignalCollectorTest {
     void should_populateReversals_when_reversalsExist() {
       List<Long> offerIds = List.of(100L);
 
-      when(dataReadRepository.findCurrentPrices(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findCurrentCogs(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findTotalStock(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findLockedOfferIds(offerIds)).thenReturn(List.of());
-      when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(null);
-      when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
+      stubPgRepos(offerIds);
       when(dataReadRepository.findPriceReversals(eq(offerIds), any()))
           .thenReturn(Map.of(100L, 5));
-      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -199,14 +152,8 @@ class PricingSignalCollectorTest {
       List<Long> offerIds = List.of(100L, 200L);
       OffsetDateTime freshness = OffsetDateTime.now().minusHours(2);
 
-      when(dataReadRepository.findCurrentPrices(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findCurrentCogs(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findTotalStock(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findLockedOfferIds(offerIds)).thenReturn(List.of());
+      stubPgRepos(offerIds);
       when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(freshness);
-      when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
-      when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
-      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -214,5 +161,287 @@ class PricingSignalCollectorTest {
       assertThat(result.get(100L).dataFreshnessAt()).isEqualTo(freshness);
       assertThat(result.get(200L).dataFreshnessAt()).isEqualTo(freshness);
     }
+
+    @Test
+    @DisplayName("calls findSellerSkuIds to build offerId→skuId mapping")
+    void should_callFindSellerSkuIds_when_offersProvided() {
+      List<Long> offerIds = List.of(100L);
+      stubPgRepos(offerIds);
+
+      collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
+
+      verify(dataReadRepository).findSellerSkuIds(offerIds);
+    }
+  }
+
+  @Nested
+  @DisplayName("collectClickHouseSignals — commission per-SKU")
+  class CommissionPerSku {
+
+    @Test
+    @DisplayName("returns empty signals when offerToSku mapping is empty")
+    void should_returnEmpty_when_noSkuMapping() {
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, Map.of());
+
+      assertThat(result.commissions()).isEmpty();
+      assertThat(result.logistics()).isEmpty();
+      assertThat(result.returnRates()).isEmpty();
+      verifyNoInteractions(clickHouseReadRepository);
+    }
+
+    @Test
+    @DisplayName("populates commission from per-SKU data when above minTransactions")
+    void should_populateCommission_when_skuHasEnoughTransactions() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L, 200L, 600L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of(
+              500L, new CommissionResult(new BigDecimal("0.12"), 25),
+              600L, new CommissionResult(new BigDecimal("0.15"), 30)));
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      assertThat(result.commissions()).containsEntry(100L, new BigDecimal("0.12"));
+      assertThat(result.commissions()).containsEntry(200L, new BigDecimal("0.15"));
+    }
+  }
+
+  @Nested
+  @DisplayName("collectClickHouseSignals — commission category fallback")
+  class CommissionCategoryFallback {
+
+    @Test
+    @DisplayName("falls back to category commission when SKU has insufficient data")
+    void should_useCategoryFallback_when_skuBelowMinTransactions() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L, 200L, 600L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of(
+              500L, new CommissionResult(new BigDecimal("0.12"), 25)));
+
+      when(clickHouseReadRepository.findCategoriesBySellerSkuIds(
+          eq(CONNECTION_ID), anyList()))
+          .thenReturn(Map.of(600L, "Одежда"));
+
+      when(clickHouseReadRepository.findCategoryAvgCommissionPct(
+          eq(CONNECTION_ID), eq(List.of("Одежда")), anyInt()))
+          .thenReturn(Map.of("Одежда", new BigDecimal("0.18")));
+
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      assertThat(result.commissions())
+          .containsEntry(100L, new BigDecimal("0.12"))
+          .containsEntry(200L, new BigDecimal("0.18"));
+    }
+
+    @Test
+    @DisplayName("returns null commission when both per-SKU and category have no data")
+    void should_returnNull_when_noCategoryData() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of());
+
+      when(clickHouseReadRepository.findCategoriesBySellerSkuIds(
+          eq(CONNECTION_ID), anyList()))
+          .thenReturn(Map.of());
+
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      assertThat(result.commissions()).doesNotContainKey(100L);
+    }
+
+    @Test
+    @DisplayName("skips category fallback when all SKUs have per-SKU data")
+    void should_skipCategoryQuery_when_allSkusHaveData() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of(
+              500L, new CommissionResult(new BigDecimal("0.10"), 15)));
+
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+
+      collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      verify(clickHouseReadRepository, never())
+          .findCategoriesBySellerSkuIds(anyLong(), anyList());
+      verify(clickHouseReadRepository, never())
+          .findCategoryAvgCommissionPct(anyLong(), anyList(), anyInt());
+    }
+  }
+
+  @Nested
+  @DisplayName("collectClickHouseSignals — logistics")
+  class Logistics {
+
+    @Test
+    @DisplayName("populates avgLogisticsPerUnit from CH data")
+    void should_populateLogistics_when_dataAvailable() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findCategoriesBySellerSkuIds(
+          eq(CONNECTION_ID), anyList()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of(500L, new BigDecimal("85.50")));
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      assertThat(result.logistics())
+          .containsEntry(100L, new BigDecimal("85.50"));
+    }
+  }
+
+  @Nested
+  @DisplayName("collectClickHouseSignals — return rate")
+  class ReturnRate {
+
+    @Test
+    @DisplayName("populates returnRatePct from CH data")
+    void should_populateReturnRate_when_dataAvailable() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findCategoriesBySellerSkuIds(
+          eq(CONNECTION_ID), anyList()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of());
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of(500L, new BigDecimal("0.035")));
+
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      assertThat(result.returnRates())
+          .containsEntry(100L, new BigDecimal("0.035"));
+    }
+  }
+
+  @Nested
+  @DisplayName("collectClickHouseSignals — CH failure resilience")
+  class ChFailureResilience {
+
+    @Test
+    @DisplayName("returns empty signals when ClickHouse throws exception")
+    void should_returnEmptySignals_when_chFails() {
+      Map<Long, Long> offerToSku = Map.of(100L, 500L);
+
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenThrow(new RuntimeException("CH connection refused"));
+
+      var result = collector.collectClickHouseSignals(CONNECTION_ID, offerToSku);
+
+      assertThat(result.commissions()).isEmpty();
+      assertThat(result.logistics()).isEmpty();
+      assertThat(result.returnRates()).isEmpty();
+    }
+  }
+
+  @Nested
+  @DisplayName("collectBatch — full integration with CH signals")
+  class FullIntegration {
+
+    @Test
+    @DisplayName("populates all CH signals in PricingSignalSet")
+    void should_populateAllChSignals_when_dataAvailable() {
+      List<Long> offerIds = List.of(100L);
+      stubPgRepos(offerIds);
+
+      when(dataReadRepository.findSellerSkuIds(offerIds))
+          .thenReturn(Map.of(100L, 500L));
+      when(clickHouseReadRepository.findAvgCommissionPct(
+          eq(CONNECTION_ID), anyList(), anyInt(), anyInt()))
+          .thenReturn(Map.of(
+              500L, new CommissionResult(new BigDecimal("0.12"), 20)));
+      when(clickHouseReadRepository.findAvgLogisticsPerUnit(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of(500L, new BigDecimal("95")));
+      when(clickHouseReadRepository.findReturnRatePct(
+          eq(CONNECTION_ID), anyList(), anyInt()))
+          .thenReturn(Map.of(500L, new BigDecimal("0.04")));
+
+      Map<Long, PricingSignalSet> result =
+          collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
+
+      PricingSignalSet signals = result.get(100L);
+      assertThat(signals.avgCommissionPct())
+          .isEqualByComparingTo(new BigDecimal("0.12"));
+      assertThat(signals.avgLogisticsPerUnit())
+          .isEqualByComparingTo(new BigDecimal("95"));
+      assertThat(signals.returnRatePct())
+          .isEqualByComparingTo(new BigDecimal("0.04"));
+    }
+
+    @Test
+    @DisplayName("CH signals are null when no sellerSkuId mapping exists")
+    void should_returnNullChSignals_when_noSkuMapping() {
+      List<Long> offerIds = List.of(100L);
+      stubPgRepos(offerIds);
+
+      Map<Long, PricingSignalSet> result =
+          collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
+
+      PricingSignalSet signals = result.get(100L);
+      assertThat(signals.avgCommissionPct()).isNull();
+      assertThat(signals.avgLogisticsPerUnit()).isNull();
+      assertThat(signals.returnRatePct()).isNull();
+    }
+  }
+
+  private void stubPgRepos(List<Long> offerIds) {
+    when(dataReadRepository.findCurrentPrices(offerIds)).thenReturn(Map.of());
+    when(dataReadRepository.findCurrentCogs(offerIds)).thenReturn(Map.of());
+    when(dataReadRepository.findTotalStock(offerIds)).thenReturn(Map.of());
+    when(dataReadRepository.findLockedOfferIds(offerIds)).thenReturn(List.of());
+    lenient().when(dataReadRepository.findDataFreshness(CONNECTION_ID))
+        .thenReturn(OffsetDateTime.now());
+    lenient().when(dataReadRepository.findLatestChangeDecisions(offerIds))
+        .thenReturn(Map.of());
+    lenient().when(dataReadRepository.findPriceReversals(eq(offerIds), any()))
+        .thenReturn(Map.of());
+    when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
+    when(dataReadRepository.findSellerSkuIds(offerIds)).thenReturn(Map.of());
   }
 }
