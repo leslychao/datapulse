@@ -52,7 +52,7 @@ public class OzonPriceWriteAdapter implements PriceWriteAdapter {
                     "Per-product rate limit exhausted (10 updates/hour)");
         }
 
-        String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
+        String baseUrl = integrationProperties.getOzon().getSellerWriteBaseUrl();
         String clientId = credentials.get("client_id");
         String apiKey = credentials.get("api_key");
 

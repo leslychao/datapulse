@@ -49,7 +49,7 @@ public class WbPriceWriteAdapter implements PriceWriteAdapter {
     @Override
     public PriceWriteResult setPrice(long connectionId, String marketplaceSku,
                                      BigDecimal targetPrice, Map<String, String> credentials) {
-        String baseUrl = integrationProperties.getWildberries().getPricesBaseUrl();
+        String baseUrl = integrationProperties.getWildberries().getPricesWriteBaseUrl();
         String token = credentials.get("token");
         long nmId = Long.parseLong(marketplaceSku);
 

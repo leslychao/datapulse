@@ -89,21 +89,36 @@ alwaysApply: true
 - Не overengineer
 - Не расширяй scope без необходимости
 
+## WB Sandbox URL Mapping
+
+| Production URL | Sandbox URL | Покрытие |
+|---|---|---|
+| `content-api.wildberries.ru` | `content-api-sandbox.wildberries.ru` | Карточки товаров |
+| `discounts-prices-api.wildberries.ru` | `discounts-prices-api-sandbox.wildberries.ru` | Цены, скидки, календарь акций |
+| `statistics-api.wildberries.ru` | `statistics-api-sandbox.wildberries.ru` | Заказы, продажи, финансовые отчёты |
+| `marketplace-api.wildberries.ru` | `marketplace-api-sandbox.wildberries.ru` | FBS/DBS, склады, остатки |
+| `advert-api.wildberries.ru` | `advert-api-sandbox.wildberries.ru` | Рекламные кампании |
+| `seller-analytics-api.wildberries.ru` | **Нет sandbox** | Аналитика (stocks report, returns) |
+
+Sandbox требует: **тестовый токен** (`"t":true` в JWT) + **sandbox URL**. Боевой токен на sandbox = 401, и наоборот.
+
+Источник: https://dev.wildberries.ru/sandbox
+
 ## Provider Connections
 
 ### Real Account
 
 ```yaml
 WILDBERRIES:
-  token: "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjMsImVudCI6MSwiZXhwIjoxNzg2MjI1MjM5LCJmb3IiOiJzZWxmIiwiaWQiOiIwMTljMzc3OS04ZjJjLTcwMmUtOWU3OC02MmI3OWFhZmE5NTQiLCJpaWQiOjEyNzE5ODQxMywib2lkIjoyNTAwNjA4NjMsInMiOjEwNzM4MjM0ODYsInNpZCI6ImUwYWVlMTNkLTk0NjItNDI5OS05Njk3LTRmOGI0Y2M0MzA2OSIsInQiOmZhbHNlLCJ1aWQiOjEyNzE5ODQxM30.8T_Ol3xGrTq3Qoo2z6Mo9P93NcXIz-kqIBfnt1XD50GAlITUtkJLvUq9X5DKXlSMyX_UUDeo553PNK0G4w9wGw"
+ token: "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjYwMzAydjEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjMsImVudCI6MSwiZXhwIjoxNzkxMTY0MjkwLCJmb3IiOiJzZWxmIiwiaWQiOiIwMTlkNWRkZC04MGI5LTdhMTgtYjFjNC01MjhhNTFjNDk2NWQiLCJpaWQiOjEyNzE5ODQxMywib2lkIjoyNTAwNjA4NjMsInMiOjEwNzM4MjM0ODYsInNpZCI6ImUwYWVlMTNkLTk0NjItNDI5OS05Njk3LTRmOGI0Y2M0MzA2OSIsInQiOmZhbHNlLCJ1aWQiOjEyNzE5ODQxM30.fUUSeW-uBagy-17A71E7SRCa4LqTXaEIT3V5TVnZPkUWcq_MEBrbUzNImm48CmfbBBqLgidEq06f59_mRIvFMg"
 OZON:
-  client-id: "1943980"
-  api-key: "a9d31abc-6f09-4848-915e-d669fba8845a"
+ client-id: "1943980"
+ api-key: "a9d31abc-6f09-4848-915e-d669fba8845a"
 ```
 
 ### Sandbox Account
 
 ```yaml
 WILDBERRIES:
-  token: "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzc3MDU5Mzg0LCJpZCI6IjAxOWExNTI1LWI1ZmEtNzNiZi04ZWIwLTE3YjMwYjk1MGY2MCIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.eURulaP5UTqegdGH86XJqRX2qnBao0jnX5DFCa_wUKzku84MCJF-IWyO6cdSokf6oVn5LPqtQkn-zLONagFvcg"
+ token: "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjYwMzAydjEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzkxMTY0MzQ0LCJpZCI6IjAxOWQ1ZGRlLTUyZGItNzZlMi05YWE3LTJlMjc3MzMxYTNmZiIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.Sj_obkpk4qSo9xme9eLYXyCOH0dJn15hWhqB1tHtPy5Eior45JR7edjZOFmFzvGwmBLbvZLq6PPNRQYe_TTycQ"
 ```

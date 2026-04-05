@@ -1,16 +1,23 @@
 datapulse:
   integration:
     wildberries:
-      content-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
-      prices-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
-      statistics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Read URLs → WB sandbox (test data, requires sandbox token in Vault — auto-provisioned below)
+      content-base-url: https://content-api-sandbox.wildberries.ru
+      prices-base-url: https://discounts-prices-api-sandbox.wildberries.ru
+      statistics-base-url: https://statistics-api-sandbox.wildberries.ru
+      marketplace-base-url: https://marketplace-api-sandbox.wildberries.ru
+      advert-base-url: https://advert-api-sandbox.wildberries.ru
+      promo-base-url: https://discounts-prices-api-sandbox.wildberries.ru
+      # No sandbox for analytics API — route to WireMock
       analytics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
-      marketplace-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
-      advert-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
-      promo-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Write URLs → WireMock
+      prices-write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Sandbox token — auto-provisioned to Vault on startup for all WB connections
+      sandbox-api-token: eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjYwMzAydjEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjIsImVudCI6MSwiZXhwIjoxNzkxMTY0MzQ0LCJpZCI6IjAxOWQ1ZGRlLTUyZGItNzZlMi05YWE3LTJlMjc3MzMxYTNmZiIsImlpZCI6MTI3MTk4NDEzLCJvaWQiOjI1MDA2MDg2MywicyI6MCwic2lkIjoiZTBhZWUxM2QtOTQ2Mi00Mjk5LTk2OTctNGY4YjRjYzQzMDY5IiwidCI6dHJ1ZSwidWlkIjoxMjcxOTg0MTN9.Sj_obkpk4qSo9xme9eLYXyCOH0dJn15hWhqB1tHtPy5Eior45JR7edjZOFmFzvGwmBLbvZLq6PPNRQYe_TTycQ
     ozon:
-      seller-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
-      performance-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Read URL uses real API (has real data — 464 products)
+      # Write URL → WireMock
+      seller-write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
 
 spring:
   jpa:

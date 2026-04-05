@@ -62,7 +62,7 @@ public class OzonPromoWriteAdapter {
 
   private PromoWriteResult executeWrite(String clientId, String apiKey,
                                          String path, ObjectNode body) {
-    String baseUrl = integrationProperties.getOzon().getSellerBaseUrl();
+    String baseUrl = integrationProperties.getOzon().getSellerWriteBaseUrl();
     try {
       String responseBody = webClientBuilder.build()
           .post()
