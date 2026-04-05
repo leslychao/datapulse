@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.datapulse.etl.domain.ConnectionStaleJobReconciler;
 import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.integration.domain.event.SyncTriggeredEvent;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SyncTriggeredListener {
 
   private final JobExecutionRepository jobExecutionRepository;
+  private final ConnectionStaleJobReconciler connectionStaleJobReconciler;
   private final OutboxService outboxService;
   private final IngestResultReporter resultReporter;
   private final ObjectMapper objectMapper;
@@ -42,6 +44,7 @@ public class SyncTriggeredListener {
   public void onSyncTriggered(SyncTriggeredEvent event) {
     Long connectionId = event.connectionId();
 
+    connectionStaleJobReconciler.reconcileForDispatch(connectionId);
     if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
       log.info("Active job already exists, skipping manual sync: connectionId={}",
           connectionId);

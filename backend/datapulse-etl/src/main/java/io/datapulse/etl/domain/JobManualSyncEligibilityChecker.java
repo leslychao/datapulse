@@ -12,9 +12,11 @@ import org.springframework.stereotype.Component;
 public class JobManualSyncEligibilityChecker implements ManualSyncEligibilityChecker {
 
     private final JobExecutionRepository jobExecutionRepository;
+    private final ConnectionStaleJobReconciler connectionStaleJobReconciler;
 
     @Override
     public void ensureCanTriggerManualSync(long connectionId) {
+        connectionStaleJobReconciler.reconcileForDispatch(connectionId);
         if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
             throw ConflictException.of(MessageCodes.JOB_ACTIVE_EXISTS, connectionId);
         }

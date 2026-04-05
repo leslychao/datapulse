@@ -47,4 +47,17 @@ public record IngestProperties(
          * Set to {@code PT0S} to disable (only {@code redelivered=true} reclaims).
          */
         @DefaultValue("PT15M") Duration inProgressOrphanReclaimThreshold
-) {}
+) {
+
+  /**
+   * How ClickHouse / mart materialization runs after a successful DAG ingest.
+   *
+   * <p>{@link #SYNC} — coordinator calls {@link io.datapulse.platform.etl.PostIngestMaterializationHook}
+   * inline (default). {@link #ASYNC_OUTBOX} — enqueue {@code ETL_POST_INGEST_MATERIALIZE} so work
+   * happens on the {@code etl.sync} consumer, keeping the ingest worker responsive.
+   */
+  public enum PostIngestMaterializationMode {
+    SYNC,
+    ASYNC_OUTBOX
+  }
+}

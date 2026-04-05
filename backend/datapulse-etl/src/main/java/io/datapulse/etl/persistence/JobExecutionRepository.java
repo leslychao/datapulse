@@ -90,6 +90,42 @@ public class JobExecutionRepository {
               ) < :threshold
             """;
 
+    private static final String MARK_STALE_IN_PROGRESS_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'IN_PROGRESS'
+              AND started_at < :threshold
+            """;
+
+    private static final String MARK_STALE_MATERIALIZING_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'MATERIALIZING'
+              AND COALESCE(materializing_at, started_at) < :threshold
+            """;
+
+    private static final String MARK_STALE_RETRY_SCHEDULED_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'RETRY_SCHEDULED'
+              AND COALESCE(
+                  (checkpoint->>'last_retry_at')::timestamptz,
+                  started_at,
+                  created_at
+              ) < :threshold
+            """;
+
+    private static final String MARK_STALE_PENDING_FOR_CONNECTION = """
+            UPDATE job_execution
+            SET status = 'STALE', completed_at = now(), materializing_at = NULL
+            WHERE connection_id = :connectionId
+              AND status = 'PENDING'
+              AND created_at < :threshold
+            """;
+
     /**
      * Refreshes {@code started_at} for an {@code IN_PROGRESS} job so a new worker can resume after
      * RabbitMQ redelivery (previous consumer died before ack). Does not change {@code status}.
@@ -246,6 +282,43 @@ public class JobExecutionRepository {
      */
     public int markStaleRetryScheduled(OffsetDateTime threshold) {
         return jdbc.update(MARK_STALE_RETRY_SCHEDULED, Map.of("threshold", threshold));
+    }
+
+    /**
+     * Same rules as {@link #markStaleInProgress(OffsetDateTime)} but scoped to one connection
+     * (eager reconcile before dispatch / manual sync).
+     */
+    public int markStaleInProgressForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_IN_PROGRESS_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
+    /**
+     * Same rules as {@link #markStaleMaterializing(OffsetDateTime)} but scoped to one connection.
+     */
+    public int markStaleMaterializingForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_MATERIALIZING_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
+    /**
+     * Same rules as {@link #markStaleRetryScheduled(OffsetDateTime)} but scoped to one connection.
+     */
+    public int markStaleRetryScheduledForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_RETRY_SCHEDULED_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
+    }
+
+    /**
+     * {@code PENDING} rows never picked up (lost queue message) older than the threshold.
+     */
+    public int markStalePendingForConnection(long connectionId, OffsetDateTime threshold) {
+        return jdbc.update(
+                MARK_STALE_PENDING_FOR_CONNECTION,
+                Map.of("connectionId", connectionId, "threshold", threshold));
     }
 
     private JobExecutionRow mapRow(ResultSet rs, int rowNum) throws SQLException {

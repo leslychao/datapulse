@@ -1,7 +1,7 @@
 package io.datapulse.etl.domain;
 
 import io.datapulse.etl.config.IngestProperties;
-import io.datapulse.etl.config.PostIngestMaterializationMode;
+import io.datapulse.etl.config.IngestProperties.PostIngestMaterializationMode;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;

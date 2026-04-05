@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
+import io.datapulse.etl.domain.ConnectionStaleJobReconciler;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.integration.domain.SyncStatus;
 import io.datapulse.integration.api.SyncStatusPushReason;
@@ -35,6 +36,7 @@ public class SyncScheduler {
 
     private final MarketplaceSyncStateRepository syncStateRepository;
     private final JobExecutionRepository jobExecutionRepository;
+    private final ConnectionStaleJobReconciler connectionStaleJobReconciler;
     private final OutboxService outboxService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -61,6 +63,7 @@ public class SyncScheduler {
 
     @Transactional
     protected void dispatchIfNotActive(Long connectionId) {
+        connectionStaleJobReconciler.reconcileForDispatch(connectionId);
         if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
             log.debug("Active job already exists for connection: connectionId={}", connectionId);
             return;

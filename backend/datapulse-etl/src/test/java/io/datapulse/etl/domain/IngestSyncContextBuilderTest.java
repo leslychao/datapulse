@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.etl.config.IngestProperties;
-import io.datapulse.etl.config.PostIngestMaterializationMode;
+import io.datapulse.etl.config.IngestProperties.PostIngestMaterializationMode;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;

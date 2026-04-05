@@ -45,6 +45,7 @@ public class JobMonitoringService {
     private static final String INCREMENTAL_EVENT_TYPE = "INCREMENTAL";
 
     private final JobExecutionRepository jobExecutionRepository;
+    private final ConnectionStaleJobReconciler connectionStaleJobReconciler;
     private final JobItemRepository jobItemRepository;
     private final MarketplaceConnectionRepository connectionRepository;
     private final OutboxService outboxService;
@@ -93,6 +94,7 @@ public class JobMonitoringService {
             throw BadRequestException.of(MessageCodes.JOB_NOT_RETRYABLE, jobId, job.getStatus());
         }
 
+        connectionStaleJobReconciler.reconcileForDispatch(job.getConnectionId());
         if (jobExecutionRepository.existsActiveForConnection(job.getConnectionId())) {
             throw ConflictException.of(MessageCodes.JOB_ACTIVE_EXISTS, job.getConnectionId());
         }
