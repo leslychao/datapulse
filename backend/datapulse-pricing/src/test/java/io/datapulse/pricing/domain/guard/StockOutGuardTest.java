@@ -73,7 +73,7 @@ class StockOutGuardTest {
     void should_pass_when_guardDisabled() {
       PricingSignalSet signals = signalsWithStock(0);
       GuardConfig config = new GuardConfig(
-          null, null, null, null, null, null, null, false, null);
+          null, null, null, null, null, null, null, false, null, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, config);
 

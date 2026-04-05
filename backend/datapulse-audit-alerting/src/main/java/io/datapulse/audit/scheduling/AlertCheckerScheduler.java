@@ -39,6 +39,30 @@ public class AlertCheckerScheduler {
         runCheckerForType(AlertRuleType.MISMATCH.name());
     }
 
+    @Scheduled(fixedDelayString = "${datapulse.alerting.ad-drr-threshold-interval:PT30M}")
+    @SchedulerLock(name = "alertChecker-adDrrThreshold", lockAtMostFor = "PT15M", lockAtLeastFor = "PT2M")
+    public void runAdDrrThresholdChecker() {
+        runCheckerForType(AlertRuleType.AD_DRR_THRESHOLD.name());
+    }
+
+    @Scheduled(fixedDelayString = "${datapulse.alerting.ad-no-stock-interval:PT15M}")
+    @SchedulerLock(name = "alertChecker-adNoStock", lockAtMostFor = "PT10M", lockAtLeastFor = "PT2M")
+    public void runAdNoStockChecker() {
+        runCheckerForType(AlertRuleType.AD_NO_STOCK.name());
+    }
+
+    @Scheduled(fixedDelayString = "${datapulse.alerting.ad-inefficient-campaign-interval:PT1H}")
+    @SchedulerLock(name = "alertChecker-adInefficientCampaign", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
+    public void runAdInefficientCampaignChecker() {
+        runCheckerForType(AlertRuleType.AD_INEFFICIENT_CAMPAIGN.name());
+    }
+
+    @Scheduled(fixedDelayString = "${datapulse.alerting.ad-price-drop-drr-interval:PT30M}")
+    @SchedulerLock(name = "alertChecker-adPriceDropDrr", lockAtMostFor = "PT15M", lockAtLeastFor = "PT2M")
+    public void runAdPriceDropDrrChecker() {
+        runCheckerForType(AlertRuleType.AD_PRICE_DROP_HIGH_DRR.name());
+    }
+
     private void runCheckerForType(String ruleType) {
         AlertChecker checker = checkerRegistry.getChecker(ruleType);
         if (checker == null) {

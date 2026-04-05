@@ -16,6 +16,7 @@ import io.datapulse.etl.domain.FinanceEntryType;
  * @param sellerSku      raw vendor code (WB: sa_name) or offer_id — for product_master fallback lookup
  * @param marketplaceSku marketplace-specific SKU (WB: nm_id, Ozon: items[].sku) — for marketplace_offer lookup
  * @param warehouseExternalId external warehouse identifier (WB: ppvz_office_id, Ozon: posting.warehouse_id)
+ * @param fulfillmentType     fulfillment scheme (WB: FBW/DBS, Ozon: delivery_schema uppercased)
  */
 public record NormalizedFinanceItem(
         String externalEntryId,
@@ -25,6 +26,7 @@ public record NormalizedFinanceItem(
         String sellerSku,
         String marketplaceSku,
         String warehouseExternalId,
+        String fulfillmentType,
         BigDecimal revenueAmount,
         BigDecimal marketplaceCommissionAmount,
         BigDecimal acquiringCommissionAmount,

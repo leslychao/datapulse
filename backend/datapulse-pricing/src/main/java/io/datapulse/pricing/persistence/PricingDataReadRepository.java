@@ -293,4 +293,26 @@ public class PricingDataReadRepository {
             BigDecimal cogs
     ) {
     }
+
+    private static final String MARKETPLACE_SKUS = """
+            SELECT mo.id, mo.marketplace_sku
+            FROM marketplace_offer mo
+            WHERE mo.id IN (:offerIds)
+            """;
+
+    public Map<Long, String> findMarketplaceSkus(List<Long> offerIds) {
+        if (offerIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(MARKETPLACE_SKUS,
+                new MapSqlParameterSource("offerIds", offerIds),
+                rs -> {
+                    Map<Long, String> result = new HashMap<>();
+                    while (rs.next()) {
+                        result.put(rs.getLong("id"),
+                                rs.getString("marketplace_sku"));
+                    }
+                    return result;
+                });
+    }
 }

@@ -475,6 +475,7 @@
   "pricing.guard.frequency": "Цена изменена менее {{hours}} ч назад (последнее изменение: {{lastChangeAt}}).",
   "pricing.guard.volatility": "Слишком много разворотов цены: {{count}} за {{periodDays}} дн (макс. {{maxReversals}}).",
   "pricing.guard.promo_active": "Товар участвует в промо-акции — изменение цены заблокировано.",
+  "pricing.guard.ad_cost_drr.blocked": "Снижение цены заблокировано: ДРР {{drrPct}}% (порог: {{threshold}}%). Рекомендация: скорректировать рекламный бюджет.",
   "pricing.automation.blocked": "Автоматизация ценообразования заблокирована для этого подключения из-за активного предупреждения о качестве данных.",
 
   "pricing.strategy.cogs_missing": "Себестоимость не задана.",
@@ -1071,6 +1072,15 @@
   "alert.event.not.found": "Алерт не найден.",
   "alert.event.invalid.state": "Невозможно выполнить операцию: алерт находится в некорректном статусе.",
   "alert.rule.not.found": "Правило алерта не найдено.",
+
+  "advertising.alert.drr_threshold.title": "ДРР превысил порог",
+  "advertising.alert.drr_threshold.body": "Товар {{sku}}: ДРР за {{days}} дней = {{drrPct}}% (порог: {{threshold}}%). Рекламный расход: {{spend}}₽, выручка: {{revenue}}₽.",
+  "advertising.alert.no_stock.title": "Реклама на товар без остатков",
+  "advertising.alert.no_stock.body": "Товар {{sku}} — 0 шт. на складе, кампания «{{campaignName}}» продолжает тратить бюджет.",
+  "advertising.alert.inefficient_campaign.title": "Неэффективная рекламная кампания",
+  "advertising.alert.inefficient_campaign.body": "Кампания {{campaignId}} за 7 дней: {{views}} показов, {{clicks}} кликов (CTR {{ctrPct}}%), {{orders}} заказов (CR {{crPct}}%). Расход: {{spend}}₽.",
+  "advertising.alert.price_drop_high_drr.title": "Снижение цены при высоком ДРР",
+  "advertising.alert.price_drop_high_drr.body": "Цена на {{sku}} снижена с {{currentPrice}}₽ до {{targetPrice}}₽ ({{changePct}}%). Текущий ДРР: {{drrPct}}% (порог: {{threshold}}%).",
 
   "kpi.null_value": "—",
   "kpi.trend_up": "+{{value}}%",
@@ -2612,10 +2622,8 @@
   "alerts.notification_type.ACTION_FAILED": "Ошибка действия",
 
   "stock_risk.CRITICAL": "Критично",
-  "stock_risk.LOW": "Низкий",
+  "stock_risk.WARNING": "Внимание",
   "stock_risk.NORMAL": "Норма",
-  "stock_risk.OVERSTOCK": "Избыток",
-  "stock_risk.NO_STOCK": "Нет остатков",
 
   "scope_type.ALL": "Все",
   "scope_type.CATEGORY": "Категория",
@@ -2788,5 +2796,13 @@
   "advertising.campaigns.col.spend": "Расход",
   "advertising.campaigns.col.orders": "Заказы",
   "advertising.campaigns.col.drr": "ДРР",
-  "advertising.campaigns.col.drr_trend": "Тренд"
+  "advertising.campaigns.col.drr_trend": "Тренд",
+  "advertising.alert.drr_threshold.title": "ДРР превышает порог",
+  "advertising.alert.inefficient_campaign.title": "Неэффективная рекламная кампания",
+  "advertising.alert.no_stock.title": "Реклама товара без остатков",
+
+  "advertising.recommendation.worth": "Стоит рекламировать: маржинальность ({{marginPct}}%) превышает ожидаемый ДРР ({{estimatedDrrPct}}%) с запасом.",
+  "advertising.recommendation.not_worth": "Реклама убыточна: маржинальность ({{marginPct}}%) ниже текущего ДРР ({{currentDrrPct}}%).",
+  "advertising.recommendation.reduce_bid": "Рекомендуется снизить ставку: текущий CPC выше максимально допустимого ({{maxCpc}}₽).",
+  "advertising.recommendation.insufficient_data": "Недостаточно данных для рекомендации: менее 7 дней рекламной статистики или отсутствует себестоимость."
 }

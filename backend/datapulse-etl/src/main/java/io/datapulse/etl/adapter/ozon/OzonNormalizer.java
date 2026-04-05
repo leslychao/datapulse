@@ -213,7 +213,8 @@ public class OzonNormalizer {
                 saleAmount,
                 null,
                 product.currencyCode(),
-                saleDate
+                saleDate,
+                "FBO"
         );
     }
 
@@ -238,7 +239,8 @@ public class OzonNormalizer {
                 saleAmount,
                 null,
                 product.currencyCode(),
-                saleDate
+                saleDate,
+                "FBS"
         );
     }
 

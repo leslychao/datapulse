@@ -19,6 +19,7 @@ import {
   StockOutRisk,
 } from '@core/models';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
+import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { formatMoney } from '@shared/utils/format.utils';
 
@@ -26,7 +27,7 @@ import { formatMoney } from '@shared/utils/format.utils';
   selector: 'dp-inventory-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DataGridComponent, LucideAngularModule],
+  imports: [TranslatePipe, DataGridComponent, LucideAngularModule, StockRiskBadgeComponent],
   template: `
     <div class="flex h-full">
       <!-- Main content -->
@@ -170,13 +171,7 @@ import { formatMoney } from '@shared/utils/format.utils';
                   {{ 'analytics.inventory.col.risk' | translate }}
                 </p>
                 <p class="mt-1">
-                  <span class="inline-flex items-center gap-1.5 text-[length:var(--text-xs)]">
-                    <span
-                      class="h-1.5 w-1.5 rounded-full"
-                      [class]="riskDotClass(product.stockOutRisk)"
-                    ></span>
-                    {{ riskLabel(product.stockOutRisk) }}
-                  </span>
+                  <dp-stock-risk-badge [risk]="product.stockOutRisk" />
                 </p>
               </div>
             </div>
@@ -372,17 +367,5 @@ export class InventoryByProductPageComponent {
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);
-  }
-
-  riskDotClass(risk: string): string {
-    switch (risk) {
-      case 'CRITICAL': return 'bg-[var(--status-error)]';
-      case 'WARNING': return 'bg-[var(--status-warning)]';
-      default: return 'bg-[var(--status-success)]';
-    }
-  }
-
-  riskLabel(risk: string): string {
-    return this.t.instant(`analytics.inventory.risk.${risk.toLowerCase()}`);
   }
 }

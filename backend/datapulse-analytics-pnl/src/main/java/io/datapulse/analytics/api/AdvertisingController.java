@@ -1,6 +1,9 @@
 package io.datapulse.analytics.api;
 
+import java.util.List;
+
 import io.datapulse.analytics.domain.AdvertisingCampaignService;
+import io.datapulse.analytics.domain.AdvertisingRecommendationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdvertisingController {
 
   private final AdvertisingCampaignService campaignService;
+  private final AdvertisingRecommendationService recommendationService;
 
   @GetMapping("/campaigns")
   @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
@@ -26,5 +31,22 @@ public class AdvertisingController {
       CampaignDashboardFilter filter,
       Pageable pageable) {
     return campaignService.getCampaigns(workspaceId, filter, pageable);
+  }
+
+  @GetMapping("/recommendations")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public List<ProductAdRecommendationResponse> getRecommendations(
+      @PathVariable("workspaceId") long workspaceId,
+      @RequestParam("offerIds") List<Long> offerIds) {
+    return recommendationService.getRecommendations(workspaceId, offerIds);
+  }
+
+  @GetMapping("/cross-mp-comparison")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public List<CrossMpComparisonResponse> getCrossMarketplaceComparison(
+      @PathVariable("workspaceId") long workspaceId,
+      @RequestParam("sellerSkuIds") List<Long> sellerSkuIds) {
+    return recommendationService.getCrossMarketplaceComparison(
+        workspaceId, sellerSkuIds);
   }
 }

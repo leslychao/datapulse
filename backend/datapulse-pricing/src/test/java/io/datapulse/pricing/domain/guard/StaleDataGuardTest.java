@@ -76,7 +76,7 @@ class StaleDataGuardTest {
       PricingSignalSet signals = signalsWithFreshness(time);
 
       GuardConfig strictConfig = new GuardConfig(
-          null, null, null, null, null, null, null, null, 4);
+          null, null, null, null, null, null, null, null, 4, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, strictConfig);
 
@@ -90,7 +90,7 @@ class StaleDataGuardTest {
       PricingSignalSet signals = signalsWithFreshness(time);
 
       GuardConfig relaxedConfig = new GuardConfig(
-          null, null, null, null, null, null, null, null, 48);
+          null, null, null, null, null, null, null, null, 48, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, relaxedConfig);
 

@@ -74,6 +74,8 @@ class OfferControllerSliceTest {
           new BigDecimal("45"), "LOW",
           new BigDecimal("50000"), new BigDecimal("15000"),
           new BigDecimal("3.5"), new BigDecimal("2.1"),
+          new BigDecimal("8000"), new BigDecimal("16.0"),
+          new BigDecimal("120"), new BigDecimal("6.25"),
           new PolicyInfo(10L, "Target Margin", "TARGET_MARGIN", "SEMI_AUTO"),
           new DecisionInfo(20L, "CHANGE", new BigDecimal("1000"),
               new BigDecimal("1100"), "Margin below target", now),
@@ -135,6 +137,7 @@ class OfferControllerSliceTest {
           new BigDecimal("1000"), null, null,
           null, null,
           null, null, null, null, null, null,
+          null, null, null, null,
           null, null, null, null, null,
           null, null,
           null, "STALE"
@@ -162,6 +165,7 @@ class OfferControllerSliceTest {
           new BigDecimal("1000.50"), null, null,
           new BigDecimal("42.35"), null,
           null, null, null, null, null, null,
+          null, null, null, null,
           null, null, null, null, null,
           null, null,
           null, "FRESH"
@@ -184,6 +188,7 @@ class OfferControllerSliceTest {
           "ACTIVE", null,
           null, null, null, null, null,
           null, null, null, null, null, null,
+          null, null, null, null,
           null, null, null, null, null,
           null, null,
           syncAt, "FRESH"

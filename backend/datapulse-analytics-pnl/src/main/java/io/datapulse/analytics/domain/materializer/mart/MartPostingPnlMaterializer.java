@@ -39,6 +39,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
           pm.posting_id,
           pm.connection_id,
           pm.source_platform,
+          pm.fulfillment_type,
           pm.order_id,
           coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) AS seller_sku_id,
           dp.product_id,
@@ -127,6 +128,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
               posting_id,
               connection_id,
               any(source_platform) AS source_platform,
+              any(fulfillment_type) AS fulfillment_type,
               any(order_id) AS order_id,
               any(seller_sku_id) AS seller_sku_id,
               coalesce(

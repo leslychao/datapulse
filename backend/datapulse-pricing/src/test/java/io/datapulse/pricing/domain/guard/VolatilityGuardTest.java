@@ -85,7 +85,7 @@ class VolatilityGuardTest {
     void should_pass_when_guardDisabled() {
       PricingSignalSet signals = signalsWithReversals(100);
       GuardConfig config = new GuardConfig(
-          null, null, null, false, null, null, null, null, null);
+          null, null, null, false, null, null, null, null, null, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, config);
 
@@ -102,7 +102,7 @@ class VolatilityGuardTest {
     void should_useCustomMax_when_configured() {
       PricingSignalSet signals = signalsWithReversals(5);
       GuardConfig config = new GuardConfig(
-          null, null, null, true, 10, 7, null, null, null);
+          null, null, null, true, 10, 7, null, null, null, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, config);
 
@@ -114,7 +114,7 @@ class VolatilityGuardTest {
     void should_block_when_atCustomThreshold() {
       PricingSignalSet signals = signalsWithReversals(10);
       GuardConfig config = new GuardConfig(
-          null, null, null, true, 10, 7, null, null, null);
+          null, null, null, true, 10, 7, null, null, null, null, null);
 
       GuardResult result = guard.check(signals, BigDecimal.TEN, config);
 

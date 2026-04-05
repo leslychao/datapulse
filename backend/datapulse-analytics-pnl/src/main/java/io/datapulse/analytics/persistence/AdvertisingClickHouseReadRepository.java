@@ -1,13 +1,12 @@
 package io.datapulse.analytics.persistence;
 
-import java.math.BigDecimal;
+import io.datapulse.analytics.config.ClickHouseReadJdbc;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import io.datapulse.analytics.config.ClickHouseReadJdbc;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Repository;
@@ -17,6 +16,8 @@ import org.springframework.stereotype.Repository;
 public class AdvertisingClickHouseReadRepository {
 
   private final ClickHouseReadJdbc jdbc;
+
+  private static final int RECOMMENDATION_LOOKBACK_DAYS = 30;
 
   private static final String CAMPAIGN_METRICS_SQL = """
       SELECT
@@ -37,8 +38,8 @@ public class AdvertisingClickHouseReadRepository {
       """;
 
   /**
-   * Enrichment query: fetches aggregated metrics for displayed campaigns.
-   * Returns a map keyed by "connectionId:campaignId" for fast lookup.
+   * Enrichment query: fetches aggregated metrics for displayed campaigns. Returns a map keyed by
+   * "connectionId:campaignId" for fast lookup.
    */
   public Map<String, CampaignMetrics> findCampaignMetrics(
       List<Long> connectionIds, List<Long> campaignIds, int periodDays) {
@@ -76,5 +77,147 @@ public class AdvertisingClickHouseReadRepository {
         .collect(Collectors.toMap(
             m -> m.connectionId() + ":" + m.campaignId(),
             m -> m));
+  }
+
+  // --- Recommendation queries (Phase C) ---
+
+  private static final String OFFER_AD_METRICS_SQL = """
+      SELECT
+          dp.product_id AS offer_id,
+          sum(fa.spend) AS spend_30d,
+          sum(fa.clicks) AS clicks_30d,
+          sum(fa.orders) AS orders_30d,
+          sum(fa.ordered_revenue) AS revenue_30d,
+          toInt32(count(DISTINCT fa.ad_date)) AS ad_days,
+          if(sum(fa.clicks) > 0,
+             sum(fa.spend) / sum(fa.clicks), NULL) AS avg_cpc,
+          if(sum(fa.clicks) > 0,
+             sum(fa.orders) / sum(fa.clicks), NULL) AS avg_cr,
+          if(sum(fa.ordered_revenue) > 0,
+             sum(fa.spend) / sum(fa.ordered_revenue) * 100, NULL) AS current_drr_pct
+      FROM fact_advertising AS fa
+      INNER JOIN dim_product AS dp
+          ON fa.connection_id = dp.connection_id
+          AND fa.marketplace_sku = dp.marketplace_sku
+      WHERE dp.product_id IN (:offerIds)
+        AND dp.connection_id IN (:connectionIds)
+        AND fa.ad_date >= today() - :lookback
+      GROUP BY dp.product_id
+      SETTINGS final = 1
+      """;
+
+  public Map<Long, OfferAdMetrics> findOfferAdMetrics(
+      List<Long> connectionIds, List<Long> offerIds) {
+
+    if (connectionIds.isEmpty() || offerIds.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    var params = new MapSqlParameterSource()
+        .addValue("connectionIds", connectionIds)
+        .addValue("offerIds", offerIds)
+        .addValue("lookback", RECOMMENDATION_LOOKBACK_DAYS);
+
+    List<OfferAdMetrics> rows = jdbc.ch().query(
+        OFFER_AD_METRICS_SQL, params, (rs, rowNum) -> new OfferAdMetrics(
+            rs.getLong("offer_id"),
+            rs.getBigDecimal("spend_30d"),
+            rs.getLong("clicks_30d"),
+            rs.getLong("orders_30d"),
+            rs.getBigDecimal("revenue_30d"),
+            rs.getInt("ad_days"),
+            rs.getBigDecimal("avg_cpc"),
+            rs.getBigDecimal("avg_cr"),
+            rs.getBigDecimal("current_drr_pct")
+        ));
+
+    return rows.stream()
+        .collect(Collectors.toMap(OfferAdMetrics::offerId, Function.identity()));
+  }
+
+  private static final String CATEGORY_AVG_METRICS_SQL = """
+      SELECT
+          dp.category,
+          if(sum(fa.clicks) > 0,
+             sum(fa.spend) / sum(fa.clicks), NULL) AS avg_cpc,
+          if(sum(fa.clicks) > 0,
+             toDecimal64(sum(fa.orders), 6) / sum(fa.clicks), NULL) AS avg_cr
+      FROM fact_advertising AS fa
+      INNER JOIN dim_product AS dp
+          ON fa.connection_id = dp.connection_id
+          AND fa.marketplace_sku = dp.marketplace_sku
+      WHERE dp.connection_id IN (:connectionIds)
+        AND dp.category IN (:categories)
+        AND fa.ad_date >= today() - :lookback
+      GROUP BY dp.category
+      HAVING sum(fa.clicks) >= 10
+      SETTINGS final = 1
+      """;
+
+  public Map<String, CategoryAdAvg> findCategoryAvgMetrics(
+      List<Long> connectionIds, List<String> categories) {
+
+    if (connectionIds.isEmpty() || categories.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    var params = new MapSqlParameterSource()
+        .addValue("connectionIds", connectionIds)
+        .addValue("categories", categories)
+        .addValue("lookback", RECOMMENDATION_LOOKBACK_DAYS);
+
+    List<CategoryAdAvg> rows = jdbc.ch().query(
+        CATEGORY_AVG_METRICS_SQL, params, (rs, rowNum) -> new CategoryAdAvg(
+            rs.getString("category"),
+            rs.getBigDecimal("avg_cpc"),
+            rs.getBigDecimal("avg_cr")
+        ));
+
+    return rows.stream()
+        .collect(Collectors.toMap(CategoryAdAvg::category, Function.identity()));
+  }
+
+  private static final String CROSS_MP_COMPARISON_SQL = """
+      SELECT
+          dp.seller_sku_id,
+          map.source_platform,
+          map.spend,
+          map.drr_pct,
+          map.roas,
+          map.cpo,
+          map.cpc,
+          map.cr_pct
+      FROM mart_advertising_product AS map
+      INNER JOIN dim_product AS dp
+          ON map.connection_id = dp.connection_id
+          AND map.marketplace_sku = dp.marketplace_sku
+      WHERE dp.seller_sku_id IN (:sellerSkuIds)
+        AND dp.connection_id IN (:connectionIds)
+      ORDER BY dp.seller_sku_id, map.source_platform
+      SETTINGS final = 1
+      """;
+
+  public List<CrossMpAdComparison> findCrossMarketplaceComparison(
+      List<Long> connectionIds, List<Long> sellerSkuIds) {
+
+    if (connectionIds.isEmpty() || sellerSkuIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    var params = new MapSqlParameterSource()
+        .addValue("connectionIds", connectionIds)
+        .addValue("sellerSkuIds", sellerSkuIds);
+
+    return jdbc.ch().query(
+        CROSS_MP_COMPARISON_SQL, params, (rs, rowNum) -> new CrossMpAdComparison(
+            rs.getLong("seller_sku_id"),
+            rs.getString("source_platform"),
+            rs.getBigDecimal("spend"),
+            rs.getBigDecimal("drr_pct"),
+            rs.getBigDecimal("roas"),
+            rs.getBigDecimal("cpo"),
+            rs.getBigDecimal("cpc"),
+            rs.getBigDecimal("cr_pct")
+        ));
   }
 }

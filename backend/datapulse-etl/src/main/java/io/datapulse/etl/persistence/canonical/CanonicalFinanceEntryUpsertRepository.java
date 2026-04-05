@@ -26,8 +26,9 @@ public class CanonicalFinanceEntryUpsertRepository {
                                                  other_marketplace_charges_amount, compensation_amount,
                                                  refund_amount, net_payout,
                                                  currency, entry_date, attribution_level,
+                                                 fulfillment_type,
                                                  job_execution_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
             ON CONFLICT (connection_id, source_platform, external_entry_id) DO UPDATE SET
                 entry_type = EXCLUDED.entry_type,
                 posting_id = EXCLUDED.posting_id,
@@ -49,6 +50,7 @@ public class CanonicalFinanceEntryUpsertRepository {
                 currency = EXCLUDED.currency,
                 entry_date = EXCLUDED.entry_date,
                 attribution_level = EXCLUDED.attribution_level,
+                fulfillment_type = EXCLUDED.fulfillment_type,
                 job_execution_id = EXCLUDED.job_execution_id,
                 updated_at = now()
             WHERE (canonical_finance_entry.entry_type, canonical_finance_entry.posting_id,
@@ -61,7 +63,8 @@ public class CanonicalFinanceEntryUpsertRepository {
                    canonical_finance_entry.other_marketplace_charges_amount, canonical_finance_entry.compensation_amount,
                    canonical_finance_entry.refund_amount, canonical_finance_entry.net_payout,
                    canonical_finance_entry.currency, canonical_finance_entry.entry_date,
-                   canonical_finance_entry.attribution_level)
+                   canonical_finance_entry.attribution_level,
+                   canonical_finance_entry.fulfillment_type)
                 IS DISTINCT FROM
                   (EXCLUDED.entry_type, EXCLUDED.posting_id,
                    EXCLUDED.order_id, EXCLUDED.seller_sku_id,
@@ -73,7 +76,8 @@ public class CanonicalFinanceEntryUpsertRepository {
                    EXCLUDED.other_marketplace_charges_amount, EXCLUDED.compensation_amount,
                    EXCLUDED.refund_amount, EXCLUDED.net_payout,
                    EXCLUDED.currency, EXCLUDED.entry_date,
-                   EXCLUDED.attribution_level)
+                   EXCLUDED.attribution_level,
+                   EXCLUDED.fulfillment_type)
             """;
 
     public void batchUpsert(List<CanonicalFinanceEntryEntity> entities) {
@@ -102,7 +106,8 @@ public class CanonicalFinanceEntryUpsertRepository {
                     ps.setString(21, e.getCurrency());
                     ps.setTimestamp(22, Timestamp.from(e.getEntryDate().toInstant()));
                     ps.setString(23, e.getAttributionLevel());
-                    ps.setLong(24, e.getJobExecutionId());
+                    ps.setString(24, e.getFulfillmentType());
+                    ps.setLong(25, e.getJobExecutionId());
                 });
     }
 }

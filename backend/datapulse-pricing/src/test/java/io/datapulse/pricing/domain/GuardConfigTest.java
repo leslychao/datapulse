@@ -13,7 +13,7 @@ class GuardConfigTest {
   class Defaults {
 
     @Test
-    @DisplayName("default config has all guards enabled")
+    @DisplayName("default config has all guards enabled except ad_cost (disabled by default)")
     void should_haveAllGuardsEnabled_when_defaults() {
       GuardConfig config = GuardConfig.DEFAULTS;
 
@@ -22,6 +22,7 @@ class GuardConfigTest {
       assertThat(config.isVolatilityGuardEnabled()).isTrue();
       assertThat(config.isPromoGuardEnabled()).isTrue();
       assertThat(config.isStockOutGuardEnabled()).isTrue();
+      assertThat(config.isAdCostGuardEnabled()).isFalse();
     }
 
     @Test
@@ -41,28 +42,30 @@ class GuardConfigTest {
   class NullFallbacks {
 
     @Test
-    @DisplayName("null boolean flags default to enabled (true)")
+    @DisplayName("null boolean flags default to enabled (true) except ad_cost which defaults to disabled")
     void should_defaultToEnabled_when_nullFlags() {
       GuardConfig config = new GuardConfig(
-          null, null, null, null, null, null, null, null, null);
+          null, null, null, null, null, null, null, null, null, null, null);
 
       assertThat(config.isMarginGuardEnabled()).isTrue();
       assertThat(config.isFrequencyGuardEnabled()).isTrue();
       assertThat(config.isVolatilityGuardEnabled()).isTrue();
       assertThat(config.isPromoGuardEnabled()).isTrue();
       assertThat(config.isStockOutGuardEnabled()).isTrue();
+      assertThat(config.isAdCostGuardEnabled()).isFalse();
     }
 
     @Test
     @DisplayName("null thresholds fall back to defaults")
     void should_fallbackToDefaults_when_nullThresholds() {
       GuardConfig config = new GuardConfig(
-          null, null, null, null, null, null, null, null, null);
+          null, null, null, null, null, null, null, null, null, null, null);
 
       assertThat(config.effectiveFrequencyGuardHours()).isEqualTo(24);
       assertThat(config.effectiveVolatilityReversals()).isEqualTo(3);
       assertThat(config.effectiveVolatilityPeriodDays()).isEqualTo(7);
       assertThat(config.effectiveStaleDataGuardHours()).isEqualTo(24);
+      assertThat(config.effectiveAdCostDrrThreshold()).isEqualByComparingTo("0.15");
     }
   }
 
@@ -74,20 +77,21 @@ class GuardConfigTest {
     @DisplayName("explicit false disables guards")
     void should_disableGuards_when_explicitFalse() {
       GuardConfig config = new GuardConfig(
-          false, false, null, false, null, null, false, false, null);
+          false, false, null, false, null, null, false, false, null, false, null);
 
       assertThat(config.isMarginGuardEnabled()).isFalse();
       assertThat(config.isFrequencyGuardEnabled()).isFalse();
       assertThat(config.isVolatilityGuardEnabled()).isFalse();
       assertThat(config.isPromoGuardEnabled()).isFalse();
       assertThat(config.isStockOutGuardEnabled()).isFalse();
+      assertThat(config.isAdCostGuardEnabled()).isFalse();
     }
 
     @Test
     @DisplayName("custom thresholds override defaults")
     void should_useCustomValues_when_provided() {
       GuardConfig config = new GuardConfig(
-          null, null, 12, null, 5, 14, null, null, 48);
+          null, null, 12, null, 5, 14, null, null, 48, null, null);
 
       assertThat(config.effectiveFrequencyGuardHours()).isEqualTo(12);
       assertThat(config.effectiveVolatilityReversals()).isEqualTo(5);

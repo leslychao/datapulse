@@ -27,6 +27,7 @@ public class FactSalesMaterializer implements AnalyticsMaterializer {
             SELECT cs.id              AS sale_id,
                    cs.connection_id,
                    cs.source_platform,
+                   cs.fulfillment_type,
                    cs.posting_id,
                    co.external_order_id AS order_id,
                    cs.seller_sku_id,
@@ -43,10 +44,11 @@ public class FactSalesMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (sale_id, connection_id, source_platform, posting_id, order_id,
+            (sale_id, connection_id, source_platform, fulfillment_type,
+             posting_id, order_id,
              seller_sku_id, product_id, quantity, sale_amount, sale_date,
              job_execution_id, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -84,6 +86,7 @@ public class FactSalesMaterializer implements AnalyticsMaterializer {
                 SELECT cs.id              AS sale_id,
                        cs.connection_id,
                        cs.source_platform,
+                       cs.fulfillment_type,
                        cs.posting_id,
                        co.external_order_id AS order_id,
                        cs.seller_sku_id,
@@ -110,31 +113,32 @@ public class FactSalesMaterializer implements AnalyticsMaterializer {
             ps.setLong(1, ((Number) row.get("sale_id")).longValue());
             ps.setInt(2, ((Number) row.get("connection_id")).intValue());
             ps.setString(3, (String) row.get("source_platform"));
-            ps.setString(4, (String) row.get("posting_id"));
-            ps.setString(5, (String) row.get("order_id"));
+            ps.setString(4, (String) row.get("fulfillment_type"));
+            ps.setString(5, (String) row.get("posting_id"));
+            ps.setString(6, (String) row.get("order_id"));
 
             Number sellerSkuId = (Number) row.get("seller_sku_id");
             if (sellerSkuId != null) {
-                ps.setLong(6, sellerSkuId.longValue());
-            } else {
-                ps.setNull(6, java.sql.Types.BIGINT);
-            }
-
-            Number productId = (Number) row.get("product_id");
-            if (productId != null) {
-                ps.setLong(7, productId.longValue());
+                ps.setLong(7, sellerSkuId.longValue());
             } else {
                 ps.setNull(7, java.sql.Types.BIGINT);
             }
 
-            ps.setInt(8, ((Number) row.get("quantity")).intValue());
-            ps.setBigDecimal(9, (BigDecimal) row.get("sale_amount"));
+            Number productId = (Number) row.get("product_id");
+            if (productId != null) {
+                ps.setLong(8, productId.longValue());
+            } else {
+                ps.setNull(8, java.sql.Types.BIGINT);
+            }
+
+            ps.setInt(9, ((Number) row.get("quantity")).intValue());
+            ps.setBigDecimal(10, (BigDecimal) row.get("sale_amount"));
 
             Timestamp saleDate = (Timestamp) row.get("sale_date");
-            ps.setDate(10, Date.valueOf(saleDate.toLocalDateTime().toLocalDate()));
+            ps.setDate(11, Date.valueOf(saleDate.toLocalDateTime().toLocalDate()));
 
-            ps.setLong(11, ((Number) row.get("job_execution_id")).longValue());
-            ps.setLong(12, ver);
+            ps.setLong(12, ((Number) row.get("job_execution_id")).longValue());
+            ps.setLong(13, ver);
         });
     }
 

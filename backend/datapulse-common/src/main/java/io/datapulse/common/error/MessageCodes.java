@@ -95,6 +95,7 @@ public final class MessageCodes {
     public static final String PRICING_GUARD_FREQUENCY = "pricing.guard.frequency";
     public static final String PRICING_GUARD_VOLATILITY = "pricing.guard.volatility";
     public static final String PRICING_GUARD_PROMO_ACTIVE = "pricing.guard.promo_active";
+    public static final String PRICING_GUARD_AD_COST_DRR_BLOCKED = "pricing.guard.ad_cost_drr.blocked";
 
     // --- Pricing: Strategy skip/hold reasons ---
     public static final String PRICING_COGS_MISSING = "pricing.strategy.cogs_missing";
@@ -170,6 +171,18 @@ public final class MessageCodes {
     public static final String GRID_EXPORT_TOO_MANY_ROWS = "grid.export.too_many_rows";
     public static final String SAVED_VIEW_NOT_FOUND = "saved_view.not_found";
     public static final String SAVED_VIEW_SYSTEM_READONLY = "saved_view.system_readonly";
+
+    // --- Advertising Alerts ---
+    public static final String AD_DRR_THRESHOLD_TITLE = "advertising.alert.drr_threshold.title";
+    public static final String AD_NO_STOCK_TITLE = "advertising.alert.no_stock.title";
+    public static final String AD_INEFFICIENT_CAMPAIGN_TITLE = "advertising.alert.inefficient_campaign.title";
+    public static final String AD_PRICE_DROP_HIGH_DRR_TITLE = "advertising.alert.price_drop_high_drr.title";
+
+    // --- Advertising Recommendations ---
+    public static final String AD_RECOMMENDATION_WORTH = "advertising.recommendation.worth";
+    public static final String AD_RECOMMENDATION_NOT_WORTH = "advertising.recommendation.not_worth";
+    public static final String AD_RECOMMENDATION_REDUCE_BID = "advertising.recommendation.reduce_bid";
+    public static final String AD_RECOMMENDATION_INSUFFICIENT_DATA = "advertising.recommendation.insufficient_data";
 
     // --- Analytics ---
     public static final String ANALYTICS_CLICKHOUSE_UNAVAILABLE = "analytics.clickhouse.unavailable";

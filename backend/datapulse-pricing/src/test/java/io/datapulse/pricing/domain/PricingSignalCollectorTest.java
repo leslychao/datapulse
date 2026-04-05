@@ -21,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import io.datapulse.pricing.persistence.PricingClickHouseReadRepository;
 import io.datapulse.pricing.persistence.PricingDataReadRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +29,9 @@ class PricingSignalCollectorTest {
 
   @Mock
   private PricingDataReadRepository dataReadRepository;
+
+  @Mock
+  private PricingClickHouseReadRepository clickHouseReadRepository;
 
   @InjectMocks
   private PricingSignalCollector collector;
@@ -47,6 +51,7 @@ class PricingSignalCollectorTest {
 
       assertThat(result).isEmpty();
       verifyNoInteractions(dataReadRepository);
+      verifyNoInteractions(clickHouseReadRepository);
     }
   }
 
@@ -72,6 +77,8 @@ class PricingSignalCollectorTest {
       when(dataReadRepository.findLatestChangeDecisions(offerIds))
           .thenReturn(Map.of());
       when(dataReadRepository.findPriceReversals(eq(offerIds), any()))
+          .thenReturn(Map.of());
+      when(dataReadRepository.findMarketplaceSkus(offerIds))
           .thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
@@ -104,6 +111,7 @@ class PricingSignalCollectorTest {
       when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(null);
       when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
       when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
+      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -128,6 +136,7 @@ class PricingSignalCollectorTest {
       when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(null);
       when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
       when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
+      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
 
@@ -138,6 +147,7 @@ class PricingSignalCollectorTest {
       verify(dataReadRepository).findDataFreshness(CONNECTION_ID);
       verify(dataReadRepository).findLatestChangeDecisions(offerIds);
       verify(dataReadRepository).findPriceReversals(eq(offerIds), any());
+      verify(dataReadRepository).findMarketplaceSkus(offerIds);
     }
 
     @Test
@@ -154,6 +164,7 @@ class PricingSignalCollectorTest {
       when(dataReadRepository.findLatestChangeDecisions(offerIds))
           .thenReturn(Map.of(100L, lastChange));
       when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
+      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -174,6 +185,7 @@ class PricingSignalCollectorTest {
       when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
       when(dataReadRepository.findPriceReversals(eq(offerIds), any()))
           .thenReturn(Map.of(100L, 5));
+      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);
@@ -194,6 +206,7 @@ class PricingSignalCollectorTest {
       when(dataReadRepository.findDataFreshness(CONNECTION_ID)).thenReturn(freshness);
       when(dataReadRepository.findLatestChangeDecisions(offerIds)).thenReturn(Map.of());
       when(dataReadRepository.findPriceReversals(eq(offerIds), any())).thenReturn(Map.of());
+      when(dataReadRepository.findMarketplaceSkus(offerIds)).thenReturn(Map.of());
 
       Map<Long, PricingSignalSet> result =
           collector.collectBatch(offerIds, CONNECTION_ID, VOLATILITY_DAYS);

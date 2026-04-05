@@ -52,7 +52,7 @@ class CanonicalFinanceNormalizerTest {
                                           String warehouseExternalId) {
     return new NormalizedFinanceItem(
         "entry-1", FinanceEntryType.SALE_ACCRUAL, postingId, orderId,
-        sellerSku, marketplaceSku, warehouseExternalId,
+        sellerSku, marketplaceSku, warehouseExternalId, null,
         BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO,
         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.valueOf(100),

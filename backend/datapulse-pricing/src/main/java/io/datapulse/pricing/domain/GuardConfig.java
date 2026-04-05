@@ -17,27 +17,35 @@ public record GuardConfig(
         @JsonProperty("promo_guard_enabled") Boolean promoGuardEnabled,
         @JsonProperty("stock_out_guard_enabled") Boolean stockOutGuardEnabled,
         @JsonProperty("stale_data_guard_hours") Integer staleDataGuardHours,
+        @JsonProperty("ad_cost_guard_enabled") Boolean adCostGuardEnabled,
+        @JsonProperty("ad_cost_drr_threshold_pct") BigDecimal adCostDrrThresholdPct,
         @JsonIgnore BigDecimal minMarginPct
 ) {
+
+    private static final BigDecimal DEFAULT_AD_COST_DRR_THRESHOLD = new BigDecimal("0.15");
 
     public GuardConfig(Boolean marginGuardEnabled, Boolean frequencyGuardEnabled,
                        Integer frequencyGuardHours, Boolean volatilityGuardEnabled,
                        Integer volatilityGuardReversals, Integer volatilityGuardPeriodDays,
                        Boolean promoGuardEnabled, Boolean stockOutGuardEnabled,
-                       Integer staleDataGuardHours) {
+                       Integer staleDataGuardHours, Boolean adCostGuardEnabled,
+                       BigDecimal adCostDrrThresholdPct) {
         this(marginGuardEnabled, frequencyGuardEnabled, frequencyGuardHours,
                 volatilityGuardEnabled, volatilityGuardReversals, volatilityGuardPeriodDays,
-                promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours, null);
+                promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours,
+                adCostGuardEnabled, adCostDrrThresholdPct, null);
     }
 
     public static final GuardConfig DEFAULTS = new GuardConfig(
-            true, true, 24, true, 3, 7, true, true, 24, null
+            true, true, 24, true, 3, 7, true, true, 24,
+            false, null, null
     );
 
     public GuardConfig withMinMarginPct(BigDecimal pct) {
         return new GuardConfig(marginGuardEnabled, frequencyGuardEnabled, frequencyGuardHours,
                 volatilityGuardEnabled, volatilityGuardReversals, volatilityGuardPeriodDays,
-                promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours, pct);
+                promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours,
+                adCostGuardEnabled, adCostDrrThresholdPct, pct);
     }
 
     public BigDecimal effectiveMinMarginPct() {
@@ -78,5 +86,13 @@ public record GuardConfig(
 
     public int effectiveStaleDataGuardHours() {
         return staleDataGuardHours != null ? staleDataGuardHours : 24;
+    }
+
+    public boolean isAdCostGuardEnabled() {
+        return adCostGuardEnabled != null && adCostGuardEnabled;
+    }
+
+    public BigDecimal effectiveAdCostDrrThreshold() {
+        return adCostDrrThresholdPct != null ? adCostDrrThresholdPct : DEFAULT_AD_COST_DRR_THRESHOLD;
     }
 }
