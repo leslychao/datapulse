@@ -15,6 +15,7 @@ import io.datapulse.etl.domain.IngestContext;
 import io.datapulse.etl.domain.SubSourceResult;
 import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalFinanceEntryUpsertRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -41,8 +42,8 @@ public class OzonFinanceFactSource implements EventSource {
 
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
-        String clientId = ctx.credentials().get("clientId");
-        String apiKey = ctx.credentials().get("apiKey");
+        String clientId = ctx.credentials().get(CredentialKeys.OZON_CLIENT_ID);
+        String apiKey = ctx.credentials().get(CredentialKeys.OZON_API_KEY);
 
         var captureCtx = CaptureContextFactory.build(ctx, eventType(), "OzonFinanceReadAdapter");
         int financePage =

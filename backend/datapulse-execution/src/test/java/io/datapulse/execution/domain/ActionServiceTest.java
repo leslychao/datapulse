@@ -36,7 +36,7 @@ import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionQueryRepository;
 import io.datapulse.execution.persistence.PriceActionRepository;
 import io.datapulse.execution.persistence.PriceActionStateTransitionRepository;
-import io.datapulse.platform.audit.AuditEvent;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.platform.security.WorkspaceContext;
 
@@ -54,6 +54,7 @@ class ActionServiceTest {
   @Mock private ExecutionProperties properties;
   @Mock private WorkspaceContext workspaceContext;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private AuditPublisher auditPublisher;
 
   @InjectMocks
   private ActionService service;
@@ -209,7 +210,7 @@ class ActionServiceTest {
 
       verify(casRepository).casApprove(ACTION_ID, ActionStatus.PENDING_APPROVAL, USER_ID);
       verify(outboxService).createEvent(any(), any(), eq(ACTION_ID), any());
-      verify(eventPublisher).publishEvent(any(AuditEvent.class));
+      verify(auditPublisher).publish(any(), any(), any(), any(), any());
     }
 
     @Test

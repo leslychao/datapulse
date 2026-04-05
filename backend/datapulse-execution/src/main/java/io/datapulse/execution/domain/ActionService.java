@@ -21,7 +21,7 @@ import io.datapulse.execution.persistence.PriceActionStateTransitionEntity;
 import io.datapulse.execution.persistence.PriceActionStateTransitionRepository;
 import io.datapulse.execution.persistence.PriceActionSummaryRow;
 import io.datapulse.execution.persistence.PriceActionTransitionRow;
-import io.datapulse.platform.audit.AuditEvent;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.platform.security.WorkspaceContext;
@@ -57,6 +57,7 @@ public class ActionService {
     private final ExecutionProperties properties;
     private final WorkspaceContext workspaceContext;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
     public Page<PriceActionSummaryRow> listActions(long workspaceId,
@@ -517,19 +518,8 @@ public class ActionService {
 
     private void publishAudit(String actionType, long actionId,
                               String outcome, String details) {
-        long wsId = 0L;
-        Long userId = null;
-        try {
-            wsId = workspaceContext.getWorkspaceId();
-            userId = workspaceContext.getUserId();
-        } catch (Exception ignored) {
-        }
-
-        eventPublisher.publishEvent(new AuditEvent(
-                wsId, "USER", userId, actionType,
-                ENTITY_TYPE, String.valueOf(actionId),
-                outcome, details, null, null
-        ));
+        auditPublisher.publish(actionType, ENTITY_TYPE,
+                String.valueOf(actionId), outcome, details);
     }
 
 }

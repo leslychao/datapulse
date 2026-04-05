@@ -13,7 +13,7 @@ import java.util.Set;
  * <pre>
  * Level 0:  CATEGORY_DICT ║ WAREHOUSE_DICT
  * Level 1:  PRODUCT_DICT
- * Level 2:  PRICE_SNAPSHOT ║ INVENTORY_FACT ║ SUPPLY_FACT ║ SALES_FACT ║ ADVERTISING_FACT ║ PROMO_SYNC
+ * Level 2:  PRICE_SNAPSHOT ║ INVENTORY_FACT ║ SUPPLY_FACT ║ SALES_FACT ║ PROMO_SYNC
  * Level 3:  FACT_FINANCE (soft dep on SALES_FACT)
  * </pre>
  */
@@ -50,9 +50,6 @@ public final class DagDefinition {
         DEPENDENCIES.put(EtlEventType.SALES_FACT, List.of(
                 EventDependency.hard(EtlEventType.PRODUCT_DICT)
         ));
-        DEPENDENCIES.put(EtlEventType.ADVERTISING_FACT, List.of(
-                EventDependency.hard(EtlEventType.PRODUCT_DICT)
-        ));
         DEPENDENCIES.put(EtlEventType.PROMO_SYNC, List.of(
                 EventDependency.hard(EtlEventType.PRODUCT_DICT)
         ));
@@ -70,7 +67,6 @@ public final class DagDefinition {
                         EtlEventType.INVENTORY_FACT,
                         EtlEventType.SUPPLY_FACT,
                         EtlEventType.SALES_FACT,
-                        EtlEventType.ADVERTISING_FACT,
                         EtlEventType.PROMO_SYNC
                 )),
                 new DagLevel(3, EnumSet.of(EtlEventType.FACT_FINANCE))

@@ -22,10 +22,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.function.Consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -57,11 +62,12 @@ class PricingRunServiceTest {
   @Mock private PriceDecisionRepository decisionRepository;
   @Mock private PricingRunRepository runRepository;
   @Mock private ObjectMapper objectMapper;
+  @Mock private BlastRadiusBreaker blastRadiusBreaker;
+  @Mock private FullAutoSafetyGate fullAutoSafetyGate;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @Mock private PricingStrategy pricingStrategy;
 
-  @InjectMocks
   private PricingRunService pricingRunService;
 
   @Captor
@@ -72,8 +78,29 @@ class PricingRunServiceTest {
 
   private PricingRunEntity runEntity;
 
+  @SuppressWarnings("unchecked") // TransactionTemplate mock delegates callback directly
   @BeforeEach
   void setUp() {
+    TransactionTemplate txTemplate = Mockito.mock(TransactionTemplate.class);
+    lenient().when(txTemplate.execute(any(TransactionCallback.class)))
+        .thenAnswer(inv -> {
+          TransactionCallback<?> cb = inv.getArgument(0);
+          return cb.doInTransaction(null);
+        });
+    lenient().doAnswer(inv -> {
+      Consumer<TransactionStatus> cb = inv.getArgument(0);
+      cb.accept(null);
+      return null;
+    }).when(txTemplate).executeWithoutResult(any());
+
+    pricingRunService = new PricingRunService(
+        automationBlockerChecker, dataReadRepository, policyResolver,
+        signalCollector, strategyRegistry, constraintResolver,
+        guardChain, explanationBuilder, actionScheduler,
+        decisionRepository, runRepository, objectMapper,
+        blastRadiusBreaker, fullAutoSafetyGate, eventPublisher,
+        txTemplate);
+
     runEntity = new PricingRunEntity();
     runEntity.setId(1L);
     runEntity.setWorkspaceId(10L);

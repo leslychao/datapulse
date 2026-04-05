@@ -20,6 +20,7 @@ import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalStockCurrentUpsertRepository;
 import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
 import io.datapulse.etl.persistence.canonical.WarehouseLookupRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,8 +51,8 @@ public class OzonInventoryFactSource implements EventSource {
 
   @Override
   public List<SubSourceResult> execute(IngestContext ctx) {
-    String clientId = ctx.credentials().get("clientId");
-    String apiKey = ctx.credentials().get("apiKey");
+    String clientId = ctx.credentials().get(CredentialKeys.OZON_CLIENT_ID);
+    String apiKey = ctx.credentials().get(CredentialKeys.OZON_API_KEY);
 
     var captureCtx = CaptureContextFactory.build(ctx, eventType(), "OzonStocksReadAdapter");
     String stocksLastId =

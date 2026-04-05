@@ -11,7 +11,7 @@ import java.util.Set;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +51,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class PricingRunService {
 
+    private static final int BATCH_SIZE = 100;
+
     private final AutomationBlockerChecker automationBlockerChecker;
     private final PricingDataReadRepository dataReadRepository;
     private final PolicyResolver policyResolver;
@@ -66,129 +68,185 @@ public class PricingRunService {
     private final BlastRadiusBreaker blastRadiusBreaker;
     private final FullAutoSafetyGate fullAutoSafetyGate;
     private final ApplicationEventPublisher eventPublisher;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public void executeRun(long pricingRunId) {
-        PricingRunEntity run = runRepository.findById(pricingRunId)
-                .orElseThrow(() -> new IllegalStateException(
-                        "PricingRun not found: " + pricingRunId));
+        PricingRunEntity run = transactionTemplate.execute(status -> {
+            PricingRunEntity r = runRepository.findById(pricingRunId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "PricingRun not found: " + pricingRunId));
+            if (r.getStatus() != RunStatus.PENDING) {
+                log.warn("PricingRun {} is not PENDING (status={}), skipping",
+                        pricingRunId, r.getStatus());
+                return null;
+            }
+            r.setStatus(RunStatus.IN_PROGRESS);
+            r.setStartedAt(OffsetDateTime.now());
+            return runRepository.save(r);
+        });
 
-        if (run.getStatus() != RunStatus.PENDING) {
-            log.warn("PricingRun {} is not PENDING (status={}), skipping", pricingRunId, run.getStatus());
+        if (run == null) {
             return;
         }
 
-        run.setStatus(RunStatus.IN_PROGRESS);
-        run.setStartedAt(OffsetDateTime.now());
-        runRepository.save(run);
+        final long runId = run.getId();
+        final long connectionId = run.getConnectionId();
+        final long workspaceId = run.getWorkspaceId();
 
         try {
-            RunCounters counters = processConnection(run);
-            completeRun(run, counters, null);
+            RunResult result = processConnection(runId, connectionId, workspaceId);
+            transactionTemplate.executeWithoutResult(status -> {
+                PricingRunEntity r = runRepository.findById(runId).orElseThrow();
+                r.setTotalOffers(result.totalOffers);
+                r.setEligibleCount(result.eligibleCount);
+                completeRun(r, result.counters, result.partialError);
+            });
         } catch (Exception e) {
-            log.error("PricingRun {} failed: {}", pricingRunId, e.getMessage(), e);
-            failRun(run, e);
+            log.error("PricingRun {} failed: {}", runId, e.getMessage(), e);
+            transactionTemplate.executeWithoutResult(status -> {
+                PricingRunEntity r = runRepository.findById(runId).orElseThrow();
+                failRun(r, e);
+            });
         }
     }
 
-    private RunCounters processConnection(PricingRunEntity run) {
-        if (automationBlockerChecker.isBlocked(run.getWorkspaceId(), run.getConnectionId())) {
+    private RunResult processConnection(long runId, long connectionId, long workspaceId) {
+        if (automationBlockerChecker.isBlocked(workspaceId, connectionId)) {
             log.warn("PricingRun {}: automation blocked for connection {} (blocking alert exists)",
-                    run.getId(), run.getConnectionId());
-            run.setErrorDetails(serializeJson(Map.of(
-                    "reason", MessageCodes.PRICING_AUTOMATION_BLOCKED,
-                    "connectionId", run.getConnectionId())));
-            return RunCounters.EMPTY;
+                    runId, connectionId);
+            transactionTemplate.executeWithoutResult(status -> {
+                PricingRunEntity r = runRepository.findById(runId).orElseThrow();
+                r.setErrorDetails(serializeJson(Map.of(
+                        "reason", MessageCodes.PRICING_AUTOMATION_BLOCKED,
+                        "connectionId", connectionId)));
+                runRepository.save(r);
+            });
+            return RunResult.empty(0, 0);
         }
 
-        List<OfferRow> allOffers = dataReadRepository.findOffersByConnection(run.getConnectionId());
-        run.setTotalOffers(allOffers.size());
+        List<OfferRow> allOffers = dataReadRepository.findOffersByConnection(connectionId);
 
         if (allOffers.isEmpty()) {
-            log.info("PricingRun {}: no offers found for connection {}", run.getId(), run.getConnectionId());
-            return RunCounters.EMPTY;
+            log.info("PricingRun {}: no offers found for connection {}", runId, connectionId);
+            return RunResult.empty(0, 0);
         }
 
         Map<Long, PricePolicyEntity> effectivePolicies = policyResolver.resolveEffectivePolicies(
-                run.getWorkspaceId(), run.getConnectionId(), allOffers);
+                workspaceId, connectionId, allOffers);
 
         List<EligibleOffer> eligible = filterEligible(allOffers, effectivePolicies);
-        run.setEligibleCount(eligible.size());
 
         if (eligible.isEmpty()) {
-            log.info("PricingRun {}: no eligible offers", run.getId());
-            return RunCounters.EMPTY;
+            log.info("PricingRun {}: no eligible offers", runId);
+            return RunResult.empty(allOffers.size(), 0);
         }
 
-        List<Long> eligibleOfferIds = eligible.stream()
-                .map(EligibleOffer::marketplaceOfferId)
-                .toList();
-
         int volatilityDays = resolveMaxVolatilityDays(effectivePolicies);
-        Map<Long, PricingSignalSet> signals = signalCollector.collectBatch(
-                eligibleOfferIds, run.getConnectionId(), volatilityDays);
-
-        return processOffers(run, eligible, signals);
-    }
-
-    private RunCounters processOffers(PricingRunEntity run, List<EligibleOffer> eligible,
-                                      Map<Long, PricingSignalSet> signals) {
-        int changeCount = 0;
-        int skipCount = 0;
-        int holdCount = 0;
-        List<PriceDecisionEntity> decisions = new ArrayList<>();
 
         boolean isFullAuto = isFullAutoRun(eligible);
         if (isFullAuto) {
             blastRadiusBreaker.reset();
         }
-
         Set<Long> downgradedPolicyIds = checkFullAutoSafety(eligible);
 
-        for (EligibleOffer offer : eligible) {
-            PricingSignalSet signalSet = signals.get(offer.marketplaceOfferId());
-            if (signalSet == null) {
-                skipCount++;
-                continue;
-            }
+        RunCounters totalCounters = RunCounters.EMPTY;
+        Exception partialError = null;
+        boolean paused = false;
 
-            PricePolicyEntity policy = offer.policy();
-            PolicySnapshot snapshot = buildSnapshot(policy);
-            GuardConfig guardConfig = parseGuardConfig(policy.getGuardConfig())
-                    .withMinMarginPct(policy.getMinMarginPct());
+        for (int from = 0; from < eligible.size(); from += BATCH_SIZE) {
+            int to = Math.min(from + BATCH_SIZE, eligible.size());
+            List<EligibleOffer> chunk = eligible.subList(from, to);
 
-            PriceDecisionEntity decision = processSingleOffer(
-                    run, offer, signalSet, policy, snapshot, guardConfig);
-            decisions.add(decision);
+            try {
+                BatchResult batch = processChunk(
+                        runId, workspaceId, connectionId, chunk,
+                        volatilityDays, isFullAuto, downgradedPolicyIds);
+                totalCounters = totalCounters.add(batch.counters);
 
-            switch (decision.getDecisionType()) {
-                case CHANGE -> changeCount++;
-                case SKIP -> skipCount++;
-                case HOLD -> holdCount++;
-            }
-
-            if (isFullAuto && decision.getDecisionType() == DecisionType.CHANGE) {
-                blastRadiusBreaker.recordDecision(
-                        decision.getCurrentPrice(), decision.getTargetPrice());
-                if (blastRadiusBreaker.isBreached()) {
-                    String metric = blastRadiusBreaker.breachedMetric();
-                    BigDecimal value = "max_abs_change_pct".equals(metric)
-                            ? blastRadiusBreaker.currentMaxAbsChangePct()
-                            : blastRadiusBreaker.currentRatio();
-                    log.warn("Blast radius breached for run {}: metric={}, value={}",
-                            run.getId(), metric, value);
-                    decisionRepository.saveAll(decisions);
-                    pauseRunForBlastRadius(run, metric, value);
-                    return new RunCounters(changeCount, skipCount, holdCount);
+                if (batch.paused) {
+                    paused = true;
+                    break;
                 }
+            } catch (Exception e) {
+                log.error("PricingRun {}: batch [{}-{}) failed: {}",
+                        runId, from, to, e.getMessage(), e);
+                partialError = e;
             }
         }
 
-        decisionRepository.saveAll(decisions);
+        if (paused) {
+            transactionTemplate.executeWithoutResult(status -> {
+                PricingRunEntity r = runRepository.findById(runId).orElseThrow();
+                r.setTotalOffers(allOffers.size());
+                r.setEligibleCount(eligible.size());
+                String metric = blastRadiusBreaker.breachedMetric();
+                BigDecimal value = "max_abs_change_pct".equals(metric)
+                        ? blastRadiusBreaker.currentMaxAbsChangePct()
+                        : blastRadiusBreaker.currentRatio();
+                pauseRunForBlastRadius(r, metric, value);
+            });
+        }
 
-        scheduleActions(decisions, run.getWorkspaceId(), downgradedPolicyIds);
+        return new RunResult(
+                allOffers.size(), eligible.size(), totalCounters, partialError);
+    }
 
-        return new RunCounters(changeCount, skipCount, holdCount);
+    private BatchResult processChunk(long runId, long workspaceId, long connectionId,
+                                     List<EligibleOffer> chunk, int volatilityDays,
+                                     boolean isFullAuto, Set<Long> downgradedPolicyIds) {
+        List<Long> chunkOfferIds = chunk.stream()
+                .map(EligibleOffer::marketplaceOfferId)
+                .toList();
+
+        Map<Long, PricingSignalSet> signals = signalCollector.collectBatch(
+                chunkOfferIds, connectionId, volatilityDays);
+
+        return transactionTemplate.execute(status -> {
+            int changeCount = 0;
+            int skipCount = 0;
+            int holdCount = 0;
+            List<PriceDecisionEntity> decisions = new ArrayList<>();
+
+            for (EligibleOffer offer : chunk) {
+                PricingSignalSet signalSet = signals.get(offer.marketplaceOfferId());
+                if (signalSet == null) {
+                    skipCount++;
+                    continue;
+                }
+
+                PricePolicyEntity policy = offer.policy();
+                PolicySnapshot snapshot = buildSnapshot(policy);
+                GuardConfig guardConfig = parseGuardConfig(policy.getGuardConfig())
+                        .withMinMarginPct(policy.getMinMarginPct());
+
+                PriceDecisionEntity decision = processSingleOffer(
+                        runId, workspaceId, offer, signalSet,
+                        policy, snapshot, guardConfig);
+                decisions.add(decision);
+
+                switch (decision.getDecisionType()) {
+                    case CHANGE -> changeCount++;
+                    case SKIP -> skipCount++;
+                    case HOLD -> holdCount++;
+                }
+
+                if (isFullAuto && decision.getDecisionType() == DecisionType.CHANGE) {
+                    blastRadiusBreaker.recordDecision(
+                            decision.getCurrentPrice(), decision.getTargetPrice());
+                    if (blastRadiusBreaker.isBreached()) {
+                        log.warn("Blast radius breached for run {}: chunk saved", runId);
+                        decisionRepository.saveAll(decisions);
+                        return new BatchResult(
+                                new RunCounters(changeCount, skipCount, holdCount), true);
+                    }
+                }
+            }
+
+            decisionRepository.saveAll(decisions);
+            scheduleActions(decisions, workspaceId, downgradedPolicyIds);
+
+            return new BatchResult(new RunCounters(changeCount, skipCount, holdCount), false);
+        });
     }
 
     private Set<Long> checkFullAutoSafety(List<EligibleOffer> eligible) {
@@ -225,15 +283,18 @@ public class PricingRunService {
         runRepository.save(run);
     }
 
-    private PriceDecisionEntity processSingleOffer(PricingRunEntity run, EligibleOffer offer,
-                                                    PricingSignalSet signals, PricePolicyEntity policy,
-                                                    PolicySnapshot snapshot, GuardConfig guardConfig) {
+    private PriceDecisionEntity processSingleOffer(long runId, long workspaceId,
+                                                    EligibleOffer offer,
+                                                    PricingSignalSet signals,
+                                                    PricePolicyEntity policy,
+                                                    PolicySnapshot snapshot,
+                                                    GuardConfig guardConfig) {
         StrategyResult strategyResult = strategyRegistry.resolve(policy.getStrategyType())
                 .calculate(signals, snapshot);
 
         if (strategyResult.rawTargetPrice() == null) {
             String skipReasonKey = strategyResult.reasonKey();
-            return buildDecision(run, offer, policy, snapshot, signals,
+            return buildDecision(runId, workspaceId, offer, policy, snapshot, signals,
                     DecisionType.HOLD, null, null, strategyResult,
                     List.of(), List.of(),
                     explanationBuilder.buildHold(strategyResult.explanation(), snapshot),
@@ -243,12 +304,14 @@ public class PricingRunService {
         ConstraintResolution constrained = constraintResolver.resolve(
                 strategyResult.rawTargetPrice(), signals, snapshot);
 
-        GuardChainResult guardResult = guardChain.evaluate(signals, constrained.clampedPrice(), guardConfig);
+        GuardChainResult guardResult = guardChain.evaluate(
+                signals, constrained.clampedPrice(), guardConfig);
 
         if (!guardResult.allPassed()) {
             String skipReasonKey = guardResult.blockingGuard().reason();
-            return buildDecision(run, offer, policy, snapshot, signals,
-                    DecisionType.SKIP, constrained.clampedPrice(), strategyResult.rawTargetPrice(),
+            return buildDecision(runId, workspaceId, offer, policy, snapshot, signals,
+                    DecisionType.SKIP, constrained.clampedPrice(),
+                    strategyResult.rawTargetPrice(),
                     strategyResult, constrained.applied(), guardResult.evaluations(),
                     explanationBuilder.buildSkipGuard(snapshot, guardResult.blockingGuard()),
                     skipReasonKey);
@@ -259,7 +322,7 @@ public class PricingRunService {
                 && targetPrice.compareTo(signals.currentPrice()) == 0;
 
         if (noChange) {
-            return buildDecision(run, offer, policy, snapshot, signals,
+            return buildDecision(runId, workspaceId, offer, policy, snapshot, signals,
                     DecisionType.SKIP, targetPrice, strategyResult.rawTargetPrice(),
                     strategyResult, constrained.applied(), guardResult.evaluations(),
                     explanationBuilder.buildSkip(MessageCodes.PRICING_NO_CHANGE, null, null),
@@ -272,10 +335,10 @@ public class PricingRunService {
                 strategyResult.explanation(), constrained.applied(),
                 policy.getExecutionMode(), actionStatus);
 
-        return buildDecision(run, offer, policy, snapshot, signals,
+        return buildDecision(runId, workspaceId, offer, policy, snapshot, signals,
                 DecisionType.CHANGE, targetPrice, strategyResult.rawTargetPrice(),
-                strategyResult, constrained.applied(), guardResult.evaluations(), explanation,
-                null);
+                strategyResult, constrained.applied(), guardResult.evaluations(),
+                explanation, null);
     }
 
     private List<EligibleOffer> filterEligible(List<OfferRow> offers,
@@ -338,7 +401,8 @@ public class PricingRunService {
         }
     }
 
-    private void completeRun(PricingRunEntity run, RunCounters counters, Exception partialError) {
+    private void completeRun(PricingRunEntity run, RunCounters counters,
+                             Exception partialError) {
         run.setChangeCount(counters.changeCount);
         run.setSkipCount(counters.skipCount);
         run.setHoldCount(counters.holdCount);
@@ -347,7 +411,7 @@ public class PricingRunService {
         if (partialError != null) {
             run.setStatus(RunStatus.COMPLETED_WITH_ERRORS);
             run.setErrorDetails(serializeError(partialError));
-        } else {
+        } else if (run.getStatus() != RunStatus.PAUSED) {
             run.setStatus(RunStatus.COMPLETED);
         }
         runRepository.save(run);
@@ -369,8 +433,10 @@ public class PricingRunService {
                 0, 0, 0, RunStatus.FAILED));
     }
 
-    private PriceDecisionEntity buildDecision(PricingRunEntity run, EligibleOffer offer,
-                                               PricePolicyEntity policy, PolicySnapshot snapshot,
+    private PriceDecisionEntity buildDecision(long runId, long workspaceId,
+                                               EligibleOffer offer,
+                                               PricePolicyEntity policy,
+                                               PolicySnapshot snapshot,
                                                PricingSignalSet signals,
                                                DecisionType decisionType,
                                                BigDecimal targetPrice, BigDecimal rawPrice,
@@ -380,8 +446,8 @@ public class PricingRunService {
                                                String explanation,
                                                String skipReasonKey) {
         var entity = new PriceDecisionEntity();
-        entity.setWorkspaceId(run.getWorkspaceId());
-        entity.setPricingRunId(run.getId());
+        entity.setWorkspaceId(workspaceId);
+        entity.setPricingRunId(runId);
         entity.setMarketplaceOfferId(offer.marketplaceOfferId());
         entity.setPricePolicyId(policy.getId());
         entity.setPolicyVersion(policy.getVersion());
@@ -477,5 +543,25 @@ public class PricingRunService {
 
     private record RunCounters(int changeCount, int skipCount, int holdCount) {
         static final RunCounters EMPTY = new RunCounters(0, 0, 0);
+
+        RunCounters add(RunCounters other) {
+            return new RunCounters(
+                    changeCount + other.changeCount,
+                    skipCount + other.skipCount,
+                    holdCount + other.holdCount);
+        }
     }
+
+    private record RunResult(
+            int totalOffers,
+            int eligibleCount,
+            RunCounters counters,
+            Exception partialError) {
+
+        static RunResult empty(int totalOffers, int eligibleCount) {
+            return new RunResult(totalOffers, eligibleCount, RunCounters.EMPTY, null);
+        }
+    }
+
+    private record BatchResult(RunCounters counters, boolean paused) {}
 }

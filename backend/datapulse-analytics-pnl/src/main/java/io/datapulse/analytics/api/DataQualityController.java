@@ -1,6 +1,7 @@
 package io.datapulse.analytics.api;
 
 import java.util.List;
+import java.util.Map;
 
 import io.datapulse.analytics.domain.DataQualityService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class DataQualityController {
 
     private final DataQualityService dataQualityService;
+
+    @GetMapping("/ch-health")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public Map<String, Boolean> getClickHouseHealth(
+            @PathVariable("workspaceId") long workspaceId) {
+        return Map.of("available", dataQualityService.isClickHouseAvailable());
+    }
 
     @GetMapping("/status")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")

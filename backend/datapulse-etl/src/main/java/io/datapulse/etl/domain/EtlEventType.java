@@ -12,8 +12,7 @@ public enum EtlEventType {
     SUPPLY_FACT,
     SALES_FACT,
     FACT_FINANCE,
-    PROMO_SYNC,
-    ADVERTISING_FACT;
+    PROMO_SYNC;
 
     private static final Set<EtlEventType> STATE_EVENTS = EnumSet.of(
             CATEGORY_DICT, WAREHOUSE_DICT, PRODUCT_DICT,
@@ -21,7 +20,7 @@ public enum EtlEventType {
     );
 
     private static final Set<EtlEventType> FLOW_EVENTS = EnumSet.of(
-            SALES_FACT, ADVERTISING_FACT
+            SALES_FACT
     );
 
     private static final Set<EtlEventType> FINANCE_EVENTS = EnumSet.of(

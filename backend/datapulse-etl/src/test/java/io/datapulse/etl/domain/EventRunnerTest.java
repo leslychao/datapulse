@@ -82,7 +82,7 @@ class EventRunnerTest {
   private IngestContext buildContext() {
     return IngestContextFixtures.any(
         1L, 100L, 1L, MarketplaceType.WB,
-        Map.of("token", "test"), "FULL_SYNC",
+        Map.of("apiToken", "test"), "FULL_SYNC",
         EnumSet.allOf(EtlEventType.class), Map.of());
   }
 

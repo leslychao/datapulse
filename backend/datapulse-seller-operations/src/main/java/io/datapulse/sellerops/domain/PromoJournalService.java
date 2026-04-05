@@ -15,11 +15,11 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PromoJournalService {
 
     private final PromoJournalJdbcRepository journalRepository;
 
-    @Transactional(readOnly = true)
     public Page<PromoJournalEntryResponse> getJournal(long workspaceId, long offerId,
                                                        LocalDate from, LocalDate to,
                                                        String decisionType, String actionStatus,

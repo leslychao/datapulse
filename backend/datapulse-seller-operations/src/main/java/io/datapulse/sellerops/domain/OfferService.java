@@ -189,12 +189,8 @@ public class OfferService {
   }
 
   private Map<Long, ClickHouseEnrichment> fetchEnrichmentSafely(List<Long> offerIds) {
-    try {
-      return chRepository.findEnrichment(offerIds);
-    } catch (Exception e) {
-      log.warn("ClickHouse enrichment failed for offer detail: error={}",
-          e.getMessage());
-      return Map.of();
-    }
+    return ChSafeQuery.getOrFallback(
+        () -> chRepository.findEnrichment(offerIds),
+        Map.of(), "enrichment/offerDetail");
   }
 }

@@ -15,11 +15,11 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PriceJournalService {
 
     private final PriceJournalJdbcRepository journalRepository;
 
-    @Transactional(readOnly = true)
     public Page<PriceJournalEntryResponse> getJournal(long workspaceId, long offerId,
                                                        LocalDate from, LocalDate to,
                                                        String decisionType, String actionStatus,

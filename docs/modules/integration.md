@@ -716,62 +716,109 @@ PUT /api/connections/{connectionId}/performance-credentials
 |--------|------|-------|----------|
 | GET | `/api/connections/{connectionId}/call-log` | ADMIN, OWNER | Paginated call log. Filters: `?from=...&to=...&endpoint=...&httpStatus=...` |
 
-## Local Mode & WireMock
+## Local Mode — гранулярная маршрутизация API
 
 ### Назначение
 
-При локальной разработке (`spring.profiles.active=local`) все marketplace API-вызовы направляются на WireMock вместо реальных хостов провайдеров. Это позволяет:
-- Разрабатывать и отлаживать адаптеры без реальных credentials
-- Запускать интеграционные тесты offline
-- Тестировать write-операции (цены, промо) без побочных эффектов
+При локальной разработке (`spring.profiles.active=local`) marketplace API-вызовы маршрутизируются **гранулярно** — в зависимости от провайдера и типа операции (read / write):
+
+| Провайдер | Операция | Куда идёт | Почему |
+|---|---|---|---|
+| **Ozon** | Read (ETL, аналитика) | Реальный API (`api-seller.ozon.ru`) | Боевой аккаунт имеет 464+ товаров с реальными данными |
+| **Ozon** | Write (цены, промо) | WireMock | Защита от побочных эффектов |
+| **WB** | Read (каталог, цены, заказы, продажи, финансы, склады, промо, реклама) | WB Sandbox (`*-sandbox.wildberries.ru`) | Боевой WB-аккаунт пустой; sandbox возвращает реалистичные тестовые данные |
+| **WB** | Read (аналитика: stocks report, returns) | WireMock | У WB Analytics API нет sandbox-эквивалента |
+| **WB** | Write (цены, промо) | WireMock | Защита от побочных эффектов |
+
+Преимущества по сравнению со старым подходом (всё через WireMock):
+- **Реальные данные** в ETL — P&L, грид, аналитика работают на реальных цифрах Ozon
+- **Реалистичные тестовые данные** WB — sandbox генерирует правдоподобные карточки, заказы, финансы
+- **Write-операции изолированы** — цены и промо никогда не уходят в реальный маркетплейс при `local`
 
 ### Архитектура
 
 ```
-┌─────────────────────┐
-│  datapulse-api /    │
-│  ingest-worker      │
-│  (profile=local)    │
-│                     │
-│  base-url →         │──► http://localhost:9091 ──► WireMock
-│  localhost:9091     │        (docker-compose)
-└─────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  profile = local                            │
+│                                                             │
+│  Ozon reads ──────────► https://api-seller.ozon.ru          │
+│  Ozon writes ─────────► http://localhost:9091 (WireMock)    │
+│                                                             │
+│  WB reads (основные) ─► https://*-sandbox.wildberries.ru    │
+│  WB reads (analytics)─► http://localhost:9091 (WireMock)    │
+│  WB writes ───────────► http://localhost:9091 (WireMock)    │
+└─────────────────────────────────────────────────────────────┘
 
-┌─────────────────────┐
-│  datapulse-api /    │
-│  ingest-worker      │
-│  (profile=!local)   │
-│                     │
-│  base-url →         │──► https://api-seller.ozon.ru
-│  real hosts         │──► https://discounts-prices-api.wildberries.ru
-└─────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  profile = !local (production)              │
+│                                                             │
+│  Все reads ───────────► реальные хосты провайдеров          │
+│  Все writes ──────────► реальные хосты провайдеров          │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+### Read / Write URL-разделение
+
+Для операций записи введены отдельные `*-write-base-url` properties в `IntegrationProperties`:
+
+| Property | Default (production) | Назначение |
+|---|---|---|
+| `wildberries.prices-base-url` | `discounts-prices-api.wildberries.ru` | Чтение цен, скидок |
+| `wildberries.prices-write-base-url` | fallback → `prices-base-url` | Запись цен (upload task) |
+| `ozon.seller-base-url` | `api-seller.ozon.ru` | Чтение (ETL, каталог) |
+| `ozon.seller-write-base-url` | fallback → `seller-base-url` | Запись (цены, промо) |
+
+В production оба URL совпадают (fallback). В `local` write-URL указывает на WireMock, а read-URL — на реальный/sandbox хост.
 
 ### Переключение base URL
 
-В `application-local.yml` все базовые URL маркетплейсов указывают на WireMock:
+В `application-local.yml`:
 
 ```yaml
 datapulse:
   integration:
     wildberries:
-      content-base-url: http://localhost:9091
-      prices-base-url: http://localhost:9091
-      statistics-base-url: http://localhost:9091
-      analytics-base-url: http://localhost:9091
-      marketplace-base-url: http://localhost:9091
-      advert-base-url: http://localhost:9091
-      promo-base-url: http://localhost:9091
+      # Read URLs → WB Sandbox (тестовые данные, sandbox-токен автопровижен в Vault)
+      content-base-url: https://content-api-sandbox.wildberries.ru
+      prices-base-url: https://discounts-prices-api-sandbox.wildberries.ru
+      statistics-base-url: https://statistics-api-sandbox.wildberries.ru
+      marketplace-base-url: https://marketplace-api-sandbox.wildberries.ru
+      advert-base-url: https://advert-api-sandbox.wildberries.ru
+      promo-base-url: https://discounts-prices-api-sandbox.wildberries.ru
+      # Нет sandbox для analytics API → WireMock
+      analytics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Write → WireMock
+      prices-write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Sandbox-токен (автоматически кладётся в Vault при старте)
+      sandbox-api-token: <WB sandbox JWT>
     ozon:
-      seller-base-url: http://localhost:9091
-      performance-base-url: http://localhost:9091
+      # Read URL — реальный API (не переопределяется, берётся дефолт из application.yml)
+      # Write → WireMock
+      seller-write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
 ```
 
-WireMock матчит запросы по path pattern — один инстанс обслуживает все провайдеры.
+### WB Sandbox — автопровижн credentials
+
+При `local`-профиле `LocalSandboxCredentialInitializer` (`@Component @Profile("local") ApplicationRunner`) автоматически при старте:
+
+1. Читает `sandbox-api-token` из `IntegrationProperties.wildberries`
+2. Находит все `MarketplaceConnectionEntity` с типом `WB`
+3. Для каждого подключения находит `SecretReferenceEntity` (vault path)
+4. Сохраняет sandbox-токен в Vault по этому пути
+
+Это гарантирует, что адаптеры получат sandbox-токен из Vault (как в production), без ручного провижна.
+
+**Требования WB Sandbox:** sandbox URL принимает **только** тестовый токен (`"t":true` в JWT). Боевой токен → 401. И наоборот — sandbox-токен не работает на production URL.
+
+Маппинг production → sandbox URL и детали токенов описаны в `.cursor/rules/provider-api-verification.mdc` (секция "WB Sandbox URL Mapping").
 
 ### WireMock в docker-compose
 
 Сервис `wiremock` в `infra/docker-compose.yml`, порт `9091:8080`. Включён `--global-response-templating` для динамических ответов.
+
+WireMock используется в `local` только для:
+- **WB Analytics** read (нет sandbox)
+- **Все write** операции (цены, промо — оба провайдера)
 
 ### Принцип создания стабов
 
@@ -783,70 +830,72 @@ WireMock матчит запросы по path pattern — один инстан
 
 ### Матрица покрытия WireMock стабов
 
+> С переходом на гранулярную маршрутизацию часть стабов **не используется в `local`** — данные приходят из реального API (Ozon) или sandbox (WB). Стабы сохраняются для integration-тестов и offline-разработки.
+
 #### Wildberries — Read
 
-| Capability | Endpoint | Method | Mapping file | Status |
-|------------|----------|--------|-------------|--------|
-| Catalog | `/content/v2/get/cards/list` | POST | `wb-catalog-cards-list.json` | ✅ |
-| Prices | `/api/v2/list/goods/filter` | GET | `wb-prices-goods-filter.json` | ✅ |
-| Stocks | `/api/analytics/v1/stocks-report/wb-warehouses` | POST | `wb-stocks-report.json` | ✅ |
-| Orders | `/api/v1/supplier/orders` | GET | `wb-orders.json` | ✅ |
-| Sales | `/api/v1/supplier/sales` | GET | `wb-sales.json` | ✅ |
-| Finance | `/api/v5/supplier/reportDetailByPeriod` | GET | `wb-finance-report.json` | ✅ |
-| Incomes | `/api/v1/supplier/incomes` | GET | `wb-incomes.json` | ✅ |
-| Offices (WB warehouses) | `/api/v3/offices` | GET | `wb-offices.json` | ✅ |
-| Seller warehouses (FBS) | `/api/v3/warehouses` | GET | `wb-warehouses-seller.json` | ✅ |
-| Returns | `/api/v1/analytics/goods-return` | GET | `wb-returns-goods-return.json` | ✅ |
-| Tariffs | `/api/v1/tariffs/commission` | GET | `wb-tariffs-commission.json` | ✅ |
+| Capability | Endpoint | Method | Mapping file | Status | Local routing |
+|------------|----------|--------|-------------|--------|---------------|
+| Catalog | `/content/v2/get/cards/list` | POST | `wb-catalog-cards-list.json` | ✅ | **Sandbox** |
+| Prices | `/api/v2/list/goods/filter` | GET | `wb-prices-goods-filter.json` | ✅ | **Sandbox** |
+| Stocks | `/api/analytics/v1/stocks-report/wb-warehouses` | POST | `wb-stocks-report.json` | ✅ | **WireMock** (нет sandbox для analytics) |
+| Orders | `/api/v1/supplier/orders` | GET | `wb-orders.json` | ✅ | **Sandbox** |
+| Sales | `/api/v1/supplier/sales` | GET | `wb-sales.json` | ✅ | **Sandbox** |
+| Finance | `/api/v5/supplier/reportDetailByPeriod` | GET | `wb-finance-report.json` | ✅ | **Sandbox** |
+| Incomes | `/api/v1/supplier/incomes` | GET | `wb-incomes.json` | ✅ | **Sandbox** |
+| Offices (WB warehouses) | `/api/v3/offices` | GET | `wb-offices.json` | ✅ | **Sandbox** |
+| Seller warehouses (FBS) | `/api/v3/warehouses` | GET | `wb-warehouses-seller.json` | ✅ | **Sandbox** |
+| Returns | `/api/v1/analytics/goods-return` | GET | `wb-returns-goods-return.json` | ✅ | **WireMock** (нет sandbox для analytics) |
+| Tariffs | `/api/v1/tariffs/commission` | GET | `wb-tariffs-commission.json` | ✅ | **Sandbox** |
 
 #### Wildberries — Write
 
-| Capability | Endpoint | Method | Mapping file | Status |
-|------------|----------|--------|-------------|--------|
-| Price upload | `/api/v2/upload/task` | POST | `wb-price-upload-task.json` | ✅ |
-| Price poll | `/api/v2/history/goods/task` | GET | `wb-price-upload-details.json` | ✅ |
-| Promo upload | `/api/v1/calendar/promotions/upload` | POST | `wb-promo-upload.json` | ✅ |
+| Capability | Endpoint | Method | Mapping file | Status | Local routing |
+|------------|----------|--------|-------------|--------|---------------|
+| Price upload | `/api/v2/upload/task` | POST | `wb-price-upload-task.json` | ✅ | **WireMock** |
+| Price poll | `/api/v2/history/goods/task` | GET | `wb-price-upload-details.json` | ✅ | **WireMock** |
+| Promo upload | `/api/v1/calendar/promotions/upload` | POST | `wb-promo-upload.json` | ✅ | **WireMock** |
 
-#### Wildberries — Promo & Advertising
+#### Wildberries — Promo & Advertising (Read)
 
-| Capability | Endpoint | Method | Mapping file | Status |
-|------------|----------|--------|-------------|--------|
-| Promo list | `/api/v1/calendar/promotions` | GET | `wb-promo-promotions.json` | ✅ |
-| Promo details | `/api/v1/calendar/promotions/details` | GET | `wb-promo-promotion-details.json` | ✅ |
-| Promo products | `/api/v1/calendar/promotions/nomenclatures` | GET | `wb-promo-promotion-nomenclatures.json` | ✅ |
-| Ad campaigns | `/api/advert/v2/adverts` | GET | `wb-advertising-campaigns.json` | ✅ |
-| Ad fullstats | `/adv/v3/fullstats` | GET | `wb-advertising-fullstats.json` | ✅ |
+| Capability | Endpoint | Method | Mapping file | Status | Local routing |
+|------------|----------|--------|-------------|--------|---------------|
+| Promo list | `/api/v1/calendar/promotions` | GET | `wb-promo-promotions.json` | ✅ | **Sandbox** |
+| Promo details | `/api/v1/calendar/promotions/details` | GET | `wb-promo-promotion-details.json` | ✅ | **Sandbox** |
+| Promo products | `/api/v1/calendar/promotions/nomenclatures` | GET | `wb-promo-promotion-nomenclatures.json` | ✅ | **Sandbox** |
+| Ad campaigns | `/api/advert/v2/adverts` | GET | `wb-advertising-campaigns.json` | ✅ | **Sandbox** |
+| Ad fullstats | `/adv/v3/fullstats` | GET | `wb-advertising-fullstats.json` | ✅ | **Sandbox** |
 
 #### Ozon — Read
 
-| Capability | Endpoint | Method | Mapping file | Status |
-|------------|----------|--------|-------------|--------|
-| Product list | `/v3/product/list` | POST | `ozon-product-list.json` | ✅ |
-| Product info | `/v3/product/info/list` | POST | `ozon-product-info-list.json` | ✅ |
-| Category tree | `/v1/description-category/tree` | POST | `ozon-category-tree.json` | ✅ |
-| Attributes (brand) | `/v4/product/info/attributes` | POST | `ozon-product-attributes.json` | ✅ |
-| Prices | `/v5/product/info/prices` | POST | `ozon-prices.json` | ✅ |
-| Stocks | `/v4/product/info/stocks` | POST | `ozon-stocks.json` | ✅ |
-| Postings FBO | `/v2/posting/fbo/list` | POST | `ozon-posting-fbo-list.json` | ✅ |
-| Postings FBS | `/v3/posting/fbs/list` | POST | `ozon-posting-fbs-list.json` | ✅ |
-| Returns | `/v1/returns/list` | POST | `ozon-returns-list.json` | ✅ |
-| Finance | `/v3/finance/transaction/list` | POST | `ozon-finance-transactions.json` | ✅ |
+| Capability | Endpoint | Method | Mapping file | Status | Local routing |
+|------------|----------|--------|-------------|--------|---------------|
+| Product list | `/v3/product/list` | POST | `ozon-product-list.json` | ✅ | **Real API** |
+| Product info | `/v3/product/info/list` | POST | `ozon-product-info-list.json` | ✅ | **Real API** |
+| Category tree | `/v1/description-category/tree` | POST | `ozon-category-tree.json` | ✅ | **Real API** |
+| Attributes (brand) | `/v4/product/info/attributes` | POST | `ozon-product-attributes.json` | ✅ | **Real API** |
+| Prices | `/v5/product/info/prices` | POST | `ozon-prices.json` | ✅ | **Real API** |
+| Stocks | `/v4/product/info/stocks` | POST | `ozon-stocks.json` | ✅ | **Real API** |
+| Postings FBO | `/v2/posting/fbo/list` | POST | `ozon-posting-fbo-list.json` | ✅ | **Real API** |
+| Postings FBS | `/v3/posting/fbs/list` | POST | `ozon-posting-fbs-list.json` | ✅ | **Real API** |
+| Returns | `/v1/returns/list` | POST | `ozon-returns-list.json` | ✅ | **Real API** |
+| Finance | `/v3/finance/transaction/list` | POST | `ozon-finance-transactions.json` | ✅ | **Real API** |
 
 #### Ozon — Write
 
-| Capability | Endpoint | Method | Mapping file | Status |
-|------------|----------|--------|-------------|--------|
-| Price import | `/v1/product/import/prices` | POST | `ozon-import-prices.json` | ✅ |
-| Promo activate | `/v1/actions/products/activate` | POST | `ozon-actions-activate.json` | ✅ |
-| Promo deactivate | `/v1/actions/products/deactivate` | POST | `ozon-actions-deactivate.json` | ✅ |
+| Capability | Endpoint | Method | Mapping file | Status | Local routing |
+|------------|----------|--------|-------------|--------|---------------|
+| Price import | `/v1/product/import/prices` | POST | `ozon-import-prices.json` | ✅ | **WireMock** |
+| Promo activate | `/v1/actions/products/activate` | POST | `ozon-actions-activate.json` | ✅ | **WireMock** |
+| Promo deactivate | `/v1/actions/products/deactivate` | POST | `ozon-actions-deactivate.json` | ✅ | **WireMock** |
 
-#### Ozon — Promo
+#### Ozon — Promo (Read)
 
-| Capability | Endpoint | Method | Mapping file | Status |
-|------------|----------|--------|-------------|--------|
-| Actions list | `/v1/actions` | GET | `ozon-actions-list.json` | ✅ |
-| Action products | `/v1/actions/products` | POST | `ozon-actions-products.json` | ✅ |
-| Action candidates | `/v1/actions/candidates` | POST | `ozon-actions-candidates.json` | ✅ |
+| Capability | Endpoint | Method | Mapping file | Status | Local routing |
+|------------|----------|--------|-------------|--------|---------------|
+| Actions list | `/v1/actions` | GET | `ozon-actions-list.json` | ✅ | **Real API** |
+| Action products | `/v1/actions/products` | POST | `ozon-actions-products.json` | ✅ | **Real API** |
+| Action candidates | `/v1/actions/candidates` | POST | `ozon-actions-candidates.json` | ✅ | **Real API** |
 
 ## Implementation Status
 

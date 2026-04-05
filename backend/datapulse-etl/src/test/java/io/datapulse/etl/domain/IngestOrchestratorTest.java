@@ -464,7 +464,7 @@ class IngestOrchestratorTest {
 
   private CredentialResolver.ResolvedCredentials buildCredentials() {
     return new CredentialResolver.ResolvedCredentials(
-        100L, 1L, MarketplaceType.WB, Map.of("token", "test"));
+        100L, 1L, MarketplaceType.WB, Map.of("apiToken", "test"));
   }
 
   private Map<EtlEventType, EventResult> allCompletedResults() {

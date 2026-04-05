@@ -11,13 +11,14 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -39,9 +40,17 @@ class ReconciliationServiceTest {
   @Mock private OutboxService outboxService;
   @Mock private ExecutionProperties properties;
   @Mock private MetricsFacade metrics;
+  @Mock private ExecutionCredentialResolver credentialResolver;
+  @Mock private PriceReadAdapter priceReadAdapter;
 
-  @InjectMocks
   private ReconciliationService service;
+
+  @BeforeEach
+  void setUp() {
+    service = new ReconciliationService(actionRepository, attemptRepository,
+        actionService, outboxService, properties, metrics,
+        credentialResolver, List.of(priceReadAdapter));
+  }
 
   private static final long ACTION_ID = 1L;
 

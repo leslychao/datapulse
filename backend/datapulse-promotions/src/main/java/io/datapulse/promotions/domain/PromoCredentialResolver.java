@@ -1,5 +1,6 @@
 package io.datapulse.promotions.domain;
 
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.CredentialStore;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.event.CredentialAccessedEvent;
@@ -76,11 +77,11 @@ public class PromoCredentialResolver {
             Map<String, String> credentials
     ) {
         public String ozonClientId() {
-            return credentials.getOrDefault("client-id", "");
+            return credentials.getOrDefault(CredentialKeys.OZON_CLIENT_ID, "");
         }
 
         public String ozonApiKey() {
-            return credentials.getOrDefault("api-key", "");
+            return credentials.getOrDefault(CredentialKeys.OZON_API_KEY, "");
         }
     }
 

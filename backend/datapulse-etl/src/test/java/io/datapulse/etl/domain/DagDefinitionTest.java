@@ -47,7 +47,6 @@ class DagDefinitionTest {
           EtlEventType.INVENTORY_FACT,
           EtlEventType.SUPPLY_FACT,
           EtlEventType.SALES_FACT,
-          EtlEventType.ADVERTISING_FACT,
           EtlEventType.PROMO_SYNC);
     }
 

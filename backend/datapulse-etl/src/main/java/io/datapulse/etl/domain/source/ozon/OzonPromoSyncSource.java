@@ -22,6 +22,7 @@ import io.datapulse.etl.persistence.canonical.CanonicalPromoProductEntity;
 import io.datapulse.etl.persistence.canonical.CanonicalPromoProductUpsertRepository;
 import io.datapulse.etl.persistence.canonical.MarketplaceOfferLookupRepository;
 import io.datapulse.etl.persistence.canonical.PromoCampaignLookupRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,8 +54,8 @@ public class OzonPromoSyncSource implements EventSource {
 
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
-        String clientId = ctx.credentials().get("clientId");
-        String apiKey = ctx.credentials().get("apiKey");
+        String clientId = ctx.credentials().get(CredentialKeys.OZON_CLIENT_ID);
+        String apiKey = ctx.credentials().get(CredentialKeys.OZON_API_KEY);
         List<SubSourceResult> results = new ArrayList<>();
 
         SubSourceResult campaignResult = syncCampaigns(ctx, clientId, apiKey);

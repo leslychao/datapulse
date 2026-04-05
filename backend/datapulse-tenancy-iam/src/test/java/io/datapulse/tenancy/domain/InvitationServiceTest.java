@@ -4,6 +4,7 @@ import io.datapulse.common.exception.AppException;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
@@ -47,7 +48,7 @@ class InvitationServiceTest {
   @Mock
   private AppUserRepository appUserRepository;
   @Mock
-  private TenancyAuditPublisher auditPublisher;
+  private AuditPublisher auditPublisher;
 
   private InvitationService invitationService;
 

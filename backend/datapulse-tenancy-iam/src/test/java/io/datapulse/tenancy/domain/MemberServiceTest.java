@@ -2,6 +2,7 @@ package io.datapulse.tenancy.domain;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
@@ -34,7 +35,7 @@ class MemberServiceTest {
   @Mock
   private WorkspaceRepository workspaceRepository;
   @Mock
-  private TenancyAuditPublisher auditPublisher;
+  private AuditPublisher auditPublisher;
 
   @InjectMocks
   private MemberService memberService;

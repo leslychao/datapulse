@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.execution.domain.PriceWriteAdapter;
 import io.datapulse.execution.domain.PriceWriteResult;
 import io.datapulse.integration.config.IntegrationProperties;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.ratelimit.MarketplaceRateLimiter;
 import io.datapulse.integration.domain.ratelimit.RateLimitGroup;
@@ -50,7 +51,7 @@ public class WbPriceWriteAdapter implements PriceWriteAdapter {
     public PriceWriteResult setPrice(long connectionId, String marketplaceSku,
                                      BigDecimal targetPrice, Map<String, String> credentials) {
         String baseUrl = integrationProperties.getWildberries().getPricesWriteBaseUrl();
-        String token = credentials.get("token");
+        String token = credentials.get(CredentialKeys.WB_API_TOKEN);
         long nmId = Long.parseLong(marketplaceSku);
 
         var requestBody = Map.of("data", List.of(Map.of(

@@ -1,5 +1,6 @@
 package io.datapulse.integration.config;
 
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.CredentialStore;
 import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
@@ -41,7 +42,7 @@ public class LocalSandboxCredentialInitializer implements ApplicationRunner {
       return;
     }
 
-    Map<String, String> sandboxCredentials = Map.of("apiToken", sandboxToken);
+    Map<String, String> sandboxCredentials = Map.of(CredentialKeys.WB_API_TOKEN, sandboxToken);
 
     for (var connection : wbConnections) {
       secretReferenceRepository.findById(connection.getSecretReferenceId())

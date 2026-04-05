@@ -21,6 +21,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class GridExportService {
 
   private final GridPostgresReadRepository pgRepository;
@@ -37,7 +38,6 @@ public class GridExportService {
 
   private static final int BATCH_SIZE = 500;
 
-  @Transactional(readOnly = true)
   public void exportCsv(long workspaceId, GridFilter filter, OutputStream out) {
     long deadlineMs = System.currentTimeMillis()
         + gridProperties.getExportTimeoutSeconds() * 1000L;
@@ -98,7 +98,6 @@ public class GridExportService {
    * Exports rows for the given offer ids in the workspace (order preserved, duplicates removed).
    * Ids that do not belong to the workspace are omitted.
    */
-  @Transactional(readOnly = true)
   public void exportCsvByOfferIds(long workspaceId, List<Long> offerIds, OutputStream out) {
     List<Long> uniqueIds = dedupePreserveOrder(offerIds);
     long deadlineMs = System.currentTimeMillis()

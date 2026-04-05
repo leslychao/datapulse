@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AimdRateController {
+public class AimdRateAdjuster {
 
     private final RateLimitProperties properties;
     private final ConcurrentHashMap<String, AimdState> states = new ConcurrentHashMap<>();

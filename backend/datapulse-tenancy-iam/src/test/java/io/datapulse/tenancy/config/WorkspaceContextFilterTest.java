@@ -1,6 +1,6 @@
 package io.datapulse.tenancy.config;
 
-import io.datapulse.platform.audit.AuditEvent;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.MemberRole;
 import io.datapulse.tenancy.domain.MemberStatus;
@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -46,7 +45,7 @@ class WorkspaceContextFilterTest {
   @Mock
   private WorkspaceMemberRepository workspaceMemberRepository;
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private AuditPublisher auditPublisher;
   @Mock
   private FilterChain filterChain;
 
@@ -58,7 +57,7 @@ class WorkspaceContextFilterTest {
     workspaceContext = new WorkspaceContext();
     filter = new WorkspaceContextFilter(
         appUserRepository, workspaceMemberRepository,
-        workspaceContext, eventPublisher);
+        workspaceContext, auditPublisher);
   }
 
   private Jwt buildJwt(String sub, String email) {
@@ -112,7 +111,8 @@ class WorkspaceContextFilterTest {
       filter.doFilterInternal(request, response, filterChain);
 
       verify(appUserRepository).save(any(AppUserEntity.class));
-      verify(eventPublisher).publishEvent(any(AuditEvent.class));
+      verify(auditPublisher).publishSystem(any(Long.class), anyString(),
+          anyString(), anyString());
       verify(filterChain).doFilter(request, response);
       assertThat(workspaceContext.getUserId()).isEqualTo(1L);
     }

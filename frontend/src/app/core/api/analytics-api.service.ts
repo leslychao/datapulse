@@ -183,6 +183,14 @@ export class AnalyticsApiService {
     );
   }
 
+  getChHealth(
+    workspaceId: number,
+  ): Observable<{ available: boolean }> {
+    return this.http.get<{ available: boolean }>(
+      `${this.base}/workspaces/${workspaceId}/analytics/data-quality/ch-health`,
+    );
+  }
+
   getProvenanceRawUrl(
     workspaceId: number,
     entryId: number,

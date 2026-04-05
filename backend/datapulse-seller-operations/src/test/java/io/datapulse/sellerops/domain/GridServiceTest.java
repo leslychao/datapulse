@@ -58,9 +58,9 @@ class GridServiceTest {
       when(pgRepository.findAll(WORKSPACE_ID, filter, pageable))
           .thenReturn(Page.empty(pageable));
 
-      Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
+      var result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result).isEmpty();
+      assertThat(result.page()).isEmpty();
       verify(chRepository, never()).findEnrichment(anyList());
     }
 
@@ -92,10 +92,10 @@ class GridServiceTest {
           .thenReturn(Map.of(1L, enrichment));
       when(gridProperties.getFreshnessThresholdHours()).thenReturn(6);
 
-      Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
+      var result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result.getContent()).hasSize(1);
-      GridRowResponse response = result.getContent().get(0);
+      assertThat(result.page().getContent()).hasSize(1);
+      GridRowResponse response = result.page().getContent().get(0);
       assertThat(response.offerId()).isEqualTo(1L);
       assertThat(response.revenue30d()).isEqualByComparingTo(new BigDecimal("50000"));
       assertThat(response.velocity14d()).isEqualByComparingTo(new BigDecimal("3.5"));
@@ -120,10 +120,10 @@ class GridServiceTest {
           .thenThrow(new RuntimeException("CH unavailable"));
       when(gridProperties.getFreshnessThresholdHours()).thenReturn(6);
 
-      Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
+      var result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result.getContent()).hasSize(1);
-      GridRowResponse response = result.getContent().get(0);
+      assertThat(result.page().getContent()).hasSize(1);
+      GridRowResponse response = result.page().getContent().get(0);
       assertThat(response.offerId()).isEqualTo(1L);
       assertThat(response.revenue30d()).isNull();
       assertThat(response.velocity14d()).isNull();
@@ -144,9 +144,9 @@ class GridServiceTest {
           .thenReturn(new PageImpl<>(List.of(row), pageable, 1));
       when(chRepository.findEnrichment(anyList())).thenReturn(Map.of());
 
-      Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
+      var result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result.getContent().get(0).dataFreshness())
+      assertThat(result.page().getContent().get(0).dataFreshness())
           .isEqualTo(DataFreshness.STALE.name());
     }
 
@@ -165,9 +165,9 @@ class GridServiceTest {
       when(chRepository.findEnrichment(anyList())).thenReturn(Map.of());
       when(gridProperties.getFreshnessThresholdHours()).thenReturn(6);
 
-      Page<GridRowResponse> result = service.getGridPage(WORKSPACE_ID, filter, pageable);
+      var result = service.getGridPage(WORKSPACE_ID, filter, pageable);
 
-      assertThat(result.getContent().get(0).dataFreshness())
+      assertThat(result.page().getContent().get(0).dataFreshness())
           .isEqualTo(DataFreshness.FRESH.name());
     }
   }

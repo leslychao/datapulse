@@ -30,7 +30,7 @@ public class MarketplaceRateLimiter {
 
     private final StringRedisTemplate redisTemplate;
     private final ScheduledExecutorService scheduler;
-    private final AimdRateController aimdController;
+    private final AimdRateAdjuster aimdController;
     private final MetricsFacade metricsFacade;
     private final DefaultRedisScript<Long> tokenBucketScript;
 
@@ -40,7 +40,7 @@ public class MarketplaceRateLimiter {
     public MarketplaceRateLimiter(
             StringRedisTemplate redisTemplate,
             @Qualifier("rateLimitScheduler") ScheduledExecutorService scheduler,
-            AimdRateController aimdController,
+            AimdRateAdjuster aimdController,
             MetricsFacade metricsFacade) {
         this.redisTemplate = redisTemplate;
         this.scheduler = scheduler;

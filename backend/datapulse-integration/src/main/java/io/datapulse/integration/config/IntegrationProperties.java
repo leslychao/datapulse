@@ -42,9 +42,6 @@ public class IntegrationProperties {
         private final String marketplaceBaseUrl;
 
         @NotBlank
-        private final String advertBaseUrl;
-
-        @NotBlank
         private final String promoBaseUrl;
 
         private final String sandboxApiToken;

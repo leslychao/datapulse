@@ -86,14 +86,14 @@ public class GridController {
             pageSort = buildSort(sort, direction);
         }
 
-        Page<GridRowResponse> result = gridService.getGridPage(workspaceId, filter,
+        var gridResult = gridService.getGridPage(workspaceId, filter,
                 PageRequest.of(page, clampedSize, pageSort));
 
-        if (gridService.wasChSortFallback()) {
+        if (gridResult.chSortFallback()) {
             httpResponse.setHeader("X-Sort-Fallback", "true");
         }
 
-        return result;
+        return gridResult.page();
     }
 
     @GetMapping("/export")

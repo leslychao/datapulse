@@ -83,7 +83,6 @@ datapulse:
       statistics-base-url: ${WB_STATISTICS_BASE_URL:https://statistics-api.wildberries.ru}
       analytics-base-url: ${WB_ANALYTICS_BASE_URL:https://seller-analytics-api.wildberries.ru}
       marketplace-base-url: ${WB_MARKETPLACE_BASE_URL:https://marketplace-api.wildberries.ru}
-      advert-base-url: ${WB_ADVERT_BASE_URL:https://advert-api.wildberries.ru}
       promo-base-url: ${WB_PROMO_BASE_URL:https://dp-calendar-api.wildberries.ru}
     ozon:
       seller-base-url: ${OZON_SELLER_BASE_URL:https://api-seller.ozon.ru}

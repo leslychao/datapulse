@@ -97,7 +97,7 @@ class DagExecutorTest {
 
       IngestContext context = IngestContextFixtures.any(
           1L, 100L, 1L, MarketplaceType.WB,
-          Map.of("token", "test"), "FULL_SYNC",
+          Map.of("apiToken", "test"), "FULL_SYNC",
           EnumSet.allOf(EtlEventType.class), checkpoint);
 
       when(eventRunner.run(any(EtlEventType.class), any(IngestContext.class)))
@@ -138,7 +138,7 @@ class DagExecutorTest {
   private IngestContext buildContext() {
     return IngestContextFixtures.any(
         1L, 100L, 1L, MarketplaceType.WB,
-        Map.of("token", "test"), "FULL_SYNC",
+        Map.of("apiToken", "test"), "FULL_SYNC",
         EnumSet.allOf(EtlEventType.class), Map.of());
   }
 }

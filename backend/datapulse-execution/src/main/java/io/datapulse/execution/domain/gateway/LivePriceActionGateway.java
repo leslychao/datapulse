@@ -1,9 +1,12 @@
 package io.datapulse.execution.domain.gateway;
 
+import io.datapulse.execution.config.ExecutionProperties;
 import io.datapulse.execution.domain.ActionExecutionMode;
 import io.datapulse.execution.domain.ErrorClassification;
 import io.datapulse.execution.domain.ErrorClassifier;
 import io.datapulse.execution.domain.OfferExecutionContext;
+import io.datapulse.execution.domain.PriceReadAdapter;
+import io.datapulse.execution.domain.PriceReadResult;
 import io.datapulse.execution.domain.PriceWriteAdapter;
 import io.datapulse.execution.domain.PriceWriteResult;
 import io.datapulse.execution.persistence.PriceActionEntity;
@@ -11,6 +14,7 @@ import io.datapulse.integration.domain.MarketplaceType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -18,19 +22,27 @@ import java.util.stream.Collectors;
 
 /**
  * Live gateway: dispatches to marketplace-specific write adapter,
- * translates PriceWriteResult → GatewayResult.
+ * performs read-after-write verification, translates PriceWriteResult → GatewayResult.
  */
 @Slf4j
 @Component
 public class LivePriceActionGateway implements PriceActionGateway {
 
     private final Map<MarketplaceType, PriceWriteAdapter> writeAdapters;
+    private final Map<MarketplaceType, PriceReadAdapter> readAdapters;
     private final ErrorClassifier errorClassifier;
+    private final ExecutionProperties properties;
 
-    public LivePriceActionGateway(List<PriceWriteAdapter> adapters, ErrorClassifier errorClassifier) {
-        this.writeAdapters = adapters.stream()
+    public LivePriceActionGateway(List<PriceWriteAdapter> writeAdapterList,
+                                  List<PriceReadAdapter> readAdapterList,
+                                  ErrorClassifier errorClassifier,
+                                  ExecutionProperties properties) {
+        this.writeAdapters = writeAdapterList.stream()
                 .collect(Collectors.toMap(PriceWriteAdapter::marketplace, Function.identity()));
+        this.readAdapters = readAdapterList.stream()
+                .collect(Collectors.toMap(PriceReadAdapter::marketplace, Function.identity()));
         this.errorClassifier = errorClassifier;
+        this.properties = properties;
     }
 
     @Override
@@ -63,7 +75,7 @@ public class LivePriceActionGateway implements PriceActionGateway {
                     context.credentials()
             );
 
-            return translateWriteResult(writeResult, context);
+            return translateWriteResult(writeResult, action, context);
         } catch (Exception e) {
             log.error("Write adapter exception: actionId={}, marketplace={}, error={}",
                     action.getId(), context.marketplaceType(), e.getMessage(), e);
@@ -86,9 +98,11 @@ public class LivePriceActionGateway implements PriceActionGateway {
     }
 
     private GatewayResult translateWriteResult(PriceWriteResult result,
+                                                PriceActionEntity action,
                                                 OfferExecutionContext context) {
         return switch (result.outcome()) {
-            case CONFIRMED -> GatewayResult.confirmed(
+            case CONFIRMED -> verifyAfterWrite(
+                    action, context,
                     result.providerRequestSummary(), result.providerResponseSummary());
 
             case UNCERTAIN -> GatewayResult.uncertain(
@@ -110,5 +124,51 @@ public class LivePriceActionGateway implements PriceActionGateway {
                         result.providerRequestSummary(), result.providerResponseSummary());
             }
         };
+    }
+
+    private GatewayResult verifyAfterWrite(PriceActionEntity action,
+                                           OfferExecutionContext context,
+                                           String requestSummary,
+                                           String responseSummary) {
+        PriceReadAdapter readAdapter = readAdapters.get(context.marketplaceType());
+        if (readAdapter == null) {
+            log.debug("No read adapter for {}, skipping read-after-write verification",
+                    context.marketplaceType());
+            return GatewayResult.confirmed(requestSummary, responseSummary);
+        }
+
+        long delayMs = properties.getReadAfterWriteDelay().toMillis();
+        if (delayMs > 0) {
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return GatewayResult.confirmed(requestSummary, responseSummary);
+            }
+        }
+
+        try {
+            PriceReadResult readResult = readAdapter.readCurrentPrice(
+                    context.connectionId(), context.marketplaceSku(), context.credentials());
+
+            if (readResult.currentPrice() == null) {
+                log.warn("Read-after-write returned null price: actionId={}, sku={}",
+                        action.getId(), context.marketplaceSku());
+                return GatewayResult.confirmed(requestSummary, responseSummary);
+            }
+
+            boolean match = readResult.currentPrice().compareTo(action.getTargetPrice()) == 0;
+            log.info("Read-after-write: actionId={}, target={}, actual={}, match={}",
+                    action.getId(), action.getTargetPrice(),
+                    readResult.currentPrice(), match);
+
+            return GatewayResult.confirmedWithVerification(
+                    requestSummary, responseSummary,
+                    readResult.currentPrice(), match);
+        } catch (Exception e) {
+            log.warn("Read-after-write failed (best-effort): actionId={}, error={}",
+                    action.getId(), e.getMessage());
+            return GatewayResult.confirmed(requestSummary, responseSummary);
+        }
     }
 }

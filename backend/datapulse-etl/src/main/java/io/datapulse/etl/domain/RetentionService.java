@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
  * Handles raw layer retention cleanup:
  * <ul>
  *   <li>Finance (FACT_FINANCE): time-based, 12 months</li>
- *   <li>Flow (SALES_FACT, ADVERTISING_FACT): time-based, 6 months</li>
+ *   <li>Flow (SALES_FACT): time-based, 6 months</li>
  *   <li>State (dictionaries, snapshots): keep_count=3 per (connection, event)</li>
  * </ul>
  * Deletes S3 objects and marks job_item status as EXPIRED.

@@ -6,7 +6,6 @@ datapulse:
       prices-base-url: https://discounts-prices-api-sandbox.wildberries.ru
       statistics-base-url: https://statistics-api-sandbox.wildberries.ru
       marketplace-base-url: https://marketplace-api-sandbox.wildberries.ru
-      advert-base-url: https://advert-api-sandbox.wildberries.ru
       promo-base-url: https://discounts-prices-api-sandbox.wildberries.ru
       # No sandbox for analytics API — route to WireMock
       analytics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}

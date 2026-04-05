@@ -17,7 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import io.datapulse.platform.audit.AuditPublisher;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -58,7 +58,7 @@ class PromoDecisionServiceTest {
   @Mock
   private PromoDecisionMapper decisionMapper;
   @Mock
-  private ApplicationEventPublisher eventPublisher;
+  private AuditPublisher auditPublisher;
 
   @InjectMocks
   private PromoDecisionService service;

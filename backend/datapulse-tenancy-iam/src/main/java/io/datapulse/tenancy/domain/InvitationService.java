@@ -4,6 +4,7 @@ import io.datapulse.common.exception.AppException;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.ConflictException;
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.tenancy.persistence.AppUserEntity;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceEntity;
@@ -40,7 +41,7 @@ public class InvitationService {
     private final WorkspaceRepository workspaceRepository;
     private final AppUserRepository appUserRepository;
     private final Optional<InvitationMailService> mailService;
-    private final TenancyAuditPublisher auditPublisher;
+    private final AuditPublisher auditPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional(readOnly = true)

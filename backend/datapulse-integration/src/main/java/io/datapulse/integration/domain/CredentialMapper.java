@@ -37,21 +37,21 @@ public final class CredentialMapper {
 
     public static Map<String, String> toWbMap(WbCredentials creds) {
         Map<String, String> map = new HashMap<>();
-        map.put("apiToken", creds.apiToken());
+        map.put(CredentialKeys.WB_API_TOKEN, creds.apiToken());
         return map;
     }
 
     public static Map<String, String> toOzonMap(OzonSellerCredentials creds) {
         Map<String, String> map = new HashMap<>();
-        map.put("clientId", creds.clientId());
-        map.put("apiKey", creds.apiKey());
+        map.put(CredentialKeys.OZON_CLIENT_ID, creds.clientId());
+        map.put(CredentialKeys.OZON_API_KEY, creds.apiKey());
         return map;
     }
 
     public static Map<String, String> toPerformanceMap(OzonPerformanceCredentials creds) {
         Map<String, String> map = new HashMap<>();
-        map.put("performanceClientId", creds.performanceClientId());
-        map.put("performanceClientSecret", creds.performanceClientSecret());
+        map.put(CredentialKeys.OZON_PERFORMANCE_CLIENT_ID, creds.performanceClientId());
+        map.put(CredentialKeys.OZON_PERFORMANCE_CLIENT_SECRET, creds.performanceClientSecret());
         return map;
     }
 

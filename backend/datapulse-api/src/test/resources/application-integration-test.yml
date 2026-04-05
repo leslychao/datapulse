@@ -45,7 +45,6 @@ datapulse:
       statistics-base-url: http://${TEST_WIREMOCK_HOST:localhost}:${TEST_WIREMOCK_PORT:9090}
       analytics-base-url: http://${TEST_WIREMOCK_HOST:localhost}:${TEST_WIREMOCK_PORT:9090}
       marketplace-base-url: http://${TEST_WIREMOCK_HOST:localhost}:${TEST_WIREMOCK_PORT:9090}
-      advert-base-url: http://${TEST_WIREMOCK_HOST:localhost}:${TEST_WIREMOCK_PORT:9090}
       promo-base-url: http://${TEST_WIREMOCK_HOST:localhost}:${TEST_WIREMOCK_PORT:9090}
     ozon:
       seller-base-url: http://${TEST_WIREMOCK_HOST:localhost}:${TEST_OZON_WIREMOCK_PORT:9091}

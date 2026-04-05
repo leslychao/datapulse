@@ -14,7 +14,6 @@ public enum RateLimitGroup {
     WB_FINANCE(1.0 / 60.0, 1, MarketplaceType.WB),
     WB_PROMO(10.0 / 6.0, 5, MarketplaceType.WB),
     WB_PROMO_NOMENCLATURES(10.0 / 6.0, 5, MarketplaceType.WB),
-    WB_ADVERT(5.0 / 60.0, 1, MarketplaceType.WB),
     WB_PRICE_UPDATE(5.0 / 60.0, 1, MarketplaceType.WB),
     WB_CONTENT(1.0 / 10.0, 1, MarketplaceType.WB),
     WB_PRICES_READ(1.0 / 10.0, 1, MarketplaceType.WB),

@@ -21,6 +21,7 @@ import io.datapulse.etl.persistence.canonical.CanonicalPromoCampaignUpsertReposi
 import io.datapulse.etl.persistence.canonical.CanonicalPromoProductUpsertRepository;
 import io.datapulse.etl.persistence.canonical.MarketplaceOfferLookupRepository;
 import io.datapulse.etl.persistence.canonical.PromoCampaignLookupRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +53,7 @@ public class WbPromoSyncSource implements EventSource {
 
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
-        String token = ctx.credentials().get("apiToken");
+        String token = ctx.credentials().get(CredentialKeys.WB_API_TOKEN);
         List<SubSourceResult> results = new ArrayList<>();
 
         SubSourceResult campaignResult = syncCampaigns(ctx, token);

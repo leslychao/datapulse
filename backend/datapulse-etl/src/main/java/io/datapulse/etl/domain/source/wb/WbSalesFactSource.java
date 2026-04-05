@@ -21,6 +21,7 @@ import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalOrderUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalReturnUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalSaleUpsertRepository;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -51,7 +52,7 @@ public class WbSalesFactSource implements EventSource {
 
     @Override
     public List<SubSourceResult> execute(IngestContext ctx) {
-        String token = ctx.credentials().get("apiToken");
+        String token = ctx.credentials().get(CredentialKeys.WB_API_TOKEN);
         var dateFrom = ctx.wbFactDateFrom();
         var dateTo = ctx.wbFactDateTo();
         List<SubSourceResult> results = new ArrayList<>();

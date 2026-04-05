@@ -33,9 +33,11 @@ public class GridService {
     private final GridClickHouseReadRepository chRepository;
     private final GridProperties gridProperties;
 
+    public record GridPageResult(Page<GridRowResponse> page, boolean chSortFallback) {}
+
     @Transactional(readOnly = true)
-    public Page<GridRowResponse> getGridPage(long workspaceId, GridFilter filter,
-                                              Pageable pageable) {
+    public GridPageResult getGridPage(long workspaceId, GridFilter filter,
+                                      Pageable pageable) {
         GridFilter resolvedFilter = resolveChPreFilter(workspaceId, filter);
 
         String sortColumn = extractSortColumn(pageable);
@@ -45,7 +47,7 @@ public class GridService {
 
         Page<GridRow> pgPage = pgRepository.findAll(workspaceId, resolvedFilter, pageable);
         if (pgPage.isEmpty()) {
-            return Page.empty(pageable);
+            return new GridPageResult(Page.empty(pageable), false);
         }
 
         List<Long> offerIds = pgPage.getContent().stream()
@@ -58,11 +60,12 @@ public class GridService {
                 .map(row -> toGridRowResponse(row, enrichment.get(row.getOfferId())))
                 .toList();
 
-        return new PageImpl<>(enrichedRows, pageable, pgPage.getTotalElements());
+        return new GridPageResult(
+                new PageImpl<>(enrichedRows, pageable, pgPage.getTotalElements()), false);
     }
 
-    private Page<GridRowResponse> getGridPageWithChSort(long workspaceId, GridFilter filter,
-                                                         Pageable pageable, String sortColumn) {
+    private GridPageResult getGridPageWithChSort(long workspaceId, GridFilter filter,
+                                                  Pageable pageable, String sortColumn) {
         String direction = pageable.getSort().stream()
                 .findFirst()
                 .map(o -> o.getDirection().name())
@@ -71,18 +74,17 @@ public class GridService {
         List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
         int maxResults = (int) pageable.getOffset() + pageable.getPageSize();
 
-        List<Long> sortedIds;
-        try {
-            sortedIds = chRepository.findSortedOfferIds(connectionIds, sortColumn, direction, maxResults);
-        } catch (Exception e) {
-            log.warn("CH sort failed, falling back to PG sort: error={}", e.getMessage());
-            CH_SORT_FALLBACK.set(true);
-            return getGridPage(workspaceId, filter,
+        List<Long> sortedIds = ChSafeQuery.getOrFallback(
+                () -> chRepository.findSortedOfferIds(connectionIds, sortColumn, direction, maxResults),
+                null, "sort");
+        if (sortedIds == null) {
+            GridPageResult fallback = getGridPage(workspaceId, filter,
                     PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+            return new GridPageResult(fallback.page(), true);
         }
 
         if (sortedIds.isEmpty()) {
-            return Page.empty(pageable);
+            return new GridPageResult(Page.empty(pageable), false);
         }
 
         int fromIdx = (int) Math.min(pageable.getOffset(), sortedIds.size());
@@ -96,17 +98,11 @@ public class GridService {
                 .map(row -> toGridRowResponse(row, enrichment.get(row.getOfferId())))
                 .toList();
 
-        return new PageImpl<>(enrichedRows, pageable, sortedIds.size());
+        return new GridPageResult(
+                new PageImpl<>(enrichedRows, pageable, sortedIds.size()), false);
     }
 
     private static final int MATCHING_IDS_LIMIT = 500;
-    private static final ThreadLocal<Boolean> CH_SORT_FALLBACK = ThreadLocal.withInitial(() -> false);
-
-    public boolean wasChSortFallback() {
-        boolean val = CH_SORT_FALLBACK.get();
-        CH_SORT_FALLBACK.remove();
-        return val;
-    }
 
     @Transactional(readOnly = true)
     public MatchingIdsResponse getMatchingOfferIds(long workspaceId, GridFilter filter) {
@@ -143,25 +139,22 @@ public class GridService {
         if (filter == null || filter.stockRisk() == null) {
             return filter;
         }
-        try {
-            List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
-            List<Long> chOfferIds = chRepository.findOfferIdsByStockRisk(connectionIds, filter.stockRisk());
-            if (chOfferIds.isEmpty()) {
-                return filter;
-            }
-            List<Long> merged = filter.connectionId() != null
-                    ? filter.connectionId() : List.of();
-            return new GridFilter(
-                    filter.marketplaceType(), merged, filter.status(),
-                    filter.skuCode(), filter.productName(), filter.categoryId(),
-                    filter.marginMin(), filter.marginMax(), filter.hasManualLock(),
-                    filter.hasActivePromo(), filter.lastDecision(), filter.lastActionStatus(),
-                    filter.viewId(), null
-            );
-        } catch (Exception e) {
-            log.warn("CH pre-filter failed, ignoring stock_risk filter: error={}", e.getMessage());
+        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+        List<Long> chOfferIds = ChSafeQuery.getOrFallback(
+                () -> chRepository.findOfferIdsByStockRisk(connectionIds, filter.stockRisk()),
+                List.of(), "pre-filter/stockRisk");
+        if (chOfferIds.isEmpty()) {
             return filter;
         }
+        List<Long> merged = filter.connectionId() != null
+                ? filter.connectionId() : List.of();
+        return new GridFilter(
+                filter.marketplaceType(), merged, filter.status(),
+                filter.skuCode(), filter.productName(), filter.categoryId(),
+                filter.marginMin(), filter.marginMax(), filter.hasManualLock(),
+                filter.hasActivePromo(), filter.lastDecision(), filter.lastActionStatus(),
+                filter.viewId(), null
+        );
     }
 
     private String extractSortColumn(Pageable pageable) {
@@ -172,23 +165,16 @@ public class GridService {
     }
 
     private ClickHouseKpiRow fetchChKpiSafely(long workspaceId) {
-        try {
-            List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
-            return chRepository.findKpi(connectionIds);
-        } catch (Exception e) {
-            log.warn("ClickHouse KPI query failed, returning zeroes: error={}", e.getMessage());
-            return new ClickHouseKpiRow(0, null, null);
-        }
+        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
+        return ChSafeQuery.getOrFallback(
+                () -> chRepository.findKpi(connectionIds),
+                new ClickHouseKpiRow(0, null, null), "kpi");
     }
 
     private Map<Long, ClickHouseEnrichment> fetchEnrichmentSafely(List<Long> offerIds) {
-        try {
-            return chRepository.findEnrichment(offerIds);
-        } catch (Exception e) {
-            log.warn("ClickHouse enrichment failed, returning degraded grid: error={}",
-                    e.getMessage());
-            return Map.of();
-        }
+        return ChSafeQuery.getOrFallback(
+                () -> chRepository.findEnrichment(offerIds),
+                Map.of(), "enrichment");
     }
 
     private GridRowResponse toGridRowResponse(GridRow row, ClickHouseEnrichment ch) {

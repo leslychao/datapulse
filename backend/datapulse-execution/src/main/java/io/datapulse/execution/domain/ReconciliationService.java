@@ -5,21 +5,23 @@ import io.datapulse.execution.persistence.PriceActionAttemptEntity;
 import io.datapulse.execution.persistence.PriceActionAttemptRepository;
 import io.datapulse.execution.persistence.PriceActionEntity;
 import io.datapulse.execution.persistence.PriceActionRepository;
+import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.platform.observability.MetricsFacade;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ReconciliationService {
 
     private static final String AGGREGATE_TYPE = "price_action";
@@ -30,6 +32,50 @@ public class ReconciliationService {
     private final OutboxService outboxService;
     private final ExecutionProperties properties;
     private final MetricsFacade metrics;
+    private final ExecutionCredentialResolver credentialResolver;
+    private final Map<MarketplaceType, PriceReadAdapter> readAdapters;
+
+    public ReconciliationService(PriceActionRepository actionRepository,
+                                 PriceActionAttemptRepository attemptRepository,
+                                 ActionService actionService,
+                                 OutboxService outboxService,
+                                 ExecutionProperties properties,
+                                 MetricsFacade metrics,
+                                 ExecutionCredentialResolver credentialResolver,
+                                 List<PriceReadAdapter> adapters) {
+        this.actionRepository = actionRepository;
+        this.attemptRepository = attemptRepository;
+        this.actionService = actionService;
+        this.outboxService = outboxService;
+        this.properties = properties;
+        this.metrics = metrics;
+        this.credentialResolver = credentialResolver;
+        this.readAdapters = adapters.stream()
+                .collect(Collectors.toMap(PriceReadAdapter::marketplace, Function.identity()));
+    }
+
+    public void executeReconciliationCheck(long actionId, int attempt) {
+        log.info("Processing reconciliation: actionId={}, attempt={}", actionId, attempt);
+
+        PriceActionEntity action = actionRepository.findById(actionId).orElse(null);
+        if (action == null) {
+            log.warn("Action not found for reconciliation: actionId={}", actionId);
+            return;
+        }
+
+        OfferExecutionContext context = credentialResolver.resolve(action.getMarketplaceOfferId());
+
+        PriceReadAdapter readAdapter = readAdapters.get(context.marketplaceType());
+        if (readAdapter == null) {
+            log.error("No read adapter for marketplace: {}", context.marketplaceType());
+            return;
+        }
+
+        PriceReadResult readResult = readAdapter.readCurrentPrice(
+                context.connectionId(), context.marketplaceSku(), context.credentials());
+
+        processReconciliationCheck(actionId, attempt, readResult.currentPrice(), readResult.rawSnapshot());
+    }
 
     @Transactional
     public void processReconciliationCheck(long actionId, int reconciliationAttempt,
