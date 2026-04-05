@@ -166,6 +166,60 @@ class MartProductPnlMaterializerTest {
     }
 
     @Test
+    @DisplayName("SQL should LEFT JOIN fact_advertising via dim_product for advertising_cost")
+    void should_joinFactAdvertising_when_sqlGenerated() {
+      when(jdbc.ch()).thenReturn(chTemplate);
+      when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
+
+      materializer.materializeFull();
+
+      ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
+
+      String sql = sqlCaptor.getAllValues().stream()
+          .filter(s -> s.contains("INSERT INTO"))
+          .findFirst()
+          .orElse("");
+
+      assertThat(sql).contains("fact_advertising");
+      assertThat(sql).contains("ad_agg");
+      assertThat(sql).contains("coalesce(ad_agg.ad_spend, toDecimal64(0, 2)) AS advertising_cost");
+      assertThat(sql).contains("dp.seller_sku_id");
+      assertThat(sql).contains("fa.marketplace_sku = dp.marketplace_sku");
+    }
+
+    @Test
+    @DisplayName("SQL should compute full_pnl using real advertising_cost from ad_agg")
+    void should_computeFullPnlWithAdvertisingCost_when_sqlGenerated() {
+      when(jdbc.ch()).thenReturn(chTemplate);
+      when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
+      doAnswer(invocation -> {
+        Consumer<String> populate = invocation.getArgument(1);
+        populate.accept(invocation.getArgument(0) + "_staging");
+        return null;
+      }).when(jdbc).fullMaterializeWithSwap(anyString(), any());
+
+      materializer.materializeFull();
+
+      ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+      verify(chTemplate, atLeast(1)).execute(sqlCaptor.capture());
+
+      String sql = sqlCaptor.getAllValues().stream()
+          .filter(s -> s.contains("INSERT INTO"))
+          .findFirst()
+          .orElse("");
+
+      assertThat(sql).contains("base.marketplace_pnl");
+      assertThat(sql).contains("- coalesce(ad_agg.ad_spend, toDecimal64(0, 2))");
+      assertThat(sql).contains("- base.net_cogs");
+    }
+
+    @Test
     @DisplayName("SQL should handle division by zero for revenue in refund ratio")
     void should_guardDivisionByZero_when_revenueIsZero() {
       when(jdbc.ch()).thenReturn(chTemplate);

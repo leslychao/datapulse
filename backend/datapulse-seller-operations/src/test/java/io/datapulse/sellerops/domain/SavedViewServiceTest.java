@@ -201,7 +201,7 @@ class SavedViewServiceTest {
     @Test
     void should_return_summaries() {
       var entity = buildView(VIEW_ID, "Test", false, false);
-      when(repository.findByWorkspaceIdAndUserIdOrderByCreatedAtAsc(WORKSPACE_ID, USER_ID))
+      when(repository.findByWorkspaceIdIncludingSystem(WORKSPACE_ID, USER_ID))
           .thenReturn(List.of(entity));
 
       List<SavedViewSummaryResponse> result = service.listViews(WORKSPACE_ID, USER_ID);

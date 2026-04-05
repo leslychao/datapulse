@@ -22,7 +22,7 @@ public class SavedViewService {
 
     @Transactional(readOnly = true)
     public List<SavedViewSummaryResponse> listViews(long workspaceId, long userId) {
-        return repository.findByWorkspaceIdAndUserIdOrderByCreatedAtAsc(workspaceId, userId)
+        return repository.findByWorkspaceIdIncludingSystem(workspaceId, userId)
                 .stream()
                 .map(this::toSummary)
                 .toList();

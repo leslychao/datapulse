@@ -138,6 +138,7 @@
   "shell.nav.analytics": "Аналитика",
   "shell.nav.pricing": "Ценообразование",
   "shell.nav.promo": "Промо",
+  "shell.nav.advertising": "Реклама",
   "shell.nav.mismatches": "Расхождения",
   "shell.nav.queues": "Очереди",
   "shell.nav.alerts": "Алерты",
@@ -2768,5 +2769,24 @@
 
   "queues.item.already_claimed": "Элемент уже взят в работу другим оператором.",
   "queue.limit.exceeded": "Достигнут лимит очередей для этого рабочего пространства (макс. {{limit}}).",
-  "saved_view.limit.exceeded": "Достигнут лимит сохранённых видов (макс. {{limit}} на пользователя)."
+  "saved_view.limit.exceeded": "Достигнут лимит сохранённых видов (макс. {{limit}} на пользователя).",
+
+  "advertising.campaigns.title": "Рекламные кампании",
+  "advertising.campaigns.period.7d": "7 дней",
+  "advertising.campaigns.period.30d": "30 дней",
+  "advertising.campaigns.filter.all_statuses": "Все статусы",
+  "advertising.campaigns.status.active": "Активна",
+  "advertising.campaigns.status.on_pause": "На паузе",
+  "advertising.campaigns.status.paused": "На паузе",
+  "advertising.campaigns.status.archived": "В архиве",
+  "advertising.campaigns.status.ready": "Готова",
+  "advertising.campaigns.col.name": "Кампания",
+  "advertising.campaigns.col.platform": "МП",
+  "advertising.campaigns.col.type": "Тип",
+  "advertising.campaigns.col.status": "Статус",
+  "advertising.campaigns.col.daily_budget": "Бюджет/день",
+  "advertising.campaigns.col.spend": "Расход",
+  "advertising.campaigns.col.orders": "Заказы",
+  "advertising.campaigns.col.drr": "ДРР",
+  "advertising.campaigns.col.drr_trend": "Тренд"
 }

@@ -70,6 +70,11 @@ export const routes: Routes = [
         data: { breadcrumb: 'Промо' },
       },
       {
+        path: 'advertising',
+        loadChildren: () => import('./features/advertising/advertising.routes'),
+        data: { breadcrumb: 'Реклама' },
+      },
+      {
         path: 'execution/actions/:actionId',
         redirectTo: 'pricing/price-actions/:actionId',
         pathMatch: 'full',

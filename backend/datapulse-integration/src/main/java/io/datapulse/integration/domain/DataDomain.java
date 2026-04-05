@@ -8,5 +8,6 @@ public enum DataDomain {
     SALES,
     RETURNS,
     FINANCE,
-    PROMO
+    PROMO,
+    ADVERTISING
 }

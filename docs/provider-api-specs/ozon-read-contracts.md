@@ -852,7 +852,24 @@ Join to catalog requires `sku` → `product_id` → `offer_id` lookup.
 | `DefectFineCancellation`             | services          | Cancellation fine (posting-linked)   | 1                | -150          | confirmed  |
 
 
-**23 operation types verified from real data (Jan 2025: 7590 ops + Feb 2026: 589 ops).**
+**New operations (discovered Apr 2026):**
+
+
+| `operation_type`                                            | `type` (category) | Semantics                                     | Confidence |
+| ----------------------------------------------------------- | ----------------- | --------------------------------------------- | ---------- |
+| `OperationGettingToTheTop`                                  | services          | Promotion "getting to the top" charge         | confirmed  |
+| `OperationMarketplaceServiceSupplyInboundCargoShortage`     | services          | Supply inbound cargo shortage penalty         | confirmed  |
+| `DefectRateDetailed`                                        | services          | Detailed defect rate penalty                  | confirmed  |
+| `TemporaryStorage`                                          | services          | Temporary warehouse storage                   | confirmed  |
+
+**New service names (discovered Apr 2026):**
+
+| `services[].name`                                           | Measure column  | Semantics                     | Confidence |
+| ----------------------------------------------------------- | --------------- | ----------------------------- | ---------- |
+| `MarketplaceServiceItemRedistributionLastMilePVZ`           | LOGISTICS       | Last mile redistribution PVZ  | confirmed  |
+
+
+**27 operation types verified from real data (Jan 2025 + Feb 2026 + Apr 2026).**
 
 **Additional 21 types from official Ozon OpenAPI enum (C-docs, not yet observed in our data):**
 
@@ -880,7 +897,7 @@ Join to catalog requires `sku` → `product_id` → `offer_id` lookup.
 | `OperationElectronicServicesPromotionInSearch` | services | Search promotion service | Official enum |
 | `OperationMarketplaceServiceItemElectronicServicesBrandShelf` | services | Brand shelf service | Official enum |
 
-**Total: 44 operation types known (23 empirical + 21 from official enum).** Mapping to FinanceEntryType and fact_finance measures — see mapping-spec.md §7.
+**Total: 48 operation types known (27 empirical + 21 from official enum).** Mapping to FinanceEntryType and fact_finance measures — see mapping-spec.md §7.
 
 **NOTE:** 11 of our 23 empirical types are NOT in the official enum (added after Sept 2024 enum update). This confirms Ozon adds types without updating the public enum. Adapter MUST default unmapped types to OTHER with logging.
 

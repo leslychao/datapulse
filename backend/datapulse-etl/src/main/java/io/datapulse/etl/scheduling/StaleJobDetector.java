@@ -11,6 +11,8 @@ import io.datapulse.etl.persistence.JobExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +29,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>STALE is a terminal status. Recovery: next scheduled sync creates a new job_execution
  * (concurrency guard excludes STALE jobs).
+ *
+ * <p>On startup ({@link ApplicationReadyEvent}), runs the same detection with a shorter threshold
+ * for {@code RETRY_SCHEDULED}: {@link IngestProperties#maxRetryBackoff()} instead of
+ * {@link IngestProperties#staleRetryThreshold()}. After a restart, if a retry message has not
+ * arrived within {@code maxRetryBackoff}, it is likely lost by the broker.
  */
 @Slf4j
 @Component
@@ -37,6 +44,33 @@ public class StaleJobDetector {
   private final IngestProperties ingestProperties;
   private final IngestResultReporter ingestResultReporter;
   private final Clock clock;
+
+  @EventListener(ApplicationReadyEvent.class)
+  public void reconcileOnStartup() {
+    try {
+      OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+
+      int staleInProgress =
+          jobExecutionRepository.markStaleInProgress(now.minus(ingestProperties.jobTimeout()));
+      int staleMaterializing = jobExecutionRepository.markStaleMaterializing(
+          now.minus(ingestProperties.materializingStaleThreshold()));
+      int staleRetryScheduled = jobExecutionRepository.markStaleRetryScheduled(
+          now.minus(ingestProperties.maxRetryBackoff()));
+
+      int total = staleInProgress + staleMaterializing + staleRetryScheduled;
+      if (total > 0) {
+        log.warn(
+            "Startup stale-job reconciliation: inProgress={}, materializing={}, retryScheduled={}",
+            staleInProgress,
+            staleMaterializing,
+            staleRetryScheduled);
+      }
+      ingestResultReporter.reconcileAllConnectionsStuckInSyncingWithoutActiveJob();
+      log.info("Startup stale-job reconciliation complete: markedStale={}", total);
+    } catch (Exception e) {
+      log.error("Startup stale-job reconciliation failed", e);
+    }
+  }
 
   @Scheduled(fixedDelayString = "${datapulse.etl.stale-check-interval:PT15M}")
   @SchedulerLock(name = "staleJobDetector", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")

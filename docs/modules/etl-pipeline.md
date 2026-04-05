@@ -500,7 +500,7 @@ warehouse:
 | `RETURNS` | `SALES_FACT` | canonical_return | WB: analytics goods-return endpoint; Ozon: через returns/list |
 | `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list |
 | `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | WB: `WbPromoSyncSource` → calendar/promotions + nomenclatures; Ozon: `OzonPromoSyncSource` → actions + products/candidates |
-| `ADVERTISING` | `ADVERTISING_FACT` | — (DD-AD-1: Raw → ClickHouse directly) | **Stub (Phase B).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Blocked by F-1/F-2/F-3 |
+| `ADVERTISING` | `ADVERTISING_FACT` | `canonical_advertising_campaign` (DD-AD-1 revised: partial canonical) | **Stub (Phase A).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | `SUPPLY` | `SUPPLY_FACT` | — (no canonical entity, see G-3) | **Stub (Phase B).** WB only. `WbSupplyFactSource` registered as no-op stub. Pending `/api/v1/supplier/incomes` deprecation June 2026 |
 
 **Примечание**: WB sales и returns извлекаются из отдельных statistics/analytics endpoints (`/api/v1/supplier/sales` и `/api/v1/analytics/goods-return`) в рамках `SALES_FACT`, а не из `FACT_FINANCE`. `FACT_FINANCE` создаёт только `canonical_finance_entry`. Граф зависимостей (`FACT_FINANCE` depends on `SALES_FACT`) обеспечивает, что canonical orders/sales/returns доступны для SKU resolution при финансовой нормализации.
@@ -543,21 +543,24 @@ CATEGORY_DICT ───────────────────┘      
 | Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_current` |
 | Финансы (Ozon) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
 | Финансы (WB) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
-| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | — (DD-AD-1: no canonical entity, see below). **Stub (Phase B)** |
+| Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | `canonical_advertising_campaign` (DD-AD-1 revised: partial canonical — campaigns in PG, facts directly to CH). **Stub (Phase A).** Full spec: [Advertising](advertising.md) |
 | Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. Implemented |
 | Поставки | `SUPPLY_FACT` | — | — (no canonical entity, see G-3). **Stub (Phase B).** WB only |
 
-### Pipeline invariant exception: Advertising (DD-AD-1)
+### Pipeline invariant exception: Advertising (DD-AD-1 revised)
 
-> **Implementation status:** `ADVERTISING_FACT` EventSource зарегистрирован как **no-op stub** (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Описание ниже — target design для Phase B.
+> **Implementation status:** `ADVERTISING_FACT` EventSource зарегистрирован как **no-op stub** (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Полная спецификация реализации — [Advertising](advertising.md) §ETL Pipeline.
 
-Advertising data (`ADVERTISING_FACT`) flows **Raw (S3) → Normalized (in-process) → ClickHouse** directly, без промежуточного canonical entity в PostgreSQL. Это единственное исключение из инварианта «Raw → Normalized → Canonical → Analytics». Raw payload сохраняется в S3 (как и все остальные domains), но canonical layer пропускается.
+Advertising data (`ADVERTISING_FACT`) использует **частичный canonical слой**:
 
-**Обоснование:** рекламные данные используются исключительно для аналитики (P&L allocation, pricing signal `ad_cost_ratio`). Ни один decision flow не читает advertising state из PostgreSQL. Ни один action lifecycle не зависит от advertising canonical truth.
+- **Кампании** (справочник) → PostgreSQL `canonical_advertising_campaign` (UPSERT) + ClickHouse `dim_advertising_campaign` (материализация). Это аналог промо-паттерна: `canonical_promo_campaign` (PG) → `dim_promo_campaign` (CH).
+- **Факты** (статистика) → ClickHouse `fact_advertising` напрямую, без canonical в PostgreSQL. Исключение из инварианта «Raw → Canonical → Analytics» — рекламная статистика не является бизнес-состоянием.
 
-**Data provenance:** обеспечивается через `job_execution_id` в `fact_advertising` (ClickHouse column). Drill-down: `fact_advertising.job_execution_id` → `job_item.s3_key` → S3 raw payload.
+**Обоснование partial canonical:** кампании — бизнес-состояние: алерты join-ят кампании с остатками в PostgreSQL, дашборд требует pagination/sorting, рекомендации join-ят с ценами/маржей. Факты — чистая аналитика с большим объёмом, агрегации выполняются в ClickHouse.
 
-**Dedup:** ReplacingMergeTree с `ver` обеспечивает upsert-семантику при re-materialization. Dedup key: `(connection_id, source_platform, campaign_id, ad_date, marketplace_sku)`.
+**Data provenance (facts):** обеспечивается через `job_execution_id` в `fact_advertising` (ClickHouse column). Drill-down: `fact_advertising.job_execution_id` → `job_item.s3_key` → S3 raw payload.
+
+**Dedup:** Campaigns: PostgreSQL UPSERT с `ON CONFLICT (connection_id, external_campaign_id) DO UPDATE`. Facts: ReplacingMergeTree с `ver`. Dedup key: `(connection_id, source_platform, campaign_id, ad_date, marketplace_sku)`.
 
 ### Platform-specific правила
 
@@ -1561,7 +1564,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Area | Notes |
 |------|-------|
 | `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
-| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Phase B |
+| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | Ingest orchestration decomposition | `IngestOrchestrator` → thin shell; `IngestJobAcquisitionService` (CAS/reclaim), `IngestSyncContextBuilder` (context), `IngestJobCompletionCoordinator` (retry/fail/materialize), `SyncDispatcher` (scheduled dispatch with `@Transactional` via AOP proxy) |
 | Async post-ingest materialization | `PostIngestMaterializationMessageHandler` processes `ETL_POST_INGEST_MATERIALIZE` via `etl.sync` queue; CAS failure reconciles sync state |
 | `IngestResultReporter` consolidation | Unified sync state transitions (SYNCING/IDLE/ERROR), configurable `syncInterval` (replaces hardcoded 6h), injectable `Clock` for testability |
@@ -1575,7 +1578,7 @@ Summary of gaps between this document (target design) and the current codebase.
 
 | Area | Notes |
 |------|-------|
-| `ADVERTISING_FACT` full implementation | v2→v3 migration (F-1/F-2), Ozon OAuth2 (F-3), DTO expansion (F-4). Phase B |
+| `ADVERTISING_FACT` full implementation | v2→v3 migration, Ozon OAuth2 token service, credential resolution. Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | ClickHouse materialization | `ClickHouseMaterializer` is a stub. ClickHouse schema (`0001-initial.sql`) created but not populated |
 
 ## Связанные модули

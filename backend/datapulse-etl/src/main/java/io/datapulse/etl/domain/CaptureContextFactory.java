@@ -21,4 +21,18 @@ public final class CaptureContextFactory {
                 UUID.randomUUID().toString().substring(0, 8)
         );
     }
+
+    /**
+     * Creates a copy with a fresh {@code requestId} — used when a single adapter
+     * splits work into multiple date windows, each needing unique S3 paths.
+     */
+    public static CaptureContext withNewRequestId(CaptureContext ctx) {
+        return new CaptureContext(
+                ctx.jobExecutionId(),
+                ctx.connectionId(),
+                ctx.etlEvent(),
+                ctx.sourceId(),
+                UUID.randomUUID().toString().substring(0, 8)
+        );
+    }
 }

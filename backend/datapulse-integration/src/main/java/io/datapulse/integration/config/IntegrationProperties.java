@@ -44,6 +44,9 @@ public class IntegrationProperties {
         @NotBlank
         private final String promoBaseUrl;
 
+        @NotBlank
+        private final String advertBaseUrl;
+
         private final String sandboxApiToken;
 
         public String getPricesWriteBaseUrl() {

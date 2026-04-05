@@ -346,6 +346,10 @@ Thresholds и calibration описаны в [Analytics & P&L](analytics-pnl.md) 
 | `RESIDUAL_ANOMALY` | [Analytics & P&L](analytics-pnl.md) | CRITICAL | true | Reconciliation residual отклонение от baseline > 2σ |
 | `SPIKE_DETECTION` | [Analytics & P&L](analytics-pnl.md) | WARNING | false | Period-over-period change > 3× median за 30 дней |
 | `MISMATCH` | [Analytics & P&L](analytics-pnl.md) | WARNING | false | Расхождения между связанными data domains |
+| `AD_DRR_THRESHOLD` | [Advertising](advertising.md) | WARNING | false | ДРР по товару превысил настраиваемый порог (default 15%) |
+| `AD_NO_STOCK` | [Advertising](advertising.md) | WARNING | false | Кампания активна + товар 0 остатков + spend > 0 за сегодня |
+| `AD_INEFFICIENT_CAMPAIGN` | [Advertising](advertising.md) | INFO | false | CTR < 1% или CR < 2% при spend > порога за 7 дней |
+| `AD_PRICE_DROP_HIGH_DRR` | [Advertising](advertising.md) | WARNING | false | Цена снижена (manual/auto) при ДРР > 15% |
 
 ### Execution и promo alerts
 

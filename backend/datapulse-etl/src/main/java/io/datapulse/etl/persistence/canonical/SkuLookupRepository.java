@@ -23,7 +23,8 @@ public class SkuLookupRepository {
             SELECT mo.seller_sku_id
             FROM marketplace_offer mo
             WHERE mo.marketplace_connection_id = ?
-              AND (mo.marketplace_sku = ? OR mo.marketplace_sku_alt = ?)
+              AND (mo.marketplace_sku = ?
+                   OR ? = ANY(string_to_array(mo.marketplace_sku_alt, ',')))
             LIMIT 1
             """;
 

@@ -53,3 +53,9 @@ databaseChangeLog:
   - include:
       file: changes/0021-job-execution-materializing-at.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0022-advertising-campaign-table.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0023-advertising-grid-system-view.sql
+      relativeToChangelogFile: true

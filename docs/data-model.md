@@ -36,10 +36,10 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 
 | Тип | Таблицы | Модуль-владелец |
 |-----|---------|-----------------|
-| Dimensions | `dim_product`, `dim_warehouse`, `dim_category`, `dim_promo_campaign`, `dim_advertising_campaign` | [Analytics & P&L](modules/analytics-pnl.md), [Promotions](modules/promotions.md) (`dim_promo_campaign`), Analytics (`dim_advertising_campaign`) |
-| P&L facts | `fact_finance`, `fact_sales`, `fact_product_cost`, `fact_advertising` | [Analytics & P&L](modules/analytics-pnl.md) |
+| Dimensions | `dim_product`, `dim_warehouse`, `dim_category`, `dim_promo_campaign`, `dim_advertising_campaign` | [Analytics & P&L](modules/analytics-pnl.md), [Promotions](modules/promotions.md) (`dim_promo_campaign`), [Advertising](modules/advertising.md) (`dim_advertising_campaign`) |
+| P&L facts | `fact_finance`, `fact_sales`, `fact_product_cost`, `fact_advertising` | [Analytics & P&L](modules/analytics-pnl.md), [Advertising](modules/advertising.md) (`fact_advertising`) |
 | Operational facts | `fact_orders`, `fact_returns`, `fact_price_snapshot`, `fact_inventory_snapshot`, `fact_promo_product` | [Analytics & P&L](modules/analytics-pnl.md), [Promotions](modules/promotions.md) (`fact_promo_product`) |
-| Marts | `mart_posting_pnl`, `mart_product_pnl`, `mart_inventory_analysis`, `mart_returns_analysis`, `mart_promo_product_analysis` | [Analytics & P&L](modules/analytics-pnl.md), [Promotions](modules/promotions.md) (`mart_promo_product_analysis`) |
+| Marts | `mart_posting_pnl`, `mart_product_pnl`, `mart_inventory_analysis`, `mart_returns_analysis`, `mart_promo_product_analysis`, `mart_advertising_product` | [Analytics & P&L](modules/analytics-pnl.md), [Promotions](modules/promotions.md) (`mart_promo_product_analysis`), [Advertising](modules/advertising.md) (`mart_advertising_product`) |
 
 ## Ключевые таблицы PostgreSQL по модулям
 
@@ -47,7 +47,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 |--------|---------|
 | [Tenancy & IAM](modules/tenancy-iam.md) | `tenant`, `workspace`, `app_user`, `workspace_member`, `workspace_invitation` |
 | [Integration](modules/integration.md) | `marketplace_connection`, `secret_reference`, `marketplace_sync_state`, `integration_call_log` |
-| [ETL Pipeline](modules/etl-pipeline.md) | `category`, `warehouse`, `product_master`, `seller_sku`, `marketplace_offer`, `cost_profile`, `canonical_price_current`, `canonical_stock_current`, `canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`, `canonical_promo_product`, `job_execution`, `job_item` |
+| [ETL Pipeline](modules/etl-pipeline.md) | `category`, `warehouse`, `product_master`, `seller_sku`, `marketplace_offer`, `cost_profile`, `canonical_price_current`, `canonical_stock_current`, `canonical_order`, `canonical_sale`, `canonical_return`, `canonical_finance_entry`, `canonical_promo_campaign`, `canonical_promo_product`, `canonical_advertising_campaign`, `job_execution`, `job_item` |
 | [Pricing](modules/pricing.md) | `price_policy` (versioned, `last_preview_version` for mandatory preview gate), `price_policy_assignment`, `price_decision` (policy_snapshot, explanation format, strategy_type `MANUAL_OVERRIDE` for bulk), `pricing_run` (trigger_type incl. `MANUAL_BULK`, `request_hash`; statuses: PENDING, IN_PROGRESS, COMPLETED, COMPLETED_WITH_ERRORS, FAILED, PAUSED, CANCELLED), `manual_price_lock` |
 | [Execution](modules/execution.md) | `price_action` (extended: decision FK, audit fields, reconciliation_source), `price_action_attempt` (provider request/response summaries, reconciliation read), `deferred_action`, `outbox_event`, `simulated_offer_state` |
 | [Promotions](modules/promotions.md) | `promo_policy` (versioned), `promo_policy_assignment`, `promo_evaluation_run`, `promo_evaluation`, `promo_decision` (policy_snapshot), `promo_action`, `promo_action_attempt`. Canonical truth: `canonical_promo_campaign`, `canonical_promo_product` (owned by ETL, read + updated by Promotions) |
@@ -188,7 +188,7 @@ AuditEvent(
 | **C — Pricing** | Объяснимое ценообразование | [Pricing](modules/pricing.md) |
 | **D — Execution** | Контролируемое исполнение | [Execution](modules/execution.md), [Promotions](modules/promotions.md) (promo evaluation + promo execution) |
 | **E — Seller Operations** | Операционный рабочий слой | [Seller Operations](modules/seller-operations.md), [Promotions](modules/promotions.md) (promo analytics in grid) |
-| **B extended — Advertising Ingestion** | Рекламные данные для P&L | [Analytics & P&L](modules/analytics-pnl.md) (`dim_advertising_campaign`, `fact_advertising`) |
+| **B extended — Advertising** | Рекламные данные, аналитика, алерты, pricing integration | [Advertising](modules/advertising.md) (`canonical_advertising_campaign` PG, `dim_advertising_campaign` CH, `fact_advertising` CH, `mart_advertising_product` CH) |
 | **F — Simulation** | Безопасное тестирование | [Execution](modules/execution.md) (simulation section) |
 | **G — Intelligence** | Расширенная аналитика, advanced advertising analytics | Расширения существующих модулей, [Promotions](modules/promotions.md) (`mart_promo_product_analysis`) |
 
