@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.datapulse.etl.config.IngestProperties;
+import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ class StaleJobDetectorTest {
 
   @Mock private JobExecutionRepository jobExecutionRepository;
   @Mock private IngestProperties ingestProperties;
+  @Mock private IngestResultReporter ingestResultReporter;
 
   @InjectMocks private StaleJobDetector staleJobDetector;
 
@@ -35,5 +37,6 @@ class StaleJobDetectorTest {
     verify(jobExecutionRepository).markStaleInProgress(any());
     verify(jobExecutionRepository).markStaleMaterializing(any());
     verify(jobExecutionRepository).markStaleRetryScheduled(any());
+    verify(ingestResultReporter).reconcileAllConnectionsStuckInSyncingWithoutActiveJob();
   }
 }

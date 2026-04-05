@@ -24,6 +24,7 @@ class ConnectionStaleJobReconcilerTest {
   private static final ZoneOffset UTC = ZoneOffset.UTC;
 
   @Mock private JobExecutionRepository jobExecutionRepository;
+  @Mock private IngestResultReporter ingestResultReporter;
 
   private ConnectionStaleJobReconciler reconciler;
 
@@ -48,7 +49,9 @@ class ConnectionStaleJobReconcilerTest {
             Duration.ofHours(1),
             PostIngestMaterializationMode.SYNC,
             Duration.ofMinutes(15));
-    reconciler = new ConnectionStaleJobReconciler(jobExecutionRepository, props, clock);
+    reconciler =
+        new ConnectionStaleJobReconciler(
+            jobExecutionRepository, props, ingestResultReporter, clock);
   }
 
   @Test
@@ -71,5 +74,6 @@ class ConnectionStaleJobReconcilerTest {
     verify(jobExecutionRepository)
         .markStaleRetryScheduledForConnection(7L, OffsetDateTime.parse("2024-06-15T11:00:00Z"));
     verify(jobExecutionRepository).markStalePendingForConnection(7L, OffsetDateTime.parse("2024-06-15T10:00:00Z"));
+    verify(ingestResultReporter).reconcileSyncingWhenNoActiveJob(7L);
   }
 }

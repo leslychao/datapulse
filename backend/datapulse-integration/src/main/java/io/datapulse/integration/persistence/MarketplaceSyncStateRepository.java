@@ -17,4 +17,10 @@ public interface MarketplaceSyncStateRepository extends JpaRepository<Marketplac
               AND s.status <> 'DISABLED'
             """)
     List<MarketplaceSyncStateEntity> findEligibleForSync(@Param("now") OffsetDateTime now);
+
+    @Query("""
+            SELECT DISTINCT s.marketplaceConnectionId FROM MarketplaceSyncStateEntity s
+            WHERE s.status = 'SYNCING'
+            """)
+    List<Long> findDistinctMarketplaceConnectionIdsWithSyncingStatus();
 }

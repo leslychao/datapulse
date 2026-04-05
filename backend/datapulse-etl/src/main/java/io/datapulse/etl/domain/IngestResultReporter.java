@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.datapulse.etl.config.IngestProperties;
+import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.api.SyncStatusPushReason;
 import io.datapulse.integration.domain.SyncStatus;
@@ -33,6 +34,7 @@ public class IngestResultReporter {
 
     private final OutboxService outboxService;
     private final MarketplaceSyncStateRepository syncStateRepository;
+    private final JobExecutionRepository jobExecutionRepository;
     private final ObjectMapper objectMapper;
     private final IngestProperties ingestProperties;
     private final ApplicationEventPublisher eventPublisher;
@@ -112,6 +114,47 @@ public class IngestResultReporter {
         }
         syncStateRepository.saveAll(states);
         publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+    }
+
+    /**
+     * Clears a stale UI state: after {@code job_execution} is no longer active (e.g. STALE) the DB
+     * can still have {@code marketplace_sync_state.status = SYNCING} because that flag is set when
+     * dispatch starts, not continuously updated. Downgrade SYNCING rows to IDLE when there is no
+     * PENDING/IN_PROGRESS/MATERIALIZING/RETRY_SCHEDULED job for the connection.
+     */
+    public void reconcileSyncingWhenNoActiveJob(long connectionId) {
+        if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
+            return;
+        }
+        List<MarketplaceSyncStateEntity> states =
+                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+        boolean anySyncing =
+                states.stream().anyMatch(s -> SyncStatus.SYNCING.name().equals(s.getStatus()));
+        if (!anySyncing) {
+            return;
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        for (MarketplaceSyncStateEntity state : states) {
+            if (SyncStatus.SYNCING.name().equals(state.getStatus())) {
+                state.setStatus(SyncStatus.IDLE.name());
+                state.setErrorMessage(null);
+                state.setNextScheduledAt(now);
+            }
+        }
+        syncStateRepository.saveAll(states);
+        log.warn(
+                "Cleared stuck SYNCING sync states (no active job): connectionId={}, rows={}",
+                connectionId,
+                states.size());
+        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+    }
+
+    /** Runs {@link #reconcileSyncingWhenNoActiveJob(long)} for every connection that has SYNCING rows. */
+    public void reconcileAllConnectionsStuckInSyncingWithoutActiveJob() {
+        List<Long> connectionIds = syncStateRepository.findDistinctMarketplaceConnectionIdsWithSyncingStatus();
+        for (Long connectionId : connectionIds) {
+            reconcileSyncingWhenNoActiveJob(connectionId);
+        }
     }
 
     private void writeCompletionOutboxLists(

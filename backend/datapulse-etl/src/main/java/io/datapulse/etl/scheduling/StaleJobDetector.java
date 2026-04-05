@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 
 import io.datapulse.etl.config.IngestProperties;
+import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class StaleJobDetector {
 
     private final JobExecutionRepository jobExecutionRepository;
     private final IngestProperties ingestProperties;
+    private final IngestResultReporter ingestResultReporter;
 
     @Scheduled(fixedDelayString = "${datapulse.etl.stale-check-interval:PT15M}")
     @SchedulerLock(name = "staleJobDetector", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
@@ -57,6 +59,7 @@ public class StaleJobDetector {
             } else {
                 log.debug("No stale jobs detected");
             }
+            ingestResultReporter.reconcileAllConnectionsStuckInSyncingWithoutActiveJob();
         } catch (Exception e) {
             log.error("Stale job detection failed", e);
         }

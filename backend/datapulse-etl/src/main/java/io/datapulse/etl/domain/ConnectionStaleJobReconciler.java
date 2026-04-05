@@ -24,6 +24,7 @@ public class ConnectionStaleJobReconciler {
 
   private final JobExecutionRepository jobExecutionRepository;
   private final IngestProperties ingestProperties;
+  private final IngestResultReporter ingestResultReporter;
   private final Clock clock;
 
   /**
@@ -45,6 +46,7 @@ public class ConnectionStaleJobReconciler {
           connectionId,
           n);
     }
+    ingestResultReporter.reconcileSyncingWhenNoActiveJob(connectionId);
     return n;
   }
 }
