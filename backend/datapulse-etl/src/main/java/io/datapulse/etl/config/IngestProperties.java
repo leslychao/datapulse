@@ -31,6 +31,8 @@ public record IngestProperties(
          * fact window start (late-arriving provider data).
          */
         @DefaultValue("PT1H") Duration factSyncOverlap,
+        /** Interval between regular scheduled syncs (used as {@code nextScheduledAt} offset). */
+        @DefaultValue("PT6H") Duration syncInterval,
         /** Delay before the next scheduled sync attempt after terminal failure (sync state ERROR). */
         @DefaultValue("PT15M") Duration syncNextAttemptAfterError,
         /**

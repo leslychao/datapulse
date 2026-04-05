@@ -1,6 +1,8 @@
 package io.datapulse.integration.domain;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
@@ -20,51 +22,56 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ConnectionSyncHealthService {
 
-    private static final int FRESH_SUCCESS_WITHIN_HOURS = 24;
+  private static final int FRESH_SUCCESS_WITHIN_HOURS = 24;
 
-    private final MarketplaceConnectionRepository connectionRepository;
-    private final MarketplaceSyncStateRepository syncStateRepository;
+  private final MarketplaceConnectionRepository connectionRepository;
+  private final MarketplaceSyncStateRepository syncStateRepository;
+  private final Clock clock;
 
-    @Transactional(readOnly = true)
-    public List<ConnectionSyncHealthResponse> listForWorkspace(long workspaceId) {
-        return connectionRepository.findAllByWorkspaceId(workspaceId).stream()
-                .filter(c -> !ConnectionStatus.ARCHIVED.name().equals(c.getStatus()))
-                .map(this::toResponse)
-                .toList();
+  @Transactional(readOnly = true)
+  public List<ConnectionSyncHealthResponse> listForWorkspace(long workspaceId) {
+    return connectionRepository.findAllByWorkspaceId(workspaceId).stream()
+        .filter(c -> !ConnectionStatus.ARCHIVED.name().equals(c.getStatus()))
+        .map(this::toResponse)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<ConnectionSyncHealthResponse> summarize(long connectionId) {
+    return connectionRepository.findById(connectionId).map(this::toResponse);
+  }
+
+  private ConnectionSyncHealthResponse toResponse(MarketplaceConnectionEntity connection) {
+    List<MarketplaceSyncStateEntity> states =
+        syncStateRepository.findAllByMarketplaceConnectionId(connection.getId());
+    List<MarketplaceSyncStateEntity> relevant =
+        states.stream().filter(s -> !"DISABLED".equals(s.getStatus())).toList();
+
+    OffsetDateTime maxSuccess = relevant.stream()
+        .map(MarketplaceSyncStateEntity::getLastSuccessAt)
+        .filter(Objects::nonNull)
+        .max(Comparator.naturalOrder())
+        .orElse(null);
+
+    SyncHealth health;
+    if (relevant.stream().anyMatch(s -> "ERROR".equals(s.getStatus()))) {
+      health = SyncHealth.ERROR;
+    } else if (relevant.stream().anyMatch(s -> "SYNCING".equals(s.getStatus()))) {
+      health = SyncHealth.SYNCING;
+    } else if (maxSuccess == null
+        || maxSuccess.isBefore(
+            now().minus(FRESH_SUCCESS_WITHIN_HOURS, ChronoUnit.HOURS))) {
+      health = SyncHealth.STALE;
+    } else {
+      health = SyncHealth.OK;
     }
 
-    @Transactional(readOnly = true)
-    public Optional<ConnectionSyncHealthResponse> summarize(long connectionId) {
-        return connectionRepository.findById(connectionId).map(this::toResponse);
-    }
+    String lastSuccessIso = maxSuccess != null ? maxSuccess.toString() : null;
+    return new ConnectionSyncHealthResponse(
+        connection.getId(), connection.getName(), lastSuccessIso, health);
+  }
 
-    private ConnectionSyncHealthResponse toResponse(MarketplaceConnectionEntity connection) {
-        List<MarketplaceSyncStateEntity> states =
-                syncStateRepository.findAllByMarketplaceConnectionId(connection.getId());
-        List<MarketplaceSyncStateEntity> relevant =
-                states.stream().filter(s -> !"DISABLED".equals(s.getStatus())).toList();
-
-        OffsetDateTime maxSuccess = relevant.stream()
-                .map(MarketplaceSyncStateEntity::getLastSuccessAt)
-                .filter(Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
-
-        SyncHealth health;
-        if (relevant.stream().anyMatch(s -> "ERROR".equals(s.getStatus()))) {
-            health = SyncHealth.ERROR;
-        } else if (relevant.stream().anyMatch(s -> "SYNCING".equals(s.getStatus()))) {
-            health = SyncHealth.STALE;
-        } else if (maxSuccess == null
-                || maxSuccess.isBefore(
-                        OffsetDateTime.now().minus(FRESH_SUCCESS_WITHIN_HOURS, ChronoUnit.HOURS))) {
-            health = SyncHealth.STALE;
-        } else {
-            health = SyncHealth.OK;
-        }
-
-        String lastSuccessIso = maxSuccess != null ? maxSuccess.toString() : null;
-        return new ConnectionSyncHealthResponse(
-                connection.getId(), connection.getName(), lastSuccessIso, health);
-    }
+  private OffsetDateTime now() {
+    return OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+  }
 }

@@ -86,10 +86,11 @@ public class PostIngestMaterializationMessageHandler {
           JobExecutionStatus.MATERIALIZING,
           terminalStatus);
       if (!advanced) {
-        log.debug(
-            "Skip ETL_POST_INGEST_MATERIALIZE finalize: CAS failed (jobExecutionId={}, target={})",
+        log.warn(
+            "ETL_POST_INGEST_MATERIALIZE CAS failed (job likely marked STALE): jobExecutionId={}, target={}",
             payload.jobExecutionId(),
             terminalStatus);
+        resultReporter.reconcileSyncingWhenNoActiveJob(job.getConnectionId());
         return;
       }
       finalized.set(true);

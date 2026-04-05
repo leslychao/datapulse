@@ -1,6 +1,6 @@
 export type MarketplaceType = 'WB' | 'OZON';
 export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'DISABLED' | 'ARCHIVED';
-export type SyncHealth = 'OK' | 'STALE' | 'ERROR';
+export type SyncHealth = 'OK' | 'SYNCING' | 'STALE' | 'ERROR';
 
 export interface ConnectionSummary {
   id: number;

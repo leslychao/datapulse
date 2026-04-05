@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.analytics.domain.MaterializationService;
 import io.datapulse.api.config.RabbitTopologyConfig;
 import io.datapulse.etl.domain.IngestOrchestrator;
+import io.datapulse.etl.domain.IngestResultReporter;
 import io.datapulse.etl.domain.PostIngestMaterializationMessageHandler;
 import io.datapulse.platform.outbox.OutboxEventType;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class EtlSyncConsumer {
 
   private final IngestOrchestrator ingestOrchestrator;
   private final PostIngestMaterializationMessageHandler postIngestMaterializationMessageHandler;
+  private final IngestResultReporter ingestResultReporter;
   private final MaterializationService materializationService;
   private final ObjectMapper objectMapper;
 
@@ -75,6 +77,7 @@ public class EtlSyncConsumer {
     } catch (Exception e) {
       log.error("Poison pill detected in etl.sync queue: messageId={}, error={}",
           message.getMessageProperties().getMessageId(), e.getMessage(), e);
+      tryReconcileSyncStateFromPoisonPill(message);
     }
   }
 
@@ -91,6 +94,18 @@ public class EtlSyncConsumer {
     } catch (Exception e) {
       log.error("Rematerialization failed: messageId={}", 
           message.getMessageProperties().getMessageId(), e);
+    }
+  }
+
+  private void tryReconcileSyncStateFromPoisonPill(Message message) {
+    try {
+      JsonNode payload = objectMapper.readTree(message.getBody());
+      long connectionId = payload.path("connectionId").asLong();
+      if (connectionId > 0) {
+        ingestResultReporter.reconcileSyncingWhenNoActiveJob(connectionId);
+      }
+    } catch (Exception ignored) {
+      // payload is completely unparseable — reconciliation will happen via StaleJobDetector
     }
   }
 

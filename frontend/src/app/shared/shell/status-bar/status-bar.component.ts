@@ -9,6 +9,7 @@ import { AuthService } from '@core/auth/auth.service';
 
 const HEALTH_COLORS: Record<SyncHealth, string> = {
   OK: 'var(--status-success)',
+  SYNCING: 'var(--accent-primary)',
   STALE: 'var(--status-warning)',
   ERROR: 'var(--status-error)',
 };
@@ -25,10 +26,15 @@ const HEALTH_COLORS: Record<SyncHealth, string> = {
         @for (conn of connections(); track conn.connectionId) {
           <div class="flex items-center gap-1">
             <span class="inline-block h-1.5 w-1.5 rounded-full"
+                  [class.animate-pulse]="conn.status === 'SYNCING'"
                   [style.background-color]="healthColor(conn.status)">
             </span>
             <span>{{ conn.connectionName }}</span>
-            @if (conn.lastSuccessAt) {
+            @if (conn.status === 'SYNCING') {
+              <span class="text-[var(--accent-primary)]">
+                синхронизация...
+              </span>
+            } @else if (conn.lastSuccessAt) {
               <span class="text-[var(--text-tertiary)]">
                 {{ relativeTime(conn.lastSuccessAt) }}
               </span>

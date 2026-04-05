@@ -218,13 +218,13 @@
 
 **Rabbit consumers (`datapulse-api`, `@RabbitListener`):** `EtlSyncConsumer`, `EtlEventsPricingConsumer`, `EtlEventsMismatchConsumer`, `SyncStatusPushListener`, `PricingRunConsumer`, `PriceActionExecuteConsumer`, `PriceActionReconcileConsumer`, `PromoActionExecuteConsumer`, `PromoEvaluationConsumer` — в основном **try/catch + log** (poison pill), см. уточнение про ACK выше.
 
-**B — Spring events:** публикация из доменных сервисов (`publishEvent`): integration (`ConnectionService`, validation, health), ETL (`IngestResultReporter`, `SyncScheduler`), execution (`ActionService`, credentials), pricing (`PricingRunService`, `PricePolicyService`), promotions, audit-alerting (`AlertEventService`, `AlertEventListener`), seller-ops (`MismatchMonitorService`), tenancy (`TenancyAuditPublisher`, `WorkspaceContextFilter`). События живут в модулях (`*.domain.event`, `platform.audit`, и т.д.) — **пакет `domain/event/` везде ещё не выровнен**.
+**B — Spring events:** публикация из доменных сервисов (`publishEvent`): integration (`ConnectionService`, validation, health), ETL (`IngestResultReporter`, `SyncDispatcher`), execution (`ActionService`, credentials), pricing (`PricingRunService`, `PricePolicyService`), promotions, audit-alerting (`AlertEventService`, `AlertEventListener`), seller-ops (`MismatchMonitorService`), tenancy (`TenancyAuditPublisher`, `WorkspaceContextFilter`). События живут в модулях (`*.domain.event`, `platform.audit`, и т.д.) — **пакет `domain/event/` везде ещё не выровнен**.
 
 **Listeners:** `AuditEventListener`, `NotificationFanOutListener`, `ConnectionValidationListener`, `PolicyChangeRunListener`, `ConnectionSyncHealthPushListener`, `ConnectionStatusPushListener` — `@TransactionalEventListener(AFTER_COMMIT)` + часто `@Async("notificationExecutor")`. `AlertEventListener`, `SyncTriggeredListener`, `ConnectionActivationListener` — намеренный `@EventListener` (см. javadoc: операционные алерты vs атомарность с источником; ETL dispatch в той же TX, что и publisher).
 
 **C — STOMP:** `WorkspaceTopicStompPublisher` (`connection-updates`, `sync-status`), `WorkspaceAlertTopicStompPublisher` (`/topic/.../alerts`), `UserNotificationStompPublisher` (`/user/.../notifications`). Listener-ы только маппят событие → вызов publisher-а.
 
-**Гибрид A+B (намеренно):** после успешного terminal sync `IngestResultReporter` пишет outbox `ETL_SYNC_COMPLETED` **и** публикует `ConnectionSyncHealthInvalidatedEvent` — разные потребители (downstream pricing/mismatch + мгновенный `sync-status` WS без дубля с fan-out нотификаций).
+**Гибрид A+B (намеренно):** после успешного terminal sync `IngestResultReporter.recordSuccessfulTerminalSync[Lists]` пишет outbox `ETL_SYNC_COMPLETED` **и** публикует `ConnectionSyncHealthInvalidatedEvent` — разные потребители (downstream pricing/mismatch + мгновенный `sync-status` WS без дубля с fan-out нотификаций). `IngestResultReporter` использует injectable `Clock` и `IngestProperties.syncInterval()` для `nextScheduledAt`; `SyncScheduler` делегирует dispatch в `SyncDispatcher` (отдельный `@Service` для корректного `@Transactional` через AOP proxy).
 
 #### План внедрения целевого решения (по шагам)
 

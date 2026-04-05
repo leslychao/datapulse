@@ -45,6 +45,7 @@ class ConnectionStaleJobReconcilerTest {
             30,
             365,
             Duration.ofHours(1),
+            Duration.ofHours(6),
             Duration.ofMinutes(15),
             Duration.ofHours(1),
             PostIngestMaterializationMode.SYNC,

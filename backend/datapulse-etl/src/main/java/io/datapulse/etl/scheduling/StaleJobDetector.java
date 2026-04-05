@@ -1,7 +1,9 @@
 package io.datapulse.etl.scheduling;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.domain.IngestResultReporter;
@@ -31,37 +33,38 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class StaleJobDetector {
 
-    private final JobExecutionRepository jobExecutionRepository;
-    private final IngestProperties ingestProperties;
-    private final IngestResultReporter ingestResultReporter;
+  private final JobExecutionRepository jobExecutionRepository;
+  private final IngestProperties ingestProperties;
+  private final IngestResultReporter ingestResultReporter;
+  private final Clock clock;
 
-    @Scheduled(fixedDelayString = "${datapulse.etl.stale-check-interval:PT15M}")
-    @SchedulerLock(name = "staleJobDetector", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
-    public void detectStaleJobs() {
-        try {
-            OffsetDateTime now = OffsetDateTime.now();
-            Duration jobTimeout = ingestProperties.jobTimeout();
-            Duration matThreshold = ingestProperties.materializingStaleThreshold();
-            Duration retryThreshold = ingestProperties.staleRetryThreshold();
+  @Scheduled(fixedDelayString = "${datapulse.etl.stale-check-interval:PT15M}")
+  @SchedulerLock(name = "staleJobDetector", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
+  public void detectStaleJobs() {
+    try {
+      OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+      Duration jobTimeout = ingestProperties.jobTimeout();
+      Duration matThreshold = ingestProperties.materializingStaleThreshold();
+      Duration retryThreshold = ingestProperties.staleRetryThreshold();
 
-            int staleInProgress = jobExecutionRepository.markStaleInProgress(now.minus(jobTimeout));
-            int staleMaterializing =
-                jobExecutionRepository.markStaleMaterializing(now.minus(matThreshold));
-            int staleRetryScheduled =
-                jobExecutionRepository.markStaleRetryScheduled(now.minus(retryThreshold));
+      int staleInProgress = jobExecutionRepository.markStaleInProgress(now.minus(jobTimeout));
+      int staleMaterializing =
+          jobExecutionRepository.markStaleMaterializing(now.minus(matThreshold));
+      int staleRetryScheduled =
+          jobExecutionRepository.markStaleRetryScheduled(now.minus(retryThreshold));
 
-            if (staleInProgress > 0 || staleMaterializing > 0 || staleRetryScheduled > 0) {
-                log.warn(
-                    "Stale jobs detected: inProgress={}, materializing={}, retryScheduled={}",
-                    staleInProgress,
-                    staleMaterializing,
-                    staleRetryScheduled);
-            } else {
-                log.debug("No stale jobs detected");
-            }
-            ingestResultReporter.reconcileAllConnectionsStuckInSyncingWithoutActiveJob();
-        } catch (Exception e) {
-            log.error("Stale job detection failed", e);
-        }
+      if (staleInProgress > 0 || staleMaterializing > 0 || staleRetryScheduled > 0) {
+        log.warn(
+            "Stale jobs detected: inProgress={}, materializing={}, retryScheduled={}",
+            staleInProgress,
+            staleMaterializing,
+            staleRetryScheduled);
+      } else {
+        log.debug("No stale jobs detected");
+      }
+      ingestResultReporter.reconcileAllConnectionsStuckInSyncingWithoutActiveJob();
+    } catch (Exception e) {
+      log.error("Stale job detection failed", e);
     }
+  }
 }

@@ -812,12 +812,12 @@ State-based full scans (prices, stocks) используют offset-based pagina
 
 ```
 8. Определяем исход ingest (результаты DAG) и retriable-порог:
-   c. Retriable failure + retry_count < max_job_retries →
+   a. Retriable failure + retry_count < max_job_retries →
       CAS IN_PROGRESS → RETRY_SCHEDULED,
       UPDATE checkpoint,
       INSERT outbox_event (ETL_SYNC_RETRY, delay = backoff)
       → DLX доставит message обратно, worker возобновит с checkpoint (goto step 1)
-   d. Все events failed/skipped или retry исчерпан при retriable → CAS IN_PROGRESS → FAILED
+   b. Все events failed/skipped или retry исчерпан при retriable → CAS IN_PROGRESS → FAILED
       (sync state → ERROR, без MATERIALIZING и без ETL_SYNC_COMPLETED)
 9. Иначе (есть хотя бы один успешный домен): CAS IN_PROGRESS → MATERIALIZING,
    сохранить checkpoint + error_details по доменам
@@ -838,7 +838,7 @@ State-based full scans (prices, stocks) используют offset-based pagina
 
 | Event type | Payload | Consumer | Действие |
 |------------|---------|----------|----------|
-| `ETL_SYNC_COMPLETED` | `{ workspace_id, connection_id, job_execution_id, sync_scope, completed_domains[], failed_domains[] }` (+ прочие поля по мере эволюции) | `datapulse-pricing-worker` | Запускает pricing run (если FINANCE ∈ completed_domains и есть active price_policies) |
+| `ETL_SYNC_COMPLETED` | `{ workspaceId, connectionId, jobExecutionId, syncScope, completedDomains[], failedDomains[] }` (+ прочие поля по мере эволюции) | `datapulse-pricing-worker` | Запускает pricing run (если FINANCE ∈ completedDomains и есть active price_policies) |
 | `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-pricing-worker` | Запускает promo evaluation (если PROMO ∈ completed_domains и есть active promo_policies). См. [Promotions](promotions.md) §Post-sync promo evaluation trigger |
 | `ETL_SYNC_COMPLETED` | (тот же payload) | `datapulse-api` | Обновляет UI через WebSocket (sync status badge) |
 | `ETL_PROMO_CAMPAIGN_STALE` | `{ connection_id, campaign_ids: [...] }` | `datapulse-pricing-worker` | Expires pending promo_actions для stale campaigns. См. [Promotions](promotions.md) §Stale campaign detection |
@@ -1034,13 +1034,12 @@ Worker получает message:
 ```
 PENDING → IN_PROGRESS → MATERIALIZING → COMPLETED
                                       → COMPLETED_WITH_ERRORS
-         IN_PROGRESS → COMPLETED_WITH_ERRORS  (ingest уже с частичными ошибками; материализация неуспешна)
          IN_PROGRESS → FAILED  (все домены failed / исчерпан retry по retriable)
          IN_PROGRESS → RETRY_SCHEDULED → IN_PROGRESS → ... (цикл до max_job_retries)
          STALE (set by timeout job)
 ```
 
-**Инварианты (реализация `IngestOrchestrator` + `IngestJobCompletionCoordinator`):**
+**Инварианты (реализация `IngestOrchestrator` + `IngestJobCompletionCoordinator` + `PostIngestMaterializationMessageHandler`):**
 
 1. Событие outbox **`ETL_SYNC_COMPLETED`** и обновление sync state в **IDLE** выполняются **только** в одной транзакции с финальным CAS **`MATERIALIZING` → `COMPLETED` или `COMPLETED_WITH_ERRORS`** — не раньше материализации и не при `FAILED`.
 2. Переход **`IN_PROGRESS` → `MATERIALIZING`** фиксирует checkpoint и `error_details` по результатам DAG. По умолчанию (`datapulse.etl.ingest.post-ingest-materialization-mode=SYNC`) post-ingest materialization (ClickHouse / marts) вызывается **вне** первой транзакции синхронно в ingest worker; финальный CAS и fan-out — вторая транзакция. В режиме **`ASYNC_OUTBOX`** в **той же** транзакции с `IN_PROGRESS` → `MATERIALIZING` пишется outbox **`ETL_POST_INGEST_MATERIALIZE`** (exchange/routing как у `ETL_SYNC_EXECUTE` → очередь `etl.sync`); материализация и финальный CAS выполняет `PostIngestMaterializationMessageHandler` из `EtlSyncConsumer`. Идемпотентность: если job уже не в `MATERIALIZING`, обработчик no-op (повторная доставка сообщения).
@@ -1060,7 +1059,7 @@ PENDING → IN_PROGRESS → MATERIALIZING → COMPLETED
 | RETRY_SCHEDULED → STALE | `checkpoint->>'last_retry_at' < now() - interval '1 hour'` | Scheduled stale job detector |
 | MATERIALIZING → STALE | Фаза post-ingest / ClickHouse дольше `datapulse.etl.ingest.materializing-stale-threshold` (дефолт 1h); учёт по `job_execution.materializing_at`, иначе fallback `started_at` для старых строк | `StaleJobDetector` → `markStaleMaterializing` |
 
-`STALE` — терминальный статус. Recovery path: stale job detector помечает зависший job как STALE → INSERT alert (business alert: "ETL sync stale for connection {name}") → следующий scheduled sync создаёт новый `job_execution` (concurrency guard пропускает STALE jobs). `stale_threshold`: configurable (default: 2 часа для IN_PROGRESS, 1 час для RETRY_SCHEDULED).
+`STALE` — терминальный статус. Recovery path: `StaleJobDetector` помечает зависший job как STALE → `IngestResultReporter.reconcileAllConnectionsStuckInSyncingWithoutActiveJob()` сбрасывает `marketplace_sync_state.status` SYNCING → IDLE для connections без активных jobs → следующий scheduled sync создаёт новый `job_execution` (concurrency guard пропускает STALE jobs). `stale_threshold`: configurable (default: 2 часа для IN_PROGRESS, 1 час для RETRY_SCHEDULED, 1 час для MATERIALIZING).
 
 **Eager reconcile per connection:** перед проверкой «есть ли активный job» для данного `connection_id` (ручной sync, `SyncTriggeredListener`, активация подключения, scheduled sync, API retry) выполняется тот же набор порогов, что и у `StaleJobDetector`, но scoped `WHERE connection_id = ?` (`ConnectionStaleJobReconciler`). Так `job.active.exists` / skip в listener не блокируют новый dispatch до следующего тика детектора (до 15 минут зазора). Это не заменяет orphan-reclaim по Rabbit: там нужна доставка сообщения; здесь — путь «пользователь/планировщик инициирует новый job».
 
@@ -1523,7 +1522,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Ozon adapters (7 EventSources, 13 ReadAdapters) | Implemented |
 | Normalized model (9 records) | Implemented |
 | Canonical persistence (JDBC batch upsert, IS DISTINCT FROM) | Implemented |
-| Scheduling (SyncScheduler, StaleJobDetector, ShedLock) | Implemented |
+| Scheduling (SyncScheduler → SyncDispatcher, StaleJobDetector, ShedLock) | Implemented |
 | Job monitoring API (JobController, CostProfileController) | Implemented |
 | Retention (RetentionService, RetentionScheduler) | Implemented |
 | Cost profile SCD2 (CRUD + bulk CSV import) | Implemented |
@@ -1533,7 +1532,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Area | Current (Phase A) | Target (Phase B) |
 |------|-------------------|------------------|
 | Date-range strategy | Hardcoded `now() - 7 days` for all date-range domains | `last_success_at - overlap_buffer` per domain |
-| Scheduling interval | Uniform 6h for all domains per connection | Per-domain cron (4x/day finance, 2x/day catalog) |
+| Scheduling interval | Configurable via `datapulse.etl.ingest.sync-interval` (default 6h), uniform for all domains per connection | Per-domain cron (4x/day finance, 2x/day catalog) |
 | WB finance cursor | Same N-day window (default 30d) | `rrdid`-based monotonic cursor |
 | Ozon finance chunking | Same N-day window (default 30d) | Automatic monthly chunk splitting for long gaps |
 | ClickHouse materializer | Stub (logs calls, no actual writes) | Full batch INSERT via ClickHouse JDBC |
@@ -1546,6 +1545,12 @@ Summary of gaps between this document (target design) and the current codebase.
 |------|-------|
 | `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
 | `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Phase B |
+| Ingest orchestration decomposition | `IngestOrchestrator` → thin shell; `IngestJobAcquisitionService` (CAS/reclaim), `IngestSyncContextBuilder` (context), `IngestJobCompletionCoordinator` (retry/fail/materialize), `SyncDispatcher` (scheduled dispatch with `@Transactional` via AOP proxy) |
+| Async post-ingest materialization | `PostIngestMaterializationMessageHandler` processes `ETL_POST_INGEST_MATERIALIZE` via `etl.sync` queue; CAS failure reconciles sync state |
+| `IngestResultReporter` consolidation | Unified sync state transitions (SYNCING/IDLE/ERROR), configurable `syncInterval` (replaces hardcoded 6h), injectable `Clock` for testability |
+| `SyncHealth.SYNCING` | Backend enum + frontend type; `ConnectionSyncHealthService` correctly maps SYNCING (was erroneously mapped to STALE) |
+| Eager reconcile | `ConnectionStaleJobReconciler` for per-connection staleness before dispatch; reconciles sync state after stale detection |
+| Poison pill recovery | `EtlSyncConsumer` catch block attempts `reconcileSyncingWhenNoActiveJob` with best-effort `connectionId` extraction |
 | Post-sync outbox events | `IngestResultReporter.recordSuccessfulTerminalSync()` writes `ETL_SYNC_COMPLETED` to outbox (with sync state IDLE) in one transactional step. Consumer routing via RabbitMQ |
 | Stale campaign detection | `StaleCampaignDetector` marks campaigns with `synced_at` older than threshold as ENDED and publishes `ETL_PROMO_CAMPAIGN_STALE` outbox event |
 

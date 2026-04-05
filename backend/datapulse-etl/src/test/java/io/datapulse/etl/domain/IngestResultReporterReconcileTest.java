@@ -14,7 +14,10 @@ import io.datapulse.integration.domain.SyncStatus;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.platform.outbox.OutboxService;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,10 +56,12 @@ class IngestResultReporterReconcileTest {
             30,
             365,
             Duration.ofHours(1),
+            Duration.ofHours(6),
             Duration.ofMinutes(15),
             Duration.ofHours(1),
             PostIngestMaterializationMode.SYNC,
             Duration.ofMinutes(15));
+    Clock clock = Clock.fixed(Instant.parse("2024-06-15T12:00:00Z"), ZoneOffset.UTC);
     reporter =
         new IngestResultReporter(
             outboxService,
@@ -64,7 +69,8 @@ class IngestResultReporterReconcileTest {
             jobExecutionRepository,
             new ObjectMapper(),
             props,
-            eventPublisher);
+            eventPublisher,
+            clock);
   }
 
   @Test

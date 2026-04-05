@@ -123,7 +123,7 @@ class PostIngestMaterializationMessageHandlerTest {
   }
 
   @Test
-  void should_skipFanOut_when_casFails() throws Exception {
+  void should_reconcileSyncState_when_casFails() throws Exception {
     JsonNode payload = objectMapper.readTree(
         "{\"jobExecutionId\":1,\"workspaceId\":2,\"connectionId\":3,\"syncScope\":\"FULL_SYNC\","
             + "\"ingestStatus\":\"COMPLETED\",\"completedDomains\":[],\"failedDomains\":[],"
@@ -147,5 +147,6 @@ class PostIngestMaterializationMessageHandlerTest {
 
     verify(resultReporter, never())
         .recordSuccessfulTerminalSyncLists(any(), anyLong(), any(), any());
+    verify(resultReporter).reconcileSyncingWhenNoActiveJob(3L);
   }
 }

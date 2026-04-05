@@ -1,6 +1,8 @@
 package io.datapulse.etl.domain;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,233 +29,259 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+/**
+ * Manages sync state transitions, outbox completion events, and error detail formatting.
+ *
+ * <p>Sync state CRUD (SYNCING → IDLE → ERROR) + outbox {@code ETL_SYNC_COMPLETED} +
+ * reconciliation of stuck SYNCING rows + error-detail JSON building.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class IngestResultReporter {
 
-    private final OutboxService outboxService;
-    private final MarketplaceSyncStateRepository syncStateRepository;
-    private final JobExecutionRepository jobExecutionRepository;
-    private final ObjectMapper objectMapper;
-    private final IngestProperties ingestProperties;
-    private final ApplicationEventPublisher eventPublisher;
+  private final OutboxService outboxService;
+  private final MarketplaceSyncStateRepository syncStateRepository;
+  private final JobExecutionRepository jobExecutionRepository;
+  private final ObjectMapper objectMapper;
+  private final IngestProperties ingestProperties;
+  private final ApplicationEventPublisher eventPublisher;
+  private final Clock clock;
 
-    public void updateSyncStateSyncing(long connectionId) {
-        List<MarketplaceSyncStateEntity> states =
-                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
-        OffsetDateTime now = OffsetDateTime.now();
-        for (MarketplaceSyncStateEntity state : states) {
-            state.setStatus(SyncStatus.SYNCING.name());
-            state.setLastSyncAt(now);
-            state.setErrorMessage(null);
-        }
-        syncStateRepository.saveAll(states);
-        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+  // ── Sync state transitions ────────────────────────────────────────────────
+
+  public void updateSyncStateSyncing(long connectionId) {
+    List<MarketplaceSyncStateEntity> states =
+        syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+    OffsetDateTime now = now();
+    for (MarketplaceSyncStateEntity state : states) {
+      state.setStatus(SyncStatus.SYNCING.name());
+      state.setLastSyncAt(now);
+      state.setNextScheduledAt(now.plus(ingestProperties.syncInterval()));
+      state.setErrorMessage(null);
     }
+    syncStateRepository.saveAll(states);
+    publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+  }
 
-    /**
-     * Terminal ingest success only: persists IDLE sync state, inserts {@code ETL_SYNC_COMPLETED} outbox row,
-     * then publishes {@link SyncStatusPushReason#ETL_JOB_COMPLETED}. Keeps UI invalidation aligned with
-     * completion fan-out; do not call without the outbox write.
-     */
-    public void recordSuccessfulTerminalSync(
-            JobExecutionRow job, long workspaceId, Map<EtlEventType, EventResult> results) {
-        List<String> completedDomains =
-                results.entrySet().stream()
-                        .filter(e -> e.getValue().isSuccess())
-                        .map(e -> e.getKey().name())
-                        .toList();
-        List<String> failedDomains =
-                results.entrySet().stream()
-                        .filter(e -> e.getValue().isFailed())
-                        .map(e -> e.getKey().name())
-                        .toList();
-        recordSuccessfulTerminalSyncLists(job, workspaceId, completedDomains, failedDomains);
+  public void updateSyncStateError(long connectionId, String errorMessage) {
+    List<MarketplaceSyncStateEntity> states =
+        syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+    OffsetDateTime now = now();
+    OffsetDateTime nextAttempt = now.plus(ingestProperties.syncNextAttemptAfterError());
+    for (MarketplaceSyncStateEntity state : states) {
+      state.setStatus(SyncStatus.ERROR.name());
+      state.setNextScheduledAt(nextAttempt);
+      if (errorMessage != null) {
+        state.setErrorMessage(
+            errorMessage.length() > 1000 ? errorMessage.substring(0, 1000) : errorMessage);
+      }
     }
+    syncStateRepository.saveAll(states);
+    publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+  }
 
-    /**
-     * Same as {@link #recordSuccessfulTerminalSync} but uses precomputed domain lists (e.g. async
-     * materialization handler that no longer has the full {@link EventResult} map).
-     */
-    public void recordSuccessfulTerminalSyncLists(
-            JobExecutionRow job,
-            long workspaceId,
-            List<String> completedDomains,
-            List<String> failedDomains) {
-        applySuccessfulSyncState(job.getConnectionId());
-        writeCompletionOutboxLists(job, workspaceId, completedDomains, failedDomains);
-        publishSyncHealthInvalidated(job.getConnectionId(), SyncStatusPushReason.ETL_JOB_COMPLETED);
+  // ── Terminal success (sync state + outbox + WS push) ──────────────────────
+
+  /**
+   * Terminal ingest success: persists IDLE sync state, inserts {@code ETL_SYNC_COMPLETED} outbox
+   * row, then publishes {@link SyncStatusPushReason#ETL_JOB_COMPLETED}. Call only inside the
+   * {@code MATERIALIZING → terminal} CAS transaction.
+   */
+  public void recordSuccessfulTerminalSync(
+      JobExecutionRow job, long workspaceId, Map<EtlEventType, EventResult> results) {
+    List<String> completedDomains =
+        results.entrySet().stream()
+            .filter(e -> e.getValue().isSuccess())
+            .map(e -> e.getKey().name())
+            .toList();
+    List<String> failedDomains =
+        results.entrySet().stream()
+            .filter(e -> e.getValue().isFailed())
+            .map(e -> e.getKey().name())
+            .toList();
+    recordSuccessfulTerminalSyncLists(job, workspaceId, completedDomains, failedDomains);
+  }
+
+  /**
+   * Same as {@link #recordSuccessfulTerminalSync} but uses precomputed domain lists (e.g. async
+   * materialization handler that no longer has the full {@link EventResult} map).
+   */
+  public void recordSuccessfulTerminalSyncLists(
+      JobExecutionRow job,
+      long workspaceId,
+      List<String> completedDomains,
+      List<String> failedDomains) {
+    applySuccessfulSyncState(job.getConnectionId());
+    writeCompletionOutbox(job, workspaceId, completedDomains, failedDomains);
+    publishSyncHealthInvalidated(job.getConnectionId(), SyncStatusPushReason.ETL_JOB_COMPLETED);
+  }
+
+  private void applySuccessfulSyncState(long connectionId) {
+    List<MarketplaceSyncStateEntity> states =
+        syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+    OffsetDateTime now = now();
+    for (MarketplaceSyncStateEntity state : states) {
+      state.setStatus(SyncStatus.IDLE.name());
+      state.setLastSuccessAt(now);
+      state.setNextScheduledAt(now.plus(ingestProperties.syncInterval()));
+      state.setErrorMessage(null);
     }
+    syncStateRepository.saveAll(states);
+  }
 
-    private void applySuccessfulSyncState(long connectionId) {
-        List<MarketplaceSyncStateEntity> states =
-                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
-        OffsetDateTime now = OffsetDateTime.now();
-        for (MarketplaceSyncStateEntity state : states) {
-            state.setStatus(SyncStatus.IDLE.name());
-            state.setLastSuccessAt(now);
-            state.setNextScheduledAt(now.plusHours(6));
-            state.setErrorMessage(null);
-        }
-        syncStateRepository.saveAll(states);
+  // ── Reconciliation ────────────────────────────────────────────────────────
+
+  /**
+   * Clears a stale UI state: after {@code job_execution} is no longer active (e.g. STALE) the DB
+   * can still have {@code marketplace_sync_state.status = SYNCING}. Downgrade SYNCING rows to IDLE
+   * when there is no PENDING/IN_PROGRESS/MATERIALIZING/RETRY_SCHEDULED job for the connection.
+   */
+  public void reconcileSyncingWhenNoActiveJob(long connectionId) {
+    if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
+      return;
     }
-
-    public void updateSyncStateError(long connectionId, String errorMessage) {
-        List<MarketplaceSyncStateEntity> states =
-                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
-        OffsetDateTime now = OffsetDateTime.now();
-        OffsetDateTime nextAttempt = now.plus(ingestProperties.syncNextAttemptAfterError());
-        for (MarketplaceSyncStateEntity state : states) {
-            state.setStatus(SyncStatus.ERROR.name());
-            state.setNextScheduledAt(nextAttempt);
-            if (errorMessage != null) {
-                state.setErrorMessage(
-                        errorMessage.length() > 1000 ? errorMessage.substring(0, 1000) : errorMessage);
-            }
-        }
-        syncStateRepository.saveAll(states);
-        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+    List<MarketplaceSyncStateEntity> states =
+        syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
+    boolean anySyncing =
+        states.stream().anyMatch(s -> SyncStatus.SYNCING.name().equals(s.getStatus()));
+    if (!anySyncing) {
+      return;
     }
-
-    /**
-     * Clears a stale UI state: after {@code job_execution} is no longer active (e.g. STALE) the DB
-     * can still have {@code marketplace_sync_state.status = SYNCING} because that flag is set when
-     * dispatch starts, not continuously updated. Downgrade SYNCING rows to IDLE when there is no
-     * PENDING/IN_PROGRESS/MATERIALIZING/RETRY_SCHEDULED job for the connection.
-     */
-    public void reconcileSyncingWhenNoActiveJob(long connectionId) {
-        if (jobExecutionRepository.existsActiveForConnection(connectionId)) {
-            return;
-        }
-        List<MarketplaceSyncStateEntity> states =
-                syncStateRepository.findAllByMarketplaceConnectionId(connectionId);
-        boolean anySyncing =
-                states.stream().anyMatch(s -> SyncStatus.SYNCING.name().equals(s.getStatus()));
-        if (!anySyncing) {
-            return;
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        for (MarketplaceSyncStateEntity state : states) {
-            if (SyncStatus.SYNCING.name().equals(state.getStatus())) {
-                state.setStatus(SyncStatus.IDLE.name());
-                state.setErrorMessage(null);
-                state.setNextScheduledAt(now);
-            }
-        }
-        syncStateRepository.saveAll(states);
-        log.warn(
-                "Cleared stuck SYNCING sync states (no active job): connectionId={}, rows={}",
-                connectionId,
-                states.size());
-        publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+    OffsetDateTime now = now();
+    for (MarketplaceSyncStateEntity state : states) {
+      if (SyncStatus.SYNCING.name().equals(state.getStatus())) {
+        state.setStatus(SyncStatus.IDLE.name());
+        state.setErrorMessage(null);
+        state.setNextScheduledAt(now);
+      }
     }
+    syncStateRepository.saveAll(states);
+    log.warn(
+        "Cleared stuck SYNCING sync states (no active job): connectionId={}, rows={}",
+        connectionId,
+        states.size());
+    publishSyncHealthInvalidated(connectionId, SyncStatusPushReason.STATE_CHANGED);
+  }
 
-    /** Runs {@link #reconcileSyncingWhenNoActiveJob(long)} for every connection that has SYNCING rows. */
-    public void reconcileAllConnectionsStuckInSyncingWithoutActiveJob() {
-        List<Long> connectionIds = syncStateRepository.findDistinctMarketplaceConnectionIdsWithSyncingStatus();
-        for (Long connectionId : connectionIds) {
-            reconcileSyncingWhenNoActiveJob(connectionId);
-        }
+  /** Runs {@link #reconcileSyncingWhenNoActiveJob(long)} for every connection with SYNCING rows. */
+  public void reconcileAllConnectionsStuckInSyncingWithoutActiveJob() {
+    List<Long> connectionIds =
+        syncStateRepository.findDistinctMarketplaceConnectionIdsWithSyncingStatus();
+    for (Long connectionId : connectionIds) {
+      reconcileSyncingWhenNoActiveJob(connectionId);
     }
+  }
 
-    private void writeCompletionOutboxLists(
-            JobExecutionRow job,
-            long workspaceId,
-            List<String> completedDomains,
-            List<String> failedDomains) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("workspaceId", workspaceId);
-        payload.put("connectionId", job.getConnectionId());
-        payload.put("jobExecutionId", job.getId());
-        payload.put("syncScope", job.getEventType());
-        payload.put("completedDomains", completedDomains);
-        payload.put("failedDomains", failedDomains);
+  // ── Outbox ────────────────────────────────────────────────────────────────
 
-        outboxService.createEvent(
-                OutboxEventType.ETL_SYNC_COMPLETED,
-                "job_execution",
-                job.getId(),
-                payload);
-    }
+  private void writeCompletionOutbox(
+      JobExecutionRow job,
+      long workspaceId,
+      List<String> completedDomains,
+      List<String> failedDomains) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("workspaceId", workspaceId);
+    payload.put("connectionId", job.getConnectionId());
+    payload.put("jobExecutionId", job.getId());
+    payload.put("syncScope", job.getEventType());
+    payload.put("completedDomains", completedDomains);
+    payload.put("failedDomains", failedDomains);
 
-    private void publishSyncHealthInvalidated(long connectionId, SyncStatusPushReason reason) {
-        eventPublisher.publishEvent(new ConnectionSyncHealthInvalidatedEvent(connectionId, reason));
-    }
+    outboxService.createEvent(
+        OutboxEventType.ETL_SYNC_COMPLETED,
+        "job_execution",
+        job.getId(),
+        payload);
+  }
 
-    public String buildErrorDetails(Map<EtlEventType, EventResult> results) {
-        Map<String, Object> details = new LinkedHashMap<>();
+  // ── WS push ───────────────────────────────────────────────────────────────
 
-        List<String> failedDomains = results.entrySet().stream()
-                .filter(e -> e.getValue().isFailed())
-                .map(e -> e.getKey().name())
-                .toList();
-        List<String> completedDomains = results.entrySet().stream()
-                .filter(e -> e.getValue().isSuccess())
-                .map(e -> e.getKey().name())
-                .toList();
+  private void publishSyncHealthInvalidated(long connectionId, SyncStatusPushReason reason) {
+    eventPublisher.publishEvent(new ConnectionSyncHealthInvalidatedEvent(connectionId, reason));
+  }
 
-        details.put("failed_domains", failedDomains);
-        details.put("completed_domains", completedDomains);
+  // ── Error detail formatting (pure functions) ──────────────────────────────
 
-        List<Map<String, Object>> errors = new ArrayList<>();
-        for (Map.Entry<EtlEventType, EventResult> entry : results.entrySet()) {
-            EventResult result = entry.getValue();
-            if (result.isFailed() || result.status() == EventResultStatus.COMPLETED_WITH_ERRORS) {
-                for (SubSourceResult ssr : result.subSourceResults()) {
-                    if (!ssr.errors().isEmpty()) {
-                        Map<String, Object> errorEntry = new LinkedHashMap<>();
-                        errorEntry.put("domain", entry.getKey().name());
-                        errorEntry.put("event", entry.getKey().name());
-                        errorEntry.put("error_type", "API_ERROR");
-                        errorEntry.put("message", ssr.errors().get(0));
-                        errorEntry.put("records_processed", ssr.recordsProcessed());
-                        errorEntry.put("records_skipped", ssr.recordsSkipped());
-                        errors.add(errorEntry);
-                    }
-                }
-            }
+  public String buildErrorDetails(Map<EtlEventType, EventResult> results) {
+    Map<String, Object> details = new LinkedHashMap<>();
+
+    List<String> failedDomains = results.entrySet().stream()
+        .filter(e -> e.getValue().isFailed())
+        .map(e -> e.getKey().name())
+        .toList();
+    List<String> completedDomains = results.entrySet().stream()
+        .filter(e -> e.getValue().isSuccess())
+        .map(e -> e.getKey().name())
+        .toList();
+
+    details.put("failed_domains", failedDomains);
+    details.put("completed_domains", completedDomains);
+
+    List<Map<String, Object>> errors = new ArrayList<>();
+    for (Map.Entry<EtlEventType, EventResult> entry : results.entrySet()) {
+      EventResult result = entry.getValue();
+      if (result.isFailed() || result.status() == EventResultStatus.COMPLETED_WITH_ERRORS) {
+        for (SubSourceResult ssr : result.subSourceResults()) {
+          if (!ssr.errors().isEmpty()) {
+            Map<String, Object> errorEntry = new LinkedHashMap<>();
+            errorEntry.put("domain", entry.getKey().name());
+            errorEntry.put("event", entry.getKey().name());
+            errorEntry.put("error_type", "API_ERROR");
+            errorEntry.put("message", ssr.errors().get(0));
+            errorEntry.put("records_processed", ssr.recordsProcessed());
+            errorEntry.put("records_skipped", ssr.recordsSkipped());
+            errors.add(errorEntry);
+          }
         }
-        details.put("errors", errors);
-
-        try {
-            return objectMapper.writeValueAsString(details);
-        } catch (JsonProcessingException e) {
-            return "{}";
-        }
+      }
     }
+    details.put("errors", errors);
 
-    /**
-     * Merges materialization failures into ingest {@code error_details} JSON. No-op when
-     * materialization fully succeeded.
-     */
-    public String mergeMaterializationIntoErrorDetails(
-            String ingestErrorDetailsJson, PostIngestMaterializationResult materialization) {
-        if (materialization.fullySucceeded()) {
-            return ingestErrorDetailsJson;
-        }
-        try {
-            ObjectNode root;
-            if (ingestErrorDetailsJson == null || ingestErrorDetailsJson.isBlank()) {
-                root = objectMapper.createObjectNode();
-            } else {
-                root = (ObjectNode) objectMapper.readTree(ingestErrorDetailsJson);
-            }
-            ObjectNode mat = objectMapper.createObjectNode();
-            mat.put("fully_succeeded", false);
-            if (materialization.fatalError() != null) {
-                mat.put("fatal_error", materialization.fatalError());
-            }
-            ArrayNode failed = objectMapper.createArrayNode();
-            for (String table : materialization.failedTables()) {
-                failed.add(table);
-            }
-            mat.set("failed_tables", failed);
-            root.set("materialization", mat);
-            return objectMapper.writeValueAsString(root);
-        } catch (Exception e) {
-            log.warn("Failed to merge materialization into error_details: {}", e.getMessage());
-            return ingestErrorDetailsJson;
-        }
+    try {
+      return objectMapper.writeValueAsString(details);
+    } catch (JsonProcessingException e) {
+      return "{}";
     }
+  }
+
+  /**
+   * Merges materialization failures into ingest {@code error_details} JSON. No-op when
+   * materialization fully succeeded.
+   */
+  public String mergeMaterializationIntoErrorDetails(
+      String ingestErrorDetailsJson, PostIngestMaterializationResult materialization) {
+    if (materialization.fullySucceeded()) {
+      return ingestErrorDetailsJson;
+    }
+    try {
+      ObjectNode root;
+      if (ingestErrorDetailsJson == null || ingestErrorDetailsJson.isBlank()) {
+        root = objectMapper.createObjectNode();
+      } else {
+        root = (ObjectNode) objectMapper.readTree(ingestErrorDetailsJson);
+      }
+      ObjectNode mat = objectMapper.createObjectNode();
+      mat.put("fully_succeeded", false);
+      if (materialization.fatalError() != null) {
+        mat.put("fatal_error", materialization.fatalError());
+      }
+      ArrayNode failed = objectMapper.createArrayNode();
+      for (String table : materialization.failedTables()) {
+        failed.add(table);
+      }
+      mat.set("failed_tables", failed);
+      root.set("materialization", mat);
+      return objectMapper.writeValueAsString(root);
+    } catch (Exception e) {
+      log.warn("Failed to merge materialization into error_details: {}", e.getMessage());
+      return ingestErrorDetailsJson;
+    }
+  }
+
+  // ── Internal ──────────────────────────────────────────────────────────────
+
+  private OffsetDateTime now() {
+    return OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+  }
 }
