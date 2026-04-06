@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "ag-grid-community/styles/ag-grid.css";
 @import "ag-grid-community/styles/ag-theme-alpine.css";
+@import "driver.js/dist/driver.css";
 
 :root {
   /* Colors — background */
@@ -288,4 +289,89 @@ router-outlet + * {
   width: 15px;
   height: 15px;
   stroke-width: 2;
+}
+
+/* Driver.js guided tour overrides */
+.dp-tour-popover.driver-popover {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  max-width: 360px;
+}
+
+.dp-tour-popover .driver-popover-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.dp-tour-popover .driver-popover-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dp-tour-popover .driver-popover-progress-text {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.dp-tour-popover .driver-popover-navigation-btns {
+  gap: 6px;
+}
+
+.dp-tour-popover .driver-popover-prev-btn {
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 5px 14px;
+  transition: background-color var(--transition-fast);
+}
+
+.dp-tour-popover .driver-popover-prev-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.dp-tour-popover .driver-popover-next-btn {
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 5px 14px;
+  transition: background-color var(--transition-fast);
+}
+
+.dp-tour-popover .driver-popover-next-btn:hover {
+  background: var(--accent-primary-hover);
+}
+
+.dp-tour-popover .driver-popover-close-btn {
+  color: var(--text-tertiary);
+}
+
+.dp-tour-popover .driver-popover-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.dp-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow,
+.dp-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow,
+.dp-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow,
+.dp-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-color: var(--border-default);
+}
+
+.dp-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow::after,
+.dp-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow::after,
+.dp-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow::after,
+.dp-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow::after {
+  background: var(--bg-primary);
 }

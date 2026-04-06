@@ -638,6 +638,9 @@ class PricingRunServiceTest {
   private PricingSignalSet signalSet(BigDecimal currentPrice, BigDecimal cogs, Integer stock) {
     return new PricingSignalSet(
         currentPrice, cogs, null, stock,
-        false, false, null, null, null, null, null, null, null, null);
+        false, false, null, null, null, null, null, null, null, null,
+        null, null, null,
+        null, null,
+        null, null, null);
   }
 }

@@ -110,6 +110,22 @@ const routes: Routes = [
           ),
         data: { breadcrumb: 'Блокировки' },
       },
+      {
+        path: 'competitors',
+        loadComponent: () =>
+          import('./competitors/competitors-page.component').then(
+            (m) => m.CompetitorsPageComponent,
+          ),
+        data: { breadcrumb: 'Конкуренты' },
+      },
+      {
+        path: 'insights',
+        loadComponent: () =>
+          import('./insights/insights-page.component').then(
+            (m) => m.InsightsPageComponent,
+          ),
+        data: { breadcrumb: 'Инсайты' },
+      },
     ],
   },
 ];

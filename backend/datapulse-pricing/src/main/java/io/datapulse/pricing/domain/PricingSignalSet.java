@@ -22,6 +22,14 @@ public record PricingSignalSet(
         OffsetDateTime lastPriceChangeAt,
         Integer priceReversalsInPeriod,
         OffsetDateTime dataFreshnessAt,
-        BigDecimal marketplaceMinPrice
+        BigDecimal marketplaceMinPrice,
+        BigDecimal salesVelocityShort,
+        BigDecimal salesVelocityLong,
+        BigDecimal daysOfCover,
+        BigDecimal frozenCapital,
+        String stockOutRisk,
+        BigDecimal competitorPrice,
+        String competitorTrustLevel,
+        OffsetDateTime competitorFreshnessAt
 ) {
 }

@@ -18,6 +18,7 @@
     </div>
     @if (rbac.canWritePolicies()) {
       <button
+        data-tour="policy-create-btn"
         (click)="navigateToCreate()"
         class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
       >
@@ -27,7 +28,7 @@
   </div>
 
   <!-- Filter Bar -->
-  <div class="border-b border-[var(--border-default)] px-4 py-2">
+  <div data-tour="policy-filter-bar" class="border-b border-[var(--border-default)] px-4 py-2">
     <dp-filter-bar
       [filters]="filterConfigs"
       [values]="filterValues()"
@@ -36,7 +37,7 @@
   </div>
 
   <!-- Content: table width follows content (w-max), scroll horizontally if needed -->
-  <div class="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+  <div data-tour="policy-table" class="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
     @if (policiesQuery.isError()) {
       <div class="p-6">
         <dp-empty-state

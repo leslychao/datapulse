@@ -249,6 +249,27 @@
             [form]="targetMarginGroup"
             [submitted]="submitted()"
           />
+        } @else if (strategyType === 'VELOCITY_ADAPTIVE') {
+          <dp-velocity-adaptive-form
+            [form]="velocityGroup"
+            [submitted]="submitted()"
+          />
+        } @else if (strategyType === 'STOCK_BALANCING') {
+          <dp-stock-balancing-form
+            [form]="stockGroup"
+            [submitted]="submitted()"
+          />
+        } @else if (strategyType === 'COMPETITOR_ANCHOR') {
+          <dp-competitor-anchor-form
+            [form]="competitorGroup"
+            [submitted]="submitted()"
+          />
+        } @else if (strategyType === 'COMPOSITE') {
+          <dp-composite-form
+            [components]="compositeComponents"
+            [roundingGroup]="compositeRoundingGroup"
+            [submitted]="submitted()"
+          />
         } @else {
           <!-- PRICE_CORRIDOR -->
           <div formGroupName="corridor" class="space-y-4">

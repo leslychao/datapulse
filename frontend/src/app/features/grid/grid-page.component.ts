@@ -11,6 +11,9 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { GridStore } from '@shared/stores/grid.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { GuidedTourService } from '@shared/services/guided-tour.service';
+import { TourProgressStore } from '@shared/stores/tour-progress.store';
+import { GRID_BASICS_TOUR } from './tours/grid-tours';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -82,7 +85,7 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
           }
         </div>
       } @else {
-        <div class="flex-1 overflow-hidden px-4 pt-2">
+        <div class="flex-1 overflow-hidden px-4 pt-2" data-tour="grid-table">
           <dp-data-grid
             [columnDefs]="columnDefs"
             [rowData]="rows()"
@@ -184,8 +187,14 @@ export class GridPageComponent implements OnInit, OnDestroy {
     !this.offersQuery.isPending() && this.rows().length === 0,
   );
 
+  private readonly tourService = inject(GuidedTourService);
+  private readonly tourProgress = inject(TourProgressStore);
+
   ngOnInit(): void {
     this.subscribeToGridUpdates();
+    if (GRID_BASICS_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(GRID_BASICS_TOUR.id)) {
+      setTimeout(() => this.tourService.start(GRID_BASICS_TOUR), 1200);
+    }
   }
 
   ngOnDestroy(): void {

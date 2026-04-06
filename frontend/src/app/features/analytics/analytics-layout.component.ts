@@ -64,7 +64,8 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
       }
 
       <!-- Section tabs -->
-      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4
+      <div data-tour="analytics-section-tabs"
+           class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4
                   [&>a:first-child]:pl-0">
         @for (tab of sectionTabs; track tab.path) {
           <a
@@ -81,7 +82,8 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
 
       <!-- Sub-navigation -->
       @if (subNavLinks().length > 0) {
-        <div class="flex gap-1 border-b border-[var(--border-default)] px-4
+        <div data-tour="analytics-sub-nav"
+             class="flex gap-1 border-b border-[var(--border-default)] px-4
                     [&>a:first-child]:pl-0">
           @for (link of subNavLinks(); track link.path) {
             <a

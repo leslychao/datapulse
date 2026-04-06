@@ -103,6 +103,14 @@ public final class MessageCodes {
     public static final String PRICING_DENOMINATOR_INVALID = "pricing.strategy.denominator_invalid";
     public static final String PRICING_CURRENT_PRICE_MISSING = "pricing.strategy.current_price_missing";
     public static final String PRICING_NO_CHANGE = "pricing.strategy.no_change";
+    public static final String PRICING_VELOCITY_INSUFFICIENT_DATA = "pricing.velocity.insufficient_data";
+    public static final String PRICING_VELOCITY_STABLE = "pricing.velocity.stable";
+    public static final String PRICING_STOCK_NO_DATA = "pricing.stock.no_data";
+    public static final String PRICING_STOCK_NORMAL = "pricing.stock.normal";
+    public static final String PRICING_COMPOSITE_ALL_SKIPPED = "pricing.composite.all_skipped";
+    public static final String PRICING_COMPETITOR_MISSING = "pricing.competitor.missing";
+    public static final String PRICING_COMPETITOR_STALE = "pricing.competitor.stale";
+    public static final String PRICING_COMPETITOR_UNTRUSTED = "pricing.competitor.untrusted";
 
     // --- Pricing: Policy API ---
     public static final String PRICING_POLICY_NOT_FOUND = "pricing.policy.not_found";
@@ -183,6 +191,13 @@ public final class MessageCodes {
     public static final String AD_RECOMMENDATION_NOT_WORTH = "advertising.recommendation.not_worth";
     public static final String AD_RECOMMENDATION_REDUCE_BID = "advertising.recommendation.reduce_bid";
     public static final String AD_RECOMMENDATION_INSUFFICIENT_DATA = "advertising.recommendation.insufficient_data";
+
+    // --- Pricing: AI Features ---
+    public static final String PRICING_ADVISOR_UNAVAILABLE = "pricing.advisor.unavailable";
+    public static final String PRICING_ADVISOR_GENERATION_FAILED = "pricing.advisor.generation_failed";
+    public static final String PRICING_NARRATIVE_UNAVAILABLE = "pricing.narrative.unavailable";
+    public static final String PRICING_INSIGHT_NOT_FOUND = "pricing.insight.not_found";
+    public static final String PRICING_INSIGHT_ALREADY_ACKNOWLEDGED = "pricing.insight.already_acknowledged";
 
     // --- Analytics ---
     public static final String ANALYTICS_CLICKHOUSE_UNAVAILABLE = "analytics.clickhouse.unavailable";

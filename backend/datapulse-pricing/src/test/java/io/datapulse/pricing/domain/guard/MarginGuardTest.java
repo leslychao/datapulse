@@ -164,6 +164,9 @@ class MarginGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), cogs, null, null,
         false, false,
-        null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null,
+        null, null, null,
+        null, null,
+        null, null, null);
   }
 }

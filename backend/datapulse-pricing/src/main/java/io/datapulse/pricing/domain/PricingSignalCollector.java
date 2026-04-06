@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import io.datapulse.pricing.persistence.PricingClickHouseReadRepository;
 import io.datapulse.pricing.persistence.PricingClickHouseReadRepository.CommissionResult;
 import io.datapulse.pricing.persistence.PricingDataReadRepository;
+import io.datapulse.pricing.persistence.PricingDataReadRepository.CompetitorSignalRow;
+import io.datapulse.pricing.persistence.PricingDataReadRepository.CurrentPriceRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,6 +34,8 @@ public class PricingSignalCollector {
     static final int COMMISSION_MIN_TRANSACTIONS = 5;
     static final int LOGISTICS_LOOKBACK_DAYS = 30;
     static final int RETURNS_LOOKBACK_DAYS = 30;
+    static final int VELOCITY_SHORT_WINDOW_DAYS = 7;
+    static final int VELOCITY_LONG_WINDOW_DAYS = 30;
 
     private final PricingDataReadRepository dataReadRepository;
     private final PricingClickHouseReadRepository clickHouseReadRepository;
@@ -42,13 +46,14 @@ public class PricingSignalCollector {
             return Collections.emptyMap();
         }
 
-        Map<Long, BigDecimal> prices = dataReadRepository.findCurrentPrices(offerIds);
+        Map<Long, CurrentPriceRow> priceRows = dataReadRepository.findCurrentPrices(offerIds);
         Map<Long, BigDecimal> cogs = dataReadRepository.findCurrentCogs(offerIds);
         Map<Long, Integer> stock = dataReadRepository.findTotalStock(offerIds);
         Set<Long> lockedIds = Set.copyOf(dataReadRepository.findLockedOfferIds(offerIds));
         OffsetDateTime dataFreshness = dataReadRepository.findDataFreshness(connectionId);
         Map<Long, OffsetDateTime> lastChanges =
                 dataReadRepository.findLatestChangeDecisions(offerIds);
+        Map<Long, String> offerStatuses = dataReadRepository.findOfferStatuses(offerIds);
 
         OffsetDateTime volatilitySince = OffsetDateTime.now().minusDays(volatilityPeriodDays);
         Map<Long, Integer> reversals =
@@ -61,13 +66,17 @@ public class PricingSignalCollector {
         Map<Long, Long> offerToSku = dataReadRepository.findSellerSkuIds(offerIds);
         ClickHouseSignals chSignals = collectClickHouseSignals(connectionId, offerToSku);
 
+        CompetitorSignals competitorSignals = collectCompetitorSignals(offerIds);
+
         Map<Long, PricingSignalSet> result = new HashMap<>();
 
         for (Long offerId : offerIds) {
+            CurrentPriceRow priceRow = priceRows.get(offerId);
+            CompetitorSignals.OfferCompetitor comp = competitorSignals.byOfferId.get(offerId);
             result.put(offerId, new PricingSignalSet(
-                    prices.get(offerId),
+                    priceRow != null ? priceRow.effectivePrice() : null,
                     cogs.get(offerId),
-                    null,
+                    offerStatuses.get(offerId),
                     stock.get(offerId),
                     lockedIds.contains(offerId),
                     promoActiveIds.contains(offerId),
@@ -78,7 +87,15 @@ public class PricingSignalCollector {
                     lastChanges.get(offerId),
                     reversals.get(offerId),
                     dataFreshness,
-                    null
+                    priceRow != null ? priceRow.minPrice() : null,
+                    chSignals.velocityShort.get(offerId),
+                    chSignals.velocityLong.get(offerId),
+                    chSignals.daysOfCover.get(offerId),
+                    chSignals.frozenCapital.get(offerId),
+                    chSignals.stockOutRisk.get(offerId),
+                    comp != null ? comp.price : null,
+                    comp != null ? comp.trustLevel : null,
+                    comp != null ? comp.observedAt : null
             ));
         }
 
@@ -88,10 +105,17 @@ public class PricingSignalCollector {
     record ClickHouseSignals(
             Map<Long, BigDecimal> commissions,
             Map<Long, BigDecimal> logistics,
-            Map<Long, BigDecimal> returnRates) {
+            Map<Long, BigDecimal> returnRates,
+            Map<Long, BigDecimal> velocityShort,
+            Map<Long, BigDecimal> velocityLong,
+            Map<Long, BigDecimal> daysOfCover,
+            Map<Long, BigDecimal> frozenCapital,
+            Map<Long, String> stockOutRisk) {
 
         static final ClickHouseSignals EMPTY =
-                new ClickHouseSignals(Map.of(), Map.of(), Map.of());
+                new ClickHouseSignals(
+                        Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
+                        Map.of(), Map.of(), Map.of());
     }
 
     /**
@@ -114,8 +138,21 @@ public class PricingSignalCollector {
                     collectLogistics(connectionId, offerToSku, sellerSkuIds);
             Map<Long, BigDecimal> returnRates =
                     collectReturnRates(connectionId, offerToSku, sellerSkuIds);
+            Map<Long, BigDecimal> velocityShort =
+                    collectVelocity(connectionId, offerToSku, sellerSkuIds,
+                            VELOCITY_SHORT_WINDOW_DAYS);
+            Map<Long, BigDecimal> velocityLong =
+                    collectVelocity(connectionId, offerToSku, sellerSkuIds,
+                            VELOCITY_LONG_WINDOW_DAYS);
+            var inventorySignals =
+                    collectInventorySignals(connectionId, offerToSku, sellerSkuIds);
 
-            return new ClickHouseSignals(commissions, logistics, returnRates);
+            return new ClickHouseSignals(
+                    commissions, logistics, returnRates,
+                    velocityShort, velocityLong,
+                    inventorySignals.daysOfCover,
+                    inventorySignals.frozenCapital,
+                    inventorySignals.stockOutRisk);
         } catch (Exception e) {
             log.warn("ClickHouse pricing signals query failed, using null fallback: {}",
                     e.getMessage());
@@ -207,6 +244,89 @@ public class PricingSignalCollector {
             }
         }
         return result;
+    }
+
+    private Map<Long, BigDecimal> collectVelocity(
+            long connectionId, Map<Long, Long> offerToSku,
+            List<Long> sellerSkuIds, int windowDays) {
+        Map<Long, BigDecimal> perSku =
+                clickHouseReadRepository.findSalesVelocity(
+                        connectionId, sellerSkuIds, windowDays);
+        return mapSkuResultsToOfferIds(offerToSku, perSku);
+    }
+
+    record InventorySignals(
+            Map<Long, BigDecimal> daysOfCover,
+            Map<Long, BigDecimal> frozenCapital,
+            Map<Long, String> stockOutRisk) {}
+
+    private InventorySignals collectInventorySignals(
+            long connectionId, Map<Long, Long> offerToSku,
+            List<Long> sellerSkuIds) {
+        Map<Long, PricingClickHouseReadRepository.InventoryResult> perSku =
+                clickHouseReadRepository.findDaysOfCover(connectionId, sellerSkuIds);
+
+        Map<Long, BigDecimal> daysOfCover = new HashMap<>();
+        Map<Long, BigDecimal> frozenCapital = new HashMap<>();
+        Map<Long, String> stockOutRisk = new HashMap<>();
+
+        for (var entry : offerToSku.entrySet()) {
+            long offerId = entry.getKey();
+            PricingClickHouseReadRepository.InventoryResult inv =
+                    perSku.get(entry.getValue());
+            if (inv != null) {
+                if (inv.avgDaysOfCover() != null) {
+                    daysOfCover.put(offerId, inv.avgDaysOfCover());
+                }
+                if (inv.frozenCapital() != null) {
+                    frozenCapital.put(offerId, inv.frozenCapital());
+                }
+                if (inv.stockOutRisk() != null) {
+                    stockOutRisk.put(offerId, inv.stockOutRisk());
+                }
+            }
+        }
+
+        return new InventorySignals(daysOfCover, frozenCapital, stockOutRisk);
+    }
+
+    record CompetitorSignals(Map<Long, CompetitorSignals.OfferCompetitor> byOfferId) {
+        static final CompetitorSignals EMPTY = new CompetitorSignals(Map.of());
+        record OfferCompetitor(BigDecimal price, String trustLevel,
+                               java.time.OffsetDateTime observedAt) {}
+    }
+
+    private CompetitorSignals collectCompetitorSignals(List<Long> offerIds) {
+        try {
+            List<CompetitorSignalRow> rows =
+                    dataReadRepository.findCompetitorSignals(offerIds);
+            if (rows.isEmpty()) {
+                return CompetitorSignals.EMPTY;
+            }
+
+            Map<Long, CompetitorSignals.OfferCompetitor> result = new HashMap<>();
+            for (CompetitorSignalRow row : rows) {
+                long oid = row.marketplaceOfferId();
+                CompetitorSignals.OfferCompetitor existing = result.get(oid);
+                boolean isTrusted = "TRUSTED".equals(row.trustLevel());
+
+                if (existing == null) {
+                    result.put(oid, new CompetitorSignals.OfferCompetitor(
+                            row.competitorPrice(), row.trustLevel(), row.observedAt()));
+                } else if (isTrusted && "CANDIDATE".equals(existing.trustLevel)) {
+                    result.put(oid, new CompetitorSignals.OfferCompetitor(
+                            row.competitorPrice(), row.trustLevel(), row.observedAt()));
+                } else if (isTrusted && row.competitorPrice().compareTo(existing.price) < 0) {
+                    result.put(oid, new CompetitorSignals.OfferCompetitor(
+                            row.competitorPrice(), row.trustLevel(), row.observedAt()));
+                }
+            }
+            return new CompetitorSignals(result);
+        } catch (Exception e) {
+            log.warn("Competitor signals query failed, using null fallback: {}",
+                    e.getMessage());
+            return CompetitorSignals.EMPTY;
+        }
     }
 
     private Map<Long, BigDecimal> collectAdCostRatios(List<Long> offerIds) {

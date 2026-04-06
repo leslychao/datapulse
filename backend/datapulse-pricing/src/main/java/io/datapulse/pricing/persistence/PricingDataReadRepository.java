@@ -33,7 +33,7 @@ public class PricingDataReadRepository {
             """;
 
     private static final String CURRENT_PRICES = """
-            SELECT cpc.marketplace_offer_id, cpc.price, cpc.discount_price
+            SELECT cpc.marketplace_offer_id, cpc.price, cpc.discount_price, cpc.min_price
             FROM canonical_price_current cpc
             WHERE cpc.marketplace_offer_id IN (:offerIds)
             """;
@@ -105,19 +105,21 @@ public class PricingDataReadRepository {
                         rs.getString("status")));
     }
 
-    public Map<Long, BigDecimal> findCurrentPrices(List<Long> offerIds) {
+    public Map<Long, CurrentPriceRow> findCurrentPrices(List<Long> offerIds) {
         if (offerIds.isEmpty()) {
             return Collections.emptyMap();
         }
         return jdbc.query(CURRENT_PRICES,
                 new MapSqlParameterSource("offerIds", offerIds),
                 rs -> {
-                    Map<Long, BigDecimal> result = new HashMap<>();
+                    Map<Long, CurrentPriceRow> result = new HashMap<>();
                     while (rs.next()) {
                         long offerId = rs.getLong("marketplace_offer_id");
                         BigDecimal discountPrice = rs.getBigDecimal("discount_price");
-                        BigDecimal price = discountPrice != null ? discountPrice : rs.getBigDecimal("price");
-                        result.put(offerId, price);
+                        BigDecimal effectivePrice =
+                                discountPrice != null ? discountPrice : rs.getBigDecimal("price");
+                        BigDecimal minPrice = rs.getBigDecimal("min_price");
+                        result.put(offerId, new CurrentPriceRow(effectivePrice, minPrice));
                     }
                     return result;
                 });
@@ -265,6 +267,12 @@ public class PricingDataReadRepository {
     ) {
     }
 
+    public record CurrentPriceRow(
+            BigDecimal effectivePrice,
+            BigDecimal minPrice
+    ) {
+    }
+
     private static final String FAILED_ACTIONS_COUNT = """
             SELECT count(*) FROM price_action pa
             WHERE pa.workspace_id = :workspaceId
@@ -314,6 +322,89 @@ public class PricingDataReadRepository {
                     }
                     return result;
                 });
+    }
+
+    private static final String OFFER_STATUSES = """
+            SELECT mo.id, mo.status
+            FROM marketplace_offer mo
+            WHERE mo.id IN (:offerIds)
+            """;
+
+    public Map<Long, String> findOfferStatuses(List<Long> offerIds) {
+        if (offerIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(OFFER_STATUSES,
+                new MapSqlParameterSource("offerIds", offerIds),
+                rs -> {
+                    Map<Long, String> result = new HashMap<>();
+                    while (rs.next()) {
+                        result.put(rs.getLong("id"), rs.getString("status"));
+                    }
+                    return result;
+                });
+    }
+
+    private static final String COMPETITOR_SIGNALS = """
+            SELECT
+                cm.marketplace_offer_id,
+                cm.trust_level,
+                co.competitor_price,
+                co.observed_at
+            FROM competitor_match cm
+            JOIN LATERAL (
+                SELECT co.competitor_price, co.observed_at
+                FROM competitor_observation co
+                WHERE co.competitor_match_id = cm.id
+                ORDER BY co.observed_at DESC
+                LIMIT 1
+            ) co ON true
+            WHERE cm.marketplace_offer_id IN (:offerIds)
+              AND cm.trust_level IN ('TRUSTED', 'CANDIDATE')
+            """;
+
+    public List<CompetitorSignalRow> findCompetitorSignals(List<Long> offerIds) {
+        if (offerIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return jdbc.query(COMPETITOR_SIGNALS,
+                new MapSqlParameterSource("offerIds", offerIds),
+                (rs, rowNum) -> new CompetitorSignalRow(
+                        rs.getLong("marketplace_offer_id"),
+                        rs.getString("trust_level"),
+                        rs.getBigDecimal("competitor_price"),
+                        rs.getObject("observed_at", OffsetDateTime.class)));
+    }
+
+    public record CompetitorSignalRow(
+            long marketplaceOfferId,
+            String trustLevel,
+            BigDecimal competitorPrice,
+            OffsetDateTime observedAt
+    ) {
+    }
+
+    private static final String OFFERS_BY_SKU_CODES = """
+            SELECT mo.id, mo.seller_sku_id, mo.category_id,
+                   mo.marketplace_connection_id, mo.status
+            FROM marketplace_offer mo
+            WHERE mo.workspace_id = :workspaceId
+              AND CAST(mo.seller_sku_id AS varchar) IN (:skuCodes)
+            """;
+
+    public List<OfferRow> findOffersBySkuCodes(long workspaceId, List<String> skuCodes) {
+        if (skuCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        var params = new MapSqlParameterSource("skuCodes", skuCodes)
+                .addValue("workspaceId", workspaceId);
+        return jdbc.query(OFFERS_BY_SKU_CODES, params,
+                (rs, rowNum) -> new OfferRow(
+                        rs.getLong("id"),
+                        rs.getLong("seller_sku_id"),
+                        rs.getObject("category_id", Long.class),
+                        rs.getLong("marketplace_connection_id"),
+                        rs.getString("status")));
     }
 
     private static final String SELLER_SKU_IDS = """

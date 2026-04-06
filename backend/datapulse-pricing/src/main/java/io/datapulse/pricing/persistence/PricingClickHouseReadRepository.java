@@ -231,6 +231,89 @@ public class PricingClickHouseReadRepository {
         });
     }
 
+    // ── sales velocity ────────────────────────────────────────────────────────
+
+    private static final String SALES_VELOCITY = """
+            SELECT seller_sku_id,
+                   toDecimal64(sum(quantity), 2) / :windowDays AS velocity
+            FROM fact_sales
+            WHERE connection_id = :connectionId
+              AND seller_sku_id IN (:sellerSkuIds)
+              AND sale_date >= today() - :windowDays
+            GROUP BY seller_sku_id
+            SETTINGS final = 1
+            """;
+
+    public Map<Long, BigDecimal> findSalesVelocity(
+            long connectionId, List<Long> sellerSkuIds, int windowDays) {
+        if (sellerSkuIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        var params = new MapSqlParameterSource()
+                .addValue("connectionId", connectionId)
+                .addValue("sellerSkuIds", sellerSkuIds)
+                .addValue("windowDays", windowDays);
+        return ch.query(SALES_VELOCITY, params, rs -> {
+            Map<Long, BigDecimal> result = new HashMap<>();
+            while (rs.next()) {
+                long skuId = rs.getLong("seller_sku_id");
+                if (skuId == 0) {
+                    continue;
+                }
+                result.put(skuId, rs.getBigDecimal("velocity"));
+            }
+            return result;
+        });
+    }
+
+    // ── days of cover + inventory signals ───────────────────────────────────
+
+    private static final String DAYS_OF_COVER = """
+            SELECT
+                m.seller_sku_id,
+                avg(m.days_of_cover) AS avg_days_of_cover,
+                sum(m.frozen_capital) AS frozen_capital,
+                anyLast(m.stock_out_risk) AS stock_out_risk
+            FROM mart_inventory_analysis AS m
+            WHERE m.connection_id = :connectionId
+              AND m.seller_sku_id IN (:sellerSkuIds)
+              AND m.analysis_date = (
+                  SELECT max(analysis_date) FROM mart_inventory_analysis
+                  WHERE connection_id = :connectionId
+              )
+            GROUP BY m.seller_sku_id
+            SETTINGS final = 1
+            """;
+
+    public record InventoryResult(
+            BigDecimal avgDaysOfCover,
+            BigDecimal frozenCapital,
+            String stockOutRisk) {}
+
+    public Map<Long, InventoryResult> findDaysOfCover(
+            long connectionId, List<Long> sellerSkuIds) {
+        if (sellerSkuIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        var params = new MapSqlParameterSource()
+                .addValue("connectionId", connectionId)
+                .addValue("sellerSkuIds", sellerSkuIds);
+        return ch.query(DAYS_OF_COVER, params, rs -> {
+            Map<Long, InventoryResult> result = new HashMap<>();
+            while (rs.next()) {
+                long skuId = rs.getLong("seller_sku_id");
+                if (skuId == 0) {
+                    continue;
+                }
+                result.put(skuId, new InventoryResult(
+                        rs.getBigDecimal("avg_days_of_cover"),
+                        rs.getBigDecimal("frozen_capital"),
+                        rs.getString("stock_out_risk")));
+            }
+            return result;
+        });
+    }
+
     // ── seller_sku_id → category (from dim_product) ─────────────────────────
 
     private static final String SKU_CATEGORIES = """

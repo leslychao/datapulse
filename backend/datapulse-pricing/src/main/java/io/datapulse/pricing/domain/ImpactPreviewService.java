@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +16,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.pricing.api.ImpactPreviewResponse;
 import io.datapulse.pricing.api.ImpactPreviewResponse.ImpactPreviewOfferResponse;
 import io.datapulse.pricing.api.ImpactPreviewResponse.ImpactPreviewSummary;
+import io.datapulse.pricing.api.ImpactPreviewResponse.NarrativeStatus;
 import io.datapulse.pricing.persistence.ImpactPreviewReadRepository;
 import io.datapulse.pricing.persistence.ImpactPreviewRow;
 import io.datapulse.pricing.persistence.PricePolicyEntity;
@@ -34,8 +37,11 @@ public class ImpactPreviewService {
   private static final BigDecimal HUNDRED = new BigDecimal("100");
   private static final BigDecimal ONE = BigDecimal.ONE;
 
+  private static final long NARRATIVE_TIMEOUT_SECONDS = 5;
+
   private final PricePolicyRepository policyRepository;
   private final ImpactPreviewReadRepository previewRepository;
+  private final ImpactNarrativeService narrativeService;
   private final ObjectMapper objectMapper;
 
   @Transactional
@@ -60,7 +66,8 @@ public class ImpactPreviewService {
         policyId, summary.totalOffers(), summary.changeCount(),
         summary.skipCount(), summary.holdCount());
 
-    return new ImpactPreviewResponse(summary, offersPage);
+    CompletableFuture<String> narrativeFuture = narrativeService.generateNarrative(summary);
+    return resolveNarrative(summary, offersPage, narrativeFuture);
   }
 
   private List<EvaluatedOffer> evaluateAll(List<ImpactPreviewRow> rows,
@@ -87,6 +94,8 @@ public class ImpactPreviewService {
       case TARGET_MARGIN -> evaluateTargetMargin(row, policy);
       case PRICE_CORRIDOR -> evaluatePriceCorridor(row, policy);
       case MANUAL_OVERRIDE -> EvaluatedOffer.skip(row, MessageCodes.PRICING_PREVIEW_MANUAL_OVERRIDE);
+      case VELOCITY_ADAPTIVE, STOCK_BALANCING, COMPOSITE, COMPETITOR_ANCHOR ->
+          EvaluatedOffer.hold(row, MessageCodes.PRICING_NO_CHANGE);
     };
   }
 
@@ -293,6 +302,23 @@ public class ImpactPreviewService {
       case "SKIP" -> 2;
       default -> 3;
     };
+  }
+
+  private ImpactPreviewResponse resolveNarrative(
+      ImpactPreviewSummary summary,
+      Page<ImpactPreviewOfferResponse> offersPage,
+      CompletableFuture<String> narrativeFuture) {
+    try {
+      String narrative = narrativeFuture.get(NARRATIVE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      if (narrative != null) {
+        return new ImpactPreviewResponse(summary, offersPage,
+            narrative, NarrativeStatus.READY);
+      }
+    } catch (Exception e) {
+      log.debug("Narrative generation timed out or failed: {}", e.getMessage());
+    }
+    return new ImpactPreviewResponse(summary, offersPage,
+        null, NarrativeStatus.UNAVAILABLE);
   }
 
   private <T> T parseStrategyParams(String json, Class<T> type) {

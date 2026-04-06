@@ -46,7 +46,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
   host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
-      <div class="border-b border-[var(--border-default)] px-4 py-2">
+      <div data-tour="decisions-filter-bar" class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
           [values]="filterValues()"
@@ -54,7 +54,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
         />
       </div>
 
-      <div class="flex-1 px-4 py-2">
+      <div data-tour="decisions-grid" class="flex-1 px-4 py-2">
         @if (decisionsQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.decisions.error' | translate"

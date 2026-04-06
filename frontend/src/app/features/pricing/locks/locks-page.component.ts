@@ -63,6 +63,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
         </h2>
         @if (rbac.canManageLocks()) {
           <button
+            data-tour="locks-create-btn"
             (click)="showCreateForm.set(true)"
             class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
           >
@@ -149,7 +150,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       </div>
 
       <!-- Data Grid -->
-      <div class="flex-1 px-4 py-2">
+      <div data-tour="locks-grid" class="flex-1 px-4 py-2">
         @if (locksQuery.isError()) {
           <dp-empty-state
             [message]="'pricing.locks.error' | translate"

@@ -33,7 +33,12 @@ class PricingSignalSetTest {
           now.minusHours(5),
           2,
           now,
-          new BigDecimal("50"));
+          new BigDecimal("50"),
+          new BigDecimal("3.5"),
+          new BigDecimal("2.1"),
+          new BigDecimal("45"),
+          null, null,
+          null, null, null);
 
       assertThat(signals.currentPrice()).isEqualByComparingTo(new BigDecimal("1000"));
       assertThat(signals.cogs()).isEqualByComparingTo(new BigDecimal("400"));
@@ -49,6 +54,9 @@ class PricingSignalSetTest {
       assertThat(signals.priceReversalsInPeriod()).isEqualTo(2);
       assertThat(signals.dataFreshnessAt()).isEqualTo(now);
       assertThat(signals.marketplaceMinPrice()).isEqualByComparingTo(new BigDecimal("50"));
+      assertThat(signals.salesVelocityShort()).isEqualByComparingTo(new BigDecimal("3.5"));
+      assertThat(signals.salesVelocityLong()).isEqualByComparingTo(new BigDecimal("2.1"));
+      assertThat(signals.daysOfCover()).isEqualByComparingTo(new BigDecimal("45"));
     }
   }
 
@@ -62,7 +70,10 @@ class PricingSignalSetTest {
       PricingSignalSet signals = new PricingSignalSet(
           null, null, null, null,
           false, false,
-          null, null, null, null, null, null, null, null);
+          null, null, null, null, null, null, null, null,
+          null, null, null,
+          null, null,
+          null, null, null);
 
       assertThat(signals.currentPrice()).isNull();
       assertThat(signals.cogs()).isNull();
@@ -78,6 +89,9 @@ class PricingSignalSetTest {
       assertThat(signals.priceReversalsInPeriod()).isNull();
       assertThat(signals.dataFreshnessAt()).isNull();
       assertThat(signals.marketplaceMinPrice()).isNull();
+      assertThat(signals.salesVelocityShort()).isNull();
+      assertThat(signals.salesVelocityLong()).isNull();
+      assertThat(signals.daysOfCover()).isNull();
     }
   }
 
@@ -90,10 +104,16 @@ class PricingSignalSetTest {
     void should_beEqual_when_sameValues() {
       PricingSignalSet a = new PricingSignalSet(
           new BigDecimal("100"), null, null, null,
-          false, false, null, null, null, null, null, null, null, null);
+          false, false, null, null, null, null, null, null, null, null,
+          null, null, null,
+          null, null,
+          null, null, null);
       PricingSignalSet b = new PricingSignalSet(
           new BigDecimal("100"), null, null, null,
-          false, false, null, null, null, null, null, null, null, null);
+          false, false, null, null, null, null, null, null, null, null,
+          null, null, null,
+          null, null,
+          null, null, null);
 
       assertThat(a).isEqualTo(b);
     }

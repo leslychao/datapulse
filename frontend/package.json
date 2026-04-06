@@ -27,6 +27,7 @@
     "ag-grid-angular": "^32.0.0",
     "ag-grid-community": "^32.0.0",
     "date-fns": "^4.0.0",
+    "driver.js": "^1.4.0",
     "echarts": "^6.0.0",
     "lucide-angular": "^1.0.0",
     "ngx-echarts": "^19.0.0",

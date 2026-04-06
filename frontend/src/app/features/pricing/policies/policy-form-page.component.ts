@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import {
   injectQuery,
@@ -24,12 +24,16 @@ import { LucideAngularModule, Info, AlertTriangle, Eye } from 'lucide-angular';
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import {
+  CompetitorAnchorParams,
+  CompositeParams,
   CreatePolicyRequest,
   PolicyExecutionMode,
   PriceCorridorParams,
   PricingPolicy,
+  StockBalancingParams,
   StrategyType,
   TargetMarginParams,
+  VelocityAdaptiveParams,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -41,6 +45,10 @@ import {
   collectPolicyValidationErrors,
 } from './policy-form.utils';
 import { TargetMarginFormComponent } from './target-margin-form.component';
+import { VelocityAdaptiveFormComponent } from './velocity-adaptive-form.component';
+import { StockBalancingFormComponent } from './stock-balancing-form.component';
+import { CompetitorAnchorFormComponent } from './competitor-anchor-form.component';
+import { CompositeFormComponent } from './composite-form.component';
 import { ConstraintsFormComponent } from './constraints-form.component';
 import { GuardConfigFormComponent } from './guard-config-form.component';
 import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
@@ -54,6 +62,10 @@ import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
     TranslatePipe,
     LucideAngularModule,
     TargetMarginFormComponent,
+    VelocityAdaptiveFormComponent,
+    StockBalancingFormComponent,
+    CompetitorAnchorFormComponent,
+    CompositeFormComponent,
     ConstraintsFormComponent,
     GuardConfigFormComponent,
     ImpactPreviewModalComponent,
@@ -137,6 +149,26 @@ export class PolicyFormPageComponent {
       labelKey: 'pricing.policies.strategy.PRICE_CORRIDOR',
       descKey: 'pricing.form.tooltip.strategy_type.PRICE_CORRIDOR',
     },
+    {
+      value: 'VELOCITY_ADAPTIVE',
+      labelKey: 'pricing.policies.strategy.VELOCITY_ADAPTIVE',
+      descKey: 'pricing.form.tooltip.strategy_type.VELOCITY_ADAPTIVE',
+    },
+    {
+      value: 'STOCK_BALANCING',
+      labelKey: 'pricing.policies.strategy.STOCK_BALANCING',
+      descKey: 'pricing.form.tooltip.strategy_type.STOCK_BALANCING',
+    },
+    {
+      value: 'COMPOSITE',
+      labelKey: 'pricing.policies.strategy.COMPOSITE',
+      descKey: 'pricing.form.tooltip.strategy_type.COMPOSITE',
+    },
+    {
+      value: 'COMPETITOR_ANCHOR',
+      labelKey: 'pricing.policies.strategy.COMPETITOR_ANCHOR',
+      descKey: 'pricing.form.tooltip.strategy_type.COMPETITOR_ANCHOR',
+    },
   ];
 
   readonly executionModes: {
@@ -215,14 +247,37 @@ export class PolicyFormPageComponent {
 
   readonly targetMarginGroup = this.form.get('targetMargin') as FormGroup;
   readonly corridorGroup = this.form.get('corridor') as FormGroup;
+  readonly velocityGroup = this.form.get('velocity') as FormGroup;
+  readonly stockGroup = this.form.get('stock') as FormGroup;
+  readonly competitorGroup = this.form.get('competitor') as FormGroup;
+  readonly compositeComponents = this.form.get('compositeComponents') as FormArray;
+  readonly compositeRoundingGroup = this.form.get('compositeRounding') as FormGroup;
+
+  private readonly strategyFormGroups: Record<string, string> = {
+    TARGET_MARGIN: 'targetMargin',
+    PRICE_CORRIDOR: 'corridor',
+    VELOCITY_ADAPTIVE: 'velocity',
+    STOCK_BALANCING: 'stock',
+    COMPETITOR_ANCHOR: 'competitor',
+  };
 
   onStrategyTypeChange(): void {
-    if (this.strategyType === 'TARGET_MARGIN') {
-      this.form.get('targetMargin')!.enable();
-      this.form.get('corridor')!.disable();
+    const active = this.strategyFormGroups[this.strategyType];
+    for (const [, groupName] of Object.entries(this.strategyFormGroups)) {
+      const group = this.form.get(groupName);
+      if (group) {
+        if (groupName === active) {
+          group.enable();
+        } else {
+          group.disable();
+        }
+      }
+    }
+    const isComposite = this.strategyType === 'COMPOSITE';
+    if (isComposite) {
+      this.compositeRoundingGroup.enable();
     } else {
-      this.form.get('targetMargin')!.disable();
-      this.form.get('corridor')!.enable();
+      this.compositeRoundingGroup.disable();
     }
   }
 
@@ -327,7 +382,58 @@ export class PolicyFormPageComponent {
     if (policy.strategyType === 'TARGET_MARGIN') {
       const params = policy.strategyParams as TargetMarginParams;
       this.form.get('targetMargin')!.patchValue(params);
-    } else {
+    } else if (policy.strategyType === 'VELOCITY_ADAPTIVE') {
+      const params = policy.strategyParams as VelocityAdaptiveParams;
+      this.form.get('velocity')!.patchValue({
+        decelerationThreshold: params.decelerationThreshold != null ? Math.round(params.decelerationThreshold * 100) : 70,
+        accelerationThreshold: params.accelerationThreshold != null ? Math.round(params.accelerationThreshold * 100) : 130,
+        decelerationDiscountPct: params.decelerationDiscountPct != null ? Math.round(params.decelerationDiscountPct * 100) : 5,
+        accelerationMarkupPct: params.accelerationMarkupPct != null ? Math.round(params.accelerationMarkupPct * 100) : 3,
+        minBaselineSales: params.minBaselineSales ?? 10,
+        velocityWindowShortDays: params.velocityWindowShortDays ?? 7,
+        velocityWindowLongDays: params.velocityWindowLongDays ?? 30,
+        roundingStep: params.roundingStep,
+        roundingDirection: params.roundingDirection,
+      });
+    } else if (policy.strategyType === 'STOCK_BALANCING') {
+      const params = policy.strategyParams as StockBalancingParams;
+      this.form.get('stock')!.patchValue({
+        criticalDaysOfCover: params.criticalDaysOfCover ?? 7,
+        overstockDaysOfCover: params.overstockDaysOfCover ?? 60,
+        stockoutMarkupPct: params.stockoutMarkupPct != null ? Math.round(params.stockoutMarkupPct * 100) : 5,
+        overstockDiscountFactor: params.overstockDiscountFactor != null ? Math.round(params.overstockDiscountFactor * 100) : 10,
+        maxDiscountPct: params.maxDiscountPct != null ? Math.round(params.maxDiscountPct * 100) : 20,
+        leadTimeDays: params.leadTimeDays ?? 14,
+        roundingStep: params.roundingStep,
+        roundingDirection: params.roundingDirection,
+      });
+    } else if (policy.strategyType === 'COMPETITOR_ANCHOR') {
+      const params = policy.strategyParams as CompetitorAnchorParams;
+      this.form.get('competitor')!.patchValue({
+        positionFactor: params.positionFactor ?? 1.0,
+        minMarginPct: params.minMarginPct != null ? Math.round(params.minMarginPct * 100) : 10,
+        aggregation: params.aggregation ?? 'MIN',
+        useMarginFloor: params.useMarginFloor ?? true,
+        roundingStep: params.roundingStep,
+        roundingDirection: params.roundingDirection,
+      });
+    } else if (policy.strategyType === 'COMPOSITE') {
+      const params = policy.strategyParams as CompositeParams;
+      this.compositeComponents.clear();
+      for (const comp of params.components ?? []) {
+        this.compositeComponents.push(
+          this.fb.group({
+            strategyType: [comp.strategyType],
+            weight: [comp.weight],
+            strategyParams: [comp.strategyParams],
+          }),
+        );
+      }
+      this.compositeRoundingGroup.patchValue({
+        roundingStep: params.roundingStep,
+        roundingDirection: params.roundingDirection,
+      });
+    } else if (policy.strategyType === 'PRICE_CORRIDOR') {
       const params = policy.strategyParams as PriceCorridorParams;
       this.form.get('corridor')!.patchValue(params);
     }

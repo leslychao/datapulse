@@ -1,7 +1,14 @@
 import { MarketplaceType, Page } from './connection.model';
 import { ExecutionMode } from './offer.model';
 
-export type StrategyType = 'TARGET_MARGIN' | 'PRICE_CORRIDOR';
+export type StrategyType =
+  | 'TARGET_MARGIN'
+  | 'PRICE_CORRIDOR'
+  | 'VELOCITY_ADAPTIVE'
+  | 'STOCK_BALANCING'
+  | 'COMPOSITE'
+  | 'COMPETITOR_ANCHOR'
+  | 'MANUAL_OVERRIDE';
 export type PolicyStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
 export type PolicyExecutionMode = 'RECOMMENDATION' | 'SEMI_AUTO' | 'FULL_AUTO' | 'SIMULATED';
 export type CommissionSource = 'AUTO' | 'MANUAL' | 'AUTO_WITH_MANUAL_FALLBACK';
@@ -30,6 +37,60 @@ export interface PriceCorridorParams {
   corridorMaxPrice: number | null;
 }
 
+export interface VelocityAdaptiveParams {
+  decelerationThreshold: number | null;
+  accelerationThreshold: number | null;
+  decelerationDiscountPct: number | null;
+  accelerationMarkupPct: number | null;
+  minBaselineSales: number | null;
+  velocityWindowShortDays: number | null;
+  velocityWindowLongDays: number | null;
+  roundingStep: number;
+  roundingDirection: RoundingDirection;
+}
+
+export interface StockBalancingParams {
+  criticalDaysOfCover: number | null;
+  overstockDaysOfCover: number | null;
+  stockoutMarkupPct: number | null;
+  overstockDiscountFactor: number | null;
+  maxDiscountPct: number | null;
+  leadTimeDays: number | null;
+  roundingStep: number;
+  roundingDirection: RoundingDirection;
+}
+
+export type CompetitorPriceAggregation = 'MIN' | 'MEDIAN' | 'AVG';
+
+export interface CompetitorAnchorParams {
+  positionFactor: number | null;
+  minMarginPct: number | null;
+  aggregation: CompetitorPriceAggregation;
+  useMarginFloor: boolean;
+  roundingStep: number;
+  roundingDirection: RoundingDirection;
+}
+
+export interface CompositeComponentConfig {
+  strategyType: StrategyType;
+  weight: number;
+  strategyParams: string;
+}
+
+export interface CompositeParams {
+  components: CompositeComponentConfig[];
+  roundingStep: number;
+  roundingDirection: RoundingDirection;
+}
+
+export type AnyStrategyParams =
+  | TargetMarginParams
+  | PriceCorridorParams
+  | VelocityAdaptiveParams
+  | StockBalancingParams
+  | CompetitorAnchorParams
+  | CompositeParams;
+
 export interface GuardConfig {
   marginGuardEnabled: boolean;
   frequencyGuardEnabled: boolean;
@@ -40,6 +101,9 @@ export interface GuardConfig {
   promoGuardEnabled: boolean;
   stockOutGuardEnabled: boolean;
   staleDataGuardHours: number;
+  competitorFreshnessGuardEnabled?: boolean;
+  competitorFreshnessHours?: number;
+  competitorTrustGuardEnabled?: boolean;
 }
 
 export interface PricingPolicySummary {
@@ -59,7 +123,7 @@ export interface PricingPolicy {
   id: number;
   name: string;
   strategyType: StrategyType;
-  strategyParams: TargetMarginParams | PriceCorridorParams;
+  strategyParams: AnyStrategyParams;
   executionMode: PolicyExecutionMode;
   status: PolicyStatus;
   priority: number;
@@ -78,7 +142,7 @@ export interface PricingPolicy {
 export interface CreatePolicyRequest {
   name: string;
   strategyType: StrategyType;
-  strategyParams: TargetMarginParams | PriceCorridorParams;
+  strategyParams: AnyStrategyParams;
   executionMode: PolicyExecutionMode;
   priority: number;
   approvalTimeoutHours: number;
@@ -246,4 +310,80 @@ export interface PricingDecisionFilter {
 export interface PricingLockFilter {
   connectionId?: number;
   search?: string;
+}
+
+export type MatchMethod = 'MANUAL' | 'AUTO';
+export type TrustLevel = 'TRUSTED' | 'CANDIDATE' | 'REJECTED';
+
+export interface CompetitorMatch {
+  id: number;
+  workspaceId: number;
+  marketplaceOfferId: number;
+  competitorName: string;
+  competitorListingUrl: string | null;
+  matchMethod: MatchMethod;
+  trustLevel: TrustLevel;
+  matchedBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompetitorObservation {
+  id: number;
+  competitorMatchId: number;
+  competitorPrice: number;
+  currency: string;
+  observedAt: string;
+  createdAt: string;
+}
+
+export interface CreateCompetitorMatchRequest {
+  marketplaceOfferId: number;
+  competitorName: string;
+  competitorListingUrl?: string;
+}
+
+export interface CreateCompetitorObservationRequest {
+  competitorPrice: number;
+  observedAt?: string;
+}
+
+export interface BulkCompetitorUploadResponse {
+  totalRows: number;
+  created: number;
+  skipped: number;
+  errors: string[];
+}
+
+export interface AdvisorResponse {
+  advice: string | null;
+  error: string | null;
+  generatedAt: string | null;
+  cachedUntil: string | null;
+}
+
+export type InsightType =
+  | 'PRICE_INCREASE_CANDIDATE'
+  | 'OVERSTOCK_LIQUIDATION'
+  | 'HIGH_DRR_ALERT'
+  | 'COMPETITOR_UNDERCUT';
+
+export type InsightSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export interface PricingInsight {
+  id: number;
+  workspaceId: number;
+  insightType: InsightType;
+  title: string;
+  body: string;
+  severity: InsightSeverity;
+  acknowledged: boolean;
+  createdAt: string;
+}
+
+export type NarrativeStatus = 'PENDING' | 'READY' | 'UNAVAILABLE';
+
+export interface ImpactPreviewResponseExtended extends ImpactPreviewResponse {
+  narrative: string | null;
+  narrativeStatus: NarrativeStatus;
 }

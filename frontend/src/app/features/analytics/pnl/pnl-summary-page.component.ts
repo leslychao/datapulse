@@ -23,6 +23,9 @@ import {
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { GuidedTourService } from '@shared/services/guided-tour.service';
+import { TourProgressStore } from '@shared/stores/tour-progress.store';
+import { PNL_OVERVIEW_TOUR } from '../tours/pnl-tours';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { KpiCardComponent, KpiAccent } from '@shared/components/kpi-card.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
@@ -57,7 +60,7 @@ interface KpiItem {
   template: `
     <div class="flex flex-col gap-5">
       <!-- Filter bar -->
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3" data-tour="pnl-period-filter">
         <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
         <select
           class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
@@ -92,7 +95,7 @@ interface KpiItem {
       } @else if (summaryQuery.isError()) {
         <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
       } @else {
-        <div class="flex flex-wrap gap-3">
+        <div class="flex flex-wrap gap-3" data-tour="pnl-kpi-cards">
           @for (kpi of kpiCards(); track kpi.labelKey) {
             <div class="cursor-pointer transition-opacity hover:opacity-80" (click)="navigateToKpi(kpi)">
               <dp-kpi-card
@@ -109,6 +112,7 @@ interface KpiItem {
 
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <dp-section-card
+            data-tour="pnl-trend-chart"
             [title]="'analytics.pnl.trend_title' | translate"
             class="lg:col-span-2"
           >
@@ -118,7 +122,7 @@ interface KpiItem {
               [loading]="trendQuery.isPending()"
             />
           </dp-section-card>
-          <dp-section-card [title]="'analytics.pnl.cost_breakdown' | translate">
+          <dp-section-card data-tour="pnl-cost-breakdown" [title]="'analytics.pnl.cost_breakdown' | translate">
             <dp-chart
               [options]="donutOptions()"
               height="200px"
@@ -133,6 +137,14 @@ export class PnlSummaryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly tourService = inject(GuidedTourService);
+  private readonly tourProgress = inject(TourProgressStore);
+
+  constructor() {
+    if (PNL_OVERVIEW_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PNL_OVERVIEW_TOUR.id)) {
+      setTimeout(() => this.tourService.start(PNL_OVERVIEW_TOUR), 1200);
+    }
+  }
   private readonly t = inject(TranslateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

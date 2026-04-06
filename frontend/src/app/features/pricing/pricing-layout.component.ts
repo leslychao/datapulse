@@ -16,7 +16,8 @@ interface PricingTab {
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe],
   template: `
     <div class="flex h-full min-h-0 flex-col">
-      <div class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4
+      <div data-tour="pricing-tabs"
+           class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4
                   [&>a:first-child]:pl-0">
         @for (tab of tabs; track tab.path) {
           <a
@@ -48,6 +49,8 @@ export class PricingLayoutComponent {
     { label: 'pricing.tabs.price_actions', path: 'price-actions' },
     { label: 'pricing.tabs.simulation', path: 'simulation' },
     { label: 'pricing.tabs.locks', path: 'locks' },
+    { label: 'pricing.tabs.competitors', path: 'competitors' },
+    { label: 'pricing.tabs.insights', path: 'insights' },
   ];
 
   getTabRoute(path: string): string[] {

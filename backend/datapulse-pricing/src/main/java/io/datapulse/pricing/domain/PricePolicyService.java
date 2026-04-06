@@ -273,6 +273,18 @@ public class PricePolicyService {
                         objectMapper.readValue(strategyParamsJson, TargetMarginParams.class));
                 case PRICE_CORRIDOR -> validatePriceCorridorParams(
                         objectMapper.readValue(strategyParamsJson, PriceCorridorParams.class));
+                case VELOCITY_ADAPTIVE -> validateVelocityAdaptiveParams(
+                        objectMapper.readValue(strategyParamsJson,
+                                VelocityAdaptiveParams.class));
+                case STOCK_BALANCING -> validateStockBalancingParams(
+                        objectMapper.readValue(strategyParamsJson,
+                                StockBalancingParams.class));
+                case COMPOSITE -> validateCompositeParams(
+                        objectMapper.readValue(strategyParamsJson,
+                                CompositeParams.class));
+                case COMPETITOR_ANCHOR -> validateCompetitorAnchorParams(
+                        objectMapper.readValue(strategyParamsJson,
+                                CompetitorAnchorParams.class));
                 case MANUAL_OVERRIDE -> throw new IllegalStateException("unreachable");
             }
         } catch (JsonProcessingException e) {
@@ -317,6 +329,183 @@ public class PricePolicyService {
                 && params.minPrice().compareTo(params.maxPrice()) > 0) {
             throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
                     "strategyParams.minPrice must be <= maxPrice");
+        }
+    }
+
+    private void validateStockBalancingParams(StockBalancingParams params) {
+        if (params.criticalDaysOfCover() != null
+                && (params.criticalDaysOfCover() < 1
+                || params.criticalDaysOfCover() > 30)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.criticalDaysOfCover must be in [1, 30]");
+        }
+        if (params.overstockDaysOfCover() != null
+                && (params.overstockDaysOfCover() < 30
+                || params.overstockDaysOfCover() > 365)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.overstockDaysOfCover must be in [30, 365]");
+        }
+        if (params.criticalDaysOfCover() != null && params.overstockDaysOfCover() != null
+                && params.criticalDaysOfCover() >= params.overstockDaysOfCover()) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.criticalDaysOfCover must be < overstockDaysOfCover");
+        }
+        if (params.stockoutMarkupPct() != null
+                && (params.stockoutMarkupPct().compareTo(
+                        new java.math.BigDecimal("0.01")) < 0
+                || params.stockoutMarkupPct().compareTo(
+                        new java.math.BigDecimal("0.30")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.stockoutMarkupPct must be in [0.01, 0.30]");
+        }
+        if (params.overstockDiscountFactor() != null
+                && (params.overstockDiscountFactor().compareTo(
+                        new java.math.BigDecimal("0.01")) < 0
+                || params.overstockDiscountFactor().compareTo(
+                        new java.math.BigDecimal("0.50")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.overstockDiscountFactor must be in [0.01, 0.50]");
+        }
+        if (params.maxDiscountPct() != null
+                && (params.maxDiscountPct().compareTo(
+                        new java.math.BigDecimal("0.01")) < 0
+                || params.maxDiscountPct().compareTo(
+                        new java.math.BigDecimal("0.50")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.maxDiscountPct must be in [0.01, 0.50]");
+        }
+        if (params.leadTimeDays() != null
+                && (params.leadTimeDays() < 1
+                || params.leadTimeDays() > 180)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.leadTimeDays must be in [1, 180]");
+        }
+        if (params.roundingStep() != null
+                && params.roundingStep()
+                        .compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.roundingStep must be > 0");
+        }
+    }
+
+    private void validateCompositeParams(CompositeParams params) {
+        if (params.components() == null || params.components().isEmpty()) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.components must not be empty");
+        }
+        for (int i = 0; i < params.components().size(); i++) {
+            CompositeParams.ComponentConfig comp = params.components().get(i);
+            if (comp.strategyType() == null) {
+                throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                        "strategyParams.components[%d].strategyType is required".formatted(i));
+            }
+            if (comp.strategyType() == PolicyType.COMPOSITE) {
+                throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                        "strategyParams.components[%d].strategyType cannot be COMPOSITE (no recursion)"
+                                .formatted(i));
+            }
+            if (comp.strategyType() == PolicyType.MANUAL_OVERRIDE) {
+                throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                        "strategyParams.components[%d].strategyType cannot be MANUAL_OVERRIDE"
+                                .formatted(i));
+            }
+            if (comp.weight() == null
+                    || comp.weight().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                        "strategyParams.components[%d].weight must be > 0".formatted(i));
+            }
+            if (comp.strategyParams() == null || comp.strategyParams().isBlank()) {
+                throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                        "strategyParams.components[%d].strategyParams is required".formatted(i));
+            }
+            validateStrategyParams(comp.strategyType(), comp.strategyParams());
+        }
+        if (params.roundingStep() != null
+                && params.roundingStep().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.roundingStep must be > 0");
+        }
+    }
+
+    private void validateCompetitorAnchorParams(CompetitorAnchorParams params) {
+        if (params.positionFactor() != null
+                && (params.positionFactor().compareTo(
+                        new java.math.BigDecimal("0.50")) < 0
+                || params.positionFactor().compareTo(
+                        new java.math.BigDecimal("2.00")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.positionFactor must be in [0.50, 2.00]");
+        }
+        if (params.minMarginPct() != null
+                && (params.minMarginPct().compareTo(java.math.BigDecimal.ZERO) < 0
+                || params.minMarginPct().compareTo(java.math.BigDecimal.ONE) >= 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.minMarginPct must be in [0, 1)");
+        }
+        if (params.roundingStep() != null
+                && params.roundingStep()
+                        .compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.roundingStep must be > 0");
+        }
+    }
+
+    private void validateVelocityAdaptiveParams(VelocityAdaptiveParams params) {
+        if (params.decelerationThreshold() != null
+                && (params.decelerationThreshold()
+                        .compareTo(java.math.BigDecimal.ZERO) <= 0
+                || params.decelerationThreshold()
+                        .compareTo(java.math.BigDecimal.ONE) >= 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.decelerationThreshold must be in (0, 1)");
+        }
+        if (params.accelerationThreshold() != null
+                && (params.accelerationThreshold()
+                        .compareTo(java.math.BigDecimal.ONE) <= 0
+                || params.accelerationThreshold().compareTo(
+                        new java.math.BigDecimal("5")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.accelerationThreshold must be in (1, 5]");
+        }
+        if (params.decelerationDiscountPct() != null
+                && (params.decelerationDiscountPct().compareTo(
+                        new java.math.BigDecimal("0.01")) < 0
+                || params.decelerationDiscountPct().compareTo(
+                        new java.math.BigDecimal("0.30")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.decelerationDiscountPct must be in [0.01, 0.30]");
+        }
+        if (params.accelerationMarkupPct() != null
+                && (params.accelerationMarkupPct().compareTo(
+                        new java.math.BigDecimal("0.01")) < 0
+                || params.accelerationMarkupPct().compareTo(
+                        new java.math.BigDecimal("0.20")) > 0)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.accelerationMarkupPct must be in [0.01, 0.20]");
+        }
+        if (params.minBaselineSales() != null
+                && (params.minBaselineSales() < 1
+                || params.minBaselineSales() > 1000)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.minBaselineSales must be in [1, 1000]");
+        }
+        if (params.velocityWindowShortDays() != null
+                && (params.velocityWindowShortDays() < 3
+                || params.velocityWindowShortDays() > 14)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.velocityWindowShortDays must be in [3, 14]");
+        }
+        if (params.velocityWindowLongDays() != null
+                && (params.velocityWindowLongDays() < 14
+                || params.velocityWindowLongDays() > 90)) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.velocityWindowLongDays must be in [14, 90]");
+        }
+        if (params.roundingStep() != null
+                && params.roundingStep()
+                        .compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
+                    "strategyParams.roundingStep must be > 0");
         }
     }
 }

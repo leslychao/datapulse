@@ -38,4 +38,7 @@ public interface PriceDecisionRepository extends JpaRepository<PriceDecisionEnti
             @Param("offerId") Long marketplaceOfferId,
             @Param("decisionType") DecisionType decisionType,
             @Param("since") OffsetDateTime since);
+
+    Optional<PriceDecisionEntity> findTopByMarketplaceOfferIdAndWorkspaceIdOrderByCreatedAtDesc(
+            Long marketplaceOfferId, Long workspaceId);
 }

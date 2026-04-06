@@ -62,3 +62,9 @@ databaseChangeLog:
   - include:
       file: changes/0024-fulfillment-type-columns.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0025-competitor-tables.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0026-pricing-insight-table.sql
+      relativeToChangelogFile: true

@@ -20,6 +20,9 @@ import { RbacService } from '@core/auth/rbac.service';
 import { PricingFilter, PricingPolicySummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
+import { GuidedTourService } from '@shared/services/guided-tour.service';
+import { TourProgressStore } from '@shared/stores/tour-progress.store';
+import { PRICING_POLICIES_TOUR } from '../tours/pricing-tours';
 import {
   FilterBarComponent,
   FilterConfig,
@@ -32,7 +35,10 @@ const POLICY_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'] as const;
 const EXECUTION_MODES = [
   'RECOMMENDATION', 'SEMI_AUTO', 'FULL_AUTO', 'SIMULATED',
 ] as const;
-const STRATEGY_TYPES = ['TARGET_MARGIN', 'PRICE_CORRIDOR'] as const;
+const STRATEGY_TYPES = [
+  'TARGET_MARGIN', 'PRICE_CORRIDOR', 'VELOCITY_ADAPTIVE',
+  'STOCK_BALANCING', 'COMPOSITE', 'COMPETITOR_ANCHOR',
+] as const;
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--status-info)',
@@ -92,6 +98,14 @@ export class PolicyListPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
+  private readonly tourService = inject(GuidedTourService);
+  private readonly tourProgress = inject(TourProgressStore);
+
+  constructor() {
+    if (PRICING_POLICIES_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PRICING_POLICIES_TOUR.id)) {
+      setTimeout(() => this.tourService.start(PRICING_POLICIES_TOUR), 1200);
+    }
+  }
   private readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
 

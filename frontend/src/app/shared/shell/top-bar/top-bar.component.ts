@@ -5,6 +5,7 @@ import { BreadcrumbsComponent } from './breadcrumbs.component';
 import { SearchTriggerComponent } from './search-trigger.component';
 import { NotificationBellComponent } from './notification-bell.component';
 import { UserMenuComponent } from './user-menu.component';
+import { TourCatalogComponent } from '@shared/components/guided-tour/tour-catalog.component';
 
 @Component({
   selector: 'dp-top-bar',
@@ -16,6 +17,7 @@ import { UserMenuComponent } from './user-menu.component';
     SearchTriggerComponent,
     NotificationBellComponent,
     UserMenuComponent,
+    TourCatalogComponent,
   ],
   template: `
     <header
@@ -29,6 +31,7 @@ import { UserMenuComponent } from './user-menu.component';
 
       <div class="flex items-center gap-2 px-3">
         <dp-search-trigger (searchRequested)="searchRequested.emit()" />
+        <dp-tour-catalog />
         <dp-notification-bell />
         <dp-user-menu />
       </div>

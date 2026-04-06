@@ -176,7 +176,10 @@ class AdCostGuardTest {
         return new PricingSignalSet(
                 currentPrice, null, null, null,
                 false, false,
-                null, null, null, adCostRatio, null, null, null, null);
+                null, null, null, adCostRatio, null, null, null, null,
+                null, null, null,
+                null, null,
+                null, null, null);
     }
 
     private GuardConfig adCostConfig(boolean enabled, BigDecimal thresholdPct) {

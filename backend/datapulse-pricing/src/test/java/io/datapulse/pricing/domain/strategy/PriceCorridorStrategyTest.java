@@ -219,7 +219,10 @@ class PriceCorridorStrategyTest {
   private PricingSignalSet signals(BigDecimal currentPrice) {
     return new PricingSignalSet(
         currentPrice, null, null, null, false, false,
-        null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null,
+        null, null, null,
+        null, null,
+        null, null, null);
   }
 
   private PolicySnapshot corridorPolicy(BigDecimal minPrice, BigDecimal maxPrice) {

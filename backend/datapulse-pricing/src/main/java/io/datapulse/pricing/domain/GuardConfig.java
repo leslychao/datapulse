@@ -19,6 +19,9 @@ public record GuardConfig(
         @JsonProperty("stale_data_guard_hours") Integer staleDataGuardHours,
         @JsonProperty("ad_cost_guard_enabled") Boolean adCostGuardEnabled,
         @JsonProperty("ad_cost_drr_threshold_pct") BigDecimal adCostDrrThresholdPct,
+        @JsonProperty("competitor_freshness_guard_enabled") Boolean competitorFreshnessGuardEnabled,
+        @JsonProperty("competitor_freshness_hours") Integer competitorFreshnessHours,
+        @JsonProperty("competitor_trust_guard_enabled") Boolean competitorTrustGuardEnabled,
         @JsonIgnore BigDecimal minMarginPct
 ) {
 
@@ -33,19 +36,22 @@ public record GuardConfig(
         this(marginGuardEnabled, frequencyGuardEnabled, frequencyGuardHours,
                 volatilityGuardEnabled, volatilityGuardReversals, volatilityGuardPeriodDays,
                 promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours,
-                adCostGuardEnabled, adCostDrrThresholdPct, null);
+                adCostGuardEnabled, adCostDrrThresholdPct,
+                null, null, null, null);
     }
 
     public static final GuardConfig DEFAULTS = new GuardConfig(
             true, true, 24, true, 3, 7, true, true, 24,
-            false, null, null
+            false, null, null, null, null, null
     );
 
     public GuardConfig withMinMarginPct(BigDecimal pct) {
         return new GuardConfig(marginGuardEnabled, frequencyGuardEnabled, frequencyGuardHours,
                 volatilityGuardEnabled, volatilityGuardReversals, volatilityGuardPeriodDays,
                 promoGuardEnabled, stockOutGuardEnabled, staleDataGuardHours,
-                adCostGuardEnabled, adCostDrrThresholdPct, pct);
+                adCostGuardEnabled, adCostDrrThresholdPct,
+                competitorFreshnessGuardEnabled, competitorFreshnessHours,
+                competitorTrustGuardEnabled, pct);
     }
 
     public BigDecimal effectiveMinMarginPct() {
@@ -94,5 +100,17 @@ public record GuardConfig(
 
     public BigDecimal effectiveAdCostDrrThreshold() {
         return adCostDrrThresholdPct != null ? adCostDrrThresholdPct : DEFAULT_AD_COST_DRR_THRESHOLD;
+    }
+
+    public boolean isCompetitorFreshnessGuardEnabled() {
+        return competitorFreshnessGuardEnabled != null && competitorFreshnessGuardEnabled;
+    }
+
+    public int effectiveCompetitorFreshnessHours() {
+        return competitorFreshnessHours != null ? competitorFreshnessHours : 72;
+    }
+
+    public boolean isCompetitorTrustGuardEnabled() {
+        return competitorTrustGuardEnabled != null && competitorTrustGuardEnabled;
     }
 }

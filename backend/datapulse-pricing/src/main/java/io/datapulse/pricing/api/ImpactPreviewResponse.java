@@ -6,8 +6,19 @@ import org.springframework.data.domain.Page;
 
 public record ImpactPreviewResponse(
     ImpactPreviewSummary summary,
-    Page<ImpactPreviewOfferResponse> offers
+    Page<ImpactPreviewOfferResponse> offers,
+    String narrative,
+    NarrativeStatus narrativeStatus
 ) {
+
+  public enum NarrativeStatus {
+    PENDING, READY, UNAVAILABLE
+  }
+
+  public ImpactPreviewResponse(ImpactPreviewSummary summary,
+                               Page<ImpactPreviewOfferResponse> offers) {
+    this(summary, offers, null, NarrativeStatus.UNAVAILABLE);
+  }
 
   public record ImpactPreviewSummary(
       int totalOffers,

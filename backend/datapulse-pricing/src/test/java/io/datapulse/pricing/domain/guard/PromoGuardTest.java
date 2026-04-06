@@ -74,7 +74,10 @@ class PromoGuardTest {
     return new PricingSignalSet(
         new BigDecimal("1000"), null, null, null,
         false, promoActive,
-        null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null,
+        null, null, null,
+        null, null,
+        null, null, null);
   }
 
   private GuardConfig disabledConfig() {

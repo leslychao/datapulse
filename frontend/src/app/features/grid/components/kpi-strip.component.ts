@@ -16,7 +16,7 @@ import { formatMoney, formatPercent } from '@shared/utils/format.utils';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display:contents' },
   template: `
-    <div class="flex flex-wrap gap-3 px-4 pt-3">
+    <div class="flex flex-wrap gap-3 px-4 pt-3" data-tour="grid-kpi-strip">
       <dp-kpi-card
         [label]="'grid.kpi.total_offers' | translate"
         [value]="totalOffers()"

@@ -26,12 +26,14 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
 
       <div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 py-1.5">
         <dp-search-input
+          data-tour="grid-search"
           class="mr-auto max-w-xs flex-1"
           [placeholder]="'grid.search_placeholder' | translate"
           (searchChange)="onSearch($event)"
         />
 
         <button
+          data-tour="grid-draft-toggle"
           (click)="gridStore.toggleDraftMode()"
           class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)] transition-colors"
           [class]="gridStore.draftMode()
@@ -51,6 +53,7 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
         </button>
 
         <button
+          data-tour="grid-export"
           (click)="exportClicked.emit()"
           class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
         >
@@ -61,7 +64,7 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
     </div>
 
     <!-- Filter bar -->
-    <div class="border-b border-[var(--border-default)] px-4 py-2">
+    <div class="border-b border-[var(--border-default)] px-4 py-2" data-tour="grid-filters">
       <dp-filter-bar
         [filters]="gridFilters"
         [values]="filterValues()"

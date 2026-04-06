@@ -19,7 +19,7 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex shrink-0 items-center' },
   template: `
-    <div class="flex items-center gap-0.5 overflow-x-auto">
+    <div class="flex items-center gap-0.5 overflow-x-auto" data-tour="grid-view-tabs">
       @for (view of viewsQuery.data() ?? []; track view.id) {
         <button
           (click)="selectView(view)"

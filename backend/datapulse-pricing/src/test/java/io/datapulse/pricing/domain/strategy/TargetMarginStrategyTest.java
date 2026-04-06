@@ -406,7 +406,10 @@ class TargetMarginStrategyTest {
           new BigDecimal("1000"), new BigDecimal("500"), null, null,
           false, false,
           new BigDecimal("0.10"), null, null, new BigDecimal("0.05"),
-          null, null, null, null);
+          null, null, null, null,
+          null, null, null,
+          null, null,
+          null, null, null);
 
       String params = """
           {
@@ -531,7 +534,10 @@ class TargetMarginStrategyTest {
       return new PricingSignalSet(
           currentPrice, cogs, null, null, false, false,
           avgCommissionPct, avgLogisticsPerUnit,
-          null, null, null, null, null, marketplaceMinPrice);
+          null, null,           null, null, null, marketplaceMinPrice,
+          null, null, null,
+          null, null,
+          null, null, null);
     }
   }
 }
