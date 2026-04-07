@@ -5,53 +5,68 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
-import { AnalyticsFilter, InventoryByProduct } from '@core/models';
+import { InventoryByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { DateRangePickerComponent } from '@shared/components/form/date-range-picker.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { formatMoney } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
+
+function resolveCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name;
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
 
 @Component({
   selector: 'dp-stock-history-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent, StockRiskBadgeComponent],
+  imports: [TranslatePipe, ChartComponent, DateRangePickerComponent, StockRiskBadgeComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <select
           class="w-64 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [value]="productId() ?? ''"
+          [value]="productIdStr()"
           (change)="onProductSelect($event)"
         >
           <option value="">{{ 'analytics.inventory.stock_history.select_product' | translate }}</option>
-          @for (p of productsQuery.data() ?? []; track p.sellerSkuId) {
-            <option [value]="p.sellerSkuId">{{ p.skuCode }} — {{ p.productName }}</option>
+          @for (p of productsQuery.data() ?? []; track p.productId) {
+            <option [value]="p.productId">{{ p.skuCode }} — {{ p.productName }}</option>
           }
         </select>
 
-        <input
-          type="date"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [value]="dateFrom()"
-          (change)="onDateFromChange($event)"
+        <dp-date-range-picker
+          [from]="dateFrom()"
+          [to]="dateTo()"
+          (fromChange)="dateFrom.set($event)"
+          (toChange)="dateTo.set($event)"
         />
 
-        <span class="text-sm text-[var(--text-tertiary)]">—</span>
-
-        <input
-          type="date"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [value]="dateTo()"
-          (change)="onDateToChange($event)"
-        />
+        @if (!filtersDefault()) {
+          <button type="button" (click)="onResetFilters()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
+        }
       </div>
 
       <!-- Chart -->
@@ -120,10 +135,34 @@ export class StockHistoryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly productId = signal<number | null>(null);
-  readonly dateFrom = signal('');
-  readonly dateTo = signal('');
+  readonly productIdStr = computed(() => this.productId()?.toString() ?? '');
+  readonly dateFrom = signal(daysAgo(30));
+  readonly dateTo = signal(daysAgo(0));
+
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'from', signal: this.dateFrom, defaultValue: daysAgo(30) },
+    { key: 'to', signal: this.dateTo, defaultValue: daysAgo(0) },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
+
+  constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    const qpProductId = this.route.snapshot.queryParams['productId'];
+    if (qpProductId) this.productId.set(Number(qpProductId));
+    syncFiltersToUrl(this.router, this.route, [
+      ...this.filterDefs,
+      { key: 'productId', signal: this.productIdStr as any, defaultValue: '' },
+    ]);
+  }
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+    this.productId.set(null);
+  }
 
   readonly productsQuery = injectQuery(() => ({
     queryKey: ['analytics', 'stock-history-products', this.wsStore.currentWorkspaceId()],
@@ -139,27 +178,27 @@ export class StockHistoryPageComponent {
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
-  private readonly historyFilter = computed<AnalyticsFilter>(() => {
-    const f: AnalyticsFilter = {};
-    const pid = this.productId();
-    if (pid) f.productId = pid;
-    const from = this.dateFrom();
-    if (from) f.from = from;
-    const to = this.dateTo();
-    if (to) f.to = to;
-    return f;
-  });
-
   readonly historyQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'stock-history', this.wsStore.currentWorkspaceId(), this.historyFilter()],
+    queryKey: [
+      'analytics', 'stock-history',
+      this.wsStore.currentWorkspaceId(),
+      this.productId(),
+      this.dateFrom(),
+      this.dateTo(),
+    ],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getStockHistory(
           this.wsStore.currentWorkspaceId()!,
-          this.historyFilter(),
+          this.productId()!,
+          this.dateFrom(),
+          this.dateTo(),
         ),
       ),
-    enabled: !!this.wsStore.currentWorkspaceId() && !!this.productId(),
+    enabled: !!this.wsStore.currentWorkspaceId()
+      && !!this.productId()
+      && !!this.dateFrom()
+      && !!this.dateTo(),
     staleTime: 60_000,
   }));
 
@@ -182,32 +221,38 @@ export class StockHistoryPageComponent {
     const points = this.historyQuery.data() ?? [];
     const dates = points.map((p) => p.date);
     const availableData = points.map((p) => p.available);
-    const reservedData = points.map((p) => p.reserved);
+    const reservedData = points.map((p) => p.reserved ?? 0);
+
+    const accentColor = resolveCssVar('--accent-primary');
+    const warningColor = resolveCssVar('--status-warning');
 
     return {
       grid: { left: 50, right: 20, top: 20, bottom: 30 },
       xAxis: {
         type: 'category',
         data: dates,
-        axisLabel: { color: 'var(--text-secondary)', fontSize: 11 },
-        axisLine: { lineStyle: { color: 'var(--border-default)' } },
+        axisLabel: { color: resolveCssVar('--text-secondary'), fontSize: 11 },
+        axisLine: { lineStyle: { color: resolveCssVar('--border-default') } },
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: 'var(--text-secondary)', fontSize: 11 },
-        splitLine: { lineStyle: { color: 'var(--border-subtle)' } },
+        axisLabel: { color: resolveCssVar('--text-secondary'), fontSize: 11 },
+        splitLine: { lineStyle: { color: resolveCssVar('--border-subtle') } },
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'var(--bg-primary)',
-        borderColor: 'var(--border-default)',
-        textStyle: { color: 'var(--text-primary)', fontSize: 12 },
+        backgroundColor: resolveCssVar('--bg-primary'),
+        borderColor: resolveCssVar('--border-default'),
+        textStyle: { color: resolveCssVar('--text-primary'), fontSize: 12 },
       },
       legend: {
-        data: [this.t.instant('analytics.inventory.chart.available'), this.t.instant('analytics.inventory.chart.reserved')],
+        data: [
+          this.t.instant('analytics.inventory.chart.available'),
+          this.t.instant('analytics.inventory.chart.reserved'),
+        ],
         top: 0,
         right: 0,
-        textStyle: { color: 'var(--text-secondary)', fontSize: 12 },
+        textStyle: { color: resolveCssVar('--text-secondary'), fontSize: 12 },
       },
       series: [
         {
@@ -215,8 +260,8 @@ export class StockHistoryPageComponent {
           type: 'line',
           step: 'end',
           data: availableData,
-          lineStyle: { color: 'var(--accent-primary)', width: 2 },
-          itemStyle: { color: 'var(--accent-primary)' },
+          lineStyle: { color: accentColor, width: 2 },
+          itemStyle: { color: accentColor },
           areaStyle: {
             color: {
               type: 'linear',
@@ -234,8 +279,8 @@ export class StockHistoryPageComponent {
           type: 'line',
           step: 'end',
           data: reservedData,
-          lineStyle: { color: 'var(--status-warning)', width: 2, type: 'dashed' },
-          itemStyle: { color: 'var(--status-warning)' },
+          lineStyle: { color: warningColor, width: 2, type: 'dashed' },
+          itemStyle: { color: warningColor },
           symbol: 'none',
         },
       ],
@@ -245,14 +290,6 @@ export class StockHistoryPageComponent {
   onProductSelect(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
     this.productId.set(value ? Number(value) : null);
-  }
-
-  onDateFromChange(event: Event): void {
-    this.dateFrom.set((event.target as HTMLInputElement).value);
-  }
-
-  onDateToChange(event: Event): void {
-    this.dateTo.set((event.target as HTMLInputElement).value);
   }
 
   formatMoney(value: number | null): string {

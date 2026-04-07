@@ -1,5 +1,6 @@
 package io.datapulse.analytics.domain;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -13,53 +14,69 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class InventoryAnalysisService {
 
-    private final InventoryReadRepository inventoryReadRepository;
-    private final WorkspaceConnectionRepository connectionRepository;
+  private final InventoryReadRepository inventoryReadRepository;
+  private final WorkspaceConnectionRepository connectionRepository;
 
-    public InventoryOverviewResponse getOverview(long workspaceId, InventoryFilter filter) {
-        List<Long> connectionIds = resolveConnectionIds(workspaceId);
-        if (connectionIds.isEmpty()) {
-            return new InventoryOverviewResponse(0, 0, 0, 0, java.math.BigDecimal.ZERO);
-        }
-        return inventoryReadRepository.findOverview(connectionIds, filter);
+  public InventoryOverviewResponse getOverview(long workspaceId, InventoryFilter filter) {
+    List<Long> connectionIds = resolveConnectionIds(workspaceId);
+    if (connectionIds.isEmpty()) {
+      return new InventoryOverviewResponse(
+          0, 0, 0, 0, BigDecimal.ZERO, List.of());
+    }
+    InventoryOverviewResponse overview =
+        inventoryReadRepository.findOverview(connectionIds, filter);
+    List<ProductInventoryResponse> topCritical =
+        inventoryReadRepository.findTopCritical(connectionIds);
+    return new InventoryOverviewResponse(
+        overview.totalSkus(),
+        overview.criticalCount(),
+        overview.warningCount(),
+        overview.normalCount(),
+        overview.frozenCapital(),
+        topCritical
+    );
+  }
+
+  public Page<ProductInventoryResponse> getByProduct(
+      long workspaceId, InventoryFilter filter, Pageable pageable) {
+    List<Long> connectionIds = resolveConnectionIds(workspaceId);
+    if (connectionIds.isEmpty()) {
+      return Page.empty(pageable);
     }
 
-    public Page<ProductInventoryResponse> getByProduct(long workspaceId, InventoryFilter filter,
-                                                        Pageable pageable) {
-        List<Long> connectionIds = resolveConnectionIds(workspaceId);
-        if (connectionIds.isEmpty()) {
-            return Page.empty(pageable);
-        }
-
-        String sortColumn = pageable.getSort().isSorted()
-                ? pageable.getSort().iterator().next().getProperty()
-                : "daysOfCover";
-
-        List<ProductInventoryResponse> content = inventoryReadRepository.findByProduct(
-                connectionIds, filter, sortColumn, pageable.getPageSize(), pageable.getOffset());
-        long total = inventoryReadRepository.countByProduct(connectionIds, filter);
-
-        return new PageImpl<>(content, pageable, total);
+    String sortColumn = "daysOfCover";
+    String sortDirection = "ASC";
+    if (pageable.getSort().isSorted()) {
+      Sort.Order order = pageable.getSort().iterator().next();
+      sortColumn = order.getProperty();
+      sortDirection = order.getDirection().name();
     }
 
-    public List<StockHistoryResponse> getStockHistory(long workspaceId, long productId,
-                                                       LocalDate from, LocalDate to) {
-        List<Long> connectionIds = resolveConnectionIds(workspaceId);
-        if (connectionIds.isEmpty()) {
-            return List.of();
-        }
-        return inventoryReadRepository.findStockHistory(connectionIds, productId, from, to);
-    }
+    List<ProductInventoryResponse> content = inventoryReadRepository.findByProduct(
+        connectionIds, filter, sortColumn, sortDirection,
+        pageable.getPageSize(), pageable.getOffset());
+    long total = inventoryReadRepository.countByProduct(connectionIds, filter);
 
-    private List<Long> resolveConnectionIds(long workspaceId) {
-        return connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
+    return new PageImpl<>(content, pageable, total);
+  }
+
+  public List<StockHistoryResponse> getStockHistory(
+      long workspaceId, long productId, LocalDate from, LocalDate to) {
+    List<Long> connectionIds = resolveConnectionIds(workspaceId);
+    if (connectionIds.isEmpty()) {
+      return List.of();
     }
+    return inventoryReadRepository.findStockHistory(connectionIds, productId, from, to);
+  }
+
+  private List<Long> resolveConnectionIds(long workspaceId) {
+    return connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
+  }
 }

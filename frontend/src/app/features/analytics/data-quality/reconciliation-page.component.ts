@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -14,7 +15,11 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReconciliationConnection } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
 
 type ReconStatus = ReconciliationConnection['status'];
 
@@ -40,19 +45,20 @@ const CONNECTION_PALETTE = [
   selector: 'dp-reconciliation-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent],
+  imports: [TranslatePipe, ChartComponent, MonthPickerComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
-        <input
-          type="month"
-          [value]="period()"
-          (change)="onPeriodChange($event)"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                 outline-none focus:border-[var(--accent-primary)]"
-        />
+        <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
+        @if (!filtersDefault()) {
+          <button type="button" (click)="onResetFilters()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
+        }
       </div>
 
       @if (reconQuery.isPending()) {
@@ -151,8 +157,24 @@ export class ReconciliationPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly period = signal(currentMonth());
+
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'period', signal: this.period, defaultValue: currentMonth() },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
+
+  constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+  }
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+  }
 
   readonly reconQuery = injectQuery(() => ({
     queryKey: ['analytics', 'reconciliation', this.wsStore.currentWorkspaceId(), this.period()],
@@ -274,10 +296,6 @@ export class ReconciliationPageComponent {
       ],
     };
   });
-
-  onPeriodChange(event: Event): void {
-    this.period.set((event.target as HTMLInputElement).value);
-  }
 
   statusColor(status: ReconStatus): string {
     return STATUS_COLORS[status] ?? 'var(--text-secondary)';

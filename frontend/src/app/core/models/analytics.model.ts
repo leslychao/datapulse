@@ -145,24 +145,31 @@ export interface InventoryOverview {
 }
 
 export interface InventoryByProduct {
+  connectionId: number;
+  sourcePlatform: string;
+  productId: number;
   sellerSkuId: number;
   skuCode: string;
   productName: string;
-  sourcePlatform: string;
+  warehouseId: number | null;
+  warehouseName: string | null;
+  analysisDate: string;
   available: number;
-  reserved: number;
-  daysOfCover: number;
+  reserved: number | null;
+  avgDailySales14d: number | null;
+  daysOfCover: number | null;
   stockOutRisk: StockOutRisk;
-  frozenCapital: number | null;
-  recommendedReplenishment: number;
-  avgDailySales14d: number;
   costPrice: number | null;
+  frozenCapital: number | null;
+  recommendedReplenishment: number | null;
 }
 
 export interface StockHistoryPoint {
   date: string;
   available: number;
-  reserved: number;
+  reserved: number | null;
+  warehouseId: number | null;
+  warehouseName: string | null;
 }
 
 export interface ReturnsSummary {

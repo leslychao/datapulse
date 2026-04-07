@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { LucideAngularModule, Calendar, ChevronLeft, ChevronRight } from 'lucide-angular';
-import { TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+
+import { currentMonth } from '@shared/utils/format.utils';
 
 @Component({
   selector: 'dp-month-picker',
   standalone: true,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="inline-flex items-center rounded-[var(--radius-md)] border border-[var(--border-default)]
@@ -21,13 +23,17 @@ import { TranslateService } from '@ngx-translate/core';
         <lucide-icon [img]="ChevronLeftIcon" [size]="16" />
       </button>
 
-      <span
-        class="flex items-center gap-2 border-x border-[var(--border-default)] px-3 py-1.5
-               text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]"
+      <button
+        type="button"
+        (click)="goToCurrentMonth()"
+        class="flex cursor-pointer items-center gap-2 border-x border-[var(--border-default)] px-3 py-1.5
+               text-[length:var(--text-sm)] font-medium text-[var(--text-primary)] transition-colors
+               hover:bg-[var(--bg-secondary)]"
+        [title]="'month_picker.today' | translate"
       >
         <lucide-icon [img]="CalendarIcon" [size]="14" class="text-[var(--text-tertiary)]" />
         {{ displayLabel() }}
-      </span>
+      </button>
 
       <button
         type="button"
@@ -63,5 +69,12 @@ export class MonthPickerComponent {
     const d = new Date(year, month - 1 + delta, 1);
     const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     this.valueChange.emit(next);
+  }
+
+  goToCurrentMonth(): void {
+    const now = currentMonth();
+    if (this.value() !== now) {
+      this.valueChange.emit(now);
+    }
   }
 }

@@ -1,11 +1,13 @@
 package io.datapulse.analytics.api;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record InventoryOverviewResponse(
         int totalSkus,
-        int criticalRiskCount,
-        int warningRiskCount,
-        int normalRiskCount,
-        BigDecimal totalFrozenCapital
+        int criticalCount,
+        int warningCount,
+        int normalCount,
+        BigDecimal frozenCapital,
+        List<ProductInventoryResponse> topCritical
 ) {}

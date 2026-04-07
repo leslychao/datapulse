@@ -118,11 +118,17 @@ export class AnalyticsApiService {
 
   getStockHistory(
     workspaceId: number,
-    filter: AnalyticsFilter,
+    productId: number,
+    from: string,
+    to: string,
   ): Observable<StockHistoryPoint[]> {
+    const params = new HttpParams()
+      .set('productId', productId)
+      .set('from', from)
+      .set('to', to);
     return this.http.get<StockHistoryPoint[]>(
       `${this.base}/workspaces/${workspaceId}/analytics/inventory/stock-history`,
-      { params: this.buildInventoryParams(filter) },
+      { params },
     );
   }
 
@@ -188,15 +194,6 @@ export class AnalyticsApiService {
   ): Observable<{ available: boolean }> {
     return this.http.get<{ available: boolean }>(
       `${this.base}/workspaces/${workspaceId}/analytics/data-quality/ch-health`,
-    );
-  }
-
-  getProvenanceRawUrl(
-    workspaceId: number,
-    entryId: number,
-  ): Observable<{ url: string }> {
-    return this.http.get<{ url: string }>(
-      `${this.base}/workspaces/${workspaceId}/analytics/provenance/entry/${entryId}/raw`,
     );
   }
 

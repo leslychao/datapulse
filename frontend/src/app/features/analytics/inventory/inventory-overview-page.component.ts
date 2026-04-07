@@ -16,6 +16,10 @@ import { ChartComponent } from '@shared/components/chart/chart.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { formatMoney } from '@shared/utils/format.utils';
 
+function resolveCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name;
+}
+
 @Component({
   selector: 'dp-inventory-overview-page',
   standalone: true,
@@ -126,7 +130,7 @@ import { formatMoney } from '@shared/utils/format.utils';
                 </tr>
               </thead>
               <tbody>
-                @for (item of topCritical(); track item.sellerSkuId) {
+                @for (item of topCritical(); track item.productId) {
                   <tr class="border-b border-[var(--border-subtle)] last:border-0">
                     <td class="py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]">
                       {{ item.skuCode }}
@@ -181,6 +185,10 @@ export class InventoryOverviewPageComponent {
 
   readonly riskChartOptions = computed<EChartsOption>(() => {
     const data = this.overview();
+    const successColor = resolveCssVar('--status-success');
+    const warningColor = resolveCssVar('--status-warning');
+    const errorColor = resolveCssVar('--status-error');
+
     return {
       grid: { left: 80, right: 40, top: 8, bottom: 8 },
       xAxis: { type: 'value', show: false },
@@ -191,7 +199,7 @@ export class InventoryOverviewPageComponent {
         axisTick: { show: false },
         axisLabel: {
           formatter: (v: string) => this.t.instant(`analytics.inventory.risk.${v.toLowerCase()}`),
-          color: 'var(--text-secondary)',
+          color: resolveCssVar('--text-secondary'),
           fontSize: 12,
         },
       },
@@ -201,22 +209,22 @@ export class InventoryOverviewPageComponent {
           data: [
             {
               value: data?.normalCount ?? 0,
-              itemStyle: { color: 'var(--status-success)', borderRadius: [0, 4, 4, 0] },
+              itemStyle: { color: successColor, borderRadius: [0, 4, 4, 0] },
             },
             {
               value: data?.warningCount ?? 0,
-              itemStyle: { color: 'var(--status-warning)', borderRadius: [0, 4, 4, 0] },
+              itemStyle: { color: warningColor, borderRadius: [0, 4, 4, 0] },
             },
             {
               value: data?.criticalCount ?? 0,
-              itemStyle: { color: 'var(--status-error)', borderRadius: [0, 4, 4, 0] },
+              itemStyle: { color: errorColor, borderRadius: [0, 4, 4, 0] },
             },
           ],
           barWidth: 20,
           label: {
             show: true,
             position: 'right',
-            color: 'var(--text-secondary)',
+            color: resolveCssVar('--text-secondary'),
             fontSize: 12,
           },
         },

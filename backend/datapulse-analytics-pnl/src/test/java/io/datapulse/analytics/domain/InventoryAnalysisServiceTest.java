@@ -1,12 +1,10 @@
 package io.datapulse.analytics.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,7 +40,7 @@ class InventoryAnalysisServiceTest {
   private InventoryAnalysisService service;
 
   private static final long WORKSPACE_ID = 1L;
-  private static final InventoryFilter EMPTY_FILTER = new InventoryFilter(null, null);
+  private static final InventoryFilter EMPTY_FILTER = new InventoryFilter(null, null, null);
 
   @Nested
   @DisplayName("getOverview")
@@ -57,10 +55,11 @@ class InventoryAnalysisServiceTest {
       InventoryOverviewResponse result = service.getOverview(WORKSPACE_ID, EMPTY_FILTER);
 
       assertThat(result.totalSkus()).isZero();
-      assertThat(result.criticalRiskCount()).isZero();
-      assertThat(result.warningRiskCount()).isZero();
-      assertThat(result.normalRiskCount()).isZero();
-      assertThat(result.totalFrozenCapital()).isEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.criticalCount()).isZero();
+      assertThat(result.warningCount()).isZero();
+      assertThat(result.normalCount()).isZero();
+      assertThat(result.frozenCapital()).isEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.topCritical()).isEmpty();
     }
 
     @Test
@@ -71,15 +70,25 @@ class InventoryAnalysisServiceTest {
           .thenReturn(connIds);
 
       var overview = new InventoryOverviewResponse(
-          150, 5, 20, 125, new BigDecimal("450000.00"));
+          150, 5, 20, 125, new BigDecimal("450000.00"), List.of());
       when(inventoryReadRepository.findOverview(connIds, EMPTY_FILTER))
           .thenReturn(overview);
+
+      var criticalProduct = new ProductInventoryResponse(
+          10L, "WB", 100L, 1L, "SKU001", "Critical Product",
+          1, "Moscow", LocalDate.of(2025, 1, 15),
+          0, 0, new BigDecimal("35.71"), new BigDecimal("0.0"),
+          "CRITICAL", new BigDecimal("250.00"), null, null);
+      when(inventoryReadRepository.findTopCritical(connIds))
+          .thenReturn(List.of(criticalProduct));
 
       InventoryOverviewResponse result = service.getOverview(WORKSPACE_ID, EMPTY_FILTER);
 
       assertThat(result.totalSkus()).isEqualTo(150);
-      assertThat(result.criticalRiskCount()).isEqualTo(5);
-      assertThat(result.totalFrozenCapital()).isEqualByComparingTo("450000.00");
+      assertThat(result.criticalCount()).isEqualTo(5);
+      assertThat(result.frozenCapital()).isEqualByComparingTo("450000.00");
+      assertThat(result.topCritical()).hasSize(1);
+      assertThat(result.topCritical().get(0).skuCode()).isEqualTo("SKU001");
     }
   }
 
@@ -100,43 +109,43 @@ class InventoryAnalysisServiceTest {
     }
 
     @Test
-    @DisplayName("should use 'daysOfCover' as default sort column")
+    @DisplayName("should use 'daysOfCover' ASC as default sort")
     void should_useDefaultSort_when_noSortProvided() {
       List<Long> connIds = List.of(10L);
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(connIds);
       when(inventoryReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(0L);
       when(inventoryReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
-          eq("daysOfCover"), eq(20), eq(0L)))
+          eq("daysOfCover"), eq("ASC"), eq(20), eq(0L)))
           .thenReturn(List.of());
 
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
 
-      verify(inventoryReadRepository).findByProduct(connIds, EMPTY_FILTER,
-          "daysOfCover", 20, 0L);
+      verify(inventoryReadRepository).findByProduct(
+          connIds, EMPTY_FILTER, "daysOfCover", "ASC", 20, 0L);
     }
 
     @Test
-    @DisplayName("should extract custom sort column from pageable")
+    @DisplayName("should extract custom sort column and direction from pageable")
     void should_extractSort_when_sortProvided() {
       List<Long> connIds = List.of(10L);
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(connIds);
       when(inventoryReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(0L);
       when(inventoryReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
-          eq("available"), eq(10), eq(0L)))
+          eq("available"), eq("DESC"), eq(10), eq(0L)))
           .thenReturn(List.of());
 
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER,
-          PageRequest.of(0, 10, Sort.by("available")));
+          PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "available")));
 
-      verify(inventoryReadRepository).findByProduct(connIds, EMPTY_FILTER,
-          "available", 10, 0L);
+      verify(inventoryReadRepository).findByProduct(
+          connIds, EMPTY_FILTER, "available", "DESC", 10, 0L);
     }
 
     @Test
-    @DisplayName("should calculate turnover from daysOfCover field")
-    void should_reflectTurnover_when_daysOfCoverProvided() {
+    @DisplayName("should return page with products when data exists")
+    void should_returnPage_when_dataExists() {
       List<Long> connIds = List.of(10L);
       when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
           .thenReturn(connIds);
@@ -153,7 +162,7 @@ class InventoryAnalysisServiceTest {
           200);
 
       when(inventoryReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
-          anyString(), eq(20), eq(0L)))
+          anyString(), anyString(), eq(20), eq(0L)))
           .thenReturn(List.of(product));
       when(inventoryReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(1L);
 

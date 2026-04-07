@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -14,7 +15,11 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { Granularity, PnlTrendPoint } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { DateRangePickerComponent } from '@shared/components/form/date-range-picker.component';
 import { formatMoney } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
 
 function daysAgo(n: number): string {
   const d = new Date();
@@ -32,33 +37,26 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
   selector: 'dp-pnl-trend-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent],
+  imports: [TranslatePipe, ChartComponent, DateRangePickerComponent],
   template: `
     <div class="flex flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
-        <label class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-          {{ 'form.date_from' | translate }}
-        </label>
-        <input
-          type="date"
-          [value]="dateFrom()"
-          (change)="onDateFromChange($event)"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                 outline-none focus:border-[var(--accent-primary)]"
+        <dp-date-range-picker
+          [from]="dateFrom()"
+          [to]="dateTo()"
+          (fromChange)="dateFrom.set($event)"
+          (toChange)="dateTo.set($event)"
         />
-        <label class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-          {{ 'form.date_to' | translate }}
-        </label>
-        <input
-          type="date"
-          [value]="dateTo()"
-          (change)="onDateToChange($event)"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                 outline-none focus:border-[var(--accent-primary)]"
-        />
+
+        @if (!filtersDefault()) {
+          <button type="button" (click)="onResetFilters()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
+        }
 
         <!-- Granularity switcher -->
         <div class="ml-auto flex rounded-[var(--radius-md)] border border-[var(--border-default)]">
@@ -128,11 +126,29 @@ export class PnlTrendPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly dateFrom = signal(daysAgo(90));
   readonly dateTo = signal(daysAgo(0));
   readonly granularity = signal<Granularity>('MONTHLY');
   readonly granularityOptions = GRANULARITY_OPTIONS;
+
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'from', signal: this.dateFrom, defaultValue: daysAgo(90) },
+    { key: 'to', signal: this.dateTo, defaultValue: daysAgo(0) },
+    { key: 'granularity', signal: this.granularity as any, defaultValue: 'MONTHLY' },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
+
+  constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+  }
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+  }
 
   readonly trendQuery = injectQuery(() => ({
     queryKey: [
@@ -198,16 +214,6 @@ export class PnlTrendPageComponent {
       ],
     };
   });
-
-  onDateFromChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.dateFrom.set(input.value);
-  }
-
-  onDateToChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.dateTo.set(input.value);
-  }
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);

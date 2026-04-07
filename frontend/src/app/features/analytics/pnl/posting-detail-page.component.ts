@@ -6,7 +6,7 @@ import {
   input,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -46,6 +46,7 @@ export class PostingDetailPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly t = inject(TranslateService);
 
   readonly postingId = input.required<string>();
   readonly measureColumns = MEASURE_COLUMNS;
@@ -74,17 +75,6 @@ export class PostingDetailPageComponent {
     return result;
   });
 
-  openProvenance(entryId: number): void {
-    lastValueFrom(
-      this.analyticsApi.getProvenanceRawUrl(
-        this.wsStore.currentWorkspaceId()!,
-        entryId,
-      ),
-    ).then((result) => {
-      window.open(result.url, '_blank');
-    });
-  }
-
   goBack(): void {
     this.router.navigate([
       '/workspace', this.wsStore.currentWorkspaceId(),
@@ -106,6 +96,12 @@ export class PostingDetailPageComponent {
   residualColorClass(value: number): string {
     if (value !== 0) return 'text-[var(--status-warning)]';
     return 'text-[var(--finance-zero)]';
+  }
+
+  entryTypeLabel(type: string): string {
+    const key = `analytics.pnl.entry_type.${type}`;
+    const translated = this.t.instant(key);
+    return translated === key ? type : translated;
   }
 
   entryMeasure(entry: PostingEntry, field: string): number {

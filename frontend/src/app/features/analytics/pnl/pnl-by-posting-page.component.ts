@@ -3,11 +3,10 @@ import {
   Component,
   computed,
   DestroyRef,
-  HostListener,
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -25,6 +24,9 @@ import {
   formatDateTime,
   currentMonth,
 } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
 
 function monthStart(period: string): string {
   return `${period}-01`;
@@ -42,191 +44,76 @@ function monthEnd(period: string): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, MonthPickerComponent, DataGridComponent, LucideAngularModule],
   template: `
-    <div class="flex h-full">
-      <div class="flex flex-1 flex-col overflow-hidden gap-4">
-        <!-- Filter bar -->
-        <div class="flex items-center gap-3">
-          <dp-month-picker [value]="period()" (valueChange)="onPeriodChange($event)" />
-          <input
-            type="text"
-            [value]="search()"
-            (input)="onSearchInput($event)"
-            [placeholder]="'analytics.pnl.search_sku' | translate"
-            class="w-52 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                   px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                   outline-none focus:border-[var(--accent-primary)]"
-          />
-          <button
-            (click)="exportCsv()"
-            class="ml-auto flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-          >
-            <lucide-icon [img]="downloadIcon" size="14" />
-            <span>{{ 'common.export_csv' | translate }}</span>
-          </button>
-        </div>
-
-        <dp-data-grid
-          [columnDefs]="columnDefs()"
-          [rowData]="gridRows()"
-          [loading]="postingsQuery.isPending()"
-          [pagination]="false"
-          [pageSize]="50"
-          height="calc(100vh - 320px)"
-          [clickableRows]="true"
-          (rowClicked)="onRowClicked($event)"
-          (cellDoubleClicked)="onRowDoubleClicked($event)"
-          (gridReady)="onGridReady($event)"
+    <div class="flex flex-col overflow-hidden gap-4">
+      <!-- Filter bar -->
+      <div class="flex items-center gap-3">
+        <dp-month-picker [value]="period()" (valueChange)="onPeriodChange($event)" />
+        <input
+          type="text"
+          [value]="search()"
+          (input)="onSearchInput($event)"
+          [placeholder]="'analytics.pnl.search_sku' | translate"
+          class="w-52 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
+                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
+                 outline-none focus:border-[var(--accent-primary)]"
         />
-
-        @if (postingsQuery.data(); as page) {
-          <div class="flex items-center justify-between text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-            <span>
-              {{ 'pagination.showing' | translate:{
-                from: page.number * page.size + 1,
-                to: page.number * page.size + page.content.length,
-                total: page.totalElements
-              } }}
-            </span>
-            <div class="flex items-center gap-2">
-              <button
-                (click)="prevPage()"
-                [disabled]="currentPage() === 0"
-                class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
-                       text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
-                       disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {{ 'pagination.prev' | translate }}
-              </button>
-              <button
-                (click)="nextPage()"
-                [disabled]="currentPage() >= page.totalPages - 1"
-                class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
-                       text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
-                       disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {{ 'pagination.next' | translate }}
-              </button>
-            </div>
-          </div>
+        @if (!filtersDefault()) {
+          <button type="button" (click)="onResetFilters()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
         }
+        <button
+          (click)="exportCsv()"
+          class="ml-auto flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+        >
+          <lucide-icon [img]="downloadIcon" size="14" />
+          <span>{{ 'common.export_csv' | translate }}</span>
+        </button>
       </div>
 
-      @if (selectedPosting(); as posting) {
-        <div class="flex w-[380px] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)]">
-          <div class="flex items-center justify-between border-b border-[var(--border-default)] px-4 py-3">
-            <h3 class="text-[length:var(--text-sm)] font-semibold text-[var(--text-primary)]">
-              {{ 'analytics.pnl.posting_detail.title' | translate }}
-            </h3>
+      <dp-data-grid
+        [columnDefs]="columnDefs()"
+        [rowData]="gridRows()"
+        [loading]="postingsQuery.isPending()"
+        [pagination]="false"
+        [pageSize]="50"
+        height="calc(100vh - 320px)"
+        [clickableRows]="true"
+        (rowClicked)="onRowClicked($event)"
+        (gridReady)="onGridReady($event)"
+      />
+
+      @if (postingsQuery.data(); as page) {
+        <div class="flex items-center justify-between text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+          <span>
+            {{ 'pagination.showing' | translate:{
+              from: page.number * page.size + 1,
+              to: page.number * page.size + page.content.length,
+              total: page.totalElements
+            } }}
+          </span>
+          <div class="flex items-center gap-2">
             <button
-              class="cursor-pointer rounded p-1 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-              aria-label="Close"
-              (click)="selectedPosting.set(null)"
+              (click)="prevPage()"
+              [disabled]="currentPage() === 0"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
+                     text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
+                     disabled:cursor-not-allowed disabled:opacity-40"
             >
-              ✕
+              {{ 'pagination.prev' | translate }}
             </button>
-          </div>
-
-          <div class="flex-1 space-y-4 overflow-auto p-4">
-            <div>
-              <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                {{ 'analytics.pnl.col.posting_id' | translate }}
-              </p>
-              <p class="mt-0.5 font-mono text-[length:var(--text-sm)] text-[var(--accent-primary)]">
-                {{ posting.postingId }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                {{ 'analytics.pnl.col.sku' | translate }}
-              </p>
-              <p class="mt-0.5 font-mono text-[length:var(--text-sm)] text-[var(--text-primary)]">
-                {{ posting.skuCode }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                {{ 'analytics.pnl.col.product' | translate }}
-              </p>
-              <p class="mt-0.5 text-[length:var(--text-sm)] text-[var(--text-primary)]">
-                {{ posting.productName }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                {{ 'analytics.pnl.col.date' | translate }}
-              </p>
-              <p class="mt-0.5 text-[length:var(--text-sm)] text-[var(--text-primary)]">
-                {{ formatDate(posting.financeDate) }}
-              </p>
-            </div>
-
-            <div class="border-t border-[var(--border-subtle)] pt-4">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ 'analytics.pnl.col.revenue' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-semibold"
-                     [style.color]="financeColor(posting.revenueAmount)">
-                    {{ formatMoney(posting.revenueAmount) }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ 'analytics.pnl.col.commission' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-semibold text-[var(--finance-negative)]">
-                    {{ formatMoney(posting.marketplaceCommissionAmount) }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ 'analytics.pnl.col.logistics' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-semibold text-[var(--finance-negative)]">
-                    {{ formatMoney(posting.logisticsCostAmount) }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ 'analytics.pnl.col.payout' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-semibold"
-                     [style.color]="financeColor(posting.netPayout)">
-                    {{ formatMoney(posting.netPayout) }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ 'analytics.pnl.col.cogs' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-semibold"
-                     [style.color]="financeColor(posting.netCogs)">
-                    {{ formatMoney(posting.netCogs) }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                    {{ 'analytics.pnl.col.residual' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-semibold"
-                     [class]="residualColorClass(posting.reconciliationResidual)">
-                    {{ formatMoney(posting.reconciliationResidual) }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="border-t border-[var(--border-subtle)] pt-4">
-              <button
-                (click)="openPosting(posting.postingId)"
-                class="w-full rounded-[var(--radius-md)] border border-[var(--accent-primary)] px-3 py-1.5
-                       text-[length:var(--text-sm)] font-medium text-[var(--accent-primary)]
-                       transition-colors hover:bg-[var(--accent-subtle)]"
-              >
-                {{ 'analytics.pnl.posting_detail.view_full' | translate }}
-              </button>
-            </div>
+            <button
+              (click)="nextPage()"
+              [disabled]="currentPage() >= page.totalPages - 1"
+              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
+                     text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
+                     disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {{ 'pagination.next' | translate }}
+            </button>
           </div>
         </div>
       }
@@ -237,27 +124,35 @@ export class PnlByPostingPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly t = inject(TranslateService);
-
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    this.selectedPosting.set(null);
-  }
 
   readonly downloadIcon = Download;
   readonly period = signal(currentMonth());
   readonly search = signal('');
   readonly currentPage = signal(0);
   readonly pageSize = signal(50);
-  readonly selectedPosting = signal<PnlByPosting | null>(null);
+
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'period', signal: this.period, defaultValue: currentMonth() },
+    { key: 'search', signal: this.search, defaultValue: '' },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   private gridApi: GridApi | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    syncFiltersToUrl(this.router, this.route, this.filterDefs);
     inject(DestroyRef).onDestroy(() => {
       if (this.searchTimer) clearTimeout(this.searchTimer);
     });
+  }
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+    this.currentPage.set(0);
   }
 
   readonly postingsQuery = injectQuery(() => ({
@@ -359,6 +254,18 @@ export class PnlByPostingPageComponent {
         color: p.value !== 0 ? 'var(--status-warning)' : 'var(--finance-zero)',
       }),
     },
+    {
+      headerName: '',
+      width: 40,
+      maxWidth: 40,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right',
+      cellClass: 'flex items-center justify-center',
+      cellStyle: () => ({ color: 'var(--text-tertiary)' }),
+      valueGetter: () => '›',
+    },
   ]);
 
   onGridReady(api: GridApi): void {
@@ -384,19 +291,9 @@ export class PnlByPostingPageComponent {
   }
 
   onRowClicked(row: PnlByPosting): void {
-    this.selectedPosting.set(
-      this.selectedPosting()?.postingId === row.postingId ? null : row,
-    );
-  }
-
-  onRowDoubleClicked(row: PnlByPosting): void {
-    this.openPosting(row.postingId);
-  }
-
-  openPosting(postingId: string): void {
     this.router.navigate([
       '/workspace', this.wsStore.currentWorkspaceId(),
-      'analytics', 'pnl', 'posting', postingId,
+      'analytics', 'pnl', 'posting', row.postingId,
     ]);
   }
 
@@ -406,22 +303,5 @@ export class PnlByPostingPageComponent {
 
   nextPage(): void {
     this.currentPage.update((p) => p + 1);
-  }
-
-  formatMoney(value: number | null): string {
-    return formatMoney(value, 0);
-  }
-
-  formatDate(iso: string): string {
-    return formatDateTime(iso);
-  }
-
-  financeColor(value: number | null): string {
-    return financeColor(value);
-  }
-
-  residualColorClass(value: number): string {
-    if (value !== 0) return 'text-[var(--status-warning)]';
-    return 'text-[var(--finance-zero)]';
   }
 }

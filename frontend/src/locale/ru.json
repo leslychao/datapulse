@@ -1130,6 +1130,12 @@
   "filter_bar.reset_all": "Сбросить все",
   "filter_bar.reset": "Сбросить",
 
+  "date_range.preset.7d": "7 дн.",
+  "date_range.preset.30d": "30 дн.",
+  "date_range.preset.90d": "90 дн.",
+  "date_range.preset.quarter": "Квартал",
+  "month_picker.today": "Текущий месяц",
+
   "data_grid.loading": "Загрузка данных...",
   "data_grid.no_rows": "Нет данных для отображения",
   "data_grid.page": "Страница",
@@ -2431,10 +2437,6 @@
   "pricing.assignments.col.connection": "Подключение",
   "pricing.assignments.col.target": "Цель",
 
-  "analytics.nav.summary": "Сводка P&L",
-  "analytics.nav.by_product": "По товарам",
-  "analytics.nav.by_posting": "По поставкам",
-  "analytics.nav.trend": "Тренд",
 
   "analytics.pnl.trend_title": "Тренд P&L",
   "analytics.pnl.cost_breakdown": "Структура затрат",
@@ -2485,12 +2487,33 @@
   "analytics.pnl.posting.title": "Поставка",
   "analytics.pnl.posting.entry_type": "Тип записи",
   "analytics.pnl.posting.total": "Итого",
-  "analytics.pnl.posting.raw": "raw",
+
+  "analytics.pnl.entry_type.SALE_ACCRUAL": "Продажа",
+  "analytics.pnl.entry_type.RETURN_REVERSAL": "Возврат",
+  "analytics.pnl.entry_type.STORNO_CORRECTION": "Сторно",
+  "analytics.pnl.entry_type.ACQUIRING": "Эквайринг",
+  "analytics.pnl.entry_type.LOGISTICS": "Логистика",
+  "analytics.pnl.entry_type.DELIVERY": "Доставка",
+  "analytics.pnl.entry_type.RETURN_LOGISTICS": "Логистика возврата",
+  "analytics.pnl.entry_type.STORAGE": "Хранение",
+  "analytics.pnl.entry_type.TEMPORARY_STORAGE": "Временное хранение",
+  "analytics.pnl.entry_type.ACCEPTANCE": "Обработка",
+  "analytics.pnl.entry_type.COMPENSATION": "Компенсация",
+  "analytics.pnl.entry_type.PENALTY": "Штраф",
+  "analytics.pnl.entry_type.BRAND_COMMISSION": "Комиссия бренда",
+  "analytics.pnl.entry_type.CPC_ADVERTISING": "Реклама CPC",
+  "analytics.pnl.entry_type.PROMO_CPC": "Промо CPC",
+  "analytics.pnl.entry_type.MARKETING_ACTION": "Маркетинг",
+  "analytics.pnl.entry_type.REVIEWS_PURCHASE": "Покупка отзывов",
+  "analytics.pnl.entry_type.PACKAGING": "Упаковка",
+  "analytics.pnl.entry_type.SUBSCRIPTION": "Подписка",
+  "analytics.pnl.entry_type.DISPOSAL": "Утилизация",
+  "analytics.pnl.entry_type.DEFECT_PENALTY": "Штраф за брак",
+  "analytics.pnl.entry_type.CANCELLATION_FINE": "Штраф за отмену",
+  "analytics.pnl.entry_type.SHIPMENT_DELAY_FINE": "Штраф за задержку",
+  "analytics.pnl.entry_type.OTHER": "Прочее",
 
   "analytics.pnl.detail.title": "Детали товара",
-
-  "analytics.pnl.posting_detail.title": "Детали поставки",
-  "analytics.pnl.posting_detail.view_full": "Подробнее",
 
   "analytics.pnl.trend.period": "Период",
 
@@ -2542,7 +2565,6 @@
   "analytics.inventory.filter.warning": "Внимание",
   "analytics.inventory.filter.normal": "Норма",
   "analytics.inventory.filter.search_placeholder": "Поиск по артикулу / названию",
-  "analytics.inventory.filter.product_id": "ID товара",
 
   "analytics.inventory.col.product": "Название",
   "analytics.inventory.col.platform": "МП",

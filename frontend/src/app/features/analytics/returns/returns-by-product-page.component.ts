@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -14,6 +15,7 @@ import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReturnsByProduct } from '@core/models';
+import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import {
@@ -21,24 +23,20 @@ import {
   formatPercent,
   currentMonth,
 } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
 
 @Component({
   selector: 'dp-returns-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DataGridComponent, LucideAngularModule],
+  imports: [TranslatePipe, DataGridComponent, LucideAngularModule, MonthPickerComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
-        <input
-          type="month"
-          [value]="period()"
-          (change)="onPeriodChange($event)"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
-                 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
-                 outline-none focus:border-[var(--accent-primary)]"
-        />
+        <dp-month-picker [value]="period()" (valueChange)="onPeriodChange($event)" />
         <input
           type="text"
           [value]="search()"
@@ -48,6 +46,14 @@ import {
                  px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none focus:border-[var(--accent-primary)]"
         />
+        @if (!filtersDefault()) {
+          <button type="button" (click)="onResetFilters()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
+        }
         <button
           (click)="exportCsv()"
           class="ml-auto flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -195,6 +201,8 @@ export class ReturnsByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly downloadIcon = Download;
   private gridApi: GridApi | null = null;
@@ -211,7 +219,23 @@ export class ReturnsByProductPageComponent {
   readonly currentSort = signal('return_rate_pct,desc');
   readonly pageSize = signal(50);
 
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'period', signal: this.period, defaultValue: currentMonth() },
+    { key: 'search', signal: this.search, defaultValue: '' },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
+
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+  }
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+    this.currentPage.set(0);
+  }
 
   readonly returnsQuery = injectQuery(() => ({
     queryKey: [
@@ -308,8 +332,8 @@ export class ReturnsByProductPageComponent {
     this.gridApi?.exportDataAsCsv({ fileName: 'returns-by-product.csv' });
   }
 
-  onPeriodChange(event: Event): void {
-    this.period.set((event.target as HTMLInputElement).value);
+  onPeriodChange(value: string): void {
+    this.period.set(value);
     this.currentPage.set(0);
   }
 

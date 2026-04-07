@@ -31,6 +31,9 @@ import { SectionCardComponent } from '@shared/components/section-card.component'
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, currentMonth } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
 
 type TrendDir = 'up' | 'down' | 'neutral';
 
@@ -61,6 +64,14 @@ interface KpiItem {
       <!-- Filter bar -->
       <div class="flex items-center gap-3" data-tour="pnl-period-filter">
         <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
+        @if (!filtersDefault()) {
+          <button type="button" (click)="onResetFilters()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
+        }
       </div>
 
       @if (summaryQuery.isPending()) {
@@ -129,6 +140,8 @@ export class PnlSummaryPageComponent {
   private readonly tourProgress = inject(TourProgressStore);
 
   constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    syncFiltersToUrl(this.router, this.route, this.filterDefs);
     if (PNL_OVERVIEW_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PNL_OVERVIEW_TOUR.id)) {
       this.tourService.startWhenReady(PNL_OVERVIEW_TOUR);
     }
@@ -139,6 +152,15 @@ export class PnlSummaryPageComponent {
 
   readonly period = signal(currentMonth());
   readonly shimmerCards = Array.from({ length: 6 });
+
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'period', signal: this.period, defaultValue: currentMonth() },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+  }
 
   readonly summaryQuery = injectQuery(() => ({
     queryKey: ['analytics', 'pnl-summary', this.wsStore.currentWorkspaceId(), this.period()],

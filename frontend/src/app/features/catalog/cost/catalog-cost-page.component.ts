@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -68,14 +70,22 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
         </div>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-4 flex items-center gap-3">
         <input
           type="text"
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearch()"
           [placeholder]="'catalog.cost.search_placeholder' | translate"
-          class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
+          class="flex-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
         />
+        @if (searchQuery) {
+          <button type="button" (click)="onResetSearch()"
+            class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                   text-[var(--text-tertiary)] transition-colors
+                   hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+            {{ 'filter_bar.reset_all' | translate }}
+          </button>
+        }
       </div>
 
       @if (profilesQuery.isPending()) {
@@ -344,6 +354,8 @@ export class CatalogCostPageComponent {
   private readonly toast = inject(ToastService);
   protected readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly showAddModal = signal(false);
   readonly showImportResult = signal(false);
@@ -353,7 +365,34 @@ export class CatalogCostPageComponent {
   private readonly pageSize = 50;
 
   searchQuery = '';
+  private readonly searchSignal = signal('');
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    const qp = this.route.snapshot.queryParams;
+    if (qp['search']) {
+      this.searchQuery = qp['search'];
+      this.searchSignal.set(qp['search']);
+    }
+    effect(() => {
+      const s = this.searchSignal();
+      const params: Record<string, string> = {};
+      if (s) params['search'] = s;
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: params,
+        queryParamsHandling: 'replace',
+        replaceUrl: true,
+      });
+    });
+  }
+
+  onResetSearch(): void {
+    this.searchQuery = '';
+    this.searchSignal.set('');
+    this.currentPage.set(0);
+    this.profilesQuery.refetch();
+  }
 
   addForm = {
     skuSearch: '',
@@ -479,6 +518,7 @@ export class CatalogCostPageComponent {
   onSearch(): void {
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
+      this.searchSignal.set(this.searchQuery);
       this.editingRowId.set(null);
       this.currentPage.set(0);
       this.profilesQuery.refetch();

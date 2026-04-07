@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -22,6 +23,9 @@ import { DataGridComponent } from '@shared/components/data-grid/data-grid.compon
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { formatMoney } from '@shared/utils/format.utils';
+import {
+  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+} from '@shared/utils/url-filters';
 
 @Component({
   selector: 'dp-inventory-by-product-page',
@@ -52,6 +56,14 @@ import { formatMoney } from '@shared/utils/format.utils';
             [value]="searchTerm()"
             (input)="onSearchInput($event)"
           />
+          @if (!filtersDefault()) {
+            <button type="button" (click)="onResetFilters()"
+              class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
+                     text-[var(--text-tertiary)] transition-colors
+                     hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+              {{ 'filter_bar.reset_all' | translate }}
+            </button>
+          }
           <button
             (click)="exportCsv()"
             class="ml-auto flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -210,6 +222,8 @@ export class InventoryByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly downloadIcon = Download;
   private gridApi: GridApi | null = null;
@@ -224,6 +238,22 @@ export class InventoryByProductPageComponent {
   readonly page = signal(0);
   readonly size = signal(25);
   readonly selectedProduct = signal<InventoryByProduct | null>(null);
+
+  private readonly filterDefs: UrlFilterDef[] = [
+    { key: 'risk', signal: this.riskFilter as any, defaultValue: '' },
+    { key: 'search', signal: this.searchTerm, defaultValue: '' },
+  ];
+  readonly filtersDefault = isFiltersDefault(this.filterDefs);
+
+  constructor() {
+    readFiltersFromUrl(this.route, this.filterDefs);
+    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+  }
+
+  onResetFilters(): void {
+    resetFilters(this.filterDefs);
+    this.page.set(0);
+  }
 
   private readonly filter = computed<AnalyticsFilter>(() => {
     const f: AnalyticsFilter = {};
@@ -338,7 +368,7 @@ export class InventoryByProductPageComponent {
 
   selectProduct(product: InventoryByProduct): void {
     this.selectedProduct.set(
-      this.selectedProduct()?.sellerSkuId === product.sellerSkuId ? null : product,
+      this.selectedProduct()?.productId === product.productId ? null : product,
     );
   }
 
