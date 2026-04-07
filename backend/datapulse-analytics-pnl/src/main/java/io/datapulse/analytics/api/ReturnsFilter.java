@@ -4,7 +4,6 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 
 public record ReturnsFilter(
-        Long connectionId,
         String period,
         String search
 ) {

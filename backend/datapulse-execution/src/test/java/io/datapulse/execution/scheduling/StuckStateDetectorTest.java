@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -56,7 +57,7 @@ class StuckStateDetectorTest {
         Duration.ofMinutes(10),
         Duration.ofMinutes(5));
     lenient().when(properties.getStuckState()).thenReturn(stuckState);
-    lenient().when(actionRepository.findStuckInStatus(any(), anyInt()))
+    lenient().when(actionRepository.findStuckInStatus(any(ActionStatus.class), any(OffsetDateTime.class)))
         .thenReturn(List.of());
   }
 
@@ -68,7 +69,7 @@ class StuckStateDetectorTest {
     @DisplayName("should escalate stuck EXECUTING to RECONCILIATION_PENDING")
     void should_escalate_when_executingStuck() {
       var action = stuckAction(ActionStatus.EXECUTING);
-      when(actionRepository.findStuckInStatus("EXECUTING", 5))
+      when(actionRepository.findStuckInStatus(eq(ActionStatus.EXECUTING), any(OffsetDateTime.class)))
           .thenReturn(List.of(action));
 
       detector.detectStuckActions();
@@ -80,7 +81,7 @@ class StuckStateDetectorTest {
     @DisplayName("should handle escalation exception gracefully")
     void should_continueProcessing_when_escalationFails() {
       var action = stuckAction(ActionStatus.EXECUTING);
-      when(actionRepository.findStuckInStatus("EXECUTING", 5))
+      when(actionRepository.findStuckInStatus(eq(ActionStatus.EXECUTING), any(OffsetDateTime.class)))
           .thenReturn(List.of(action));
       doThrow(new RuntimeException("CAS conflict"))
           .when(actionService).casReconciliationPending(1L);
@@ -100,7 +101,7 @@ class StuckStateDetectorTest {
     void should_fail_when_retryScheduledWithoutNextAttempt() {
       var action = stuckAction(ActionStatus.RETRY_SCHEDULED);
       action.setNextAttemptAt(null);
-      when(actionRepository.findStuckInStatus("RETRY_SCHEDULED", 5))
+      when(actionRepository.findStuckInStatus(eq(ActionStatus.RETRY_SCHEDULED), any(OffsetDateTime.class)))
           .thenReturn(List.of(action));
 
       detector.detectStuckActions();
@@ -114,7 +115,7 @@ class StuckStateDetectorTest {
     void should_skip_when_retryScheduledWithNextAttempt() {
       var action = stuckAction(ActionStatus.RETRY_SCHEDULED);
       action.setNextAttemptAt(OffsetDateTime.now().plusMinutes(10));
-      when(actionRepository.findStuckInStatus("RETRY_SCHEDULED", 5))
+      when(actionRepository.findStuckInStatus(eq(ActionStatus.RETRY_SCHEDULED), any(OffsetDateTime.class)))
           .thenReturn(List.of(action));
 
       detector.detectStuckActions();
@@ -132,7 +133,7 @@ class StuckStateDetectorTest {
     @DisplayName("should fail RECONCILIATION_PENDING past timeout")
     void should_fail_when_reconciliationPendingTimeout() {
       var action = stuckAction(ActionStatus.RECONCILIATION_PENDING);
-      when(actionRepository.findStuckInStatus("RECONCILIATION_PENDING", 10))
+      when(actionRepository.findStuckInStatus(eq(ActionStatus.RECONCILIATION_PENDING), any(OffsetDateTime.class)))
           .thenReturn(List.of(action));
 
       detector.detectStuckActions();
@@ -151,7 +152,7 @@ class StuckStateDetectorTest {
     @DisplayName("should fail SCHEDULED past TTL (outbox delivery failure)")
     void should_fail_when_scheduledPastTtl() {
       var action = stuckAction(ActionStatus.SCHEDULED);
-      when(actionRepository.findStuckInStatus("SCHEDULED", 5))
+      when(actionRepository.findStuckInStatus(eq(ActionStatus.SCHEDULED), any(OffsetDateTime.class)))
           .thenReturn(List.of(action));
 
       detector.detectStuckActions();
@@ -168,7 +169,7 @@ class StuckStateDetectorTest {
     @Test
     @DisplayName("should not escalate when no stuck actions found")
     void should_doNothing_when_noStuckActions() {
-      when(actionRepository.findStuckInStatus(any(), anyInt()))
+      when(actionRepository.findStuckInStatus(any(ActionStatus.class), any(OffsetDateTime.class)))
           .thenReturn(List.of());
 
       detector.detectStuckActions();

@@ -1,11 +1,10 @@
 package io.datapulse.tenancy.config;
 
-import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.MemberStatus;
+import io.datapulse.tenancy.domain.UserResolverService;
 import io.datapulse.tenancy.domain.UserStatus;
 import io.datapulse.tenancy.persistence.AppUserEntity;
-import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import jakarta.servlet.FilterChain;
@@ -22,8 +21,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import org.springframework.dao.DataIntegrityViolationException;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,10 +33,9 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
 
     private static final String WORKSPACE_HEADER = "X-Workspace-Id";
 
-    private final AppUserRepository appUserRepository;
+    private final UserResolverService userResolverService;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceContext workspaceContext;
-    private final AuditPublisher auditPublisher;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -61,7 +57,7 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
         String email = jwtAuth.getToken().getClaimAsString("email");
         String name = resolveDisplayName(jwtAuth);
 
-        AppUserEntity user = resolveOrProvisionUser(sub, email, name);
+        AppUserEntity user = userResolverService.resolveOrProvision(sub, email, name);
         log.debug("WorkspaceContextFilter: resolved user id={}, email={}", user.getId(), user.getEmail());
 
         if (user.getStatus() == UserStatus.DEACTIVATED) {
@@ -101,34 +97,6 @@ public class WorkspaceContextFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-  private AppUserEntity resolveOrProvisionUser(String sub, String email, String name) {
-    return appUserRepository.findByExternalId(sub)
-        .orElseGet(() -> {
-          try {
-            return provisionUser(sub, email, name);
-          } catch (DataIntegrityViolationException e) {
-            return appUserRepository.findByExternalId(sub)
-                .orElseThrow(() -> e);
-          }
-        });
-  }
-
-    private AppUserEntity provisionUser(String sub, String email, String name) {
-        log.info("Auto-provisioning user: externalId={}, email={}", sub, email);
-
-        var user = new AppUserEntity();
-        user.setExternalId(sub);
-        user.setEmail(email);
-        user.setName(name != null ? name : email);
-        user.setStatus(UserStatus.ACTIVE);
-        AppUserEntity saved = appUserRepository.save(user);
-
-        auditPublisher.publishSystem(saved.getId(), "user.provision",
-                "app_user", String.valueOf(saved.getId()));
-
-        return saved;
     }
 
     private String resolveDisplayName(JwtAuthenticationToken jwtAuth) {

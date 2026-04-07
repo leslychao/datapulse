@@ -13,7 +13,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -50,9 +50,10 @@ public class StuckStateDetector {
     }
 
     private int escalateStuckExecuting() {
-        int ttlMinutes = toMinutes(properties.getStuckState().getExecutingTtl());
+        OffsetDateTime cutoff = OffsetDateTime.now()
+            .minus(properties.getStuckState().getExecutingTtl());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.EXECUTING.name(), ttlMinutes);
+                .findStuckInStatus(ActionStatus.EXECUTING, cutoff);
 
         int escalated = 0;
         for (var action : stuck) {
@@ -71,9 +72,10 @@ public class StuckStateDetector {
     }
 
     private int escalateStuckRetryScheduled() {
-        int ttlMinutes = toMinutes(properties.getStuckState().getRetryScheduledGrace());
+        OffsetDateTime cutoff = OffsetDateTime.now()
+            .minus(properties.getStuckState().getRetryScheduledGrace());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.RETRY_SCHEDULED.name(), ttlMinutes);
+                .findStuckInStatus(ActionStatus.RETRY_SCHEDULED, cutoff);
 
         int escalated = 0;
         for (var action : stuck) {
@@ -96,9 +98,10 @@ public class StuckStateDetector {
     }
 
     private int escalateStuckReconciliation() {
-        int ttlMinutes = toMinutes(properties.getStuckState().getReconciliationPendingTtl());
+        OffsetDateTime cutoff = OffsetDateTime.now()
+            .minus(properties.getStuckState().getReconciliationPendingTtl());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.RECONCILIATION_PENDING.name(), ttlMinutes);
+                .findStuckInStatus(ActionStatus.RECONCILIATION_PENDING, cutoff);
 
         int escalated = 0;
         for (var action : stuck) {
@@ -118,9 +121,10 @@ public class StuckStateDetector {
     }
 
     private int escalateStuckScheduled() {
-        int ttlMinutes = toMinutes(properties.getStuckState().getScheduledTtl());
+        OffsetDateTime cutoff = OffsetDateTime.now()
+            .minus(properties.getStuckState().getScheduledTtl());
         List<PriceActionEntity> stuck = actionRepository
-                .findStuckInStatus(ActionStatus.SCHEDULED.name(), ttlMinutes);
+                .findStuckInStatus(ActionStatus.SCHEDULED, cutoff);
 
         int escalated = 0;
         for (var action : stuck) {
@@ -139,7 +143,4 @@ public class StuckStateDetector {
         return escalated;
     }
 
-    private int toMinutes(Duration duration) {
-        return (int) duration.toMinutes();
-    }
 }

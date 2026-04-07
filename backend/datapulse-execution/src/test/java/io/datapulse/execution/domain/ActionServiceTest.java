@@ -97,7 +97,7 @@ class ActionServiceTest {
     @DisplayName("should create action with PENDING_APPROVAL when autoApprove is false")
     void should_createPendingApproval_when_notAutoApproved() {
       when(actionRepository.findActiveByOfferAndModeForUpdate(
-          eq(OFFER_ID), eq(ActionExecutionMode.LIVE.name())))
+          eq(OFFER_ID), eq(ActionExecutionMode.LIVE)))
           .thenReturn(Optional.empty());
       when(properties.getMaxAttempts()).thenReturn(3);
       when(actionRepository.save(any())).thenAnswer(inv -> {
@@ -121,7 +121,7 @@ class ActionServiceTest {
     @DisplayName("should create action with APPROVED and schedule when autoApprove is true")
     void should_createApproved_when_autoApproved() {
       when(actionRepository.findActiveByOfferAndModeForUpdate(
-          eq(OFFER_ID), eq(ActionExecutionMode.LIVE.name())))
+          eq(OFFER_ID), eq(ActionExecutionMode.LIVE)))
           .thenReturn(Optional.empty());
       when(properties.getMaxAttempts()).thenReturn(3);
       when(actionRepository.save(any())).thenAnswer(inv -> {
@@ -149,7 +149,7 @@ class ActionServiceTest {
       var existing = actionEntity(ActionStatus.APPROVED);
       existing.setId(99L);
       when(actionRepository.findActiveByOfferAndModeForUpdate(
-          OFFER_ID, ActionExecutionMode.LIVE.name()))
+          OFFER_ID, ActionExecutionMode.LIVE))
           .thenReturn(Optional.of(existing));
       when(casRepository.casSupersede(eq(99L), eq(ActionStatus.APPROVED), anyLong()))
           .thenReturn(1);
@@ -176,7 +176,7 @@ class ActionServiceTest {
       var existing = actionEntity(ActionStatus.EXECUTING);
       existing.setId(99L);
       when(actionRepository.findActiveByOfferAndModeForUpdate(
-          OFFER_ID, ActionExecutionMode.LIVE.name()))
+          OFFER_ID, ActionExecutionMode.LIVE))
           .thenReturn(Optional.of(existing));
       when(deferredActionRepository.findByMarketplaceOfferIdAndExecutionMode(
           OFFER_ID, ActionExecutionMode.LIVE)).thenReturn(Optional.empty());

@@ -8,11 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceAccessService;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.sellerops.api.PromoJournalController;
-import io.datapulse.tenancy.persistence.AppUserRepository;
+import io.datapulse.tenancy.domain.UserResolverService;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.sellerops.api.PromoJournalEntryResponse;
 import io.datapulse.sellerops.domain.PromoJournalService;
@@ -48,13 +47,10 @@ class PromoJournalControllerSliceTest {
   private WorkspaceContext workspaceContext;
 
   @MockitoBean
-  private AppUserRepository appUserRepository;
+  private UserResolverService userResolverService;
 
   @MockitoBean
   private WorkspaceMemberRepository workspaceMemberRepository;
-
-  @MockitoBean
-  private AuditPublisher auditPublisher;
 
   @BeforeEach
   void setUp() {

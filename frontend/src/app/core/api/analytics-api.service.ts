@@ -202,9 +202,6 @@ export class AnalyticsApiService {
 
   private buildParams(filter: AnalyticsFilter): HttpParams {
     let params = new HttpParams();
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
-    }
     if (filter.from) {
       params = params.set('from', filter.from);
     }

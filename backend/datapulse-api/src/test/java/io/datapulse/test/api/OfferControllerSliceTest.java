@@ -6,11 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceAccessService;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.sellerops.api.OfferController;
-import io.datapulse.tenancy.persistence.AppUserRepository;
+import io.datapulse.tenancy.domain.UserResolverService;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import io.datapulse.sellerops.api.OfferDetailResponse;
 import io.datapulse.sellerops.api.OfferDetailResponse.ActionInfo;
@@ -48,13 +47,10 @@ class OfferControllerSliceTest {
   private WorkspaceContext workspaceContext;
 
   @MockitoBean
-  private AppUserRepository appUserRepository;
+  private UserResolverService userResolverService;
 
   @MockitoBean
   private WorkspaceMemberRepository workspaceMemberRepository;
-
-  @MockitoBean
-  private AuditPublisher auditPublisher;
 
   @BeforeEach
   void setUp() {

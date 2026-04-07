@@ -4,7 +4,6 @@ export type StockOutRisk = 'CRITICAL' | 'WARNING' | 'NORMAL';
 export type SyncDomainStatus = 'FRESH' | 'STALE' | 'OVERDUE';
 
 export interface AnalyticsFilter {
-  connectionId?: number;
   from?: string;
   to?: string;
   period?: string;

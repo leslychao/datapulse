@@ -13,9 +13,8 @@ import io.datapulse.integration.api.ConnectionController;
 import io.datapulse.integration.api.ConnectionResponse;
 import io.datapulse.integration.api.ConnectionSummaryResponse;
 import io.datapulse.integration.domain.ConnectionService;
-import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceContext;
-import io.datapulse.tenancy.persistence.AppUserRepository;
+import io.datapulse.tenancy.domain.UserResolverService;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -45,13 +44,10 @@ class ConnectionControllerSliceTest {
   private WorkspaceContext workspaceContext;
 
   @MockitoBean
-  private AppUserRepository appUserRepository;
+  private UserResolverService userResolverService;
 
   @MockitoBean
   private WorkspaceMemberRepository workspaceMemberRepository;
-
-  @MockitoBean
-  private AuditPublisher auditPublisher;
 
   @BeforeEach
   void setUp() {

@@ -8,7 +8,6 @@ import {
 import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { UserApiService } from '@core/api/user-api.service';
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
 import { AuthService } from '@core/auth/auth.service';
 import { WorkspaceMembership, WorkspaceRole, WorkspaceDetail } from '@core/models';
@@ -125,7 +124,6 @@ interface WorkspaceCard {
   `,
 })
 export class WorkspaceSelectorComponent implements OnInit {
-  private readonly userApi = inject(UserApiService);
   private readonly workspaceApi = inject(WorkspaceApiService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
@@ -142,11 +140,14 @@ export class WorkspaceSelectorComponent implements OnInit {
   protected loadData(): void {
     this.state.set('loading');
 
-    this.userApi.getMe().subscribe({
+    this.authService.ensureUser().subscribe({
       next: (profile) => {
-        this.userEmail.set(profile.email);
+        if (!profile) {
+          this.state.set('error');
+          return;
+        }
 
-        this.authService.applyCachedUser(profile);
+        this.userEmail.set(profile.email);
 
         this.workspaceApi.listWorkspaces().subscribe({
           next: (details) => {

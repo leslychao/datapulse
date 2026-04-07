@@ -22,7 +22,7 @@ import { FormModalComponent } from '@shared/components/form-modal.component';
 type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt';
 
 @Component({
-  selector: 'dp-cost-profiles-page',
+  selector: 'dp-catalog-cost-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -37,8 +37,8 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
     <div class="max-w-5xl">
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'settings.cost_profiles.title' | translate }}</h1>
-          <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.cost_profiles.subtitle' | translate }}</p>
+          <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">{{ 'catalog.cost.title' | translate }}</h1>
+          <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'catalog.cost.subtitle' | translate }}</p>
         </div>
         <div class="flex items-center gap-2">
           @if (rbac.canEditCostProfiles()) {
@@ -47,13 +47,13 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
               class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
             >
               <lucide-icon [img]="PlusIcon" [size]="16" />
-              {{ 'settings.cost_profiles.add' | translate }}
+              {{ 'catalog.cost.add' | translate }}
             </button>
             <label
               class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
             >
               <lucide-icon [img]="UploadIcon" [size]="16" />
-              {{ 'settings.cost_profiles.import_csv' | translate }}
+              {{ 'catalog.cost.import_csv' | translate }}
               <input type="file" accept=".csv" class="hidden" (change)="onFileSelected($event)" />
             </label>
           }
@@ -63,7 +63,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
             class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
           >
             <lucide-icon [img]="DownloadIcon" [size]="16" />
-            {{ 'settings.cost_profiles.export_csv' | translate }}
+            {{ 'catalog.cost.export_csv' | translate }}
           </button>
         </div>
       </div>
@@ -73,7 +73,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
           type="text"
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearch()"
-          [placeholder]="'settings.cost_profiles.search_placeholder' | translate"
+          [placeholder]="'catalog.cost.search_placeholder' | translate"
           class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-primary)]"
         />
       </div>
@@ -85,8 +85,8 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
       @if (profilesQuery.data(); as page) {
         @if (page.content.length === 0 && currentPage() === 0) {
           <dp-empty-state
-            [message]="'settings.cost_profiles.empty' | translate"
-            [hint]="'settings.cost_profiles.empty_hint' | translate"
+            [message]="'catalog.cost.empty' | translate"
+            [hint]="'catalog.cost.empty_hint' | translate"
           />
         } @else {
           <div
@@ -104,7 +104,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
                       class="flex w-full cursor-pointer items-center gap-1 whitespace-nowrap px-4 py-2.5 text-left text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
                       (click)="toggleSort('skuCode')"
                     >
-                      <span>{{ 'settings.cost_profiles.col_sku' | translate }}</span>
+                      <span>{{ 'catalog.cost.col_sku' | translate }}</span>
                       @if (sortField() === 'skuCode') {
                         <lucide-icon
                           [img]="sortDir() === 'asc' ? ArrowUpIcon : ArrowDownIcon"
@@ -123,7 +123,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
                       class="flex w-full cursor-pointer items-center gap-1 px-4 py-2.5 text-left text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
                       (click)="toggleSort('productName')"
                     >
-                      <span>{{ 'settings.cost_profiles.col_product_name' | translate }}</span>
+                      <span>{{ 'catalog.cost.col_product_name' | translate }}</span>
                       @if (sortField() === 'productName') {
                         <lucide-icon
                           [img]="sortDir() === 'asc' ? ArrowUpIcon : ArrowDownIcon"
@@ -149,7 +149,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
                           class="shrink-0 text-[var(--text-tertiary)]"
                         />
                       }
-                      <span>{{ 'settings.cost_profiles.col_cost_price' | translate }}</span>
+                      <span>{{ 'catalog.cost.col_cost_price' | translate }}</span>
                     </button>
                   </th>
                   <th class="w-0 p-0" [attr.aria-sort]="sortAriaSort('updatedAt')">
@@ -165,7 +165,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
                           class="shrink-0 text-[var(--text-tertiary)]"
                         />
                       }
-                      <span>{{ 'settings.cost_profiles.col_updated_at' | translate }}</span>
+                      <span>{{ 'catalog.cost.col_updated_at' | translate }}</span>
                     </button>
                   </th>
                 </tr>
@@ -196,7 +196,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
                           [class.select-none]="rbac.canEditCostProfiles()"
                           [title]="
                             rbac.canEditCostProfiles()
-                              ? ('settings.cost_profiles.edit_cost_hint' | translate)
+                              ? ('catalog.cost.edit_cost_hint' | translate)
                               : ''
                           "
                           (dblclick)="beginCostEdit(row)"
@@ -205,7 +205,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
                             {{ row.costPrice }} ₽
                           } @else {
                             <span class="text-[var(--text-tertiary)]">{{
-                              'settings.cost_profiles.not_set' | translate
+                              'catalog.cost.not_set' | translate
                             }}</span>
                           }
                         </span>
@@ -245,9 +245,9 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
       }
 
       <dp-form-modal
-        [title]="'settings.cost_profiles.add_title' | translate"
+        [title]="'catalog.cost.add_title' | translate"
         [isOpen]="showAddModal()"
-        [submitLabel]="'settings.cost_profiles.add' | translate"
+        [submitLabel]="'catalog.cost.add' | translate"
         [isPending]="createMutation.isPending()"
         [submitDisabled]="!isAddFormValid()"
         (submit)="submitAdd()"
@@ -255,12 +255,12 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
       >
         <div class="space-y-4">
           <div>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.cost_profiles.sku_label' | translate }}</label>
+            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'catalog.cost.sku_label' | translate }}</label>
             <input
               type="text"
               [(ngModel)]="addForm.skuSearch"
               (ngModelChange)="onSkuSearch($event)"
-              [placeholder]="'settings.cost_profiles.sku_search_placeholder' | translate"
+              [placeholder]="'catalog.cost.sku_search_placeholder' | translate"
               class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             />
             @if (skuSuggestions().length > 0 && !addForm.sellerSkuId) {
@@ -283,7 +283,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
             }
           </div>
           <div>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.cost_profiles.cost_label' | translate }}</label>
+            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'catalog.cost.cost_label' | translate }}</label>
             <input
               type="number"
               [(ngModel)]="addForm.costPrice"
@@ -294,7 +294,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
             />
           </div>
           <div>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.cost_profiles.valid_from_label' | translate }}</label>
+            <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'catalog.cost.valid_from_label' | translate }}</label>
             <input
               type="date"
               [(ngModel)]="addForm.validFrom"
@@ -305,7 +305,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
       </dp-form-modal>
 
       <dp-form-modal
-        [title]="'settings.cost_profiles.import_result_title' | translate"
+        [title]="'catalog.cost.import_result_title' | translate"
         [isOpen]="showImportResult()"
         [submitLabel]="'actions.close' | translate"
         cancelLabel=""
@@ -314,15 +314,15 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
       >
         @if (importResult(); as result) {
           <div class="space-y-3">
-            <p class="text-sm text-[var(--status-success)]">✓ {{ 'settings.cost_profiles.import_imported' | translate }}: {{ result.imported }}</p>
+            <p class="text-sm text-[var(--status-success)]">✓ {{ 'catalog.cost.import_imported' | translate }}: {{ result.imported }}</p>
             @if (result.skipped > 0) {
-              <p class="text-sm text-[var(--status-warning)]">⚠ {{ 'settings.cost_profiles.import_skipped' | translate }}: {{ result.skipped }}</p>
+              <p class="text-sm text-[var(--status-warning)]">⚠ {{ 'catalog.cost.import_skipped' | translate }}: {{ result.skipped }}</p>
             }
             @if (result.errors.length > 0) {
-              <p class="text-sm text-[var(--status-error)]">✕ {{ 'settings.cost_profiles.import_errors' | translate }}: {{ result.errors.length }}</p>
+              <p class="text-sm text-[var(--status-error)]">✕ {{ 'catalog.cost.import_errors' | translate }}: {{ result.errors.length }}</p>
               <ul class="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
                 @for (err of result.errors; track err.row) {
-                  <li>• {{ 'settings.cost_profiles.import_error_row' | translate }}: {{ err.row }} — {{ err.message }}</li>
+                  <li>• {{ 'catalog.cost.import_error_row' | translate }}: {{ err.row }} — {{ err.message }}</li>
                 }
               </ul>
             }
@@ -333,7 +333,7 @@ type CostProfileSortField = 'skuCode' | 'productName' | 'costPrice' | 'updatedAt
     </div>
   `,
 })
-export class CostProfilesPageComponent {
+export class CatalogCostPageComponent {
   protected readonly PlusIcon = Plus;
   protected readonly UploadIcon = Upload;
   protected readonly DownloadIcon = Download;
@@ -428,9 +428,9 @@ export class CostProfilesPageComponent {
     onSuccess: () => {
       this.profilesQuery.refetch();
       this.closeAddModal();
-      this.toast.success(this.translate.instant('settings.cost_profiles.added'));
+      this.toast.success(this.translate.instant('catalog.cost.added'));
     },
-    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.error_add')),
+    onError: () => this.toast.error(this.translate.instant('catalog.cost.error_add')),
   }));
 
   readonly updateMutation = injectMutation(() => ({
@@ -444,11 +444,11 @@ export class CostProfilesPageComponent {
       ),
     onSuccess: () => {
       this.profilesQuery.refetch();
-      this.toast.success(this.translate.instant('settings.cost_profiles.updated'));
+      this.toast.success(this.translate.instant('catalog.cost.updated'));
     },
     onError: () => {
       this.profilesQuery.refetch();
-      this.toast.error(this.translate.instant('settings.cost_profiles.error_save'));
+      this.toast.error(this.translate.instant('catalog.cost.error_save'));
     },
   }));
 
@@ -459,7 +459,7 @@ export class CostProfilesPageComponent {
       this.importResult.set(result);
       this.showImportResult.set(true);
     },
-    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.import_failed')),
+    onError: () => this.toast.error(this.translate.instant('catalog.cost.import_failed')),
   }));
 
   readonly exportMutation = injectMutation(() => ({
@@ -471,9 +471,9 @@ export class CostProfilesPageComponent {
       a.download = 'cost-profiles.csv';
       a.click();
       URL.revokeObjectURL(url);
-      this.toast.success(this.translate.instant('settings.cost_profiles.export_done'));
+      this.toast.success(this.translate.instant('catalog.cost.export_done'));
     },
-    onError: () => this.toast.error(this.translate.instant('settings.cost_profiles.error_export')),
+    onError: () => this.toast.error(this.translate.instant('catalog.cost.error_export')),
   }));
 
   onSearch(): void {
@@ -594,7 +594,7 @@ export class CostProfilesPageComponent {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      this.toast.error(this.translate.instant('settings.cost_profiles.file_too_large'));
+      this.toast.error(this.translate.instant('catalog.cost.file_too_large'));
       return;
     }
 
@@ -603,7 +603,7 @@ export class CostProfilesPageComponent {
   }
 
   exportCsv(): void {
-    this.toast.info(this.translate.instant('settings.cost_profiles.export_preparing'));
+    this.toast.info(this.translate.instant('catalog.cost.export_preparing'));
     this.exportMutation.mutate(undefined as never);
   }
 }

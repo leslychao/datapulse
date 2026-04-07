@@ -35,6 +35,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
@@ -89,6 +91,12 @@ datapulse:
       seller-base-url: ${OZON_SELLER_BASE_URL:https://api-seller.ozon.ru}
       seller-write-base-url: ${OZON_SELLER_WRITE_BASE_URL:${OZON_SELLER_BASE_URL:https://api-seller.ozon.ru}}
       performance-base-url: ${OZON_PERFORMANCE_BASE_URL:https://api-performance.ozon.ru}
+    rate-limits:
+      groups:
+        OZON_DEFAULT:
+          initialRate: ${OZON_DEFAULT_INITIAL_RATE:2.0}
+        OZON_PROMO:
+          initialRate: ${OZON_PROMO_INITIAL_RATE:1.0}
     health-check:
       interval: ${HEALTH_CHECK_INTERVAL:PT15M}
       failure-threshold: ${HEALTH_CHECK_FAILURE_THRESHOLD:3}
@@ -117,6 +125,7 @@ datapulse:
       backoff-multiplier: ${EXECUTION_RECON_BACKOFF_MULTIPLIER:2}
       max-attempts: ${EXECUTION_RECON_MAX_ATTEMPTS:3}
       timeout: ${EXECUTION_RECON_TIMEOUT:PT10M}
+    deferred-action-interval: ${EXECUTION_DEFERRED_ACTION_INTERVAL:PT30S}
     stuck-state:
       interval: ${EXECUTION_STUCK_INTERVAL:PT5M}
       executing-ttl: ${EXECUTION_STUCK_EXECUTING_TTL:PT5M}

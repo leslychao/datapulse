@@ -70,10 +70,11 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
         @for (tab of sectionTabs; track tab.path) {
           <a
             [routerLink]="tab.path"
-            routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
+            routerLinkActive="active"
             class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
                    font-medium text-[var(--text-secondary)] transition-colors
-                   hover:text-[var(--text-primary)]"
+                   hover:text-[var(--text-primary)]
+                   [&.active]:border-[var(--accent-primary)] [&.active]:text-[var(--accent-primary)]"
           >
             {{ tab.labelKey | translate }}
           </a>
@@ -88,11 +89,12 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
           @for (link of subNavLinks(); track link.path) {
             <a
               [routerLink]="link.path"
-              routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
+              routerLinkActive="active"
               [routerLinkActiveOptions]="{ exact: link.exact }"
               class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
                      font-medium text-[var(--text-secondary)] transition-colors
-                     hover:text-[var(--text-primary)]"
+                     hover:text-[var(--text-primary)]
+                     [&.active]:border-[var(--accent-primary)] [&.active]:text-[var(--accent-primary)]"
             >
               {{ link.labelKey | translate }}
             </a>

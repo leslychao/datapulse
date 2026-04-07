@@ -18,7 +18,7 @@ public class AsyncConfig implements AsyncConfigurer {
 
     @Bean("etlExecutor")
     public TaskExecutor etlExecutor() {
-        return buildExecutor("etl-", 2, 5, 50);
+        return buildExecutor("etl-", 4, 8, 50);
     }
 
     @Bean("pricingExecutor")

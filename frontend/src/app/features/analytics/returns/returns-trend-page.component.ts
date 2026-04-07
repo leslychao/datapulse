@@ -11,7 +11,6 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
-import { ConnectionApiService } from '@core/api/connection-api.service';
 import { AnalyticsFilter, Granularity } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
@@ -41,16 +40,6 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
-        <select
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [value]="connectionId()"
-          (change)="onConnectionChange($event)"
-        >
-          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
-          @for (conn of connectionsQuery.data() ?? []; track conn.id) {
-            <option [value]="conn.id">{{ conn.name }}</option>
-          }
-        </select>
         <input
           type="date"
           [value]="dateFrom()"
@@ -103,26 +92,18 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
 })
 export class ReturnsTrendPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
-  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
-  readonly connectionId = signal(0);
   readonly dateFrom = signal(defaultDateFrom());
   readonly dateTo = signal(defaultDateTo());
   readonly granularity = signal<Granularity>('MONTHLY');
   readonly granularityOptions = GRANULARITY_OPTIONS;
 
   private readonly filter = computed<AnalyticsFilter>(() => ({
-    connectionId: this.connectionId() || undefined,
     from: this.dateFrom(),
     to: this.dateTo(),
     granularity: this.granularity(),
-  }));
-
-  readonly connectionsQuery = injectQuery(() => ({
-    queryKey: ['connections'],
-    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
   }));
 
   readonly trendQuery = injectQuery(() => ({
@@ -208,10 +189,6 @@ export class ReturnsTrendPageComponent {
       ],
     };
   });
-
-  onConnectionChange(event: Event): void {
-    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
-  }
 
   onDateFromChange(event: Event): void {
     this.dateFrom.set((event.target as HTMLInputElement).value);

@@ -55,6 +55,11 @@ export const routes: Routes = [
         data: { breadcrumb: 'Операции' },
       },
       {
+        path: 'catalog',
+        loadChildren: () => import('./features/catalog/catalog.routes'),
+        data: { breadcrumb: 'Товары' },
+      },
+      {
         path: 'analytics',
         loadChildren: () => import('./features/analytics/analytics.routes'),
         data: { breadcrumb: 'Аналитика' },

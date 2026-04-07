@@ -143,10 +143,6 @@ public class ReturnsReadRepository {
     }
 
     private void appendFilter(StringBuilder sb, MapSqlParameterSource params, ReturnsFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         Integer periodInt = filter.periodAsInt();
         if (periodInt != null) {
             sb.append(" AND period = :period");

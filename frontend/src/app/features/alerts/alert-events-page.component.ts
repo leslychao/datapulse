@@ -138,6 +138,7 @@ export class AlertEventsPageComponent {
     queryKey: ['alerts', 'summary', this.workspaceId()],
     queryFn: () => lastValueFrom(this.alertApi.getSummary()),
     enabled: this.workspaceId() != null,
+    staleTime: 30_000,
   }));
 
   readonly alertsQuery = injectQuery(() => ({

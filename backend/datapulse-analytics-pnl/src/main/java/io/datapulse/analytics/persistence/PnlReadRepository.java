@@ -104,40 +104,65 @@ public class PnlReadRepository {
             """;
 
     /**
-     * Product/posting lists read sku_code, product_name, marketplace_sku from marts (denormalized
-     * at materialization from facts + catalog). No dim joins here.
+     * Product labels (sku_code, product_name) are denormalized in the mart at materialization,
+     * but we fall back to dim_product in case the mart data is stale or the materializer ran
+     * before the catalog was populated.
      */
     private static final String BY_PRODUCT_SQL = """
             SELECT
-                m.connection_id,
-                m.source_platform,
-                m.seller_sku_id,
-                m.product_id,
-                m.period,
-                m.attribution_level,
-                m.sku_code,
-                m.product_name,
-                m.revenue_amount,
-                m.marketplace_commission_amount,
-                m.acquiring_commission_amount,
-                m.logistics_cost_amount,
-                m.storage_cost_amount,
-                m.penalties_amount,
-                m.marketing_cost_amount,
-                m.acceptance_cost_amount,
-                m.other_marketplace_charges_amount,
-                m.compensation_amount,
-                m.refund_amount,
-                m.net_payout,
-                m.gross_cogs,
-                m.net_cogs,
-                m.cogs_status,
-                m.advertising_cost,
-                m.marketplace_pnl,
-                m.full_pnl
+                m.connection_id AS connection_id,
+                m.source_platform AS source_platform,
+                m.seller_sku_id AS seller_sku_id,
+                m.product_id AS product_id,
+                m.period AS period,
+                m.attribution_level AS attribution_level,
+                coalesce(
+                    nullIf(m.sku_code, ''),
+                    nullIf(p_by_id.sku_code, ''),
+                    nullIf(p_by_sku.sku_code, ''),
+                    nullIf(p_by_id.marketplace_sku, ''),
+                    nullIf(p_by_sku.marketplace_sku, '')
+                ) AS sku_code,
+                coalesce(
+                    nullIf(m.product_name, ''),
+                    nullIf(p_by_id.product_name, ''),
+                    nullIf(p_by_sku.product_name, '')
+                ) AS product_name,
+                m.revenue_amount AS revenue_amount,
+                m.marketplace_commission_amount AS marketplace_commission_amount,
+                m.acquiring_commission_amount AS acquiring_commission_amount,
+                m.logistics_cost_amount AS logistics_cost_amount,
+                m.storage_cost_amount AS storage_cost_amount,
+                m.penalties_amount AS penalties_amount,
+                m.marketing_cost_amount AS marketing_cost_amount,
+                m.acceptance_cost_amount AS acceptance_cost_amount,
+                m.other_marketplace_charges_amount AS other_marketplace_charges_amount,
+                m.compensation_amount AS compensation_amount,
+                m.refund_amount AS refund_amount,
+                m.net_payout AS net_payout,
+                m.gross_cogs AS gross_cogs,
+                m.net_cogs AS net_cogs,
+                m.cogs_status AS cogs_status,
+                m.advertising_cost AS advertising_cost,
+                m.marketplace_pnl AS marketplace_pnl,
+                m.full_pnl AS full_pnl
             FROM mart_product_pnl AS m
+            LEFT JOIN dim_product AS p_by_id
+                ON m.product_id = p_by_id.product_id
+                AND m.connection_id = p_by_id.connection_id
+            LEFT JOIN (
+                SELECT connection_id, seller_sku_id,
+                       anyLast(sku_code) AS sku_code,
+                       anyLast(marketplace_sku) AS marketplace_sku,
+                       anyLast(product_name) AS product_name
+                FROM dim_product
+                GROUP BY connection_id, seller_sku_id
+            ) AS p_by_sku
+                ON m.seller_sku_id = p_by_sku.seller_sku_id
+                AND m.connection_id = p_by_sku.connection_id
             WHERE m.connection_id IN (:connectionIds)
               AND m.attribution_level = 'PRODUCT'
+              AND m.revenue_amount != 0
             """;
 
     private static final String BY_POSTING_SQL = """
@@ -273,8 +298,22 @@ public class PnlReadRepository {
         var sb = new StringBuilder("""
                 SELECT count(*)
                 FROM mart_product_pnl AS m
+                LEFT JOIN dim_product AS p_by_id
+                    ON m.product_id = p_by_id.product_id
+                    AND m.connection_id = p_by_id.connection_id
+                LEFT JOIN (
+                    SELECT connection_id, seller_sku_id,
+                           anyLast(sku_code) AS sku_code,
+                           anyLast(marketplace_sku) AS marketplace_sku,
+                           anyLast(product_name) AS product_name
+                    FROM dim_product
+                    GROUP BY connection_id, seller_sku_id
+                ) AS p_by_sku
+                    ON m.seller_sku_id = p_by_sku.seller_sku_id
+                    AND m.connection_id = p_by_sku.connection_id
                 WHERE m.connection_id IN (:connectionIds)
-                  AND m.attribution_level = 'PRODUCT'""");
+                  AND m.attribution_level = 'PRODUCT'
+                  AND m.revenue_amount != 0""");
         appendProductFilter(sb, params, filter);
         sb.append(SETTINGS_FINAL);
 
@@ -425,10 +464,6 @@ public class PnlReadRepository {
 
     private void appendMonthlyTrendFilter(StringBuilder sb, MapSqlParameterSource params,
                                            PnlFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         if (filter.from() != null) {
             sb.append(" AND period >= :periodFrom");
             params.addValue("periodFrom", toPeriod(filter.from()));
@@ -441,10 +476,6 @@ public class PnlReadRepository {
 
     private void appendDateTrendFilter(StringBuilder sb, MapSqlParameterSource params,
                                         PnlFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         if (filter.from() != null) {
             sb.append(" AND finance_date >= :dateFrom");
             params.addValue("dateFrom", filter.from());
@@ -457,10 +488,6 @@ public class PnlReadRepository {
 
     private void appendPeriodFilter(StringBuilder sb, MapSqlParameterSource params,
                                       PnlFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         if (filter.periodAsInt() != null) {
             sb.append(" AND period = :period");
             params.addValue("period", filter.periodAsInt());
@@ -476,10 +503,6 @@ public class PnlReadRepository {
     }
 
     private void appendProductFilter(StringBuilder sb, MapSqlParameterSource params, PnlFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND m.connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         if (filter.periodAsInt() != null) {
             sb.append(" AND m.period = :period");
             params.addValue("period", filter.periodAsInt());
@@ -489,18 +512,15 @@ public class PnlReadRepository {
             params.addValue("sellerSkuId", filter.sellerSkuId());
         }
         if (filter.search() != null && !filter.search().isBlank()) {
-            sb.append(
-                    " AND (m.product_name ILIKE :search OR m.sku_code ILIKE :search OR"
-                        + " m.marketplace_sku ILIKE :search)");
+            sb.append("""
+                     AND (coalesce(m.product_name, p_by_id.product_name, p_by_sku.product_name) ILIKE :search\
+                     OR coalesce(m.sku_code, p_by_id.sku_code, p_by_sku.sku_code) ILIKE :search\
+                     OR m.marketplace_sku ILIKE :search)""");
             params.addValue("search", "%%" + filter.search().trim() + "%%");
         }
     }
 
     private void appendPostingFilter(StringBuilder sb, MapSqlParameterSource params, PnlFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND m.connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         if (filter.from() != null) {
             sb.append(" AND m.finance_date >= :dateFrom");
             params.addValue("dateFrom", filter.from());

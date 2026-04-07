@@ -35,7 +35,7 @@ public class DeferredActionProcessor {
             WHERE id = :decisionId
             """;
 
-    @Scheduled(fixedDelayString = "PT30S")
+    @Scheduled(fixedDelayString = "${datapulse.execution.deferred-action-interval:PT30S}")
     @SchedulerLock(name = "execution_deferredActionProcessor", lockAtMostFor = "PT5M")
     @Transactional
     public void processDeferred() {

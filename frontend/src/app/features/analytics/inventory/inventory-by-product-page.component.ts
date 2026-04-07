@@ -36,14 +36,6 @@ import { formatMoney } from '@shared/utils/format.utils';
         <div class="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-secondary)] py-2.5">
           <select
             class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-            [value]="connectionId()"
-            (change)="onConnectionChange($event)"
-          >
-            <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
-          </select>
-
-          <select
-            class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             [value]="riskFilter()"
             (change)="onRiskFilterChange($event)"
           >
@@ -227,7 +219,6 @@ export class InventoryByProductPageComponent {
     this.selectedProduct.set(null);
   }
 
-  readonly connectionId = signal(0);
   readonly riskFilter = signal<StockOutRisk | ''>('');
   readonly searchTerm = signal('');
   readonly page = signal(0);
@@ -236,8 +227,6 @@ export class InventoryByProductPageComponent {
 
   private readonly filter = computed<AnalyticsFilter>(() => {
     const f: AnalyticsFilter = {};
-    const cid = this.connectionId();
-    if (cid) f.connectionId = cid;
     const risk = this.riskFilter();
     if (risk) f.stockOutRisk = risk;
     const search = this.searchTerm();
@@ -335,11 +324,6 @@ export class InventoryByProductPageComponent {
 
   exportCsv(): void {
     this.gridApi?.exportDataAsCsv({ fileName: 'inventory-by-product.csv' });
-  }
-
-  onConnectionChange(event: Event): void {
-    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
-    this.page.set(0);
   }
 
   onRiskFilterChange(event: Event): void {

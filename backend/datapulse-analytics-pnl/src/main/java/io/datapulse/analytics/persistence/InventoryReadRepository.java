@@ -162,17 +162,9 @@ public class InventoryReadRepository {
     }
 
     private void appendOverviewFilter(StringBuilder sb, MapSqlParameterSource params, InventoryFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND m.connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
     }
 
     private void appendProductFilter(StringBuilder sb, MapSqlParameterSource params, InventoryFilter filter) {
-        if (filter.connectionId() != null) {
-            sb.append(" AND m.connection_id = :connectionId");
-            params.addValue("connectionId", filter.connectionId());
-        }
         if (filter.stockOutRisk() != null && !filter.stockOutRisk().isBlank()) {
             sb.append(" AND m.stock_out_risk = :stockOutRisk");
             params.addValue("stockOutRisk", filter.stockOutRisk().trim().toUpperCase());

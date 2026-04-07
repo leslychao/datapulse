@@ -2,10 +2,13 @@ package io.datapulse.execution.persistence;
 
 import io.datapulse.execution.domain.ActionExecutionMode;
 import io.datapulse.execution.domain.ActionStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,25 +31,31 @@ public interface PriceActionRepository extends JpaRepository<PriceActionEntity, 
             @Param("mode") ActionExecutionMode mode
     );
 
-    @Query(value = """
-            SELECT * FROM price_action
-            WHERE marketplace_offer_id = :offerId
-              AND execution_mode = :mode
-              AND status NOT IN ('SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED', 'SUPERSEDED')
-            FOR UPDATE
-            """, nativeQuery = true)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT pa FROM PriceActionEntity pa
+            WHERE pa.marketplaceOfferId = :offerId
+              AND pa.executionMode = :mode
+              AND pa.status NOT IN (
+                io.datapulse.execution.domain.ActionStatus.SUCCEEDED,
+                io.datapulse.execution.domain.ActionStatus.FAILED,
+                io.datapulse.execution.domain.ActionStatus.EXPIRED,
+                io.datapulse.execution.domain.ActionStatus.CANCELLED,
+                io.datapulse.execution.domain.ActionStatus.SUPERSEDED
+              )
+            """)
     Optional<PriceActionEntity> findActiveByOfferAndModeForUpdate(
             @Param("offerId") long offerId,
-            @Param("mode") String mode
+            @Param("mode") ActionExecutionMode mode
     );
 
-    @Query(value = """
-            SELECT * FROM price_action
-            WHERE status = :status
-              AND updated_at < CURRENT_TIMESTAMP - CAST(:minutesAgo || ' minutes' AS INTERVAL)
-            """, nativeQuery = true)
+    @Query("""
+            SELECT pa FROM PriceActionEntity pa
+            WHERE pa.status = :status
+              AND pa.updatedAt < :cutoff
+            """)
     List<PriceActionEntity> findStuckInStatus(
-            @Param("status") String status,
-            @Param("minutesAgo") int minutesAgo
+            @Param("status") ActionStatus status,
+            @Param("cutoff") OffsetDateTime cutoff
     );
 }

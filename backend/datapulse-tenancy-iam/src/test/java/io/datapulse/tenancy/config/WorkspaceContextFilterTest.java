@@ -1,12 +1,11 @@
 package io.datapulse.tenancy.config;
 
-import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.domain.MemberRole;
 import io.datapulse.tenancy.domain.MemberStatus;
+import io.datapulse.tenancy.domain.UserResolverService;
 import io.datapulse.tenancy.domain.UserStatus;
 import io.datapulse.tenancy.persistence.AppUserEntity;
-import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import jakarta.servlet.FilterChain;
@@ -27,7 +26,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,11 +39,9 @@ import static org.mockito.Mockito.when;
 class WorkspaceContextFilterTest {
 
   @Mock
-  private AppUserRepository appUserRepository;
+  private UserResolverService userResolverService;
   @Mock
   private WorkspaceMemberRepository workspaceMemberRepository;
-  @Mock
-  private AuditPublisher auditPublisher;
   @Mock
   private FilterChain filterChain;
 
@@ -56,8 +52,8 @@ class WorkspaceContextFilterTest {
   void setUp() {
     workspaceContext = new WorkspaceContext();
     filter = new WorkspaceContextFilter(
-        appUserRepository, workspaceMemberRepository,
-        workspaceContext, auditPublisher);
+        userResolverService, workspaceMemberRepository,
+        workspaceContext);
   }
 
   private Jwt buildJwt(String sub, String email) {
@@ -90,7 +86,7 @@ class WorkspaceContextFilterTest {
       filter.doFilterInternal(request, response, filterChain);
 
       verify(filterChain).doFilter(request, response);
-      verify(appUserRepository, never()).findByExternalId(anyString());
+      verify(userResolverService, never()).resolveOrProvision(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -99,20 +95,18 @@ class WorkspaceContextFilterTest {
       var jwt = buildJwt("ext-id-1", "new@test.com");
       setJwtAuth(jwt);
 
-      when(appUserRepository.findByExternalId("ext-id-1")).thenReturn(Optional.empty());
-      var savedUser = new AppUserEntity();
-      savedUser.setId(1L);
-      savedUser.setStatus(UserStatus.ACTIVE);
-      when(appUserRepository.save(any(AppUserEntity.class))).thenReturn(savedUser);
+      var provisionedUser = new AppUserEntity();
+      provisionedUser.setId(1L);
+      provisionedUser.setStatus(UserStatus.ACTIVE);
+      when(userResolverService.resolveOrProvision("ext-id-1", "new@test.com", "TestUser"))
+          .thenReturn(provisionedUser);
 
       var request = new MockHttpServletRequest();
       var response = new MockHttpServletResponse();
 
       filter.doFilterInternal(request, response, filterChain);
 
-      verify(appUserRepository).save(any(AppUserEntity.class));
-      verify(auditPublisher).publishSystem(any(Long.class), anyString(),
-          anyString(), anyString());
+      verify(userResolverService).resolveOrProvision("ext-id-1", "new@test.com", "TestUser");
       verify(filterChain).doFilter(request, response);
       assertThat(workspaceContext.getUserId()).isEqualTo(1L);
     }
@@ -126,7 +120,8 @@ class WorkspaceContextFilterTest {
       var user = new AppUserEntity();
       user.setId(1L);
       user.setStatus(UserStatus.DEACTIVATED);
-      when(appUserRepository.findByExternalId("ext-id-1")).thenReturn(Optional.of(user));
+      when(userResolverService.resolveOrProvision("ext-id-1", "user@test.com", "TestUser"))
+          .thenReturn(user);
 
       var request = new MockHttpServletRequest();
       var response = new MockHttpServletResponse();
@@ -147,7 +142,8 @@ class WorkspaceContextFilterTest {
       var user = new AppUserEntity();
       user.setId(1L);
       user.setStatus(UserStatus.ACTIVE);
-      when(appUserRepository.findByExternalId("ext-id-1")).thenReturn(Optional.of(user));
+      when(userResolverService.resolveOrProvision("ext-id-1", "user@test.com", "TestUser"))
+          .thenReturn(user);
 
       var member = new WorkspaceMemberEntity();
       member.setRole(MemberRole.ADMIN);
@@ -180,7 +176,8 @@ class WorkspaceContextFilterTest {
       var user = new AppUserEntity();
       user.setId(1L);
       user.setStatus(UserStatus.ACTIVE);
-      when(appUserRepository.findByExternalId("ext-id-1")).thenReturn(Optional.of(user));
+      when(userResolverService.resolveOrProvision("ext-id-1", "user@test.com", "TestUser"))
+          .thenReturn(user);
       when(workspaceMemberRepository.findByWorkspace_IdAndUser_IdAndStatus(
           5L, 1L, MemberStatus.ACTIVE))
           .thenReturn(Optional.empty());
@@ -204,7 +201,8 @@ class WorkspaceContextFilterTest {
       var user = new AppUserEntity();
       user.setId(1L);
       user.setStatus(UserStatus.ACTIVE);
-      when(appUserRepository.findByExternalId("ext-id-1")).thenReturn(Optional.of(user));
+      when(userResolverService.resolveOrProvision("ext-id-1", "user@test.com", "TestUser"))
+          .thenReturn(user);
 
       var request = new MockHttpServletRequest();
       request.addHeader("X-Workspace-Id", "not-a-number");
@@ -225,7 +223,8 @@ class WorkspaceContextFilterTest {
       var user = new AppUserEntity();
       user.setId(1L);
       user.setStatus(UserStatus.ACTIVE);
-      when(appUserRepository.findByExternalId("ext-id-1")).thenReturn(Optional.of(user));
+      when(userResolverService.resolveOrProvision("ext-id-1", "user@test.com", "TestUser"))
+          .thenReturn(user);
 
       var request = new MockHttpServletRequest();
       var response = new MockHttpServletResponse();

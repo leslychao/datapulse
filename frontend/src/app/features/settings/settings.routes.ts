@@ -46,14 +46,6 @@ const routes: Routes = [
         data: { breadcrumb: 'Общие' },
       },
       {
-        path: 'cost-profiles',
-        loadComponent: () =>
-          import('./cost-profiles/cost-profiles-page.component').then(
-            (m) => m.CostProfilesPageComponent,
-          ),
-        data: { breadcrumb: 'Себестоимость' },
-      },
-      {
         path: 'alert-rules',
         loadComponent: () =>
           import('./alert-rules/alert-rules-page.component').then(

@@ -3,7 +3,6 @@ import {
   Component,
   computed,
   inject,
-  signal,
 } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
@@ -11,8 +10,7 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
-import { ConnectionApiService } from '@core/api/connection-api.service';
-import { AnalyticsFilter, InventoryByProduct } from '@core/models';
+import { InventoryByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
@@ -25,20 +23,6 @@ import { formatMoney } from '@shared/utils/format.utils';
   imports: [TranslatePipe, ChartComponent, StockRiskBadgeComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
-      <!-- Filter bar -->
-      <div class="flex items-center gap-3">
-        <select
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [value]="connectionId()"
-          (change)="onConnectionChange($event)"
-        >
-          <option [value]="0">{{ 'analytics.filter.all_connections' | translate }}</option>
-          @for (conn of connectionsQuery.data() ?? []; track conn.id) {
-            <option [value]="conn.id">{{ conn.name }}</option>
-          }
-        </select>
-      </div>
-
       <!-- KPI cards -->
       <div class="grid grid-cols-3 gap-3">
         <!-- Total SKUs -->
@@ -171,29 +155,16 @@ import { formatMoney } from '@shared/utils/format.utils';
 })
 export class InventoryOverviewPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
-  private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
-  readonly connectionId = signal(0);
-
-  readonly connectionsQuery = injectQuery(() => ({
-    queryKey: ['connections'],
-    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
-  }));
-
-  private readonly filter = computed<AnalyticsFilter>(() => {
-    const cid = this.connectionId();
-    return cid ? { connectionId: cid } : {};
-  });
-
   readonly overviewQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'inventory-overview', this.wsStore.currentWorkspaceId(), this.filter()],
+    queryKey: ['analytics', 'inventory-overview', this.wsStore.currentWorkspaceId()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getInventoryOverview(
           this.wsStore.currentWorkspaceId()!,
-          this.filter(),
+          {},
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -253,11 +224,6 @@ export class InventoryOverviewPageComponent {
       tooltip: { show: false },
     };
   });
-
-  onConnectionChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
-    this.connectionId.set(Number(value));
-  }
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);

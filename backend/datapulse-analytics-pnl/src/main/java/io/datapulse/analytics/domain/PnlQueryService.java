@@ -36,11 +36,6 @@ public class PnlQueryService {
 
     public PnlAggregatedSummaryResponse getAggregatedSummary(long workspaceId, PnlFilter filter) {
         List<Long> connectionIds = resolveConnectionIds(workspaceId);
-        if (filter.connectionId() != null) {
-            connectionIds = connectionIds.stream()
-                .filter(id -> id.equals(filter.connectionId()))
-                .toList();
-        }
         if (connectionIds.isEmpty()) {
             return emptyAggregatedSummary();
         }

@@ -4,6 +4,7 @@ import {
   LucideAngularModule,
   LucideIconData,
   LayoutGrid,
+  Package,
   BarChart3,
   Tag,
   Gift,
@@ -94,6 +95,7 @@ export class ActivityBarComponent {
 
   readonly topItems: NavItem[] = [
     { icon: LayoutGrid, route: 'grid', tooltipKey: 'shell.nav.operations' },
+    { icon: Package, route: 'catalog', tooltipKey: 'shell.nav.catalog' },
     { icon: BarChart3, route: 'analytics', tooltipKey: 'shell.nav.analytics' },
     { icon: Tag, route: 'pricing', tooltipKey: 'shell.nav.pricing' },
     { icon: Gift, route: 'promo', tooltipKey: 'shell.nav.promo' },

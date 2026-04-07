@@ -5,8 +5,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.datapulse.tenancy.domain.MemberStatus;
+import io.datapulse.tenancy.domain.UserResolverService;
 import io.datapulse.tenancy.persistence.AppUserEntity;
-import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceMemberEntity;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     static final String ATTR_WORKSPACE_IDS = "ws.workspaceIds";
 
     private final JwtDecoder jwtDecoder;
-    private final AppUserRepository appUserRepository;
+    private final UserResolverService userResolverService;
     private final WorkspaceMemberRepository workspaceMemberRepository;
 
     @Override
@@ -47,7 +47,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             Jwt jwt = jwtDecoder.decode(token);
             String sub = jwt.getSubject();
 
-            AppUserEntity user = appUserRepository.findByExternalId(sub).orElse(null);
+            AppUserEntity user = userResolverService.resolve(sub);
             if (user == null) {
                 log.debug("WebSocket handshake rejected: unknown user sub={}", sub);
                 return false;

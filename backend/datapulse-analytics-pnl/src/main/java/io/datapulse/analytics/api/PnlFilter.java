@@ -5,7 +5,6 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 
 public record PnlFilter(
-        Long connectionId,
         LocalDate from,
         LocalDate to,
         String period,

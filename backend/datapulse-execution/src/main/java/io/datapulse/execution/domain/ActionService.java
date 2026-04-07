@@ -102,7 +102,7 @@ public class ActionService {
                                           int approvalTimeoutHours,
                                           boolean autoApprove) {
         var existingActive = actionRepository.findActiveByOfferAndModeForUpdate(
-                marketplaceOfferId, executionMode.name());
+                marketplaceOfferId, executionMode);
 
         if (existingActive.isPresent()) {
             var active = existingActive.get();
