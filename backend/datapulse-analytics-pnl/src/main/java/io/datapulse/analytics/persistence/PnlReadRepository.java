@@ -85,10 +85,9 @@ public class PnlReadRepository {
           sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
           sum(compensation_amount) AS compensation_amount,
           sum(refund_amount) AS refund_amount,
-          sum(net_cogs) AS net_cogs,
-          sum(advertising_cost) AS advertising_cost,
-          sum(marketplace_pnl) AS marketplace_pnl,
-          sum(full_pnl) AS full_pnl
+          sum(coalesce(net_cogs, 0)) AS net_cogs,
+          sum(coalesce(advertising_cost, 0)) AS advertising_cost,
+          sum(marketplace_pnl) AS marketplace_pnl
       FROM mart_product_pnl
       WHERE workspace_id = :workspaceId
         AND period = :period
@@ -422,11 +421,15 @@ public class PnlReadRepository {
                 + sum(penalties_amount) + sum(marketing_cost_amount)
                 + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount)
                 AS total_costs_amount,
-        sum(net_cogs) AS cogs_amount,
-        toDecimal64(0, 2) AS advertising_cost_amount,
-        revenue_amount + total_costs_amount
-            + sum(compensation_amount) + sum(refund_amount)
-            - coalesce(cogs_amount, toDecimal64(0, 2)) AS full_pnl
+            sum(net_cogs) AS cogs_amount,
+            toDecimal64(0, 2) AS advertising_cost_amount,
+            sum(revenue_amount)
+                + sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
+                + sum(logistics_cost_amount) + sum(storage_cost_amount)
+                + sum(penalties_amount) + sum(marketing_cost_amount)
+                + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount)
+                + sum(compensation_amount) + sum(refund_amount)
+                - coalesce(sum(net_cogs), toDecimal64(0, 2)) AS full_pnl
         FROM mart_posting_pnl
         WHERE workspace_id = :workspaceId
         """.formatted(periodExpr);
@@ -671,7 +674,6 @@ public class PnlReadRepository {
         .netCogs(rs.getBigDecimal("net_cogs"))
         .advertisingCost(rs.getBigDecimal("advertising_cost"))
         .marketplacePnl(rs.getBigDecimal("marketplace_pnl"))
-        .fullPnl(rs.getBigDecimal("full_pnl"))
         .build();
   }
 

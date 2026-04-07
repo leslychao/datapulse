@@ -56,22 +56,32 @@
       <nav class="hidden w-40 shrink-0 lg:block">
         <div class="sticky top-4 space-y-1">
           @for (sec of sections; track sec.id) {
-            <button
-              type="button"
-              (click)="scrollToSection(sec.id)"
-              class="flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left text-[var(--text-xs)] transition-colors"
-              [class]="activeSection() === sec.id
-                ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'"
-            >
+            @if (sec.editOnly && !isEditMode()) {
               <span
-                class="h-1.5 w-1.5 shrink-0 rounded-full"
+                class="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left text-[var(--text-xs)] text-[var(--text-tertiary)] opacity-50"
+                [title]="'pricing.form.section.assignments_hint_create' | translate"
+              >
+                <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--border-default)]"></span>
+                {{ sec.labelKey | translate }}
+              </span>
+            } @else {
+              <button
+                type="button"
+                (click)="scrollToSection(sec.id)"
+                class="flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left text-[var(--text-xs)] transition-colors"
                 [class]="activeSection() === sec.id
-                  ? 'bg-[var(--accent-primary)]'
-                  : 'bg-[var(--border-default)]'"
-              ></span>
-              {{ sec.labelKey | translate }}
-            </button>
+                  ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'"
+              >
+                <span
+                  class="h-1.5 w-1.5 shrink-0 rounded-full"
+                  [class]="activeSection() === sec.id
+                    ? 'bg-[var(--accent-primary)]'
+                    : 'bg-[var(--border-default)]'"
+                ></span>
+                {{ sec.labelKey | translate }}
+              </button>
+            }
           }
         </div>
       </nav>

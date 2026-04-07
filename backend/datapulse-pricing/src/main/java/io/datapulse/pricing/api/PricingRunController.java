@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping(value = "/api/workspaces/{workspaceId}/pricing/runs",
     produces = MediaType.APPLICATION_JSON_VALUE)
@@ -23,6 +25,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class PricingRunController {
 
     private final PricingRunApiService runApiService;
+
+    @PostMapping("/trigger")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    public List<PricingRunResponse> triggerManualRuns(
+            @PathVariable("workspaceId") long workspaceId) {
+        return runApiService.triggerManualRunForWorkspace(workspaceId);
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

@@ -255,14 +255,32 @@ class PnlQueryServiceTest {
   class GetTrend {
 
     @Test
-    @DisplayName("should pass granularity to repository")
+    @DisplayName("should pass granularity to repository with default bounds when no from/to")
     void should_passGranularity() {
-      when(pnlReadRepository.findTrend(WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.WEEKLY))
+      when(pnlReadRepository.findTrend(eq(WORKSPACE_ID), any(PnlFilter.class),
+          eq(TrendGranularity.WEEKLY)))
           .thenReturn(List.of());
 
       service.getTrend(WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.WEEKLY);
 
-      verify(pnlReadRepository).findTrend(WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.WEEKLY);
+      verify(pnlReadRepository).findTrend(eq(WORKSPACE_ID), any(PnlFilter.class),
+          eq(TrendGranularity.WEEKLY));
+    }
+
+    @Test
+    @DisplayName("should preserve explicit from/to without override")
+    void should_preserveExplicitBounds() {
+      var filter = new PnlFilter(
+          java.time.LocalDate.of(2026, 1, 1),
+          java.time.LocalDate.of(2026, 3, 31),
+          null, null, null);
+
+      when(pnlReadRepository.findTrend(WORKSPACE_ID, filter, TrendGranularity.MONTHLY))
+          .thenReturn(List.of());
+
+      service.getTrend(WORKSPACE_ID, filter, TrendGranularity.MONTHLY);
+
+      verify(pnlReadRepository).findTrend(WORKSPACE_ID, filter, TrendGranularity.MONTHLY);
     }
   }
 

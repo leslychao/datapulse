@@ -1,5 +1,6 @@
 package io.datapulse.pricing.domain;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
 import io.datapulse.pricing.persistence.PriceDecisionRepository;
+import io.datapulse.pricing.persistence.PricePolicyAssignmentRepository;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
 import io.datapulse.pricing.persistence.PricingRunEntity;
 import io.datapulse.pricing.persistence.PricingRunReadRepository;
@@ -37,13 +39,38 @@ public class PricingRunApiService {
     private final PricingRunReadRepository runReadRepository;
     private final PriceDecisionRepository decisionRepository;
     private final PricePolicyRepository policyRepository;
+    private final PricePolicyAssignmentRepository assignmentRepository;
     private final PricingRunMapper runMapper;
     private final OutboxService outboxService;
 
     @Transactional
     public PricingRunResponse triggerManualRun(long connectionId, long workspaceId) {
         ensureNoRunInProgress(connectionId);
+        return doCreateManualRun(connectionId, workspaceId);
+    }
 
+    @Transactional
+    public List<PricingRunResponse> triggerManualRunForWorkspace(long workspaceId) {
+        List<Long> connectionIds = assignmentRepository
+                .findDistinctConnectionIdsWithActivePoliciesForWorkspace(workspaceId);
+
+        if (connectionIds.isEmpty()) {
+            throw BadRequestException.of(MessageCodes.PRICING_RUN_NO_ACTIVE_ASSIGNMENTS);
+        }
+
+        List<PricingRunResponse> results = new ArrayList<>();
+        for (long connectionId : connectionIds) {
+            if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)) {
+                log.debug("Manual workspace run: skipping connectionId={} (run in progress)",
+                        connectionId);
+                continue;
+            }
+            results.add(doCreateManualRun(connectionId, workspaceId));
+        }
+        return results;
+    }
+
+    private PricingRunResponse doCreateManualRun(long connectionId, long workspaceId) {
         var run = new PricingRunEntity();
         run.setWorkspaceId(workspaceId);
         run.setConnectionId(connectionId);
@@ -54,7 +81,6 @@ public class PricingRunApiService {
         enqueuePricingRunExecute(saved.getId());
         log.info("Manual pricing run triggered: id={}, connectionId={}, workspaceId={}",
                 saved.getId(), connectionId, workspaceId);
-
         return runMapper.toResponse(saved);
     }
 

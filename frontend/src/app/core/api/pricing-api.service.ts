@@ -250,6 +250,15 @@ export class PricingApiService {
     );
   }
 
+  triggerManualRuns(
+    workspaceId: number,
+  ): Observable<PricingRunSummary[]> {
+    return this.http.post<PricingRunSummary[]>(
+      `${this.base}/workspaces/${workspaceId}/pricing/runs/trigger`,
+      {},
+    );
+  }
+
   listDecisions(
     workspaceId: number,
     filter: PricingDecisionFilter,

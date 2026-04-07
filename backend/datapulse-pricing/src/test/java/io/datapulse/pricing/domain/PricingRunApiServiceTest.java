@@ -3,6 +3,8 @@ package io.datapulse.pricing.domain;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +37,7 @@ import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
 import io.datapulse.pricing.persistence.PriceDecisionRepository;
+import io.datapulse.pricing.persistence.PricePolicyAssignmentRepository;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
 import io.datapulse.pricing.persistence.PricingRunEntity;
 import io.datapulse.pricing.persistence.PricingRunReadRepository;
@@ -47,6 +50,7 @@ class PricingRunApiServiceTest {
   @Mock private PricingRunReadRepository runReadRepository;
   @Mock private PriceDecisionRepository decisionRepository;
   @Mock private PricePolicyRepository policyRepository;
+  @Mock private PricePolicyAssignmentRepository assignmentRepository;
   @Mock private PricingRunMapper runMapper;
   @Mock private OutboxService outboxService;
 
@@ -137,6 +141,74 @@ class PricingRunApiServiceTest {
 
       assertThatThrownBy(() -> service.getRun(99L, WORKSPACE_ID))
           .isInstanceOf(NotFoundException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("triggerManualRunForWorkspace")
+  class TriggerManualRunForWorkspace {
+
+    @Test
+    @DisplayName("creates runs for all connections with active policies")
+    void should_createRuns_when_multipleConnectionsHaveActivePolicies() {
+      when(assignmentRepository.findDistinctConnectionIdsWithActivePoliciesForWorkspace(WORKSPACE_ID))
+          .thenReturn(List.of(10L, 20L));
+      when(runRepository.existsByConnectionIdAndStatus(10L, RunStatus.IN_PROGRESS))
+          .thenReturn(false);
+      when(runRepository.existsByConnectionIdAndStatus(20L, RunStatus.IN_PROGRESS))
+          .thenReturn(false);
+      when(runRepository.save(any(PricingRunEntity.class)))
+          .thenAnswer(inv -> {
+            PricingRunEntity e = inv.getArgument(0);
+            e.setId(100L);
+            return e;
+          });
+      when(runMapper.toResponse(any(PricingRunEntity.class)))
+          .thenReturn(new PricingRunResponse(
+              100L, 10L, null, RunTriggerType.MANUAL, RunStatus.PENDING,
+              0, 0, 0, 0, 0, null, null, null, null, 0));
+
+      List<PricingRunResponse> result = service.triggerManualRunForWorkspace(WORKSPACE_ID);
+
+      assertThat(result).hasSize(2);
+      verify(runRepository, times(2)).save(any(PricingRunEntity.class));
+    }
+
+    @Test
+    @DisplayName("skips connections that already have a run in progress")
+    void should_skipConnection_when_runAlreadyInProgress() {
+      when(assignmentRepository.findDistinctConnectionIdsWithActivePoliciesForWorkspace(WORKSPACE_ID))
+          .thenReturn(List.of(10L, 20L));
+      when(runRepository.existsByConnectionIdAndStatus(10L, RunStatus.IN_PROGRESS))
+          .thenReturn(true);
+      when(runRepository.existsByConnectionIdAndStatus(20L, RunStatus.IN_PROGRESS))
+          .thenReturn(false);
+      when(runRepository.save(any(PricingRunEntity.class)))
+          .thenAnswer(inv -> {
+            PricingRunEntity e = inv.getArgument(0);
+            e.setId(100L);
+            return e;
+          });
+      when(runMapper.toResponse(any(PricingRunEntity.class)))
+          .thenReturn(new PricingRunResponse(
+              100L, 20L, null, RunTriggerType.MANUAL, RunStatus.PENDING,
+              0, 0, 0, 0, 0, null, null, null, null, 0));
+
+      List<PricingRunResponse> result = service.triggerManualRunForWorkspace(WORKSPACE_ID);
+
+      assertThat(result).hasSize(1);
+      verify(runRepository, times(1)).save(any(PricingRunEntity.class));
+    }
+
+    @Test
+    @DisplayName("throws BadRequestException when no connections with active policies")
+    void should_throwBadRequest_when_noActivePolicies() {
+      when(assignmentRepository.findDistinctConnectionIdsWithActivePoliciesForWorkspace(WORKSPACE_ID))
+          .thenReturn(List.of());
+
+      assertThatThrownBy(() -> service.triggerManualRunForWorkspace(WORKSPACE_ID))
+          .isInstanceOf(BadRequestException.class);
+      verify(runRepository, never()).save(any());
     }
   }
 

@@ -75,6 +75,7 @@ import { PolicyAssignmentsSectionComponent } from './policy-assignments-section.
 interface SectionDef {
   id: string;
   labelKey: string;
+  editOnly?: boolean;
 }
 
 @Component({
@@ -179,7 +180,7 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
     { id: 'section-params', labelKey: 'pricing.form.section.strategy' },
     { id: 'section-constraints', labelKey: 'pricing.form.section.constraints' },
     { id: 'section-guards', labelKey: 'pricing.form.section.guards' },
-    { id: 'section-assignments', labelKey: 'pricing.form.section.assignments' },
+    { id: 'section-assignments', labelKey: 'pricing.form.section.assignments', editOnly: true },
   ];
   readonly activeSection = signal('section-basics');
   private observer: IntersectionObserver | null = null;

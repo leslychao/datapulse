@@ -23,6 +23,8 @@ export interface CostBreakdownItem {
 export interface PnlSummary {
   revenueAmount: number;
   totalCostsAmount: number;
+  compensationAmount: number;
+  refundAmount: number;
   cogsAmount: number;
   advertisingCostAmount: number;
   marketplacePnl: number;
@@ -31,6 +33,8 @@ export interface PnlSummary {
   reconciliationRatio: number;
   revenueDeltaPct: number | null;
   costsDeltaPct: number | null;
+  compensationDeltaPct: number | null;
+  refundDeltaPct: number | null;
   cogsDeltaPct: number | null;
   advertisingDeltaPct: number | null;
   pnlDeltaPct: number | null;

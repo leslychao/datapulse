@@ -2,6 +2,7 @@ package io.datapulse.analytics.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -59,20 +60,35 @@ public class PnlQueryService {
             .multiply(BigDecimal.valueOf(100))
         : BigDecimal.ZERO;
 
+    BigDecimal compensation = orZero(current.getCompensationAmount());
+    BigDecimal refund = orZero(current.getRefundAmount());
+    BigDecimal marketplacePnl = orZero(current.getMarketplacePnl());
+    BigDecimal cogs = orZero(current.getNetCogs());
+    BigDecimal advertising = orZero(current.getAdvertisingCost());
+    BigDecimal fullPnl = marketplacePnl.subtract(advertising).subtract(cogs);
+
+    BigDecimal prevFullPnl = prev != null
+        ? computeFullPnl(prev)
+        : null;
+
     return new PnlAggregatedSummaryResponse(
         revenue,
         totalCosts,
-        orZero(current.getNetCogs()),
-        orZero(current.getAdvertisingCost()),
-        orZero(current.getMarketplacePnl()),
-        orZero(current.getFullPnl()),
+        compensation,
+        refund,
+        cogs,
+        advertising,
+        marketplacePnl,
+        fullPnl,
         orZero(residual),
         reconciliationRatio,
         deltaPct(current.getRevenueAmount(), prev != null ? prev.getRevenueAmount() : null),
         deltaPct(totalCosts, prevTotalCosts),
-        deltaPct(current.getNetCogs(), prev != null ? prev.getNetCogs() : null),
-        deltaPct(current.getAdvertisingCost(), prev != null ? prev.getAdvertisingCost() : null),
-        deltaPct(current.getFullPnl(), prev != null ? prev.getFullPnl() : null),
+        deltaPct(compensation, prev != null ? prev.getCompensationAmount() : null),
+        deltaPct(refund, prev != null ? prev.getRefundAmount() : null),
+        deltaPct(cogs, prev != null ? prev.getNetCogs() : null),
+        deltaPct(advertising, prev != null ? prev.getAdvertisingCost() : null),
+        deltaPct(fullPnl, prevFullPnl),
         buildCostBreakdown(current, totalCosts)
     );
   }
@@ -107,7 +123,38 @@ public class PnlQueryService {
 
   public List<PnlTrendResponse> getTrend(long workspaceId, PnlFilter filter,
       TrendGranularity granularity) {
-    return pnlReadRepository.findTrend(workspaceId, filter, granularity);
+    PnlFilter bounded = ensureTrendBounds(filter, granularity);
+    return pnlReadRepository.findTrend(workspaceId, bounded, granularity);
+  }
+
+  private BigDecimal computeFullPnl(PnlAggregatedRow row) {
+    return orZero(row.getMarketplacePnl())
+        .subtract(orZero(row.getAdvertisingCost()))
+        .subtract(orZero(row.getNetCogs()));
+  }
+
+  private PnlFilter ensureTrendBounds(PnlFilter filter, TrendGranularity granularity) {
+    if (filter.from() != null || filter.to() != null) {
+      return filter;
+    }
+    YearMonth anchor = filter.period() != null && !filter.period().isBlank()
+        ? parseYearMonth(filter.period())
+        : YearMonth.now();
+    if (anchor == null) {
+      anchor = YearMonth.now();
+    }
+    LocalDate to = anchor.atEndOfMonth();
+    int monthsBack = granularity == TrendGranularity.MONTHLY ? 11 : 2;
+    LocalDate from = anchor.minusMonths(monthsBack).atDay(1);
+    return new PnlFilter(from, to, filter.period(), filter.sellerSkuId(), filter.search());
+  }
+
+  private YearMonth parseYearMonth(String period) {
+    try {
+      return YearMonth.parse(period);
+    } catch (DateTimeParseException e) {
+      return null;
+    }
   }
 
   private String extractSortColumn(Pageable pageable, String defaultColumn) {
@@ -192,7 +239,8 @@ public class PnlQueryService {
     return new PnlAggregatedSummaryResponse(
         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-        null, null, null, null, null, List.of());
+        BigDecimal.ZERO, BigDecimal.ZERO,
+        null, null, null, null, null, null, null, List.of());
   }
 
   private BigDecimal orZero(BigDecimal value) {

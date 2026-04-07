@@ -505,6 +505,7 @@
   "pricing.run.not_resumable": "Расчёт не может быть возобновлён из состояния {{status}}.",
   "pricing.run.not_cancellable": "Расчёт не может быть отменён из состояния {{status}}.",
   "pricing.run.blast_radius_breached": "Превышен порог массовых изменений ({{metric}}: {{value}}). Расчёт приостановлен.",
+  "pricing.run.no_active_assignments": "Нет подключений с активными ценовыми политиками. Создайте политику и назначьте её на подключение.",
   "pricing.policy.full_auto_gate_failed": "FULL_AUTO не может быть включён: {{violations}}.",
   "pricing.policy.full_auto_gate.semi_auto_duration_insufficient": "Политика должна проработать в режиме SEMI_AUTO минимум 7 дней.",
   "pricing.policy.full_auto_gate.recent_failed_actions": "В последние 7 дней есть неудавшиеся действия по ценам.",
@@ -2280,7 +2281,8 @@
   "pricing.runs.empty": "Прогоны ценообразования ещё не выполнялись.",
   "pricing.runs.empty_filtered": "Нет прогонов, соответствующих фильтрам.",
   "pricing.runs.error": "Не удалось загрузить прогоны.",
-  "pricing.runs.trigger_success": "Прогон ценообразования запущен",
+  "pricing.runs.trigger_success": "Запущено прогонов: {{count}}",
+  "pricing.runs.trigger_submitting": "Запуск...",
   "pricing.runs.trigger_error": "Не удалось запустить прогон",
   "pricing.runs.not_found": "Прогон не найден",
   "pricing.runs.back": "← Назад к прогонам",
@@ -2457,6 +2459,8 @@
 
   "analytics.pnl.kpi.revenue": "Выручка",
   "analytics.pnl.kpi.total_costs": "Затраты",
+  "analytics.pnl.kpi.compensation": "Компенсации",
+  "analytics.pnl.kpi.refund": "Возвраты",
   "analytics.pnl.kpi.cogs": "Себестоимость",
   "analytics.pnl.kpi.advertising": "Реклама",
   "analytics.pnl.kpi.pnl": "P&L",
@@ -2928,11 +2932,6 @@
 
   "pricing.runs.detail_error": "Не удалось загрузить детали прогона",
 
-  "pricing.runs.trigger_modal.description": "Выберите подключение для ручного запуска прогона ценообразования.",
-  "pricing.runs.trigger_modal.connection_label": "Подключение",
-  "pricing.runs.trigger_modal.connection_placeholder": "Выберите подключение",
-  "pricing.runs.trigger_modal.submitting": "Запуск...",
-  "pricing.runs.trigger_modal.submit": "Запустить",
   "pricing.runs.detail.run_number": "Прогон #{{id}}",
   "pricing.runs.detail.empty_decisions": "Решений по данному прогону пока нет.",
   "pricing.runs.detail.started": "Начат {{time}}",
@@ -2967,6 +2966,7 @@
   "pricing.assignments.delete_message": "Удалить назначение?",
 
   "pricing.form.section.assignments": "Назначения",
+  "pricing.form.section.assignments_hint_create": "Доступно после создания политики",
   "pricing.form.assignments.subtitle": "Определите, к каким подключениям, категориям или товарам будет применяться эта политика. Без назначений политика не работает.",
   "pricing.form.assignments.add_btn": "Добавить назначение",
   "pricing.form.assignments.scope_label": "Тип области",

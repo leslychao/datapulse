@@ -850,7 +850,7 @@ Pricing pipeline работает с конечной ценой для поку
 | Триггер | Механизм | Частота |
 |---------|----------|---------|
 | Post-sync | RabbitMQ event `ETL_SYNC_COMPLETED` (outbox, [ETL Pipeline](etl-pipeline.md#post-sync-outbox-events)) | После успешного ETL sync (1-4 раза в день) |
-| Manual | REST API `POST /api/workspaces/{workspaceId}/pricing/runs` → outbox → RabbitMQ | По требованию |
+| Manual | REST API `POST /api/workspaces/{workspaceId}/pricing/runs/trigger` → derives connections from active policy assignments → outbox → RabbitMQ. Skips connections with run already in progress | По требованию |
 | Schedule | Spring `@Scheduled` cron → outbox → RabbitMQ | Configurable cron |
 | Policy change | `@TransactionalEventListener(AFTER_COMMIT)` → outbox → RabbitMQ | При изменении/активации policy |
 | **Manual bulk** | REST API `POST /api/workspaces/{workspaceId}/pricing/bulk-manual/apply` → synchronous run | По требованию (ad-hoc). Strategy = `MANUAL_OVERRIDE` (user-provided price). Guards: frequency, volatility, stock-out **не применяются**. См. [Bulk Operations & Draft Mode](../features/2026-03-31-bulk-operations-draft-mode.md) |
@@ -1032,7 +1032,8 @@ Pricing run в FULL_AUTO mode отслеживает aggregate metrics по хо
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/workspaces/{workspaceId}/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run. Body: `{ connectionId }` |
+| POST | `/api/workspaces/{workspaceId}/pricing/runs/trigger` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing runs for all connections with active policies. No body. Returns `List<PricingRunResponse>`. Skips connections with run already in progress |
+| POST | `/api/workspaces/{workspaceId}/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run for specific connection. Body: `{ connectionId }`. Legacy endpoint |
 | GET | `/api/workspaces/{workspaceId}/pricing/runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
 | GET | `/api/workspaces/{workspaceId}/pricing/runs/{runId}` | Any role | Детали run: status, counts, timing |
 | POST | `/api/workspaces/{workspaceId}/pricing/runs/{runId}/resume` | PRICING_MANAGER, ADMIN, OWNER | Resume PAUSED run (blast radius override). PAUSED → IN_PROGRESS, ON_HOLD actions → APPROVED |

@@ -25,7 +25,7 @@ public class PricingInsightController {
   private final PricingInsightService insightService;
 
   @GetMapping
-  @PreAuthorize("@workspaceAccessService.canRead(#workspaceId)")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public Page<PricingInsightResponse> listInsights(
       @PathVariable("workspaceId") long workspaceId,
       @RequestParam(value = "type", required = false) String insightType,
@@ -36,13 +36,13 @@ public class PricingInsightController {
   }
 
   @GetMapping("/count")
-  @PreAuthorize("@workspaceAccessService.canRead(#workspaceId)")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public long countUnacknowledged(@PathVariable("workspaceId") long workspaceId) {
     return insightService.countUnacknowledged(workspaceId);
   }
 
   @PostMapping("/{insightId}/acknowledge")
-  @PreAuthorize("@workspaceAccessService.canRead(#workspaceId)")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void acknowledge(
       @PathVariable("workspaceId") long workspaceId,

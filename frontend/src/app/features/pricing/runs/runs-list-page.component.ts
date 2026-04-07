@@ -7,7 +7,6 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -19,12 +18,7 @@ import { lastValueFrom, startWith } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { RbacService } from '@core/auth/rbac.service';
-import { ConnectionApiService } from '@core/api/connection-api.service';
-import {
-  PricingRunSummary,
-  PricingRunFilter,
-  ConnectionSummary,
-} from '@core/models';
+import { PricingRunSummary, PricingRunFilter } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import {
@@ -71,7 +65,6 @@ const DECISION_COLOR: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
-    FormsModule,
     RouterLink,
     FilterBarComponent,
     DataGridComponent,
@@ -87,10 +80,15 @@ const DECISION_COLOR: Record<string, string> = {
         </h2>
         @if (rbac.canWritePolicies()) {
           <button
-            (click)="showTriggerModal.set(true)"
-            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+            (click)="triggerRun()"
+            [disabled]="triggerMutation.isPending()"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {{ 'pricing.runs.trigger_run' | translate }}
+            @if (triggerMutation.isPending()) {
+              {{ 'pricing.runs.trigger_submitting' | translate }}
+            } @else {
+              {{ 'pricing.runs.trigger_run' | translate }}
+            }
           </button>
         }
       </div>
@@ -304,57 +302,6 @@ const DECISION_COLOR: Record<string, string> = {
       </div>
     </div>
 
-    <!-- Trigger Manual Run Modal -->
-    @if (showTriggerModal()) {
-      <div class="fixed inset-0 z-[9000] flex items-center justify-center">
-        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="showTriggerModal.set(false)"></div>
-        <div
-          class="relative z-10 w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)] animate-[fadeIn_150ms_ease]"
-        >
-          <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ 'pricing.runs.trigger_run' | translate }}</h3>
-          <p class="mt-1 text-sm text-[var(--text-secondary)]">
-            {{ 'pricing.runs.trigger_modal.description' | translate }}
-          </p>
-
-          <div class="mt-4 flex flex-col gap-1.5">
-            <label class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.trigger_modal.connection_label' | translate }}</label>
-            @if (connectionsQuery.isPending()) {
-              <div class="h-9 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] dp-shimmer"></div>
-            } @else {
-              <select
-                [(ngModel)]="selectedConnectionId"
-                class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-              >
-                <option [ngValue]="null" disabled>{{ 'pricing.runs.trigger_modal.connection_placeholder' | translate }}</option>
-                @for (conn of activeConnections(); track conn.id) {
-                  <option [ngValue]="conn.id">{{ conn.name }} ({{ conn.marketplaceType }})</option>
-                }
-              </select>
-            }
-          </div>
-
-          <div class="mt-6 flex justify-end gap-3">
-            <button
-              (click)="showTriggerModal.set(false)"
-              class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
-            >
-              {{ 'actions.cancel' | translate }}
-            </button>
-            <button
-              (click)="triggerRun()"
-              [disabled]="!selectedConnectionId || triggerMutation.isPending()"
-              class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              @if (triggerMutation.isPending()) {
-                {{ 'pricing.runs.trigger_modal.submitting' | translate }}
-              } @else {
-                {{ 'pricing.runs.trigger_modal.submit' | translate }}
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    }
   `,
   styles: [`
     .peek-section {
@@ -364,15 +311,10 @@ const DECISION_COLOR: Record<string, string> = {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.97); }
-      to { opacity: 1; transform: scale(1); }
-    }
   `],
 })
 export class RunsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
-  private readonly connectionApi = inject(ConnectionApiService);
   protected readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -397,9 +339,7 @@ export class RunsListPageComponent {
   );
 
   readonly filterValues = signal<Record<string, any>>({});
-  readonly showTriggerModal = signal(false);
   readonly expandedRunId = signal<number | null>(null);
-  protected selectedConnectionId: number | null = null;
 
   readonly currentSort = signal<{ field: string; dir: 'asc' | 'desc' }>({
     field: 'createdAt',
@@ -554,14 +494,6 @@ export class RunsListPageComponent {
     staleTime: 30_000,
   }));
 
-  readonly connectionsQuery = injectQuery(() => ({
-    queryKey: ['connections'],
-    queryFn: () =>
-      lastValueFrom(this.connectionApi.listConnections()),
-    enabled: this.showTriggerModal(),
-    staleTime: 60_000,
-  }));
-
   readonly peekDecisionsQuery = injectQuery(() => ({
     queryKey: [
       'pricing-decisions',
@@ -586,12 +518,6 @@ export class RunsListPageComponent {
   }));
 
   readonly rows = computed(() => this.runsQuery.data()?.content ?? []);
-
-  readonly activeConnections = computed<ConnectionSummary[]>(() =>
-    (this.connectionsQuery.data() ?? []).filter(
-      (c) => c.status === 'ACTIVE',
-    ),
-  );
 
   readonly hasActiveFilters = computed(() =>
     Object.values(this.filterValues()).some(
@@ -618,18 +544,17 @@ export class RunsListPageComponent {
   );
 
   readonly triggerMutation = injectMutation(() => ({
-    mutationFn: (connectionId: number) =>
+    mutationFn: () =>
       lastValueFrom(
-        this.pricingApi.triggerManualRun(
+        this.pricingApi.triggerManualRuns(
           this.wsStore.currentWorkspaceId()!,
-          connectionId,
         ),
       ),
-    onSuccess: () => {
-      this.showTriggerModal.set(false);
-      this.selectedConnectionId = null;
+    onSuccess: (runs: PricingRunSummary[]) => {
       this.queryClient.invalidateQueries({ queryKey: ['pricing-runs'] });
-      this.toast.success(this.translate.instant('pricing.runs.trigger_success'));
+      this.toast.success(
+        this.translate.instant('pricing.runs.trigger_success', { count: runs.length }),
+      );
     },
     onError: () => {
       this.toast.error(this.translate.instant('pricing.runs.trigger_error'));
@@ -669,9 +594,7 @@ export class RunsListPageComponent {
   }
 
   triggerRun(): void {
-    if (this.selectedConnectionId) {
-      this.triggerMutation.mutate(this.selectedConnectionId);
-    }
+    this.triggerMutation.mutate(undefined);
   }
 
   decisionColor(dt: string): string {

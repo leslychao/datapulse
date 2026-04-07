@@ -129,6 +129,7 @@ public final class MessageCodes {
     public static final String PRICING_POLICY_FULL_AUTO_CONFIRM_REQUIRED = "pricing.policy.full_auto_confirm_required";
     public static final String PRICING_POLICY_PREVIEW_REQUIRED = "pricing.policy.preview_required_for_full_auto";
     public static final String PRICING_RUN_BLAST_RADIUS_BREACHED = "pricing.run.blast_radius_breached";
+    public static final String PRICING_RUN_NO_ACTIVE_ASSIGNMENTS = "pricing.run.no_active_assignments";
 
     // --- Pricing: Impact Preview ---
     public static final String PRICING_PREVIEW_OFFER_INACTIVE = "pricing.preview.offer_inactive";

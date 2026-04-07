@@ -38,4 +38,13 @@ public interface PricePolicyAssignmentRepository extends JpaRepository<PricePoli
         WHERE a.pricePolicyId = :policyId
         """)
     List<Long> findDistinctConnectionIdsByPolicyId(@Param("policyId") Long policyId);
+
+    @Query("""
+        SELECT DISTINCT a.marketplaceConnectionId
+        FROM PricePolicyAssignmentEntity a
+        JOIN PricePolicyEntity p ON p.id = a.pricePolicyId
+        WHERE p.status = 'ACTIVE' AND p.workspaceId = :workspaceId
+        """)
+    List<Long> findDistinctConnectionIdsWithActivePoliciesForWorkspace(
+        @Param("workspaceId") long workspaceId);
 }

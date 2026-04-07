@@ -27,6 +27,7 @@ import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Slf4j
 @Component
@@ -104,11 +105,25 @@ public class OzonPromoSyncSource implements EventSource {
             long actionId = Long.parseLong(externalPromoId);
 
             try {
-                syncActionProducts(ctx, clientId, apiKey, actionId, campaignId,
-                        true, totalPages, totalRecords, totalSkipped, errors);
-                syncActionProducts(ctx, clientId, apiKey, actionId, campaignId,
-                        false, totalPages, totalRecords, totalSkipped, errors);
+                SubSourceResult participating = syncActionProducts(
+                        ctx, clientId, apiKey, actionId, campaignId, true);
+                totalPages += participating.pagesProcessed();
+                totalRecords += participating.recordsProcessed();
+                totalSkipped += participating.recordsSkipped();
+                errors.addAll(participating.errors());
+
+                SubSourceResult candidates = syncActionProducts(
+                        ctx, clientId, apiKey, actionId, campaignId, false);
+                totalPages += candidates.pagesProcessed();
+                totalRecords += candidates.recordsProcessed();
+                totalSkipped += candidates.recordsSkipped();
+                errors.addAll(candidates.errors());
             } catch (Exception e) {
+                if (isActionNotFound(e)) {
+                    log.warn("Ozon action no longer exists, skipping: connectionId={}, actionId={}",
+                            ctx.connectionId(), externalPromoId);
+                    continue;
+                }
                 log.error("Failed to sync products for Ozon action: connectionId={}, actionId={}, error={}",
                         ctx.connectionId(), externalPromoId, e.getMessage(), e);
                 errors.add("Action %s: %s".formatted(externalPromoId, e.getMessage()));
@@ -125,12 +140,10 @@ public class OzonPromoSyncSource implements EventSource {
         return SubSourceResult.success("OzonActionProducts", totalPages, totalRecords);
     }
 
-    private void syncActionProducts(IngestContext ctx,
-                                    String clientId, String apiKey,
-                                    long actionId, long campaignId,
-                                    boolean isParticipating,
-                                    int totalPages, int totalRecords,
-                                    int totalSkipped, List<String> errors) {
+    private SubSourceResult syncActionProducts(IngestContext ctx,
+                                               String clientId, String apiKey,
+                                               long actionId, long campaignId,
+                                               boolean isParticipating) {
         String sourceLabel = isParticipating ? "products" : "candidates";
         var captureCtx = CaptureContextFactory.build(
                 ctx, eventType(), "OzonAction-%s-%d".formatted(sourceLabel, actionId));
@@ -139,17 +152,19 @@ public class OzonPromoSyncSource implements EventSource {
                 ? adapter.captureActionProducts(captureCtx, clientId, apiKey, actionId)
                 : adapter.captureActionCandidates(captureCtx, clientId, apiKey, actionId);
 
-        SubSourceResult result = subSourceRunner.processPages(
+        return subSourceRunner.processPages(
                 "OzonAction-%s-%d".formatted(sourceLabel, actionId), pages,
                 OzonActionProductDto.class,
                 batch -> processProductBatch(batch, ctx, campaignId, actionId, isParticipating));
+    }
 
-        totalPages += result.pagesProcessed();
-        totalRecords += result.recordsProcessed();
-        totalSkipped += result.recordsSkipped();
-        if (!result.errors().isEmpty()) {
-            errors.addAll(result.errors());
+    private static boolean isActionNotFound(Exception e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof WebClientResponseException.NotFound) {
+                return true;
+            }
         }
+        return false;
     }
 
     private void processProductBatch(List<OzonActionProductDto> batch,

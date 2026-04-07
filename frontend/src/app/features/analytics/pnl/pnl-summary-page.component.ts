@@ -18,6 +18,8 @@ import {
   Megaphone,
   ChartBar,
   Scale,
+  ShieldCheck,
+  RotateCcw,
 } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
@@ -151,7 +153,7 @@ export class PnlSummaryPageComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly period = signal(currentMonth());
-  readonly shimmerCards = Array.from({ length: 6 });
+  readonly shimmerCards = Array.from({ length: 8 });
 
   private readonly filterDefs: UrlFilterDef[] = [
     { key: 'period', signal: this.period, defaultValue: currentMonth() },
@@ -190,6 +192,8 @@ export class PnlSummaryPageComponent {
     return [
       this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct, Banknote, 'success', 'pnl/by-product'),
       this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct, Receipt, 'error', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.compensation', s.compensationAmount, s.compensationDeltaPct, ShieldCheck, 'info', 'pnl/by-posting'),
+      this.buildKpi('analytics.pnl.kpi.refund', s.refundAmount, s.refundDeltaPct, RotateCcw, 'warning', 'pnl/by-posting'),
       this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct, Package, 'warning', 'pnl/by-product'),
       this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct, Megaphone, 'info', 'pnl/by-product'),
       this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct, ChartBar, 'primary', 'pnl/trend'),

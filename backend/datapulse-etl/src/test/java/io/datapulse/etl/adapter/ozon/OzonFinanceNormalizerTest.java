@@ -28,7 +28,7 @@ class OzonFinanceNormalizerTest {
       var tx = new OzonFinanceTransaction(
           1001L, "OperationAgentDeliveredToCustomer",
           "2024-01-15 10:30:00", "Доставка покупателю",
-          BigDecimal.valueOf(1000), BigDecimal.valueOf(150),
+          BigDecimal.valueOf(1000), BigDecimal.valueOf(-150),
           BigDecimal.valueOf(700), "orders",
           new OzonFinancePosting(
               "FBO", "2024-01-14", "87621408-0010-1", 777L),
