@@ -449,10 +449,10 @@ public class OzonNormalizer {
         if (info.isArchived() || info.isAutoarchived()) {
             return "ARCHIVED";
         }
-        if (info.visibility() != null && info.visibility().visible()) {
-            return "ACTIVE";
+        if (info.visibility() != null && !info.visibility().visible()) {
+            return "INACTIVE";
         }
-        return "INACTIVE";
+        return "ACTIVE";
     }
 
     private static String resolveWarehouseId(OzonStockItem.OzonStockEntry entry) {

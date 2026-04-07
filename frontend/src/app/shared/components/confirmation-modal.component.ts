@@ -27,7 +27,8 @@ import { TranslatePipe } from '@ngx-translate/core';
               </label>
               <input
                 type="text"
-                [(ngModel)]="confirmInput"
+                [ngModel]="confirmInput()"
+                (ngModelChange)="confirmInput.set($event)"
                 class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
@@ -79,22 +80,22 @@ export class ConfirmationModalComponent {
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();
 
-  protected confirmInput = '';
+  protected readonly confirmInput = signal('');
 
   protected readonly canConfirm = computed(() => {
     const ttc = this.typeToConfirm();
     if (!ttc) return true;
-    return this.confirmInput === ttc;
+    return this.confirmInput() === ttc;
   });
 
   onConfirm(): void {
     if (!this.canConfirm()) return;
     this.confirmed.emit();
-    this.confirmInput = '';
+    this.confirmInput.set('');
   }
 
   onCancel(): void {
     this.cancelled.emit();
-    this.confirmInput = '';
+    this.confirmInput.set('');
   }
 }

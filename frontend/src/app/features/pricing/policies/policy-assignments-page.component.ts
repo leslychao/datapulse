@@ -23,10 +23,12 @@ import {
   ValueGetterParams,
 } from 'ag-grid-community';
 
+import { ConnectionApiService } from '@core/api/connection-api.service';
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import {
   AssignmentScopeType,
+  ConnectionSummary,
   CreateAssignmentRequest,
   PolicyAssignment,
 } from '@core/models';
@@ -90,14 +92,21 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
           <div class="flex flex-wrap items-end gap-4">
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
-                {{ 'pricing.assignments.form.connection_id_label' | translate }}
+                {{ 'pricing.assignments.form.connection_label' | translate }}
               </label>
-              <input
-                type="number"
+              <select
                 [(ngModel)]="formConnectionId"
-                class="h-8 w-36 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                placeholder="1"
-              />
+                class="h-8 w-56 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              >
+                <option [ngValue]="null" disabled>
+                  {{ 'pricing.assignments.form.connection_placeholder' | translate }}
+                </option>
+                @for (conn of activeConnections(); track conn.id) {
+                  <option [ngValue]="conn.id">
+                    {{ conn.name }} ({{ conn.marketplaceType }})
+                  </option>
+                }
+              </select>
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-[11px] text-[var(--text-tertiary)]">
@@ -202,6 +211,7 @@ const SCOPE_TYPE_COLOR: Record<string, string> = {
   `,
 })
 export class PolicyAssignmentsPageComponent {
+  private readonly connectionApi = inject(ConnectionApiService);
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
@@ -215,6 +225,18 @@ export class PolicyAssignmentsPageComponent {
   readonly showCreateForm = signal(false);
   readonly showDeleteModal = signal(false);
   readonly deleteTarget = signal<PolicyAssignment | null>(null);
+
+  private readonly connectionsQuery = injectQuery(() => ({
+    queryKey: ['connections'],
+    queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
+    staleTime: 60_000,
+  }));
+
+  readonly activeConnections = computed(() =>
+    (this.connectionsQuery.data() ?? []).filter(
+      (c: ConnectionSummary) => c.status === 'ACTIVE',
+    ),
+  );
 
   formConnectionId: number | null = null;
   formScopeType: AssignmentScopeType = 'CONNECTION';

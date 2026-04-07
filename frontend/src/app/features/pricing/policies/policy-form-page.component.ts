@@ -11,7 +11,7 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import {
@@ -70,6 +70,7 @@ import { CompositeFormComponent } from './composite-form.component';
 import { ConstraintsFormComponent } from './constraints-form.component';
 import { GuardConfigFormComponent } from './guard-config-form.component';
 import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
+import { PolicyAssignmentsSectionComponent } from './policy-assignments-section.component';
 
 interface SectionDef {
   id: string;
@@ -92,6 +93,7 @@ interface SectionDef {
     ConstraintsFormComponent,
     GuardConfigFormComponent,
     ImpactPreviewModalComponent,
+    PolicyAssignmentsSectionComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto bg-[var(--bg-secondary)]' },
   templateUrl: './policy-form-page.component.html',
@@ -105,6 +107,8 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
   private readonly queryClient = inject(QueryClient);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
+
+  private readonly route = inject(ActivatedRoute);
 
   readonly icons = {
     Info, AlertTriangle, Eye, ArrowLeft,
@@ -146,6 +150,7 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
     },
     onSuccess: (result: PricingPolicy) => {
       this.queryClient.invalidateQueries({ queryKey: ['policies'] });
+      this.formDirty.set(false);
       if (this.isEditMode()) {
         this.queryClient.invalidateQueries({ queryKey: ['policy', this.policyId()] });
         this.toast.success(
@@ -153,11 +158,14 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
             version: String(result.version),
           }),
         );
+        this.navigateToList();
       } else {
         this.toast.success(this.translate.instant('pricing.policies.created'));
+        this.router.navigate(
+          ['/workspace', this.wsId(), 'pricing', 'policies', result.id, 'edit'],
+          { fragment: 'section-assignments' },
+        );
       }
-      this.formDirty.set(false);
-      this.navigateToList();
     },
     onError: (err) =>
       this.toast.error(
@@ -171,6 +179,7 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
     { id: 'section-params', labelKey: 'pricing.form.section.strategy' },
     { id: 'section-constraints', labelKey: 'pricing.form.section.constraints' },
     { id: 'section-guards', labelKey: 'pricing.form.section.guards' },
+    { id: 'section-assignments', labelKey: 'pricing.form.section.assignments' },
   ];
   readonly activeSection = signal('section-basics');
   private observer: IntersectionObserver | null = null;
@@ -525,6 +534,12 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.setupSectionObserver();
+
+    this.route.fragment.subscribe((fragment) => {
+      if (fragment) {
+        setTimeout(() => this.scrollToSection(fragment), 600);
+      }
+    });
   }
 
   ngOnDestroy(): void {

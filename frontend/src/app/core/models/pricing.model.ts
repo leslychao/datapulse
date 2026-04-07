@@ -176,6 +176,19 @@ export interface CreateAssignmentRequest {
   marketplaceOfferId?: number;
 }
 
+export interface CategorySuggestion {
+  id: number;
+  name: string;
+  externalCategoryId: string;
+}
+
+export interface OfferSuggestion {
+  id: number;
+  name: string;
+  marketplaceSku: string;
+  sellerSku: string;
+}
+
 export interface PricingRunSummary {
   id: number;
   triggerType: RunTriggerType;

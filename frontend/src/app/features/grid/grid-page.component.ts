@@ -265,7 +265,7 @@ export class GridPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.subscribeToGridUpdates();
     if (GRID_BASICS_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(GRID_BASICS_TOUR.id)) {
-      setTimeout(() => this.tourService.start(GRID_BASICS_TOUR), 1200);
+      this.tourService.startWhenReady(GRID_BASICS_TOUR);
     }
   }
 

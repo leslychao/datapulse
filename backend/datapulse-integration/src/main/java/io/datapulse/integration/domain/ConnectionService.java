@@ -94,7 +94,8 @@ public class ConnectionService {
 
     @Transactional(readOnly = true)
     public List<ConnectionSummaryResponse> listConnections(Long workspaceId) {
-        List<MarketplaceConnectionEntity> connections = connectionRepository.findAllByWorkspaceId(workspaceId);
+        List<MarketplaceConnectionEntity> connections =
+            connectionRepository.findAllByWorkspaceIdAndStatusNot(workspaceId, ConnectionStatus.ARCHIVED.name());
         return connectionMapper.toSummaries(connections);
     }
 
@@ -240,7 +241,6 @@ public class ConnectionService {
     @Transactional
     public void archiveConnection(Long connectionId, Long workspaceId) {
         MarketplaceConnectionEntity connection = findConnectionOrThrow(connectionId, workspaceId);
-        ensureNotTerminal(connection);
 
         String oldStatus = connection.getStatus();
         connection.setStatus(ConnectionStatus.ARCHIVED.name());
@@ -248,7 +248,7 @@ public class ConnectionService {
 
         log.info("Connection archived: connectionId={}, workspaceId={}", connectionId, workspaceId);
         eventPublisher.publishEvent(new ConnectionStatusChangedEvent(
-                connectionId, oldStatus, ConnectionStatus.ARCHIVED.name(), "admin_archive"));
+            connectionId, oldStatus, ConnectionStatus.ARCHIVED.name(), "admin_archive"));
     }
 
     @Transactional(readOnly = true)

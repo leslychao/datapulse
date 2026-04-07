@@ -121,6 +121,8 @@ export class DataGridComponent {
   }
 
   onRowClicked(event: RowClickedEvent<any>): void {
+    const target = event.event?.target as HTMLElement | null;
+    if (target?.closest('[data-action]')) return;
     if (event.data) this.rowClicked.emit(event.data);
   }
 

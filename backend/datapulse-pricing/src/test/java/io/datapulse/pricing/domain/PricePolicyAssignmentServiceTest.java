@@ -21,10 +21,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
-import io.datapulse.pricing.api.AssignmentMapper;
 import io.datapulse.pricing.api.AssignmentResponse;
 import io.datapulse.pricing.api.CreateAssignmentRequest;
+import io.datapulse.pricing.persistence.AssignmentSuggestionReadRepository;
 import io.datapulse.pricing.persistence.PricePolicyAssignmentEntity;
+import io.datapulse.pricing.persistence.PricePolicyAssignmentReadRepository;
 import io.datapulse.pricing.persistence.PricePolicyAssignmentRepository;
 import io.datapulse.pricing.persistence.PricePolicyEntity;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
@@ -33,8 +34,9 @@ import io.datapulse.pricing.persistence.PricePolicyRepository;
 class PricePolicyAssignmentServiceTest {
 
   @Mock private PricePolicyAssignmentRepository assignmentRepository;
+  @Mock private PricePolicyAssignmentReadRepository assignmentReadRepository;
+  @Mock private AssignmentSuggestionReadRepository suggestionReadRepository;
   @Mock private PricePolicyRepository policyRepository;
-  @Mock private AssignmentMapper assignmentMapper;
 
   @InjectMocks
   private PricePolicyAssignmentService service;
@@ -51,16 +53,15 @@ class PricePolicyAssignmentServiceTest {
   class ListAssignments {
 
     @Test
-    @DisplayName("returns assignments when policy exists")
+    @DisplayName("returns enriched assignments when policy exists")
     void should_returnAssignments_when_policyExists() {
       mockPolicyExists();
-      var entities = List.of(new PricePolicyAssignmentEntity());
-      when(assignmentRepository.findAllByPricePolicyId(POLICY_ID)).thenReturn(entities);
-      when(assignmentMapper.toResponses(entities)).thenReturn(List.of());
+      when(assignmentReadRepository.findEnrichedByPolicyId(POLICY_ID))
+          .thenReturn(List.of());
 
       service.listAssignments(POLICY_ID, WORKSPACE_ID);
 
-      verify(assignmentMapper).toResponses(entities);
+      verify(assignmentReadRepository).findEnrichedByPolicyId(POLICY_ID);
     }
 
     @Test
@@ -89,8 +90,10 @@ class PricePolicyAssignmentServiceTest {
         e.setId(1L);
         return e;
       });
-      when(assignmentMapper.toResponse(any())).thenReturn(
-          new AssignmentResponse(1L, POLICY_ID, CONNECTION_ID, ScopeType.CONNECTION, null, null));
+      when(assignmentReadRepository.findEnrichedById(1L)).thenReturn(
+          new AssignmentResponse(1L, POLICY_ID, CONNECTION_ID,
+              "Test Connection", "WB", ScopeType.CONNECTION,
+              null, null, null, null, null));
 
       var request = new CreateAssignmentRequest(CONNECTION_ID, ScopeType.CONNECTION, null, null);
       AssignmentResponse response = service.createAssignment(POLICY_ID, request, WORKSPACE_ID);
@@ -99,6 +102,7 @@ class PricePolicyAssignmentServiceTest {
       PricePolicyAssignmentEntity saved = entityCaptor.getValue();
       assertThat(saved.getScopeType()).isEqualTo(ScopeType.CONNECTION);
       assertThat(saved.getPricePolicyId()).isEqualTo(POLICY_ID);
+      assertThat(response.connectionName()).isEqualTo("Test Connection");
     }
 
     @Test
@@ -109,6 +113,32 @@ class PricePolicyAssignmentServiceTest {
           POLICY_ID, CONNECTION_ID, ScopeType.CONNECTION)).thenReturn(true);
 
       var request = new CreateAssignmentRequest(CONNECTION_ID, ScopeType.CONNECTION, null, null);
+
+      assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
+          .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    @DisplayName("rejects duplicate CATEGORY assignment")
+    void should_throwBadRequest_when_duplicateCategoryAssignment() {
+      mockPolicyExists();
+      when(assignmentRepository.existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndCategoryId(
+          POLICY_ID, CONNECTION_ID, ScopeType.CATEGORY, 5L)).thenReturn(true);
+
+      var request = new CreateAssignmentRequest(CONNECTION_ID, ScopeType.CATEGORY, 5L, null);
+
+      assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
+          .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    @DisplayName("rejects duplicate SKU assignment")
+    void should_throwBadRequest_when_duplicateSkuAssignment() {
+      mockPolicyExists();
+      when(assignmentRepository.existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndMarketplaceOfferId(
+          POLICY_ID, CONNECTION_ID, ScopeType.SKU, 100L)).thenReturn(true);
+
+      var request = new CreateAssignmentRequest(CONNECTION_ID, ScopeType.SKU, null, 100L);
 
       assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
           .isInstanceOf(BadRequestException.class);
@@ -140,8 +170,14 @@ class PricePolicyAssignmentServiceTest {
     @DisplayName("creates SKU assignment with offer id")
     void should_create_when_skuWithOfferId() {
       mockPolicyExists();
-      when(assignmentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-      when(assignmentMapper.toResponse(any())).thenReturn(null);
+      when(assignmentRepository.existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndMarketplaceOfferId(
+          POLICY_ID, CONNECTION_ID, ScopeType.SKU, 100L)).thenReturn(false);
+      when(assignmentRepository.save(any())).thenAnswer(i -> {
+        PricePolicyAssignmentEntity e = i.getArgument(0);
+        e.setId(2L);
+        return e;
+      });
+      when(assignmentReadRepository.findEnrichedById(2L)).thenReturn(null);
 
       var request = new CreateAssignmentRequest(CONNECTION_ID, ScopeType.SKU, null, 100L);
       service.createAssignment(POLICY_ID, request, WORKSPACE_ID);
@@ -155,8 +191,14 @@ class PricePolicyAssignmentServiceTest {
     @DisplayName("creates CATEGORY assignment with category id")
     void should_create_when_categoryWithCategoryId() {
       mockPolicyExists();
-      when(assignmentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-      when(assignmentMapper.toResponse(any())).thenReturn(null);
+      when(assignmentRepository.existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndCategoryId(
+          POLICY_ID, CONNECTION_ID, ScopeType.CATEGORY, 5L)).thenReturn(false);
+      when(assignmentRepository.save(any())).thenAnswer(i -> {
+        PricePolicyAssignmentEntity e = i.getArgument(0);
+        e.setId(3L);
+        return e;
+      });
+      when(assignmentReadRepository.findEnrichedById(3L)).thenReturn(null);
 
       var request = new CreateAssignmentRequest(CONNECTION_ID, ScopeType.CATEGORY, 5L, null);
       service.createAssignment(POLICY_ID, request, WORKSPACE_ID);

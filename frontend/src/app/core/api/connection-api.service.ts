@@ -59,7 +59,7 @@ export class ConnectionApiService {
   }
 
   archiveConnection(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/connections/${id}`);
+    return this.http.post<void>(`${this.base}/connections/${id}/archive`, {});
   }
 
   getSyncStates(connectionId: number): Observable<SyncState[]> {

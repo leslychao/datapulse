@@ -39,14 +39,6 @@ const routes: Routes = [
         data: { breadcrumb: 'Редактирование' },
       },
       {
-        path: 'policies/:policyId/assignments',
-        loadComponent: () =>
-          import('./policies/policy-assignments-page.component').then(
-            (m) => m.PolicyAssignmentsPageComponent,
-          ),
-        data: { breadcrumb: 'Назначения' },
-      },
-      {
         path: 'runs',
         loadComponent: () =>
           import('./runs/runs-list-page.component').then(

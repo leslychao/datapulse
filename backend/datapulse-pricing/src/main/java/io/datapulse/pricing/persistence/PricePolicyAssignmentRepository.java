@@ -18,6 +18,12 @@ public interface PricePolicyAssignmentRepository extends JpaRepository<PricePoli
     boolean existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeType(
             Long pricePolicyId, Long marketplaceConnectionId, ScopeType scopeType);
 
+    boolean existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndCategoryId(
+            Long pricePolicyId, Long marketplaceConnectionId, ScopeType scopeType, Long categoryId);
+
+    boolean existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndMarketplaceOfferId(
+            Long pricePolicyId, Long marketplaceConnectionId, ScopeType scopeType, Long marketplaceOfferId);
+
     @Query("""
         SELECT DISTINCT a.marketplaceConnectionId, p.workspaceId
         FROM PricePolicyAssignmentEntity a

@@ -321,7 +321,7 @@ router-outlet + * {
   max-width: 360px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  backface-visibility: hidden;
+  transform: none !important;
 }
 
 .dp-tour-popover .driver-popover-title {
@@ -369,6 +369,7 @@ router-outlet + * {
   font-size: var(--text-sm);
   font-weight: 500;
   padding: 5px 14px;
+  text-shadow: none;
   transition: background-color var(--transition-fast);
 }
 

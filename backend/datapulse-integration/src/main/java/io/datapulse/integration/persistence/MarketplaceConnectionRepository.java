@@ -9,6 +9,8 @@ public interface MarketplaceConnectionRepository extends JpaRepository<Marketpla
 
     List<MarketplaceConnectionEntity> findAllByWorkspaceId(Long workspaceId);
 
+    List<MarketplaceConnectionEntity> findAllByWorkspaceIdAndStatusNot(Long workspaceId, String status);
+
     Optional<MarketplaceConnectionEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     List<MarketplaceConnectionEntity> findAllByMarketplaceType(String marketplaceType);
@@ -17,4 +19,13 @@ public interface MarketplaceConnectionRepository extends JpaRepository<Marketpla
 
     boolean existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountId(
             Long workspaceId, String marketplaceType, String externalAccountId);
+
+    boolean existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNot(
+            Long workspaceId, String marketplaceType, String externalAccountId, Long id);
+
+    boolean existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNotAndStatusNot(
+            Long workspaceId, String marketplaceType, String externalAccountId, Long id, String status);
+
+    Optional<MarketplaceConnectionEntity> findFirstByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndStatusAndIdNot(
+            Long workspaceId, String marketplaceType, String externalAccountId, String status, Long excludeId);
 }

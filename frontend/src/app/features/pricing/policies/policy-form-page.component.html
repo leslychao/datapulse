@@ -10,13 +10,15 @@
       <lucide-icon [name]="icons.ArrowLeft" [size]="14" />
       {{ 'pricing.form.back_to_list' | translate }}
     </button>
-    <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">
-      @if (isEditMode()) {
-        {{ 'pricing.form.title_edit' | translate }}
-      } @else {
-        {{ 'pricing.form.title_create' | translate }}
-      }
-    </h1>
+    <div class="flex items-center justify-between">
+      <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">
+        @if (isEditMode()) {
+          {{ 'pricing.form.title_edit' | translate }}
+        } @else {
+          {{ 'pricing.form.title_create' | translate }}
+        }
+      </h1>
+    </div>
     <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">
       {{ 'pricing.form.subtitle' | translate }}
     </p>
@@ -439,8 +441,14 @@
           <dp-guard-config-form [form]="form" [submitted]="submitted()" />
         </div>
 
+        <!-- ─── Section 6: Assignments (edit mode only) ─── -->
+        @if (isEditMode()) {
+          <dp-policy-assignments-section [policyId]="+policyId()!" />
+        }
+
         <!-- ─── Footer ─── -->
-        <div class="sticky bottom-0 -mx-1 flex items-center justify-end rounded-t-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 shadow-[var(--shadow-sm)] backdrop-blur-sm">
+        <div aria-hidden="true" class="h-2"></div>
+        <div class="sticky bottom-0 flex items-center justify-end rounded-t-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 shadow-[var(--shadow-sm)] backdrop-blur-sm">
           <div class="flex items-center gap-2">
             @if (isEditMode()) {
               <button

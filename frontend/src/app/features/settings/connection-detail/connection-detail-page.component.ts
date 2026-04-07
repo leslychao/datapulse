@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   RefreshCw,
   Shield,
-  Trash2,
+  Archive,
   Power,
   PowerOff,
   Pencil,
@@ -207,7 +207,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
               </button>
             }
           </div>
-          @if (syncStateQuery.data(); as syncStates) {
+          @if (conn.syncStates; as syncStates) {
             <ag-grid-angular
               class="ag-theme-alpine"
               [style.height.px]="Math.max(200, syncStates.length * 42 + 48)"
@@ -277,15 +277,15 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
               @if (rbac.isOwner()) {
                 <div class="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
                   <div>
-                    <p class="text-sm font-medium text-[var(--status-error)]">{{ 'settings.connection_detail.delete_title' | translate }}</p>
-                    <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.delete_hint' | translate }}</p>
+                    <p class="text-sm font-medium text-[var(--status-warning)]">{{ 'settings.connection_detail.archive_title' | translate }}</p>
+                    <p class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'settings.connection_detail.archive_hint' | translate }}</p>
                   </div>
                   <button
-                    (click)="showDeleteModal.set(true)"
-                    class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-error)] px-3 py-1.5 text-sm text-[var(--status-error)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)]"
+                    (click)="showArchiveModal.set(true)"
+                    class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-warning)] px-3 py-1.5 text-sm text-[var(--status-warning)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-warning)_8%,transparent)]"
                   >
-                    <lucide-icon [img]="Trash2Icon" [size]="14" />
-                    {{ 'actions.delete' | translate }}
+                    <lucide-icon [img]="ArchiveIcon" [size]="14" />
+                    {{ 'actions.archive' | translate }}
                   </button>
                 </div>
               }
@@ -296,14 +296,14 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
       @if (connectionQuery.data(); as conn) {
         <dp-confirmation-modal
-          [open]="showDeleteModal()"
-          [title]="'settings.connection_detail.delete_modal_title' | translate"
-          [message]="translate.instant('settings.connection_detail.delete_modal_message', { name: conn.name })"
-          [confirmLabel]="'actions.delete' | translate"
+          [open]="showArchiveModal()"
+          [title]="'settings.connection_detail.archive_modal_title' | translate"
+          [message]="translate.instant('settings.connection_detail.archive_modal_message', { name: conn.name })"
+          [confirmLabel]="'actions.archive' | translate"
           [danger]="true"
           [typeToConfirm]="conn.name"
-          (confirmed)="deleteMutation.mutate(undefined); showDeleteModal.set(false)"
-          (cancelled)="showDeleteModal.set(false)"
+          (confirmed)="archiveMutation.mutate(undefined); showArchiveModal.set(false)"
+          (cancelled)="showArchiveModal.set(false)"
         />
       }
     </div>
@@ -313,7 +313,7 @@ export class ConnectionDetailPageComponent {
   protected readonly ArrowLeftIcon = ArrowLeft;
   protected readonly RefreshIcon = RefreshCw;
   protected readonly ShieldIcon = Shield;
-  protected readonly Trash2Icon = Trash2;
+  protected readonly ArchiveIcon = Archive;
   protected readonly PowerIcon = Power;
   protected readonly PowerOffIcon = PowerOff;
   protected readonly PencilIcon = Pencil;
@@ -349,7 +349,7 @@ export class ConnectionDetailPageComponent {
   }
 
   readonly showRotation = signal(false);
-  readonly showDeleteModal = signal(false);
+  readonly showArchiveModal = signal(false);
 
   newWbToken = '';
   newOzonClientId = '';
@@ -363,11 +363,6 @@ export class ConnectionDetailPageComponent {
     queryKey: ['connection', this.connectionId()],
     queryFn: () => lastValueFrom(this.connectionApi.getConnection(this.connId)),
     staleTime: 30_000,
-  }));
-
-  readonly syncStateQuery = injectQuery(() => ({
-    queryKey: ['connection-sync-state', this.connectionId()],
-    queryFn: () => lastValueFrom(this.connectionApi.getSyncStates(this.connId)),
   }));
 
   readonly callLogQuery = injectQuery(() => ({
@@ -407,7 +402,7 @@ export class ConnectionDetailPageComponent {
       lastValueFrom(this.connectionApi.triggerSync(this.connId, domains)),
     onSuccess: () => {
       this.toast.success(this.translate.instant('settings.connection_detail.sync_started'));
-      this.syncStateQuery.refetch();
+      this.connectionQuery.refetch();
     },
     onError: (error: unknown) =>
       this.toast.error(
@@ -437,13 +432,13 @@ export class ConnectionDetailPageComponent {
     onError: () => this.toast.error(this.translate.instant('settings.connection_detail.enable_error')),
   }));
 
-  readonly deleteMutation = injectMutation(() => ({
+  readonly archiveMutation = injectMutation(() => ({
     mutationFn: () => lastValueFrom(this.connectionApi.archiveConnection(this.connId)),
     onSuccess: () => {
-      this.toast.success(this.translate.instant('settings.connection_detail.deleted'));
+      this.toast.success(this.translate.instant('settings.connection_detail.archived'));
       this.goBack();
     },
-    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.delete_error')),
+    onError: () => this.toast.error(this.translate.instant('settings.connection_detail.archive_error')),
   }));
 
   readonly defaultColDef: ColDef = {

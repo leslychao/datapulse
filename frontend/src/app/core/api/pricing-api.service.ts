@@ -4,11 +4,13 @@ import { Observable } from 'rxjs';
 
 import { environment } from '@env';
 import {
+  CategorySuggestion,
   CreateAssignmentRequest,
   CreateLockRequest,
   CreatePolicyRequest,
   ImpactPreviewResponse,
   ManualPriceLock,
+  OfferSuggestion,
   PolicyAssignment,
   PricingDecisionDetail,
   PricingDecisionFilter,
@@ -152,6 +154,35 @@ export class PricingApiService {
   ): Observable<void> {
     return this.http.delete<void>(
       `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments/${assignmentId}`,
+    );
+  }
+
+  listAssignmentCategories(
+    workspaceId: number,
+    policyId: number,
+    connectionId: number,
+    search?: string,
+  ): Observable<CategorySuggestion[]> {
+    let params = new HttpParams().set('connectionId', connectionId);
+    if (search) params = params.set('search', search);
+    return this.http.get<CategorySuggestion[]>(
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments/categories`,
+      { params },
+    );
+  }
+
+  searchAssignmentOffers(
+    workspaceId: number,
+    policyId: number,
+    connectionId: number,
+    search: string,
+  ): Observable<OfferSuggestion[]> {
+    const params = new HttpParams()
+      .set('connectionId', connectionId)
+      .set('search', search);
+    return this.http.get<OfferSuggestion[]>(
+      `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments/offers`,
+      { params },
     );
   }
 

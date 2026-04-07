@@ -142,7 +142,7 @@ export class PnlSummaryPageComponent {
 
   constructor() {
     if (PNL_OVERVIEW_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PNL_OVERVIEW_TOUR.id)) {
-      setTimeout(() => this.tourService.start(PNL_OVERVIEW_TOUR), 1200);
+      this.tourService.startWhenReady(PNL_OVERVIEW_TOUR);
     }
   }
   private readonly t = inject(TranslateService);

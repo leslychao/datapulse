@@ -10,6 +10,7 @@ import io.datapulse.integration.persistence.SecretReferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -38,9 +39,23 @@ public class ConnectionValidationService {
             HealthProbeResult result = performValidation(connection);
 
             if (result.success()) {
-                resultApplier.applySuccess(connectionId, result.externalAccountId());
-                log.info("Async validation success: connectionId={}, externalAccountId={}",
-                        connectionId, result.externalAccountId());
+                if (isDuplicateAccount(connection, result.externalAccountId())) {
+                    resultApplier.applyFailure(connectionId, "DUPLICATE_ACCOUNT");
+                    log.warn("Duplicate account detected: connectionId={}, externalAccountId={}, "
+                            + "workspace={}, marketplace={}",
+                        connectionId, result.externalAccountId(),
+                        connection.getWorkspaceId(), connection.getMarketplaceType());
+                } else {
+                    try {
+                        resultApplier.applySuccess(connectionId, result.externalAccountId());
+                        log.info("Async validation success: connectionId={}, externalAccountId={}",
+                            connectionId, result.externalAccountId());
+                    } catch (DataIntegrityViolationException ex) {
+                        log.warn("Duplicate account constraint violation: connectionId={}, "
+                                + "externalAccountId={}", connectionId, result.externalAccountId(), ex);
+                        resultApplier.applyFailure(connectionId, "DUPLICATE_ACCOUNT");
+                    }
+                }
             } else {
                 resultApplier.applyFailure(connectionId, result.errorCode());
                 log.warn("Async validation failed: connectionId={}, error={}",
@@ -71,6 +86,20 @@ public class ConnectionValidationService {
 
         MarketplaceType marketplaceType = MarketplaceType.valueOf(connection.getMarketplaceType());
         return resolveProbe(marketplaceType).probe(credentials);
+    }
+
+    private boolean isDuplicateAccount(MarketplaceConnectionEntity connection,
+                                       String externalAccountId) {
+        if (externalAccountId == null) {
+            return false;
+        }
+        return connectionRepository
+            .existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNotAndStatusNot(
+                connection.getWorkspaceId(),
+                connection.getMarketplaceType(),
+                externalAccountId,
+                connection.getId(),
+                ConnectionStatus.ARCHIVED.name());
     }
 
     private MarketplaceHealthProbe resolveProbe(MarketplaceType type) {

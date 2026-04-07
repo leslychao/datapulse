@@ -6,16 +6,16 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
   injectMutation,
   QueryClient,
 } from '@tanstack/angular-query-experimental';
-import { lastValueFrom } from 'rxjs';
+import { lastValueFrom, startWith } from 'rxjs';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { RbacService } from '@core/auth/rbac.service';
@@ -31,25 +31,20 @@ import {
   FilterBarComponent,
   FilterConfig,
 } from '@shared/components/filter-bar/filter-bar.component';
+import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
-import { formatRelativeTime, formatMoney } from '@shared/utils/format.utils';
-
-interface ColumnDef {
-  key: string;
-  label: string;
-  sortField?: string;
-  defaultWidth: number;
-  minWidth: number;
-  align: 'left' | 'right';
-  flex?: boolean;
-}
+import {
+  formatRelativeTime,
+  formatMoney,
+  renderBadge,
+} from '@shared/utils/format.utils';
 
 const RUN_STATUS_COLOR: Record<string, string> = {
-  PENDING: 'var(--status-info)',
-  IN_PROGRESS: 'var(--status-info)',
-  COMPLETED: 'var(--status-success)',
-  COMPLETED_WITH_ERRORS: 'var(--status-warning)',
-  FAILED: 'var(--status-error)',
+  PENDING: 'info',
+  IN_PROGRESS: 'info',
+  COMPLETED: 'success',
+  COMPLETED_WITH_ERRORS: 'warning',
+  FAILED: 'error',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {
@@ -73,48 +68,300 @@ const DECISION_COLOR: Record<string, string> = {
     TranslatePipe,
     FormsModule,
     RouterLink,
-    NgTemplateOutlet,
     FilterBarComponent,
+    DataGridComponent,
     EmptyStateComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0' },
-  templateUrl: './runs-list-page.component.html',
+  template: `
+    <div class="flex h-full flex-col">
+      <!-- Toolbar -->
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
+        <h2 class="text-sm font-semibold text-[var(--text-primary)]">
+          {{ 'pricing.runs.title' | translate }}
+        </h2>
+        @if (rbac.canWritePolicies()) {
+          <button
+            (click)="showTriggerModal.set(true)"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)]"
+          >
+            {{ 'pricing.runs.trigger_run' | translate }}
+          </button>
+        }
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="border-b border-[var(--border-default)] px-4 py-2">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="filterValues()"
+          (filtersChanged)="onFiltersChanged($event)"
+        />
+      </div>
+
+      <!-- Content: grid + peek panel -->
+      <div class="flex flex-1 flex-col overflow-hidden">
+        <div class="flex-1 px-4 py-2" [class.max-h-[50%]]="expandedRun()">
+          @if (runsQuery.isError()) {
+            <dp-empty-state
+              [message]="'pricing.runs.error' | translate"
+              [actionLabel]="'actions.retry' | translate"
+              (action)="runsQuery.refetch()"
+            />
+          } @else if (!runsQuery.isPending() && rows().length === 0) {
+            <dp-empty-state
+              [message]="hasActiveFilters()
+                ? ('pricing.runs.empty_filtered' | translate)
+                : ('pricing.runs.empty' | translate)"
+              [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
+              (action)="onFiltersChanged({})"
+            />
+          } @else {
+            <dp-data-grid
+              [columnDefs]="columnDefs()"
+              [rowData]="rows()"
+              [loading]="runsQuery.isPending()"
+              [pagination]="true"
+              [pageSize]="50"
+              [getRowId]="getRowId"
+              [height]="'100%'"
+              [clickableRows]="true"
+              (rowClicked)="onRowClicked($event)"
+              (sortChanged)="onSortChanged($event)"
+            />
+          }
+        </div>
+
+        <!-- Peek panel -->
+        @if (expandedRun(); as run) {
+          <div class="peek-section shrink-0 border-t-2 border-t-[var(--accent-primary)] bg-[var(--bg-secondary)] overflow-y-auto"
+               style="max-height: 50%">
+            <!-- Peek header -->
+            <div class="flex items-center justify-between px-4 py-2">
+              <div class="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+                <span class="font-mono font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.runs.detail.run_number' | translate:{ id: run.id } }}
+                </span>
+                <span>·</span>
+                <span>{{ run.connectionName }}</span>
+                @if (formatDuration(run.startedAt, run.completedAt) !== '—') {
+                  <span>·</span>
+                  <span>{{ formatDuration(run.startedAt, run.completedAt) }}</span>
+                }
+              </div>
+              <div class="flex items-center gap-3">
+                <a
+                  class="text-[length:var(--text-xs)] font-medium text-[var(--accent-primary)] transition-colors hover:underline"
+                  [routerLink]="['/workspace', wsStore.currentWorkspaceId(), 'pricing', 'runs', run.id]"
+                >
+                  {{ 'pricing.runs.peek.open_full' | translate }}
+                </a>
+                <button
+                  type="button"
+                  (click)="closeExpand()"
+                  class="flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                >
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- KPI strip -->
+            <div class="flex gap-6 border-t border-[var(--border-subtle)] px-4 py-2">
+              <div class="flex items-baseline gap-1.5">
+                <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">{{ run.totalOffers }}</span>
+                <span class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.kpi.total' | translate }}</span>
+              </div>
+              <div class="flex items-baseline gap-1.5">
+                <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">{{ run.eligibleCount }}</span>
+                <span class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.kpi.eligible' | translate }}</span>
+              </div>
+              <div class="flex items-baseline gap-1.5">
+                <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--status-success)]">{{ run.changeCount }}</span>
+                <span class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.kpi.changed' | translate }}</span>
+              </div>
+              <div class="flex items-baseline gap-1.5">
+                <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--status-warning)]">{{ run.skipCount }}</span>
+                <span class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.kpi.skipped' | translate }}</span>
+              </div>
+              <div class="flex items-baseline gap-1.5">
+                <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--text-secondary)]">{{ run.holdCount }}</span>
+                <span class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.kpi.hold' | translate }}</span>
+              </div>
+            </div>
+
+            <!-- Decisions mini-table -->
+            <div class="border-t border-[var(--border-subtle)] px-4 py-2.5">
+              @if (peekDecisionsQuery.isPending()) {
+                <div class="space-y-2.5">
+                  @for (i of [1,2,3]; track i) {
+                    <div class="flex items-center gap-4">
+                      <div class="h-4 w-36 rounded dp-shimmer"></div>
+                      <div class="h-4 w-16 rounded dp-shimmer"></div>
+                      <div class="h-5 w-20 rounded-full dp-shimmer"></div>
+                      <div class="h-4 w-14 rounded dp-shimmer"></div>
+                      <div class="h-4 w-14 rounded dp-shimmer"></div>
+                      <div class="h-4 w-10 rounded dp-shimmer"></div>
+                    </div>
+                  }
+                </div>
+              } @else if (peekDecisions().length === 0) {
+                <p class="py-2 text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
+                  {{ 'pricing.runs.peek.no_decisions' | translate }}
+                </p>
+              } @else {
+                <table class="w-full">
+                  <thead>
+                    <tr>
+                      <th class="pb-1.5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.offer' | translate }}
+                      </th>
+                      <th class="pb-1.5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.sku' | translate }}
+                      </th>
+                      <th class="pb-1.5 pr-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.decision' | translate }}
+                      </th>
+                      <th class="pb-1.5 pr-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.current_price' | translate }}
+                      </th>
+                      <th class="pb-1.5 pr-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.target_price' | translate }}
+                      </th>
+                      <th class="pb-1.5 pr-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.price_delta' | translate }}
+                      </th>
+                      <th class="pb-1.5 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {{ 'pricing.runs.detail.col.skip_reason' | translate }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (d of peekDecisions(); track d.id) {
+                      <tr class="border-t border-[var(--border-subtle)]">
+                        <td class="max-w-[200px] truncate py-1.5 pr-3 text-[length:var(--text-sm)] text-[var(--text-primary)]">
+                          {{ d.offerName }}
+                        </td>
+                        <td class="py-1.5 pr-3 font-mono text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+                          {{ d.sellerSku }}
+                        </td>
+                        <td class="py-1.5 pr-3">
+                          <span
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                            [style.color]="decisionColor(d.decisionType)"
+                            [style.background-color]="decisionBg(d.decisionType)"
+                          >
+                            <span class="inline-block h-1.5 w-1.5 rounded-full" [style.background-color]="decisionColor(d.decisionType)"></span>
+                            {{ 'pricing.decisions.type.' + d.decisionType | translate }}
+                          </span>
+                          @if (d.executionMode === 'SIMULATED') {
+                            <span class="ml-1 inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--status-info)_12%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--status-info)]">
+                              {{ 'pricing.execution_mode.sim_badge' | translate }}
+                            </span>
+                          }
+                        </td>
+                        <td class="py-1.5 pr-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                          {{ formatPrice(d.currentPrice) }}
+                        </td>
+                        <td class="py-1.5 pr-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+                          {{ formatPrice(d.targetPrice) }}
+                        </td>
+                        <td
+                          class="py-1.5 pr-3 text-right font-mono text-[length:var(--text-sm)]"
+                          [style.color]="changePctColor(d.changePct)"
+                        >
+                          {{ changePctText(d.changePct) }}
+                        </td>
+                        <td class="max-w-[180px] truncate py-1.5 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+                          @if (d.skipReason) {
+                            {{ d.skipReason | translate }}
+                          } @else {
+                            —
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+
+                @if (peekDecisionsTotalCount() > peekDecisions().length) {
+                  <p class="mt-2 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+                    {{ 'pricing.runs.peek.shown_of' | translate:{ shown: peekDecisions().length, total: peekDecisionsTotalCount() } }}
+                  </p>
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Trigger Manual Run Modal -->
+    @if (showTriggerModal()) {
+      <div class="fixed inset-0 z-[9000] flex items-center justify-center">
+        <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="showTriggerModal.set(false)"></div>
+        <div
+          class="relative z-10 w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)] animate-[fadeIn_150ms_ease]"
+        >
+          <h3 class="text-base font-semibold text-[var(--text-primary)]">{{ 'pricing.runs.trigger_run' | translate }}</h3>
+          <p class="mt-1 text-sm text-[var(--text-secondary)]">
+            {{ 'pricing.runs.trigger_modal.description' | translate }}
+          </p>
+
+          <div class="mt-4 flex flex-col gap-1.5">
+            <label class="text-[11px] text-[var(--text-tertiary)]">{{ 'pricing.runs.trigger_modal.connection_label' | translate }}</label>
+            @if (connectionsQuery.isPending()) {
+              <div class="h-9 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] dp-shimmer"></div>
+            } @else {
+              <select
+                [(ngModel)]="selectedConnectionId"
+                class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              >
+                <option [ngValue]="null" disabled>{{ 'pricing.runs.trigger_modal.connection_placeholder' | translate }}</option>
+                @for (conn of activeConnections(); track conn.id) {
+                  <option [ngValue]="conn.id">{{ conn.name }} ({{ conn.marketplaceType }})</option>
+                }
+              </select>
+            }
+          </div>
+
+          <div class="mt-6 flex justify-end gap-3">
+            <button
+              (click)="showTriggerModal.set(false)"
+              class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+            >
+              {{ 'actions.cancel' | translate }}
+            </button>
+            <button
+              (click)="triggerRun()"
+              [disabled]="!selectedConnectionId || triggerMutation.isPending()"
+              class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              @if (triggerMutation.isPending()) {
+                {{ 'pricing.runs.trigger_modal.submitting' | translate }}
+              } @else {
+                {{ 'pricing.runs.trigger_modal.submit' | translate }}
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  `,
   styles: [`
-    .run-row {
-      border-left: 3px solid transparent;
-      transition: background-color 150ms ease, border-color 150ms ease;
-    }
-    .run-row:hover { background-color: var(--bg-secondary); }
-    .run-row.expanded {
-      background-color: var(--bg-secondary);
-      border-bottom-color: transparent;
-    }
     .peek-section {
       animation: peekReveal 200ms ease-out;
     }
     @keyframes peekReveal {
-      from { opacity: 0; transform: translateY(-4px); }
+      from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: scale(0.97); }
       to { opacity: 1; transform: scale(1); }
-    }
-    .resize-handle {
-      position: absolute;
-      right: 0;
-      top: 4px;
-      bottom: 4px;
-      width: 3px;
-      cursor: col-resize;
-      border-radius: 1px;
-      opacity: 0;
-      background-color: var(--accent-primary);
-      transition: opacity 120ms ease;
-    }
-    th:hover .resize-handle,
-    .resize-handle:active {
-      opacity: 1;
     }
   `],
 })
@@ -128,73 +375,39 @@ export class RunsListPageComponent {
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
 
-  readonly columnDefs: ColumnDef[] = [
-    { key: 'id', label: '#', sortField: 'id', defaultWidth: 50, minWidth: 40, align: 'right' },
-    { key: 'trigger', label: this.translate.instant('pricing.runs.col.trigger'), sortField: 'triggerType', defaultWidth: 110, minWidth: 80, align: 'left' },
-    { key: 'connection', label: this.translate.instant('pricing.runs.col.connection'), sortField: 'connectionName', defaultWidth: 180, minWidth: 100, align: 'left', flex: true },
-    { key: 'status', label: this.translate.instant('pricing.runs.col.status'), sortField: 'status', defaultWidth: 130, minWidth: 90, align: 'left' },
-    { key: 'total', label: this.translate.instant('pricing.runs.col.total'), sortField: 'totalOffers', defaultWidth: 60, minWidth: 45, align: 'right' },
-    { key: 'change', label: this.translate.instant('pricing.runs.col.change'), sortField: 'changeCount', defaultWidth: 65, minWidth: 45, align: 'right' },
-    { key: 'skip', label: this.translate.instant('pricing.runs.col.skip'), sortField: 'skipCount', defaultWidth: 65, minWidth: 45, align: 'right' },
-    { key: 'duration', label: this.translate.instant('pricing.runs.col.duration'), defaultWidth: 90, minWidth: 60, align: 'right' },
-    { key: 'created', label: this.translate.instant('pricing.runs.col.created_at'), sortField: 'createdAt', defaultWidth: 100, minWidth: 70, align: 'right' },
-    { key: 'expand', label: '', defaultWidth: 32, minWidth: 32, align: 'left' },
-  ];
-
-  readonly columnWidths = signal<Record<string, number>>(
-    Object.fromEntries(
-      this.columnDefs.map((c) => [c.key, c.defaultWidth]),
-    ),
+  private readonly translationChange = toSignal(
+    this.translate.onTranslationChange.pipe(startWith(null)),
   );
-
-  readonly currentSort = signal<{
-    field: string;
-    dir: 'asc' | 'desc';
-  }>({ field: 'createdAt', dir: 'desc' });
-
-  readonly sortParam = computed(() => {
-    const s = this.currentSort();
-    return `${s.field},${s.dir}`;
-  });
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly showTriggerModal = signal(false);
   readonly expandedRunId = signal<number | null>(null);
   protected selectedConnectionId: number | null = null;
 
+  readonly currentSort = signal<{ field: string; dir: 'asc' | 'desc' }>({
+    field: 'createdAt',
+    dir: 'desc',
+  });
+
+  readonly sortParam = computed(() => {
+    const s = this.currentSort();
+    return `${s.field},${s.dir}`;
+  });
+
   readonly filterConfigs: FilterConfig[] = [
     {
       key: 'status',
       label: 'pricing.runs.filter.status',
       type: 'multi-select',
-      options: (
-        [
-          'PENDING',
-          'IN_PROGRESS',
-          'COMPLETED',
-          'COMPLETED_WITH_ERRORS',
-          'FAILED',
-        ] as const
-      ).map((value) => ({
-        value,
-        label: `pricing.runs.status.${value}`,
-      })),
+      options: (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED'] as const)
+        .map((value) => ({ value, label: `pricing.runs.status.${value}` })),
     },
     {
       key: 'triggerType',
       label: 'pricing.runs.filter.trigger',
       type: 'multi-select',
-      options: (
-        [
-          'POST_SYNC',
-          'MANUAL',
-          'SCHEDULED',
-          'POLICY_CHANGE',
-        ] as const
-      ).map((value) => ({
-        value,
-        label: `pricing.runs.trigger.${value}`,
-      })),
+      options: (['POST_SYNC', 'MANUAL', 'SCHEDULED', 'POLICY_CHANGE'] as const)
+        .map((value) => ({ value, label: `pricing.runs.trigger.${value}` })),
     },
     {
       key: 'period',
@@ -203,12 +416,101 @@ export class RunsListPageComponent {
     },
   ];
 
+  readonly columnDefs = computed(() => {
+    this.translationChange();
+    return [
+      {
+        headerName: '#',
+        field: 'id',
+        width: 70,
+        sortable: true,
+        cellClass: 'font-mono text-right',
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.trigger'),
+        field: 'triggerType',
+        width: 130,
+        sortable: true,
+        cellRenderer: (params: any) => {
+          if (!params.value) return '';
+          const color = TRIGGER_COLOR[params.value] ?? 'var(--text-secondary)';
+          const label = this.translate.instant('pricing.runs.trigger.' + params.value);
+          return renderBadge(label, color);
+        },
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.connection'),
+        field: 'connectionName',
+        width: 180,
+        sortable: true,
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.status'),
+        field: 'status',
+        width: 170,
+        sortable: true,
+        cellRenderer: (params: any) => {
+          if (!params.value) return '';
+          const color = RUN_STATUS_COLOR[params.value] ?? 'neutral';
+          const label = this.translate.instant('pricing.runs.status.' + params.value);
+          let html = renderBadge(label, `var(--status-${color})`, params.value === 'IN_PROGRESS');
+          const run = params.data as PricingRunSummary | undefined;
+          if (run && run.simulatedDecisionCount > 0) {
+            html += ` <span class="ml-1 inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--status-info)_12%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--status-info)]">SIM</span>`;
+          }
+          return html;
+        },
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.total'),
+        field: 'totalOffers',
+        width: 80,
+        sortable: true,
+        cellClass: 'font-mono text-right',
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.change'),
+        field: 'changeCount',
+        width: 80,
+        sortable: true,
+        cellClass: 'font-mono text-right',
+        cellStyle: { color: 'var(--status-success)' },
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.skip'),
+        field: 'skipCount',
+        width: 80,
+        sortable: true,
+        cellClass: 'font-mono text-right',
+        cellStyle: { color: 'var(--status-warning)' },
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.duration'),
+        field: '_duration',
+        width: 100,
+        sortable: false,
+        cellClass: 'font-mono text-right',
+        valueGetter: (params: any) => {
+          if (!params.data) return '';
+          return this.formatDuration(params.data.startedAt, params.data.completedAt);
+        },
+      },
+      {
+        headerName: this.translate.instant('pricing.runs.col.created_at'),
+        field: 'createdAt',
+        width: 120,
+        sortable: true,
+        sort: 'desc' as const,
+        valueFormatter: (params: any) => formatRelativeTime(params.value),
+      },
+    ];
+  });
+
   private readonly filter = computed<PricingRunFilter>(() => {
     const vals = this.filterValues();
     const f: PricingRunFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
-    if (vals['triggerType']?.length)
-      f.triggerType = vals['triggerType'];
+    if (vals['triggerType']?.length) f.triggerType = vals['triggerType'];
     if (vals['period']?.from) f.from = vals['period'].from;
     if (vals['period']?.to) f.to = vals['period'].to;
     return f;
@@ -266,9 +568,7 @@ export class RunsListPageComponent {
     staleTime: 30_000,
   }));
 
-  readonly rows = computed(
-    () => this.runsQuery.data()?.content ?? [],
-  );
+  readonly rows = computed(() => this.runsQuery.data()?.content ?? []);
 
   readonly activeConnections = computed<ConnectionSummary[]>(() =>
     (this.connectionsQuery.data() ?? []).filter(
@@ -285,6 +585,12 @@ export class RunsListPageComponent {
         (!Array.isArray(v) || v.length > 0),
     ),
   );
+
+  readonly expandedRun = computed(() => {
+    const id = this.expandedRunId();
+    if (id == null) return null;
+    return this.rows().find((r) => r.id === id) ?? null;
+  });
 
   readonly peekDecisions = computed(
     () => this.peekDecisionsQuery.data()?.content ?? [],
@@ -305,23 +611,15 @@ export class RunsListPageComponent {
     onSuccess: () => {
       this.showTriggerModal.set(false);
       this.selectedConnectionId = null;
-      this.queryClient.invalidateQueries({
-        queryKey: ['pricing-runs'],
-      });
-      this.toast.success(
-        this.translate.instant('pricing.runs.trigger_success'),
-      );
+      this.queryClient.invalidateQueries({ queryKey: ['pricing-runs'] });
+      this.toast.success(this.translate.instant('pricing.runs.trigger_success'));
     },
     onError: () => {
-      this.toast.error(
-        this.translate.instant('pricing.runs.trigger_error'),
-      );
+      this.toast.error(this.translate.instant('pricing.runs.trigger_error'));
     },
   }));
 
-  private resizingCol: string | null = null;
-  private resizeStartX = 0;
-  private resizeStartWidth = 0;
+  readonly getRowId = (params: any) => String(params.data.id);
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
@@ -330,71 +628,18 @@ export class RunsListPageComponent {
     }
   }
 
-  colWidth(key: string): number {
-    return this.columnWidths()[key] ?? 80;
-  }
-
-  sortDir(colKey: string): 'asc' | 'desc' | null {
-    const col = this.columnDefs.find((c) => c.key === colKey);
-    if (!col?.sortField) return null;
-    const s = this.currentSort();
-    return s.field === col.sortField ? s.dir : null;
-  }
-
-  toggleSort(colKey: string): void {
-    const col = this.columnDefs.find((c) => c.key === colKey);
-    if (!col?.sortField) return;
-
-    const current = this.currentSort();
-    if (current.field === col.sortField) {
-      this.currentSort.set({
-        field: col.sortField,
-        dir: current.dir === 'asc' ? 'desc' : 'asc',
-      });
-    } else {
-      this.currentSort.set({ field: col.sortField, dir: 'asc' });
-    }
-    this.expandedRunId.set(null);
-  }
-
-  startResize(event: MouseEvent, colKey: string): void {
-    event.stopPropagation();
-    event.preventDefault();
-    this.resizingCol = colKey;
-    this.resizeStartX = event.clientX;
-    this.resizeStartWidth = this.colWidth(colKey);
-
-    const col = this.columnDefs.find((c) => c.key === colKey);
-    const min = col?.minWidth ?? 40;
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!this.resizingCol) return;
-      const delta = e.clientX - this.resizeStartX;
-      const newWidth = Math.max(min, this.resizeStartWidth + delta);
-      this.columnWidths.update((w) => ({
-        ...w,
-        [this.resizingCol!]: newWidth,
-      }));
-    };
-
-    const onMouseUp = () => {
-      this.resizingCol = null;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }
-
-  toggleExpand(run: PricingRunSummary): void {
+  onRowClicked(run: PricingRunSummary): void {
     this.expandedRunId.set(
       this.expandedRunId() === run.id ? null : run.id,
     );
+  }
+
+  onSortChanged(sort: { column: string; direction: string }): void {
+    this.currentSort.set({
+      field: sort.column,
+      dir: sort.direction.toLowerCase() as 'asc' | 'desc',
+    });
+    this.expandedRunId.set(null);
   }
 
   closeExpand(): void {
@@ -410,22 +655,6 @@ export class RunsListPageComponent {
     if (this.selectedConnectionId) {
       this.triggerMutation.mutate(this.selectedConnectionId);
     }
-  }
-
-  statusColor(status: string): string {
-    return RUN_STATUS_COLOR[status] ?? 'var(--text-tertiary)';
-  }
-
-  statusBg(status: string): string {
-    return `color-mix(in srgb, ${this.statusColor(status)} 12%, transparent)`;
-  }
-
-  triggerColor(trigger: string): string {
-    return TRIGGER_COLOR[trigger] ?? 'var(--text-secondary)';
-  }
-
-  triggerBg(trigger: string): string {
-    return `color-mix(in srgb, ${this.triggerColor(trigger)} 12%, transparent)`;
   }
 
   decisionColor(dt: string): string {
@@ -445,17 +674,13 @@ export class RunsListPageComponent {
   }
 
   changePctColor(value: number | null): string {
-    if (value === null || value === undefined)
-      return 'var(--text-tertiary)';
+    if (value === null || value === undefined) return 'var(--text-tertiary)';
     if (value > 0) return 'var(--finance-positive)';
     if (value < 0) return 'var(--finance-negative)';
     return 'var(--finance-zero)';
   }
 
-  formatDuration(
-    start: string | null,
-    end: string | null,
-  ): string {
+  formatDuration(start: string | null, end: string | null): string {
     if (!start) return '—';
     const endMs = end ? new Date(end).getTime() : Date.now();
     const ms = endMs - new Date(start).getTime();
@@ -469,10 +694,6 @@ export class RunsListPageComponent {
     return sec > 0
       ? `${min} ${minUnit} ${sec} ${secUnit}`
       : `${min} ${minUnit}`;
-  }
-
-  relativeTime(iso: string | null): string {
-    return formatRelativeTime(iso);
   }
 
   formatPrice(value: number | null): string {

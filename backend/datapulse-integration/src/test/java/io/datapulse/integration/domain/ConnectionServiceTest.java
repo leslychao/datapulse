@@ -40,7 +40,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -224,9 +223,10 @@ class ConnectionServiceTest {
   class ArchiveConnection {
 
     @Test
-    @DisplayName("should_archive_when_active")
-    void should_archive_when_active() {
+    @DisplayName("should_set_status_archived_and_keep_external_account_id")
+    void should_set_status_archived_and_keep_external_account_id() {
       var conn = buildConnection(1L, "WB", ConnectionStatus.ACTIVE.name());
+      conn.setExternalAccountId("ext-123");
       when(connectionRepository.findByIdAndWorkspaceId(1L, 1L))
           .thenReturn(Optional.of(conn));
       when(connectionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -234,17 +234,21 @@ class ConnectionServiceTest {
       connectionService.archiveConnection(1L, 1L);
 
       assertThat(conn.getStatus()).isEqualTo(ConnectionStatus.ARCHIVED.name());
+      assertThat(conn.getExternalAccountId()).isEqualTo("ext-123");
+
+      ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+      verify(eventPublisher).publishEvent(captor.capture());
+      assertThat(captor.getValue()).isInstanceOf(ConnectionStatusChangedEvent.class);
     }
 
     @Test
-    @DisplayName("should_throw_when_already_archived")
-    void should_throw_when_already_archived() {
-      var conn = buildConnection(1L, "WB", ConnectionStatus.ARCHIVED.name());
+    @DisplayName("should_throw_when_connection_not_found")
+    void should_throw_when_connection_not_found() {
       when(connectionRepository.findByIdAndWorkspaceId(1L, 1L))
-          .thenReturn(Optional.of(conn));
+          .thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> connectionService.archiveConnection(1L, 1L))
-          .isInstanceOf(BadRequestException.class);
+          .isInstanceOf(NotFoundException.class);
     }
   }
 

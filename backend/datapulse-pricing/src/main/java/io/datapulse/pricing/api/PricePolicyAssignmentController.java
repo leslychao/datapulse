@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -52,5 +53,25 @@ public class PricePolicyAssignmentController {
             @PathVariable("policyId") Long policyId,
             @PathVariable("assignmentId") Long assignmentId) {
         assignmentService.deleteAssignment(policyId, assignmentId, workspaceId);
+    }
+
+    @GetMapping("/categories")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public List<CategorySuggestionResponse> listCategories(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            @RequestParam("connectionId") long connectionId,
+            @RequestParam(value = "search", required = false) String search) {
+        return assignmentService.listCategories(connectionId, search);
+    }
+
+    @GetMapping("/offers")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public List<OfferSuggestionResponse> searchOffers(
+            @PathVariable("workspaceId") long workspaceId,
+            @PathVariable("policyId") Long policyId,
+            @RequestParam("connectionId") long connectionId,
+            @RequestParam(value = "search", required = false) String search) {
+        return assignmentService.searchOffers(connectionId, search);
     }
 }

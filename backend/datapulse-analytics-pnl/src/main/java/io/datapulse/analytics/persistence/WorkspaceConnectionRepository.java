@@ -16,7 +16,6 @@ public class WorkspaceConnectionRepository {
     private static final String FIND_IDS_SQL = """
             SELECT id FROM marketplace_connection
             WHERE workspace_id = :workspaceId
-              AND status != 'ARCHIVED'
             """;
 
     public List<Long> findConnectionIdsByWorkspaceId(long workspaceId) {

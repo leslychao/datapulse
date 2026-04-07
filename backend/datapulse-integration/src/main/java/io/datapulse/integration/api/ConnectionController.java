@@ -100,7 +100,7 @@ public class ConnectionController {
         connectionService.enableConnection(connectionId, workspaceContext.getWorkspaceId());
     }
 
-    @DeleteMapping("/{connectionId}")
+    @PostMapping("/{connectionId}/archive")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyAuthority('ROLE_OWNER')")
     public void archiveConnection(@PathVariable("connectionId") Long connectionId) {

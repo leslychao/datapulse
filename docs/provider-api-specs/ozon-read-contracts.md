@@ -110,7 +110,7 @@
   - attribute_id = 85 (name = "Бренд", type = String, is_required = true)
   - path: `result[].attributes[?(@.id==85)].values[0].value`
   - пример: `"BOROFONE"` (confirmed 2026-03-29)
-- `visible` — заменено на `is_archived` + `is_autoarchived`
+- `visible` / `visibility` — **НЕТ в v3 ответе**. Заменено на `is_archived` + `is_autoarchived`. Объект `visibility` десериализуется как `null`. Статус товара определяется: `is_archived || is_autoarchived` → ARCHIVED, иначе ACTIVE. (confirmed 2026-04-07: все не-архивные товары получали INACTIVE из-за `visibility == null`)
 - `status` (complex object) — заменено на `is_archived` / `is_autoarchived`
 - `category_id` — заменено на `description_category_id`
 - `vat` — НЕТ в product/info/list v3

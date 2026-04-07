@@ -79,6 +79,20 @@ class OzonNormalizerTest {
 
       assertThat(result.status()).isEqualTo("INACTIVE");
     }
+
+    @Test
+    void should_returnActive_when_visibilityNull() {
+      var info = new OzonProductInfo(
+          99001L, "OFFER-1", "Product", "barcode",
+          null, 100L, 200L, "2024-01-01T00:00:00Z",
+          false, false,
+          null,
+          null, null);
+
+      var result = normalizer.normalizeProductInfo(info);
+
+      assertThat(result.status()).isEqualTo("ACTIVE");
+    }
   }
 
   @Nested
