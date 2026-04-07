@@ -92,7 +92,7 @@ public class CanonicalFinanceNormalizer {
         }
 
         if (resolved.isEmpty() && (raw.marketplaceSku() != null || raw.sellerSku() != null)) {
-            log.warn("SKU lookup miss: marketplaceSku={}, sellerSku={}, connectionId={}",
+            log.debug("SKU lookup miss: marketplaceSku={}, sellerSku={}, connectionId={}",
                     raw.marketplaceSku(), raw.sellerSku(), ctx.connectionId());
         }
 

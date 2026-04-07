@@ -30,6 +30,7 @@ import io.datapulse.etl.domain.normalized.NormalizedPromoProduct;
 import io.datapulse.etl.domain.normalized.NormalizedReturnItem;
 import io.datapulse.etl.domain.normalized.NormalizedSaleItem;
 import io.datapulse.etl.domain.normalized.NormalizedStockItem;
+import io.datapulse.etl.domain.normalized.NormalizedWarehouse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -348,7 +349,6 @@ public class OzonNormalizer {
         }
         for (var node : nodes) {
             if (node.categoryName() == null || node.categoryName().isBlank()) {
-                log.debug("Skipping category node with blank name: id={}", node.descriptionCategoryId());
                 flattenRecursive(node.children(), parentId, result);
                 continue;
             }
@@ -453,6 +453,42 @@ public class OzonNormalizer {
             return "INACTIVE";
         }
         return "ACTIVE";
+    }
+
+    /**
+     * Extracts unique warehouse descriptors from stock items for auto-discovery.
+     * Ozon has no dedicated warehouse API — warehouses are discovered from stock responses.
+     */
+    public List<NormalizedWarehouse> extractWarehouses(List<OzonStockItem> items) {
+        var seen = new java.util.LinkedHashMap<String, NormalizedWarehouse>();
+        for (var item : items) {
+            if (item.stocks() == null) {
+                continue;
+            }
+            for (var entry : item.stocks()) {
+                String externalId = resolveWarehouseId(entry);
+                if (!seen.containsKey(externalId)) {
+                    String name = resolveWarehouseName(entry, externalId);
+                    String type = entry.type() != null ? entry.type().toUpperCase() : "UNKNOWN";
+                    seen.put(externalId, new NormalizedWarehouse(
+                            externalId, name, type, MARKETPLACE_OZON));
+                }
+            }
+        }
+        return new ArrayList<>(seen.values());
+    }
+
+    private static String resolveWarehouseName(OzonStockItem.OzonStockEntry entry,
+                                                String externalId) {
+        if (entry.warehouseName() != null && !entry.warehouseName().isBlank()) {
+            return entry.warehouseName();
+        }
+        return switch (externalId.toLowerCase()) {
+            case "fbo" -> "Ozon FBO";
+            case "fbs" -> "Ozon FBS";
+            case "rfbs" -> "Ozon rFBS";
+            default -> "Ozon Warehouse " + externalId;
+        };
     }
 
     private static String resolveWarehouseId(OzonStockItem.OzonStockEntry entry) {

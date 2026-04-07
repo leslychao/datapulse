@@ -208,6 +208,6 @@ class GridExportServiceTest {
 
   private GridFilter emptyFilter() {
     return new GridFilter(null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null);
   }
 }

@@ -17,5 +17,6 @@ public record GridFilter(
     String lastDecision,
     String lastActionStatus,
     Long viewId,
-    String stockRisk
+    String stockRisk,
+    List<Long> offerIds
 ) {}

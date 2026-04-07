@@ -141,9 +141,15 @@ public class WbNormalizer {
      */
     public NormalizedFinanceItem normalizeFinance(WbFinanceRow row) {
         OffsetDateTime entryDate = resolveEntryDate(row);
-        FinanceEntryType entryType = FinanceEntryType.fromWbDocTypeName(row.docTypeName());
+        FinanceEntryType entryType =
+                FinanceEntryType.fromWbSupplierOperName(row.supplierOperName());
 
-        boolean isReturn = entryType == FinanceEntryType.WB_RETURN;
+        if (entryType == FinanceEntryType.OTHER && row.supplierOperName() != null) {
+            log.warn("Unmapped WB finance supplier_oper_name: type={}, rrdId={}",
+                    row.supplierOperName(), row.rrdId());
+        }
+
+        boolean isReturn = "Возврат".equals(row.docTypeName());
         BigDecimal retailPrice = safe(row.retailPriceWithdiscRub());
         BigDecimal revenueAmount = isReturn ? BigDecimal.ZERO : retailPrice;
         BigDecimal refundAmount = isReturn ? retailPrice.negate() : BigDecimal.ZERO;

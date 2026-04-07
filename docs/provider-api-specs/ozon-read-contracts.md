@@ -862,6 +862,19 @@ Join to catalog requires `sku` → `product_id` → `offer_id` lookup.
 | `DefectRateDetailed`                                        | services          | Detailed defect rate penalty                  | confirmed  |
 | `TemporaryStorage`                                          | services          | Temporary warehouse storage                   | confirmed  |
 
+**Additional 8 types discovered from real API (Apr 2026):**
+
+| `operation_type`                                            | `type` (category) | Semantics                                     | Measure column | Confidence |
+| ----------------------------------------------------------- | ----------------- | --------------------------------------------- | -------------- | ---------- |
+| `AccrualConsigDefectiveWriteOff`                            | compensation      | Consignment defective goods write-off         | COMPENSATION   | confirmed  |
+| `DefectFineShipmentDelay`                                   | services          | Shipment delay fine (flat, non-rated)         | PENALTIES      | confirmed  |
+| `MarketplaceSellerCorrectionOperation`                      | other             | Marketplace-initiated seller correction       | OTHER          | confirmed  |
+| `MarketplaceSellerDecompensationItemByTypeDocOperation`     | compensation      | Compensation reversal by document type        | COMPENSATION   | confirmed  |
+| `OperationMarketplaceServiceSupplyInboundCargoSurplus`      | services          | Supply inbound cargo surplus penalty          | PENALTIES      | confirmed  |
+| `OperationMarketplaceSupplyAdditional`                      | services          | Additional supply logistics charge            | LOGISTICS      | confirmed  |
+| `OperationSellerReturnsCargoAssortmentInvalid`              | services          | Invalid assortment return penalty             | PENALTIES      | confirmed  |
+| `SellerReturnsDeliveryToPickupPoint`                        | services          | Returns delivery to pickup point              | LOGISTICS      | confirmed  |
+
 **New service names (discovered Apr 2026):**
 
 | `services[].name`                                           | Measure column  | Semantics                     | Confidence |

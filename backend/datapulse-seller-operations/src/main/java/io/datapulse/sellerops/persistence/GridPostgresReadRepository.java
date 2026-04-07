@@ -256,6 +256,11 @@ public class GridPostgresReadRepository {
             where.append(" AND latest_pa.status = :lastActionStatus");
             params.addValue("lastActionStatus", filter.lastActionStatus().trim());
         }
+
+        if (filter.offerIds() != null && !filter.offerIds().isEmpty()) {
+            where.append(" AND mo.id IN (:preFilterOfferIds)");
+            params.addValue("preFilterOfferIds", filter.offerIds());
+        }
     }
 
     String buildOrderByClause(Sort sort) {

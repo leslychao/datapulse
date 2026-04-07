@@ -40,13 +40,21 @@ public class GridClickHouseReadRepository {
                 ad.ad_cpo,
                 ad.ad_roas
             FROM (
-                SELECT product_id, days_of_cover, stock_out_risk
+                SELECT
+                    product_id,
+                    minOrNull(days_of_cover) AS days_of_cover,
+                    multiIf(
+                        countIf(stock_out_risk = 'CRITICAL') > 0, 'CRITICAL',
+                        countIf(stock_out_risk = 'WARNING') > 0, 'WARNING',
+                        'NORMAL'
+                    ) AS stock_out_risk
                 FROM mart_inventory_analysis
                 WHERE product_id IN (:offerIds)
                   AND analysis_date = (
                       SELECT max(analysis_date) FROM mart_inventory_analysis
                       WHERE product_id IN (:offerIds)
                   )
+                GROUP BY product_id
             ) inv
             LEFT JOIN (
                 SELECT
@@ -126,7 +134,22 @@ public class GridClickHouseReadRepository {
 
         String sql = """
                 SELECT inv.product_id AS offer_id
-                FROM mart_inventory_analysis inv
+                FROM (
+                    SELECT
+                        product_id,
+                        minOrNull(days_of_cover) AS days_of_cover,
+                        multiIf(
+                            countIf(stock_out_risk = 'CRITICAL') > 0, 'CRITICAL',
+                            countIf(stock_out_risk = 'WARNING') > 0, 'WARNING',
+                            'NORMAL'
+                        ) AS stock_out_risk
+                    FROM mart_inventory_analysis
+                    WHERE connection_id IN (:connectionIds)
+                      AND analysis_date = (SELECT max(analysis_date)
+                                           FROM mart_inventory_analysis
+                                           WHERE connection_id IN (:connectionIds))
+                    GROUP BY product_id
+                ) inv
                 LEFT JOIN (
                     SELECT dp.product_id,
                            sum(ff.revenue_amount) AS revenue_30d,
@@ -152,10 +175,6 @@ public class GridClickHouseReadRepository {
                       AND period = (SELECT max(period) FROM mart_returns_analysis
                                     WHERE connection_id IN (:connectionIds))
                 ) ret ON inv.product_id = ret.product_id
-                WHERE inv.connection_id IN (:connectionIds)
-                  AND inv.analysis_date = (SELECT max(analysis_date)
-                                           FROM mart_inventory_analysis
-                                           WHERE connection_id IN (:connectionIds))
                 ORDER BY %s %s NULLS LAST
                 LIMIT :limit
                 SETTINGS final = 1
@@ -174,7 +193,7 @@ public class GridClickHouseReadRepository {
         }
 
         String sql = """
-                SELECT product_id
+                SELECT DISTINCT product_id
                 FROM mart_inventory_analysis
                 WHERE connection_id IN (:connectionIds)
                   AND stock_out_risk = :stockRisk
@@ -274,15 +293,15 @@ public class GridClickHouseReadRepository {
 
     private static final String STOCK_SNAPSHOT_QUERY = """
             SELECT
-                marketplace_offer_id AS offer_id,
+                product_id AS offer_id,
                 toInt32(sum(available)) AS snapshot_stock
             FROM fact_inventory_snapshot
-            WHERE marketplace_connection_id IN (%s)
-              AND snapshot_date = (
-                  SELECT max(snapshot_date) FROM fact_inventory_snapshot
-                  WHERE marketplace_connection_id IN (%s)
+            WHERE connection_id IN (%s)
+              AND captured_date = (
+                  SELECT max(captured_date) FROM fact_inventory_snapshot
+                  WHERE connection_id IN (%s)
               )
-            GROUP BY marketplace_offer_id
+            GROUP BY product_id
             """;
 
     public Map<Long, Integer> findLatestSnapshotStocks(List<Long> connectionIds) {

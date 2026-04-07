@@ -230,7 +230,7 @@ class WbNormalizerTest {
     @Test
     void should_mapSaleFinance_with_signConventions() {
       var row = buildFinanceRow(
-          "Продажа", BigDecimal.valueOf(1000),
+          "Продажа", "Продажа", BigDecimal.valueOf(1000),
           BigDecimal.valueOf(100), BigDecimal.valueOf(50),
           "2024-01-15T10:30:00+03:00", "2024-01-15");
 
@@ -250,7 +250,7 @@ class WbNormalizerTest {
     @Test
     void should_mapReturn_to_refundAmount() {
       var row = buildFinanceRow(
-          "Возврат", BigDecimal.valueOf(500),
+          "Возврат", "Возврат", BigDecimal.valueOf(500),
           BigDecimal.ZERO, BigDecimal.ZERO,
           "2024-01-15T10:30:00+03:00", "2024-01-15");
 
@@ -264,9 +264,41 @@ class WbNormalizerTest {
     }
 
     @Test
+    void should_mapLogistics_when_supplierOperNameIsLogistics() {
+      var row = buildFinanceRow(
+          "Продажа", "Логистика", BigDecimal.ZERO,
+          BigDecimal.ZERO, BigDecimal.valueOf(20),
+          "2024-01-15T10:30:00+03:00", "2024-01-15");
+
+      var result = normalizer.normalizeFinance(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.WB_LOGISTICS);
+      assertThat(result.revenueAmount())
+          .isEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.logisticsCostAmount())
+          .isEqualByComparingTo(BigDecimal.valueOf(-20));
+    }
+
+    @Test
+    void should_useDocTypeName_for_returnRouting_notSupplierOperName() {
+      var row = buildFinanceRow(
+          "Возврат", "Компенсация ущерба", BigDecimal.valueOf(300),
+          BigDecimal.ZERO, BigDecimal.ZERO,
+          "2024-01-15T10:30:00+03:00", "2024-01-15");
+
+      var result = normalizer.normalizeFinance(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.WB_COMPENSATION);
+      assertThat(result.refundAmount())
+          .isEqualByComparingTo(BigDecimal.valueOf(-300));
+      assertThat(result.revenueAmount())
+          .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
     void should_fallbackToRrDt_when_saleDtIsNull() {
       var row = buildFinanceRow(
-          "Продажа", BigDecimal.valueOf(1000),
+          "Продажа", "Продажа", BigDecimal.valueOf(1000),
           BigDecimal.ZERO, BigDecimal.ZERO,
           null, "2024-01-15");
 
@@ -280,7 +312,7 @@ class WbNormalizerTest {
     @Test
     void should_handleNullFinanceFields() {
       var row = buildFinanceRow(
-          "Продажа", null, null, null,
+          "Продажа", "Продажа", null, null, null,
           "2024-01-15T10:30:00+03:00", "2024-01-15");
 
       var result = normalizer.normalizeFinance(row);
@@ -291,15 +323,28 @@ class WbNormalizerTest {
       assertThat(result.storageCostAmount()).isEqualByComparingTo(BigDecimal.ZERO);
       assertThat(result.penaltiesAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    @Test
+    void should_fallbackToOther_when_unknownSupplierOperName() {
+      var row = buildFinanceRow(
+          "", "Неизвестная операция", BigDecimal.ZERO,
+          BigDecimal.ZERO, BigDecimal.ZERO,
+          "2024-01-15T10:30:00+03:00", "2024-01-15");
+
+      var result = normalizer.normalizeFinance(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.OTHER);
+    }
   }
 
-  private WbFinanceRow buildFinanceRow(String docTypeName, BigDecimal retailPrice,
+  private WbFinanceRow buildFinanceRow(String docTypeName, String supplierOperName,
+                                       BigDecimal retailPrice,
                                        BigDecimal commission, BigDecimal delivery,
                                        String saleDt, String rrDt) {
     return new WbFinanceRow(
         1L, 100L, rrDt, "2024-01-01", "2024-01-31", "2024-01-15",
         "2024-01-10", saleDt, "srid-1", 12345L, "SA-001", "barcode",
-        docTypeName, "supplier_op", 1,
+        docTypeName, supplierOperName, 1,
         BigDecimal.ZERO, BigDecimal.ZERO, retailPrice,
         BigDecimal.valueOf(850), BigDecimal.ZERO, BigDecimal.ZERO,
         commission, delivery, BigDecimal.ZERO, BigDecimal.ZERO,

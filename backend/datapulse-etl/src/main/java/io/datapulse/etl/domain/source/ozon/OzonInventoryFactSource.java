@@ -20,6 +20,7 @@ import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalStockCurrentUpsertRepository;
 import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
 import io.datapulse.etl.persistence.canonical.WarehouseLookupRepository;
+import io.datapulse.etl.persistence.canonical.WarehouseUpsertRepository;
 import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class OzonInventoryFactSource implements EventSource {
   private final OzonStocksReadAdapter adapter;
   private final OzonNormalizer normalizer;
   private final CanonicalStockCurrentUpsertRepository repository;
+  private final WarehouseUpsertRepository warehouseUpsertRepository;
   private final CanonicalEntityMapper mapper;
   private final SubSourceRunner subSourceRunner;
   private final SkuLookupRepository skuLookup;
@@ -61,12 +63,15 @@ public class OzonInventoryFactSource implements EventSource {
         adapter.captureAllPages(captureCtx, clientId, apiKey, stocksLastId);
 
     Map<String, Long> offerIdMap = skuLookup.findAllOfferIdsByConnection(ctx.connectionId());
-    Map<String, Long> warehouseIdMap = warehouseLookup.findAllIdsByConnection(ctx.connectionId());
+    var warehouseIdMap = new java.util.HashMap<>(
+        warehouseLookup.findAllIdsByConnection(ctx.connectionId()));
     OffsetDateTime capturedAt = OffsetDateTime.now();
 
     SubSourceResult result = subSourceRunner.processPages(
         "OzonStocksReadAdapter", pages, OzonStockItem.class,
         batch -> {
+          discoverWarehouses(batch, warehouseIdMap, ctx);
+
           var entities = batch.stream()
               .flatMap(item -> normalizer.normalizeStocks(item).stream())
               .map(norm -> {
@@ -95,5 +100,30 @@ public class OzonInventoryFactSource implements EventSource {
           }
         });
     return List.of(result);
+  }
+
+  /**
+   * Ozon has no dedicated warehouse API. Warehouses are auto-discovered
+   * from stock entries and upserted before stock processing.
+   */
+  private void discoverWarehouses(List<OzonStockItem> batch,
+                                  Map<String, Long> warehouseIdMap,
+                                  IngestContext ctx) {
+    var warehouses = normalizer.extractWarehouses(batch);
+    var newWarehouses = warehouses.stream()
+        .filter(w -> !warehouseIdMap.containsKey(w.externalWarehouseId()))
+        .map(w -> mapper.toWarehouse(w, ctx))
+        .toList();
+
+    if (newWarehouses.isEmpty()) {
+      return;
+    }
+
+    warehouseUpsertRepository.batchUpsert(newWarehouses);
+    log.info("Auto-discovered Ozon warehouses: count={}, connectionId={}",
+        newWarehouses.size(), ctx.connectionId());
+
+    var refreshed = warehouseLookup.findAllIdsByConnection(ctx.connectionId());
+    warehouseIdMap.putAll(refreshed);
   }
 }

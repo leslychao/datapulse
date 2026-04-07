@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 
 /**
  * Unified finance entry type enum mapping Ozon operation_type values and WB doc_type_name.
- * 48 Ozon types (27 empirical + 21 from official enum) + WB composite types.
+ * 56 Ozon types (35 empirical + 21 from official enum) + WB composite types.
  *
  * <p>{@link #canonicalName()} maps WB-specific types to canonical entry type names
  * stored in {@code canonical_finance_entry.entry_type}.</p>
@@ -72,7 +72,17 @@ public enum FinanceEntryType {
     // --- Alias from official enum (ItemAgentServiceStarsMembership = StarsMembership) ---
     SUBSCRIPTION_ALIAS("ItemAgentServiceStarsMembership", MeasureColumn.OTHER),
 
-    // --- WB composite types (entry_type from doc_type_name) ---
+    // --- Ozon empirical (8 types, discovered Apr 2026 from real API) ---
+    CONSIG_DEFECTIVE_WRITEOFF("AccrualConsigDefectiveWriteOff", MeasureColumn.COMPENSATION),
+    SHIPMENT_DELAY_FINE_FLAT("DefectFineShipmentDelay", MeasureColumn.PENALTIES),
+    SELLER_CORRECTION("MarketplaceSellerCorrectionOperation", MeasureColumn.OTHER),
+    SELLER_DECOMPENSATION("MarketplaceSellerDecompensationItemByTypeDocOperation", MeasureColumn.COMPENSATION),
+    SUPPLY_CARGO_SURPLUS("OperationMarketplaceServiceSupplyInboundCargoSurplus", MeasureColumn.PENALTIES),
+    SUPPLY_ADDITIONAL("OperationMarketplaceSupplyAdditional", MeasureColumn.LOGISTICS),
+    RETURNS_ASSORTMENT_INVALID("OperationSellerReturnsCargoAssortmentInvalid", MeasureColumn.PENALTIES),
+    RETURNS_DELIVERY_TO_PVZ("SellerReturnsDeliveryToPickupPoint", MeasureColumn.LOGISTICS),
+
+    // --- WB composite types (entry_type from supplier_oper_name) ---
     WB_SALE("Продажа", MeasureColumn.REVENUE),
     WB_RETURN("Возврат", MeasureColumn.REFUND),
     WB_LOGISTICS("Логистика", MeasureColumn.LOGISTICS),
@@ -85,6 +95,16 @@ public enum FinanceEntryType {
     WB_CORRECTION_SALES("Коррекция продаж", MeasureColumn.REVENUE),
     WB_CORRECTION_LOGISTICS("Коррекция логистики", MeasureColumn.LOGISTICS),
     WB_CORRECTION_ACQUIRING("Коррекция эквайринга", MeasureColumn.ACQUIRING),
+
+    // --- WB additional supplier_oper_name values (official docs, 2026-03-30) ---
+    WB_TRANSPORT_REIMBURSEMENT("Возмещение издержек по перевозке", MeasureColumn.LOGISTICS),
+    WB_PVZ_REIMBURSEMENT("Возмещение за выдачу и возврат товаров на ПВЗ", MeasureColumn.LOGISTICS),
+    WB_PAID_DELIVERY("Услуга платной доставки", MeasureColumn.LOGISTICS),
+    WB_CLICK_COLLECT("Бронирование товара через самовывоз", MeasureColumn.OTHER),
+    WB_LOYALTY_FEE("Стоимость участия в программе лояльности", MeasureColumn.OTHER),
+    WB_LOYALTY_DEDUCTION("Сумма, удержанная за начисленные баллы программы лояльности", MeasureColumn.OTHER),
+    WB_LOYALTY_COMPENSATION("Компенсация скидки по программе лояльности", MeasureColumn.OTHER),
+    WB_EARLY_WITHDRAWAL("Разовое изменение срока перечисления денежных средств", MeasureColumn.OTHER),
 
     OTHER("OTHER", MeasureColumn.OTHER);
 
@@ -147,17 +167,24 @@ public enum FinanceEntryType {
         return switch (this) {
             case WB_SALE, WB_CORRECTION_SALES -> SALE_ACCRUAL.name();
             case WB_RETURN -> RETURN_REVERSAL.name();
-            case WB_LOGISTICS, WB_CORRECTION_LOGISTICS -> "DELIVERY";
+            case WB_LOGISTICS, WB_CORRECTION_LOGISTICS, WB_TRANSPORT_REIMBURSEMENT,
+                    WB_PVZ_REIMBURSEMENT, WB_PAID_DELIVERY -> "DELIVERY";
             case WB_STORAGE -> STORAGE.name();
             case WB_ACCEPTANCE -> "ACCEPTANCE";
             case WB_PENALTY -> "PENALTY";
-            case WB_DEDUCTION -> OTHER.name();
+            case WB_DEDUCTION, WB_CLICK_COLLECT, WB_LOYALTY_FEE,
+                    WB_LOYALTY_DEDUCTION, WB_LOYALTY_COMPENSATION,
+                    WB_EARLY_WITHDRAWAL -> OTHER.name();
             case WB_COMPENSATION, WB_VOLUNTARY_COMPENSATION -> COMPENSATION.name();
             case WB_CORRECTION_ACQUIRING -> ACQUIRING.name();
             case DISPOSAL_DAMAGED -> DISPOSAL.name();
-            case COMPENSATION_WITHOUT_DOCS, SELLER_COMPENSATION -> COMPENSATION.name();
+            case COMPENSATION_WITHOUT_DOCS, SELLER_COMPENSATION,
+                    CONSIG_DEFECTIVE_WRITEOFF, SELLER_DECOMPENSATION -> COMPENSATION.name();
             case REVIEWS_POINTS -> REVIEWS_PURCHASE.name();
             case SUBSCRIPTION_ALIAS -> SUBSCRIPTION.name();
+            case SHIPMENT_DELAY_FINE_FLAT -> SHIPMENT_DELAY_FINE.name();
+            case SUPPLY_CARGO_SURPLUS -> SUPPLY_CARGO_SHORTAGE.name();
+            case RETURNS_ASSORTMENT_INVALID -> DEFECT_PENALTY.name();
             default -> this.name();
         };
     }
@@ -177,10 +204,10 @@ public enum FinanceEntryType {
         return OZON_LOOKUP.getOrDefault(operationType, OTHER);
     }
 
-    public static FinanceEntryType fromWbDocTypeName(String docTypeName) {
-        if (docTypeName == null || docTypeName.isBlank()) {
+    public static FinanceEntryType fromWbSupplierOperName(String supplierOperName) {
+        if (supplierOperName == null || supplierOperName.isBlank()) {
             return OTHER;
         }
-        return WB_LOOKUP.getOrDefault(docTypeName.trim(), OTHER);
+        return WB_LOOKUP.getOrDefault(supplierOperName.trim(), OTHER);
     }
 }

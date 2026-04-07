@@ -146,14 +146,12 @@ public class GridService {
         if (chOfferIds.isEmpty()) {
             return filter;
         }
-        List<Long> merged = filter.connectionId() != null
-                ? filter.connectionId() : List.of();
         return new GridFilter(
-                filter.marketplaceType(), merged, filter.status(),
+                filter.marketplaceType(), filter.connectionId(), filter.status(),
                 filter.skuCode(), filter.productName(), filter.categoryId(),
                 filter.marginMin(), filter.marginMax(), filter.hasManualLock(),
                 filter.hasActivePromo(), filter.lastDecision(), filter.lastActionStatus(),
-                filter.viewId(), null
+                filter.viewId(), null, chOfferIds
         );
     }
 

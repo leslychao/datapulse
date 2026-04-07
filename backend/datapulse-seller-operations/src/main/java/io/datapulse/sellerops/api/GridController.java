@@ -81,7 +81,7 @@ public class GridController {
             filter = new GridFilter(
                     marketplaceType, connectionId, status, skuCode, productName,
                     categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
-                    lastDecision, lastActionStatus, null, stockRisk
+                    lastDecision, lastActionStatus, null, stockRisk, null
             );
             pageSort = buildSort(sort, direction);
         }
@@ -115,7 +115,7 @@ public class GridController {
         GridFilter filter = new GridFilter(
                 marketplaceType, connectionId, status, skuCode, productName,
                 categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
-                null, null, null, null
+                null, null, null, null, null
         );
 
         String filename = "datapulse-export-"
@@ -157,7 +157,7 @@ public class GridController {
         GridFilter filter = new GridFilter(
                 marketplaceType, connectionId, status, skuCode, productName,
                 categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
-                lastDecision, lastActionStatus, null, stockRisk
+                lastDecision, lastActionStatus, null, stockRisk, null
         );
 
         return gridService.getMatchingOfferIds(workspaceId, filter);
@@ -188,7 +188,8 @@ public class GridController {
                 f.get("last_decision") instanceof String s ? s : null,
                 f.get("last_action_status") instanceof String s ? s : null,
                 null,
-                f.get("stock_risk") instanceof String s ? s : null
+                f.get("stock_risk") instanceof String s ? s : null,
+                null
         );
     }
 

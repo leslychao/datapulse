@@ -36,6 +36,7 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
                  AS Decimal(18, 1)),
              NULL) AS days_of_cover,
           multiIf(
+              inv.available = 0, 'CRITICAL',
               sales_agg.avg_daily_sales IS NULL OR sales_agg.avg_daily_sales = 0, 'NORMAL',
               cast(cast(inv.available AS Decimal(18, 4)) / sales_agg.avg_daily_sales AS Decimal(18, 4))
                   < %d, 'CRITICAL',
