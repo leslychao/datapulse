@@ -1,7 +1,7 @@
 package io.datapulse.analytics.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -262,7 +262,7 @@ class DataQualityServiceTest {
       assertThat(result.connections()).isEmpty();
       assertThat(result.trend()).isEmpty();
       assertThat(result.distribution()).isEmpty();
-      verify(dataQualityReadRepository, never()).findReconciliationRows(anyList());
+      verify(dataQualityReadRepository, never()).findReconciliationRows(anyLong());
     }
 
     @Test
@@ -277,9 +277,9 @@ class DataQualityServiceTest {
           new BigDecimal("500000"), new BigDecimal("5000"),
           new BigDecimal("0.01"));
 
-      when(dataQualityReadRepository.findReconciliationRows(List.of(10L)))
+      when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
           .thenReturn(List.of(row));
-      when(dataQualityReadRepository.findBaselineStats(List.of(10L)))
+      when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
           .thenReturn(Map.of("10:WB", new BaselineStat(
               new BigDecimal("0.015"), new BigDecimal("0.005"), 5)));
 
@@ -304,9 +304,9 @@ class DataQualityServiceTest {
           new BigDecimal("500000"), new BigDecimal("50000"),
           new BigDecimal("0.10"));
 
-      when(dataQualityReadRepository.findReconciliationRows(List.of(10L)))
+      when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
           .thenReturn(List.of(row));
-      when(dataQualityReadRepository.findBaselineStats(List.of(10L)))
+      when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
           .thenReturn(Map.of("10:WB", new BaselineStat(
               new BigDecimal("0.02"), new BigDecimal("0.01"), 200)));
 
@@ -328,9 +328,9 @@ class DataQualityServiceTest {
           new BigDecimal("500000"), new BigDecimal("1000"),
           new BigDecimal("0.002"));
 
-      when(dataQualityReadRepository.findReconciliationRows(List.of(10L)))
+      when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
           .thenReturn(List.of(row));
-      when(dataQualityReadRepository.findBaselineStats(List.of(10L)))
+      when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
           .thenReturn(Map.of("10:WB", new BaselineStat(
               new BigDecimal("0.002"), new BigDecimal("0.001"), 3)));
 

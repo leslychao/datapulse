@@ -71,11 +71,10 @@ public class GridService {
                 .map(o -> o.getDirection().name())
                 .orElse("ASC");
 
-        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
         int maxResults = (int) pageable.getOffset() + pageable.getPageSize();
 
         List<Long> sortedIds = ChSafeQuery.getOrFallback(
-                () -> chRepository.findSortedOfferIds(connectionIds, sortColumn, direction, maxResults),
+                () -> chRepository.findSortedOfferIds(workspaceId, sortColumn, direction, maxResults),
                 null, "sort");
         if (sortedIds == null) {
             GridPageResult fallback = getGridPage(workspaceId, filter,
@@ -139,9 +138,8 @@ public class GridService {
         if (filter == null || filter.stockRisk() == null) {
             return filter;
         }
-        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
         List<Long> chOfferIds = ChSafeQuery.getOrFallback(
-                () -> chRepository.findOfferIdsByStockRisk(connectionIds, filter.stockRisk()),
+                () -> chRepository.findOfferIdsByStockRisk(workspaceId, filter.stockRisk()),
                 List.of(), "pre-filter/stockRisk");
         if (chOfferIds.isEmpty()) {
             return filter;
@@ -163,9 +161,8 @@ public class GridService {
     }
 
     private ClickHouseKpiRow fetchChKpiSafely(long workspaceId) {
-        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
         return ChSafeQuery.getOrFallback(
-                () -> chRepository.findKpi(connectionIds),
+                () -> chRepository.findKpi(workspaceId),
                 new ClickHouseKpiRow(0, null, null), "kpi");
     }
 

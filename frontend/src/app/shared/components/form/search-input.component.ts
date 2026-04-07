@@ -67,6 +67,7 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 export class SearchInputComponent implements OnInit {
   readonly placeholder = input('');
   readonly debounceMs = input(300);
+  readonly initialValue = input('');
 
   readonly searchChange = output<string>();
 
@@ -76,6 +77,11 @@ export class SearchInputComponent implements OnInit {
   private readonly search$ = new Subject<string>();
 
   ngOnInit(): void {
+    const initial = this.initialValue();
+    if (initial) {
+      this.value.set(initial);
+    }
+
     this.search$
       .pipe(
         debounceTime(this.debounceMs()),

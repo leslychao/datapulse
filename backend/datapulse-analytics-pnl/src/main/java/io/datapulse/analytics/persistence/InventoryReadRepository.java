@@ -42,41 +42,40 @@ public class InventoryReadRepository {
           countIf(m.stock_out_risk = 'NORMAL') AS normal_count,
           sum(m.frozen_capital) AS frozen_capital
       FROM mart_inventory_analysis AS m
-      WHERE m.connection_id IN (:connectionIds)
+      WHERE m.workspace_id = :workspaceId
         AND m.analysis_date = (
             SELECT max(analysis_date) FROM mart_inventory_analysis
-            WHERE connection_id IN (:connectionIds)
+            WHERE workspace_id = :workspaceId
         )
       """;
 
   private static final String TOP_CRITICAL_SQL = """
       SELECT
-          m.connection_id,
-          m.source_platform,
-          m.product_id,
-          m.seller_sku_id,
-          p.sku_code,
-          p.product_name,
-          m.warehouse_id,
+          m.source_platform AS source_platform,
+          m.product_id AS product_id,
+          m.seller_sku_id AS seller_sku_id,
+          p.sku_code AS sku_code,
+          p.product_name AS product_name,
+          m.warehouse_id AS warehouse_id,
           w.name AS warehouse_name,
-          m.analysis_date,
-          m.available,
-          m.reserved,
-          m.avg_daily_sales_14d,
-          m.days_of_cover,
-          m.stock_out_risk,
-          m.cost_price,
-          m.frozen_capital,
-          m.recommended_replenishment
+          m.analysis_date AS analysis_date,
+          m.available AS available,
+          m.reserved AS reserved,
+          m.avg_daily_sales_14d AS avg_daily_sales_14d,
+          m.days_of_cover AS days_of_cover,
+          m.stock_out_risk AS stock_out_risk,
+          m.cost_price AS cost_price,
+          m.frozen_capital AS frozen_capital,
+          m.recommended_replenishment AS recommended_replenishment
       FROM mart_inventory_analysis AS m
       LEFT JOIN dim_product AS p
-          ON m.product_id = p.product_id AND m.connection_id = p.connection_id
+          ON m.product_id = p.product_id
       LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
-      WHERE m.connection_id IN (:connectionIds)
+      WHERE m.workspace_id = :workspaceId
         AND m.stock_out_risk = 'CRITICAL'
         AND m.analysis_date = (
             SELECT max(analysis_date) FROM mart_inventory_analysis
-            WHERE connection_id IN (:connectionIds)
+            WHERE workspace_id = :workspaceId
         )
       ORDER BY m.days_of_cover ASC NULLS FIRST, m.available ASC
       LIMIT 10
@@ -84,31 +83,30 @@ public class InventoryReadRepository {
 
   private static final String BY_PRODUCT_SQL = """
       SELECT
-          m.connection_id,
-          m.source_platform,
-          m.product_id,
-          m.seller_sku_id,
-          p.sku_code,
-          p.product_name,
-          m.warehouse_id,
+          m.source_platform AS source_platform,
+          m.product_id AS product_id,
+          m.seller_sku_id AS seller_sku_id,
+          p.sku_code AS sku_code,
+          p.product_name AS product_name,
+          m.warehouse_id AS warehouse_id,
           w.name AS warehouse_name,
-          m.analysis_date,
-          m.available,
-          m.reserved,
-          m.avg_daily_sales_14d,
-          m.days_of_cover,
-          m.stock_out_risk,
-          m.cost_price,
-          m.frozen_capital,
-          m.recommended_replenishment
+          m.analysis_date AS analysis_date,
+          m.available AS available,
+          m.reserved AS reserved,
+          m.avg_daily_sales_14d AS avg_daily_sales_14d,
+          m.days_of_cover AS days_of_cover,
+          m.stock_out_risk AS stock_out_risk,
+          m.cost_price AS cost_price,
+          m.frozen_capital AS frozen_capital,
+          m.recommended_replenishment AS recommended_replenishment
       FROM mart_inventory_analysis AS m
       LEFT JOIN dim_product AS p
-          ON m.product_id = p.product_id AND m.connection_id = p.connection_id
+          ON m.product_id = p.product_id
       LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
-      WHERE m.connection_id IN (:connectionIds)
+      WHERE m.workspace_id = :workspaceId
         AND m.analysis_date = (
             SELECT max(analysis_date) FROM mart_inventory_analysis
-            WHERE connection_id IN (:connectionIds)
+            WHERE workspace_id = :workspaceId
         )
       """;
 
@@ -122,7 +120,7 @@ public class InventoryReadRepository {
       FROM fact_inventory_snapshot AS s
       LEFT JOIN dim_warehouse AS w ON s.warehouse_id = w.warehouse_id
       WHERE s.product_id = :productId
-        AND s.connection_id IN (:connectionIds)
+        AND s.workspace_id = :workspaceId
         AND s.captured_date >= :dateFrom
         AND s.captured_date <= :dateTo
       ORDER BY date, warehouse_id
@@ -130,8 +128,8 @@ public class InventoryReadRepository {
       """;
 
   public InventoryOverviewResponse findOverview(
-      List<Long> connectionIds, InventoryFilter filter) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+      long workspaceId, InventoryFilter filter) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(OVERVIEW_SQL);
     sb.append(SETTINGS_FINAL);
 
@@ -146,18 +144,18 @@ public class InventoryReadRepository {
         ));
   }
 
-  public List<ProductInventoryResponse> findTopCritical(List<Long> connectionIds) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+  public List<ProductInventoryResponse> findTopCritical(long workspaceId) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(TOP_CRITICAL_SQL);
     sb.append(SETTINGS_FINAL);
     return jdbc.ch().query(sb.toString(), params, this::mapProductInventory);
   }
 
   public List<ProductInventoryResponse> findByProduct(
-      List<Long> connectionIds, InventoryFilter filter,
+      long workspaceId, InventoryFilter filter,
       String sortColumn, String sortDirection,
       int limit, long offset) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(BY_PRODUCT_SQL);
     appendProductFilter(sb, params, filter);
 
@@ -172,16 +170,16 @@ public class InventoryReadRepository {
     return jdbc.ch().query(sb.toString(), params, this::mapProductInventory);
   }
 
-  public long countByProduct(List<Long> connectionIds, InventoryFilter filter) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+  public long countByProduct(long workspaceId, InventoryFilter filter) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder("""
         SELECT count(*) FROM mart_inventory_analysis AS m
         LEFT JOIN dim_product AS p
-            ON m.product_id = p.product_id AND m.connection_id = p.connection_id
-        WHERE m.connection_id IN (:connectionIds)
+            ON m.product_id = p.product_id
+        WHERE m.workspace_id = :workspaceId
           AND m.analysis_date = (
               SELECT max(analysis_date) FROM mart_inventory_analysis
-              WHERE connection_id IN (:connectionIds)
+              WHERE workspace_id = :workspaceId
           )
         """);
     appendProductFilter(sb, params, filter);
@@ -192,10 +190,10 @@ public class InventoryReadRepository {
   }
 
   public List<StockHistoryResponse> findStockHistory(
-      List<Long> connectionIds, long productId,
+      long workspaceId, long productId,
       LocalDate from, LocalDate to) {
     var params = new MapSqlParameterSource()
-        .addValue("connectionIds", connectionIds)
+        .addValue("workspaceId", workspaceId)
         .addValue("productId", productId)
         .addValue("dateFrom", from)
         .addValue("dateTo", to);
@@ -229,7 +227,6 @@ public class InventoryReadRepository {
   private ProductInventoryResponse mapProductInventory(ResultSet rs, int rowNum)
       throws SQLException {
     return new ProductInventoryResponse(
-        rs.getLong("connection_id"),
         rs.getString("source_platform"),
         rs.getLong("product_id"),
         rs.getLong("seller_sku_id"),

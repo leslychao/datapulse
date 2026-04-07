@@ -29,6 +29,7 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
           data-tour="grid-search"
           class="mr-auto max-w-xs flex-1"
           [placeholder]="'grid.search_placeholder' | translate"
+          [initialValue]="gridStore.searchTerm()"
           (searchChange)="onSearch($event)"
         />
 

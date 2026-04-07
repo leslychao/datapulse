@@ -5,7 +5,6 @@ import java.time.LocalDate;
 
 public record PostingPnlResponse(
         String postingId,
-        long connectionId,
         String sourcePlatform,
         String orderId,
         Long sellerSkuId,

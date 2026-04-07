@@ -145,7 +145,6 @@ export interface InventoryOverview {
 }
 
 export interface InventoryByProduct {
-  connectionId: number;
   sourcePlatform: string;
   productId: number;
   sellerSkuId: number;

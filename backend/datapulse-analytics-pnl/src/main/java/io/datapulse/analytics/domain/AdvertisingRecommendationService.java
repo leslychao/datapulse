@@ -14,7 +14,6 @@ import io.datapulse.analytics.persistence.CrossMpAdComparison;
 import io.datapulse.analytics.persistence.OfferAdMetrics;
 import io.datapulse.analytics.persistence.RecommendationOfferReadRepository;
 import io.datapulse.analytics.persistence.RecommendationOfferRow;
-import io.datapulse.analytics.persistence.WorkspaceConnectionRepository;
 import io.datapulse.common.error.MessageCodes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,20 +28,17 @@ public class AdvertisingRecommendationService {
   private static final BigDecimal DRR_BUFFER_PP = BigDecimal.valueOf(5);
   private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
-  private final WorkspaceConnectionRepository connectionRepository;
   private final RecommendationOfferReadRepository offerRepo;
   private final AdvertisingClickHouseReadRepository chRepo;
 
   public List<CrossMpComparisonResponse> getCrossMarketplaceComparison(
       long workspaceId, List<Long> sellerSkuIds) {
 
-    List<Long> connectionIds =
-        connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
-    if (connectionIds.isEmpty() || sellerSkuIds.isEmpty()) {
+    if (sellerSkuIds.isEmpty()) {
       return List.of();
     }
 
-    return chRepo.findCrossMarketplaceComparison(connectionIds, sellerSkuIds)
+    return chRepo.findCrossMarketplaceComparison(workspaceId, sellerSkuIds)
         .stream()
         .map(row -> new CrossMpComparisonResponse(
             row.sellerSkuId(), row.sourcePlatform(),
@@ -54,9 +50,7 @@ public class AdvertisingRecommendationService {
   public List<ProductAdRecommendationResponse> getRecommendations(
       long workspaceId, List<Long> offerIds) {
 
-    List<Long> connectionIds =
-        connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
-    if (connectionIds.isEmpty() || offerIds.isEmpty()) {
+    if (offerIds.isEmpty()) {
       return List.of();
     }
 
@@ -69,7 +63,7 @@ public class AdvertisingRecommendationService {
     List<Long> foundOfferIds = offers.stream()
         .map(RecommendationOfferRow::offerId).toList();
     Map<Long, OfferAdMetrics> adMetrics =
-        chRepo.findOfferAdMetrics(connectionIds, foundOfferIds);
+        chRepo.findOfferAdMetrics(foundOfferIds);
 
     List<String> categories = offers.stream()
         .map(RecommendationOfferRow::category)
@@ -77,7 +71,7 @@ public class AdvertisingRecommendationService {
         .distinct()
         .toList();
     Map<String, CategoryAdAvg> categoryAvgs =
-        chRepo.findCategoryAvgMetrics(connectionIds, categories);
+        chRepo.findCategoryAvgMetrics(workspaceId, categories);
 
     List<ProductAdRecommendationResponse> results = new ArrayList<>();
     for (RecommendationOfferRow offer : offers) {
@@ -153,10 +147,6 @@ public class AdvertisingRecommendationService {
         MessageCodes.AD_RECOMMENDATION_WORTH);
   }
 
-  /**
-   * estimated DRR = avg_cpc / (avg_cr × price) × 100.
-   * Represents the expected DRR given category-average CPC and CR at the product's price point.
-   */
   private BigDecimal computeEstimatedDrr(
       CategoryAdAvg categoryAvg, BigDecimal price) {
 
@@ -175,10 +165,6 @@ public class AdvertisingRecommendationService {
         .setScale(2, RoundingMode.HALF_UP);
   }
 
-  /**
-   * max CPC = price × (margin_pct / 100) × avg_cr.
-   * The highest affordable bid that keeps ad cost within margin.
-   */
   private BigDecimal computeMaxCpc(
       BigDecimal price, BigDecimal marginPct, CategoryAdAvg categoryAvg) {
 

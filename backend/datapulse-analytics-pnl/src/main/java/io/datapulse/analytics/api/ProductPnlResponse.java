@@ -3,7 +3,6 @@ package io.datapulse.analytics.api;
 import java.math.BigDecimal;
 
 public record ProductPnlResponse(
-        long connectionId,
         String sourcePlatform,
         long sellerSkuId,
         long productId,

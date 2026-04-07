@@ -152,11 +152,10 @@ public class QueueAutoPopulationService {
 
     private Set<Long> evaluateChCriteria(long workspaceId, List<MatchRule> chRules) {
         return ChSafeQuery.getOrFallback(() -> {
-            List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
             Set<Long> result = new HashSet<>();
             for (MatchRule rule : chRules) {
                 if ("stock_risk".equals(rule.field) && rule.value instanceof String risk) {
-                    result.addAll(chRepository.findOfferIdsByStockRisk(connectionIds, risk));
+                    result.addAll(chRepository.findOfferIdsByStockRisk(workspaceId, risk));
                 }
             }
             return result;

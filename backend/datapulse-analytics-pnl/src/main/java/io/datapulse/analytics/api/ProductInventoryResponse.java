@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record ProductInventoryResponse(
-        long connectionId,
         String sourcePlatform,
         long productId,
         long sellerSkuId,

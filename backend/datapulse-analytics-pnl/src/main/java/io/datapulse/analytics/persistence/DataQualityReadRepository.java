@@ -30,7 +30,7 @@ public class DataQualityReadRepository {
           sum(net_payout) AS total_net_payout,
           sum(reconciliation_residual) AS total_residual
       FROM mart_posting_pnl
-      WHERE connection_id IN (:connectionIds)
+      WHERE workspace_id = :workspaceId
       GROUP BY connection_id, source_platform, period
       ORDER BY connection_id, period DESC
       SETTINGS final = 1
@@ -51,15 +51,15 @@ public class DataQualityReadRepository {
               abs(sum(reconciliation_residual))
                   / nullIf(abs(sum(net_payout)), 0) AS abs_residual_ratio
           FROM mart_posting_pnl
-          WHERE connection_id IN (:connectionIds)
+          WHERE workspace_id = :workspaceId
           GROUP BY connection_id, source_platform, period
       )
       GROUP BY connection_id, source_platform
       SETTINGS final = 1
       """;
 
-  public List<ReconciliationRow> findReconciliationRows(List<Long> connectionIds) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+  public List<ReconciliationRow> findReconciliationRows(long workspaceId) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     return jdbc.ch().query(RECONCILIATION_SQL, params, (rs, rowNum) -> {
       long connId = rs.getLong("connection_id");
       String platform = rs.getString("source_platform");
@@ -78,8 +78,8 @@ public class DataQualityReadRepository {
     });
   }
 
-  public Map<String, BaselineStat> findBaselineStats(List<Long> connectionIds) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+  public Map<String, BaselineStat> findBaselineStats(long workspaceId) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var rows = jdbc.ch().query(BASELINE_SQL, params,
         (rs, rowNum) -> Map.entry(
             rs.getLong("connection_id") + ":" + rs.getString("source_platform"),

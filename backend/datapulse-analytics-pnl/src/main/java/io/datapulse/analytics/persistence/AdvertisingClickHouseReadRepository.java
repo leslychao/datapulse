@@ -29,7 +29,7 @@ public class AdvertisingClickHouseReadRepository {
           sumIf(spend, ad_date >= :prevFrom AND ad_date < :prevTo) AS prev_spend,
           sumIf(ordered_revenue, ad_date >= :prevFrom AND ad_date < :prevTo) AS prev_revenue
       FROM fact_advertising
-      WHERE connection_id IN (:connectionIds)
+      WHERE workspace_id = :workspaceId
         AND campaign_id IN (:campaignIds)
         AND ad_date >= :prevFrom
         AND ad_date < :currentTo
@@ -37,14 +37,10 @@ public class AdvertisingClickHouseReadRepository {
       SETTINGS final = 1
       """;
 
-  /**
-   * Enrichment query: fetches aggregated metrics for displayed campaigns. Returns a map keyed by
-   * "connectionId:campaignId" for fast lookup.
-   */
   public Map<String, CampaignMetrics> findCampaignMetrics(
-      List<Long> connectionIds, List<Long> campaignIds, int periodDays) {
+      long workspaceId, List<Long> campaignIds, int periodDays) {
 
-    if (connectionIds.isEmpty() || campaignIds.isEmpty()) {
+    if (campaignIds.isEmpty()) {
       return Collections.emptyMap();
     }
 
@@ -55,7 +51,7 @@ public class AdvertisingClickHouseReadRepository {
     LocalDate prevFrom = currentFrom.minusDays(periodDays);
 
     var params = new MapSqlParameterSource()
-        .addValue("connectionIds", connectionIds)
+        .addValue("workspaceId", workspaceId)
         .addValue("campaignIds", campaignIds)
         .addValue("currentFrom", currentFrom)
         .addValue("currentTo", currentTo)
@@ -104,15 +100,12 @@ public class AdvertisingClickHouseReadRepository {
       SETTINGS final = 1
       """;
 
-  public Map<Long, OfferAdMetrics> findOfferAdMetrics(
-      List<Long> connectionIds, List<Long> offerIds) {
-
-    if (connectionIds.isEmpty() || offerIds.isEmpty()) {
+  public Map<Long, OfferAdMetrics> findOfferAdMetrics(List<Long> offerIds) {
+    if (offerIds.isEmpty()) {
       return Collections.emptyMap();
     }
 
     var params = new MapSqlParameterSource()
-        .addValue("connectionIds", connectionIds)
         .addValue("offerIds", offerIds)
         .addValue("lookback", RECOMMENDATION_LOOKBACK_DAYS);
 
@@ -143,7 +136,7 @@ public class AdvertisingClickHouseReadRepository {
       FROM fact_advertising AS fa
       INNER JOIN dim_product AS dp
           ON fa.marketplace_sku = dp.marketplace_sku
-      WHERE fa.connection_id IN (:connectionIds)
+      WHERE fa.workspace_id = :workspaceId
         AND dp.category IN (:categories)
         AND fa.ad_date >= today() - :lookback
       GROUP BY dp.category
@@ -152,14 +145,14 @@ public class AdvertisingClickHouseReadRepository {
       """;
 
   public Map<String, CategoryAdAvg> findCategoryAvgMetrics(
-      List<Long> connectionIds, List<String> categories) {
+      long workspaceId, List<String> categories) {
 
-    if (connectionIds.isEmpty() || categories.isEmpty()) {
+    if (categories.isEmpty()) {
       return Collections.emptyMap();
     }
 
     var params = new MapSqlParameterSource()
-        .addValue("connectionIds", connectionIds)
+        .addValue("workspaceId", workspaceId)
         .addValue("categories", categories)
         .addValue("lookback", RECOMMENDATION_LOOKBACK_DAYS);
 
@@ -188,20 +181,20 @@ public class AdvertisingClickHouseReadRepository {
       INNER JOIN dim_product AS dp
           ON map.marketplace_sku = dp.marketplace_sku
       WHERE dp.seller_sku_id IN (:sellerSkuIds)
-        AND map.connection_id IN (:connectionIds)
+        AND map.workspace_id = :workspaceId
       ORDER BY dp.seller_sku_id, map.source_platform
       SETTINGS final = 1
       """;
 
   public List<CrossMpAdComparison> findCrossMarketplaceComparison(
-      List<Long> connectionIds, List<Long> sellerSkuIds) {
+      long workspaceId, List<Long> sellerSkuIds) {
 
-    if (connectionIds.isEmpty() || sellerSkuIds.isEmpty()) {
+    if (sellerSkuIds.isEmpty()) {
       return Collections.emptyList();
     }
 
     var params = new MapSqlParameterSource()
-        .addValue("connectionIds", connectionIds)
+        .addValue("workspaceId", workspaceId)
         .addValue("sellerSkuIds", sellerSkuIds);
 
     return jdbc.ch().query(

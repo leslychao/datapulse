@@ -2,28 +2,22 @@ package io.datapulse.analytics.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import io.datapulse.analytics.api.PnlFilter;
 import io.datapulse.analytics.api.PnlSummaryResponse;
 import io.datapulse.analytics.api.PnlTrendResponse;
-import io.datapulse.analytics.api.PostingDetailResponse;
 import io.datapulse.analytics.api.PostingPnlDetailResponse;
 import io.datapulse.analytics.api.PostingPnlResponse;
 import io.datapulse.analytics.api.ProductPnlResponse;
 import io.datapulse.analytics.api.TrendGranularity;
 import io.datapulse.analytics.persistence.PnlReadRepository;
-import io.datapulse.analytics.persistence.WorkspaceConnectionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -40,7 +34,6 @@ import org.springframework.data.domain.Sort;
 class PnlQueryServiceTest {
 
   @Mock private PnlReadRepository pnlReadRepository;
-  @Mock private WorkspaceConnectionRepository connectionRepository;
 
   @InjectMocks
   private PnlQueryService service;
@@ -53,26 +46,10 @@ class PnlQueryServiceTest {
   class GetSummary {
 
     @Test
-    @DisplayName("should return empty list when workspace has no connections")
-    void should_returnEmpty_when_noConnections() {
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(List.of());
-
-      List<PnlSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
-
-      assertThat(result).isEmpty();
-      verify(pnlReadRepository, never()).findSummary(anyList(), any());
-    }
-
-    @Test
-    @DisplayName("should delegate to repository with resolved connection ids")
-    void should_delegateToRepo_when_connectionsExist() {
-      List<Long> connIds = List.of(10L, 20L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-
+    @DisplayName("should delegate to repository with workspaceId")
+    void should_delegateToRepo() {
       var summary = new PnlSummaryResponse(
-          10L, "WB",
+          "WB",
           new BigDecimal("100000.00"), new BigDecimal("-15000.00"),
           new BigDecimal("-3000.00"), new BigDecimal("-8000.00"),
           new BigDecimal("-2000.00"), new BigDecimal("-500.00"),
@@ -83,7 +60,7 @@ class PnlQueryServiceTest {
           BigDecimal.ZERO, new BigDecimal("49000.00"),
           new BigDecimal("31000.00"));
 
-      when(pnlReadRepository.findSummary(connIds, EMPTY_FILTER))
+      when(pnlReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
           .thenReturn(List.of(summary));
 
       List<PnlSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
@@ -95,10 +72,6 @@ class PnlQueryServiceTest {
     @Test
     @DisplayName("should verify P&L formula: marketplace_pnl = revenue + costs")
     void should_verifyPnlFormula_when_summaryReturned() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-
       BigDecimal revenue = new BigDecimal("100000.00");
       BigDecimal commission = new BigDecimal("-15000.00");
       BigDecimal acquiring = new BigDecimal("-3000.00");
@@ -117,13 +90,13 @@ class PnlQueryServiceTest {
           .add(acceptance).add(other).add(compensation).add(refund);
 
       var summary = new PnlSummaryResponse(
-          10L, "WB", revenue, commission, acquiring, logistics,
+          "WB", revenue, commission, acquiring, logistics,
           storage, penalties, marketing, acceptance, other,
           compensation, refund, new BigDecimal("67000.00"),
           new BigDecimal("20000.00"), new BigDecimal("18000.00"),
           BigDecimal.ZERO, expectedMarketplacePnl, null);
 
-      when(pnlReadRepository.findSummary(connIds, EMPTY_FILTER))
+      when(pnlReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
           .thenReturn(List.of(summary));
 
       List<PnlSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
@@ -135,19 +108,15 @@ class PnlQueryServiceTest {
     @Test
     @DisplayName("should return zero profit when all components are zero")
     void should_returnZeroProfit_when_allComponentsZero() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-
       var summary = new PnlSummaryResponse(
-          10L, "WB",
+          "WB",
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
           BigDecimal.ZERO, BigDecimal.ZERO,
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
-      when(pnlReadRepository.findSummary(connIds, EMPTY_FILTER))
+      when(pnlReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
           .thenReturn(List.of(summary));
 
       List<PnlSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
@@ -159,10 +128,6 @@ class PnlQueryServiceTest {
     @Test
     @DisplayName("should represent loss as negative fullPnl")
     void should_returnNegativePnl_when_costsExceedRevenue() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-
       BigDecimal revenue = new BigDecimal("10000.00");
       BigDecimal commission = new BigDecimal("-8000.00");
       BigDecimal logistics = new BigDecimal("-5000.00");
@@ -171,13 +136,13 @@ class PnlQueryServiceTest {
       BigDecimal fullPnl = marketplacePnl.subtract(netCogs);
 
       var summary = new PnlSummaryResponse(
-          10L, "WB", revenue, commission, BigDecimal.ZERO, logistics,
+          "WB", revenue, commission, BigDecimal.ZERO, logistics,
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
           netCogs, netCogs,
           BigDecimal.ZERO, marketplacePnl, fullPnl);
 
-      when(pnlReadRepository.findSummary(connIds, EMPTY_FILTER))
+      when(pnlReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
           .thenReturn(List.of(summary));
 
       List<PnlSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
@@ -192,62 +157,39 @@ class PnlQueryServiceTest {
   class GetByProduct {
 
     @Test
-    @DisplayName("should return empty page when no connections")
-    void should_returnEmptyPage_when_noConnections() {
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(List.of());
-
-      Page<ProductPnlResponse> result = service.getByProduct(
-          WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
-
-      assertThat(result.getContent()).isEmpty();
-      assertThat(result.getTotalElements()).isZero();
-    }
-
-    @Test
     @DisplayName("should use default sort column 'revenue_amount' when unsorted")
     void should_useDefaultSort_when_noSortProvided() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-      when(pnlReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(0L);
-      when(pnlReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
+      when(pnlReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(0L);
+      when(pnlReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
           eq("revenue_amount"), eq(20), eq(0L)))
           .thenReturn(List.of());
 
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
 
-      verify(pnlReadRepository).findByProduct(connIds, EMPTY_FILTER,
+      verify(pnlReadRepository).findByProduct(WORKSPACE_ID, EMPTY_FILTER,
           "revenue_amount", 20, 0L);
     }
 
     @Test
     @DisplayName("should extract sort column from pageable when provided")
     void should_extractSortColumn_when_sortProvided() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-      when(pnlReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(0L);
-      when(pnlReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
+      when(pnlReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(0L);
+      when(pnlReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
           eq("fullPnl"), eq(10), eq(0L)))
           .thenReturn(List.of());
 
       var pageable = PageRequest.of(0, 10, Sort.by("fullPnl"));
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER, pageable);
 
-      verify(pnlReadRepository).findByProduct(connIds, EMPTY_FILTER,
+      verify(pnlReadRepository).findByProduct(WORKSPACE_ID, EMPTY_FILTER,
           "fullPnl", 10, 0L);
     }
 
     @Test
     @DisplayName("should verify COGS status NO_COST_PROFILE when cost missing")
     void should_returnNoCostProfile_when_cogsStatusIndicates() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-
       var response = new ProductPnlResponse(
-          10L, "WB", 1L, 100L, 202501, "PRODUCT", "SKU001", "Product A",
+          "WB", 1L, 100L, 202501, "PRODUCT", "SKU001", "Product A",
           new BigDecimal("50000.00"), new BigDecimal("-7500.00"),
           BigDecimal.ZERO, new BigDecimal("-4000.00"),
           BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
@@ -255,10 +197,10 @@ class PnlQueryServiceTest {
           null, null, "NO_COST_PROFILE",
           BigDecimal.ZERO, new BigDecimal("38500.00"), null);
 
-      when(pnlReadRepository.findByProduct(eq(connIds), eq(EMPTY_FILTER),
+      when(pnlReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
           anyString(), eq(20), eq(0L)))
           .thenReturn(List.of(response));
-      when(pnlReadRepository.countByProduct(connIds, EMPTY_FILTER)).thenReturn(1L);
+      when(pnlReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(1L);
 
       Page<ProductPnlResponse> result = service.getByProduct(
           WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
@@ -275,31 +217,16 @@ class PnlQueryServiceTest {
   class GetByPosting {
 
     @Test
-    @DisplayName("should return empty page when no connections")
-    void should_returnEmptyPage_when_noConnections() {
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(List.of());
-
-      Page<PostingPnlResponse> result = service.getByPosting(
-          WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
-
-      assertThat(result).isEmpty();
-    }
-
-    @Test
     @DisplayName("should use default sort column 'finance_date' when unsorted")
     void should_useDefaultSort_when_noSortOnPosting() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-      when(pnlReadRepository.countByPosting(connIds, EMPTY_FILTER)).thenReturn(0L);
-      when(pnlReadRepository.findByPosting(eq(connIds), eq(EMPTY_FILTER),
+      when(pnlReadRepository.countByPosting(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(0L);
+      when(pnlReadRepository.findByPosting(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
           eq("finance_date"), eq(20), eq(0L)))
           .thenReturn(List.of());
 
       service.getByPosting(WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
 
-      verify(pnlReadRepository).findByPosting(connIds, EMPTY_FILTER,
+      verify(pnlReadRepository).findByPosting(WORKSPACE_ID, EMPTY_FILTER,
           "finance_date", 20, 0L);
     }
   }
@@ -309,32 +236,17 @@ class PnlQueryServiceTest {
   class GetPostingDetails {
 
     @Test
-    @DisplayName("should return empty detail when no connections")
-    void should_returnEmpty_when_noConnections() {
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(List.of());
-
-      PostingPnlDetailResponse result = service.getPostingDetails(WORKSPACE_ID, "P-001");
-
-      assertThat(result.entries()).isEmpty();
-      assertThat(result.postingId()).isEqualTo("P-001");
-    }
-
-    @Test
     @DisplayName("should delegate posting id to repository")
-    void should_delegatePostingId_when_connectionsExist() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-      when(pnlReadRepository.findPostingDetail(connIds, "P-001"))
+    void should_delegatePostingId() {
+      when(pnlReadRepository.findPostingDetail(WORKSPACE_ID, "P-001"))
           .thenReturn(new PostingPnlDetailResponse(
               "P-001", null, null, null, null,
-              java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO,
-              null, java.math.BigDecimal.ZERO, List.of()));
+              BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+              null, BigDecimal.ZERO, List.of()));
 
       service.getPostingDetails(WORKSPACE_ID, "P-001");
 
-      verify(pnlReadRepository).findPostingDetail(connIds, "P-001");
+      verify(pnlReadRepository).findPostingDetail(WORKSPACE_ID, "P-001");
     }
   }
 
@@ -343,29 +255,14 @@ class PnlQueryServiceTest {
   class GetTrend {
 
     @Test
-    @DisplayName("should return empty list when no connections")
-    void should_returnEmpty_when_noConnections() {
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(List.of());
-
-      List<PnlTrendResponse> result = service.getTrend(
-          WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.MONTHLY);
-
-      assertThat(result).isEmpty();
-    }
-
-    @Test
     @DisplayName("should pass granularity to repository")
-    void should_passGranularity_when_connectionsExist() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-      when(pnlReadRepository.findTrend(connIds, EMPTY_FILTER, TrendGranularity.WEEKLY))
+    void should_passGranularity() {
+      when(pnlReadRepository.findTrend(WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.WEEKLY))
           .thenReturn(List.of());
 
       service.getTrend(WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.WEEKLY);
 
-      verify(pnlReadRepository).findTrend(connIds, EMPTY_FILTER, TrendGranularity.WEEKLY);
+      verify(pnlReadRepository).findTrend(WORKSPACE_ID, EMPTY_FILTER, TrendGranularity.WEEKLY);
     }
   }
 
@@ -376,12 +273,8 @@ class PnlQueryServiceTest {
     @Test
     @DisplayName("should preserve 2 decimal places in monetary amounts")
     void should_preserve2DecimalPlaces_when_summaryReturned() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
-
       var summary = new PnlSummaryResponse(
-          10L, "WB",
+          "WB",
           new BigDecimal("99999.99"), new BigDecimal("-14999.99"),
           new BigDecimal("-2999.99"), new BigDecimal("-7999.99"),
           new BigDecimal("-1999.99"), new BigDecimal("-499.99"),
@@ -392,7 +285,7 @@ class PnlQueryServiceTest {
           BigDecimal.ZERO, new BigDecimal("67000.08"),
           new BigDecimal("49000.09"));
 
-      when(pnlReadRepository.findSummary(connIds, EMPTY_FILTER))
+      when(pnlReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
           .thenReturn(List.of(summary));
 
       List<PnlSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);

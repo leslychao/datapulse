@@ -151,9 +151,8 @@ public class MismatchMonitorService {
             return;
         }
 
-        List<Long> connectionIds = pgRepository.findConnectionIds(workspaceId);
         Map<Long, Integer> chStocks = ChSafeQuery.getOrFallback(
-                () -> chRepository.findLatestSnapshotStocks(connectionIds),
+                () -> chRepository.findLatestSnapshotStocks(workspaceId),
                 null, "stockMismatch");
         if (chStocks == null) {
             return;

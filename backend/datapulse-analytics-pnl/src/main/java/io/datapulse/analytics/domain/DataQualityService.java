@@ -97,11 +97,10 @@ public class DataQualityService {
       return new ReconciliationResultResponse(List.of(), List.of(), List.of());
     }
 
-    List<Long> connectionIds = List.copyOf(connMap.keySet());
     List<ReconciliationRow> allRows =
-        dataQualityReadRepository.findReconciliationRows(connectionIds);
+        dataQualityReadRepository.findReconciliationRows(workspaceId);
     Map<String, BaselineStat> baselines =
-        dataQualityReadRepository.findBaselineStats(connectionIds);
+        dataQualityReadRepository.findBaselineStats(workspaceId);
 
     if (allRows.isEmpty()) {
       return new ReconciliationResultResponse(List.of(), List.of(), List.of());

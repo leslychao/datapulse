@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -105,12 +106,12 @@ public class GridClickHouseReadRepository {
             SETTINGS final = 1
             """;
 
-    private static final java.util.Set<String> CH_SORT_COLUMNS = java.util.Set.of(
+    private static final Set<String> CH_SORT_COLUMNS = Set.of(
             "revenue30d", "netPnl30d", "velocity14d",
             "returnRatePct", "daysOfCover", "stockRisk"
     );
 
-    private static final java.util.Map<String, String> CH_SORT_COLUMN_MAP = java.util.Map.of(
+    private static final Map<String, String> CH_SORT_COLUMN_MAP = Map.of(
             "revenue30d", "fin.revenue_30d",
             "netPnl30d", "fin.net_pnl_30d",
             "velocity14d", "sales.velocity_14d",
@@ -123,10 +124,10 @@ public class GridClickHouseReadRepository {
         return CH_SORT_COLUMNS.contains(column);
     }
 
-    public List<Long> findSortedOfferIds(List<Long> connectionIds, String sortColumn,
+    public List<Long> findSortedOfferIds(long workspaceId, String sortColumn,
                                           String direction, int limit) {
         String chColumn = CH_SORT_COLUMN_MAP.get(sortColumn);
-        if (chColumn == null || connectionIds == null || connectionIds.isEmpty()) {
+        if (chColumn == null) {
             return List.of();
         }
 
@@ -142,10 +143,10 @@ public class GridClickHouseReadRepository {
                             'NORMAL'
                         ) AS stock_out_risk
                     FROM mart_inventory_analysis
-                    WHERE connection_id IN (:connectionIds)
+                    WHERE workspace_id = :workspaceId
                       AND analysis_date = (SELECT max(analysis_date)
                                            FROM mart_inventory_analysis
-                                           WHERE connection_id IN (:connectionIds))
+                                           WHERE workspace_id = :workspaceId)
                     GROUP BY product_id
                 ) inv
                 LEFT JOIN (
@@ -155,22 +156,22 @@ public class GridClickHouseReadRepository {
                                  ff.attribution_level IN ('POSTING','PRODUCT')) AS net_pnl_30d
                     FROM fact_finance ff
                     JOIN dim_product dp ON ff.seller_sku_id = dp.seller_sku_id
-                    WHERE ff.connection_id IN (:connectionIds)
+                    WHERE ff.workspace_id = :workspaceId
                       AND ff.finance_date >= today() - 30
                     GROUP BY dp.product_id
                 ) fin ON inv.product_id = fin.product_id
                 LEFT JOIN (
                     SELECT product_id, toDecimal64(sum(quantity),2)/14 AS velocity_14d
                     FROM fact_sales
-                    WHERE connection_id IN (:connectionIds) AND sale_date >= today()-14
+                    WHERE workspace_id = :workspaceId AND sale_date >= today()-14
                     GROUP BY product_id
                 ) sales ON inv.product_id = sales.product_id
                 LEFT JOIN (
                     SELECT product_id, return_rate_pct
                     FROM mart_returns_analysis
-                    WHERE connection_id IN (:connectionIds)
+                    WHERE workspace_id = :workspaceId
                       AND period = (SELECT max(period) FROM mart_returns_analysis
-                                    WHERE connection_id IN (:connectionIds))
+                                    WHERE workspace_id = :workspaceId)
                 ) ret ON inv.product_id = ret.product_id
                 ORDER BY %s %s NULLS LAST
                 LIMIT :limit
@@ -178,31 +179,27 @@ public class GridClickHouseReadRepository {
                 """.formatted(chColumn, direction);
 
         var params = new MapSqlParameterSource()
-                .addValue("connectionIds", connectionIds)
+                .addValue("workspaceId", workspaceId)
                 .addValue("limit", limit);
 
         return ch.queryForList(sql, params, Long.class);
     }
 
-    public List<Long> findOfferIdsByStockRisk(List<Long> connectionIds, String stockRisk) {
-        if (connectionIds == null || connectionIds.isEmpty()) {
-            return List.of();
-        }
-
+    public List<Long> findOfferIdsByStockRisk(long workspaceId, String stockRisk) {
         String sql = """
                 SELECT DISTINCT product_id
                 FROM mart_inventory_analysis
-                WHERE connection_id IN (:connectionIds)
+                WHERE workspace_id = :workspaceId
                   AND stock_out_risk = :stockRisk
                   AND analysis_date = (SELECT max(analysis_date)
                                        FROM mart_inventory_analysis
-                                       WHERE connection_id IN (:connectionIds))
+                                       WHERE workspace_id = :workspaceId)
                 LIMIT 10000
                 SETTINGS final = 1
                 """;
 
         var params = new MapSqlParameterSource()
-                .addValue("connectionIds", connectionIds)
+                .addValue("workspaceId", workspaceId)
                 .addValue("stockRisk", stockRisk);
 
         return ch.queryForList(sql, params, Long.class);
@@ -232,36 +229,32 @@ public class GridClickHouseReadRepository {
             FROM (
                 SELECT countDistinct(product_id) AS critical_stock_count
                 FROM mart_inventory_analysis
-                WHERE connection_id IN (:connectionIds)
+                WHERE workspace_id = :workspaceId
                   AND stock_out_risk = 'CRITICAL'
                   AND analysis_date = (
                       SELECT max(analysis_date)
                       FROM mart_inventory_analysis
-                      WHERE connection_id IN (:connectionIds)
+                      WHERE workspace_id = :workspaceId
                   )
             ) inv
             CROSS JOIN (
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_30d_total
                 FROM fact_finance AS ff
-                WHERE ff.connection_id IN (:connectionIds)
+                WHERE ff.workspace_id = :workspaceId
                   AND ff.finance_date >= today() - 30
             ) cur
             CROSS JOIN (
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_prev_30d
                 FROM fact_finance AS ff
-                WHERE ff.connection_id IN (:connectionIds)
+                WHERE ff.workspace_id = :workspaceId
                   AND ff.finance_date >= today() - 60
                   AND ff.finance_date < today() - 30
             ) prev
             SETTINGS final = 1
             """;
 
-    public ClickHouseKpiRow findKpi(List<Long> connectionIds) {
-        if (connectionIds == null || connectionIds.isEmpty()) {
-            return new ClickHouseKpiRow(0, null, null);
-        }
-
-        var params = new MapSqlParameterSource("connectionIds", connectionIds);
+    public ClickHouseKpiRow findKpi(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
         return ch.queryForObject(KPI_SQL, params, this::mapKpi);
     }
 
@@ -288,27 +281,22 @@ public class GridClickHouseReadRepository {
                 .build();
     }
 
-    private static final String STOCK_SNAPSHOT_QUERY = """
+    private static final String STOCK_SNAPSHOT_SQL = """
             SELECT
                 product_id AS offer_id,
                 toInt32(sum(available)) AS snapshot_stock
             FROM fact_inventory_snapshot
-            WHERE connection_id IN (%s)
+            WHERE workspace_id = :workspaceId
               AND captured_date = (
                   SELECT max(captured_date) FROM fact_inventory_snapshot
-                  WHERE connection_id IN (%s)
+                  WHERE workspace_id = :workspaceId
               )
             GROUP BY product_id
             """;
 
-    public Map<Long, Integer> findLatestSnapshotStocks(List<Long> connectionIds) {
-        if (connectionIds == null || connectionIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        String inClause = connectionIds.stream()
-                .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
-        String sql = STOCK_SNAPSHOT_QUERY.formatted(inClause, inClause);
-        return ch.getJdbcTemplate().query(sql, (ResultSet rs) -> {
+    public Map<Long, Integer> findLatestSnapshotStocks(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        return ch.query(STOCK_SNAPSHOT_SQL, params, (ResultSet rs) -> {
             Map<Long, Integer> result = new java.util.HashMap<>();
             while (rs.next()) {
                 result.put(rs.getLong("offer_id"), rs.getInt("snapshot_stock"));

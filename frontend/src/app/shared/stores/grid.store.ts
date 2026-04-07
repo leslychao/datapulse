@@ -150,6 +150,15 @@ export const GridStore = signalStore(
       });
     },
 
+    restoreUrlState(
+        filters: OfferFilter,
+        searchTerm: string,
+        sortColumn: string | null,
+        sortDirection: 'ASC' | 'DESC',
+    ): void {
+      patchState(store, { filters, searchTerm, sortColumn, sortDirection, page: 0 });
+    },
+
     toggleDensity(): void {
       patchState(store, {
         rowDensity: store.rowDensity() === 'compact' ? 'comfortable' : 'compact',

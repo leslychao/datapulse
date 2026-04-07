@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { GetContextMenuItemsParams, GridApi, MenuItemDef, RowClassRules } from 'ag-grid-community';
 
 import { OfferApiService } from '@core/api/offer-api.service';
-import { OfferSummary } from '@core/models';
+import { OfferFilter, OfferSummary } from '@core/models';
 import { WebSocketService } from '@core/websocket/websocket.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { GridStore } from '@shared/stores/grid.store';
@@ -135,11 +135,64 @@ export class GridPageComponent implements OnInit, OnDestroy {
   private readonly offerApi = inject(OfferApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly detailPanelService = inject(DetailPanelService);
   private readonly webSocket = inject(WebSocketService);
   private readonly queryClient = injectQueryClient();
   protected readonly gridStore = inject(GridStore);
   private readonly zone = inject(NgZone);
+
+  private static readonly URL_FILTER_KEYS = [
+    'marketplace', 'status', 'decision', 'actionStatus', 'search', 'sort', 'dir',
+  ] as const;
+
+  constructor() {
+    this.restoreFiltersFromUrl();
+  }
+
+  private readonly urlSyncEffect = effect(() => {
+    const f = this.gridStore.filters();
+    const sortCol = this.gridStore.sortColumn();
+    const sortDir = this.gridStore.sortDirection();
+
+    const params: Record<string, string> = {};
+    if (f.marketplaceType?.length) params['marketplace'] = f.marketplaceType.join(',');
+    if (f.status?.length) params['status'] = f.status.join(',');
+    if (f.lastDecision?.length) params['decision'] = f.lastDecision.join(',');
+    if (f.lastActionStatus?.length) params['actionStatus'] = f.lastActionStatus.join(',');
+    if (f.skuCode) params['search'] = f.skuCode;
+
+    const isDefaultSort = sortCol === 'skuCode' && sortDir === 'ASC';
+    if (!isDefaultSort && sortCol) {
+      params['sort'] = sortCol;
+      params['dir'] = sortDir;
+    }
+
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: params,
+      replaceUrl: true,
+    });
+  });
+
+  private restoreFiltersFromUrl(): void {
+    const qp = this.route.snapshot.queryParams;
+    const hasUrlState = GridPageComponent.URL_FILTER_KEYS.some((k) => qp[k]);
+    if (!hasUrlState) return;
+
+    const filters: OfferFilter = {};
+    if (qp['marketplace']) filters.marketplaceType = qp['marketplace'].split(',');
+    if (qp['status']) filters.status = qp['status'].split(',');
+    if (qp['decision']) filters.lastDecision = qp['decision'].split(',');
+    if (qp['actionStatus']) filters.lastActionStatus = qp['actionStatus'].split(',');
+    const search = qp['search'] ?? '';
+    if (search) filters.skuCode = search;
+
+    const sortColumn = qp['sort'] || 'skuCode';
+    const sortDirection = (qp['dir']?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC') as 'ASC' | 'DESC';
+
+    this.gridStore.restoreUrlState(filters, search, sortColumn, sortDirection);
+  }
 
   private gridApi: GridApi | null = null;
 

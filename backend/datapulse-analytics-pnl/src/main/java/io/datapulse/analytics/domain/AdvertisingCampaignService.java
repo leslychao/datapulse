@@ -48,13 +48,11 @@ public class AdvertisingCampaignService {
       return new PageImpl<>(List.of(), pageable, total);
     }
 
-    List<Long> pgConnectionIds = pgRows.stream()
-        .map(CampaignPgRow::connectionId).distinct().toList();
     List<Long> campaignIds = parseCampaignIds(pgRows);
     int periodDays = filter.periodDays();
 
     Map<String, CampaignMetrics> metricsMap =
-        chRepo.findCampaignMetrics(pgConnectionIds, campaignIds, periodDays);
+        chRepo.findCampaignMetrics(workspaceId, campaignIds, periodDays);
 
     List<CampaignSummaryResponse> content = pgRows.stream()
         .map(row -> toResponse(row, metricsMap))
