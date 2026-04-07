@@ -18,13 +18,15 @@ public class AdvertisingCampaignUpsertRepository {
   private static final int DEFAULT_BATCH_SIZE = 500;
 
   private static final String UPSERT = """
-      INSERT INTO canonical_advertising_campaign (connection_id, external_campaign_id,
-                                                  name, campaign_type, status, placement,
-                                                  daily_budget, start_time, end_time,
+      INSERT INTO canonical_advertising_campaign (workspace_id, connection_id, source_platform,
+                                                  external_campaign_id, name, campaign_type,
+                                                  status, placement, daily_budget,
+                                                  start_time, end_time,
                                                   created_at_external, synced_at,
                                                   created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
-      ON CONFLICT (connection_id, external_campaign_id) DO UPDATE SET
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+      ON CONFLICT (workspace_id, source_platform, external_campaign_id) DO UPDATE SET
+          connection_id = EXCLUDED.connection_id,
           name = EXCLUDED.name,
           campaign_type = EXCLUDED.campaign_type,
           status = EXCLUDED.status,
@@ -73,20 +75,22 @@ public class AdvertisingCampaignUpsertRepository {
   public void upsertAll(List<CanonicalAdvertisingCampaignEntity> entities) {
     jdbc.batchUpdate(UPSERT, entities, DEFAULT_BATCH_SIZE,
         (ps, e) -> {
-          ps.setLong(1, e.getConnectionId());
-          ps.setString(2, e.getExternalCampaignId());
-          ps.setString(3, e.getName());
-          ps.setString(4, e.getCampaignType());
-          ps.setString(5, e.getStatus());
-          ps.setString(6, e.getPlacement());
-          ps.setBigDecimal(7, e.getDailyBudget());
-          ps.setObject(8, e.getStartTime() != null
+          ps.setLong(1, e.getWorkspaceId());
+          ps.setLong(2, e.getConnectionId());
+          ps.setString(3, e.getSourcePlatform());
+          ps.setString(4, e.getExternalCampaignId());
+          ps.setString(5, e.getName());
+          ps.setString(6, e.getCampaignType());
+          ps.setString(7, e.getStatus());
+          ps.setString(8, e.getPlacement());
+          ps.setBigDecimal(9, e.getDailyBudget());
+          ps.setObject(10, e.getStartTime() != null
               ? Timestamp.from(e.getStartTime().toInstant()) : null);
-          ps.setObject(9, e.getEndTime() != null
+          ps.setObject(11, e.getEndTime() != null
               ? Timestamp.from(e.getEndTime().toInstant()) : null);
-          ps.setObject(10, e.getCreatedAtExternal() != null
+          ps.setObject(12, e.getCreatedAtExternal() != null
               ? Timestamp.from(e.getCreatedAtExternal().toInstant()) : null);
-          ps.setObject(11, e.getSyncedAt() != null
+          ps.setObject(13, e.getSyncedAt() != null
               ? Timestamp.from(e.getSyncedAt().toInstant()) : null);
         });
   }

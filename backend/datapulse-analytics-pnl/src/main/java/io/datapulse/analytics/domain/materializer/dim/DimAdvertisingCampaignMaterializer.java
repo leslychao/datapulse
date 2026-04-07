@@ -29,7 +29,8 @@ public class DimAdvertisingCampaignMaterializer implements AnalyticsMaterializer
   private static final String TABLE = "dim_advertising_campaign";
 
   private static final String PG_QUERY = """
-      SELECT cac.connection_id,
+      SELECT cac.workspace_id,
+             cac.connection_id,
              mc.marketplace_type AS source_platform,
              cac.external_campaign_id AS campaign_id,
              cac.name,
@@ -48,9 +49,9 @@ public class DimAdvertisingCampaignMaterializer implements AnalyticsMaterializer
 
   private static final String CH_INSERT = """
       INSERT INTO %s
-      (connection_id, source_platform, campaign_id, name, campaign_type,
+      (workspace_id, connection_id, source_platform, campaign_id, name, campaign_type,
        status, placement, daily_budget, start_time, end_time, created_at, ver)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """;
 
   private final MaterializationJdbc jdbc;
@@ -73,18 +74,19 @@ public class DimAdvertisingCampaignMaterializer implements AnalyticsMaterializer
         }
 
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-          ps.setInt(1, ((Number) row.get("connection_id")).intValue());
-          ps.setString(2, (String) row.get("source_platform"));
-          ps.setLong(3, Long.parseLong((String) row.get("campaign_id")));
-          ps.setString(4, (String) row.get("name"));
-          ps.setString(5, (String) row.get("campaign_type"));
-          ps.setString(6, (String) row.get("status"));
-          setNullableString(ps, 7, row.get("placement"));
-          setNullableDecimal(ps, 8, row.get("daily_budget"));
-          setNullableTimestamp(ps, 9, row.get("start_time"));
-          setNullableTimestamp(ps, 10, row.get("end_time"));
-          setNullableTimestamp(ps, 11, row.get("created_at"));
-          ps.setLong(12, ver);
+          ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+          ps.setInt(2, ((Number) row.get("connection_id")).intValue());
+          ps.setString(3, (String) row.get("source_platform"));
+          ps.setLong(4, Long.parseLong((String) row.get("campaign_id")));
+          ps.setString(5, (String) row.get("name"));
+          ps.setString(6, (String) row.get("campaign_type"));
+          ps.setString(7, (String) row.get("status"));
+          setNullableString(ps, 8, row.get("placement"));
+          setNullableDecimal(ps, 9, row.get("daily_budget"));
+          setNullableTimestamp(ps, 10, row.get("start_time"));
+          setNullableTimestamp(ps, 11, row.get("end_time"));
+          setNullableTimestamp(ps, 12, row.get("created_at"));
+          ps.setLong(13, ver);
         });
 
         total[0] += rows.size();

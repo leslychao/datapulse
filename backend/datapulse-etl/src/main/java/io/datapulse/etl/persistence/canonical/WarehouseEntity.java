@@ -13,6 +13,9 @@ import lombok.Setter;
 @Table(name = "warehouse")
 public class WarehouseEntity extends BaseEntity {
 
+    @Column(name = "workspace_id", nullable = false)
+    private Long workspaceId;
+
     @Column(name = "marketplace_connection_id", nullable = false)
     private Long marketplaceConnectionId;
 

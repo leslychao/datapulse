@@ -40,6 +40,7 @@ public class CanonicalEntityMapper {
 
     public WarehouseEntity toWarehouse(NormalizedWarehouse norm, IngestContext ctx) {
         var entity = new WarehouseEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setMarketplaceConnectionId(ctx.connectionId());
         entity.setExternalWarehouseId(norm.externalWarehouseId());
         entity.setName(norm.name());
@@ -51,6 +52,7 @@ public class CanonicalEntityMapper {
 
     public CategoryEntity toCategory(NormalizedCategory norm, IngestContext ctx) {
         var entity = new CategoryEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setMarketplaceConnectionId(ctx.connectionId());
         entity.setExternalCategoryId(norm.externalCategoryId());
         entity.setName(norm.name());
@@ -87,6 +89,7 @@ public class CanonicalEntityMapper {
         var entity = new MarketplaceOfferEntity();
         entity.setSellerSkuId(sellerSkuId);
         entity.setMarketplaceConnectionId(ctx.connectionId());
+        entity.setMarketplaceType(platformName(ctx));
         entity.setMarketplaceSku(norm.marketplaceSku());
         entity.setMarketplaceSkuAlt(norm.marketplaceSkuAlt());
         entity.setName(norm.name());
@@ -116,6 +119,7 @@ public class CanonicalEntityMapper {
 
     public CanonicalOrderEntity toOrder(NormalizedOrderItem norm, IngestContext ctx) {
         var entity = new CanonicalOrderEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalOrderId(norm.externalOrderId());
@@ -133,6 +137,7 @@ public class CanonicalEntityMapper {
 
     public CanonicalSaleEntity toSale(NormalizedSaleItem norm, IngestContext ctx) {
         var entity = new CanonicalSaleEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalSaleId(norm.externalSaleId());
@@ -148,6 +153,7 @@ public class CanonicalEntityMapper {
 
     public CanonicalReturnEntity toReturn(NormalizedReturnItem norm, IngestContext ctx) {
         var entity = new CanonicalReturnEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalReturnId(norm.externalReturnId());
@@ -176,6 +182,7 @@ public class CanonicalEntityMapper {
                                                       Long warehouseId,
                                                       String attributionLevel) {
         var entity = new CanonicalFinanceEntryEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalEntryId(norm.externalEntryId());
@@ -207,6 +214,7 @@ public class CanonicalEntityMapper {
     public CanonicalPromoCampaignEntity toPromoCampaign(NormalizedPromoCampaign norm,
                                                           IngestContext ctx) {
         var entity = new CanonicalPromoCampaignEntity();
+        entity.setWorkspaceId(ctx.workspaceId());
         entity.setConnectionId(ctx.connectionId());
         entity.setExternalPromoId(norm.externalPromoId());
         entity.setSourcePlatform(platformName(ctx));

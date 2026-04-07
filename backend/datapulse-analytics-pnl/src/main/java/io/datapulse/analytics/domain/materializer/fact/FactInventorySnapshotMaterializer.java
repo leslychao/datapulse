@@ -23,7 +23,8 @@ public class FactInventorySnapshotMaterializer implements AnalyticsMaterializer 
     private static final String TABLE = "fact_inventory_snapshot";
 
     private static final String PG_QUERY = """
-            SELECT mo.marketplace_connection_id AS connection_id,
+            SELECT mc.workspace_id,
+                   mo.marketplace_connection_id AS connection_id,
                    mc.marketplace_type          AS source_platform,
                    csc.marketplace_offer_id     AS product_id,
                    csc.warehouse_id,
@@ -39,9 +40,9 @@ public class FactInventorySnapshotMaterializer implements AnalyticsMaterializer 
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (connection_id, source_platform, product_id, warehouse_id,
+            (workspace_id, connection_id, source_platform, product_id, warehouse_id,
              available, reserved, captured_at, captured_date, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -76,7 +77,8 @@ public class FactInventorySnapshotMaterializer implements AnalyticsMaterializer 
         String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
-                SELECT mo.marketplace_connection_id AS connection_id,
+                SELECT mc.workspace_id,
+                       mo.marketplace_connection_id AS connection_id,
                        mc.marketplace_type          AS source_platform,
                        csc.marketplace_offer_id     AS product_id,
                        csc.warehouse_id,
@@ -99,23 +101,24 @@ public class FactInventorySnapshotMaterializer implements AnalyticsMaterializer 
 
     private void insertBatch(List<Map<String, Object>> rows, long ver, String chInsert) {
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setInt(1, ((Number) row.get("connection_id")).intValue());
-            ps.setString(2, (String) row.get("source_platform"));
-            ps.setLong(3, ((Number) row.get("product_id")).longValue());
-            ps.setInt(4, ((Number) row.get("warehouse_id")).intValue());
-            ps.setInt(5, ((Number) row.get("available")).intValue());
+            ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+            ps.setInt(2, ((Number) row.get("connection_id")).intValue());
+            ps.setString(3, (String) row.get("source_platform"));
+            ps.setLong(4, ((Number) row.get("product_id")).longValue());
+            ps.setInt(5, ((Number) row.get("warehouse_id")).intValue());
+            ps.setInt(6, ((Number) row.get("available")).intValue());
 
             Number reserved = (Number) row.get("reserved");
             if (reserved != null) {
-                ps.setInt(6, reserved.intValue());
+                ps.setInt(7, reserved.intValue());
             } else {
-                ps.setNull(6, java.sql.Types.INTEGER);
+                ps.setNull(7, java.sql.Types.INTEGER);
             }
 
             Timestamp ts = (Timestamp) row.get("captured_at");
-            ps.setTimestamp(7, ts);
-            ps.setDate(8, Date.valueOf(ts.toLocalDateTime().toLocalDate()));
-            ps.setLong(9, ver);
+            ps.setTimestamp(8, ts);
+            ps.setDate(9, Date.valueOf(ts.toLocalDateTime().toLocalDate()));
+            ps.setLong(10, ver);
         });
     }
 

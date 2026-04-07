@@ -17,6 +17,9 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "canonical_promo_campaign")
 public class CanonicalPromoCampaignEntity extends BaseEntity {
 
+    @Column(name = "workspace_id", nullable = false)
+    private Long workspaceId;
+
     @Column(name = "connection_id", nullable = false)
     private Long connectionId;
 

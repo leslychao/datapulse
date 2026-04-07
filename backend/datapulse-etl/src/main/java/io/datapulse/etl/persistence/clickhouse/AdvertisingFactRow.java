@@ -9,6 +9,7 @@ import java.time.LocalDate;
  * Produced by flatteners (WB/Ozon), consumed by {@link AdvertisingClickHouseWriter}.
  */
 public record AdvertisingFactRow(
+    long workspaceId,
     long connectionId,
     String sourcePlatform,
     long campaignId,
@@ -28,7 +29,7 @@ public record AdvertisingFactRow(
 ) {
 
   public static AdvertisingFactRow fromOzon(
-      long connectionId, long campaignId, LocalDate adDate,
+      long workspaceId, long connectionId, long campaignId, LocalDate adDate,
       String sku, long views, long clicks, BigDecimal spend,
       int orders, BigDecimal revenue, long jobExecutionId) {
     float ctr = views > 0 ? (float) clicks / views : 0f;
@@ -38,7 +39,7 @@ public record AdvertisingFactRow(
     float cr = clicks > 0 ? (float) orders / clicks : 0f;
 
     return new AdvertisingFactRow(
-        connectionId, "OZON", campaignId, adDate, sku,
+        workspaceId, connectionId, "OZON", campaignId, adDate, sku,
         views, clicks, spend, orders, orders, revenue,
         0, ctr, cpc, cr, jobExecutionId);
   }

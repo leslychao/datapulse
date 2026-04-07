@@ -17,13 +17,15 @@ public class CanonicalReturnUpsertRepository {
     private static final int DEFAULT_BATCH_SIZE = 500;
 
     private static final String UPSERT = """
-            INSERT INTO canonical_return (connection_id, source_platform, external_return_id,
-                                          canonical_order_id, marketplace_offer_id, seller_sku_id,
+            INSERT INTO canonical_return (workspace_id, connection_id, source_platform,
+                                          external_return_id, canonical_order_id,
+                                          marketplace_offer_id, seller_sku_id,
                                           return_date, return_amount, return_reason,
                                           quantity, status, currency, fulfillment_type,
                                           job_execution_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
-            ON CONFLICT (connection_id, external_return_id) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+            ON CONFLICT (workspace_id, source_platform, external_return_id) DO UPDATE SET
+                connection_id = EXCLUDED.connection_id,
                 canonical_order_id = EXCLUDED.canonical_order_id,
                 marketplace_offer_id = EXCLUDED.marketplace_offer_id,
                 seller_sku_id = EXCLUDED.seller_sku_id,
@@ -36,36 +38,39 @@ public class CanonicalReturnUpsertRepository {
                 fulfillment_type = EXCLUDED.fulfillment_type,
                 job_execution_id = EXCLUDED.job_execution_id,
                 updated_at = now()
-            WHERE (canonical_return.canonical_order_id, canonical_return.marketplace_offer_id,
-                   canonical_return.seller_sku_id, canonical_return.return_date,
-                   canonical_return.return_amount, canonical_return.return_reason,
-                   canonical_return.quantity, canonical_return.status,
-                   canonical_return.currency, canonical_return.fulfillment_type)
+            WHERE (canonical_return.connection_id, canonical_return.canonical_order_id,
+                   canonical_return.marketplace_offer_id, canonical_return.seller_sku_id,
+                   canonical_return.return_date, canonical_return.return_amount,
+                   canonical_return.return_reason, canonical_return.quantity,
+                   canonical_return.status, canonical_return.currency,
+                   canonical_return.fulfillment_type)
                 IS DISTINCT FROM
-                  (EXCLUDED.canonical_order_id, EXCLUDED.marketplace_offer_id,
-                   EXCLUDED.seller_sku_id, EXCLUDED.return_date,
-                   EXCLUDED.return_amount, EXCLUDED.return_reason,
-                   EXCLUDED.quantity, EXCLUDED.status,
-                   EXCLUDED.currency, EXCLUDED.fulfillment_type)
+                  (EXCLUDED.connection_id, EXCLUDED.canonical_order_id,
+                   EXCLUDED.marketplace_offer_id, EXCLUDED.seller_sku_id,
+                   EXCLUDED.return_date, EXCLUDED.return_amount,
+                   EXCLUDED.return_reason, EXCLUDED.quantity,
+                   EXCLUDED.status, EXCLUDED.currency,
+                   EXCLUDED.fulfillment_type)
             """;
 
     public void batchUpsert(List<CanonicalReturnEntity> entities) {
         jdbc.batchUpdate(UPSERT, entities, DEFAULT_BATCH_SIZE,
                 (ps, e) -> {
-                    ps.setLong(1, e.getConnectionId());
-                    ps.setString(2, e.getSourcePlatform());
-                    ps.setString(3, e.getExternalReturnId());
-                    ps.setObject(4, e.getCanonicalOrderId());
-                    ps.setObject(5, e.getMarketplaceOfferId());
-                    ps.setObject(6, e.getSellerSkuId());
-                    ps.setTimestamp(7, Timestamp.from(e.getReturnDate().toInstant()));
-                    ps.setBigDecimal(8, e.getReturnAmount());
-                    ps.setString(9, e.getReturnReason());
-                    ps.setInt(10, e.getQuantity());
-                    ps.setString(11, e.getStatus());
-                    ps.setString(12, e.getCurrency());
-                    ps.setString(13, e.getFulfillmentType());
-                    ps.setLong(14, e.getJobExecutionId());
+                    ps.setLong(1, e.getWorkspaceId());
+                    ps.setLong(2, e.getConnectionId());
+                    ps.setString(3, e.getSourcePlatform());
+                    ps.setString(4, e.getExternalReturnId());
+                    ps.setObject(5, e.getCanonicalOrderId());
+                    ps.setObject(6, e.getMarketplaceOfferId());
+                    ps.setObject(7, e.getSellerSkuId());
+                    ps.setTimestamp(8, Timestamp.from(e.getReturnDate().toInstant()));
+                    ps.setBigDecimal(9, e.getReturnAmount());
+                    ps.setString(10, e.getReturnReason());
+                    ps.setInt(11, e.getQuantity());
+                    ps.setString(12, e.getStatus());
+                    ps.setString(13, e.getCurrency());
+                    ps.setString(14, e.getFulfillmentType());
+                    ps.setLong(15, e.getJobExecutionId());
                 });
     }
 }

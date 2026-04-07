@@ -40,6 +40,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
   private static final String FULL_MATERIALIZE_SQL = """
       INSERT INTO %s
       SELECT
+          base.workspace_id,
           base.connection_id,
           base.source_platform,
           base.seller_sku_id,
@@ -87,6 +88,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
       FROM (
       SELECT
           connection_id,
+          workspace_id,
           source_platform,
           seller_sku_id,
           product_id,
@@ -131,6 +133,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
       FROM (
       SELECT
           connection_id,
+          workspace_id,
           any(source_platform) AS source_platform,
           seller_sku_id,
           max(product_id) AS product_id,
@@ -159,6 +162,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           -- Inner query: only plain aggregates (no countIf inside multiIf/if — CH 24 ILLEGAL_AGGREGATION).
           SELECT
               connection_id,
+              workspace_id,
               source_platform,
               seller_sku_id,
               product_id,
@@ -183,6 +187,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           FROM (
               SELECT
                   connection_id,
+                  any(workspace_id) AS workspace_id,
                   source_platform,
                   seller_sku_id,
                   product_id,
@@ -206,6 +211,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
               FROM (
                   SELECT
                       connection_id,
+                      workspace_id,
                       source_platform,
                       coalesce(seller_sku_id, 0) AS seller_sku_id,
                       coalesce(product_id, 0) AS product_id,
@@ -235,6 +241,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           -- Inner projection so GROUP BY keys match SELECT (CH 24 NOT_AN_AGGREGATE on coalesce).
           SELECT
               connection_id,
+              any(workspace_id) AS workspace_id,
               any(source_platform) AS source_platform,
               seller_sku_id_key AS seller_sku_id,
               0 AS product_id,
@@ -257,6 +264,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           FROM (
               SELECT
                   connection_id,
+                  workspace_id,
                   source_platform,
                   coalesce(seller_sku_id, 0) AS seller_sku_id_key,
                   toYYYYMM(finance_date) AS period,
@@ -283,6 +291,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           -- Inner projection isolates WHERE from SELECT alias to avoid CH alias shadowing.
           SELECT
               connection_id,
+              any(workspace_id) AS workspace_id,
               any(source_platform) AS source_platform,
               0 AS seller_sku_id,
               0 AS product_id,
@@ -305,6 +314,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           FROM (
               SELECT
                   connection_id,
+                  workspace_id,
                   source_platform,
                   toYYYYMM(finance_date) AS period,
                   revenue_amount,
@@ -324,7 +334,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           ) AS ff_account
           GROUP BY connection_id, period
       ) AS raw_union
-      GROUP BY connection_id, seller_sku_id, period, attribution_level
+      GROUP BY workspace_id, connection_id, seller_sku_id, period, attribution_level
       )
       ) AS base
       LEFT JOIN dim_product AS p_by_id ON base.product_id = p_by_id.product_id

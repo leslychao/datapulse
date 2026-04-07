@@ -27,6 +27,7 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
     private static final String FULL_MATERIALIZE_SQL = """
             INSERT INTO %s
             SELECT
+                r.workspace_id,
                 r.connection_id,
                 r.source_platform,
                 r.product_id,
@@ -49,6 +50,7 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                 -- Returns aggregation (GROUP BY raw keys; coalesce only in SELECT for CH compatibility)
                 SELECT
                     connection_id,
+                    any(workspace_id) AS workspace_id,
                     any(source_platform) AS source_platform,
                     coalesce(product_id, toUInt64(0)) AS product_id,
                     coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,

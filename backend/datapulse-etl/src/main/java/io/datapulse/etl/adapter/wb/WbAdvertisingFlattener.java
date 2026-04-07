@@ -24,6 +24,7 @@ public class WbAdvertisingFlattener {
 
   public List<AdvertisingFactRow> flatten(
       List<WbFullstatsCampaignDto> campaigns,
+      long workspaceId,
       long connectionId,
       long jobExecutionId) {
 
@@ -44,7 +45,7 @@ public class WbAdvertisingFlattener {
           }
           for (var nm : app.nms()) {
             rows.add(toRow(campaign.advertId(), adDate, nm,
-                connectionId, jobExecutionId));
+                workspaceId, connectionId, jobExecutionId));
           }
         }
       }
@@ -55,7 +56,7 @@ public class WbAdvertisingFlattener {
 
   private AdvertisingFactRow toRow(long campaignId, LocalDate adDate,
       WbFullstatsCampaignDto.Nm nm,
-      long connectionId, long jobExecutionId) {
+      long workspaceId, long connectionId, long jobExecutionId) {
 
     float ctr = nm.views() > 0
         ? (float) nm.clicks() / nm.views()
@@ -66,6 +67,7 @@ public class WbAdvertisingFlattener {
         : BigDecimal.ZERO;
 
     return new AdvertisingFactRow(
+        workspaceId,
         connectionId,
         SOURCE_PLATFORM,
         campaignId,

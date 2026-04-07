@@ -21,7 +21,8 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "dim_category";
 
     private static final String PG_QUERY = """
-            SELECT c.id                       AS category_id,
+            SELECT c.workspace_id,
+                   c.id                       AS category_id,
                    c.marketplace_connection_id AS connection_id,
                    c.external_category_id,
                    c.name,
@@ -34,9 +35,9 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (category_id, connection_id, external_category_id, name,
+            (workspace_id, category_id, connection_id, external_category_id, name,
              parent_category_id, marketplace_type, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -59,18 +60,19 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
                 }
 
                 jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-                    ps.setLong(1, ((Number) row.get("category_id")).longValue());
-                    ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-                    ps.setString(3, (String) row.get("external_category_id"));
-                    ps.setString(4, (String) row.get("name"));
+                    ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+                    ps.setLong(2, ((Number) row.get("category_id")).longValue());
+                    ps.setInt(3, ((Number) row.get("connection_id")).intValue());
+                    ps.setString(4, (String) row.get("external_category_id"));
+                    ps.setString(5, (String) row.get("name"));
                     Number parentId = (Number) row.get("parent_category_id");
                     if (parentId != null) {
-                        ps.setLong(5, parentId.longValue());
+                        ps.setLong(6, parentId.longValue());
                     } else {
-                        ps.setNull(5, java.sql.Types.BIGINT);
+                        ps.setNull(6, java.sql.Types.BIGINT);
                     }
-                    ps.setString(6, (String) row.get("marketplace_type"));
-                    ps.setLong(7, ver);
+                    ps.setString(7, (String) row.get("marketplace_type"));
+                    ps.setLong(8, ver);
                 });
 
                 total[0] += rows.size();
@@ -87,7 +89,8 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
         String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
-                SELECT c.id                       AS category_id,
+                SELECT c.workspace_id,
+                       c.id                       AS category_id,
                        c.marketplace_connection_id AS connection_id,
                        c.external_category_id,
                        c.name,
@@ -102,18 +105,19 @@ public class DimCategoryMaterializer implements AnalyticsMaterializer {
         }
 
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setLong(1, ((Number) row.get("category_id")).longValue());
-            ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-            ps.setString(3, (String) row.get("external_category_id"));
-            ps.setString(4, (String) row.get("name"));
+            ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+            ps.setLong(2, ((Number) row.get("category_id")).longValue());
+            ps.setInt(3, ((Number) row.get("connection_id")).intValue());
+            ps.setString(4, (String) row.get("external_category_id"));
+            ps.setString(5, (String) row.get("name"));
             Number parentId = (Number) row.get("parent_category_id");
             if (parentId != null) {
-                ps.setLong(5, parentId.longValue());
+                ps.setLong(6, parentId.longValue());
             } else {
-                ps.setNull(5, java.sql.Types.BIGINT);
+                ps.setNull(6, java.sql.Types.BIGINT);
             }
-            ps.setString(6, (String) row.get("marketplace_type"));
-            ps.setLong(7, ver);
+            ps.setString(7, (String) row.get("marketplace_type"));
+            ps.setLong(8, ver);
         });
 
         log.info("Incremental dim_category: jobExecutionId={}, rows={}", jobExecutionId, rows.size());

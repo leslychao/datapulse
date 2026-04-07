@@ -246,6 +246,8 @@ public class ConnectionService {
         connection.setStatus(ConnectionStatus.ARCHIVED.name());
         connectionRepository.save(connection);
 
+        revokeSecretReferences(connection);
+
         log.info("Connection archived: connectionId={}, workspaceId={}", connectionId, workspaceId);
         eventPublisher.publishEvent(new ConnectionStatusChangedEvent(
             connectionId, oldStatus, ConnectionStatus.ARCHIVED.name(), "admin_archive"));
@@ -330,6 +332,22 @@ public class ConnectionService {
         secretRef.setSecretType(secretType.name());
         secretRef.setStatus(SecretStatus.ACTIVE.name());
         return secretReferenceRepository.save(secretRef);
+    }
+
+    private void revokeSecretReferences(MarketplaceConnectionEntity connection) {
+        revokeSecretReference(connection.getSecretReferenceId());
+        if (connection.getPerfSecretReferenceId() != null) {
+            revokeSecretReference(connection.getPerfSecretReferenceId());
+        }
+    }
+
+    private void revokeSecretReference(Long secretReferenceId) {
+        secretReferenceRepository.findById(secretReferenceId).ifPresent(ref -> {
+            ref.setStatus(SecretStatus.REVOKED.name());
+            secretReferenceRepository.save(ref);
+            credentialStore.evictCache(ref.getVaultPath(), ref.getVaultKey());
+            log.debug("Secret reference revoked: id={}, path={}", ref.getId(), ref.getVaultPath());
+        });
     }
 
     private String buildVaultPath(Long workspaceId, MarketplaceType marketplace, String suffix) {

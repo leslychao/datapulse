@@ -16,6 +16,9 @@ import lombok.Setter;
 @Table(name = "canonical_finance_entry")
 public class CanonicalFinanceEntryEntity extends BaseEntity {
 
+    @Column(name = "workspace_id", nullable = false)
+    private Long workspaceId;
+
     @Column(name = "connection_id", nullable = false)
     private Long connectionId;
 

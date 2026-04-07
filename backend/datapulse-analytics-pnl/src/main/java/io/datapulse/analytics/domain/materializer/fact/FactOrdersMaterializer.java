@@ -24,7 +24,8 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "fact_orders";
 
     private static final String PG_QUERY = """
-            SELECT co.id               AS order_id_pk,
+            SELECT co.workspace_id,
+                   co.id               AS order_id_pk,
                    co.connection_id,
                    co.source_platform,
                    co.external_order_id,
@@ -46,10 +47,10 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (order_id_pk, connection_id, source_platform, external_order_id,
+            (workspace_id, order_id_pk, connection_id, source_platform, external_order_id,
              seller_sku_id, product_id, quantity, price_per_unit, total_amount,
              order_date, status, fulfillment_type, region, job_execution_id, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -84,7 +85,8 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
         String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
-                SELECT co.id               AS order_id_pk,
+                SELECT co.workspace_id,
+                       co.id               AS order_id_pk,
                        co.connection_id,
                        co.source_platform,
                        co.external_order_id,
@@ -113,37 +115,38 @@ public class FactOrdersMaterializer implements AnalyticsMaterializer {
 
     private void insertBatch(List<Map<String, Object>> rows, long ver, String chInsert) {
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setLong(1, ((Number) row.get("order_id_pk")).longValue());
-            ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-            ps.setString(3, (String) row.get("source_platform"));
-            ps.setString(4, (String) row.get("external_order_id"));
+            ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+            ps.setLong(2, ((Number) row.get("order_id_pk")).longValue());
+            ps.setInt(3, ((Number) row.get("connection_id")).intValue());
+            ps.setString(4, (String) row.get("source_platform"));
+            ps.setString(5, (String) row.get("external_order_id"));
 
             Number sellerSkuId = (Number) row.get("seller_sku_id");
             if (sellerSkuId != null) {
-                ps.setLong(5, sellerSkuId.longValue());
-            } else {
-                ps.setNull(5, java.sql.Types.BIGINT);
-            }
-
-            Number productId = (Number) row.get("product_id");
-            if (productId != null) {
-                ps.setLong(6, productId.longValue());
+                ps.setLong(6, sellerSkuId.longValue());
             } else {
                 ps.setNull(6, java.sql.Types.BIGINT);
             }
 
-            ps.setInt(7, ((Number) row.get("quantity")).intValue());
-            ps.setBigDecimal(8, (BigDecimal) row.get("price_per_unit"));
-            ps.setBigDecimal(9, (BigDecimal) row.get("total_amount"));
+            Number productId = (Number) row.get("product_id");
+            if (productId != null) {
+                ps.setLong(7, productId.longValue());
+            } else {
+                ps.setNull(7, java.sql.Types.BIGINT);
+            }
+
+            ps.setInt(8, ((Number) row.get("quantity")).intValue());
+            ps.setBigDecimal(9, (BigDecimal) row.get("price_per_unit"));
+            ps.setBigDecimal(10, (BigDecimal) row.get("total_amount"));
 
             Timestamp orderDate = (Timestamp) row.get("order_date");
-            ps.setDate(10, Date.valueOf(orderDate.toLocalDateTime().toLocalDate()));
+            ps.setDate(11, Date.valueOf(orderDate.toLocalDateTime().toLocalDate()));
 
-            ps.setString(11, (String) row.get("status"));
-            ps.setString(12, (String) row.get("fulfillment_type"));
-            ps.setString(13, (String) row.get("region"));
-            ps.setLong(14, ((Number) row.get("job_execution_id")).longValue());
-            ps.setLong(15, ver);
+            ps.setString(12, (String) row.get("status"));
+            ps.setString(13, (String) row.get("fulfillment_type"));
+            ps.setString(14, (String) row.get("region"));
+            ps.setLong(15, ((Number) row.get("job_execution_id")).longValue());
+            ps.setLong(16, ver);
         });
     }
 

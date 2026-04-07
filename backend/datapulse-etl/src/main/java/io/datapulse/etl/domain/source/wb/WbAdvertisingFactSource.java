@@ -127,7 +127,7 @@ public class WbAdvertisingFactSource implements EventSource {
         "WbAdFullstats", statsPages, WbFullstatsCampaignDto.class,
         batch -> {
           var rows = flattener.flatten(
-              batch, ctx.connectionId(), ctx.jobExecutionId());
+              batch, ctx.workspaceId(), ctx.connectionId(), ctx.jobExecutionId());
           if (!rows.isEmpty()) {
             clickHouseWriter.writeFacts(rows);
           }
@@ -168,7 +168,9 @@ public class WbAdvertisingFactSource implements EventSource {
   private CanonicalAdvertisingCampaignEntity mapCampaignToEntity(
       WbAdvertCampaignDto dto, IngestContext ctx) {
     var entity = new CanonicalAdvertisingCampaignEntity();
+    entity.setWorkspaceId(ctx.workspaceId());
     entity.setConnectionId(ctx.connectionId());
+    entity.setSourcePlatform(ctx.marketplace().name().toLowerCase());
     entity.setExternalCampaignId(String.valueOf(dto.advertId()));
     entity.setName(dto.name());
     entity.setCampaignType(WbCampaignTypeMapper.mapType(dto.type()));

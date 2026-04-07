@@ -161,7 +161,7 @@ class PricingRunApiServiceTest {
       when(runReadRepository.findByFilter(WORKSPACE_ID, filter, pageable)).thenReturn(page);
       when(runMapper.toResponse(entity)).thenReturn(baseResponse);
       when(decisionRepository.countSimulatedByRunIds(List.of(1L)))
-          .thenReturn(List.of(new Object[]{1L, 3L}));
+          .thenReturn(List.<Object[]>of(new Object[]{1L, 3L}));
       when(runReadRepository.findConnectionNames(java.util.Set.of(CONNECTION_ID)))
           .thenReturn(Map.of(CONNECTION_ID, "Test Connection"));
 

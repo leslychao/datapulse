@@ -24,7 +24,8 @@ public class FactPriceSnapshotMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "fact_price_snapshot";
 
     private static final String PG_QUERY = """
-            SELECT mo.marketplace_connection_id AS connection_id,
+            SELECT mc.workspace_id,
+                   mo.marketplace_connection_id AS connection_id,
                    mc.marketplace_type          AS source_platform,
                    cpc.marketplace_offer_id     AS product_id,
                    cpc.price,
@@ -40,9 +41,9 @@ public class FactPriceSnapshotMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (connection_id, source_platform, product_id, price, discount_price,
+            (workspace_id, connection_id, source_platform, product_id, price, discount_price,
              currency, captured_at, captured_date, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -77,7 +78,8 @@ public class FactPriceSnapshotMaterializer implements AnalyticsMaterializer {
         String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
-                SELECT mo.marketplace_connection_id AS connection_id,
+                SELECT mc.workspace_id,
+                       mo.marketplace_connection_id AS connection_id,
                        mc.marketplace_type          AS source_platform,
                        cpc.marketplace_offer_id     AS product_id,
                        cpc.price,
@@ -100,24 +102,25 @@ public class FactPriceSnapshotMaterializer implements AnalyticsMaterializer {
 
     private void insertBatch(List<Map<String, Object>> rows, long ver, String chInsert) {
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setInt(1, ((Number) row.get("connection_id")).intValue());
-            ps.setString(2, (String) row.get("source_platform"));
-            ps.setLong(3, ((Number) row.get("product_id")).longValue());
-            ps.setBigDecimal(4, (BigDecimal) row.get("price"));
+            ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+            ps.setInt(2, ((Number) row.get("connection_id")).intValue());
+            ps.setString(3, (String) row.get("source_platform"));
+            ps.setLong(4, ((Number) row.get("product_id")).longValue());
+            ps.setBigDecimal(5, (BigDecimal) row.get("price"));
 
             BigDecimal discountPrice = (BigDecimal) row.get("discount_price");
             if (discountPrice != null) {
-                ps.setBigDecimal(5, discountPrice);
+                ps.setBigDecimal(6, discountPrice);
             } else {
-                ps.setNull(5, java.sql.Types.DECIMAL);
+                ps.setNull(6, java.sql.Types.DECIMAL);
             }
 
-            ps.setString(6, (String) row.get("currency"));
+            ps.setString(7, (String) row.get("currency"));
 
             Timestamp ts = (Timestamp) row.get("captured_at");
-            ps.setTimestamp(7, ts);
-            ps.setDate(8, Date.valueOf(ts.toLocalDateTime().toLocalDate()));
-            ps.setLong(9, ver);
+            ps.setTimestamp(8, ts);
+            ps.setDate(9, Date.valueOf(ts.toLocalDateTime().toLocalDate()));
+            ps.setLong(10, ver);
         });
     }
 

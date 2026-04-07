@@ -19,6 +19,9 @@ public class MarketplaceOfferEntity extends BaseEntity {
     @Column(name = "marketplace_connection_id", nullable = false)
     private Long marketplaceConnectionId;
 
+    @Column(name = "marketplace_type", nullable = false, length = 10)
+    private String marketplaceType;
+
     @Column(name = "marketplace_sku", nullable = false, length = 120)
     private String marketplaceSku;
 

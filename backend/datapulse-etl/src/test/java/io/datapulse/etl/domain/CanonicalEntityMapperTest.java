@@ -42,6 +42,7 @@ class CanonicalEntityMapperTest {
 
       var entity = mapper.toWarehouse(norm, ctx);
 
+      assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getMarketplaceConnectionId()).isEqualTo(100L);
       assertThat(entity.getExternalWarehouseId()).isEqualTo("WH-001");
       assertThat(entity.getName()).isEqualTo("Main Warehouse");
@@ -62,6 +63,7 @@ class CanonicalEntityMapperTest {
 
       var entity = mapper.toCategory(norm, ctx);
 
+      assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getMarketplaceConnectionId()).isEqualTo(100L);
       assertThat(entity.getExternalCategoryId()).isEqualTo("CAT-10");
       assertThat(entity.getName()).isEqualTo("Electronics");
@@ -85,6 +87,7 @@ class CanonicalEntityMapperTest {
 
       var entity = mapper.toOrder(norm, ctx);
 
+      assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getConnectionId()).isEqualTo(100L);
       assertThat(entity.getSourcePlatform()).isEqualTo("wb");
       assertThat(entity.getExternalOrderId()).isEqualTo("ORD-1");
@@ -115,6 +118,7 @@ class CanonicalEntityMapperTest {
 
       var entity = mapper.toSale(norm, ctx);
 
+      assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getConnectionId()).isEqualTo(100L);
       assertThat(entity.getSourcePlatform()).isEqualTo("wb");
       assertThat(entity.getExternalSaleId()).isEqualTo("SALE-1");
@@ -142,6 +146,7 @@ class CanonicalEntityMapperTest {
 
       var entity = mapper.toReturn(norm, ctx);
 
+      assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getConnectionId()).isEqualTo(100L);
       assertThat(entity.getSourcePlatform()).isEqualTo("wb");
       assertThat(entity.getExternalReturnId()).isEqualTo("RET-1");
@@ -235,6 +240,7 @@ class CanonicalEntityMapperTest {
 
       var entity = mapper.toFinanceEntry(norm, ctx, 42L, 7L, "POSTING");
 
+      assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getConnectionId()).isEqualTo(100L);
       assertThat(entity.getSourcePlatform()).isEqualTo("wb");
       assertThat(entity.getExternalEntryId()).isEqualTo("FE-1");
@@ -319,6 +325,7 @@ class CanonicalEntityMapperTest {
 
       assertThat(entity.getSellerSkuId()).isEqualTo(50L);
       assertThat(entity.getMarketplaceConnectionId()).isEqualTo(100L);
+      assertThat(entity.getMarketplaceType()).isEqualTo("wb");
       assertThat(entity.getMarketplaceSku()).isEqualTo("MSKU-1");
       assertThat(entity.getMarketplaceSkuAlt()).isEqualTo("ALT-1");
       assertThat(entity.getName()).isEqualTo("Product Name");

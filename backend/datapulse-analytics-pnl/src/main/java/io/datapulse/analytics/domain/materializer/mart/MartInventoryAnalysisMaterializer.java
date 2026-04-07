@@ -20,6 +20,7 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
   private static final String FULL_MATERIALIZE_SQL = """
       INSERT INTO %s
       SELECT
+          inv.workspace_id,
           inv.connection_id,
           inv.source_platform,
           inv.product_id,
@@ -56,6 +57,7 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
       FROM (
           SELECT
               connection_id,
+              any(workspace_id) AS workspace_id,
               source_platform,
               product_id,
               warehouse_id,

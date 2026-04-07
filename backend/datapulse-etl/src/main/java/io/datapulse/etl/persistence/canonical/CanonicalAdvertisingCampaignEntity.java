@@ -16,8 +16,14 @@ import lombok.Setter;
 @Table(name = "canonical_advertising_campaign")
 public class CanonicalAdvertisingCampaignEntity extends BaseEntity {
 
+  @Column(name = "workspace_id", nullable = false)
+  private Long workspaceId;
+
   @Column(name = "connection_id", nullable = false)
   private Long connectionId;
+
+  @Column(name = "source_platform", nullable = false, length = 10)
+  private String sourcePlatform;
 
   @Column(name = "external_campaign_id", nullable = false, length = 64)
   private String externalCampaignId;

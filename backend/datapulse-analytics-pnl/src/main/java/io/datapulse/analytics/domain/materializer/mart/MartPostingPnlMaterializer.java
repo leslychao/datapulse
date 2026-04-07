@@ -36,6 +36,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
   private static final String FULL_MATERIALIZE_SQL = """
       INSERT INTO %s
       SELECT
+          pm.workspace_id,
           pm.posting_id,
           pm.connection_id,
           pm.source_platform,
@@ -127,6 +128,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
           SELECT
               posting_id,
               connection_id,
+              any(workspace_id) AS workspace_id,
               any(source_platform) AS source_platform,
               any(fulfillment_type) AS fulfillment_type,
               any(order_id) AS order_id,
@@ -215,6 +217,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
               SELECT
                   posting_id,
                   connection_id,
+                  any(workspace_id) AS workspace_id,
                   any(source_platform) AS source_platform,
                   any(order_id) AS order_id,
                   any(seller_sku_id) AS seller_sku_id,

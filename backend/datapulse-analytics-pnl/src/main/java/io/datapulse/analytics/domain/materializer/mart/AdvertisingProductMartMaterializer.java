@@ -30,6 +30,7 @@ public class AdvertisingProductMartMaterializer implements AnalyticsMaterializer
   private static final String FULL_MATERIALIZE_SQL = """
       INSERT INTO %s
       SELECT
+          fa.workspace_id,
           fa.connection_id,
           fa.source_platform,
           fa.marketplace_sku,
@@ -71,7 +72,7 @@ public class AdvertisingProductMartMaterializer implements AnalyticsMaterializer
           AND fa.marketplace_sku = ff_rev.marketplace_sku
           AND toYYYYMM(fa.ad_date) = ff_rev.period
       GROUP BY
-          fa.connection_id, fa.source_platform, fa.marketplace_sku,
+          fa.workspace_id, fa.connection_id, fa.source_platform, fa.marketplace_sku,
           period, ff_rev.total_revenue
       SETTINGS final = 1
       """;

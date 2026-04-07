@@ -138,16 +138,18 @@ public class OzonAdvertisingFactSource implements EventSource {
 
   private void processCampaignBatch(List<OzonPerformanceCampaignDto> batch, IngestContext ctx) {
     List<CanonicalAdvertisingCampaignEntity> entities = batch.stream()
-        .map(dto -> mapToCanonicalCampaign(dto, ctx.connectionId()))
+        .map(dto -> mapToCanonicalCampaign(dto, ctx))
         .toList();
 
     campaignRepository.upsertAll(entities);
   }
 
   private CanonicalAdvertisingCampaignEntity mapToCanonicalCampaign(
-      OzonPerformanceCampaignDto dto, long connectionId) {
+      OzonPerformanceCampaignDto dto, IngestContext ctx) {
     var entity = new CanonicalAdvertisingCampaignEntity();
-    entity.setConnectionId(connectionId);
+    entity.setWorkspaceId(ctx.workspaceId());
+    entity.setConnectionId(ctx.connectionId());
+    entity.setSourcePlatform(ctx.marketplace().name().toLowerCase());
     entity.setExternalCampaignId(String.valueOf(dto.id()));
     entity.setName(dto.title());
     entity.setCampaignType(dto.advObjectType() != null ? dto.advObjectType() : "UNKNOWN");
@@ -195,6 +197,7 @@ public class OzonAdvertisingFactSource implements EventSource {
   private void processStatsBatch(List<OzonPerformanceStatDto> batch, IngestContext ctx) {
     List<AdvertisingFactRow> rows = batch.stream()
         .map(dto -> AdvertisingFactRow.fromOzon(
+            ctx.workspaceId(),
             ctx.connectionId(),
             dto.campaignId(),
             LocalDate.parse(dto.date()),

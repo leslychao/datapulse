@@ -24,15 +24,15 @@ public class CanonicalPromoCampaignUpsertRepository {
     private static final int DEFAULT_BATCH_SIZE = 500;
 
     private static final String UPSERT = """
-            INSERT INTO canonical_promo_campaign (connection_id, external_promo_id, source_platform,
-                                                  promo_name, promo_type, status,
+            INSERT INTO canonical_promo_campaign (workspace_id, connection_id, external_promo_id,
+                                                  source_platform, promo_name, promo_type, status,
                                                   date_from, date_to, freeze_at, participation_deadline,
                                                   description, mechanic, is_participating,
                                                   raw_payload, job_execution_id, synced_at,
                                                   created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, now(), now())
-            ON CONFLICT (connection_id, external_promo_id) DO UPDATE SET
-                source_platform = EXCLUDED.source_platform,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, now(), now())
+            ON CONFLICT (workspace_id, source_platform, external_promo_id) DO UPDATE SET
+                connection_id = EXCLUDED.connection_id,
                 promo_name = EXCLUDED.promo_name,
                 promo_type = EXCLUDED.promo_type,
                 status = EXCLUDED.status,
@@ -77,22 +77,23 @@ public class CanonicalPromoCampaignUpsertRepository {
     public void batchUpsert(List<CanonicalPromoCampaignEntity> entities) {
         jdbc.batchUpdate(UPSERT, entities, DEFAULT_BATCH_SIZE,
                 (ps, e) -> {
-                    ps.setLong(1, e.getConnectionId());
-                    ps.setString(2, e.getExternalPromoId());
-                    ps.setString(3, e.getSourcePlatform());
-                    ps.setString(4, e.getPromoName());
-                    ps.setString(5, e.getPromoType());
-                    ps.setString(6, e.getStatus());
-                    ps.setObject(7, e.getDateFrom() != null ? Timestamp.from(e.getDateFrom().toInstant()) : null);
-                    ps.setObject(8, e.getDateTo() != null ? Timestamp.from(e.getDateTo().toInstant()) : null);
-                    ps.setObject(9, e.getFreezeAt() != null ? Timestamp.from(e.getFreezeAt().toInstant()) : null);
-                    ps.setObject(10, e.getParticipationDeadline() != null ? Timestamp.from(e.getParticipationDeadline().toInstant()) : null);
-                    ps.setString(11, e.getDescription());
-                    ps.setString(12, e.getMechanic());
-                    ps.setObject(13, e.getIsParticipating());
-                    ps.setString(14, e.getRawPayload());
-                    ps.setLong(15, e.getJobExecutionId());
-                    ps.setObject(16, e.getSyncedAt() != null ? Timestamp.from(e.getSyncedAt().toInstant()) : null);
+                    ps.setLong(1, e.getWorkspaceId());
+                    ps.setLong(2, e.getConnectionId());
+                    ps.setString(3, e.getExternalPromoId());
+                    ps.setString(4, e.getSourcePlatform());
+                    ps.setString(5, e.getPromoName());
+                    ps.setString(6, e.getPromoType());
+                    ps.setString(7, e.getStatus());
+                    ps.setObject(8, e.getDateFrom() != null ? Timestamp.from(e.getDateFrom().toInstant()) : null);
+                    ps.setObject(9, e.getDateTo() != null ? Timestamp.from(e.getDateTo().toInstant()) : null);
+                    ps.setObject(10, e.getFreezeAt() != null ? Timestamp.from(e.getFreezeAt().toInstant()) : null);
+                    ps.setObject(11, e.getParticipationDeadline() != null ? Timestamp.from(e.getParticipationDeadline().toInstant()) : null);
+                    ps.setString(12, e.getDescription());
+                    ps.setString(13, e.getMechanic());
+                    ps.setObject(14, e.getIsParticipating());
+                    ps.setString(15, e.getRawPayload());
+                    ps.setLong(16, e.getJobExecutionId());
+                    ps.setObject(17, e.getSyncedAt() != null ? Timestamp.from(e.getSyncedAt().toInstant()) : null);
                 });
     }
 }

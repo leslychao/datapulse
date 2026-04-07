@@ -24,7 +24,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "fact_finance";
 
     private static final String PG_QUERY = """
-            SELECT id, connection_id, source_platform, entry_type,
+            SELECT workspace_id, id, connection_id, source_platform, entry_type,
                    posting_id, order_id, seller_sku_id, warehouse_id,
                    revenue_amount, marketplace_commission_amount, acquiring_commission_amount,
                    logistics_cost_amount, storage_cost_amount, penalties_amount,
@@ -37,7 +37,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
             """;
 
     private static final String PG_INCREMENTAL_QUERY = """
-            SELECT id, connection_id, source_platform, entry_type,
+            SELECT workspace_id, id, connection_id, source_platform, entry_type,
                    posting_id, order_id, seller_sku_id, warehouse_id,
                    revenue_amount, marketplace_commission_amount, acquiring_commission_amount,
                    logistics_cost_amount, storage_cost_amount, penalties_amount,
@@ -50,7 +50,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (connection_id, source_platform, entry_id, posting_id, order_id,
+            (workspace_id, connection_id, source_platform, entry_id, posting_id, order_id,
              seller_sku_id, warehouse_id, finance_date, entry_type, attribution_level,
              fulfillment_type,
              revenue_amount, marketplace_commission_amount, acquiring_commission_amount,
@@ -58,7 +58,7 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
              marketing_cost_amount, acceptance_cost_amount, other_marketplace_charges_amount,
              compensation_amount, refund_amount, net_payout,
              job_execution_id, ver, materialized_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -107,50 +107,51 @@ public class FactFinanceMaterializer implements AnalyticsMaterializer {
     private void insertBatch(List<Map<String, Object>> rows, long ver,
             Timestamp materializedAt, String chInsert) {
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setInt(1, ((Number) row.get("connection_id")).intValue());
-            ps.setString(2, (String) row.get("source_platform"));
-            ps.setLong(3, ((Number) row.get("id")).longValue());
-            ps.setString(4, (String) row.get("posting_id"));
-            ps.setString(5, (String) row.get("order_id"));
+            ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+            ps.setInt(2, ((Number) row.get("connection_id")).intValue());
+            ps.setString(3, (String) row.get("source_platform"));
+            ps.setLong(4, ((Number) row.get("id")).longValue());
+            ps.setString(5, (String) row.get("posting_id"));
+            ps.setString(6, (String) row.get("order_id"));
 
             Number sellerSkuId = (Number) row.get("seller_sku_id");
             if (sellerSkuId != null) {
-                ps.setLong(6, sellerSkuId.longValue());
+                ps.setLong(7, sellerSkuId.longValue());
             } else {
-                ps.setNull(6, java.sql.Types.BIGINT);
+                ps.setNull(7, java.sql.Types.BIGINT);
             }
 
             Number warehouseId = (Number) row.get("warehouse_id");
             if (warehouseId != null) {
-                ps.setInt(7, warehouseId.intValue());
+                ps.setInt(8, warehouseId.intValue());
             } else {
-                ps.setNull(7, java.sql.Types.INTEGER);
+                ps.setNull(8, java.sql.Types.INTEGER);
             }
 
             Timestamp entryDate = (Timestamp) row.get("entry_date");
-            ps.setDate(8, Date.valueOf(entryDate.toLocalDateTime().toLocalDate()));
-            ps.setString(9, (String) row.get("entry_type"));
-            ps.setString(10, (String) row.get("attribution_level"));
-            ps.setString(11, (String) row.get("fulfillment_type"));
+            ps.setDate(9, Date.valueOf(entryDate.toLocalDateTime().toLocalDate()));
+            ps.setString(10, (String) row.get("entry_type"));
+            ps.setString(11, (String) row.get("attribution_level"));
+            ps.setString(12, (String) row.get("fulfillment_type"));
 
-            ps.setBigDecimal(12, (BigDecimal) row.get("revenue_amount"));
-            ps.setBigDecimal(13, (BigDecimal) row.get("marketplace_commission_amount"));
-            ps.setBigDecimal(14, (BigDecimal) row.get("acquiring_commission_amount"));
-            ps.setBigDecimal(15, (BigDecimal) row.get("logistics_cost_amount"));
-            ps.setBigDecimal(16, (BigDecimal) row.get("storage_cost_amount"));
-            ps.setBigDecimal(17, (BigDecimal) row.get("penalties_amount"));
-            ps.setBigDecimal(18, (BigDecimal) row.get("marketing_cost_amount"));
-            ps.setBigDecimal(19, (BigDecimal) row.get("acceptance_cost_amount"));
-            ps.setBigDecimal(20, (BigDecimal) row.get("other_marketplace_charges_amount"));
-            ps.setBigDecimal(21, (BigDecimal) row.get("compensation_amount"));
-            ps.setBigDecimal(22, (BigDecimal) row.get("refund_amount"));
+            ps.setBigDecimal(13, (BigDecimal) row.get("revenue_amount"));
+            ps.setBigDecimal(14, (BigDecimal) row.get("marketplace_commission_amount"));
+            ps.setBigDecimal(15, (BigDecimal) row.get("acquiring_commission_amount"));
+            ps.setBigDecimal(16, (BigDecimal) row.get("logistics_cost_amount"));
+            ps.setBigDecimal(17, (BigDecimal) row.get("storage_cost_amount"));
+            ps.setBigDecimal(18, (BigDecimal) row.get("penalties_amount"));
+            ps.setBigDecimal(19, (BigDecimal) row.get("marketing_cost_amount"));
+            ps.setBigDecimal(20, (BigDecimal) row.get("acceptance_cost_amount"));
+            ps.setBigDecimal(21, (BigDecimal) row.get("other_marketplace_charges_amount"));
+            ps.setBigDecimal(22, (BigDecimal) row.get("compensation_amount"));
+            ps.setBigDecimal(23, (BigDecimal) row.get("refund_amount"));
 
             BigDecimal netPayout = (BigDecimal) row.get("net_payout");
-            ps.setBigDecimal(23, netPayout != null ? netPayout : BigDecimal.ZERO);
+            ps.setBigDecimal(24, netPayout != null ? netPayout : BigDecimal.ZERO);
 
-            ps.setLong(24, ((Number) row.get("job_execution_id")).longValue());
-            ps.setLong(25, ver);
-            ps.setTimestamp(26, materializedAt);
+            ps.setLong(25, ((Number) row.get("job_execution_id")).longValue());
+            ps.setLong(26, ver);
+            ps.setTimestamp(27, materializedAt);
         });
     }
 

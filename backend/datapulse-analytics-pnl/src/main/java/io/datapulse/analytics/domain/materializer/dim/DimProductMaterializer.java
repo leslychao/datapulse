@@ -21,7 +21,8 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "dim_product";
 
     private static final String PG_QUERY = """
-            SELECT mo.id              AS product_id,
+            SELECT mc.workspace_id,
+                   mo.id              AS product_id,
                    mo.marketplace_connection_id AS connection_id,
                    mc.marketplace_type AS source_platform,
                    ss.id              AS seller_sku_id,
@@ -43,9 +44,10 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (product_id, connection_id, source_platform, seller_sku_id, product_master_id,
-             sku_code, marketplace_sku, product_name, brand, category, status, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (workspace_id, product_id, connection_id, source_platform, seller_sku_id,
+             product_master_id, sku_code, marketplace_sku, product_name, brand, category,
+             status, ver)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -68,18 +70,19 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
                 }
 
                 jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-                    ps.setLong(1, ((Number) row.get("product_id")).longValue());
-                    ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-                    ps.setString(3, (String) row.get("source_platform"));
-                    ps.setLong(4, ((Number) row.get("seller_sku_id")).longValue());
-                    ps.setLong(5, ((Number) row.get("product_master_id")).longValue());
-                    ps.setString(6, (String) row.get("sku_code"));
-                    ps.setString(7, (String) row.get("marketplace_sku"));
-                    ps.setString(8, (String) row.get("product_name"));
-                    ps.setString(9, (String) row.get("brand"));
-                    ps.setString(10, (String) row.get("category"));
-                    ps.setString(11, (String) row.get("status"));
-                    ps.setLong(12, ver);
+                    ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+                    ps.setLong(2, ((Number) row.get("product_id")).longValue());
+                    ps.setInt(3, ((Number) row.get("connection_id")).intValue());
+                    ps.setString(4, (String) row.get("source_platform"));
+                    ps.setLong(5, ((Number) row.get("seller_sku_id")).longValue());
+                    ps.setLong(6, ((Number) row.get("product_master_id")).longValue());
+                    ps.setString(7, (String) row.get("sku_code"));
+                    ps.setString(8, (String) row.get("marketplace_sku"));
+                    ps.setString(9, (String) row.get("product_name"));
+                    ps.setString(10, (String) row.get("brand"));
+                    ps.setString(11, (String) row.get("category"));
+                    ps.setString(12, (String) row.get("status"));
+                    ps.setLong(13, ver);
                 });
 
                 total[0] += rows.size();
@@ -96,7 +99,8 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
         String chInsert = CH_INSERT.formatted(TABLE);
 
         String pgQuery = """
-                SELECT mo.id              AS product_id,
+                SELECT mc.workspace_id,
+                       mo.id              AS product_id,
                        mo.marketplace_connection_id AS connection_id,
                        mc.marketplace_type AS source_platform,
                        ss.id              AS seller_sku_id,
@@ -123,18 +127,19 @@ public class DimProductMaterializer implements AnalyticsMaterializer {
         }
 
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setLong(1, ((Number) row.get("product_id")).longValue());
-            ps.setInt(2, ((Number) row.get("connection_id")).intValue());
-            ps.setString(3, (String) row.get("source_platform"));
-            ps.setLong(4, ((Number) row.get("seller_sku_id")).longValue());
-            ps.setLong(5, ((Number) row.get("product_master_id")).longValue());
-            ps.setString(6, (String) row.get("sku_code"));
-            ps.setString(7, (String) row.get("marketplace_sku"));
-            ps.setString(8, (String) row.get("product_name"));
-            ps.setString(9, (String) row.get("brand"));
-            ps.setString(10, (String) row.get("category"));
-            ps.setString(11, (String) row.get("status"));
-            ps.setLong(12, ver);
+            ps.setInt(1, ((Number) row.get("workspace_id")).intValue());
+            ps.setLong(2, ((Number) row.get("product_id")).longValue());
+            ps.setInt(3, ((Number) row.get("connection_id")).intValue());
+            ps.setString(4, (String) row.get("source_platform"));
+            ps.setLong(5, ((Number) row.get("seller_sku_id")).longValue());
+            ps.setLong(6, ((Number) row.get("product_master_id")).longValue());
+            ps.setString(7, (String) row.get("sku_code"));
+            ps.setString(8, (String) row.get("marketplace_sku"));
+            ps.setString(9, (String) row.get("product_name"));
+            ps.setString(10, (String) row.get("brand"));
+            ps.setString(11, (String) row.get("category"));
+            ps.setString(12, (String) row.get("status"));
+            ps.setLong(13, ver);
         });
 
         log.info("Incremental dim_product: jobExecutionId={}, rows={}", jobExecutionId, rows.size());

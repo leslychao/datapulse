@@ -17,8 +17,9 @@ public class CanonicalFinanceEntryUpsertRepository {
     private static final int DEFAULT_BATCH_SIZE = 500;
 
     private static final String UPSERT = """
-            INSERT INTO canonical_finance_entry (connection_id, source_platform, external_entry_id,
-                                                 entry_type, posting_id, order_id, seller_sku_id, warehouse_id,
+            INSERT INTO canonical_finance_entry (workspace_id, connection_id, source_platform,
+                                                 external_entry_id, entry_type, posting_id,
+                                                 order_id, seller_sku_id, warehouse_id,
                                                  revenue_amount, marketplace_commission_amount,
                                                  acquiring_commission_amount, logistics_cost_amount,
                                                  storage_cost_amount, penalties_amount,
@@ -28,8 +29,9 @@ public class CanonicalFinanceEntryUpsertRepository {
                                                  currency, entry_date, attribution_level,
                                                  fulfillment_type,
                                                  job_execution_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
-            ON CONFLICT (connection_id, source_platform, external_entry_id) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+            ON CONFLICT (workspace_id, source_platform, external_entry_id) DO UPDATE SET
+                connection_id = EXCLUDED.connection_id,
                 entry_type = EXCLUDED.entry_type,
                 posting_id = EXCLUDED.posting_id,
                 order_id = EXCLUDED.order_id,
@@ -83,31 +85,32 @@ public class CanonicalFinanceEntryUpsertRepository {
     public void batchUpsert(List<CanonicalFinanceEntryEntity> entities) {
         jdbc.batchUpdate(UPSERT, entities, DEFAULT_BATCH_SIZE,
                 (ps, e) -> {
-                    ps.setLong(1, e.getConnectionId());
-                    ps.setString(2, e.getSourcePlatform());
-                    ps.setString(3, e.getExternalEntryId());
-                    ps.setString(4, e.getEntryType());
-                    ps.setString(5, e.getPostingId());
-                    ps.setString(6, e.getOrderId());
-                    ps.setObject(7, e.getSellerSkuId());
-                    ps.setObject(8, e.getWarehouseId());
-                    ps.setBigDecimal(9, e.getRevenueAmount());
-                    ps.setBigDecimal(10, e.getMarketplaceCommissionAmount());
-                    ps.setBigDecimal(11, e.getAcquiringCommissionAmount());
-                    ps.setBigDecimal(12, e.getLogisticsCostAmount());
-                    ps.setBigDecimal(13, e.getStorageCostAmount());
-                    ps.setBigDecimal(14, e.getPenaltiesAmount());
-                    ps.setBigDecimal(15, e.getAcceptanceCostAmount());
-                    ps.setBigDecimal(16, e.getMarketingCostAmount());
-                    ps.setBigDecimal(17, e.getOtherMarketplaceChargesAmount());
-                    ps.setBigDecimal(18, e.getCompensationAmount());
-                    ps.setBigDecimal(19, e.getRefundAmount());
-                    ps.setBigDecimal(20, e.getNetPayout());
-                    ps.setString(21, e.getCurrency());
-                    ps.setTimestamp(22, Timestamp.from(e.getEntryDate().toInstant()));
-                    ps.setString(23, e.getAttributionLevel());
-                    ps.setString(24, e.getFulfillmentType());
-                    ps.setLong(25, e.getJobExecutionId());
+                    ps.setLong(1, e.getWorkspaceId());
+                    ps.setLong(2, e.getConnectionId());
+                    ps.setString(3, e.getSourcePlatform());
+                    ps.setString(4, e.getExternalEntryId());
+                    ps.setString(5, e.getEntryType());
+                    ps.setString(6, e.getPostingId());
+                    ps.setString(7, e.getOrderId());
+                    ps.setObject(8, e.getSellerSkuId());
+                    ps.setObject(9, e.getWarehouseId());
+                    ps.setBigDecimal(10, e.getRevenueAmount());
+                    ps.setBigDecimal(11, e.getMarketplaceCommissionAmount());
+                    ps.setBigDecimal(12, e.getAcquiringCommissionAmount());
+                    ps.setBigDecimal(13, e.getLogisticsCostAmount());
+                    ps.setBigDecimal(14, e.getStorageCostAmount());
+                    ps.setBigDecimal(15, e.getPenaltiesAmount());
+                    ps.setBigDecimal(16, e.getAcceptanceCostAmount());
+                    ps.setBigDecimal(17, e.getMarketingCostAmount());
+                    ps.setBigDecimal(18, e.getOtherMarketplaceChargesAmount());
+                    ps.setBigDecimal(19, e.getCompensationAmount());
+                    ps.setBigDecimal(20, e.getRefundAmount());
+                    ps.setBigDecimal(21, e.getNetPayout());
+                    ps.setString(22, e.getCurrency());
+                    ps.setTimestamp(23, Timestamp.from(e.getEntryDate().toInstant()));
+                    ps.setString(24, e.getAttributionLevel());
+                    ps.setString(25, e.getFulfillmentType());
+                    ps.setLong(26, e.getJobExecutionId());
                 });
     }
 }

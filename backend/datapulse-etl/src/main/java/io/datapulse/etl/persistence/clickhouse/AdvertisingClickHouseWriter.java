@@ -20,10 +20,11 @@ public class AdvertisingClickHouseWriter {
 
   private static final String INSERT = """
       INSERT INTO fact_advertising (
-          connection_id, source_platform, campaign_id, ad_date, marketplace_sku,
-          views, clicks, spend, orders, ordered_units, ordered_revenue, canceled,
-          ctr, cpc, cr, job_execution_id, ver, materialized_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+          workspace_id, connection_id, source_platform, campaign_id, ad_date,
+          marketplace_sku, views, clicks, spend, orders, ordered_units,
+          ordered_revenue, canceled, ctr, cpc, cr,
+          job_execution_id, ver, materialized_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
       """;
 
   private final JdbcTemplate clickhouseJdbcTemplate;
@@ -42,23 +43,24 @@ public class AdvertisingClickHouseWriter {
 
     clickhouseJdbcTemplate.batchUpdate(INSERT, rows, BATCH_SIZE,
         (ps, row) -> {
-          ps.setLong(1, row.connectionId());
-          ps.setString(2, row.sourcePlatform());
-          ps.setLong(3, row.campaignId());
-          ps.setDate(4, java.sql.Date.valueOf(row.adDate()));
-          ps.setString(5, row.marketplaceSku());
-          ps.setLong(6, row.views());
-          ps.setLong(7, row.clicks());
-          ps.setBigDecimal(8, row.spend());
-          ps.setInt(9, row.orders());
-          ps.setInt(10, row.orderedUnits());
-          ps.setBigDecimal(11, row.orderedRevenue());
-          ps.setInt(12, row.canceled());
-          ps.setFloat(13, row.ctr());
-          ps.setBigDecimal(14, row.cpc());
-          ps.setFloat(15, row.cr());
-          ps.setLong(16, row.jobExecutionId());
-          ps.setLong(17, ver);
+          ps.setLong(1, row.workspaceId());
+          ps.setLong(2, row.connectionId());
+          ps.setString(3, row.sourcePlatform());
+          ps.setLong(4, row.campaignId());
+          ps.setDate(5, java.sql.Date.valueOf(row.adDate()));
+          ps.setString(6, row.marketplaceSku());
+          ps.setLong(7, row.views());
+          ps.setLong(8, row.clicks());
+          ps.setBigDecimal(9, row.spend());
+          ps.setInt(10, row.orders());
+          ps.setInt(11, row.orderedUnits());
+          ps.setBigDecimal(12, row.orderedRevenue());
+          ps.setInt(13, row.canceled());
+          ps.setFloat(14, row.ctr());
+          ps.setBigDecimal(15, row.cpc());
+          ps.setFloat(16, row.cr());
+          ps.setLong(17, row.jobExecutionId());
+          ps.setLong(18, ver);
         });
 
     log.info("Written {} advertising fact rows to ClickHouse, ver={}",
