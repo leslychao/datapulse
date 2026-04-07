@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -24,6 +25,11 @@ import {
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
+import {
+  FilterBarUrlDef,
+  readFilterBarFromUrl,
+  syncFilterBarToUrl,
+} from '@shared/utils/url-filters';
 import {
   CreateLockRequest,
   ManualPriceLock,
@@ -159,7 +165,11 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           />
         } @else if (!locksQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="'pricing.locks.empty' | translate"
+            [message]="hasActiveFilters()
+              ? ('pricing.locks.empty_filtered' | translate)
+              : ('pricing.locks.empty' | translate)"
+            [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
+            (action)="onFiltersChanged({})"
           />
         } @else {
           <dp-data-grid
@@ -188,12 +198,23 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
 export class LocksPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
 
+  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
+    { key: 'search', type: 'string' },
+  ];
+
   readonly filterValues = signal<Record<string, any>>({});
+
+  constructor() {
+    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
+    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
+  }
   readonly currentPage = signal(0);
   readonly currentSort = signal('lockedAt,desc');
 
@@ -407,6 +428,12 @@ export class LocksPageComponent {
 
   readonly getRowId = (params: GetRowIdParams<ManualPriceLock>) =>
     String(params.data.id);
+
+  readonly hasActiveFilters = computed(() =>
+    Object.values(this.filterValues()).some(
+      (v) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0),
+    ),
+  );
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);

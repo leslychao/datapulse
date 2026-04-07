@@ -6,7 +6,7 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -19,6 +19,11 @@ import {
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { formatMoney, formatDateTime, renderBadge, renderOutlineBadge } from '@shared/utils/format.utils';
+import {
+  FilterBarUrlDef,
+  readFilterBarFromUrl,
+  syncFilterBarToUrl,
+} from '@shared/utils/url-filters';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -209,13 +214,23 @@ export class RunDetailPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
   private readonly detailPanel = inject(DetailPanelService);
 
+  private readonly decisionFilterBarUrlDefs: FilterBarUrlDef[] = [
+    { key: 'decisionType', type: 'csv' },
+  ];
+
   readonly decisionFilterValues = signal<Record<string, any>>({});
   readonly decisionPage = signal(0);
+
+  constructor() {
+    readFilterBarFromUrl(this.route, this.decisionFilterValues, this.decisionFilterBarUrlDefs);
+    syncFilterBarToUrl(this.router, this.route, this.decisionFilterValues, this.decisionFilterBarUrlDefs);
+  }
 
   private readonly numericRunId = computed(() => Number(this.runId()));
 

@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -32,6 +32,11 @@ import { DataGridComponent } from '@shared/components/data-grid/data-grid.compon
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 import { formatRelativeTime, renderBadge } from '@shared/utils/format.utils';
+import {
+  FilterBarUrlDef,
+  readFilterBarFromUrl,
+  syncFilterBarToUrl,
+} from '@shared/utils/url-filters';
 
 const POLICY_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'] as const;
 const EXECUTION_MODES = [
@@ -177,6 +182,7 @@ export class PolicyListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
@@ -184,7 +190,16 @@ export class PolicyListPageComponent {
   private readonly tourProgress = inject(TourProgressStore);
   protected readonly rbac = inject(RbacService);
 
+  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
+    { key: 'status', type: 'csv' },
+    { key: 'strategyType', type: 'string' },
+    { key: 'executionMode', type: 'csv' },
+  ];
+
   constructor() {
+    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
+    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
+
     if (PRICING_POLICIES_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PRICING_POLICIES_TOUR.id)) {
       this.tourService.startWhenReady(PRICING_POLICIES_TOUR);
     }

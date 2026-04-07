@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -38,6 +38,11 @@ import {
   formatMoney,
   renderBadge,
 } from '@shared/utils/format.utils';
+import {
+  FilterBarUrlDef,
+  readFilterBarFromUrl,
+  syncFilterBarToUrl,
+} from '@shared/utils/url-filters';
 
 const RUN_STATUS_COLOR: Record<string, string> = {
   PENDING: 'info',
@@ -370,10 +375,22 @@ export class RunsListPageComponent {
   private readonly connectionApi = inject(ConnectionApiService);
   protected readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
+
+  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
+    { key: 'status', type: 'csv' },
+    { key: 'triggerType', type: 'csv' },
+    { key: 'period', type: 'date-range' },
+  ];
+
+  constructor() {
+    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
+    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
+  }
 
   private readonly translationChange = toSignal(
     this.translate.onTranslationChange.pipe(startWith(null)),

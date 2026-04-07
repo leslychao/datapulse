@@ -2389,6 +2389,7 @@
   "pricing.locks.title": "Блокировки цен",
   "pricing.locks.create": "Заблокировать цену",
   "pricing.locks.empty": "Нет активных блокировок цен. Все товары участвуют в автоматическом ценообразовании.",
+  "pricing.locks.empty_filtered": "Блокировок по фильтру не найдено",
   "pricing.locks.error": "Не удалось загрузить блокировки.",
   "pricing.locks.created": "Цена заблокирована",
   "pricing.locks.create_error": "Не удалось заблокировать цену",
@@ -3159,6 +3160,7 @@
 
   "pricing.insights.title": "Ценовые инсайты",
   "pricing.insights.empty": "Нет инсайтов. Инсайты генерируются автоматически на основе ваших данных.",
+  "pricing.insights.empty_filtered": "Инсайтов по фильтру не найдено",
   "pricing.insights.error": "Не удалось загрузить инсайты.",
   "pricing.insights.acknowledge": "Прочитано",
   "pricing.insights.acknowledge_error": "Не удалось отметить инсайт",

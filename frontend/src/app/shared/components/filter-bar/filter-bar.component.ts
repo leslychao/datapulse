@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 
+import { DateRangePickerComponent } from '../form/date-range-picker.component';
+
 export interface FilterConfig {
   key: string;
   label: string;
@@ -20,7 +22,7 @@ export interface FilterConfig {
 @Component({
   selector: 'dp-filter-bar',
   standalone: true,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, DateRangePickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-wrap items-center gap-2">
@@ -130,27 +132,12 @@ export interface FilterConfig {
         }
 
         @if (filter.type === 'date-range') {
-          <div class="flex items-center gap-1">
-            <input
-              type="date"
-              [value]="getDateRangeValue(filter.key, 'from')"
-              (change)="onDateRangeChange(filter.key, 'from', $event)"
-              class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)]
-                     bg-[var(--bg-primary)] px-3 text-[length:var(--text-sm)]
-                     text-[var(--text-primary)] outline-none transition-colors
-                     focus:border-[var(--accent-primary)]"
-            />
-            <span class="text-[var(--text-tertiary)]">–</span>
-            <input
-              type="date"
-              [value]="getDateRangeValue(filter.key, 'to')"
-              (change)="onDateRangeChange(filter.key, 'to', $event)"
-              class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)]
-                     bg-[var(--bg-primary)] px-3 text-[length:var(--text-sm)]
-                     text-[var(--text-primary)] outline-none transition-colors
-                     focus:border-[var(--accent-primary)]"
-            />
-          </div>
+          <dp-date-range-picker
+            [from]="getDateRangeValue(filter.key, 'from')"
+            [to]="getDateRangeValue(filter.key, 'to')"
+            (fromChange)="onDateRangePartChange(filter.key, 'from', $event)"
+            (toChange)="onDateRangePartChange(filter.key, 'to', $event)"
+          />
         }
       }
 
@@ -257,15 +244,14 @@ export class FilterBarComponent {
     this.emitChange(key, target.value || '');
   }
 
-  protected onDateRangeChange(
+  protected onDateRangePartChange(
     key: string,
     part: 'from' | 'to',
-    event: Event,
+    value: string,
   ): void {
-    const target = event.target as HTMLInputElement;
     const current = this.values()[key] ?? {};
     const range = typeof current === 'object' ? { ...current } : {};
-    range[part] = target.value || '';
+    range[part] = value || '';
 
     const hasValue = range['from'] || range['to'];
     this.emitChange(key, hasValue ? range : '');

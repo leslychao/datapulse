@@ -2,10 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   HostListener,
   inject,
-  OnInit,
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -28,6 +26,11 @@ import { RbacService } from '@core/auth/rbac.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
 import { ActionFilter, ActionSummary } from '@core/models';
 import { formatMoney, formatRelativeTime, formatDateTime, renderBadge } from '@shared/utils/format.utils';
+import {
+  FilterBarUrlDef,
+  readFilterBarFromUrl,
+  syncFilterBarToUrl,
+} from '@shared/utils/url-filters';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -347,7 +350,7 @@ interface ContextMenuState {
     }
   `,
 })
-export class ActionsListPageComponent implements OnInit {
+export class ActionsListPageComponent {
   private readonly actionApi = inject(ActionApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
@@ -366,6 +369,14 @@ export class ActionsListPageComponent implements OnInit {
   protected readonly DownloadIcon = Download;
   protected readonly ColumnsIcon = Columns3;
 
+  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
+    { key: 'connectionId', type: 'string' },
+    { key: 'status', type: 'csv' },
+    { key: 'executionMode', type: 'string' },
+    { key: 'search', type: 'string' },
+    { key: 'period', type: 'date-range' },
+  ];
+
   readonly filterValues = signal<Record<string, any>>({});
   readonly selectedRows = signal<ActionSummary[]>([]);
   readonly showBulkApproveModal = signal(false);
@@ -378,43 +389,10 @@ export class ActionsListPageComponent implements OnInit {
   readonly showColumnsPopover = signal(false);
   readonly columnVisibility = signal<Record<string, boolean>>({});
   private gridApiRef: GridApi | null = null;
-  private skipUrlSync = false;
 
   constructor() {
-    effect(() => {
-      if (this.skipUrlSync) return;
-      const vals = this.filterValues();
-      const params: Record<string, string> = {};
-      if (vals['connectionId']) params['connectionId'] = vals['connectionId'];
-      if (vals['status']?.length) params['status'] = vals['status'].join(',');
-      if (vals['executionMode']) params['mode'] = vals['executionMode'];
-      if (vals['search']) params['search'] = vals['search'];
-      if (vals['period']?.from) params['from'] = vals['period'].from;
-      if (vals['period']?.to) params['to'] = vals['period'].to;
-      this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: params,
-        queryParamsHandling: 'replace',
-        replaceUrl: true,
-      });
-    });
-  }
-
-  ngOnInit(): void {
-    const qp = this.route.snapshot.queryParams;
-    const restored: Record<string, any> = {};
-    if (qp['connectionId']) restored['connectionId'] = qp['connectionId'];
-    if (qp['status']) restored['status'] = qp['status'].split(',');
-    if (qp['mode']) restored['executionMode'] = qp['mode'];
-    if (qp['search']) restored['search'] = qp['search'];
-    if (qp['from'] || qp['to']) {
-      restored['period'] = { from: qp['from'] ?? '', to: qp['to'] ?? '' };
-    }
-    if (Object.keys(restored).length > 0) {
-      this.skipUrlSync = true;
-      this.filterValues.set(restored);
-      this.skipUrlSync = false;
-    }
+    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
+    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
   }
 
   @HostListener('document:click')

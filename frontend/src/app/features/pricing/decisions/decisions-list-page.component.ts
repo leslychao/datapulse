@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -17,6 +18,11 @@ import {
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
+import {
+  FilterBarUrlDef,
+  readFilterBarFromUrl,
+  syncFilterBarToUrl,
+} from '@shared/utils/url-filters';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -91,12 +97,25 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
 export class DecisionsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
   private readonly detailPanel = inject(DetailPanelService);
+
+  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
+    { key: 'decisionType', type: 'csv' },
+    { key: 'executionMode', type: 'string' },
+    { key: 'period', type: 'date-range' },
+  ];
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
   readonly currentSort = signal('createdAt,desc');
+
+  constructor() {
+    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
+    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
+  }
 
   readonly filterConfigs: FilterConfig[] = [
     {
