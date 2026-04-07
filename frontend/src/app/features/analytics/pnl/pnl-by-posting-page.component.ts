@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   HostListener,
   inject,
   signal,
@@ -253,6 +254,12 @@ export class PnlByPostingPageComponent {
   private gridApi: GridApi | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+    });
+  }
+
   readonly postingsQuery = injectQuery(() => ({
     queryKey: [
       'analytics', 'pnl-by-posting',
@@ -285,7 +292,6 @@ export class PnlByPostingPageComponent {
       field: 'postingId',
       headerName: this.t.instant('analytics.pnl.col.posting_id'),
       cellClass: 'font-mono text-[11px]',
-      cellStyle: () => ({ color: 'var(--accent-primary)', cursor: 'pointer' }),
     },
     {
       field: 'skuCode',
@@ -309,6 +315,7 @@ export class PnlByPostingPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: (p) => ({ color: financeColor(p.value) }),
     },
     {
       field: 'marketplaceCommissionAmount',
@@ -332,6 +339,7 @@ export class PnlByPostingPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: (p) => ({ color: financeColor(p.value) }),
     },
     {
       field: 'netCogs',
@@ -339,6 +347,7 @@ export class PnlByPostingPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: (p) => ({ color: financeColor(p.value) }),
     },
     {
       field: 'reconciliationResidual',
@@ -385,7 +394,10 @@ export class PnlByPostingPageComponent {
   }
 
   openPosting(postingId: string): void {
-    this.router.navigate(['/analytics/pnl/posting', postingId]);
+    this.router.navigate([
+      '/workspace', this.wsStore.currentWorkspaceId(),
+      'analytics', 'pnl', 'posting', postingId,
+    ]);
   }
 
   prevPage(): void {

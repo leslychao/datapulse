@@ -42,7 +42,7 @@ class InventoryAnalysisServiceTest {
   private InventoryAnalysisService service;
 
   private static final long WORKSPACE_ID = 1L;
-  private static final InventoryFilter EMPTY_FILTER = new InventoryFilter(null, null, null);
+  private static final InventoryFilter EMPTY_FILTER = new InventoryFilter(null, null);
 
   @Nested
   @DisplayName("getOverview")

@@ -1,8 +1,6 @@
 package io.datapulse.analytics.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,17 +9,20 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 import io.datapulse.analytics.api.DataQualityStatusResponse;
-import io.datapulse.analytics.api.DataQualityStatusResponse.AutomationBlocker;
-import io.datapulse.analytics.api.DataQualityStatusResponse.SyncFreshness;
-import io.datapulse.analytics.api.ReconciliationResponse;
+import io.datapulse.analytics.api.DataQualityStatusResponse.ConnectionDataQuality;
+import io.datapulse.analytics.api.ReconciliationResultResponse;
 import io.datapulse.analytics.config.AnalyticsQueryProperties;
 import io.datapulse.analytics.config.AnalyticsQueryProperties.DataQualityProperties;
 import io.datapulse.analytics.persistence.DataQualityReadRepository;
+import io.datapulse.analytics.persistence.DataQualityReadRepository.BaselineStat;
+import io.datapulse.analytics.persistence.DataQualityReadRepository.ReconciliationRow;
 import io.datapulse.analytics.persistence.SyncStateReadRepository;
 import io.datapulse.analytics.persistence.SyncStateReadRepository.SyncFreshnessRow;
 import io.datapulse.analytics.persistence.WorkspaceConnectionRepository;
+import io.datapulse.analytics.persistence.WorkspaceConnectionRepository.ConnectionRow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,126 +57,145 @@ class DataQualityServiceTest {
   class GetStatus {
 
     @Test
-    @DisplayName("should return empty freshness when no sync states")
-    void should_returnEmptyFreshness_when_noSyncStates() {
+    @DisplayName("should return empty connections when no sync states")
+    void should_returnEmpty_when_noSyncStates() {
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
           .thenReturn(List.of());
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.syncFreshness()).isEmpty();
-      assertThat(result.automationBlockers()).isEmpty();
+      assertThat(result.connections()).isEmpty();
     }
 
     @Test
-    @DisplayName("should mark finance domain as stale when older than threshold")
-    void should_markStale_when_financeDataOlderThanThreshold() {
-      OffsetDateTime staleTime = OffsetDateTime.now().minusHours(25);
-      var row = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "finance", staleTime);
+    @DisplayName("should group domains under connection")
+    void should_groupDomainsUnderConnection() {
+      OffsetDateTime recent = OffsetDateTime.now().minusHours(5);
+      var finance = new SyncFreshnessRow(10L, "WB", "WB", "finance", recent);
+      var orders = new SyncFreshnessRow(10L, "WB", "WB", "orders", recent);
 
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
-          .thenReturn(List.of(row));
+          .thenReturn(List.of(finance, orders));
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.syncFreshness()).hasSize(1);
-      SyncFreshness freshness = result.syncFreshness().get(0);
-      assertThat(freshness.stale()).isTrue();
-      assertThat(freshness.thresholdHours()).isEqualTo(24);
+      assertThat(result.connections()).hasSize(1);
+      ConnectionDataQuality conn = result.connections().get(0);
+      assertThat(conn.connectionId()).isEqualTo(10L);
+      assertThat(conn.domains()).hasSize(2);
     }
 
     @Test
-    @DisplayName("should mark finance domain as fresh when within threshold")
-    void should_markFresh_when_financeDataWithinThreshold() {
-      OffsetDateTime recentTime = OffsetDateTime.now().minusHours(10);
-      var row = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "finance", recentTime);
-
-      when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
-          .thenReturn(List.of(row));
-
-      DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
-
-      SyncFreshness freshness = result.syncFreshness().get(0);
-      assertThat(freshness.stale()).isFalse();
-    }
-
-    @Test
-    @DisplayName("should mark as stale when lastSuccessAt is null")
-    void should_markStale_when_lastSuccessAtIsNull() {
-      var row = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "finance", null);
-
-      when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
-          .thenReturn(List.of(row));
-
-      DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
-
-      assertThat(result.syncFreshness().get(0).stale()).isTrue();
-    }
-
-    @Test
-    @DisplayName("should create automation blocker for stale finance domain")
-    void should_createBlocker_when_financeDomainIsStale() {
+    @DisplayName("should mark finance domain as STALE when older than threshold")
+    void should_markStale_when_financeOlderThanThreshold() {
       OffsetDateTime staleTime = OffsetDateTime.now().minusHours(30);
-      var row = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "finance", staleTime);
+      var row = new SyncFreshnessRow(10L, "WB", "WB", "finance", staleTime);
 
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
           .thenReturn(List.of(row));
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.automationBlockers()).hasSize(1);
-      AutomationBlocker blocker = result.automationBlockers().get(0);
-      assertThat(blocker.connectionId()).isEqualTo(10L);
-      assertThat(blocker.blocked()).isTrue();
-      assertThat(blocker.reason()).contains("finance");
+      var domain = result.connections().get(0).domains().get(0);
+      assertThat(domain.status()).isEqualTo("STALE");
     }
 
     @Test
-    @DisplayName("should NOT create blocker for stale non-finance domain")
-    void should_notCreateBlocker_when_nonFinanceDomainIsStale() {
-      OffsetDateTime staleTime = OffsetDateTime.now().minusHours(100);
-      var row = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "orders", staleTime);
+    @DisplayName("should mark domain as FRESH when within threshold")
+    void should_markFresh_when_withinThreshold() {
+      OffsetDateTime recentTime = OffsetDateTime.now().minusHours(10);
+      var row = new SyncFreshnessRow(10L, "WB", "WB", "finance", recentTime);
 
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
           .thenReturn(List.of(row));
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.syncFreshness().get(0).stale()).isTrue();
-      assertThat(result.automationBlockers()).isEmpty();
+      assertThat(result.connections().get(0).domains().get(0).status())
+          .isEqualTo("FRESH");
+    }
+
+    @Test
+    @DisplayName("should mark as OVERDUE when lastSuccessAt is null")
+    void should_markOverdue_when_nullLastSuccess() {
+      var row = new SyncFreshnessRow(10L, "WB", "WB", "finance", null);
+
+      when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
+          .thenReturn(List.of(row));
+
+      DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
+
+      assertThat(result.connections().get(0).domains().get(0).status())
+          .isEqualTo("OVERDUE");
+    }
+
+    @Test
+    @DisplayName("should mark as OVERDUE when far beyond threshold")
+    void should_markOverdue_when_farBeyondThreshold() {
+      OffsetDateTime veryOld = OffsetDateTime.now().minusHours(200);
+      var row = new SyncFreshnessRow(10L, "WB", "WB", "finance", veryOld);
+
+      when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
+          .thenReturn(List.of(row));
+
+      DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
+
+      assertThat(result.connections().get(0).domains().get(0).status())
+          .isEqualTo("OVERDUE");
+    }
+
+    @Test
+    @DisplayName("should set automationBlocked when finance domain is not FRESH")
+    void should_setBlocked_when_financeDomainStale() {
+      OffsetDateTime staleTime = OffsetDateTime.now().minusHours(30);
+      var row = new SyncFreshnessRow(10L, "WB", "WB", "finance", staleTime);
+
+      when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
+          .thenReturn(List.of(row));
+
+      DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
+
+      ConnectionDataQuality conn = result.connections().get(0);
+      assertThat(conn.automationBlocked()).isTrue();
+      assertThat(conn.blockReason()).contains("finance");
+    }
+
+    @Test
+    @DisplayName("should NOT block automation for stale non-finance domain")
+    void should_notBlock_when_nonFinanceDomainStale() {
+      OffsetDateTime staleTime = OffsetDateTime.now().minusHours(100);
+      var row = new SyncFreshnessRow(10L, "WB", "WB", "orders", staleTime);
+
+      when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
+          .thenReturn(List.of(row));
+
+      DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
+
+      assertThat(result.connections().get(0).automationBlocked()).isFalse();
     }
 
     @Test
     @DisplayName("should use domain-specific threshold hours")
-    void should_useDomainThreshold_when_differentDomainsChecked() {
-      OffsetDateTime time = OffsetDateTime.now().minusHours(50);
-      var financeRow = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "finance", time);
-      var otherRow = new SyncFreshnessRow(
-          10L, "WB Connection", "WB", "orders", time);
+    void should_useDomainThreshold() {
+      OffsetDateTime time = OffsetDateTime.now().minusHours(30);
+      var finance = new SyncFreshnessRow(10L, "WB", "WB", "finance", time);
+      var orders = new SyncFreshnessRow(10L, "WB", "WB", "orders", time);
 
       when(syncStateReadRepository.findSyncFreshness(WORKSPACE_ID))
-          .thenReturn(List.of(financeRow, otherRow));
+          .thenReturn(List.of(finance, orders));
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.syncFreshness()).hasSize(2);
-      // finance: threshold=24, 50h > 24h → stale
-      assertThat(result.syncFreshness().get(0).stale()).isTrue();
-      assertThat(result.syncFreshness().get(0).thresholdHours()).isEqualTo(24);
-      // orders (default): threshold=48, 50h > 48h → stale
-      assertThat(result.syncFreshness().get(1).stale()).isTrue();
-      assertThat(result.syncFreshness().get(1).thresholdHours()).isEqualTo(48);
+      var domains = result.connections().get(0).domains();
+      // finance: threshold=24h, 30h past → STALE
+      assertThat(domains.get(0).status()).isEqualTo("STALE");
+      // orders: threshold=48h, 30h past → FRESH
+      assertThat(domains.get(1).status()).isEqualTo("FRESH");
     }
 
     @Test
-    @DisplayName("should handle multiple connections with mixed staleness")
-    void should_handleMixedStaleness_when_multipleConnections() {
+    @DisplayName("should handle multiple connections")
+    void should_handleMultipleConnections() {
       var staleRow = new SyncFreshnessRow(
           10L, "WB Conn", "WB", "finance",
           OffsetDateTime.now().minusHours(30));
@@ -188,11 +208,41 @@ class DataQualityServiceTest {
 
       DataQualityStatusResponse result = service.getStatus(WORKSPACE_ID);
 
-      assertThat(result.syncFreshness()).hasSize(2);
-      assertThat(result.syncFreshness().get(0).stale()).isTrue();
-      assertThat(result.syncFreshness().get(1).stale()).isFalse();
-      assertThat(result.automationBlockers()).hasSize(1);
-      assertThat(result.automationBlockers().get(0).connectionId()).isEqualTo(10L);
+      assertThat(result.connections()).hasSize(2);
+      assertThat(result.connections().get(0).automationBlocked()).isTrue();
+      assertThat(result.connections().get(1).automationBlocked()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("computeSyncStatus")
+  class ComputeSyncStatus {
+
+    @Test
+    void should_returnFresh_when_withinThreshold() {
+      OffsetDateTime now = OffsetDateTime.now();
+      assertThat(service.computeSyncStatus(now.minusHours(10), 24, now))
+          .isEqualTo("FRESH");
+    }
+
+    @Test
+    void should_returnStale_when_beyondThresholdWithinOverdue() {
+      OffsetDateTime now = OffsetDateTime.now();
+      assertThat(service.computeSyncStatus(now.minusHours(30), 24, now))
+          .isEqualTo("STALE");
+    }
+
+    @Test
+    void should_returnOverdue_when_beyondOverdueThreshold() {
+      OffsetDateTime now = OffsetDateTime.now();
+      assertThat(service.computeSyncStatus(now.minusHours(100), 24, now))
+          .isEqualTo("OVERDUE");
+    }
+
+    @Test
+    void should_returnOverdue_when_null() {
+      assertThat(service.computeSyncStatus(null, 24, OffsetDateTime.now()))
+          .isEqualTo("OVERDUE");
     }
   }
 
@@ -201,59 +251,93 @@ class DataQualityServiceTest {
   class GetReconciliation {
 
     @Test
-    @DisplayName("should return empty list when no connections")
+    @DisplayName("should return empty when no connections")
     void should_returnEmpty_when_noConnections() {
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(List.of());
+      when(connectionRepository.findActiveByWorkspaceIdAsMap(WORKSPACE_ID))
+          .thenReturn(Map.of());
 
-      List<ReconciliationResponse> result = service.getReconciliation(WORKSPACE_ID);
+      ReconciliationResultResponse result =
+          service.getReconciliation(WORKSPACE_ID, null);
 
-      assertThat(result).isEmpty();
-      verify(dataQualityReadRepository, never()).findReconciliation(anyList(), anyInt());
+      assertThat(result.connections()).isEmpty();
+      assertThat(result.trend()).isEmpty();
+      assertThat(result.distribution()).isEmpty();
+      verify(dataQualityReadRepository, never()).findReconciliationRows(anyList());
+    }
+
+    @Test
+    @DisplayName("should build complete result with connections, trend, distribution")
+    void should_buildCompleteResult() {
+      var connRow = new ConnectionRow(10L, "WB Shop", "WB");
+      when(connectionRepository.findActiveByWorkspaceIdAsMap(WORKSPACE_ID))
+          .thenReturn(Map.of(10L, connRow));
+
+      var row = new ReconciliationRow(
+          10L, "WB", 202504,
+          new BigDecimal("500000"), new BigDecimal("5000"),
+          new BigDecimal("0.01"));
+
+      when(dataQualityReadRepository.findReconciliationRows(List.of(10L)))
+          .thenReturn(List.of(row));
+      when(dataQualityReadRepository.findBaselineStats(List.of(10L)))
+          .thenReturn(Map.of("10:WB", new BaselineStat(
+              new BigDecimal("0.015"), new BigDecimal("0.005"), 5)));
+
+      ReconciliationResultResponse result =
+          service.getReconciliation(WORKSPACE_ID, null);
+
+      assertThat(result.connections()).hasSize(1);
+      assertThat(result.connections().get(0).connectionName()).isEqualTo("WB Shop");
+      assertThat(result.trend()).hasSize(1);
+      assertThat(result.distribution()).isNotEmpty();
     }
 
     @Test
     @DisplayName("should detect anomaly when residual ratio exceeds threshold")
-    void should_detectAnomaly_when_residualRatioHigh() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
+    void should_detectAnomaly() {
+      var connRow = new ConnectionRow(10L, "WB Shop", "WB");
+      when(connectionRepository.findActiveByWorkspaceIdAsMap(WORKSPACE_ID))
+          .thenReturn(Map.of(10L, connRow));
 
-      var recon = new ReconciliationResponse(
-          10L, "WB", 202501,
-          new BigDecimal("500000.00"), new BigDecimal("450000.00"),
-          new BigDecimal("50000.00"), new BigDecimal("0.10"),
-          new BigDecimal("0.02"), true);
+      var row = new ReconciliationRow(
+          10L, "WB", 202504,
+          new BigDecimal("500000"), new BigDecimal("50000"),
+          new BigDecimal("0.10"));
 
-      when(dataQualityReadRepository.findReconciliation(connIds, 2))
-          .thenReturn(List.of(recon));
+      when(dataQualityReadRepository.findReconciliationRows(List.of(10L)))
+          .thenReturn(List.of(row));
+      when(dataQualityReadRepository.findBaselineStats(List.of(10L)))
+          .thenReturn(Map.of("10:WB", new BaselineStat(
+              new BigDecimal("0.02"), new BigDecimal("0.01"), 200)));
 
-      List<ReconciliationResponse> result = service.getReconciliation(WORKSPACE_ID);
+      ReconciliationResultResponse result =
+          service.getReconciliation(WORKSPACE_ID, null);
 
-      assertThat(result).hasSize(1);
-      assertThat(result.get(0).anomaly()).isTrue();
-      assertThat(result.get(0).residualRatio()).isEqualByComparingTo("0.10");
+      assertThat(result.connections().get(0).status()).isEqualTo("ANOMALY");
     }
 
     @Test
-    @DisplayName("should not flag anomaly when residual within normal range")
-    void should_notFlagAnomaly_when_residualNormal() {
-      List<Long> connIds = List.of(10L);
-      when(connectionRepository.findConnectionIdsByWorkspaceId(WORKSPACE_ID))
-          .thenReturn(connIds);
+    @DisplayName("should return CALIBRATION when few data periods")
+    void should_returnCalibration_when_fewPeriods() {
+      var connRow = new ConnectionRow(10L, "WB Shop", "WB");
+      when(connectionRepository.findActiveByWorkspaceIdAsMap(WORKSPACE_ID))
+          .thenReturn(Map.of(10L, connRow));
 
-      var recon = new ReconciliationResponse(
-          10L, "WB", 202501,
-          new BigDecimal("500000.00"), new BigDecimal("499000.00"),
-          new BigDecimal("1000.00"), new BigDecimal("0.002"),
-          new BigDecimal("0.003"), false);
+      var row = new ReconciliationRow(
+          10L, "WB", 202504,
+          new BigDecimal("500000"), new BigDecimal("1000"),
+          new BigDecimal("0.002"));
 
-      when(dataQualityReadRepository.findReconciliation(connIds, 2))
-          .thenReturn(List.of(recon));
+      when(dataQualityReadRepository.findReconciliationRows(List.of(10L)))
+          .thenReturn(List.of(row));
+      when(dataQualityReadRepository.findBaselineStats(List.of(10L)))
+          .thenReturn(Map.of("10:WB", new BaselineStat(
+              new BigDecimal("0.002"), new BigDecimal("0.001"), 3)));
 
-      List<ReconciliationResponse> result = service.getReconciliation(WORKSPACE_ID);
+      ReconciliationResultResponse result =
+          service.getReconciliation(WORKSPACE_ID, null);
 
-      assertThat(result.get(0).anomaly()).isFalse();
+      assertThat(result.connections().get(0).status()).isEqualTo("CALIBRATION");
     }
   }
 }

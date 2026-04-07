@@ -97,10 +97,8 @@ public class AdvertisingClickHouseReadRepository {
              sum(fa.spend) / sum(fa.ordered_revenue) * 100, NULL) AS current_drr_pct
       FROM fact_advertising AS fa
       INNER JOIN dim_product AS dp
-          ON fa.connection_id = dp.connection_id
-          AND fa.marketplace_sku = dp.marketplace_sku
+          ON fa.marketplace_sku = dp.marketplace_sku
       WHERE dp.product_id IN (:offerIds)
-        AND dp.connection_id IN (:connectionIds)
         AND fa.ad_date >= today() - :lookback
       GROUP BY dp.product_id
       SETTINGS final = 1
@@ -144,9 +142,8 @@ public class AdvertisingClickHouseReadRepository {
              toDecimal64(sum(fa.orders), 6) / sum(fa.clicks), NULL) AS avg_cr
       FROM fact_advertising AS fa
       INNER JOIN dim_product AS dp
-          ON fa.connection_id = dp.connection_id
-          AND fa.marketplace_sku = dp.marketplace_sku
-      WHERE dp.connection_id IN (:connectionIds)
+          ON fa.marketplace_sku = dp.marketplace_sku
+      WHERE fa.connection_id IN (:connectionIds)
         AND dp.category IN (:categories)
         AND fa.ad_date >= today() - :lookback
       GROUP BY dp.category
@@ -189,10 +186,9 @@ public class AdvertisingClickHouseReadRepository {
           map.cr_pct
       FROM mart_advertising_product AS map
       INNER JOIN dim_product AS dp
-          ON map.connection_id = dp.connection_id
-          AND map.marketplace_sku = dp.marketplace_sku
+          ON map.marketplace_sku = dp.marketplace_sku
       WHERE dp.seller_sku_id IN (:sellerSkuIds)
-        AND dp.connection_id IN (:connectionIds)
+        AND map.connection_id IN (:connectionIds)
       ORDER BY dp.seller_sku_id, map.source_platform
       SETTINGS final = 1
       """;

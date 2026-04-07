@@ -40,7 +40,7 @@ class ReturnsAnalysisServiceTest {
   private ReturnsAnalysisService service;
 
   private static final long WORKSPACE_ID = 1L;
-  private static final ReturnsFilter EMPTY_FILTER = new ReturnsFilter(null, null, null);
+  private static final ReturnsFilter EMPTY_FILTER = new ReturnsFilter(null, null);
 
   @Nested
   @DisplayName("getSummary")

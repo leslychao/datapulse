@@ -11,6 +11,7 @@ import { lastValueFrom } from 'rxjs';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ConnectionDataQuality, SyncDomainStatus } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { formatDateTime, formatInteger } from '@shared/utils/format.utils';
 
 const DOMAIN_LABEL_KEYS: Record<string, string> = {
   finance: 'analytics.data_quality.domain.finance',
@@ -18,6 +19,12 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
   stock: 'analytics.data_quality.domain.stock',
   catalog: 'analytics.data_quality.domain.catalog',
   advertising: 'analytics.data_quality.domain.advertising',
+};
+
+const STATUS_DOT_CLASS: Record<SyncDomainStatus, string> = {
+  FRESH: 'bg-[var(--status-success)]',
+  STALE: 'bg-[var(--status-warning)]',
+  OVERDUE: 'bg-[var(--status-error)]',
 };
 
 @Component({
@@ -58,7 +65,6 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
                   </span>
                 </div>
 
-                <!-- Automation Status -->
                 <span
                   class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
                   [class]="conn.automationBlocked
@@ -77,7 +83,6 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
                 </div>
               }
 
-              <!-- Sync Domain Table -->
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
@@ -95,7 +100,7 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
                           {{ domainLabel(domain.domain) }}
                         </td>
                         <td class="px-4 py-2 text-[var(--text-secondary)]">
-                          {{ domain.lastSuccessAt ? formatDateTime(domain.lastSuccessAt) : '—' }}
+                          {{ fmtDateTime(domain.lastSuccessAt) }}
                         </td>
                         <td class="px-4 py-2">
                           <span class="inline-flex items-center gap-1.5 text-[length:var(--text-xs)]">
@@ -107,7 +112,7 @@ const DOMAIN_LABEL_KEYS: Record<string, string> = {
                           </span>
                         </td>
                         <td class="px-4 py-2 text-right font-mono text-[var(--text-secondary)]">
-                          {{ domain.recordCount.toLocaleString('ru-RU') }}
+                          {{ fmtInteger(domain.recordCount) }}
                         </td>
                       </tr>
                     }
@@ -154,25 +159,18 @@ export class DataQualityStatusPageComponent {
   }
 
   syncStatusDotClass(status: SyncDomainStatus): string {
-    switch (status) {
-      case 'FRESH': return 'bg-[var(--status-success)]';
-      case 'STALE': return 'bg-[var(--status-warning)]';
-      case 'OVERDUE': return 'bg-[var(--status-error)]';
-    }
+    return STATUS_DOT_CLASS[status] ?? 'bg-[var(--text-tertiary)]';
   }
 
   syncStatusLabel(status: SyncDomainStatus): string {
     return this.t.instant(`analytics.data_quality.sync_status.${status}`);
   }
 
-  formatDateTime(iso: string): string {
-    const date = new Date(iso);
-    if (isNaN(date.getTime())) return iso;
-    const d = String(date.getDate()).padStart(2, '0');
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const y = date.getFullYear();
-    const h = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-    return `${d}.${m}.${y} ${h}:${min}`;
+  fmtDateTime(iso: string | null): string {
+    return formatDateTime(iso);
+  }
+
+  fmtInteger(value: number): string {
+    return formatInteger(value);
   }
 }

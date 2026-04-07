@@ -2625,14 +2625,10 @@
   "analytics.data_quality.domain.catalog": "Каталог",
   "analytics.data_quality.domain.advertising": "Реклама",
 
-  "analytics.data_quality.sync_status.OK": "OK",
-  "analytics.data_quality.sync_status.STALE": "Устарело",
-  "analytics.data_quality.sync_status.MISSING": "Нет данных",
-  "analytics.data_quality.sync_status.ERROR": "Ошибка",
   "analytics.data_quality.sync_status.FRESH": "Актуально",
+  "analytics.data_quality.sync_status.STALE": "Устарело",
   "analytics.data_quality.sync_status.OVERDUE": "Просрочено",
 
-  "analytics.reconciliation.title": "Reconciliation",
   "analytics.reconciliation.load_error": "Не удалось загрузить данные reconciliation",
   "analytics.reconciliation.trend_title": "Тренд residual",
   "analytics.reconciliation.distribution_title": "Распределение residual",

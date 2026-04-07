@@ -46,7 +46,7 @@ class PnlQueryServiceTest {
   private PnlQueryService service;
 
   private static final long WORKSPACE_ID = 1L;
-  private static final PnlFilter EMPTY_FILTER = new PnlFilter(null, null, null, null, null, null);
+  private static final PnlFilter EMPTY_FILTER = new PnlFilter(null, null, null, null, null);
 
   @Nested
   @DisplayName("getSummary")

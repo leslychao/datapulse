@@ -51,23 +51,23 @@ public class InventoryReadRepository {
 
     private static final String BY_PRODUCT_SQL = """
             SELECT
-                m.connection_id,
-                m.source_platform,
-                m.product_id,
-                m.seller_sku_id,
-                p.sku_code,
-                p.product_name,
-                m.warehouse_id,
+                m.connection_id AS connection_id,
+                m.source_platform AS source_platform,
+                m.product_id AS product_id,
+                m.seller_sku_id AS seller_sku_id,
+                p.sku_code AS sku_code,
+                p.product_name AS product_name,
+                m.warehouse_id AS warehouse_id,
                 w.name AS warehouse_name,
-                m.analysis_date,
-                m.available,
-                m.reserved,
-                m.avg_daily_sales_14d,
-                m.days_of_cover,
-                m.stock_out_risk,
-                m.cost_price,
-                m.frozen_capital,
-                m.recommended_replenishment
+                m.analysis_date AS analysis_date,
+                m.available AS available,
+                m.reserved AS reserved,
+                m.avg_daily_sales_14d AS avg_daily_sales_14d,
+                m.days_of_cover AS days_of_cover,
+                m.stock_out_risk AS stock_out_risk,
+                m.cost_price AS cost_price,
+                m.frozen_capital AS frozen_capital,
+                m.recommended_replenishment AS recommended_replenishment
             FROM mart_inventory_analysis AS m
             LEFT JOIN dim_product AS p ON m.product_id = p.product_id
             LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id

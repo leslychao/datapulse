@@ -2,14 +2,19 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router, Routes } from '@angular/router';
 
 import { RbacService } from '@core/auth/rbac.service';
+import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
 import { AnalyticsLayoutComponent } from './analytics-layout.component';
 
 const reconciliationGuard: CanActivateFn = () => {
   const rbac = inject(RbacService);
   const router = inject(Router);
+  const wsStore = inject(WorkspaceContextStore);
   if (rbac.isAdmin()) return true;
-  return router.createUrlTree(['/analytics/data-quality/status']);
+  return router.createUrlTree([
+    '/workspace', wsStore.currentWorkspaceId(),
+    'analytics', 'data-quality', 'status',
+  ]);
 };
 
 const routes: Routes = [

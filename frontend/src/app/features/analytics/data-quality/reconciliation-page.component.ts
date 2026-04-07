@@ -65,6 +65,10 @@ const CONNECTION_PALETTE = [
         <div class="text-sm text-[var(--status-error)]">
           {{ 'analytics.reconciliation.load_error' | translate }}
         </div>
+      } @else if (connections().length === 0) {
+        <div class="py-12 text-center text-sm text-[var(--text-tertiary)]">
+          {{ 'analytics.reconciliation.empty' | translate }}
+        </div>
       } @else {
         <div class="space-y-4 pb-4">
           <!-- Per-connection KPI Cards -->

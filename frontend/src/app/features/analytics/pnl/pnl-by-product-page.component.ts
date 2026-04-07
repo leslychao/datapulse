@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
@@ -64,8 +65,6 @@ const COGS_STATUS_COLOR: Record<string, string> = {
         [pagination]="false"
         [pageSize]="50"
         height="calc(100vh - 320px)"
-        [clickableRows]="true"
-        (rowClicked)="onRowClicked($event)"
         (gridReady)="onGridReady($event)"
       />
 
@@ -116,6 +115,12 @@ export class PnlByProductPageComponent {
 
   private gridApi: GridApi | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+    });
+  }
 
   readonly productsQuery = injectQuery(() => ({
     queryKey: [
@@ -169,6 +174,7 @@ export class PnlByProductPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: (p) => ({ color: financeColor(p.value) }),
     },
     {
       field: 'marketplaceCommissionAmount',
@@ -200,6 +206,7 @@ export class PnlByProductPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: (p) => ({ color: financeColor(p.value) }),
     },
     {
       field: 'fullPnl',
@@ -241,10 +248,6 @@ export class PnlByProductPageComponent {
       this.search.set(input.value);
       this.currentPage.set(0);
     }, 300);
-  }
-
-  onRowClicked(_row: any): void {
-    // Future detail panel
   }
 
   prevPage(): void {

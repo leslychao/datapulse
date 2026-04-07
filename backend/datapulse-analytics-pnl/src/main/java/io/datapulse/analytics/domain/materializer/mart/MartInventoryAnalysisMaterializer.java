@@ -69,7 +69,7 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
           GROUP BY connection_id, source_platform, product_id, warehouse_id
       ) inv
       LEFT JOIN dim_product AS dp
-          ON inv.product_id = dp.product_id AND inv.connection_id = dp.connection_id
+          ON inv.product_id = dp.product_id
       LEFT JOIN (
           SELECT
               product_id,

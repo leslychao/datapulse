@@ -207,7 +207,6 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
       -- Product dimension for product_id resolution (uses resolved seller SKU)
       LEFT JOIN dim_product AS dp
           ON coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) = dp.seller_sku_id
-          AND pm.connection_id = dp.connection_id
       -- SCD2 cost for COGS (equality-only JOIN: range filter moved to WHERE — CH hash join)
       LEFT JOIN (
           SELECT
@@ -250,19 +249,16 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
           GROUP BY pm_c.posting_id
       ) AS fpc_cost ON pm.posting_id = fpc_cost.posting_id
       LEFT JOIN dim_product AS p_by_id ON dp.product_id = p_by_id.product_id
-          AND pm.connection_id = p_by_id.connection_id
       LEFT JOIN (
           SELECT
-              connection_id,
               seller_sku_id,
               anyLast(sku_code) AS sku_code,
               anyLast(marketplace_sku) AS marketplace_sku,
               anyLast(product_name) AS product_name
           FROM dim_product
-          GROUP BY connection_id, seller_sku_id
+          GROUP BY seller_sku_id
       ) AS p_by_sku
           ON coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) = p_by_sku.seller_sku_id
-          AND pm.connection_id = p_by_sku.connection_id
       SETTINGS final = 1
       """;
 

@@ -65,7 +65,6 @@ public class GridClickHouseReadRepository {
                 FROM fact_finance AS ff
                 JOIN dim_product AS dp
                     ON ff.seller_sku_id = dp.seller_sku_id
-                    AND ff.connection_id = dp.connection_id
                 WHERE dp.product_id IN (:offerIds)
                   AND ff.finance_date >= today() - 30
                 GROUP BY dp.product_id
@@ -97,8 +96,7 @@ public class GridClickHouseReadRepository {
                     map.roas        AS ad_roas
                 FROM mart_advertising_product AS map
                 INNER JOIN dim_product AS dp
-                    ON map.connection_id = dp.connection_id
-                    AND map.marketplace_sku = dp.marketplace_sku
+                    ON map.marketplace_sku = dp.marketplace_sku
                 WHERE dp.product_id IN (:offerIds)
                   AND map.period = (
                       SELECT max(period) FROM mart_advertising_product
@@ -157,8 +155,7 @@ public class GridClickHouseReadRepository {
                                  ff.attribution_level IN ('POSTING','PRODUCT')) AS net_pnl_30d
                     FROM fact_finance ff
                     JOIN dim_product dp ON ff.seller_sku_id = dp.seller_sku_id
-                        AND ff.connection_id = dp.connection_id
-                    WHERE dp.connection_id IN (:connectionIds)
+                    WHERE ff.connection_id IN (:connectionIds)
                       AND ff.finance_date >= today() - 30
                     GROUP BY dp.product_id
                 ) fin ON inv.product_id = fin.product_id

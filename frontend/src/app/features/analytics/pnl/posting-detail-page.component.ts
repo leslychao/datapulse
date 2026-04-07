@@ -86,7 +86,10 @@ export class PostingDetailPageComponent {
   }
 
   goBack(): void {
-    this.router.navigate(['/analytics/pnl/by-posting']);
+    this.router.navigate([
+      '/workspace', this.wsStore.currentWorkspaceId(),
+      'analytics', 'pnl', 'by-posting',
+    ]);
   }
 
   formatMoney(value: number | null): string {

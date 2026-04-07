@@ -73,20 +73,17 @@ public class AdPriceDropDrrChecker implements AlertChecker {
         FROM fact_advertising AS fa
         LEFT JOIN (
             SELECT
-                ff.connection_id,
                 dp.marketplace_sku,
                 sum(ff.revenue_amount) AS total_revenue
             FROM fact_finance AS ff
             INNER JOIN dim_product AS dp
-                ON ff.connection_id = dp.connection_id
-                AND ff.seller_sku_id = dp.seller_sku_id
+                ON ff.seller_sku_id = dp.seller_sku_id
             WHERE ff.finance_date >= today() - :lookbackDays
               AND ff.attribution_level IN ('POSTING', 'PRODUCT')
               AND ff.connection_id IN (:connectionIds)
-            GROUP BY ff.connection_id, dp.marketplace_sku
+            GROUP BY dp.marketplace_sku
         ) AS ff_rev
-            ON fa.connection_id = ff_rev.connection_id
-            AND fa.marketplace_sku = ff_rev.marketplace_sku
+            ON fa.marketplace_sku = ff_rev.marketplace_sku
         WHERE fa.ad_date >= today() - :lookbackDays
           AND fa.connection_id IN (:connectionIds)
           AND fa.marketplace_sku IN (:skus)

@@ -37,12 +37,12 @@ public class ReturnsReadRepository {
                 connection_id,
                 source_platform,
                 sum(return_count) AS return_count,
-                sum(return_quantity) AS return_quantity,
+                sum(return_quantity) AS total_return_quantity,
                 sum(return_amount) AS return_amount,
                 sum(sale_count) AS sale_count,
-                sum(sale_quantity) AS sale_quantity,
-                if(sum(sale_quantity) > 0,
-                   sum(return_quantity) / sum(sale_quantity) * 100, NULL) AS return_rate_pct,
+                sum(sale_quantity) AS total_sale_quantity,
+                if(total_sale_quantity > 0,
+                   total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct,
                 sum(financial_refund_amount) AS financial_refund_amount,
                 sum(penalties_amount) AS penalties_amount,
                 topK(1)(top_return_reason)[1] AS top_return_reason
@@ -52,21 +52,21 @@ public class ReturnsReadRepository {
 
     private static final String BY_PRODUCT_SQL = """
             SELECT
-                m.connection_id,
-                m.source_platform,
-                m.product_id,
-                m.seller_sku_id,
-                p.sku_code,
-                p.product_name,
-                m.period,
-                m.return_count,
-                m.return_quantity,
-                m.return_amount,
-                m.sale_quantity,
-                m.return_rate_pct,
-                m.financial_refund_amount,
-                m.penalties_amount,
-                m.top_return_reason
+                m.connection_id AS connection_id,
+                m.source_platform AS source_platform,
+                m.product_id AS product_id,
+                m.seller_sku_id AS seller_sku_id,
+                p.sku_code AS sku_code,
+                p.product_name AS product_name,
+                m.period AS period,
+                m.return_count AS return_count,
+                m.return_quantity AS return_quantity,
+                m.return_amount AS return_amount,
+                m.sale_quantity AS sale_quantity,
+                m.return_rate_pct AS return_rate_pct,
+                m.financial_refund_amount AS financial_refund_amount,
+                m.penalties_amount AS penalties_amount,
+                m.top_return_reason AS top_return_reason
             FROM mart_returns_analysis AS m
             LEFT JOIN dim_product AS p ON m.product_id = p.product_id
             WHERE m.connection_id IN (:connectionIds)
@@ -75,10 +75,10 @@ public class ReturnsReadRepository {
     private static final String TREND_SQL = """
             SELECT
                 period,
-                sum(return_quantity) AS return_quantity,
-                sum(sale_quantity) AS sale_quantity,
-                if(sum(sale_quantity) > 0,
-                   sum(return_quantity) / sum(sale_quantity) * 100, NULL) AS return_rate_pct,
+                sum(return_quantity) AS total_return_quantity,
+                sum(sale_quantity) AS total_sale_quantity,
+                if(total_sale_quantity > 0,
+                   total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct,
                 sum(financial_refund_amount) AS financial_refund_amount
             FROM mart_returns_analysis
             WHERE connection_id IN (:connectionIds)
@@ -135,8 +135,8 @@ public class ReturnsReadRepository {
 
         return jdbc.ch().query(sb.toString(), params, (rs, rowNum) -> new ReturnsTrendResponse(
                 rs.getInt("period"),
-                rs.getInt("return_quantity"),
-                rs.getInt("sale_quantity"),
+                rs.getInt("total_return_quantity"),
+                rs.getInt("total_sale_quantity"),
                 rs.getBigDecimal("return_rate_pct"),
                 rs.getBigDecimal("financial_refund_amount")
         ));
@@ -162,10 +162,10 @@ public class ReturnsReadRepository {
                 rs.getLong("connection_id"),
                 rs.getString("source_platform"),
                 rs.getInt("return_count"),
-                rs.getInt("return_quantity"),
+                rs.getInt("total_return_quantity"),
                 rs.getBigDecimal("return_amount"),
                 rs.getInt("sale_count"),
-                rs.getInt("sale_quantity"),
+                rs.getInt("total_sale_quantity"),
                 rs.getBigDecimal("return_rate_pct"),
                 rs.getBigDecimal("financial_refund_amount"),
                 rs.getBigDecimal("penalties_amount"),

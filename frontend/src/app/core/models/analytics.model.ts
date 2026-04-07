@@ -47,7 +47,6 @@ export interface PnlTrendPoint {
 }
 
 export interface PnlByProduct {
-  connectionId: number;
   sourcePlatform: string;
   sellerSkuId: number;
   productId: number;
@@ -77,7 +76,6 @@ export interface PnlByProduct {
 
 export interface PnlByPosting {
   postingId: string;
-  connectionId: number;
   sourcePlatform: string;
   orderId: string | null;
   sellerSkuId: number | null;
@@ -222,7 +220,6 @@ export interface ConnectionDataQuality {
   marketplaceType: string;
   automationBlocked: boolean;
   blockReason: string | null;
-  lastSyncRelative: string | null;
   domains: SyncDomainInfo[];
 }
 

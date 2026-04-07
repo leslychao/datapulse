@@ -4,25 +4,22 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 public record DataQualityStatusResponse(
-        List<SyncFreshness> syncFreshness,
-        List<AutomationBlocker> automationBlockers
+    List<ConnectionDataQuality> connections
 ) {
 
-    public record SyncFreshness(
-            long connectionId,
-            String connectionName,
-            String sourcePlatform,
-            String dataDomain,
-            OffsetDateTime lastSuccessAt,
-            boolean stale,
-            int thresholdHours
-    ) {}
+  public record ConnectionDataQuality(
+      long connectionId,
+      String connectionName,
+      String marketplaceType,
+      boolean automationBlocked,
+      String blockReason,
+      List<SyncDomainInfo> domains
+  ) {}
 
-    public record AutomationBlocker(
-            long connectionId,
-            String connectionName,
-            String sourcePlatform,
-            String reason,
-            boolean blocked
-    ) {}
+  public record SyncDomainInfo(
+      String domain,
+      OffsetDateTime lastSuccessAt,
+      String status,
+      long recordCount
+  ) {}
 }

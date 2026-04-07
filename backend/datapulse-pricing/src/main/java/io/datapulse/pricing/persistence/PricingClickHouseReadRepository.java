@@ -30,11 +30,9 @@ public class PricingClickHouseReadRepository {
                 sum(fa.spend) / nullIf(sum(ff.revenue_amount), 0) AS ad_cost_ratio
             FROM fact_advertising AS fa
             INNER JOIN dim_product AS dp
-                ON fa.connection_id = dp.connection_id
-                AND fa.marketplace_sku = dp.marketplace_sku
+                ON fa.marketplace_sku = dp.marketplace_sku
             LEFT JOIN fact_finance AS ff
-                ON dp.connection_id = ff.connection_id
-                AND dp.seller_sku_id = ff.seller_sku_id
+                ON dp.seller_sku_id = ff.seller_sku_id
                 AND toYYYYMM(fa.ad_date) = toYYYYMM(ff.finance_date)
             WHERE fa.marketplace_sku IN (:skus)
                 AND fa.ad_date >= today() - :lookbackDays
@@ -118,7 +116,7 @@ public class PricingClickHouseReadRepository {
                     / nullIf(sum(mp.revenue_amount), 0) AS avg_commission_pct
             FROM mart_posting_pnl AS mp
             INNER JOIN dim_product AS dp
-                ON mp.product_id = dp.product_id AND mp.connection_id = dp.connection_id
+                ON mp.product_id = dp.product_id
             WHERE mp.connection_id = :connectionId
               AND dp.category IN (:categories)
               AND mp.finance_date >= today() - :lookbackDays
@@ -319,8 +317,7 @@ public class PricingClickHouseReadRepository {
     private static final String SKU_CATEGORIES = """
             SELECT seller_sku_id, category
             FROM dim_product
-            WHERE connection_id = :connectionId
-              AND seller_sku_id IN (:sellerSkuIds)
+            WHERE seller_sku_id IN (:sellerSkuIds)
               AND category IS NOT NULL
               AND category != ''
             SETTINGS final = 1

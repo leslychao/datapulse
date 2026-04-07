@@ -149,17 +149,15 @@ public class PnlReadRepository {
             FROM mart_product_pnl AS m
             LEFT JOIN dim_product AS p_by_id
                 ON m.product_id = p_by_id.product_id
-                AND m.connection_id = p_by_id.connection_id
             LEFT JOIN (
-                SELECT connection_id, seller_sku_id,
+                SELECT seller_sku_id,
                        anyLast(sku_code) AS sku_code,
                        anyLast(marketplace_sku) AS marketplace_sku,
                        anyLast(product_name) AS product_name
                 FROM dim_product
-                GROUP BY connection_id, seller_sku_id
+                GROUP BY seller_sku_id
             ) AS p_by_sku
                 ON m.seller_sku_id = p_by_sku.seller_sku_id
-                AND m.connection_id = p_by_sku.connection_id
             WHERE m.connection_id IN (:connectionIds)
               AND m.attribution_level = 'PRODUCT'
               AND m.revenue_amount != 0
@@ -300,17 +298,15 @@ public class PnlReadRepository {
                 FROM mart_product_pnl AS m
                 LEFT JOIN dim_product AS p_by_id
                     ON m.product_id = p_by_id.product_id
-                    AND m.connection_id = p_by_id.connection_id
                 LEFT JOIN (
-                    SELECT connection_id, seller_sku_id,
+                    SELECT seller_sku_id,
                            anyLast(sku_code) AS sku_code,
                            anyLast(marketplace_sku) AS marketplace_sku,
                            anyLast(product_name) AS product_name
                     FROM dim_product
-                    GROUP BY connection_id, seller_sku_id
+                    GROUP BY seller_sku_id
                 ) AS p_by_sku
                     ON m.seller_sku_id = p_by_sku.seller_sku_id
-                    AND m.connection_id = p_by_sku.connection_id
                 WHERE m.connection_id IN (:connectionIds)
                   AND m.attribution_level = 'PRODUCT'
                   AND m.revenue_amount != 0""");
