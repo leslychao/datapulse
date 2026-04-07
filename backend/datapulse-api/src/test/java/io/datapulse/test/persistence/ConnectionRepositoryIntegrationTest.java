@@ -103,18 +103,30 @@ class ConnectionRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void should_checkDuplicateByMarketplaceAndAccount() {
+    void should_detectDuplicate_excludingSelfAndArchived() {
       var secret = secretRefRepository.save(
+          aSecretReference().withWorkspaceId(workspaceId).build());
+      var conn = connectionRepository.save(
+          aConnection().withWorkspaceId(workspaceId)
+              .withMarketplaceType("WB").withExternalAccountId("acc-1")
+              .withStatus("ACTIVE")
+              .withSecretReferenceId(secret.getId()).build());
+
+      assertThat(connectionRepository
+          .existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNotAndStatusNot(
+              workspaceId, "WB", "acc-1", conn.getId(), "ARCHIVED")).isFalse();
+
+      var secret2 = secretRefRepository.save(
           aSecretReference().withWorkspaceId(workspaceId).build());
       connectionRepository.save(
           aConnection().withWorkspaceId(workspaceId)
               .withMarketplaceType("WB").withExternalAccountId("acc-1")
-              .withSecretReferenceId(secret.getId()).build());
+              .withStatus("ACTIVE")
+              .withSecretReferenceId(secret2.getId()).build());
 
-      assertThat(connectionRepository.existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountId(
-          workspaceId, "WB", "acc-1")).isTrue();
-      assertThat(connectionRepository.existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountId(
-          workspaceId, "OZON", "acc-1")).isFalse();
+      assertThat(connectionRepository
+          .existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNotAndStatusNot(
+              workspaceId, "WB", "acc-1", conn.getId(), "ARCHIVED")).isTrue();
     }
   }
 

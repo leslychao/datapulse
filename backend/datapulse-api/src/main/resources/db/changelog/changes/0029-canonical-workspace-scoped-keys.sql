@@ -47,6 +47,7 @@ ALTER TABLE category DROP CONSTRAINT uq_category_connection_external;
 ALTER TABLE warehouse DROP CONSTRAINT uq_warehouse_connection_external;
 ALTER TABLE marketplace_offer DROP CONSTRAINT uq_offer_sku_connection_msku;
 
+--changeset datapulse:0029-drop-adcampaign-dynamic-constraints splitStatements:false
 DO $$
 DECLARE r RECORD;
 BEGIN
@@ -58,6 +59,7 @@ BEGIN
     END LOOP;
 END $$;
 
+--changeset datapulse:0029-canonical-workspace-scoped-constraints
 -- Phase 4: create new workspace-scoped unique constraints
 ALTER TABLE canonical_order
     ADD CONSTRAINT uq_order_workspace_platform_external

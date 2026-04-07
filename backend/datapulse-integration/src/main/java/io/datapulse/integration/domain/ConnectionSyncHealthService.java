@@ -30,8 +30,9 @@ public class ConnectionSyncHealthService {
 
   @Transactional(readOnly = true)
   public List<ConnectionSyncHealthResponse> listForWorkspace(long workspaceId) {
-    return connectionRepository.findAllByWorkspaceId(workspaceId).stream()
-        .filter(c -> !ConnectionStatus.ARCHIVED.name().equals(c.getStatus()))
+    return connectionRepository
+        .findAllByWorkspaceIdAndStatusNot(workspaceId, ConnectionStatus.ARCHIVED.name())
+        .stream()
         .map(this::toResponse)
         .toList();
   }
