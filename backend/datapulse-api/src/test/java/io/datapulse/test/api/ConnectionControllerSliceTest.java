@@ -13,6 +13,7 @@ import io.datapulse.integration.api.ConnectionController;
 import io.datapulse.integration.api.ConnectionResponse;
 import io.datapulse.integration.api.ConnectionSummaryResponse;
 import io.datapulse.integration.domain.ConnectionService;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.tenancy.persistence.AppUserRepository;
 import io.datapulse.tenancy.persistence.WorkspaceMemberRepository;
@@ -48,6 +49,9 @@ class ConnectionControllerSliceTest {
 
   @MockitoBean
   private WorkspaceMemberRepository workspaceMemberRepository;
+
+  @MockitoBean
+  private AuditPublisher auditPublisher;
 
   @BeforeEach
   void setUp() {

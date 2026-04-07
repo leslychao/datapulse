@@ -174,6 +174,26 @@ public class CostProfileRepository {
         return jdbc.query(FIND_CURRENT_BY_SKU, Map.of("sellerSkuId", sellerSkuId), this::mapEntity);
     }
 
+    private static final String FIND_CURRENT_BY_SKU_AND_WORKSPACE = """
+            SELECT cp.id, cp.seller_sku_id, cp.cost_price, cp.currency,
+                   cp.valid_from, cp.valid_to, cp.updated_by_user_id,
+                   cp.created_at, cp.updated_at
+            FROM cost_profile cp
+            JOIN seller_sku ss ON ss.id = cp.seller_sku_id
+            WHERE cp.seller_sku_id = :sellerSkuId
+              AND ss.workspace_id = :workspaceId
+              AND cp.valid_to IS NULL
+            LIMIT 1
+            """;
+
+    public Optional<CostProfileEntity> findCurrentBySkuAndWorkspace(
+            long sellerSkuId, long workspaceId) {
+        var rows = jdbc.query(FIND_CURRENT_BY_SKU_AND_WORKSPACE,
+                Map.of("sellerSkuId", sellerSkuId, "workspaceId", workspaceId),
+                this::mapEntity);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
     public List<CostProfileEntity> findHistoryBySku(long sellerSkuId) {
         return jdbc.query(FIND_HISTORY_BY_SKU, Map.of("sellerSkuId", sellerSkuId), this::mapEntity);
     }

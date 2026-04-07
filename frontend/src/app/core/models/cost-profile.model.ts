@@ -47,3 +47,18 @@ export interface CostProfileImportError {
   row: number;
   message: string;
 }
+
+export type CostUpdateOperation = 'FIXED' | 'INCREASE_PCT' | 'DECREASE_PCT' | 'MULTIPLY';
+
+export interface BulkFormulaCostRequest {
+  sellerSkuIds: number[];
+  operation: CostUpdateOperation;
+  value: number;
+  validFrom: string;
+}
+
+export interface BulkFormulaCostResponse {
+  updated: number;
+  skipped: number;
+  errors: string[];
+}

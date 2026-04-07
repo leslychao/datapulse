@@ -107,6 +107,15 @@ public class CostProfileController {
                 request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
     }
 
+    @PostMapping("/bulk-formula")
+    @PreAuthorize(
+            "hasAnyAuthority('ROLE_ADMIN', 'ROLE_OWNER', 'ROLE_PRICING_MANAGER')")
+    public BulkFormulaCostResponse bulkFormula(
+            @Valid @RequestBody BulkFormulaCostRequest request) {
+        return costProfileService.bulkFormula(
+                request, workspaceContext.getWorkspaceId(), workspaceContext.getUserId());
+    }
+
     @GetMapping("/{sellerSkuId}/history")
     @PreAuthorize("isAuthenticated()")
     public List<CostProfileResponse> getHistory(@PathVariable("sellerSkuId") Long sellerSkuId) {

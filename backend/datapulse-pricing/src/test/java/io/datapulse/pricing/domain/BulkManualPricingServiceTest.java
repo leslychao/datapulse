@@ -11,8 +11,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -60,6 +62,9 @@ class BulkManualPricingServiceTest {
 
   @Captor
   private ArgumentCaptor<List<PriceDecisionEntity>> decisionsCaptor;
+
+  @Captor
+  private ArgumentCaptor<PricingSignalSet> signalsCaptor;
 
   private static final long WORKSPACE_ID = 10L;
 
@@ -173,6 +178,106 @@ class BulkManualPricingServiceTest {
       assertThat(response.summary().maxChangePct())
           .isGreaterThanOrEqualTo(new BigDecimal("30"));
       assertThat(response.summary().minMarginAfter()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("returns SKIP when offer has manual lock")
+    void should_skip_when_offer_has_manual_lock() {
+      BulkManualPreviewRequest request = previewRequest(100L, "1200");
+
+      EnrichedOfferRow offer = enrichedOffer(100L, new BigDecimal("1000"), new BigDecimal("500"));
+      when(dataReadRepository.findOffersByIds(List.of(100L), WORKSPACE_ID))
+          .thenReturn(List.of(offer));
+      when(dataReadRepository.findLockedOfferIds(any()))
+          .thenReturn(List.of(100L));
+      when(dataReadRepository.findPromoActiveOfferIds(any()))
+          .thenReturn(Set.of());
+      when(dataReadRepository.findDataFreshness(20L))
+          .thenReturn(OffsetDateTime.now());
+
+      when(constraintResolver.resolve(any(), any(), any()))
+          .thenReturn(new ConstraintResolution(new BigDecimal("1200"), List.of()));
+
+      GuardResult blocking = GuardResult.block("manual_lock_guard",
+          "pricing.guard.manual_lock");
+      when(guardChain.evaluate(any(), any(), any()))
+          .thenReturn(new GuardChainResult(false, blocking, List.of()));
+
+      BulkManualPreviewResponse response = service.preview(request, WORKSPACE_ID);
+
+      assertThat(response.offers()).hasSize(1);
+      assertThat(response.offers().get(0).result()).isEqualTo("SKIP");
+      assertThat(response.offers().get(0).guard()).isEqualTo("manual_lock_guard");
+      assertThat(response.summary().willBlock()).isEqualTo(1);
+
+      verify(guardChain).evaluate(signalsCaptor.capture(), any(), any());
+      assertThat(signalsCaptor.getValue().manualLockActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("returns SKIP when offer is in active promo")
+    void should_skip_when_offer_in_active_promo() {
+      BulkManualPreviewRequest request = previewRequest(100L, "1200");
+
+      EnrichedOfferRow offer = enrichedOffer(100L, new BigDecimal("1000"), new BigDecimal("500"));
+      when(dataReadRepository.findOffersByIds(List.of(100L), WORKSPACE_ID))
+          .thenReturn(List.of(offer));
+      when(dataReadRepository.findLockedOfferIds(any()))
+          .thenReturn(List.of());
+      when(dataReadRepository.findPromoActiveOfferIds(any()))
+          .thenReturn(Set.of(100L));
+      when(dataReadRepository.findDataFreshness(20L))
+          .thenReturn(OffsetDateTime.now());
+
+      when(constraintResolver.resolve(any(), any(), any()))
+          .thenReturn(new ConstraintResolution(new BigDecimal("1200"), List.of()));
+
+      GuardResult blocking = GuardResult.block("promo_guard",
+          "pricing.guard.promo_active");
+      when(guardChain.evaluate(any(), any(), any()))
+          .thenReturn(new GuardChainResult(false, blocking, List.of()));
+
+      BulkManualPreviewResponse response = service.preview(request, WORKSPACE_ID);
+
+      assertThat(response.offers()).hasSize(1);
+      assertThat(response.offers().get(0).result()).isEqualTo("SKIP");
+      assertThat(response.offers().get(0).guard()).isEqualTo("promo_guard");
+      assertThat(response.summary().willBlock()).isEqualTo(1);
+
+      verify(guardChain).evaluate(signalsCaptor.capture(), any(), any());
+      assertThat(signalsCaptor.getValue().promoActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("passes stale guard when data freshness is recent")
+    void should_pass_stale_guard_when_data_fresh() {
+      BulkManualPreviewRequest request = previewRequest(100L, "1200");
+      OffsetDateTime freshTimestamp = OffsetDateTime.now().minusHours(1);
+
+      EnrichedOfferRow offer = enrichedOffer(100L, new BigDecimal("1000"), new BigDecimal("500"));
+      when(dataReadRepository.findOffersByIds(List.of(100L), WORKSPACE_ID))
+          .thenReturn(List.of(offer));
+      when(dataReadRepository.findLockedOfferIds(any()))
+          .thenReturn(List.of());
+      when(dataReadRepository.findPromoActiveOfferIds(any()))
+          .thenReturn(Set.of());
+      when(dataReadRepository.findDataFreshness(20L))
+          .thenReturn(freshTimestamp);
+
+      when(constraintResolver.resolve(any(), any(), any()))
+          .thenReturn(new ConstraintResolution(new BigDecimal("1200"), List.of()));
+      when(guardChain.evaluate(any(), any(), any()))
+          .thenReturn(new GuardChainResult(true, null, List.of()));
+
+      BulkManualPreviewResponse response = service.preview(request, WORKSPACE_ID);
+
+      assertThat(response.offers()).hasSize(1);
+      assertThat(response.offers().get(0).result()).isEqualTo("CHANGE");
+      assertThat(response.offers().get(0).effectivePrice())
+          .isEqualByComparingTo(new BigDecimal("1200"));
+
+      verify(guardChain).evaluate(signalsCaptor.capture(), any(), any());
+      assertThat(signalsCaptor.getValue().dataFreshnessAt()).isEqualTo(freshTimestamp);
     }
   }
 

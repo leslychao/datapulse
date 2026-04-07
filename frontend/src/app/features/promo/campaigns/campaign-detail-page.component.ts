@@ -209,9 +209,10 @@ export class CampaignDetailPageComponent {
     return [
     {
       headerName: this.translate.instant('promo.detail.col.product'),
-      field: 'productName',
-      minWidth: 280,
-      pinned: 'left' as const,
+        field: 'productName',
+        minWidth: 280,
+        flex: 1,
+        pinned: 'left' as const,
       sortable: true,
       cellRenderer: (params: any) =>
         params.data

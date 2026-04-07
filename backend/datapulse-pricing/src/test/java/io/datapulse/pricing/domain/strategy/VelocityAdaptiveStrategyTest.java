@@ -80,11 +80,12 @@ class VelocityAdaptiveStrategyTest {
     }
 
     @Test
-    @DisplayName("caps deviation at 1.0 for extreme deceleration")
+    @DisplayName("near-maximum discount for extreme deceleration")
     void should_capDeviation_when_extremeDeceleration() {
-      // velocityShort=0.01, velocityLong=5.0 → ratio≈0.002 << 0.70
-      // deviation would be (0.70 - 0.002) / 0.70 ≈ 0.997, capped at 1.0 anyway
-      // adjustment = -0.05 × 1.0 = -0.05
+      // velocityShort=0.01, velocityLong=5.0 → ratio=0.0020
+      // deviation = (0.70 - 0.0020) / 0.70 = 0.9971 (< 1.0, cap not reached)
+      // adjustment = -0.05 × 0.9971 = -0.049855
+      // raw = 2000 × 0.950145 = 1900.29
       PricingSignalSet signals = signalsBuilder()
           .currentPrice(new BigDecimal("2000"))
           .salesVelocityShort(new BigDecimal("0.01"))
@@ -94,7 +95,7 @@ class VelocityAdaptiveStrategyTest {
       StrategyResult result = strategy.calculate(signals, policySnapshot(defaultParams()));
 
       assertThat(result.rawTargetPrice())
-          .isEqualByComparingTo(new BigDecimal("1900.00"));
+          .isEqualByComparingTo(new BigDecimal("1900.29"));
     }
 
     @Test
@@ -176,8 +177,8 @@ class VelocityAdaptiveStrategyTest {
       // accelThreshold=1.20, markupPct=0.08
       // velocityShort=6.0, velocityLong=3.0 → ratio=2.0 > 1.20
       // deviation = (2.0 - 1.20) / 1.20 = 0.6667
-      // adjustment = +0.08 × 0.6667 = +0.05333
-      // raw = 1000 × 1.05333 = 1053.33
+      // adjustment = +0.08 × 0.6667 = +0.053336
+      // raw = 1000 × 1.053336 = 1053.34
       PricingSignalSet signals = signalsBuilder()
           .currentPrice(new BigDecimal("1000"))
           .salesVelocityShort(new BigDecimal("6.0"))
@@ -196,7 +197,7 @@ class VelocityAdaptiveStrategyTest {
       StrategyResult result = strategy.calculate(signals, policySnapshot(params));
 
       assertThat(result.rawTargetPrice())
-          .isEqualByComparingTo(new BigDecimal("1053.33"));
+          .isEqualByComparingTo(new BigDecimal("1053.34"));
     }
   }
 
@@ -377,14 +378,24 @@ class VelocityAdaptiveStrategyTest {
     @Test
     @DisplayName("baseline exactly equals minBaselineSales → proceeds")
     void should_proceed_when_baselineExactlyAtMinimum() {
-      // velocityLong = 10/30 = 0.3333 u/d × 30d = 10.0 == minBaselineSales
+      // velocityLong = 0.5 u/d × 30d = 15.0 == minBaselineSales (custom 15)
       PricingSignalSet signals = signalsBuilder()
           .currentPrice(new BigDecimal("1000"))
           .salesVelocityShort(new BigDecimal("0.15"))
-          .salesVelocityLong(new BigDecimal("0.3333"))
+          .salesVelocityLong(new BigDecimal("0.5"))
           .build();
 
-      StrategyResult result = strategy.calculate(signals, policySnapshot(defaultParams()));
+      String params = """
+          {
+            "decelerationThreshold": 0.70,
+            "accelerationThreshold": 1.30,
+            "decelerationDiscountPct": 0.05,
+            "accelerationMarkupPct": 0.03,
+            "minBaselineSales": 15
+          }
+          """;
+
+      StrategyResult result = strategy.calculate(signals, policySnapshot(params));
 
       assertThat(result.reasonKey())
           .isNotEqualTo("pricing.velocity.insufficient_data");

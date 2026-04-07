@@ -418,6 +418,7 @@ Grain: одна строка per canonical_return.
 | `return_id` | UInt64 | canonical_return.id (PK) | No | Grain key |
 | `connection_id` | UInt32 | canonical_return.connection_id | No | FK marketplace_connection |
 | `source_platform` | LowCardinality(String) | canonical_return.source_platform | No | `'ozon'` / `'wb'` |
+| `fulfillment_type` | LowCardinality(Nullable(String)) | COALESCE(canonical_return.fulfillment_type, canonical_order.fulfillment_type) | Yes | FBW (WB), NULL (Ozon — resolved via order linkage) |
 | `external_return_id` | String | canonical_return.external_return_id | No | Provider-specific ID |
 | `seller_sku_id` | UInt64 | canonical_return.seller_sku_id | Yes | FK seller_sku |
 | `product_id` | UInt64 | canonical_return.marketplace_offer_id | Yes | FK dim_product |

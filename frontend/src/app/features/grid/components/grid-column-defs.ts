@@ -1,14 +1,19 @@
 import { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
 
+import { DraftPriceChange } from '@core/models';
+
 const MARGIN_THRESHOLDS = { high: 30, low: 10, negative: 0 };
 
-function moneyFormatter(params: ValueFormatterParams): string {
-  const v = params.value;
+function formatMoney(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—';
   const abs = Math.abs(v);
   const intPart = Math.floor(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
   const prefix = v < 0 ? '\u2212' : '';
   return `${prefix}${intPart}\u00A0₽`;
+}
+
+function moneyFormatter(params: ValueFormatterParams): string {
+  return formatMoney(params.value);
 }
 
 function percentFormatter(params: ValueFormatterParams): string {
@@ -63,10 +68,114 @@ const PROMO_LABELS: Record<string, string> = { PARTICIPATING: 'Участвуе�
 
 export interface GridColumnCallbacks {
   onLockToggle?: (offerId: number, currentlyLocked: boolean, currentPrice: number | null) => void;
+  onDraftPriceChange?: (offerId: number, newPrice: number, originalPrice: number, costPrice: number | null) => void;
+  getDraftChange?: (offerId: number) => DraftPriceChange | undefined;
 }
 
-export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
-  return [
+function buildCurrentPriceCol(
+    callbacks: GridColumnCallbacks | undefined,
+    draftMode: boolean,
+): ColDef {
+  const base: ColDef = {
+    field: 'currentPrice',
+    headerName: 'Текущая цена',
+    width: draftMode ? 180 : 120,
+    sortable: true,
+    type: 'rightAligned',
+    cellClass: 'font-mono text-[length:var(--text-sm)]',
+    valueFormatter: moneyFormatter,
+  };
+
+  if (!draftMode) return base;
+
+  return {
+    ...base,
+    editable: (params) => {
+      if (params.data?.manualLock) return false;
+      if (params.data?.promoStatus === 'PARTICIPATING') return false;
+      return true;
+    },
+    cellEditor: 'agNumberCellEditor',
+    cellEditorParams: { min: 0.01, precision: 2 },
+    valueSetter: (params) => {
+      const newValue = params.newValue;
+      if (newValue == null || newValue <= 0) return false;
+      callbacks?.onDraftPriceChange?.(
+          params.data.offerId,
+          newValue,
+          params.data.currentPrice ?? 0,
+          params.data.costPrice ?? null,
+      );
+      return false;
+    },
+    cellRenderer: (params: ICellRendererParams) => {
+      const draft = callbacks?.getDraftChange?.(params.data?.offerId);
+      if (!draft) return formatMoney(params.value);
+
+      const container = document.createElement('span');
+
+      const oldEl = document.createElement('span');
+      oldEl.style.textDecoration = 'line-through';
+      oldEl.style.color = 'var(--text-tertiary)';
+      oldEl.style.marginRight = '6px';
+      oldEl.textContent = formatMoney(draft.originalPrice);
+
+      const newEl = document.createElement('span');
+      newEl.style.fontWeight = '700';
+      newEl.textContent = formatMoney(draft.newPrice);
+
+      container.append(oldEl, newEl);
+      return container;
+    },
+    cellStyle: (params) => {
+      const draft = callbacks?.getDraftChange?.(params.data?.offerId);
+      if (draft) {
+        return {
+          backgroundColor: 'color-mix(in srgb, var(--status-warning) 15%, transparent)',
+        };
+      }
+      return null;
+    },
+    tooltipValueGetter: (params) => {
+      if (params.data?.manualLock) return 'Ручная блокировка цены — редактирование недоступно';
+      if (params.data?.promoStatus === 'PARTICIPATING') return 'Товар в активном промо — редактирование недоступно';
+      return undefined;
+    },
+  };
+}
+
+function buildProjectedMarginCol(callbacks: GridColumnCallbacks | undefined): ColDef {
+  return {
+    colId: 'projectedMargin',
+    headerName: 'Проект. маржа',
+    width: 110,
+    sortable: false,
+    type: 'rightAligned',
+    cellClass: 'font-mono text-[length:var(--text-sm)]',
+    valueGetter: (params) => {
+      const draft = callbacks?.getDraftChange?.(params.data?.offerId);
+      if (!draft) return null;
+      const costPrice = params.data?.costPrice;
+      if (!costPrice || costPrice === 0) return null;
+      return ((draft.newPrice - costPrice) / draft.newPrice) * 100;
+    },
+    valueFormatter: percentFormatter,
+    cellStyle: (params) => {
+      const v = params.value;
+      if (v === null || v === undefined) return null;
+      if (v < MARGIN_THRESHOLDS.negative) return { color: 'var(--finance-negative)' };
+      if (v < MARGIN_THRESHOLDS.low) return { color: 'var(--status-warning)' };
+      if (v >= MARGIN_THRESHOLDS.high) return { color: 'var(--finance-positive)' };
+      return null;
+    },
+  };
+}
+
+export function buildGridColumnDefs(
+    callbacks?: GridColumnCallbacks,
+    draftMode = false,
+): ColDef[] {
+  const cols: ColDef[] = [
     {
       field: 'skuCode',
       headerName: 'Артикул',
@@ -93,15 +202,7 @@ export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
       cellClass: 'text-center',
       valueFormatter: (p: ValueFormatterParams) => MARKETPLACE_LABELS[p.value] ?? p.value,
     },
-    {
-      field: 'currentPrice',
-      headerName: 'Текущая цена',
-      width: 120,
-      sortable: true,
-      type: 'rightAligned',
-      cellClass: 'font-mono text-[length:var(--text-sm)]',
-      valueFormatter: moneyFormatter,
-    },
+    buildCurrentPriceCol(callbacks, draftMode),
     {
       field: 'marginPct',
       headerName: 'Маржа',
@@ -119,6 +220,13 @@ export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
         return null;
       },
     },
+  ];
+
+  if (draftMode) {
+    cols.push(buildProjectedMarginCol(callbacks));
+  }
+
+  cols.push(
     {
       field: 'availableStock',
       headerName: 'Остаток',
@@ -355,5 +463,7 @@ export function buildGridColumnDefs(callbacks?: GridColumnCallbacks): ColDef[] {
         return `${days} дн назад`;
       },
     },
-  ];
+  );
+
+  return cols;
 }

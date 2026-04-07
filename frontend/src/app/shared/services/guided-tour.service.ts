@@ -22,7 +22,7 @@ export class GuidedTourService {
 
     this.driverInstance = driver({
       showProgress: true,
-      animate: true,
+      animate: false,
       overlayColor: 'rgba(0, 0, 0, 0.55)',
       stagePadding: 8,
       stageRadius: 8,

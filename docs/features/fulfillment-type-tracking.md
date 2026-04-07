@@ -1,18 +1,86 @@
 # Fulfillment Type Tracking — Technical Breakdown Document
 
-## Problem Statement
+**Статус:** READY TO IMPLEMENT (Phase 3 — Returns)
+**Дата создания:** 2026-04-01
+**Дата обновления:** 2026-04-06
+**Автор:** Виталий Ким
+**Целевая фаза:** D — Analytics & P&L
 
-FBO/FBS/FBW/DBS fulfillment type is the dimension that determines WHO handles logistics for each order/sale/financial operation. Currently:
+---
 
-- **Orders** (`canonical_order`) — fulfillment_type captured correctly (FBO/FBS/FBW)
-- **Sales** (`canonical_sale`) — fulfillment_type NOT captured (lost at normalization)
-- **Returns** (`canonical_return`) — fulfillment_type NOT captured
-- **Finance** (`canonical_finance_entry`) — fulfillment_type NOT captured, despite Ozon API providing `delivery_schema` and WB API providing `srv_dbs` + `delivery_method`
-- **Analytics** (`fact_finance`, `fact_sales`, `fact_returns`, `mart_posting_pnl`, `mart_product_pnl`) — fulfillment_type absent
+## Business Context
 
-**Business impact**: impossible to answer "how much do I spend on FBO logistics vs FBS logistics?" — the most common fulfillment-level P&L question.
+### Проблема
 
-**Data availability**: both Ozon and WB APIs already provide this data, it's just not being propagated.
+FBO/FBS/FBW/DBS fulfillment type — измерение, определяющее КТО обрабатывает логистику для каждой операции. Текущее состояние:
+
+- **Заказы** (`canonical_order`) — fulfillment_type captured correctly (FBO/FBS/FBW) ✅
+- **Финансы** (`canonical_finance_entry`) — fulfillment_type captured ✅
+- **Продажи** (`canonical_sale`) — fulfillment_type captured ✅
+- **Возвраты** (`canonical_return`) — fulfillment_type **NOT captured** ❌
+- **Аналитика ClickHouse**: `fact_finance` ✅, `fact_sales` ✅, `fact_returns` ❌ (колонка есть, но всегда NULL), `mart_posting_pnl` ✅
+
+### Бизнес-ценность
+
+**Без fulfillment_type в возвратах** невозможно ответить на вопрос: «Сколько возвратов по FBO vs FBS?», «Какая доля возвратов по типу фулфилмента?» — это критично для анализа юнит-экономики по каналам.
+
+### Что уже реализовано (Phase 1 + Phase 2)
+
+Phase 1 (Finance) и Phase 2 (Sales) **полностью реализованы**:
+
+| Слой | Файл | Статус |
+|------|------|--------|
+| Normalized DTO | `NormalizedFinanceItem.fulfillmentType` | ✅ |
+| Normalized DTO | `NormalizedSaleItem.fulfillmentType` | ✅ |
+| Ozon normalizer | `OzonFinanceNormalizer.resolveOzonFulfillment()` | ✅ |
+| Ozon normalizer | `OzonNormalizer.normalizeFboSale()` → "FBO", `normalizeFbsSale()` → "FBS" | ✅ |
+| WB normalizer | `WbNormalizer.normalizeFinance()` → srvDbs ? "DBS" : "FBW" | ✅ |
+| WB normalizer | `WbNormalizer.normalizeSale()` → "FBW" | ✅ |
+| JPA entity | `CanonicalFinanceEntryEntity.fulfillmentType` | ✅ |
+| JPA entity | `CanonicalSaleEntity.fulfillmentType` | ✅ |
+| Mapper | `CanonicalEntityMapper.toFinanceEntry()` + `toSale()` | ✅ |
+| Upsert repo | `CanonicalFinanceEntryUpsertRepository` — SQL + bind | ✅ |
+| Upsert repo | `CanonicalSaleUpsertRepository` — SQL + bind | ✅ |
+| PG migration | `0024-fulfillment-type-columns.sql` | ✅ |
+| CH migration | `0008-fulfillment-type.sql` — fact_finance, fact_sales, fact_returns, mart_posting_pnl | ✅ |
+| Materializer | `FactFinanceMaterializer` — PG SELECT + CH INSERT | ✅ |
+| Materializer | `FactSalesMaterializer` — PG SELECT + CH INSERT | ✅ |
+| Materializer | `MartPostingPnlMaterializer` — `any(fulfillment_type)` | ✅ |
+
+### Что осталось (Phase 3 — Returns)
+
+`FactReturnsMaterializer` уже содержит `LEFT JOIN canonical_order co ON cr.canonical_order_id = co.id` и выбирает `co.fulfillment_type`. Но `canonical_order_id` в `canonical_return` **никогда не заполняется** (маппер его не ставит), поэтому JOIN всегда возвращает NULL.
+
+---
+
+## User Stories
+
+### US-1: P&L breakdown по типу фулфилмента
+
+**Как** селлер,
+**я хочу** видеть в P&L аналитике разбивку по FBO/FBS (Ozon) и FBW/DBS (WB),
+**чтобы** понимать, какой канал фулфилмента прибыльнее.
+
+### US-2: Возвраты по типу фулфилмента
+
+**Как** менеджер по операциям,
+**я хочу** видеть количество и сумму возвратов в разрезе FBO/FBS/FBW,
+**чтобы** оценить, какой тип фулфилмента генерирует больше возвратов.
+
+---
+
+## Acceptance Criteria
+
+- [x] Finance: `fulfillment_type` заполняется в `canonical_finance_entry` (Ozon: FBO/FBS, WB: FBW/DBS)
+- [x] Sales: `fulfillment_type` заполняется в `canonical_sale` (Ozon: FBO/FBS, WB: FBW)
+- [x] ClickHouse: `fact_finance.fulfillment_type` populated after materialization
+- [x] ClickHouse: `fact_sales.fulfillment_type` populated after materialization
+- [x] ClickHouse: `mart_posting_pnl.fulfillment_type` populated
+- [ ] Returns: `fulfillment_type` заполняется в `canonical_return` (WB: FBW, Ozon: null → fallback через JOIN)
+- [ ] ClickHouse: `fact_returns.fulfillment_type` populated after materialization
+- [ ] Materializer: `FactReturnsMaterializer` использует `COALESCE(cr.fulfillment_type, co.fulfillment_type)` — прямое значение с fallback на JOIN
+
+---
 
 ## Terminology
 
@@ -25,425 +93,187 @@ FBO/FBS/FBW/DBS fulfillment type is the dimension that determines WHO handles lo
 
 Canonical column type: `varchar(10)` / `LowCardinality(Nullable(String))`. Nullable — for operations that don't have an associated posting (e.g. account-level penalties).
 
+---
+
 ## Data Source Evidence
-
-### Ozon Finance API
-
-`OzonFinancePosting` already deserializes `delivery_schema`:
-
-```java
-// OzonFinancePosting.java (existing)
-@JsonProperty("delivery_schema") String deliverySchema  // "FBO", "FBS", or ""
-```
-
-Verified in real API data (docs/provider-api-specs/samples/empirical-verification-log.md:341):
-```json
-"delivery_schema": "FBO"
-```
-
-Per ozon-read-contracts.md:794 — confirmed field, values: `"FBO"`, `"FBS"`, empty string for non-order operations.
-
-### Ozon FBO/FBS Postings (Orders/Sales)
-
-FBO and FBS are already fetched via separate API endpoints:
-- FBO: `POST /v2/posting/fbo/list` → `OzonFboOrdersReadAdapter`
-- FBS: `POST /v3/posting/fbs/list` → `OzonFbsOrdersReadAdapter`
-
-`OzonNormalizer` already hardcodes `"FBO"` / `"FBS"` in `normalizeFboPosting()` / `normalizeFbsPosting()`. Same for sales: `normalizeFboSale()` / `normalizeFbsSale()`. The fulfillment type is known at normalization time.
-
-### WB Finance API
-
-`WbFinanceRow` already deserializes both fields:
-
-```java
-// WbFinanceRow.java (existing)
-@JsonProperty("srv_dbs") Boolean srvDbs               // true = DBS, false/null = FBW
-@JsonProperty("delivery_method") String deliveryMethod // e.g. "FBS, (МГТ)"
-```
-
-Per wb-read-contracts.md:781 — `srv_dbs` confirmed in docs + sandbox. Per wb-read-contracts.md:765 — `delivery_method` confirmed in docs.
-
-Logic: `srvDbs == true` → `"DBS"`, else → `"FBW"`.
-
-### WB Orders API
-
-`WbOrderItem` has `isSupply` (boolean) and `isRealization` (boolean), but no direct fulfillment type marker. WB orders API (`/api/v1/supplier/orders`) returns only FBW orders by design. DBS orders are via a separate marketplace API not currently integrated.
-
-Current hardcode `"FBW"` in `normalizeOrder()` is acceptable for Phase 1, since we only ingest FBW orders.
 
 ### Ozon Returns API
 
-`OzonReturnItem` does not carry `delivery_schema` directly. However, the return's `posting_number` can be used to infer fulfillment type: Ozon FBO posting numbers follow pattern `NNNNNNN-NNNN-N`, same as FBS. The `order_number` field links to the original order.
+`OzonReturnItem` does NOT carry `delivery_schema`. The unified endpoint `POST /v1/returns/list` returns all returns without FBO/FBS distinction. Fields available: `id`, `returnId`, `orderId`, `orderNumber`, `postingNumber`, `status`, `returnReasonName`, etc.
 
-For returns, fulfillment_type will be resolved via JOIN to `canonical_order` at materialization time (fact_returns → canonical_order.fulfillment_type), not at ETL normalization time. This avoids adding a second lookup to the returns adapter.
+**Decision:** Ozon returns fulfillment_type = `null` at normalization time. Will be resolved via:
+1. `canonical_order_id` JOIN (when order linkage is implemented — separate task)
+2. Future: Ozon may expose `delivery_schema` in returns API
+
+### WB Returns API
+
+`WbReturnItem` (from `GET /api/v1/analytics/goods-return`) does NOT have explicit fulfillment field. However, WB returns API returns only FBW returns (DBS returns are via a separate endpoint not yet integrated).
+
+**Decision:** WB returns fulfillment_type = `"FBW"` (hardcode, same logic as sales).
 
 ---
 
-## Implementation Plan
+## Phase 3 Implementation Plan (Returns)
 
-### Phase 1: Finance (Critical Path)
+### Architectural Decision: Direct Column + Fallback JOIN
 
-Finance is the highest-priority layer because P&L analysis depends on it.
+**Вопрос:** как получить fulfillment_type для возвратов?
 
-#### Step 1.1: Add `fulfillmentType` to `NormalizedFinanceItem`
+**Варианты:**
+- **A: Только JOIN** к `canonical_order` через `canonical_order_id` — текущий подход в materializer
+- **B: Только прямая колонка** в `canonical_return` — заполняется при нормализации
+- **C: Прямая колонка + fallback JOIN** — COALESCE
 
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/domain/normalized/NormalizedFinanceItem.java`
+**Выбор: C (Direct + Fallback)**
 
-Add field after `warehouseExternalId`:
+**Обоснование:**
+1. `canonical_order_id` в `canonical_return` сейчас **не заполняется** (`CanonicalEntityMapper.toReturn()` не ставит его) → JOIN всегда даёт NULL. Исправление order linkage — отдельная задача.
+2. WB fulfillment известен при нормализации ("FBW") — нет смысла делать JOIN когда значение детерминировано.
+3. Ozon fulfillment неизвестен при нормализации (unified returns API) — будет null, но заработает через JOIN когда order linkage починят.
+4. `COALESCE(cr.fulfillment_type, co.fulfillment_type)` — берёт прямое значение если есть, иначе пробует JOIN.
+
+### Step 3.1: Add `fulfillmentType` to `NormalizedReturnItem`
+
+**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/domain/normalized/NormalizedReturnItem.java`
+
+Add field after `status`:
 
 ```java
-public record NormalizedFinanceItem(
-        String externalEntryId,
-        FinanceEntryType entryType,
-        String postingId,
-        String orderId,
+public record NormalizedReturnItem(
+        String externalReturnId,
         String sellerSku,
-        String marketplaceSku,
-        String warehouseExternalId,
-        String fulfillmentType,        // ← NEW: "FBO", "FBS", "FBW", "DBS", or null
-        BigDecimal revenueAmount,
-        // ... rest unchanged
+        int quantity,
+        BigDecimal returnAmount,
+        String returnReason,
+        String currency,
+        OffsetDateTime returnDate,
+        String status,
+        String fulfillmentType     // ← NEW: "FBW" for WB, null for Ozon
 ) {}
 ```
 
-#### Step 1.2: Populate in `OzonFinanceNormalizer`
+### Step 3.2: Add column to `CanonicalReturnEntity`
 
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/ozon/OzonFinanceNormalizer.java`
+**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/persistence/canonical/CanonicalReturnEntity.java`
 
-In `normalizeFinanceTransaction()`, extract `deliverySchema` from posting and normalize:
-
-```java
-String rawPosting = tx.posting() != null ? tx.posting().postingNumber() : null;
-String warehouseExternalId = tx.posting() != null && tx.posting().warehouseId() != 0
-        ? String.valueOf(tx.posting().warehouseId())
-        : null;
-String fulfillmentType = resolveOzonFulfillment(tx.posting());  // ← NEW
-```
-
-New private method:
-
-```java
-private static String resolveOzonFulfillment(OzonFinancePosting posting) {
-    if (posting == null || posting.deliverySchema() == null
-            || posting.deliverySchema().isBlank()) {
-        return null;
-    }
-    return posting.deliverySchema().toUpperCase();
-}
-```
-
-Pass `fulfillmentType` as new argument to `NormalizedFinanceItem` constructor (position 8, after `warehouseExternalId`).
-
-#### Step 1.3: Populate in `WbNormalizer.normalizeFinance()`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/wb/WbNormalizer.java`
-
-In `normalizeFinance()`, determine fulfillment from `srvDbs`:
-
-```java
-String fulfillmentType = Boolean.TRUE.equals(row.srvDbs()) ? "DBS" : "FBW";
-```
-
-Pass as new argument to `NormalizedFinanceItem` constructor (position 8).
-
-#### Step 1.4: Add column to `CanonicalFinanceEntryEntity`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/persistence/canonical/CanonicalFinanceEntryEntity.java`
-
-Add field after `attributionLevel`:
+Add field after `currency`:
 
 ```java
 @Column(name = "fulfillment_type", length = 10)
 private String fulfillmentType;
 ```
 
-#### Step 1.5: Update `CanonicalEntityMapper.toFinanceEntry()`
+### Step 3.3: Populate in WB normalizer
+
+**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/wb/WbNormalizer.java`
+
+In `normalizeReturn()` — pass `"FBW"` as last argument to `NormalizedReturnItem`:
+
+```java
+return new NormalizedReturnItem(
+        item.srid(),
+        null,
+        1,
+        BigDecimal.ZERO,
+        item.returnType(),
+        "RUB",
+        returnDate,
+        item.status(),
+        "FBW"              // ← NEW
+);
+```
+
+### Step 3.4: Populate in Ozon normalizer
+
+**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/ozon/OzonNormalizer.java`
+
+In `normalizeReturn()` — pass `null` as last argument (Ozon unified returns API doesn't expose delivery_schema):
+
+```java
+return new NormalizedReturnItem(
+        String.valueOf(item.id()),
+        sellerSku,
+        quantity,
+        returnAmount,
+        item.returnReasonName(),
+        currency,
+        returnDate,
+        item.status(),
+        null                // ← NEW: unknown at normalization time
+);
+```
+
+### Step 3.5: Update `CanonicalEntityMapper.toReturn()`
 
 **File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/domain/CanonicalEntityMapper.java`
 
-Add line after `entity.setAttributionLevel(attributionLevel)`:
+Add line after `entity.setCurrency(...)`:
 
 ```java
 entity.setFulfillmentType(norm.fulfillmentType());
 ```
 
-#### Step 1.6: PostgreSQL migration
+### Step 3.6: PostgreSQL migration
 
-**File**: `backend/datapulse-api/src/main/resources/db/changelog/changes/0024-finance-fulfillment-type.sql`
+**File**: `backend/datapulse-api/src/main/resources/db/changelog/changes/0027-return-fulfillment-type.sql`
 
 ```sql
 --liquibase formatted sql
 
---changeset datapulse:0024-finance-fulfillment-type
-ALTER TABLE canonical_finance_entry
+--changeset datapulse:0027-return-fulfillment-type
+ALTER TABLE canonical_return
     ADD COLUMN fulfillment_type varchar(10);
 
-COMMENT ON COLUMN canonical_finance_entry.fulfillment_type
-    IS 'Delivery schema: FBO, FBS (Ozon), FBW, DBS (WB). NULL for non-order operations.';
+COMMENT ON COLUMN canonical_return.fulfillment_type
+    IS 'Delivery schema: FBO, FBS (Ozon), FBW, DBS (WB). NULL for Ozon returns (resolved via canonical_order JOIN).';
 
---rollback ALTER TABLE canonical_finance_entry DROP COLUMN fulfillment_type;
+--rollback ALTER TABLE canonical_return DROP COLUMN fulfillment_type;
 ```
 
 Register in `db.changelog-master.yaml`:
 ```yaml
 - include:
-    file: changes/0024-finance-fulfillment-type.sql
+    file: changes/0027-return-fulfillment-type.sql
     relativeToChangelogFile: true
 ```
 
-#### Step 1.7: Update `CanonicalFinanceEntryUpsertRepository`
+**Note:** номер 0027 — следующий после текущего последнего (0026-pricing-insight-table.sql). ClickHouse migration не нужна — `fact_returns.fulfillment_type` уже добавлена в `0008-fulfillment-type.sql`.
 
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/persistence/canonical/CanonicalFinanceEntryUpsertRepository.java`
+### Step 3.7: Update `CanonicalReturnUpsertRepository`
+
+**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/persistence/canonical/CanonicalReturnUpsertRepository.java`
 
 Changes to UPSERT SQL:
-- INSERT column list: add `fulfillment_type` after `attribution_level`
-- VALUES: add one more `?` (position 25, shift `now(), now()` to 26-27)
+- INSERT column list: add `fulfillment_type` after `currency` (position 13)
+- VALUES: 14 `?` placeholders (was 13), shift `job_execution_id` to position 14
 - ON CONFLICT SET: add `fulfillment_type = EXCLUDED.fulfillment_type`
-- IS DISTINCT FROM: add `canonical_finance_entry.fulfillment_type` / `EXCLUDED.fulfillment_type`
+- IS DISTINCT FROM: add `canonical_return.fulfillment_type` / `EXCLUDED.fulfillment_type`
 
 In `batchUpsert` lambda:
-- Add `ps.setString(25, e.getFulfillmentType())` after `ps.setLong(24, ...)` (attribution)
-- Shift `created_at, updated_at` handling if needed (they use `now()` in SQL, not params — no shift needed, just add the new param)
+- Add `ps.setString(13, e.getFulfillmentType())` after `ps.setString(12, e.getCurrency())`
+- Shift `job_execution_id` from position 13 to 14: `ps.setLong(14, e.getJobExecutionId())`
 
-Exact change: current param count is 24, new param count is 25. Add after position 24:
+### Step 3.8: Update `FactReturnsMaterializer`
 
-```java
-ps.setString(25, e.getFulfillmentType());
-```
+**File**: `backend/datapulse-analytics-pnl/src/main/java/io/datapulse/analytics/domain/materializer/fact/FactReturnsMaterializer.java`
 
-Update VALUES clause to have 25 `?` placeholders.
-
-#### Step 1.8: ClickHouse migration — `fact_finance`
-
-**File**: `backend/datapulse-etl/src/main/resources/db/clickhouse/0008-fulfillment-type.sql`
+Change PG_QUERY and incremental query to use COALESCE + add direct column:
 
 ```sql
--- Add fulfillment_type to fact tables that need it
-
-ALTER TABLE fact_finance
-    ADD COLUMN IF NOT EXISTS fulfillment_type LowCardinality(Nullable(String))
-    AFTER attribution_level;
-```
-
-#### Step 1.9: Update `FactFinanceMaterializer`
-
-**File**: `backend/datapulse-analytics-pnl/src/main/java/io/datapulse/analytics/domain/materializer/fact/FactFinanceMaterializer.java`
-
-PG_QUERY and PG_INCREMENTAL_QUERY — add `fulfillment_type` to SELECT:
-
-```sql
-SELECT id, connection_id, source_platform, entry_type,
-       posting_id, order_id, seller_sku_id, warehouse_id,
-       revenue_amount, marketplace_commission_amount, acquiring_commission_amount,
-       logistics_cost_amount, storage_cost_amount, penalties_amount,
-       acceptance_cost_amount, marketing_cost_amount, other_marketplace_charges_amount,
-       compensation_amount, refund_amount, net_payout,
-       entry_date, attribution_level, fulfillment_type,
-       job_execution_id
-FROM canonical_finance_entry
-```
-
-CH_INSERT — add `fulfillment_type` after `attribution_level`:
-
-```sql
-INSERT INTO %s
-(connection_id, source_platform, entry_id, posting_id, order_id,
- seller_sku_id, warehouse_id, finance_date, entry_type, attribution_level,
- fulfillment_type,
- revenue_amount, ...)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-```
-
-In `insertBatch` lambda — add after `ps.setString(10, attribution_level)`:
-
-```java
-ps.setString(11, (String) row.get("fulfillment_type"));
-```
-
-Shift all subsequent parameter indices by +1 (12→revenue through 26→materialized_at).
-
-#### Step 1.10: Update `MartPostingPnlMaterializer`
-
-**File**: `backend/datapulse-analytics-pnl/src/main/java/io/datapulse/analytics/domain/materializer/mart/MartPostingPnlMaterializer.java`
-
-In the inner `pm` subquery (posting-level aggregation from fact_finance), add:
-
-```sql
-any(fulfillment_type) AS fulfillment_type,
-```
-
-Add `fulfillment_type` column to the final SELECT and the outer query chain.
-
-**ClickHouse migration** — add column to `mart_posting_pnl`:
-
-```sql
-ALTER TABLE mart_posting_pnl
-    ADD COLUMN IF NOT EXISTS fulfillment_type LowCardinality(Nullable(String))
-    AFTER source_platform;
-```
-
-#### Step 1.11: Update `MartProductPnlMaterializer`
-
-**File**: `backend/datapulse-analytics-pnl/src/main/java/io/datapulse/analytics/domain/materializer/mart/MartProductPnlMaterializer.java`
-
-`mart_product_pnl` aggregates per (seller_sku_id, period). A single SKU can have both FBO and FBS entries. Two approaches:
-
-**Option A (recommended)**: DO NOT add fulfillment_type to `mart_product_pnl` — it's a product-level aggregation that intentionally merges all fulfillment types. P&L breakdown by fulfillment is available at `mart_posting_pnl` level.
-
-**Option B**: Add fulfillment_type to the GROUP BY key, creating separate rows per fulfillment type per product. This changes the mart semantics significantly.
-
-**Decision**: Option A. Product P&L stays aggregated. Fulfillment breakdown is a mart_posting_pnl concern. Frontend can drill down from product to posting level for fulfillment analysis.
-
----
-
-### Phase 2: Sales
-
-#### Step 2.1: Add `fulfillmentType` to `NormalizedSaleItem`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/domain/normalized/NormalizedSaleItem.java`
-
-```java
-public record NormalizedSaleItem(
-        String externalSaleId,
-        String sellerSku,
-        int quantity,
-        BigDecimal saleAmount,
-        BigDecimal commission,
-        String currency,
-        OffsetDateTime saleDate,
-        String fulfillmentType     // ← NEW
-) {}
-```
-
-#### Step 2.2: Populate in Ozon normalizers
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/ozon/OzonNormalizer.java`
-
-`normalizeFboSale()` — pass `"FBO"` as last argument.
-`normalizeFbsSale()` — pass `"FBS"` as last argument.
-
-#### Step 2.3: Populate in WB normalizer
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/wb/WbNormalizer.java`
-
-`normalizeSale()` — pass `"FBW"` as last argument. (WB sales API returns only FBW sales.)
-
-#### Step 2.4: Add column to `CanonicalSaleEntity`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/persistence/canonical/CanonicalSaleEntity.java`
-
-```java
-@Column(name = "fulfillment_type", length = 10)
-private String fulfillmentType;
-```
-
-#### Step 2.5: Update `CanonicalEntityMapper.toSale()`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/domain/CanonicalEntityMapper.java`
-
-Add: `entity.setFulfillmentType(norm.fulfillmentType());`
-
-#### Step 2.6: PostgreSQL migration
-
-Same migration file `0024-finance-fulfillment-type.sql` — add:
-
-```sql
---changeset datapulse:0024-sale-fulfillment-type
-ALTER TABLE canonical_sale
-    ADD COLUMN fulfillment_type varchar(10);
-
---rollback ALTER TABLE canonical_sale DROP COLUMN fulfillment_type;
-```
-
-#### Step 2.7: Update `CanonicalSaleUpsertRepository`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/persistence/canonical/CanonicalSaleUpsertRepository.java`
-
-- Add `fulfillment_type` to INSERT column list after `currency`
-- Add `?` to VALUES (position 13, shift `job_execution_id` to 14)
-- Add to ON CONFLICT SET: `fulfillment_type = EXCLUDED.fulfillment_type`
-- Add to IS DISTINCT FROM
-- Add `ps.setString(13, e.getFulfillmentType())` in lambda, shift job_execution_id to 14
-
-#### Step 2.8: ClickHouse migration — `fact_sales`
-
-Same file `0008-fulfillment-type.sql`:
-
-```sql
-ALTER TABLE fact_sales
-    ADD COLUMN IF NOT EXISTS fulfillment_type LowCardinality(Nullable(String))
-    AFTER source_platform;
-```
-
-#### Step 2.9: Update `FactSalesMaterializer`
-
-**File**: `backend/datapulse-analytics-pnl/src/main/java/io/datapulse/analytics/domain/materializer/fact/FactSalesMaterializer.java`
-
-Add `cs.fulfillment_type` to PG_QUERY SELECT list and incremental query.
-Add `fulfillment_type` to CH_INSERT column list and VALUES.
-Add `ps.setString(...)` in `insertBatch` lambda.
-
----
-
-### Phase 3: Returns
-
-#### Step 3.1: ClickHouse migration — `fact_returns`
-
-Same file `0008-fulfillment-type.sql`:
-
-```sql
-ALTER TABLE fact_returns
-    ADD COLUMN IF NOT EXISTS fulfillment_type LowCardinality(Nullable(String))
-    AFTER source_platform;
-```
-
-#### Step 3.2: Resolve via JOIN in `FactReturnsMaterializer`
-
-Returns do NOT need a new field in `NormalizedReturnItem` or `CanonicalReturnEntity`. The fulfillment type is resolved at PostgreSQL materialization time by adding a LEFT JOIN to `canonical_order`.
-
-**Current state**: `FactReturnsMaterializer.PG_QUERY` does NOT join `canonical_order`:
-
-```sql
--- Current (no fulfillment)
-SELECT cr.id AS return_id, cr.connection_id, cr.source_platform,
-       cr.external_return_id, cr.seller_sku_id, ...
-FROM canonical_return cr
-```
-
-**Target state**: add JOIN to resolve fulfillment_type from the linked order:
-
-```sql
-SELECT cr.id AS return_id, cr.connection_id, cr.source_platform,
-       co.fulfillment_type,
-       cr.external_return_id, cr.seller_sku_id, ...
+SELECT cr.id                AS return_id,
+       cr.connection_id,
+       cr.source_platform,
+       COALESCE(cr.fulfillment_type, co.fulfillment_type) AS fulfillment_type,
+       cr.external_return_id,
+       ...
 FROM canonical_return cr
 LEFT JOIN canonical_order co ON cr.canonical_order_id = co.id
 ```
 
-Update both `PG_QUERY` (full) and the inline incremental query.
-
-Add `fulfillment_type` to `CH_INSERT` column list and VALUES clause.
-Add `ps.setString(...)` for `fulfillment_type` in `insertBatch` lambda.
-
-**Fallback**: if `canonical_order_id` is NULL (return without order link), `fulfillment_type` will be NULL in the fact table. This is acceptable — the order link resolution is a separate data quality concern.
-
-**Alternative (if order link coverage is too low)**: Add `fulfillment_type` directly to `NormalizedReturnItem` → `CanonicalReturnEntity` and populate it:
-- Ozon: the source is known at processing time (FBO adapter → `"FBO"`, FBS adapter → `"FBS"`)
-- WB: hardcode `"FBW"` (same as orders)
-
-Decision deferred until data quality check of `canonical_order_id` population rate after deployment.
-
----
-
-### Phase 4: WB DBS — Order Fulfillment Fix
-
-#### Step 4.1: Fix `WbNormalizer.normalizeOrder()`
-
-**File**: `backend/datapulse-etl/src/main/java/io/datapulse/etl/adapter/wb/WbNormalizer.java`
-
-Currently hardcoded `"FBW"`. WB orders API (`/api/v1/supplier/orders`) returns only FBO/FBW orders, so `"FBW"` is correct for this endpoint.
-
-**No change needed** — WB DBS orders come through a separate marketplace API endpoint (`/api/v3/orders`) that is not currently integrated. When DBS order ingestion is added, that adapter will set `"DBS"`.
+This gives:
+- WB returns → `cr.fulfillment_type = 'FBW'` → COALESCE returns 'FBW' ✅
+- Ozon returns (no order link) → `cr.fulfillment_type = NULL`, `co.fulfillment_type = NULL` → returns NULL (acceptable until order linkage fixed)
+- Ozon returns (with order link, future) → `cr.fulfillment_type = NULL`, `co.fulfillment_type = 'FBO'` → returns 'FBO' ✅
 
 ---
 
@@ -453,81 +283,54 @@ Currently hardcoded `"FBW"`. WB orders API (`/api/v1/supplier/orders`) returns o
 
 | File | Description |
 |---|---|
-| `backend/.../db/changelog/changes/0024-fulfillment-type-columns.sql` | PG migration: add `fulfillment_type` to `canonical_finance_entry` and `canonical_sale` |
-| `backend/.../db/clickhouse/0008-fulfillment-type.sql` | CH migration: add `fulfillment_type` to `fact_finance`, `fact_sales`, `fact_returns`, `mart_posting_pnl` |
+| `backend/.../db/changelog/changes/0027-return-fulfillment-type.sql` | PG migration: add `fulfillment_type` to `canonical_return` |
 
 ### Modified files
 
 | File | Change |
 |---|---|
-| `db.changelog-master.yaml` | Register migration 0024 |
-| **Normalized DTOs** | |
-| `NormalizedFinanceItem.java` | Add `fulfillmentType` field (position 8) |
-| `NormalizedSaleItem.java` | Add `fulfillmentType` field (last position) |
-| **Ozon normalizers** | |
-| `OzonFinanceNormalizer.java` | Extract `posting.deliverySchema`, pass to NormalizedFinanceItem |
-| `OzonNormalizer.java` | Pass `"FBO"`/`"FBS"` to `normalizeFboSale()`/`normalizeFbsSale()` |
-| **WB normalizer** | |
-| `WbNormalizer.java` | `normalizeFinance()`: use `srvDbs` → `"DBS"`/`"FBW"`. `normalizeSale()`: pass `"FBW"` |
-| **Canonical entities** | |
-| `CanonicalFinanceEntryEntity.java` | Add `fulfillmentType` field + JPA annotation |
-| `CanonicalSaleEntity.java` | Add `fulfillmentType` field + JPA annotation |
-| **Entity mapper** | |
-| `CanonicalEntityMapper.java` | `toFinanceEntry()` + `toSale()`: set `fulfillmentType` |
-| **Upsert repositories** | |
-| `CanonicalFinanceEntryUpsertRepository.java` | Add `fulfillment_type` to UPSERT SQL + bind param |
-| `CanonicalSaleUpsertRepository.java` | Add `fulfillment_type` to UPSERT SQL + bind param |
-| **Materializers** | |
-| `FactFinanceMaterializer.java` | Add `fulfillment_type` to PG SELECT, CH INSERT, bind param |
-| `FactSalesMaterializer.java` | Add `fulfillment_type` to PG SELECT, CH INSERT, bind param |
-| `FactReturnsMaterializer.java` | Add LEFT JOIN to `canonical_order`, select `co.fulfillment_type`, add to CH INSERT |
-| `MartPostingPnlMaterializer.java` | Add `any(fulfillment_type)` to posting aggregation |
+| `db.changelog-master.yaml` | Register migration 0027 |
+| `NormalizedReturnItem.java` | Add `fulfillmentType` field (last position) |
+| `CanonicalReturnEntity.java` | Add `fulfillmentType` field + JPA annotation |
+| `OzonNormalizer.java` | `normalizeReturn()`: pass `null` as fulfillmentType |
+| `WbNormalizer.java` | `normalizeReturn()`: pass `"FBW"` as fulfillmentType |
+| `CanonicalEntityMapper.java` | `toReturn()`: set `fulfillmentType` from normalized |
+| `CanonicalReturnUpsertRepository.java` | Add `fulfillment_type` to UPSERT SQL + bind param (position 13, shift job_execution_id to 14) |
+| `FactReturnsMaterializer.java` | PG_QUERY + incremental: `COALESCE(cr.fulfillment_type, co.fulfillment_type)` |
 
 ### NOT modified (by design)
 
 | File | Reason |
 |---|---|
-| `NormalizedOrderItem.java` | Already has `fulfillmentType` — no change needed |
-| `NormalizedReturnItem.java` | Resolved via JOIN, not at normalization (Phase 3 decision) |
-| `CanonicalReturnEntity.java` | Resolved via JOIN, not stored directly |
-| `CanonicalOrderEntity.java` | Already has `fulfillmentType` — no change |
-| `MartProductPnlMaterializer.java` | Product-level aggregation stays fulfillment-agnostic (Option A) |
-| `WbNormalizer.normalizeOrder()` | `"FBW"` is correct — DBS comes from a separate unintegrated API |
+| ClickHouse migration | `fact_returns.fulfillment_type` already added in `0008-fulfillment-type.sql` |
+| `MartProductPnlMaterializer.java` | Product-level aggregation stays fulfillment-agnostic (by design decision) |
+| `OzonReturnItem.java` | Ozon returns API doesn't expose delivery_schema |
+| `WbReturnItem.java` | WB returns API doesn't have explicit fulfillment field |
 
 ---
 
 ## Backfill Strategy
 
-After deployment, existing data in `canonical_finance_entry` and `canonical_sale` will have `fulfillment_type = NULL`.
+After deployment, existing `canonical_return` rows will have `fulfillment_type = NULL`.
 
-### Option 1: Re-sync (recommended)
-
-Trigger a full ETL re-sync for all connections. This will:
-1. Re-fetch finance and order data from marketplace APIs
-2. UPSERT with the now-populated `fulfillment_type`
-3. Full materialization will rebuild all ClickHouse tables
-
-This is the cleanest approach because it uses the same code path as normal operation.
-
-### Option 2: SQL backfill (faster, less clean)
-
-For finance entries that already have `posting_id`:
+### WB: SQL backfill (immediate)
 
 ```sql
--- Ozon: infer from posting_id pattern (FBO/FBS use same format, 
--- so this CANNOT distinguish FBO vs FBS without re-fetching)
--- → Not viable for Ozon
-
--- WB: all existing entries are FBW (DBS not yet integrated)
-UPDATE canonical_finance_entry
-SET fulfillment_type = 'FBW'
+UPDATE canonical_return
+SET fulfillment_type = 'FBW', updated_at = now()
 WHERE source_platform = 'wb'
   AND fulfillment_type IS NULL;
 ```
 
-For Ozon, re-sync is the only reliable option because `delivery_schema` is not inferrable from other stored fields.
+Safe because WB returns API returns only FBW returns. DBS not yet integrated.
 
-**Recommendation**: Option 1 (re-sync). Schedule a full sync cycle after deployment.
+### Ozon: deferred
+
+Ozon returns will remain NULL until `canonical_order_id` linkage is implemented. This is acceptable — FBO/FBS breakdown for Ozon returns is a data quality improvement tracked separately.
+
+### ClickHouse: re-materialize
+
+After PG backfill, trigger full materialization of `fact_returns` to propagate changes to ClickHouse.
 
 ---
 
@@ -535,57 +338,34 @@ For Ozon, re-sync is the only reliable option because `delivery_schema` is not i
 
 ### Unit tests
 
-- [ ] `OzonFinanceNormalizerTest`: verify `fulfillmentType` = "FBO" when `posting.delivery_schema = "FBO"`
-- [ ] `OzonFinanceNormalizerTest`: verify `fulfillmentType` = null when posting is null
-- [ ] `OzonFinanceNormalizerTest`: verify `fulfillmentType` = null when `delivery_schema` is empty
-- [ ] `WbNormalizerTest`: verify `fulfillmentType` = "DBS" when `srvDbs = true`
-- [ ] `WbNormalizerTest`: verify `fulfillmentType` = "FBW" when `srvDbs = false`
-- [ ] `WbNormalizerTest`: verify `fulfillmentType` = "FBW" when `srvDbs = null`
-- [ ] `OzonNormalizerTest`: verify `normalizeFboSale()` returns `fulfillmentType = "FBO"`
-- [ ] `OzonNormalizerTest`: verify `normalizeFbsSale()` returns `fulfillmentType = "FBS"`
-- [ ] `CanonicalEntityMapperTest`: verify `toFinanceEntry()` maps `fulfillmentType`
-- [ ] `CanonicalEntityMapperTest`: verify `toSale()` maps `fulfillmentType`
+- [ ] `WbNormalizerTest`: verify `normalizeReturn()` returns `fulfillmentType = "FBW"`
+- [ ] `OzonNormalizerTest`: verify `normalizeReturn()` returns `fulfillmentType = null`
+- [ ] `CanonicalEntityMapperTest`: verify `toReturn()` maps `fulfillmentType`
 
 ### Integration tests
 
-- [ ] `CanonicalFinanceEntryUpsertRepository`: UPSERT with `fulfillment_type` value, verify stored
-- [ ] `CanonicalFinanceEntryUpsertRepository`: UPSERT with `fulfillment_type = null`, verify stored as NULL
-- [ ] `CanonicalSaleUpsertRepository`: same as above
-- [ ] Full ETL cycle: verify `fulfillment_type` flows from API → canonical → fact_finance
+- [ ] `CanonicalReturnUpsertRepository`: UPSERT with `fulfillment_type = "FBW"`, verify stored
+- [ ] `CanonicalReturnUpsertRepository`: UPSERT with `fulfillment_type = null`, verify stored as NULL
+- [ ] Full ETL cycle: verify WB returns get `fulfillment_type = "FBW"` in `canonical_return`
 
 ### Data verification (post-deployment)
 
-- [ ] Query `canonical_finance_entry` — verify Ozon entries have FBO/FBS, WB entries have FBW/DBS
-- [ ] Query `fact_finance` in ClickHouse — verify `fulfillment_type` populated
-- [ ] Query `mart_posting_pnl` — verify `fulfillment_type` populated
-- [ ] Verify P&L totals unchanged (fulfillment_type is a dimension, not a measure)
+- [ ] Query `canonical_return` — verify WB entries have FBW after backfill
+- [ ] Query `fact_returns` in ClickHouse — verify `fulfillment_type` populated for WB
+- [ ] Verify return totals unchanged (fulfillment_type is a dimension, not a measure)
 
 ---
 
 ## Implementation Order
 
-Strict sequential order within each phase; phases can overlap:
-
 ```
-Phase 1 (Finance):
-  1.1 NormalizedFinanceItem → 1.2 OzonFinanceNormalizer → 1.3 WbNormalizer
-  → 1.4 Entity → 1.5 Mapper → 1.6 PG migration → 1.7 UpsertRepo
-  → 1.8 CH migration → 1.9 FactFinanceMaterializer
-  → 1.10 MartPostingPnlMaterializer
-
-Phase 2 (Sales):
-  2.1 NormalizedSaleItem → 2.2 OzonNormalizer → 2.3 WbNormalizer
-  → 2.4 Entity → 2.5 Mapper → 2.6 PG migration → 2.7 UpsertRepo
-  → 2.8 CH migration → 2.9 FactSalesMaterializer
-
-Phase 3 (Returns):
-  3.1 CH migration → 3.2 FactReturnsMaterializer
-
-Post-deployment:
-  Trigger full re-sync → full materialization
+Step 3.1 (NormalizedReturnItem) → 3.3 (WbNormalizer) + 3.4 (OzonNormalizer)
+→ 3.2 (Entity) → 3.5 (Mapper) → 3.6 (PG migration) → 3.7 (UpsertRepo)
+→ 3.8 (FactReturnsMaterializer COALESCE)
+→ Backfill (WB SQL + full CH materialization)
 ```
 
-Phases 1 and 2 share the same migration files (0024 for PG, 0008 for CH) — they should be implemented together in one PR to avoid partial schema states.
+All steps in one PR — to avoid partial schema states.
 
 ---
 
@@ -593,27 +373,38 @@ Phases 1 and 2 share the same migration files (0024 for PG, 0008 for CH) — the
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| NormalizedFinanceItem record change breaks callers | Medium | Build failure | Compile immediately after change; record position matters |
-| NormalizedSaleItem record change breaks callers | Medium | Build failure | Same — all callers must be updated in same commit |
+| `NormalizedReturnItem` record change breaks callers | Medium | Build failure | Compile immediately; update all callers in same commit |
 | UPSERT param index shift introduces silent data corruption | Low | High | Careful counting; integration test covers |
-| ClickHouse ALTER TABLE on large fact_finance | Low | Slow migration | `ADD COLUMN IF NOT EXISTS` is instant in ClickHouse (metadata-only) |
-| Backfill via re-sync takes too long | Low | Delayed data | Can run per-connection; WB can use SQL backfill |
-| Ozon `delivery_schema` empty for some operations | Expected | NULL values | Acceptable — non-order operations have no fulfillment |
-| WB `srvDbs` null in old data | Expected | Defaults to FBW | Correct — null means not DBS |
+| Ozon returns stay NULL for fulfillment_type | Expected | Limited | Acceptable — Ozon doesn't expose this field. Will resolve via order linkage |
+| WB backfill SQL updates too many rows | Low | Slow query | Run with `LIMIT 10000` in batches if needed |
 
 ---
 
 ## Scope Boundaries
 
-**In scope**:
-- `fulfillment_type` column in finance, sales, returns (fact level)
-- `fulfillment_type` in `mart_posting_pnl`
-- Data population from existing API fields
-- Backfill strategy
+**In scope:**
+- `fulfillment_type` column in `canonical_return`
+- Population from WB normalizer ("FBW")
+- COALESCE fallback in `FactReturnsMaterializer`
+- WB SQL backfill
+- Unit + integration tests
 
-**Out of scope** (separate tasks):
+**Out of scope (separate tasks):**
 - Frontend UI for fulfillment_type filter/breakdown
-- `mart_product_pnl` fulfillment dimension (requires P&L split discussion)
-- WB DBS order ingestion (separate marketplace API)
+- `canonical_order_id` population in `canonical_return` (order linkage — separate data quality task)
 - Ozon rFBS (realFBS) support
+- WB DBS return ingestion
 - Seller Operations grid fulfillment column
+
+---
+
+## Definition of Done
+
+- [ ] Код написан и прошёл code review
+- [ ] Unit-тесты: `WbNormalizerTest`, `OzonNormalizerTest`, `CanonicalEntityMapperTest` для fulfillmentType
+- [ ] Integration-тесты: `CanonicalReturnUpsertRepository` с fulfillment_type
+- [ ] Liquibase миграция `0027-return-fulfillment-type.sql` создана и зарегистрирована
+- [ ] `FactReturnsMaterializer` использует `COALESCE(cr.fulfillment_type, co.fulfillment_type)`
+- [ ] WB backfill SQL подготовлен
+- [ ] Архитектурные документы обновлены: `analytics-pnl.md` (fulfillment_type в fact_returns)
+- [ ] Проект собирается, все существующие тесты проходят

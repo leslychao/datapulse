@@ -2,15 +2,17 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import { TranslatePipe } from '@ngx-translate/core';
+import { LucideAngularModule, Info } from 'lucide-angular';
 
 @Component({
   selector: 'dp-constraints-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslatePipe],
+  imports: [ReactiveFormsModule, TranslatePipe, LucideAngularModule],
   templateUrl: './constraints-form.component.html',
 })
 export class ConstraintsFormComponent {
+  readonly icons = { Info };
   readonly form = input.required<FormGroup>();
   readonly submitted = input(false);
 

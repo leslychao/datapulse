@@ -1,5 +1,8 @@
-<section [formGroup]="form()" class="space-y-3 pb-5">
-  <div>
+<section
+  [formGroup]="form()"
+  class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6"
+>
+  <div class="mb-4">
     <div class="flex items-center gap-2">
       <lucide-icon [name]="icons.Shield" [size]="15" class="text-[var(--text-secondary)]" />
       <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
@@ -10,113 +13,144 @@
       {{ 'pricing.form.hint.guards' | translate }}
     </p>
   </div>
-  <div class="divide-y divide-[var(--border-default)]">
 
-    <!-- Margin guard -->
-    <label class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:text-[var(--accent-primary)]">
-      <input type="checkbox" formControlName="marginGuardEnabled" class="h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
-      <div class="min-w-0 flex-1">
-        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.margin' | translate }}</span>
-        <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.margin' | translate }}</p>
-      </div>
-    </label>
+  <!-- Stale data guard (always on, highlighted) -->
+  <div class="mb-4 flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--accent-primary)]/20 bg-[var(--accent-subtle)] px-4 py-3">
+    <div class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+      <lucide-icon [name]="icons.CircleCheck" [size]="14" class="text-[var(--accent-primary)]" />
+    </div>
+    <div class="min-w-0 flex-1">
+      <span class="text-[var(--text-sm)] font-medium text-[var(--text-primary)]">{{ 'pricing.form.guard.stale_data' | translate }}</span>
+      <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.guard.stale_data_hint' | translate }}</p>
+    </div>
+    <div class="flex shrink-0 items-center gap-1.5">
+      <input
+        formControlName="staleDataGuardHours"
+        type="number"
+        min="1"
+        max="168"
+        class="w-14 rounded-[var(--radius-md)] border px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        [class]="isInvalid('staleDataGuardHours')
+          ? 'border-[var(--status-error)]'
+          : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+      />
+      <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.stale_data_hours' | translate }}</span>
+    </div>
+  </div>
 
-    <!-- Frequency guard -->
-    <div class="flex items-center gap-3 py-2.5">
-      <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-        <input type="checkbox" formControlName="frequencyGuardEnabled" class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
-        <div class="min-w-0 flex-1">
-          <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.frequency' | translate }}</span>
-          <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.frequency' | translate }}</p>
-        </div>
-      </label>
-      <div class="flex shrink-0 items-center gap-1.5">
-        <input
-          formControlName="frequencyGuardHours"
-          type="number"
-          min="1"
-          max="720"
-          class="w-14 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-40"
-          [attr.disabled]="!form().get('frequencyGuardEnabled')!.value ? '' : null"
-        />
-        <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.frequency_hours' | translate }}</span>
+  <div class="space-y-4">
+
+    <!-- Group: Financial safety -->
+    <div>
+      <h3 class="mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+        {{ 'pricing.form.guard_group.financial' | translate }}
+      </h3>
+      <div class="divide-y divide-[var(--border-subtle)] rounded-[var(--radius-md)] border border-[var(--border-default)]">
+
+        <!-- Margin guard -->
+        <label class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-secondary)]">
+          <input type="checkbox" formControlName="marginGuardEnabled" class="h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
+          <div class="min-w-0 flex-1">
+            <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.margin' | translate }}</span>
+            <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.margin' | translate }}</p>
+          </div>
+        </label>
+
       </div>
     </div>
 
-    <!-- Volatility guard -->
-    <div class="flex items-center gap-3 py-2.5">
-      <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-        <input type="checkbox" formControlName="volatilityGuardEnabled" class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
-        <div class="min-w-0 flex-1">
-          <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.volatility' | translate }}</span>
-          <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.volatility' | translate }}</p>
+    <!-- Group: Price stability -->
+    <div>
+      <h3 class="mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+        {{ 'pricing.form.guard_group.stability' | translate }}
+      </h3>
+      <div class="divide-y divide-[var(--border-subtle)] rounded-[var(--radius-md)] border border-[var(--border-default)]">
+
+        <!-- Frequency guard -->
+        <div class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-secondary)]">
+          <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+            <input type="checkbox" formControlName="frequencyGuardEnabled" class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
+            <div class="min-w-0 flex-1">
+              <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.frequency' | translate }}</span>
+              <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.frequency' | translate }}</p>
+            </div>
+          </label>
+          <div class="flex shrink-0 items-center gap-1.5">
+            <input
+              formControlName="frequencyGuardHours"
+              type="number"
+              min="1"
+              max="720"
+              class="w-14 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-40"
+              [attr.disabled]="!form().get('frequencyGuardEnabled')!.value ? '' : null"
+            />
+            <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.frequency_hours' | translate }}</span>
+          </div>
         </div>
-      </label>
-      <div class="flex shrink-0 items-center gap-3">
-        <div class="flex items-center gap-1">
-          <input
-            formControlName="volatilityGuardReversals"
-            type="number"
-            min="1"
-            max="20"
-            class="w-12 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-40"
-            [attr.disabled]="!form().get('volatilityGuardEnabled')!.value ? '' : null"
-          />
-          <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.volatility_reversals' | translate }}</span>
+
+        <!-- Volatility guard -->
+        <div class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-secondary)]">
+          <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+            <input type="checkbox" formControlName="volatilityGuardEnabled" class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
+            <div class="min-w-0 flex-1">
+              <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.volatility' | translate }}</span>
+              <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.volatility' | translate }}</p>
+            </div>
+          </label>
+          <div class="flex shrink-0 items-center gap-3">
+            <div class="flex items-center gap-1">
+              <input
+                formControlName="volatilityGuardReversals"
+                type="number"
+                min="1"
+                max="20"
+                class="w-12 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-40"
+                [attr.disabled]="!form().get('volatilityGuardEnabled')!.value ? '' : null"
+              />
+              <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.volatility_reversals' | translate }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <input
+                formControlName="volatilityGuardPeriodDays"
+                type="number"
+                min="1"
+                max="90"
+                class="w-12 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-40"
+                [attr.disabled]="!form().get('volatilityGuardEnabled')!.value ? '' : null"
+              />
+              <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.volatility_period' | translate }}</span>
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-1">
-          <input
-            formControlName="volatilityGuardPeriodDays"
-            type="number"
-            min="1"
-            max="90"
-            class="w-12 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-40"
-            [attr.disabled]="!form().get('volatilityGuardEnabled')!.value ? '' : null"
-          />
-          <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.volatility_period' | translate }}</span>
-        </div>
+
       </div>
     </div>
 
-    <!-- Promo guard -->
-    <label class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:text-[var(--accent-primary)]">
-      <input type="checkbox" formControlName="promoGuardEnabled" class="h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
-      <div class="min-w-0 flex-1">
-        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.promo' | translate }}</span>
-        <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.promo' | translate }}</p>
-      </div>
-    </label>
+    <!-- Group: Context checks -->
+    <div>
+      <h3 class="mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+        {{ 'pricing.form.guard_group.context' | translate }}
+      </h3>
+      <div class="divide-y divide-[var(--border-subtle)] rounded-[var(--radius-md)] border border-[var(--border-default)]">
 
-    <!-- Stock out guard -->
-    <label class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:text-[var(--accent-primary)]">
-      <input type="checkbox" formControlName="stockOutGuardEnabled" class="h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
-      <div class="min-w-0 flex-1">
-        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.stock_out' | translate }}</span>
-        <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.stock_out' | translate }}</p>
-      </div>
-    </label>
+        <!-- Promo guard -->
+        <label class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-secondary)]">
+          <input type="checkbox" formControlName="promoGuardEnabled" class="h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
+          <div class="min-w-0 flex-1">
+            <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.promo' | translate }}</span>
+            <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.promo' | translate }}</p>
+          </div>
+        </label>
 
-    <!-- Stale data guard (always on) -->
-    <div class="flex items-center gap-3 py-2.5">
-      <div class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-        <lucide-icon [name]="icons.CircleCheck" [size]="14" class="text-[var(--accent-primary)]" />
-      </div>
-      <div class="min-w-0 flex-1">
-        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.stale_data' | translate }}</span>
-        <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.guard.stale_data_hint' | translate }}</p>
-      </div>
-      <div class="flex shrink-0 items-center gap-1.5">
-        <input
-          formControlName="staleDataGuardHours"
-          type="number"
-          min="1"
-          max="168"
-          class="w-14 rounded-[var(--radius-md)] border px-2 py-1 text-center font-mono text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [class]="isInvalid('staleDataGuardHours')
-            ? 'border-[var(--status-error)]'
-            : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
-        />
-        <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.guard.stale_data_hours' | translate }}</span>
+        <!-- Stock out guard -->
+        <label class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-secondary)]">
+          <input type="checkbox" formControlName="stockOutGuardEnabled" class="h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]" />
+          <div class="min-w-0 flex-1">
+            <span class="text-[var(--text-sm)] text-[var(--text-primary)]">{{ 'pricing.form.guard.stock_out' | translate }}</span>
+            <p class="mt-0.5 text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">{{ 'pricing.form.tooltip.guard.stock_out' | translate }}</p>
+          </div>
+        </label>
+
       </div>
     </div>
 

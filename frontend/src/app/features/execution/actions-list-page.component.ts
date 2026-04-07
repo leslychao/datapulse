@@ -171,6 +171,7 @@ interface ContextMenuState {
             [height]="'100%'"
             [enableFlash]="true"
             [contextMenuEnabled]="true"
+            [clickableRows]="true"
             (rowClicked)="onRowClicked($event)"
             (cellDoubleClicked)="onRowDoubleClicked($event)"
             (selectionChanged)="onSelectionChanged($event)"

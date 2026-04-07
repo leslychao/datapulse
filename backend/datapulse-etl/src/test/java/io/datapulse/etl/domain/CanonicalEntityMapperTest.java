@@ -132,12 +132,12 @@ class CanonicalEntityMapperTest {
   class ToReturn {
 
     @Test
-    void should_mapAllFields() {
+    void should_mapAllFields_includingFulfillmentType() {
       var returnDate = OffsetDateTime.now();
       var norm = new NormalizedReturnItem(
           "RET-1", "SKU-1", 1,
           BigDecimal.valueOf(500), "defective",
-          "RUB", returnDate, "accepted");
+          "RUB", returnDate, "accepted", "FBW");
       var ctx = buildContext();
 
       var entity = mapper.toReturn(norm, ctx);
@@ -150,7 +150,22 @@ class CanonicalEntityMapperTest {
       assertThat(entity.getReturnReason()).isEqualTo("defective");
       assertThat(entity.getQuantity()).isEqualTo(1);
       assertThat(entity.getStatus()).isEqualTo("accepted");
+      assertThat(entity.getFulfillmentType()).isEqualTo("FBW");
       assertThat(entity.getJobExecutionId()).isEqualTo(1L);
+    }
+
+    @Test
+    void should_mapNullFulfillmentType() {
+      var returnDate = OffsetDateTime.now();
+      var norm = new NormalizedReturnItem(
+          "RET-2", "SKU-1", 1,
+          BigDecimal.valueOf(300), "damaged",
+          "RUB", returnDate, "accepted", null);
+      var ctx = buildContext();
+
+      var entity = mapper.toReturn(norm, ctx);
+
+      assertThat(entity.getFulfillmentType()).isNull();
     }
   }
 

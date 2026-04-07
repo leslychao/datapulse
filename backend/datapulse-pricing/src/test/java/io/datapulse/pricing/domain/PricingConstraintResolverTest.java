@@ -333,6 +333,74 @@ class PricingConstraintResolverTest {
       assertThat(result.clampedPrice()).isEqualByComparingTo(new BigDecimal("1300"));
       assertThat(result.applied()).noneMatch(c -> "rounding".equals(c.name()));
     }
+
+    @Test
+    @DisplayName("applies rounding for VELOCITY_ADAPTIVE strategy")
+    void should_applyRounding_when_velocityAdaptiveStrategy() {
+      String params = """
+          {"roundingStep": 50, "roundingDirection": "FLOOR"}
+          """;
+      PolicySnapshot policy = new PolicySnapshot(
+          1L, 1, "Policy", PolicyType.VELOCITY_ADAPTIVE, params, null,
+          null, null, null, null, ExecutionMode.RECOMMENDATION);
+      PricingSignalSet signals = signals(new BigDecimal("1000"));
+
+      ConstraintResolution result = resolver.resolve(new BigDecimal("1337"), signals, policy);
+
+      assertThat(result.clampedPrice()).isEqualByComparingTo(new BigDecimal("1300"));
+      assertThat(result.applied()).anyMatch(c -> "rounding".equals(c.name()));
+    }
+
+    @Test
+    @DisplayName("applies rounding for STOCK_BALANCING strategy")
+    void should_applyRounding_when_stockBalancingStrategy() {
+      String params = """
+          {"roundingStep": 100, "roundingDirection": "CEIL"}
+          """;
+      PolicySnapshot policy = new PolicySnapshot(
+          1L, 1, "Policy", PolicyType.STOCK_BALANCING, params, null,
+          null, null, null, null, ExecutionMode.RECOMMENDATION);
+      PricingSignalSet signals = signals(new BigDecimal("1000"));
+
+      ConstraintResolution result = resolver.resolve(new BigDecimal("1050"), signals, policy);
+
+      assertThat(result.clampedPrice()).isEqualByComparingTo(new BigDecimal("1100"));
+      assertThat(result.applied()).anyMatch(c -> "rounding".equals(c.name()));
+    }
+
+    @Test
+    @DisplayName("applies rounding for COMPETITOR_ANCHOR strategy")
+    void should_applyRounding_when_competitorAnchorStrategy() {
+      String params = """
+          {"roundingStep": 10, "roundingDirection": "NEAREST"}
+          """;
+      PolicySnapshot policy = new PolicySnapshot(
+          1L, 1, "Policy", PolicyType.COMPETITOR_ANCHOR, params, null,
+          null, null, null, null, ExecutionMode.RECOMMENDATION);
+      PricingSignalSet signals = signals(new BigDecimal("1000"));
+
+      ConstraintResolution result = resolver.resolve(new BigDecimal("1337"), signals, policy);
+
+      assertThat(result.clampedPrice()).isEqualByComparingTo(new BigDecimal("1340"));
+      assertThat(result.applied()).anyMatch(c -> "rounding".equals(c.name()));
+    }
+
+    @Test
+    @DisplayName("skips rounding when strategy params have no roundingStep")
+    void should_skipRounding_when_noRoundingStepInParams() {
+      String params = """
+          {"overstockDaysOfCover": 60}
+          """;
+      PolicySnapshot policy = new PolicySnapshot(
+          1L, 1, "Policy", PolicyType.STOCK_BALANCING, params, null,
+          null, null, null, null, ExecutionMode.RECOMMENDATION);
+      PricingSignalSet signals = signals(new BigDecimal("1000"));
+
+      ConstraintResolution result = resolver.resolve(new BigDecimal("1337"), signals, policy);
+
+      assertThat(result.clampedPrice()).isEqualByComparingTo(new BigDecimal("1337"));
+      assertThat(result.applied()).noneMatch(c -> "rounding".equals(c.name()));
+    }
   }
 
   private PolicySnapshot snapshot(BigDecimal minPrice, BigDecimal maxPrice,

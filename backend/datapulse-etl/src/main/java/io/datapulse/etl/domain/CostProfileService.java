@@ -1,6 +1,8 @@
 package io.datapulse.etl.domain;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.common.error.MessageCodes;
+import io.datapulse.etl.api.BulkFormulaCostRequest;
+import io.datapulse.etl.api.BulkFormulaCostResponse;
 import io.datapulse.etl.api.BulkImportResponse;
 import io.datapulse.etl.api.BulkImportResponse.BulkImportError;
 import io.datapulse.etl.api.BulkUpdateCostProfileRequest;
@@ -196,6 +200,73 @@ public class CostProfileService {
         log.info("Bulk cost profile update completed: updated={}, created={}, errors={}, userId={}",
                 updated, created, errorCount, userId);
         return new BulkUpdateCostProfileResponse(updated, created, errorCount);
+    }
+
+    @Transactional
+    public BulkFormulaCostResponse bulkFormula(BulkFormulaCostRequest request,
+                                               long workspaceId, long userId) {
+        int updated = 0;
+        int skipped = 0;
+        var errors = new ArrayList<String>();
+
+        for (Long sellerSkuId : request.sellerSkuIds()) {
+            try {
+                Optional<CostProfileEntity> current = costProfileRepository
+                        .findCurrentBySkuAndWorkspace(sellerSkuId, workspaceId);
+
+                BigDecimal newCostPrice;
+                if (request.operation() == CostUpdateOperation.FIXED) {
+                    newCostPrice = request.value();
+                } else {
+                    if (current.isEmpty()) {
+                        skipped++;
+                        continue;
+                    }
+                    newCostPrice = applyFormula(
+                            current.get().getCostPrice(), request.operation(), request.value());
+                }
+
+                if (newCostPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                    skipped++;
+                    continue;
+                }
+
+                var entity = new CostProfileEntity();
+                entity.setSellerSkuId(sellerSkuId);
+                entity.setCostPrice(newCostPrice);
+                entity.setCurrency(REQUIRED_CURRENCY);
+                entity.setValidFrom(request.validFrom());
+                entity.setUpdatedByUserId(userId);
+
+                costProfileRepository.createVersion(entity);
+                updated++;
+            } catch (Exception e) {
+                log.warn("Bulk formula failed for sellerSkuId={}: {}",
+                        sellerSkuId, e.getMessage());
+                errors.add("sellerSkuId=%d: %s".formatted(sellerSkuId, e.getMessage()));
+            }
+        }
+
+        log.info("Bulk formula completed: operation={}, updated={}, skipped={}, errors={}, userId={}",
+                request.operation(), updated, skipped, errors.size(), userId);
+        return new BulkFormulaCostResponse(updated, skipped, errors);
+    }
+
+    private BigDecimal applyFormula(BigDecimal current, CostUpdateOperation operation,
+                                    BigDecimal value) {
+        return switch (operation) {
+            case FIXED -> value;
+            case INCREASE_PCT -> current.multiply(
+                    BigDecimal.ONE.add(
+                            value.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)))
+                    .setScale(2, RoundingMode.HALF_UP);
+            case DECREASE_PCT -> current.multiply(
+                    BigDecimal.ONE.subtract(
+                            value.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)))
+                    .setScale(2, RoundingMode.HALF_UP);
+            case MULTIPLY -> current.multiply(value)
+                    .setScale(2, RoundingMode.HALF_UP);
+        };
     }
 
     @Transactional

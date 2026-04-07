@@ -34,7 +34,7 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
 
         <button
           data-tour="grid-draft-toggle"
-          (click)="gridStore.toggleDraftMode()"
+          (click)="draftToggle.emit()"
           class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[length:var(--text-sm)] transition-colors"
           [class]="gridStore.draftMode()
             ? 'bg-[var(--accent-primary)] font-medium text-white'
@@ -81,6 +81,7 @@ export class GridToolbarComponent {
   protected readonly PencilIcon = Pencil;
 
   readonly exportClicked = output<void>();
+  readonly draftToggle = output<void>();
 
   protected readonly gridFilters: FilterConfig[] = [
     {

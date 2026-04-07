@@ -137,6 +137,7 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
+            [clickableRows]="true"
             (rowClicked)="onRowClicked($event)"
           />
         }

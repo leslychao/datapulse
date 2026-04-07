@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceAccessService;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.sellerops.api.PromoJournalController;
@@ -51,6 +52,9 @@ class PromoJournalControllerSliceTest {
 
   @MockitoBean
   private WorkspaceMemberRepository workspaceMemberRepository;
+
+  @MockitoBean
+  private AuditPublisher auditPublisher;
 
   @BeforeEach
   void setUp() {

@@ -2,6 +2,7 @@ package io.datapulse.pricing.domain.strategy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 
@@ -48,6 +49,8 @@ public class StockBalancingStrategy implements PricingStrategy {
 
         BigDecimal adjustment;
 
+        int leadTimeDays = params.effectiveLeadTimeDays();
+
         if (daysOfCover.compareTo(BigDecimal.valueOf(criticalThreshold)) < 0) {
             adjustment = params.effectiveStockoutMarkupPct();
 
@@ -56,7 +59,8 @@ public class StockBalancingStrategy implements PricingStrategy {
                     .setScale(2, RoundingMode.HALF_UP);
 
             String explanation = buildNearStockoutExplanation(
-                    daysOfCover, criticalThreshold, adjustment, rawTargetPrice);
+                    daysOfCover, criticalThreshold, leadTimeDays,
+                    adjustment, rawTargetPrice);
             return StrategyResult.success(rawTargetPrice, explanation);
 
         } else if (daysOfCover.compareTo(
@@ -77,7 +81,8 @@ public class StockBalancingStrategy implements PricingStrategy {
                     .setScale(2, RoundingMode.HALF_UP);
 
             String explanation = buildOverstockExplanation(
-                    daysOfCover, overstockThreshold, overshoot,
+                    daysOfCover, overstockThreshold,
+                    signals.frozenCapital(), overshoot,
                     params.effectiveOverstockDiscountFactor(),
                     discount, adjustment, rawTargetPrice);
             return StrategyResult.success(rawTargetPrice, explanation);
@@ -92,47 +97,62 @@ public class StockBalancingStrategy implements PricingStrategy {
 
     private String buildNearStockoutExplanation(
             BigDecimal daysOfCover, int criticalThreshold,
+            int leadTimeDays,
             BigDecimal adjustment, BigDecimal rawPrice) {
-        return ("days_of_cover=%s, critical_threshold=%d, "
-                + "adjustment=%+.1f%%, raw=%s")
-                .formatted(
-                        daysOfCover.setScale(1, RoundingMode.HALF_UP)
-                                .toPlainString(),
-                        criticalThreshold,
-                        adjustment.multiply(BigDecimal.valueOf(100))
-                                .doubleValue(),
-                        rawPrice.toPlainString());
+        return String.format(Locale.US,
+                "days_of_cover=%s, critical_threshold=%d, "
+                        + "lead_time=%d, "
+                        + "adjustment=%+.1f%%, raw=%s",
+                daysOfCover.setScale(1, RoundingMode.HALF_UP)
+                        .toPlainString(),
+                criticalThreshold,
+                leadTimeDays,
+                adjustment.multiply(BigDecimal.valueOf(100))
+                        .doubleValue(),
+                rawPrice.toPlainString());
     }
 
     private String buildOverstockExplanation(
             BigDecimal daysOfCover, int overstockThreshold,
-            BigDecimal overshoot, BigDecimal discountFactor,
-            BigDecimal discount, BigDecimal adjustment,
-            BigDecimal rawPrice) {
-        return ("days_of_cover=%s, overstock_threshold=%d, "
-                + "overshoot=%.1f%%, discount_factor=%s, "
-                + "adjustment=%+.1f%%, raw=%s")
+            BigDecimal frozenCapital, BigDecimal overshoot,
+            BigDecimal discountFactor, BigDecimal discount,
+            BigDecimal adjustment, BigDecimal rawPrice) {
+        var sb = new StringBuilder();
+        sb.append("days_of_cover=%s, overstock_threshold=%d"
                 .formatted(
                         daysOfCover.setScale(1, RoundingMode.HALF_UP)
                                 .toPlainString(),
-                        overstockThreshold,
-                        overshoot.multiply(BigDecimal.valueOf(100))
-                                .doubleValue(),
-                        discountFactor.toPlainString(),
-                        adjustment.multiply(BigDecimal.valueOf(100))
-                                .doubleValue(),
-                        rawPrice.toPlainString());
+                        overstockThreshold));
+
+        if (frozenCapital != null
+                && frozenCapital.compareTo(BigDecimal.ZERO) > 0) {
+            sb.append(", frozen_capital=%s"
+                    .formatted(frozenCapital.setScale(0, RoundingMode.HALF_UP)
+                            .toPlainString()));
+        }
+
+        sb.append(String.format(Locale.US,
+                ", overshoot=%.1f%%, discount_factor=%s, "
+                        + "adjustment=%+.1f%%, raw=%s",
+                overshoot.multiply(BigDecimal.valueOf(100))
+                        .doubleValue(),
+                discountFactor.toPlainString(),
+                adjustment.multiply(BigDecimal.valueOf(100))
+                        .doubleValue(),
+                rawPrice.toPlainString()));
+
+        return sb.toString();
     }
 
     private String buildNormalExplanation(
             BigDecimal daysOfCover, int criticalThreshold,
             int overstockThreshold) {
-        return ("days_of_cover=%s — within [%d, %d], normal")
-                .formatted(
-                        daysOfCover.setScale(1, RoundingMode.HALF_UP)
-                                .toPlainString(),
-                        criticalThreshold,
-                        overstockThreshold);
+        return String.format(Locale.US,
+                "days_of_cover=%s — within [%d, %d], normal",
+                daysOfCover.setScale(1, RoundingMode.HALF_UP)
+                        .toPlainString(),
+                criticalThreshold,
+                overstockThreshold);
     }
 
     private StockBalancingParams parseParams(String json) {

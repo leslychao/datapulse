@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,14 +19,18 @@ import io.datapulse.pricing.domain.PolicySnapshot;
 import io.datapulse.pricing.domain.PolicyType;
 import io.datapulse.pricing.domain.PricingSignalSet;
 import io.datapulse.pricing.domain.StrategyResult;
-import lombok.RequiredArgsConstructor;
 
 @Component
-@RequiredArgsConstructor
 public class CompositeStrategy implements PricingStrategy {
 
     private final PricingStrategyRegistry registry;
     private final ObjectMapper objectMapper;
+
+    public CompositeStrategy(@Lazy PricingStrategyRegistry registry,
+                             ObjectMapper objectMapper) {
+        this.registry = registry;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public PolicyType strategyType() {

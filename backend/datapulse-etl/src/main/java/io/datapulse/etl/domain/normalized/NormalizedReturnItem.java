@@ -11,5 +11,6 @@ public record NormalizedReturnItem(
         String returnReason,
         String currency,
         OffsetDateTime returnDate,
-        String status
+        String status,
+        String fulfillmentType
 ) {}

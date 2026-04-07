@@ -265,6 +265,16 @@ router-outlet + * {
   user-select: text;
 }
 
+/* Clickable rows — cursor + enhanced hover */
+.dp-grid-clickable .ag-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.dp-grid-clickable .ag-row:hover {
+  background-color: var(--bg-active) !important;
+}
+
 /* Action buttons inside AG Grid cells */
 .action-btn {
   display: inline-flex;
@@ -300,6 +310,9 @@ router-outlet + * {
   box-shadow: var(--shadow-lg);
   color: var(--text-primary);
   max-width: 360px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
 }
 
 .dp-tour-popover .driver-popover-title {

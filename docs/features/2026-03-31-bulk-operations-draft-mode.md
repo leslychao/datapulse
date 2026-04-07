@@ -1,7 +1,8 @@
 # Feature: Bulk Operations & Draft Mode
 
-**Статус:** DRAFT
+**Статус:** PARTIALLY IMPLEMENTED
 **Дата создания:** 2026-03-31
+**Дата обновления:** 2026-04-06
 **Автор:** Виталий Ким
 **Целевая фаза:** E — Seller Operations
 
@@ -77,17 +78,32 @@ Bulk operations — **не обход** pricing pipeline, а его расшир
 
 ## Acceptance Criteria
 
-- [ ] Bulk price formula: выделить N строк → применить формулу → preview → apply. Формулы: +/−%, ×коэффициент, фиксированная цена, наценка от с/с
-- [ ] Bulk cost update: выделить N строк → массовое изменение себестоимости → SCD2 корректный
-- [ ] Draft mode: toggle в toolbar → ячейки цен становятся editable → изменения видны как diff (старая → новая) → projected margin пересчитывается в real-time
-- [ ] Draft summary banner: количество изменений, средний %, min/max margin, количество заблокированных guards
-- [ ] Apply draft: все изменения проходят через constraint resolution + guard pipeline → создаются `price_decision` + `price_action`
-- [ ] Discard draft: отмена всех несохранённых изменений одной кнопкой
-- [ ] Guard protection: товары, не прошедшие guards, помечаются в draft как «заблокировано» с причиной. Не применяются
-- [ ] Explanation: каждое bulk-изменение имеет `explanation_summary` с секцией `[Источник] Ручное массовое изменение`
-- [ ] Audit trail: `pricing_run.trigger_type = MANUAL_BULK`, все decisions + actions прослеживаемы
-- [ ] Permissions: Bulk price operations — PRICING_MANAGER, ADMIN, OWNER. Bulk cost update — ADMIN, PRICING_MANAGER
-- [ ] Undo draft per cell: клик на изменённую ячейку → «Отменить изменение» → возврат к текущей цене
+### Backend
+- [x] REST endpoints: `POST /api/workspaces/{workspaceId}/pricing/bulk-manual/preview` и `/apply` — работают
+- [x] `BulkManualPricingService`: constraint resolution + guard pipeline для list of (offerId, targetPrice)
+- [x] Guard pipeline: frequency/volatility/stock-out отключены для MANUAL_BULK через `BULK_GUARD_CONFIG`
+- [x] Explanation: `[Источник] Ручное массовое изменение (MANUAL_BULK run #N)` — реализован
+- [x] Audit trail: `pricing_run.trigger_type = MANUAL_BULK`, `request_hash`, `requested_offers_count`
+- [x] Permissions: PRICING_MANAGER, ADMIN, OWNER — настроены на контроллере
+- [ ] **BUG:** `buildBulkSignals()` — `manualLockActive`, `promoActive`, `dataFreshnessAt` захардкожены (false/false/null). Guards promo и manual_lock не работают; stale data guard блокирует всё
+- [x] `BULK_GUARD_CONFIG.minMarginPct = null` (0%) — решение принято: guard защищает только от отрицательной маржи (см. §9)
+- [ ] Bulk cost update: `POST /api/cost-profiles/bulk-update` — endpoint есть, но поддерживает только абсолютные значения (FIXED). Формулы (INCREASE_PCT, DECREASE_PCT, MULTIPLY) не реализованы
+
+### Frontend
+- [x] Draft mode toggle в toolbar — кнопка «Черновик» есть
+- [x] `GridStore.draftChanges` Map и `setDraftPrice()` / `removeDraftPrice()` — определены
+- [x] `beforeunload` host listener в grid-page — есть
+- [ ] **BUG:** `setDraftPrice()` нигде не вызывается — draft changes не наполняются
+- [ ] **BUG:** Draft exit confirmation: `showDraftExitConfirm` signal есть, но `toggleDraftMode()` делает `return` при unsaved changes — модалка не показывается
+- [ ] **BUG:** Frontend↔Backend контракт рассогласован (см. секцию «Contract Alignment» ниже)
+- [ ] Grid diff cells: strikethrough old price, yellow bg, projected margin — не реализовано
+- [ ] Inline price edit в Draft Mode — не реализовано
+- [ ] Formula Panel (6 формул, client-side preview) — не реализовано
+- [ ] Bulk Cost Update Panel (UI) — не реализовано
+- [ ] Per-cell undo (right-click → «Отменить изменение») — не реализовано
+- [ ] Draft banner: мин. маржа, guards warning, server-side preview перед apply — не реализовано
+- [ ] «Показать diff» filter view — не реализовано
+- [ ] Bulk actions bar: кнопки «Изменить цену» и «Себестоимость» — не реализовано
 
 ---
 
@@ -118,13 +134,13 @@ Bulk operations — **не обход** pricing pipeline, а его расшир
 
 ## Architectural Impact
 
-**Статус:** в процессе
+**Статус:** resolved
 
 ### Затронутые модули
 
 | Модуль | Тип изменения | Описание |
 |--------|---------------|----------|
-| [Pricing](../modules/pricing.md) | Расширение | Новый trigger_type `MANUAL_BULK`; новый endpoint `POST /api/pricing/bulk-manual`; новый strategy_type контекст `MANUAL_OVERRIDE`; explanation extension |
+| [Pricing](../modules/pricing.md) | Расширение | Новый trigger_type `MANUAL_BULK`; новый endpoint `POST /api/workspaces/{workspaceId}/pricing/bulk-manual`; новый strategy_type контекст `MANUAL_OVERRIDE`; explanation extension |
 | [Seller Operations](../modules/seller-operations.md) | Расширение | Bulk Actions Bar: formula panel, cost update panel. Draft mode section |
 | [Execution](../modules/execution.md) | Без изменений | Actions от manual bulk идут через тот же lifecycle |
 | Frontend: [pages-operational-grid.md](../frontend/pages-operational-grid.md) | Расширение | Draft mode toggle, inline edit, diff cells, draft banner, formula panel UI, bulk cost update UI |
@@ -342,7 +358,7 @@ Toggle button в Toolbar grid-а: «Черновик» (outline button → fille
 #### Шаг 1: Client → Server dry-run
 
 ```
-POST /api/pricing/bulk-manual/preview
+POST /api/workspaces/{workspaceId}/pricing/bulk-manual/preview
 ```
 
 Request:
@@ -393,7 +409,7 @@ Response:
       "marketplaceOfferId": 99999,
       "skuCode": "JKL-004",
       "result": "SKIP",
-      "skipReason": "Ручная блокировка цены",
+      "skipReason": "pricing.guard.manual_lock.blocked",
       "guard": "manual_lock_guard"
     }
   ]
@@ -427,7 +443,7 @@ Response:
 #### Шаг 3: Apply
 
 ```
-POST /api/pricing/bulk-manual/apply
+POST /api/workspaces/{workspaceId}/pricing/bulk-manual/apply
 ```
 
 Request body — тот же формат, что и preview. Backend:
@@ -460,7 +476,7 @@ Request body — тот же формат, что и preview. Backend:
 | Manual | REST API `POST /api/pricing/runs` | По требованию |
 | Schedule | Spring `@Scheduled` cron | Configurable |
 | Policy change | `@TransactionalEventListener` | При изменении policy |
-| **Manual bulk** | REST API `POST /api/pricing/bulk-manual/apply` | По требованию (ad-hoc) |
+| **Manual bulk** | REST API `POST /api/workspaces/{workspaceId}/pricing/bulk-manual/apply` | По требованию (ad-hoc) |
 
 **Отличия MANUAL_BULK от MANUAL:**
 
@@ -533,7 +549,7 @@ pricing_run:
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/bulk-manual/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run: constraints + guards. Response: per-offer result + summary |
+| POST | `/api/workspaces/{workspaceId}/pricing/bulk-manual/preview` | PRICING_MANAGER, ADMIN, OWNER | Dry-run: constraints + guards. Response: per-offer result + summary |
 
 Request body:
 
@@ -554,7 +570,7 @@ Request body:
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/pricing/bulk-manual/apply` | PRICING_MANAGER, ADMIN, OWNER | Создаёт pricing_run + decisions + actions. Response: `{ pricingRunId, created, skipped, errors[] }` |
+| POST | `/api/workspaces/{workspaceId}/pricing/bulk-manual/apply` | PRICING_MANAGER, ADMIN, OWNER | Создаёт pricing_run + decisions + actions. Response: `{ pricingRunId, created, skipped, errors[] }` |
 
 Request body — тот же формат, что и preview.
 
@@ -581,11 +597,64 @@ Request body:
 
 **Limits:** max 500 SKUs per request.
 
+### 8. Contract Alignment (Frontend ↔ Backend)
+
+**Статус:** РАССОГЛАСОВАН — требуется фикс на фронтенде.
+
+Backend является источником правды (Java records с Jakarta Validation). Frontend types должны быть приведены в соответствие.
+
+#### Request body
+
+| Аспект | Backend (canonical) | Frontend (текущее, НЕВЕРНОЕ) |
+|--------|--------------------|-----------------------------|
+| Корневое поле | `changes: PriceChange[]` | `items: DraftPriceChange[]` |
+| ID оффера | `marketplaceOfferId: Long` | `offerId: number` |
+| Новая цена | `targetPrice: BigDecimal` | `newPrice: number` |
+| Старая цена | — (не передаётся) | `originalPrice: number` |
+
+**Фикс:** переименовать frontend types и API-вызовы:
+- `BulkManualPreviewRequest.items` → `changes`
+- `DraftPriceChange.offerId` → `marketplaceOfferId`
+- `DraftPriceChange.newPrice` → `targetPrice`
+- `originalPrice` — оставить в клиентском `DraftPriceChange` для UI, но не отправлять на сервер
+
+#### Preview response
+
+| Аспект | Backend | Frontend (текущее, НЕВЕРНОЕ) |
+|--------|---------|------------------------------|
+| Структура | `{ summary: Summary, offers: OfferPreview[] }` | `{ items, totalChange, totalSkip, ... }` (flat) |
+| Счётчики | `summary.totalRequested`, `willChange`, `willSkip`, `willBlock` | `totalChange`, `totalSkip` (нет `totalRequested`, `willBlock`) |
+| Процент | `summary.avgChangePct`, `maxChangePct` | `avgDeltaPct`, `maxDeltaPct` |
+| Маржа | `summary.minMarginAfter` | `minMargin` |
+| Offers | `offers[].marketplaceOfferId`, `effectivePrice`, `result`, `constraintsApplied[]` | `items[].offerId`, `targetPrice`, `status` |
+
+**Фикс:** обновить `BulkManualPreviewResponse` на фронте — nested structure `summary` + `offers`.
+
+#### Apply response
+
+| Аспект | Backend | Frontend |
+|--------|---------|----------|
+| Run ID | `pricingRunId: Long` | Нет |
+| Счётчики | `processed`, `skipped`, `errored` | `processed`, `skipped`, `errored` ✅ |
+| Ошибки | `errors: String[]` | `errors: string[]` ✅ |
+
+**Фикс:** добавить `pricingRunId` в `BulkActionResponse`.
+
+### 9. Решение по `minMarginPct` для MANUAL_BULK
+
+**Статус:** RESOLVED
+
+`BULK_GUARD_CONFIG` задаёт margin guard = enabled, `minMarginPct = null` → интерпретируется как 0%.
+
+**Выбор: A — оставить null (0%).**
+
+Margin guard при 0% предотвращает отрицательную маржу (продажу в убыток). Manual bulk = осознанное ручное действие, оператор сам отвечает за целевую маржу. Двойная защита: клиентский preview показывает projected margin, серверный constraint `min_margin` может clamp если настроен в policy.
+
 ---
 
 ## Technical Breakdown (TBD)
 
-**Статус:** не начат
+**Статус:** частично реализовано (см. AC выше)
 
 ### Предусловия
 
@@ -598,8 +667,8 @@ Request body:
 | # | Задача | Зависимости | Оценка | Приоритет |
 |---|--------|-------------|--------|-----------|
 | 1 | Backend: `BulkManualPricingService` — constraint resolution + guards для list of (offerId, targetPrice) | — | M | must |
-| 2 | Backend: `POST /api/pricing/bulk-manual/preview` endpoint | #1 | S | must |
-| 3 | Backend: `POST /api/pricing/bulk-manual/apply` endpoint + pricing_run (MANUAL_BULK) + batch decisions/actions | #1 | L | must |
+| 2 | Backend: `POST /api/workspaces/{workspaceId}/pricing/bulk-manual/preview` endpoint | #1 | S | must |
+| 3 | Backend: `POST /api/workspaces/{workspaceId}/pricing/bulk-manual/apply` endpoint + pricing_run (MANUAL_BULK) + batch decisions/actions | #1 | L | must |
 | 4 | Backend: Explanation builder extension — `[Источник]` секция, MANUAL_OVERRIDE strategy_type | #3 | S | must |
 | 5 | Backend: Guard pipeline — skip frequency/volatility/stock-out для MANUAL_BULK context | #1 | S | must |
 | 6 | Backend: `POST /api/cost-profiles/bulk-update` endpoint | — | M | must |

@@ -1,7 +1,15 @@
-<div class="mx-auto max-w-3xl px-4 py-6">
+<div class="mx-auto max-w-6xl px-4 py-6">
 
   <!-- Page header -->
-  <div class="mb-5">
+  <div class="mb-6">
+    <button
+      type="button"
+      (click)="navigateToList()"
+      class="mb-3 flex cursor-pointer items-center gap-1 text-[var(--text-sm)] text-[var(--accent-primary)] transition-colors hover:text-[var(--accent-primary-hover)]"
+    >
+      <lucide-icon [name]="icons.ArrowLeft" [size]="14" />
+      {{ 'pricing.form.back_to_list' | translate }}
+    </button>
     <h1 class="text-[var(--text-xl)] font-semibold text-[var(--text-primary)]">
       @if (isEditMode()) {
         {{ 'pricing.form.title_edit' | translate }}
@@ -9,7 +17,7 @@
         {{ 'pricing.form.title_create' | translate }}
       }
     </h1>
-    <p class="mt-0.5 text-[var(--text-sm)] text-[var(--text-secondary)]">
+    <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">
       {{ 'pricing.form.subtitle' | translate }}
     </p>
   </div>
@@ -17,78 +25,268 @@
   @if (policyQuery.isLoading() && isEditMode()) {
     <!-- Skeleton -->
     <div class="space-y-5">
-      <div class="space-y-2">
-        <div class="dp-shimmer h-3.5 w-28 rounded"></div>
-        <div class="dp-shimmer h-8 w-full rounded-[var(--radius-md)]"></div>
-      </div>
-      <div class="space-y-2">
-        <div class="dp-shimmer h-3.5 w-24 rounded"></div>
-        <div class="dp-shimmer h-8 w-56 rounded-[var(--radius-md)]"></div>
-      </div>
-      <div class="space-y-2">
-        <div class="dp-shimmer h-3.5 w-36 rounded"></div>
-        <div class="dp-shimmer h-8 w-80 rounded-[var(--radius-md)]"></div>
-      </div>
-      <div class="border-t border-[var(--border-default)]"></div>
-      <div class="grid grid-cols-2 gap-4">
-        <div class="space-y-2">
-          <div class="dp-shimmer h-3.5 w-20 rounded"></div>
-          <div class="dp-shimmer h-8 rounded-[var(--radius-md)]"></div>
+      <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6">
+        <div class="space-y-4">
+          <div class="dp-shimmer h-4 w-32 rounded"></div>
+          <div class="dp-shimmer h-9 w-full rounded-[var(--radius-md)]"></div>
+          <div class="dp-shimmer h-4 w-24 rounded"></div>
+          <div class="grid grid-cols-4 gap-3">
+            <div class="dp-shimmer h-20 rounded-[var(--radius-lg)]"></div>
+            <div class="dp-shimmer h-20 rounded-[var(--radius-lg)]"></div>
+            <div class="dp-shimmer h-20 rounded-[var(--radius-lg)]"></div>
+            <div class="dp-shimmer h-20 rounded-[var(--radius-lg)]"></div>
+          </div>
         </div>
-        <div class="space-y-2">
-          <div class="dp-shimmer h-3.5 w-32 rounded"></div>
-          <div class="dp-shimmer h-8 rounded-[var(--radius-md)]"></div>
+      </div>
+      <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6">
+        <div class="dp-shimmer h-4 w-36 rounded"></div>
+        <div class="mt-4 grid grid-cols-3 gap-3">
+          <div class="dp-shimmer h-28 rounded-[var(--radius-lg)]"></div>
+          <div class="dp-shimmer h-28 rounded-[var(--radius-lg)]"></div>
+          <div class="dp-shimmer h-28 rounded-[var(--radius-lg)]"></div>
         </div>
       </div>
     </div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5">
+    <div class="flex gap-6">
 
-      <!-- ─── Section 1: Basics ─── -->
-      <div class="space-y-4 border-b border-[var(--border-default)] pb-5">
-        <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
-          {{ 'pricing.form.section.general' | translate }}
-        </h2>
-
-        <!-- Name -->
-        <div>
-          <label for="name" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-            {{ 'pricing.form.name' | translate }}
-          </label>
-          <input
-            id="name"
-            formControlName="name"
-            type="text"
-            [placeholder]="'pricing.form.name_placeholder' | translate"
-            class="h-8 w-full rounded-[var(--radius-md)] border px-3 text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
-            [class]="isInvalid('name')
-              ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
-              : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
-          />
-          @if (hasError('name', 'required')) {
-            <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
-              {{ 'pricing.form.validation.name_required' | translate }}
-            </p>
-          }
-          @if (hasError('name', 'maxlength')) {
-            <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
-              {{ 'pricing.form.validation.name_maxlength' | translate }}
-            </p>
+      <!-- Sidebar outline (desktop only) -->
+      <nav class="hidden w-40 shrink-0 lg:block">
+        <div class="sticky top-4 space-y-1">
+          @for (sec of sections; track sec.id) {
+            <button
+              type="button"
+              (click)="scrollToSection(sec.id)"
+              class="flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left text-[var(--text-xs)] transition-colors"
+              [class]="activeSection() === sec.id
+                ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'"
+            >
+              <span
+                class="h-1.5 w-1.5 shrink-0 rounded-full"
+                [class]="activeSection() === sec.id
+                  ? 'bg-[var(--accent-primary)]'
+                  : 'bg-[var(--border-default)]'"
+              ></span>
+              {{ sec.labelKey | translate }}
+            </button>
           }
         </div>
+      </nav>
 
-        <!-- Strategy type — segmented control -->
-        <div>
-          <span class="mb-1.5 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-            {{ 'pricing.form.strategy_type' | translate }}
-          </span>
-          <div class="inline-flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
+      <!-- Main form content -->
+      <form [formGroup]="form" (ngSubmit)="submit()" class="min-w-0 flex-1 space-y-5">
+
+        <!-- ─── Section 1: Basics ─── -->
+        <section
+          id="section-basics"
+          class="scroll-mt-4 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6"
+        >
+          <h2 class="mb-4 text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
+            {{ 'pricing.form.section.general' | translate }}
+          </h2>
+
+          <div class="space-y-5">
+            <!-- Name -->
+            <div>
+              <div class="mb-1 flex items-center gap-1.5">
+                <label for="name" class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.form.name' | translate }}
+                </label>
+                <span class="group relative inline-flex">
+                  <lucide-icon [name]="icons.Info" [size]="13"
+                    class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+                  <span class="dp-tooltip">{{ 'pricing.form.tooltip.name' | translate }}</span>
+                </span>
+              </div>
+              <input
+                id="name"
+                formControlName="name"
+                type="text"
+                [placeholder]="'pricing.form.name_placeholder' | translate"
+                class="h-9 w-full rounded-[var(--radius-md)] border px-3 text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+                [class]="isInvalid('name')
+                  ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+                  : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+              />
+              @if (hasError('name', 'required')) {
+                <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'pricing.form.validation.name_required' | translate }}
+                </p>
+              }
+              @if (hasError('name', 'maxlength')) {
+                <p class="mt-1 text-[var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'pricing.form.validation.name_maxlength' | translate }}
+                </p>
+              }
+            </div>
+
+            <!-- Execution mode — card selector -->
+            <div>
+              <div class="mb-2 flex items-center gap-1.5">
+                <span class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                  {{ 'pricing.form.execution_mode' | translate }}
+                </span>
+                <span class="group relative inline-flex">
+                  <lucide-icon [name]="icons.Info" [size]="13"
+                    class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+                  <span class="dp-tooltip">{{ 'pricing.form.tooltip.execution_mode' | translate }}</span>
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                @for (mode of executionModes; track mode.value) {
+                  <label
+                    class="relative flex cursor-pointer flex-col rounded-[var(--radius-lg)] border p-3 transition-all"
+                    [class]="form.get('executionMode')!.value === mode.value
+                      ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)] shadow-[0_0_0_1px_var(--accent-primary)]'
+                      : 'border-[var(--border-default)] bg-[var(--bg-primary)] hover:border-[var(--accent-primary)]/40 hover:bg-[var(--bg-secondary)]'"
+                  >
+                    <input
+                      type="radio"
+                      formControlName="executionMode"
+                      [value]="mode.value"
+                      class="sr-only"
+                    />
+                    <div class="mb-1.5 flex items-center gap-1.5">
+                      <lucide-icon
+                        [name]="mode.icon"
+                        [size]="14"
+                        [class]="form.get('executionMode')!.value === mode.value
+                          ? 'text-[var(--accent-primary)]'
+                          : 'text-[var(--text-tertiary)]'"
+                      />
+                      <span
+                        class="text-[var(--text-sm)] font-medium"
+                        [class]="form.get('executionMode')!.value === mode.value
+                          ? 'text-[var(--accent-primary)]'
+                          : 'text-[var(--text-primary)]'"
+                      >
+                        {{ mode.labelKey | translate }}
+                      </span>
+                    </div>
+                    <span class="text-[var(--text-xs)] leading-relaxed text-[var(--text-tertiary)]">
+                      {{ mode.descKey | translate }}
+                    </span>
+                  </label>
+                }
+              </div>
+            </div>
+
+            @if (executionMode === 'FULL_AUTO') {
+              <div class="space-y-2 rounded-[var(--radius-md)] border border-[var(--status-warning)]/30 bg-[var(--status-warning-bg)] px-4 py-3">
+                <div class="flex items-start gap-2">
+                  <lucide-icon
+                    [name]="icons.AlertTriangle"
+                    [size]="14"
+                    class="mt-0.5 shrink-0 text-[var(--status-warning)]"
+                  />
+                  <div>
+                    <span class="text-[var(--text-xs)] font-medium text-[var(--text-primary)]">
+                      {{ 'pricing.form.full_auto_warning' | translate }}
+                    </span>
+                    <p class="mt-1 text-[var(--text-xs)] leading-relaxed text-[var(--text-primary)]/70">
+                      {{ 'pricing.form.full_auto_requirements' | translate }}
+                    </p>
+                  </div>
+                </div>
+                <label class="flex cursor-pointer items-start gap-2 pl-5">
+                  <input
+                    type="checkbox"
+                    formControlName="confirmFullAuto"
+                    class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]"
+                  />
+                  <span class="text-[var(--text-xs)] font-medium text-[var(--text-primary)]">
+                    {{ 'pricing.form.full_auto_confirm' | translate }}
+                  </span>
+                </label>
+                @if (hasError('confirmFullAuto', 'requiredTrue')) {
+                  <p class="pl-5 text-[var(--text-xs)] text-[var(--status-error)]">
+                    {{ 'pricing.form.validation.full_auto_confirm_required' | translate }}
+                  </p>
+                }
+              </div>
+            }
+
+            <!-- Priority + Approval timeout -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="mb-1 flex items-center gap-1.5">
+                  <label for="priority" class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                    {{ 'pricing.form.priority' | translate }}
+                  </label>
+                  <span class="group relative inline-flex">
+                    <lucide-icon [name]="icons.Info" [size]="13"
+                      class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+                    <span class="dp-tooltip">{{ 'pricing.form.tooltip.priority' | translate }}</span>
+                  </span>
+                </div>
+                <input
+                  id="priority"
+                  formControlName="priority"
+                  type="number"
+                  min="0"
+                  class="h-9 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+                  [class]="isInvalid('priority')
+                    ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+                    : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+                />
+                <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.priority' | translate }}</p>
+                @if (hasError('priority', 'min')) {
+                  <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+                    {{ 'pricing.form.validation.priority_min' | translate }}
+                  </p>
+                }
+              </div>
+
+              @if (executionMode === 'SEMI_AUTO') {
+                <div>
+                  <div class="mb-1 flex items-center gap-1.5">
+                    <label for="approvalTimeoutHours" class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
+                      {{ 'pricing.form.approval_timeout' | translate }}
+                    </label>
+                    <span class="group relative inline-flex">
+                      <lucide-icon [name]="icons.Info" [size]="13"
+                        class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+                      <span class="dp-tooltip">{{ 'pricing.form.tooltip.approval_timeout' | translate }}</span>
+                    </span>
+                  </div>
+                  <input
+                    id="approvalTimeoutHours"
+                    formControlName="approvalTimeoutHours"
+                    type="number"
+                    min="1"
+                    class="h-9 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
+                    [class]="isInvalid('approvalTimeoutHours')
+                      ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
+                      : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+                  />
+                  <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.approval_timeout' | translate }}</p>
+                  @if (hasError('approvalTimeoutHours', 'min')) {
+                    <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
+                      {{ 'pricing.form.validation.approval_timeout_min' | translate }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Section 2: Strategy selection ─── -->
+        <section
+          id="section-strategy"
+          class="scroll-mt-4 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6"
+        >
+          <h2 class="mb-4 text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
+            {{ 'pricing.form.section.strategy_select' | translate }}
+          </h2>
+          <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2 lg:grid-cols-3">
             @for (st of strategyTypes; track st.value) {
               <label
-                class="relative cursor-pointer select-none px-3.5 py-1.5 text-[var(--text-sm)] transition-colors"
+                class="relative flex cursor-pointer flex-col rounded-[var(--radius-lg)] border p-4 transition-all"
                 [class]="form.get('strategyType')!.value === st.value
-                  ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
-                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
+                  ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)] shadow-[0_0_0_1px_var(--accent-primary)]'
+                  : 'border-[var(--border-default)] bg-[var(--bg-primary)] hover:border-[var(--accent-primary)]/40 hover:bg-[var(--bg-secondary)]'"
               >
                 <input
                   type="radio"
@@ -97,283 +295,189 @@
                   (change)="onStrategyTypeUserChange(st.value)"
                   class="sr-only"
                 />
-                {{ st.labelKey | translate }}
-              </label>
-            }
-          </div>
-          <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">
-            {{ strategyTypeDescription | translate }}
-          </p>
-        </div>
-
-        <!-- Execution mode — segmented control -->
-        <div>
-          <span class="mb-1.5 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-            {{ 'pricing.form.execution_mode' | translate }}
-          </span>
-          <div class="inline-flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            @for (mode of executionModes; track mode.value) {
-              <label
-                class="relative cursor-pointer select-none px-3.5 py-1.5 text-[var(--text-sm)] transition-colors"
-                [class]="form.get('executionMode')!.value === mode.value
-                  ? 'bg-[var(--accent-subtle)] font-medium text-[var(--accent-primary)]'
-                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
-              >
-                <input
-                  type="radio"
-                  formControlName="executionMode"
-                  [value]="mode.value"
-                  class="sr-only"
-                />
-                {{ mode.labelKey | translate }}
-              </label>
-            }
-          </div>
-          <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">
-            {{ executionModeDescription | translate }}
-          </p>
-        </div>
-
-        @if (executionMode === 'FULL_AUTO') {
-          <div class="space-y-2 rounded-[var(--radius-md)] border border-[var(--status-warning)]/30 bg-[var(--status-warning-bg)] px-3 py-2.5">
-            <div class="flex items-start gap-2">
-              <lucide-icon
-                [name]="icons.AlertTriangle"
-                [size]="14"
-                class="mt-0.5 shrink-0 text-[var(--status-warning)]"
-              />
-              <span class="text-[var(--text-xs)] leading-relaxed text-[var(--text-primary)]/80">
-                {{ 'pricing.form.full_auto_warning' | translate }}
-              </span>
-            </div>
-            <label class="flex cursor-pointer items-start gap-2 pl-5">
-              <input
-                type="checkbox"
-                formControlName="confirmFullAuto"
-                class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded accent-[var(--accent-primary)]"
-              />
-              <span class="text-[var(--text-xs)] font-medium text-[var(--text-primary)]">
-                {{ 'pricing.form.full_auto_confirm' | translate }}
-              </span>
-            </label>
-            @if (hasError('confirmFullAuto', 'requiredTrue')) {
-              <p class="pl-5 text-[var(--text-xs)] text-[var(--status-error)]">
-                {{ 'pricing.form.validation.full_auto_confirm_required' | translate }}
-              </p>
-            }
-          </div>
-        }
-
-        <!-- Priority + Approval timeout -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <div class="mb-1 flex items-center gap-1.5">
-              <label for="priority" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-                {{ 'pricing.form.priority' | translate }}
-              </label>
-              <span class="group relative inline-flex">
                 <lucide-icon
-                  [name]="icons.Info"
-                  [size]="13"
-                  class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]"
+                  [name]="st.icon"
+                  [size]="20"
+                  [class]="form.get('strategyType')!.value === st.value
+                    ? 'text-[var(--accent-primary)]'
+                    : 'text-[var(--text-tertiary)]'"
                 />
-                <span class="dp-tooltip">
-                  {{ 'pricing.form.tooltip.priority' | translate }}
+                <span
+                  class="mt-2 text-[var(--text-sm)] font-semibold"
+                  [class]="form.get('strategyType')!.value === st.value
+                    ? 'text-[var(--accent-primary)]'
+                    : 'text-[var(--text-primary)]'"
+                >
+                  {{ st.labelKey | translate }}
                 </span>
-              </span>
-            </div>
-            <input
-              id="priority"
-              formControlName="priority"
-              type="number"
-              min="0"
-              class="h-8 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
-              [class]="isInvalid('priority')
-                ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
-                : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
-            />
-            <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.priority' | translate }}</p>
-            @if (hasError('priority', 'min')) {
-              <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
-                {{ 'pricing.form.validation.priority_min' | translate }}
-              </p>
+                <span class="mt-1 text-[var(--text-xs)] leading-relaxed text-[var(--text-secondary)]">
+                  {{ st.descKey | translate }}
+                </span>
+                <span class="mt-2 text-[var(--text-xs)] italic text-[var(--text-tertiary)]">
+                  {{ st.taglineKey | translate }}
+                </span>
+              </label>
             }
           </div>
+        </section>
 
-          @if (executionMode === 'SEMI_AUTO') {
-            <div>
-              <div class="mb-1 flex items-center gap-1.5">
-                <label for="approvalTimeoutHours" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-                  {{ 'pricing.form.approval_timeout' | translate }}
-                </label>
-                <span class="group relative inline-flex">
-                  <lucide-icon
-                    [name]="icons.Info"
-                    [size]="13"
-                    class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]"
-                  />
-                  <span class="dp-tooltip">
-                    {{ 'pricing.form.tooltip.approval_timeout' | translate }}
-                  </span>
-                </span>
+        <!-- ─── Section 3: Strategy params ─── -->
+        <section
+          id="section-params"
+          class="scroll-mt-4 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6"
+        >
+          <h2 class="mb-4 text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
+            {{ 'pricing.form.section.strategy' | translate }}
+          </h2>
+          @if (strategyType === 'TARGET_MARGIN') {
+            <dp-target-margin-form
+              [form]="targetMarginGroup"
+              [submitted]="submitted()"
+            />
+          } @else if (strategyType === 'VELOCITY_ADAPTIVE') {
+            <dp-velocity-adaptive-form
+              [form]="velocityGroup"
+              [submitted]="submitted()"
+            />
+          } @else if (strategyType === 'STOCK_BALANCING') {
+            <dp-stock-balancing-form
+              [form]="stockGroup"
+              [submitted]="submitted()"
+            />
+          } @else if (strategyType === 'COMPETITOR_ANCHOR') {
+            <dp-competitor-anchor-form
+              [form]="competitorGroup"
+              [submitted]="submitted()"
+            />
+          } @else if (strategyType === 'COMPOSITE') {
+            <dp-composite-form
+              [components]="compositeComponents"
+              [roundingGroup]="compositeRoundingGroup"
+              [submitted]="submitted()"
+            />
+          } @else {
+            <!-- PRICE_CORRIDOR -->
+            <div formGroupName="corridor" class="space-y-4">
+              <p class="text-[var(--text-xs)] text-[var(--text-tertiary)]">
+                {{ 'pricing.form.tooltip.corridor_hint' | translate }}
+              </p>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <div class="mb-1 flex items-center gap-1.5">
+                    <label for="corridorMinPrice" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+                      {{ 'pricing.form.corridor_min_price' | translate }}
+                    </label>
+                    <span class="group relative inline-flex">
+                      <lucide-icon [name]="icons.Info" [size]="13"
+                        class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+                      <span class="dp-tooltip">{{ 'pricing.form.tooltip.corridor_min_price' | translate }}</span>
+                    </span>
+                  </div>
+                  <div class="relative">
+                    <input
+                      id="corridorMinPrice"
+                      formControlName="corridorMinPrice"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      class="h-9 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+                      [class]="isInvalid('corridor.corridorMinPrice')
+                        ? 'border-[var(--status-error)]'
+                        : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+                    />
+                    <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
+                  </div>
+                </div>
+                <div>
+                  <div class="mb-1 flex items-center gap-1.5">
+                    <label for="corridorMaxPrice" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+                      {{ 'pricing.form.corridor_max_price' | translate }}
+                    </label>
+                    <span class="group relative inline-flex">
+                      <lucide-icon [name]="icons.Info" [size]="13"
+                        class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+                      <span class="dp-tooltip">{{ 'pricing.form.tooltip.corridor_max_price' | translate }}</span>
+                    </span>
+                  </div>
+                  <div class="relative">
+                    <input
+                      id="corridorMaxPrice"
+                      formControlName="corridorMaxPrice"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      class="h-9 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
+                      [class]="isInvalid('corridor.corridorMaxPrice')
+                        ? 'border-[var(--status-error)]'
+                        : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
+                    />
+                    <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
+                  </div>
+                </div>
               </div>
-              <input
-                id="approvalTimeoutHours"
-                formControlName="approvalTimeoutHours"
-                type="number"
-                min="1"
-                class="h-8 w-full rounded-[var(--radius-md)] border px-3 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
-                [class]="isInvalid('approvalTimeoutHours')
-                  ? 'border-[var(--status-error)] bg-[var(--status-error-bg)]/30'
-                  : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
-              />
-              <p class="mt-1 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'pricing.form.hint.approval_timeout' | translate }}</p>
-              @if (hasError('approvalTimeoutHours', 'min')) {
-                <p class="mt-0.5 text-[var(--text-xs)] text-[var(--status-error)]">
-                  {{ 'pricing.form.validation.approval_timeout_min' | translate }}
+              @if (form.get('corridor')!.hasError('corridorAtLeastOne') && (form.get('corridor')!.touched || submitted())) {
+                <p class="text-[var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'pricing.form.validation.corridor_at_least_one' | translate }}
+                </p>
+              }
+              @if (form.get('corridor')!.hasError('corridorMaxGtMin') && (form.get('corridor')!.touched || submitted())) {
+                <p class="text-[var(--text-xs)] text-[var(--status-error)]">
+                  {{ 'pricing.form.validation.corridor_max_gt_min' | translate }}
                 </p>
               }
             </div>
           }
+        </section>
+
+        <!-- ─── Section 4: Constraints ─── -->
+        <div id="section-constraints" class="scroll-mt-4">
+          <dp-constraints-form [form]="form" [submitted]="submitted()" />
         </div>
 
-      </div>
+        <!-- ─── Section 5: Guards ─── -->
+        <div id="section-guards" class="scroll-mt-4">
+          <dp-guard-config-form [form]="form" [submitted]="submitted()" />
+        </div>
 
-      <!-- ─── Section 2: Strategy params ─── -->
-      <div class="space-y-4 border-b border-[var(--border-default)] pb-5">
-        <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
-          {{ 'pricing.form.section.strategy' | translate }}
-        </h2>
-        @if (strategyType === 'TARGET_MARGIN') {
-          <dp-target-margin-form
-            [form]="targetMarginGroup"
-            [submitted]="submitted()"
-          />
-        } @else if (strategyType === 'VELOCITY_ADAPTIVE') {
-          <dp-velocity-adaptive-form
-            [form]="velocityGroup"
-            [submitted]="submitted()"
-          />
-        } @else if (strategyType === 'STOCK_BALANCING') {
-          <dp-stock-balancing-form
-            [form]="stockGroup"
-            [submitted]="submitted()"
-          />
-        } @else if (strategyType === 'COMPETITOR_ANCHOR') {
-          <dp-competitor-anchor-form
-            [form]="competitorGroup"
-            [submitted]="submitted()"
-          />
-        } @else if (strategyType === 'COMPOSITE') {
-          <dp-composite-form
-            [components]="compositeComponents"
-            [roundingGroup]="compositeRoundingGroup"
-            [submitted]="submitted()"
-          />
-        } @else {
-          <!-- PRICE_CORRIDOR -->
-          <div formGroupName="corridor" class="space-y-4">
-            <p class="text-[var(--text-xs)] text-[var(--text-tertiary)]">
-              {{ 'pricing.form.tooltip.corridor_hint' | translate }}
-            </p>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label for="corridorMinPrice" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-                  {{ 'pricing.form.corridor_min_price' | translate }}
-                </label>
-                <div class="relative">
-                  <input
-                    id="corridorMinPrice"
-                    formControlName="corridorMinPrice"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                    [class]="isInvalid('corridor.corridorMinPrice')
-                      ? 'border-[var(--status-error)]'
-                      : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
-                  />
-                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
-                </div>
-              </div>
-              <div>
-                <label for="corridorMaxPrice" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-                  {{ 'pricing.form.corridor_max_price' | translate }}
-                </label>
-                <div class="relative">
-                  <input
-                    id="corridorMaxPrice"
-                    formControlName="corridorMaxPrice"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    class="h-8 w-full rounded-[var(--radius-md)] border px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)]"
-                    [class]="isInvalid('corridor.corridorMaxPrice')
-                      ? 'border-[var(--status-error)]'
-                      : 'border-[var(--border-default)] bg-[var(--bg-primary)]'"
-                  />
-                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">&#8381;</span>
-                </div>
-              </div>
-            </div>
-            @if (form.get('corridor')!.hasError('corridorAtLeastOne') && (form.get('corridor')!.touched || submitted())) {
-              <p class="text-[var(--text-xs)] text-[var(--status-error)]">
-                {{ 'pricing.form.validation.corridor_at_least_one' | translate }}
-              </p>
+        <!-- ─── Footer ─── -->
+        <div class="sticky bottom-0 -mx-1 flex items-center justify-end rounded-t-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 shadow-[var(--shadow-sm)] backdrop-blur-sm">
+          <div class="flex items-center gap-2">
+            @if (isEditMode()) {
+              <button
+                type="button"
+                (click)="showPreviewModal.set(true)"
+                class="flex h-8 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
+              >
+                <lucide-icon [name]="icons.Eye" [size]="14" />
+                {{ 'pricing.form.preview_impact' | translate }}
+              </button>
             }
-            @if (form.get('corridor')!.hasError('corridorMaxGtMin') && (form.get('corridor')!.touched || submitted())) {
-              <p class="text-[var(--text-xs)] text-[var(--status-error)]">
-                {{ 'pricing.form.validation.corridor_max_gt_min' | translate }}
-              </p>
-            }
-          </div>
-        }
-      </div>
-
-      <!-- ─── Section 3: Constraints ─── -->
-      <dp-constraints-form [form]="form" [submitted]="submitted()" />
-
-      <!-- ─── Section 4: Guards ─── -->
-      <dp-guard-config-form [form]="form" [submitted]="submitted()" />
-
-      <!-- ─── Footer ─── -->
-      <div class="sticky bottom-0 -mx-6 flex items-center justify-end border-t border-[var(--border-default)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur-sm">
-        <div class="flex items-center gap-2">
-          @if (isEditMode()) {
             <button
               type="button"
-              (click)="showPreviewModal.set(true)"
-              class="flex h-7 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
+              (click)="cancel()"
+              class="h-8 cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-4 text-[var(--text-sm)] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)]"
             >
-              <lucide-icon [name]="icons.Eye" [size]="14" />
-              {{ 'pricing.form.preview_impact' | translate }}
+              {{ 'pricing.form.cancel' | translate }}
             </button>
-          }
-          <button
-            type="button"
-            (click)="cancel()"
-            class="h-7 cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-[var(--text-sm)] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)]"
-          >
-            {{ 'pricing.form.cancel' | translate }}
-          </button>
-          <button
-            type="submit"
-            [disabled]="saveMutation.isPending()"
-            class="h-7 cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 text-[var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            @if (saveMutation.isPending()) {
-              <span class="flex items-center gap-1.5">
-                <span class="dp-spinner h-3 w-3 rounded-full border-2 border-white/30 border-t-white"></span>
-                {{ 'pricing.form.saving' | translate }}
-              </span>
-            } @else {
-              {{ 'pricing.form.save' | translate }}
-            }
-          </button>
+            <button
+              type="submit"
+              [disabled]="saveMutation.isPending()"
+              class="h-8 cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-5 text-[var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              @if (saveMutation.isPending()) {
+                <span class="flex items-center gap-1.5">
+                  <span class="dp-spinner h-3 w-3 rounded-full border-2 border-white/30 border-t-white"></span>
+                  {{ 'pricing.form.saving' | translate }}
+                </span>
+              } @else {
+                {{ 'pricing.form.save' | translate }}
+              }
+            </button>
+          </div>
         </div>
-      </div>
 
-    </form>
+      </form>
+    </div>
   }
 </div>
 

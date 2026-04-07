@@ -13,6 +13,7 @@ export interface GridStoreState {
   selectedOfferIds: Set<number>;
   draftMode: boolean;
   draftChanges: Map<number, DraftPriceChange>;
+  showDraftOnly: boolean;
   searchTerm: string;
   rowDensity: 'compact' | 'comfortable';
 }
@@ -27,6 +28,7 @@ const initialState: GridStoreState = {
   selectedOfferIds: new Set<number>(),
   draftMode: false,
   draftChanges: new Map<number, DraftPriceChange>(),
+  showDraftOnly: false,
   searchTerm: '',
   rowDensity: 'compact',
 };
@@ -104,22 +106,22 @@ export const GridStore = signalStore(
 
     toggleDraftMode(): void {
       const enabling = !store.draftMode();
-      if (!enabling && store.draftChanges().size > 0) {
-        return;
-      }
-      patchState(store, { draftMode: enabling });
+      patchState(store, {
+        draftMode: enabling,
+        ...(!enabling ? { showDraftOnly: false } : {}),
+      });
     },
 
     setDraftMode(enabled: boolean): void {
       patchState(store, {
         draftMode: enabled,
-        ...(!enabled ? { draftChanges: new Map<number, DraftPriceChange>() } : {}),
+        ...(!enabled ? { draftChanges: new Map<number, DraftPriceChange>(), showDraftOnly: false } : {}),
       });
     },
 
-    setDraftPrice(offerId: number, newPrice: number, originalPrice: number): void {
+    setDraftPrice(offerId: number, newPrice: number, originalPrice: number, costPrice: number | null): void {
       const next = new Map(store.draftChanges());
-      next.set(offerId, { offerId, newPrice, originalPrice });
+      next.set(offerId, { offerId, newPrice, originalPrice, costPrice });
       patchState(store, { draftChanges: next });
     },
 
@@ -130,7 +132,11 @@ export const GridStore = signalStore(
     },
 
     clearDraftChanges(): void {
-      patchState(store, { draftChanges: new Map<number, DraftPriceChange>() });
+      patchState(store, { draftChanges: new Map<number, DraftPriceChange>(), showDraftOnly: false });
+    },
+
+    toggleShowDraftOnly(): void {
+      patchState(store, { showDraftOnly: !store.showDraftOnly() });
     },
 
     setSearchTerm(term: string): void {

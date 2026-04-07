@@ -68,3 +68,6 @@ databaseChangeLog:
   - include:
       file: changes/0026-pricing-insight-table.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0027-return-fulfillment-type.sql
+      relativeToChangelogFile: true

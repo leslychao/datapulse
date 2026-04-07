@@ -1,20 +1,28 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { LucideAngularModule, Check, X, Pause, Lock, Unlock } from 'lucide-angular';
+import { LucideAngularModule, Check, X, Pause, Lock, Unlock, Calculator, Coins } from 'lucide-angular';
+import { CdkOverlayOrigin, CdkConnectedOverlay, ConnectedPosition } from '@angular/cdk/overlay';
 
 import { ActionApiService } from '@core/api/action-api.service';
+import { OfferSummary } from '@core/models';
 import { GridStore } from '@shared/stores/grid.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
+import { FormulaPanelComponent } from './formula-panel.component';
+import { CostUpdatePanelComponent } from './cost-update-panel.component';
 
 @Component({
   selector: 'dp-bulk-actions-bar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, LucideAngularModule, ConfirmationModalComponent],
+  imports: [
+    TranslatePipe, LucideAngularModule, ConfirmationModalComponent,
+    CdkOverlayOrigin, CdkConnectedOverlay, FormulaPanelComponent,
+    CostUpdatePanelComponent,
+  ],
   template: `
     <div class="flex items-center gap-3 border-t border-[var(--border-default)]
                 bg-[var(--bg-secondary)] px-4 py-2.5
@@ -51,7 +59,59 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           <lucide-icon [img]="pauseIcon" [size]="14" />
           {{ 'grid.bulk.hold' | translate }}
         </button>
+
+        <div class="mx-1 h-5 w-px bg-[var(--border-default)]"></div>
+
+        <button
+          cdkOverlayOrigin #formulaTrigger="cdkOverlayOrigin"
+          (click)="showFormulaPanel.set(!showFormulaPanel())"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)]
+                 border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)]
+                 font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+        >
+          <lucide-icon [img]="calculatorIcon" [size]="14" />
+          {{ 'grid.bulk.change_price' | translate }}
+        </button>
+
+        <button
+          cdkOverlayOrigin #costTrigger="cdkOverlayOrigin"
+          (click)="showCostPanel.set(!showCostPanel())"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)]
+                 border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)]
+                 font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+        >
+          <lucide-icon [img]="coinsIcon" [size]="14" />
+          {{ 'grid.bulk.update_cost' | translate }}
+        </button>
       </div>
+
+      <ng-template cdkConnectedOverlay
+                   [cdkConnectedOverlayOrigin]="formulaTrigger"
+                   [cdkConnectedOverlayOpen]="showFormulaPanel()"
+                   [cdkConnectedOverlayPositions]="formulaPanelPositions"
+                   [cdkConnectedOverlayHasBackdrop]="true"
+                   cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+                   (backdropClick)="showFormulaPanel.set(false)">
+        <dp-formula-panel
+          [offers]="selectedOffers()"
+          (applied)="onFormulaApplied()"
+          (close)="showFormulaPanel.set(false)"
+        />
+      </ng-template>
+
+      <ng-template cdkConnectedOverlay
+                   [cdkConnectedOverlayOrigin]="costTrigger"
+                   [cdkConnectedOverlayOpen]="showCostPanel()"
+                   [cdkConnectedOverlayPositions]="formulaPanelPositions"
+                   [cdkConnectedOverlayHasBackdrop]="true"
+                   cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+                   (backdropClick)="showCostPanel.set(false)">
+        <dp-cost-update-panel
+          [offers]="selectedOffers()"
+          (applied)="onCostApplied()"
+          (close)="showCostPanel.set(false)"
+        />
+      </ng-template>
 
       <div class="flex-1"></div>
 
@@ -102,6 +162,9 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
   `],
 })
 export class BulkActionsBarComponent {
+
+  readonly selectedOffers = input<OfferSummary[]>([]);
+
   protected readonly gridStore = inject(GridStore);
   private readonly actionApi = inject(ActionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
@@ -113,12 +176,21 @@ export class BulkActionsBarComponent {
   readonly pauseIcon = Pause;
   readonly lockIcon = Lock;
   readonly unlockIcon = Unlock;
+  readonly calculatorIcon = Calculator;
+  readonly coinsIcon = Coins;
 
   private readonly translate = inject(TranslateService);
 
   readonly showApproveModal = signal(false);
   readonly showRejectModal = signal(false);
   readonly showHoldModal = signal(false);
+  readonly showFormulaPanel = signal(false);
+  readonly showCostPanel = signal(false);
+
+  readonly formulaPanelPositions: ConnectedPosition[] = [
+    { originX: 'start', originY: 'top', overlayX: 'start', overlayY: 'bottom', offsetY: -8 },
+    { originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top', offsetY: 8 },
+  ];
 
   readonly bulkApproveMutation = injectMutation(() => ({
     mutationFn: (ids: number[]) =>
@@ -197,6 +269,18 @@ export class BulkActionsBarComponent {
   onBulkHold(): void {
     this.showHoldModal.set(false);
     this.toast.info(this.translate.instant('grid.bulk.hold_wip'));
+  }
+
+  onFormulaApplied(): void {
+    this.showFormulaPanel.set(false);
+    this.gridStore.clearSelection();
+    this.toast.success(this.translate.instant('grid.formula.applied'));
+  }
+
+  onCostApplied(): void {
+    this.showCostPanel.set(false);
+    this.gridStore.clearSelection();
+    this.invalidateQueries();
   }
 
   private invalidateQueries(): void {

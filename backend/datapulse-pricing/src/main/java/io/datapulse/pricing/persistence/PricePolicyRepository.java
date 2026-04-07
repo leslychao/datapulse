@@ -38,6 +38,8 @@ public interface PricePolicyRepository extends JpaRepository<PricePolicyEntity, 
 
     Optional<PricePolicyEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
+    boolean existsByWorkspaceIdAndStatus(Long workspaceId, PolicyStatus status);
+
     @Query("""
         SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END
         FROM PricePolicyAssignmentEntity a

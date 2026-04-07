@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 
 import { environment } from '@env';
 import {
+  BulkFormulaCostRequest,
+  BulkFormulaCostResponse,
   CostProfile,
   CostProfileImportResult,
   CostProfilePage,
@@ -62,5 +64,12 @@ export class CostProfileApiService {
     return this.http.get(`${this.base}/cost-profiles/export`, {
       responseType: 'blob',
     });
+  }
+
+  bulkFormula(req: BulkFormulaCostRequest): Observable<BulkFormulaCostResponse> {
+    return this.http.post<BulkFormulaCostResponse>(
+      `${this.base}/cost-profiles/bulk-formula`,
+      req,
+    );
   }
 }

@@ -64,6 +64,7 @@ const COGS_STATUS_COLOR: Record<string, string> = {
         [pagination]="false"
         [pageSize]="50"
         height="calc(100vh - 320px)"
+        [clickableRows]="true"
         (rowClicked)="onRowClicked($event)"
         (gridReady)="onGridReady($event)"
       />

@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { GetContextMenuItemsParams, GridApi, MenuItemDef } from 'ag-grid-community';
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { OfferSummary } from '@core/models';
@@ -47,7 +48,7 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
     <div class="flex h-full flex-col overflow-hidden">
       <dp-kpi-strip />
 
-      <dp-grid-toolbar (exportClicked)="exportData()">
+      <dp-grid-toolbar (exportClicked)="exportData()" (draftToggle)="onDraftToggle()">
         <dp-view-tabs />
       </dp-grid-toolbar>
 
@@ -87,16 +88,20 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
       } @else {
         <div class="flex-1 overflow-hidden px-4 pt-2" data-tour="grid-table">
           <dp-data-grid
-            [columnDefs]="columnDefs"
+            [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="false"
             [pagination]="false"
             [rowSelection]="rowSelectionConfig"
             [getRowId]="getRowId"
             [height]="'100%'"
+            [suppressCellFocus]="!gridStore.draftMode()"
+            [getContextMenuItems]="contextMenuItems()"
+            [clickableRows]="true"
             (rowClicked)="onRowClicked($event)"
             (selectionChanged)="onSelectionChanged($event)"
             (sortChanged)="onSortChanged($event)"
+            (gridReady)="onGridReady($event)"
           />
         </div>
 
@@ -109,7 +114,7 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
         />
 
         @if (gridStore.hasSelection()) {
-          <dp-bulk-actions-bar />
+          <dp-bulk-actions-bar [selectedOffers]="selectedOffers()" />
         }
       }
     </div>
@@ -135,10 +140,19 @@ export class GridPageComponent implements OnInit, OnDestroy {
   protected readonly gridStore = inject(GridStore);
   private readonly zone = inject(NgZone);
 
-  protected readonly columnDefs = buildGridColumnDefs({
+  private gridApi: GridApi | null = null;
+
+  private readonly gridCallbacks: GridColumnCallbacks = {
     onLockToggle: (offerId, locked, currentPrice) =>
       this.zone.run(() => this.toggleLock(offerId, locked, currentPrice)),
-  });
+    onDraftPriceChange: (offerId, newPrice, originalPrice, costPrice) =>
+      this.zone.run(() => this.handleDraftPriceChange(offerId, newPrice, originalPrice, costPrice)),
+    getDraftChange: (offerId) => this.gridStore.draftChanges().get(offerId),
+  };
+
+  protected readonly columnDefs = computed(() =>
+    buildGridColumnDefs(this.gridCallbacks, this.gridStore.draftMode()),
+  );
 
   protected readonly rowSelectionConfig = {
     mode: 'multiRow' as const,
@@ -150,6 +164,40 @@ export class GridPageComponent implements OnInit, OnDestroy {
   protected readonly getRowId = (params: any): string => String(params.data.offerId);
 
   protected readonly showDraftExitConfirm = signal(false);
+
+  protected readonly contextMenuItems = computed(() => {
+    if (!this.gridStore.draftMode()) return undefined;
+
+    return (params: GetContextMenuItemsParams): (string | MenuItemDef)[] => {
+      if (params.column?.getColId() !== 'currentPrice') return [];
+      const offerId = params.node?.data?.offerId;
+      if (!offerId) return [];
+      const draft = this.gridStore.draftChanges().get(offerId);
+      if (!draft) return [];
+
+      return [{
+        name: this.translate.instant('grid.draft.undo_change'),
+        action: () => {
+          this.gridStore.removeDraftPrice(offerId);
+          if (params.node) {
+            params.api.refreshCells({
+              rowNodes: [params.node],
+              columns: ['currentPrice', 'projectedMargin'],
+              force: true,
+            });
+          }
+        },
+      }];
+    };
+  });
+
+  protected onDraftToggle(): void {
+    if (this.gridStore.draftMode() && this.gridStore.hasDraftChanges()) {
+      this.showDraftExitConfirm.set(true);
+    } else {
+      this.gridStore.toggleDraftMode();
+    }
+  }
 
   readonly offersQuery = injectQuery(() => ({
     queryKey: [
@@ -175,9 +223,14 @@ export class GridPageComponent implements OnInit, OnDestroy {
     staleTime: 30_000,
   }));
 
-  protected readonly rows = computed(() =>
-    this.offersQuery.data()?.content ?? [],
-  );
+  protected readonly rows = computed(() => {
+    const allRows = this.offersQuery.data()?.content ?? [];
+    if (this.gridStore.showDraftOnly()) {
+      const draftIds = this.gridStore.draftChanges();
+      return allRows.filter(r => draftIds.has(r.offerId));
+    }
+    return allRows;
+  });
 
   protected readonly totalItems = computed(() =>
     this.offersQuery.data()?.totalElements ?? 0,
@@ -186,6 +239,12 @@ export class GridPageComponent implements OnInit, OnDestroy {
   protected readonly isEmpty = computed(() =>
     !this.offersQuery.isPending() && this.rows().length === 0,
   );
+
+  protected readonly selectedOffers = computed(() => {
+    const ids = this.gridStore.selectedOfferIds();
+    if (ids.size === 0) return [];
+    return this.rows().filter(r => ids.has(r.offerId));
+  });
 
   private readonly tourService = inject(GuidedTourService);
   private readonly tourProgress = inject(TourProgressStore);
@@ -290,6 +349,29 @@ export class GridPageComponent implements OnInit, OnDestroy {
 
   toggleLock(offerId: number, currentlyLocked: boolean, currentPrice: number | null): void {
     this.lockMutation.mutate({ offerId, locked: currentlyLocked, currentPrice });
+  }
+
+  protected onGridReady(api: GridApi): void {
+    this.gridApi = api;
+  }
+
+  private handleDraftPriceChange(
+      offerId: number, newPrice: number, originalPrice: number, costPrice: number | null): void {
+    if (newPrice === originalPrice) {
+      this.gridStore.removeDraftPrice(offerId);
+    } else {
+      this.gridStore.setDraftPrice(offerId, newPrice, originalPrice, costPrice);
+    }
+    setTimeout(() => {
+      const rowNode = this.gridApi?.getRowNode(String(offerId));
+      if (rowNode) {
+        this.gridApi?.refreshCells({
+          rowNodes: [rowNode],
+          columns: ['currentPrice', 'projectedMargin'],
+          force: true,
+        });
+      }
+    });
   }
 
   protected draftExitMessage(): string {

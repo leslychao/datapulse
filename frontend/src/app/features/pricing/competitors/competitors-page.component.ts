@@ -186,6 +186,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
+            [clickableRows]="true"
             (rowClicked)="onRowClicked($event)"
           />
         }

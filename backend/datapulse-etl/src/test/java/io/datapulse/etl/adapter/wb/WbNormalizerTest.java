@@ -10,6 +10,7 @@ import io.datapulse.etl.adapter.wb.dto.WbCatalogCard;
 import io.datapulse.etl.adapter.wb.dto.WbFinanceRow;
 import io.datapulse.etl.adapter.wb.dto.WbOrderItem;
 import io.datapulse.etl.adapter.wb.dto.WbPriceGood;
+import io.datapulse.etl.adapter.wb.dto.WbReturnItem;
 import io.datapulse.etl.adapter.wb.dto.WbSaleItem;
 import io.datapulse.etl.adapter.wb.dto.WbStockItem;
 import io.datapulse.etl.domain.FinanceEntryType;
@@ -193,6 +194,32 @@ class WbNormalizerTest {
       assertThat(result.commission()).isEqualByComparingTo(BigDecimal.valueOf(150));
       assertThat(result.currency()).isEqualTo("RUB");
       assertThat(result.saleDate()).isNotNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("normalizeReturn()")
+  class NormalizeReturn {
+
+    @Test
+    void should_mapReturnFields_and_setFbw() {
+      var item = new WbReturnItem(
+          12345L, "barcode", "srid-1", 100L, 200L, "sticker",
+          "Brand", "Subject", "M", "Возврат",
+          1, "Брак", "reason",
+          "2024-02-10T12:00:00+03:00", null, null, null,
+          42L, "Office Address");
+
+      var result = normalizer.normalizeReturn(item);
+
+      assertThat(result.externalReturnId()).isEqualTo("srid-1");
+      assertThat(result.quantity()).isEqualTo(1);
+      assertThat(result.returnAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.returnReason()).isEqualTo("Брак");
+      assertThat(result.currency()).isEqualTo("RUB");
+      assertThat(result.status()).isEqualTo("Возврат");
+      assertThat(result.fulfillmentType()).isEqualTo("FBW");
+      assertThat(result.returnDate()).isNotNull();
     }
   }
 

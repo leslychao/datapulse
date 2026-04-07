@@ -139,6 +139,7 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
+            [clickableRows]="true"
             (rowClicked)="onRowClicked($event)"
           />
         }
@@ -205,6 +206,7 @@ export class CampaignListPageComponent {
         headerName: this.translate.instant('promo.campaigns.col.name'),
         field: 'promoName',
         minWidth: 250,
+        flex: 1,
         pinned: 'left' as const,
         sortable: true,
         cellRenderer: (params: any) => {

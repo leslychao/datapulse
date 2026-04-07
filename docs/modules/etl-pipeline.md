@@ -338,6 +338,7 @@ canonical_return:
   seller_sku_id           BIGINT FK → seller_sku              (nullable — SKU lookup miss)
   return_date             TIMESTAMPTZ NOT NULL
   return_amount           DECIMAL NOT NULL
+  fulfillment_type        VARCHAR(10)                         -- 'FBW' (WB), NULL (Ozon — unified API, no delivery_schema)
   return_reason           VARCHAR(255)                        -- provider-specific reason (nullable — WB no reason)
   quantity                INT NOT NULL DEFAULT 1
   status                  VARCHAR(30)                         -- PENDING, COMPLETED (nullable)

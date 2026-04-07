@@ -210,7 +210,8 @@ public class WbNormalizer {
                 item.returnType(),
                 "RUB",
                 returnDate,
-                item.status()
+                item.status(),
+                "FBW"
         );
     }
 

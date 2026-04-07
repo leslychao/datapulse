@@ -192,6 +192,7 @@ class OzonNormalizerTest {
       assertThat(result.returnReason()).isEqualTo("Defective product");
       assertThat(result.currency()).isEqualTo("RUB");
       assertThat(result.status()).isEqualTo("returned_to_seller");
+      assertThat(result.fulfillmentType()).isNull();
       assertThat(result.returnDate()).isNotNull();
     }
 

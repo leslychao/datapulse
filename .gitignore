@@ -32,6 +32,7 @@ Thumbs.db
 
 # === Infrastructure ===
 infra/.env
+infra/llm/.env
 
 # === Logs ===
 *.log

@@ -1,5 +1,8 @@
-<section [formGroup]="form()" class="space-y-4 border-b border-[var(--border-default)] pb-5">
-  <div>
+<section
+  [formGroup]="form()"
+  class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6"
+>
+  <div class="mb-4">
     <div class="flex items-center justify-between">
       <h2 class="text-[var(--text-sm)] font-semibold text-[var(--text-primary)]">
         {{ 'pricing.form.section.constraints' | translate }}
@@ -14,9 +17,16 @@
   </div>
   <div class="grid grid-cols-2 gap-4">
     <div>
-      <label for="minMarginPct" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-        {{ 'pricing.form.min_margin_pct' | translate }}
-      </label>
+      <div class="mb-1 flex items-center gap-1.5">
+        <label for="minMarginPct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+          {{ 'pricing.form.min_margin_pct' | translate }}
+        </label>
+        <span class="group relative inline-flex">
+          <lucide-icon [name]="icons.Info" [size]="13"
+            class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+          <span class="dp-tooltip">{{ 'pricing.form.tooltip.constraints.min_margin' | translate }}</span>
+        </span>
+      </div>
       <div class="relative">
         <input
           id="minMarginPct"
@@ -36,9 +46,16 @@
       }
     </div>
     <div>
-      <label for="maxPriceChangePct" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-        {{ 'pricing.form.max_price_change_pct' | translate }}
-      </label>
+      <div class="mb-1 flex items-center gap-1.5">
+        <label for="maxPriceChangePct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+          {{ 'pricing.form.max_price_change_pct' | translate }}
+        </label>
+        <span class="group relative inline-flex">
+          <lucide-icon [name]="icons.Info" [size]="13"
+            class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+          <span class="dp-tooltip">{{ 'pricing.form.tooltip.constraints.max_price_change' | translate }}</span>
+        </span>
+      </div>
       <div class="relative">
         <input
           id="maxPriceChangePct"
@@ -58,9 +75,16 @@
       }
     </div>
     <div>
-      <label for="minPrice" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-        {{ 'pricing.form.min_price' | translate }}
-      </label>
+      <div class="mb-1 flex items-center gap-1.5">
+        <label for="minPrice" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+          {{ 'pricing.form.min_price' | translate }}
+        </label>
+        <span class="group relative inline-flex">
+          <lucide-icon [name]="icons.Info" [size]="13"
+            class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+          <span class="dp-tooltip">{{ 'pricing.form.tooltip.constraints.min_price' | translate }}</span>
+        </span>
+      </div>
       <div class="relative">
         <input
           id="minPrice"
@@ -80,9 +104,16 @@
       }
     </div>
     <div>
-      <label for="maxPrice" class="mb-1 block text-[var(--text-sm)] text-[var(--text-secondary)]">
-        {{ 'pricing.form.max_price' | translate }}
-      </label>
+      <div class="mb-1 flex items-center gap-1.5">
+        <label for="maxPrice" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
+          {{ 'pricing.form.max_price' | translate }}
+        </label>
+        <span class="group relative inline-flex">
+          <lucide-icon [name]="icons.Info" [size]="13"
+            class="cursor-help text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--text-secondary)]" />
+          <span class="dp-tooltip">{{ 'pricing.form.tooltip.constraints.max_price' | translate }}</span>
+        </span>
+      </div>
       <div class="relative">
         <input
           id="maxPrice"
@@ -103,7 +134,7 @@
     </div>
   </div>
   @if (form().hasError('maxPriceGtMin') && (form().get('minPrice')!.touched || form().get('maxPrice')!.touched || submitted())) {
-    <p class="text-[var(--text-xs)] text-[var(--status-error)]">
+    <p class="mt-2 text-[var(--text-xs)] text-[var(--status-error)]">
       {{ 'pricing.form.validation.max_price_gt_min' | translate }}
     </p>
   }

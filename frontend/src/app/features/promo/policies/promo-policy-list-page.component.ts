@@ -107,6 +107,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
+            [clickableRows]="true"
             (rowClicked)="onRowClicked($event)"
           />
         }

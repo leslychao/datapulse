@@ -147,9 +147,10 @@ public class ReturnsReadRepository {
             sb.append(" AND connection_id = :connectionId");
             params.addValue("connectionId", filter.connectionId());
         }
-        if (filter.period() != null) {
+        Integer periodInt = filter.periodAsInt();
+        if (periodInt != null) {
             sb.append(" AND period = :period");
-            params.addValue("period", filter.period());
+            params.addValue("period", periodInt);
         }
     }
 

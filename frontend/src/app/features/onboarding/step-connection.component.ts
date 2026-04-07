@@ -174,7 +174,7 @@ const SUCCESS_REDIRECT_DELAY = 2000;
               [disabled]="!canSubmit()"
               class="flex cursor-pointer items-center justify-center gap-2 self-end rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              @if (validationState() === 'submitting' || validationState() === 'validating') {
+              @if (validationState() === 'submitting' || validationState() === 'validating' || validationState() === 'timeout') {
                 <dp-spinner [size]="14" color="white" />
                 @if (validationState() === 'submitting') {
                   {{ 'onboarding.connection.submitting' | translate }}
@@ -229,21 +229,24 @@ export class StepConnectionComponent implements OnDestroy {
 
   protected canSubmit = signal(true);
 
-  private readonly validationConnectionQuery = injectQuery(() => ({
-    queryKey: ['connection', this.validatingConnectionId() ?? -1],
-    queryFn: () =>
-      lastValueFrom(this.connectionApi.getConnection(this.validatingConnectionId()!)),
-    enabled:
-      this.validationState() === 'validating' &&
-      this.validatingConnectionId() != null &&
-      this.validatingConnectionId()! > 0,
-    staleTime: 0,
-  }));
+  private readonly validationConnectionQuery = injectQuery(() => {
+    const state = this.validationState();
+    const id = this.validatingConnectionId();
+    const watching = (state === 'validating' || state === 'timeout') && id != null && id > 0;
+    return {
+      queryKey: ['connection', id ?? -1],
+      queryFn: () => lastValueFrom(this.connectionApi.getConnection(id!)),
+      enabled: watching,
+      staleTime: 0,
+      refetchInterval: watching ? 3_000 : false,
+    };
+  });
 
   constructor() {
     effect(() => {
       const conn = this.validationConnectionQuery.data();
-      if (this.validationState() !== 'validating' || !conn) {
+      const state = this.validationState();
+      if ((state !== 'validating' && state !== 'timeout') || !conn) {
         return;
       }
       this.handlePollResult(conn.status, conn.lastErrorCode);
@@ -315,15 +318,14 @@ export class StepConnectionComponent implements OnDestroy {
 
     this.timeoutHandle = setTimeout(() => {
       if (this.validationState() === 'validating') {
-        this.stopValidationWatch();
         this.validationState.set('timeout');
-        this.updateCanSubmit();
       }
     }, POLL_TIMEOUT_MS);
   }
 
   private handlePollResult(status: ConnectionStatus, errorCode: string | null): void {
-    if (this.validationState() !== 'validating') {
+    const state = this.validationState();
+    if (state !== 'validating' && state !== 'timeout') {
       return;
     }
 
@@ -358,8 +360,6 @@ export class StepConnectionComponent implements OnDestroy {
 
   private updateCanSubmit(): void {
     const state = this.validationState();
-    this.canSubmit.set(
-      state === 'idle' || state === 'failure' || state === 'timeout',
-    );
+    this.canSubmit.set(state === 'idle' || state === 'failure');
   }
 }

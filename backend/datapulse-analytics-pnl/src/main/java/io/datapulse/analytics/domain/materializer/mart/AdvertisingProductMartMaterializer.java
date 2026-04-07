@@ -56,8 +56,8 @@ public class AdvertisingProductMartMaterializer implements AnalyticsMaterializer
       FROM fact_advertising AS fa
       LEFT JOIN (
           SELECT
-              dp.connection_id,
-              dp.marketplace_sku,
+              dp.connection_id AS connection_id,
+              dp.marketplace_sku AS marketplace_sku,
               toYYYYMM(ff.finance_date) AS period,
               sum(ff.revenue_amount) AS total_revenue
           FROM fact_finance AS ff
@@ -65,7 +65,7 @@ public class AdvertisingProductMartMaterializer implements AnalyticsMaterializer
               ON ff.connection_id = dp.connection_id
               AND ff.seller_sku_id = dp.seller_sku_id
           WHERE ff.attribution_level IN ('POSTING', 'PRODUCT')
-          GROUP BY dp.connection_id, dp.marketplace_sku, period
+          GROUP BY connection_id, marketplace_sku, period
       ) AS ff_rev
           ON fa.connection_id = ff_rev.connection_id
           AND fa.marketplace_sku = ff_rev.marketplace_sku

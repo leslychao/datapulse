@@ -1,8 +1,10 @@
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
   HostListener,
+  OnDestroy,
   computed,
   effect,
   inject,
@@ -19,7 +21,23 @@ import {
 } from '@tanstack/angular-query-experimental';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { lastValueFrom } from 'rxjs';
-import { LucideAngularModule, Info, AlertTriangle, Eye } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  LucideIconData,
+  Info,
+  AlertTriangle,
+  Eye,
+  ArrowLeft,
+  Target,
+  ArrowLeftRight,
+  TrendingUp,
+  Package,
+  Layers,
+  Users,
+  Zap,
+  FlaskConical,
+  Clock,
+} from 'lucide-angular';
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
@@ -53,6 +71,11 @@ import { ConstraintsFormComponent } from './constraints-form.component';
 import { GuardConfigFormComponent } from './guard-config-form.component';
 import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
 
+interface SectionDef {
+  id: string;
+  labelKey: string;
+}
+
 @Component({
   selector: 'dp-policy-form-page',
   standalone: true,
@@ -70,10 +93,10 @@ import { ImpactPreviewModalComponent } from './impact-preview-modal.component';
     GuardConfigFormComponent,
     ImpactPreviewModalComponent,
   ],
-  host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto' },
+  host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto bg-[var(--bg-secondary)]' },
   templateUrl: './policy-form-page.component.html',
 })
-export class PolicyFormPageComponent {
+export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly el = inject(ElementRef);
@@ -83,7 +106,11 @@ export class PolicyFormPageComponent {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
-  readonly icons = { Info, AlertTriangle, Eye };
+  readonly icons = {
+    Info, AlertTriangle, Eye, ArrowLeft,
+    Target, ArrowLeftRight, TrendingUp, Package,
+    Layers, Users, Zap, FlaskConical, Clock,
+  };
 
   readonly policyId = input<string>();
   readonly isEditMode = computed(() => !!this.policyId());
@@ -138,36 +165,64 @@ export class PolicyFormPageComponent {
       ),
   }));
 
-  readonly strategyTypes: { value: StrategyType; labelKey: string; descKey: string }[] = [
+  readonly sections: SectionDef[] = [
+    { id: 'section-basics', labelKey: 'pricing.form.section.general' },
+    { id: 'section-strategy', labelKey: 'pricing.form.section.strategy_select' },
+    { id: 'section-params', labelKey: 'pricing.form.section.strategy' },
+    { id: 'section-constraints', labelKey: 'pricing.form.section.constraints' },
+    { id: 'section-guards', labelKey: 'pricing.form.section.guards' },
+  ];
+  readonly activeSection = signal('section-basics');
+  private observer: IntersectionObserver | null = null;
+
+  readonly strategyTypes: {
+    value: StrategyType;
+    labelKey: string;
+    descKey: string;
+    taglineKey: string;
+    icon: LucideIconData;
+  }[] = [
     {
       value: 'TARGET_MARGIN',
       labelKey: 'pricing.policies.strategy.TARGET_MARGIN',
       descKey: 'pricing.form.tooltip.strategy_type.TARGET_MARGIN',
+      taglineKey: 'pricing.form.strategy_type.TARGET_MARGIN.tagline',
+      icon: Target,
     },
     {
       value: 'PRICE_CORRIDOR',
       labelKey: 'pricing.policies.strategy.PRICE_CORRIDOR',
       descKey: 'pricing.form.tooltip.strategy_type.PRICE_CORRIDOR',
+      taglineKey: 'pricing.form.strategy_type.PRICE_CORRIDOR.tagline',
+      icon: ArrowLeftRight,
     },
     {
       value: 'VELOCITY_ADAPTIVE',
       labelKey: 'pricing.policies.strategy.VELOCITY_ADAPTIVE',
       descKey: 'pricing.form.tooltip.strategy_type.VELOCITY_ADAPTIVE',
+      taglineKey: 'pricing.form.strategy_type.VELOCITY_ADAPTIVE.tagline',
+      icon: TrendingUp,
     },
     {
       value: 'STOCK_BALANCING',
       labelKey: 'pricing.policies.strategy.STOCK_BALANCING',
       descKey: 'pricing.form.tooltip.strategy_type.STOCK_BALANCING',
+      taglineKey: 'pricing.form.strategy_type.STOCK_BALANCING.tagline',
+      icon: Package,
     },
     {
       value: 'COMPOSITE',
       labelKey: 'pricing.policies.strategy.COMPOSITE',
       descKey: 'pricing.form.tooltip.strategy_type.COMPOSITE',
+      taglineKey: 'pricing.form.strategy_type.COMPOSITE.tagline',
+      icon: Layers,
     },
     {
       value: 'COMPETITOR_ANCHOR',
       labelKey: 'pricing.policies.strategy.COMPETITOR_ANCHOR',
       descKey: 'pricing.form.tooltip.strategy_type.COMPETITOR_ANCHOR',
+      taglineKey: 'pricing.form.strategy_type.COMPETITOR_ANCHOR.tagline',
+      icon: Users,
     },
   ];
 
@@ -175,26 +230,31 @@ export class PolicyFormPageComponent {
     value: PolicyExecutionMode;
     labelKey: string;
     descKey: string;
+    icon: LucideIconData;
   }[] = [
     {
       value: 'RECOMMENDATION',
       labelKey: 'pricing.policies.mode.RECOMMENDATION',
       descKey: 'pricing.form.tooltip.execution_mode.RECOMMENDATION',
+      icon: Eye,
     },
     {
       value: 'SEMI_AUTO',
       labelKey: 'pricing.policies.mode.SEMI_AUTO',
       descKey: 'pricing.form.tooltip.execution_mode.SEMI_AUTO',
+      icon: Clock,
     },
     {
       value: 'FULL_AUTO',
       labelKey: 'pricing.policies.mode.FULL_AUTO',
       descKey: 'pricing.form.tooltip.execution_mode.FULL_AUTO',
+      icon: Zap,
     },
     {
       value: 'SIMULATED',
       labelKey: 'pricing.policies.mode.SIMULATED',
       descKey: 'pricing.form.tooltip.execution_mode.SIMULATED',
+      icon: FlaskConical,
     },
   ];
 
@@ -443,7 +503,42 @@ export class PolicyFormPageComponent {
     this.formPristineAfterPatch = true;
   }
 
-  private navigateToList(): void {
+  scrollToSection(sectionId: string): void {
+    const host: HTMLElement = this.el.nativeElement;
+    const target = host.querySelector(`#${sectionId}`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  ngAfterViewInit(): void {
+    this.setupSectionObserver();
+  }
+
+  ngOnDestroy(): void {
+    this.observer?.disconnect();
+  }
+
+  private setupSectionObserver(): void {
+    const host: HTMLElement = this.el.nativeElement;
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            this.activeSection.set(entry.target.id);
+            break;
+          }
+        }
+      },
+      { root: host, rootMargin: '-20% 0px -60% 0px', threshold: 0 },
+    );
+    for (const section of this.sections) {
+      const el = host.querySelector(`#${section.id}`);
+      if (el) this.observer.observe(el);
+    }
+  }
+
+  navigateToList(): void {
     this.router.navigate([
       '/workspace',
       String(this.wsId()),

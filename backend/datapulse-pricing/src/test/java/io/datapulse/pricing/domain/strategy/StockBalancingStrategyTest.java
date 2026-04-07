@@ -56,6 +56,7 @@ class StockBalancingStrategyTest {
       assertThat(result.reasonKey()).isNull();
       assertThat(result.explanation()).contains("days_of_cover=3.0");
       assertThat(result.explanation()).contains("critical_threshold=7");
+      assertThat(result.explanation()).contains("lead_time=14");
       assertThat(result.explanation()).contains("adjustment=+5.0%");
     }
 
@@ -359,6 +360,36 @@ class StockBalancingStrategyTest {
     }
 
     @Test
+    @DisplayName("includes frozen_capital in overstock explanation when available")
+    void should_includeFrozenCapital_when_overstockedWithFrozenCapital() {
+      PricingSignalSet signals = signalsBuilder()
+          .currentPrice(new BigDecimal("5000"))
+          .daysOfCover(new BigDecimal("85"))
+          .frozenCapital(new BigDecimal("450000"))
+          .build();
+
+      StrategyResult result = strategy.calculate(signals, policySnapshot(defaultParams()));
+
+      assertThat(result.explanation())
+          .contains("frozen_capital=450000")
+          .contains("overstock_threshold=60");
+    }
+
+    @Test
+    @DisplayName("omits frozen_capital when null")
+    void should_omitFrozenCapital_when_null() {
+      PricingSignalSet signals = signalsBuilder()
+          .currentPrice(new BigDecimal("5000"))
+          .daysOfCover(new BigDecimal("85"))
+          .frozenCapital(null)
+          .build();
+
+      StrategyResult result = strategy.calculate(signals, policySnapshot(defaultParams()));
+
+      assertThat(result.explanation()).doesNotContain("frozen_capital");
+    }
+
+    @Test
     @DisplayName("daysOfCover just below critical triggers markup")
     void should_markup_when_justBelowCritical() {
       // daysOfCover=6.9 < critical=7 → near-stockout
@@ -445,6 +476,7 @@ class StockBalancingStrategyTest {
 
     private BigDecimal currentPrice;
     private BigDecimal daysOfCover;
+    private BigDecimal frozenCapital;
 
     SignalSetBuilder currentPrice(BigDecimal v) {
       this.currentPrice = v;
@@ -456,12 +488,17 @@ class StockBalancingStrategyTest {
       return this;
     }
 
+    SignalSetBuilder frozenCapital(BigDecimal v) {
+      this.frozenCapital = v;
+      return this;
+    }
+
     PricingSignalSet build() {
       return new PricingSignalSet(
           currentPrice, null, null, null, false, false,
           null, null, null, null, null, null, null, null,
           null, null, daysOfCover,
-          null, null,
+          frozenCapital, null,
           null, null, null);
     }
   }

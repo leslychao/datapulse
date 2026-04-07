@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -62,11 +63,16 @@ public class BulkManualPricingService {
     public BulkManualPreviewResponse preview(BulkManualPreviewRequest request,
                                              long workspaceId) {
         Map<Long, EnrichedOfferRow> offers = loadOffers(request, workspaceId);
+        long connectionId = resolveConnectionId(offers);
+        BulkSignalContext signalCtx = loadSignalContext(
+                List.copyOf(offers.keySet()), connectionId);
+
         List<OfferPreview> previews = new ArrayList<>();
         var stats = new PreviewStats();
 
         for (PriceChange change : request.changes()) {
-            OfferPreview preview = evaluateOffer(change, offers.get(change.marketplaceOfferId()), stats);
+            OfferPreview preview = evaluateOffer(
+                    change, offers.get(change.marketplaceOfferId()), signalCtx, stats);
             previews.add(preview);
         }
 
@@ -86,12 +92,14 @@ public class BulkManualPricingService {
             throw BadRequestException.of(MessageCodes.PRICING_AUTOMATION_BLOCKED);
         }
 
+        BulkSignalContext signalCtx = loadSignalContext(
+                List.copyOf(offers.keySet()), connectionId);
         PricingRunEntity run = createRun(workspaceId, connectionId, hash, request.changes().size());
-        return processApply(request, offers, run, workspaceId);
+        return processApply(request, offers, run, workspaceId, signalCtx);
     }
 
     private OfferPreview evaluateOffer(PriceChange change, EnrichedOfferRow offer,
-                                       PreviewStats stats) {
+                                       BulkSignalContext signalCtx, PreviewStats stats) {
         if (offer == null) {
             stats.skip();
             return buildSkipPreview(change, null, MessageCodes.ENTITY_NOT_FOUND, null);
@@ -99,7 +107,10 @@ public class BulkManualPricingService {
 
         BigDecimal currentPrice = offer.currentPrice();
         PolicySnapshot snapshot = buildBulkSnapshot(offer);
-        PricingSignalSet signals = buildBulkSignals(offer, currentPrice);
+        PricingSignalSet signals = buildBulkSignals(offer, currentPrice,
+                signalCtx.lockedOfferIds().contains(offer.id()),
+                signalCtx.promoActiveOfferIds().contains(offer.id()),
+                signalCtx.dataFreshnessAt());
 
         ConstraintResolution constrained = constraintResolver.resolve(
                 change.targetPrice(), signals, snapshot);
@@ -133,7 +144,8 @@ public class BulkManualPricingService {
 
     private BulkManualApplyResponse processApply(BulkManualPreviewRequest request,
                                                   Map<Long, EnrichedOfferRow> offers,
-                                                  PricingRunEntity run, long workspaceId) {
+                                                  PricingRunEntity run, long workspaceId,
+                                                  BulkSignalContext signalCtx) {
         int processed = 0;
         int skipped = 0;
         int errored = 0;
@@ -147,7 +159,8 @@ public class BulkManualPricingService {
                 continue;
             }
             try {
-                PriceDecisionEntity decision = buildAndEvaluateDecision(run, offer, change.targetPrice());
+                PriceDecisionEntity decision = buildAndEvaluateDecision(
+                        run, offer, change.targetPrice(), signalCtx);
                 if (decision != null) {
                     decisions.add(decision);
                     processed++;
@@ -179,10 +192,14 @@ public class BulkManualPricingService {
 
     private PriceDecisionEntity buildAndEvaluateDecision(PricingRunEntity run,
                                                           EnrichedOfferRow offer,
-                                                          BigDecimal targetPrice) {
+                                                          BigDecimal targetPrice,
+                                                          BulkSignalContext signalCtx) {
         BigDecimal currentPrice = offer.currentPrice();
         PolicySnapshot snapshot = buildBulkSnapshot(offer);
-        PricingSignalSet signals = buildBulkSignals(offer, currentPrice);
+        PricingSignalSet signals = buildBulkSignals(offer, currentPrice,
+                signalCtx.lockedOfferIds().contains(offer.id()),
+                signalCtx.promoActiveOfferIds().contains(offer.id()),
+                signalCtx.dataFreshnessAt());
 
         ConstraintResolution constrained = constraintResolver.resolve(
                 targetPrice, signals, snapshot);
@@ -274,15 +291,16 @@ public class BulkManualPricingService {
                 "{}", null, null, null, null, null, ExecutionMode.FULL_AUTO);
     }
 
-    private PricingSignalSet buildBulkSignals(EnrichedOfferRow offer, BigDecimal currentPrice) {
+    private PricingSignalSet buildBulkSignals(EnrichedOfferRow offer, BigDecimal currentPrice,
+                                               boolean manualLockActive, boolean promoActive,
+                                               OffsetDateTime dataFreshnessAt) {
         return new PricingSignalSet(
                 currentPrice, offer.cogs(), offer.status(), null,
-                false, false,
+                manualLockActive, promoActive,
                 null, null, null, null,
+                null, null, dataFreshnessAt,
                 null, null, null, null,
-                null, null, null,
-                null, null,
-                null, null, null);
+                null, null, null, null, null);
     }
 
     private void ensureNotDuplicate(String hash) {
@@ -329,6 +347,16 @@ public class BulkManualPricingService {
                 .toList();
         return dataReadRepository.findOffersByIds(offerIds, workspaceId).stream()
                 .collect(Collectors.toMap(EnrichedOfferRow::id, Function.identity()));
+    }
+
+    private BulkSignalContext loadSignalContext(List<Long> offerIds, long connectionId) {
+        Set<Long> lockedOfferIds = Set.copyOf(
+                dataReadRepository.findLockedOfferIds(offerIds));
+        Set<Long> promoActiveOfferIds =
+                dataReadRepository.findPromoActiveOfferIds(offerIds);
+        OffsetDateTime dataFreshnessAt =
+                dataReadRepository.findDataFreshness(connectionId);
+        return new BulkSignalContext(lockedOfferIds, promoActiveOfferIds, dataFreshnessAt);
     }
 
     private Long resolveConnectionId(Map<Long, EnrichedOfferRow> offers) {
@@ -381,6 +409,13 @@ public class BulkManualPricingService {
             log.error("JSON serialization failed", e);
             return "{}";
         }
+    }
+
+    private record BulkSignalContext(
+            Set<Long> lockedOfferIds,
+            Set<Long> promoActiveOfferIds,
+            OffsetDateTime dataFreshnessAt
+    ) {
     }
 
     private static class PreviewStats {

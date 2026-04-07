@@ -10,6 +10,7 @@ import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
+import io.datapulse.pricing.persistence.PricePolicyRepository;
 import io.datapulse.pricing.persistence.PricingRunEntity;
 import io.datapulse.pricing.persistence.PricingRunReadRepository;
 import io.datapulse.pricing.persistence.PricingRunRepository;
@@ -29,6 +30,7 @@ public class PricingRunApiService {
 
     private final PricingRunRepository runRepository;
     private final PricingRunReadRepository runReadRepository;
+    private final PricePolicyRepository policyRepository;
     private final PricingRunMapper runMapper;
     private final OutboxService outboxService;
 
@@ -53,6 +55,11 @@ public class PricingRunApiService {
     @Transactional
     public void triggerPostSyncRun(long connectionId, long workspaceId,
                                    long sourceJobExecutionId) {
+        if (!hasActivePolicies(workspaceId)) {
+            log.debug("POST_SYNC run skipped: no active policies, workspaceId={}, connectionId={}",
+                    workspaceId, connectionId);
+            return;
+        }
         if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)
                 || runRepository.existsBySourceJobExecutionId(sourceJobExecutionId)) {
             log.debug("POST_SYNC run skipped: connectionId={}, jobId={} (in-progress or duplicate)",
@@ -75,6 +82,11 @@ public class PricingRunApiService {
 
     @Transactional
     public void triggerScheduledRun(long connectionId, long workspaceId) {
+        if (!hasActivePolicies(workspaceId)) {
+            log.debug("Scheduled run skipped: no active policies, workspaceId={}, connectionId={}",
+                    workspaceId, connectionId);
+            return;
+        }
         if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)) {
             log.debug("Scheduled run skipped: connectionId={} (run in progress)", connectionId);
             return;
@@ -93,6 +105,11 @@ public class PricingRunApiService {
 
     @Transactional
     public void triggerPolicyChangeRun(long connectionId, long workspaceId) {
+        if (!hasActivePolicies(workspaceId)) {
+            log.debug("Policy change run skipped: no active policies, workspaceId={}, connectionId={}",
+                    workspaceId, connectionId);
+            return;
+        }
         if (runRepository.existsByConnectionIdAndStatus(connectionId, RunStatus.IN_PROGRESS)) {
             log.debug("Policy change run skipped: connectionId={} (run in progress)", connectionId);
             return;
@@ -116,6 +133,10 @@ public class PricingRunApiService {
                 PRICING_RUN_AGGREGATE_TYPE,
                 pricingRunId,
                 Map.of("runId", pricingRunId));
+    }
+
+    private boolean hasActivePolicies(long workspaceId) {
+        return policyRepository.existsByWorkspaceIdAndStatus(workspaceId, PolicyStatus.ACTIVE);
     }
 
     private void ensureNoRunInProgress(long connectionId) {

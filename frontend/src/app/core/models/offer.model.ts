@@ -183,6 +183,7 @@ export interface ActionHistoryEntry {
 }
 
 export interface BulkActionResponse {
+  pricingRunId?: number;
   processed: number;
   skipped: number;
   errored: number;
@@ -193,32 +194,40 @@ export interface DraftPriceChange {
   offerId: number;
   newPrice: number;
   originalPrice: number;
+  costPrice: number | null;
 }
 
 export interface BulkManualPreviewRequest {
-  items: DraftPriceChange[];
+  changes: { marketplaceOfferId: number; targetPrice: number }[];
 }
 
-export interface BulkManualPreviewItem {
-  offerId: number;
+export interface BulkManualPreviewSummary {
+  totalRequested: number;
+  willChange: number;
+  willSkip: number;
+  willBlock: number;
+  avgChangePct: number;
+  minMarginAfter: number | null;
+  maxChangePct: number;
+}
+
+export interface BulkManualPreviewOffer {
+  marketplaceOfferId: number;
   skuCode: string;
   productName: string;
   currentPrice: number;
-  targetPrice: number;
-  deltaPct: number;
-  currentMargin: number | null;
-  projectedMargin: number | null;
-  status: 'CHANGE' | 'SKIP';
+  requestedPrice: number;
+  effectivePrice: number;
+  result: 'CHANGE' | 'SKIP';
+  constraintsApplied: { name: string; fromPrice: number; toPrice: number }[];
+  projectedMarginPct: number | null;
   skipReason: string | null;
+  guard: string | null;
 }
 
 export interface BulkManualPreviewResponse {
-  items: BulkManualPreviewItem[];
-  totalChange: number;
-  totalSkip: number;
-  avgDeltaPct: number;
-  minMargin: number | null;
-  maxDeltaPct: number;
+  summary: BulkManualPreviewSummary;
+  offers: BulkManualPreviewOffer[];
 }
 
 export interface LockPriceRequest {

@@ -9,9 +9,11 @@ import { AgGridAngular } from 'ag-grid-angular';
 import {
   CellContextMenuEvent,
   ColDef,
+  GetContextMenuItemsParams,
   GetRowIdParams,
   GridApi,
   GridReadyEvent,
+  MenuItemDef,
   RowClickedEvent,
   RowDoubleClickedEvent,
   RowDataUpdatedEvent,
@@ -33,7 +35,7 @@ const DEFAULT_COL_DEF: ColDef = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AgGridAngular],
   template: `
-    <div [style.height]="height()" class="w-full">
+    <div [style.height]="height()" class="w-full" [class.dp-grid-clickable]="clickableRows()">
       @if (loading()) {
         <div class="flex h-full items-center justify-center">
           <span
@@ -53,7 +55,7 @@ const DEFAULT_COL_DEF: ColDef = {
           [rowSelection]="rowSelection()"
           [getRowId]="getRowId()"
           [selectionColumnDef]="selectionColumnDef"
-          [suppressCellFocus]="true"
+          [suppressCellFocus]="suppressCellFocus()"
           [suppressRowClickSelection]="true"
           [alwaysShowVerticalScroll]="true"
           [animateRows]="false"
@@ -66,7 +68,8 @@ const DEFAULT_COL_DEF: ColDef = {
           (rowDataUpdated)="onRowDataUpdated($event)"
           (cellContextMenu)="onCellContextMenu($event)"
           (gridReady)="onGridReady($event)"
-          [suppressContextMenu]="true"
+          [suppressContextMenu]="!getContextMenuItems()"
+          [getContextMenuItems]="getContextMenuItems()"
         ></ag-grid-angular>
       }
     </div>
@@ -85,8 +88,11 @@ export class DataGridComponent {
   readonly density = input<'compact' | 'comfortable' | 'normal'>('normal');
   readonly selectable = input(false);
 
+  readonly clickableRows = input(false);
+  readonly suppressCellFocus = input(true);
   readonly enableFlash = input(false);
   readonly contextMenuEnabled = input(false);
+  readonly getContextMenuItems = input<(params: GetContextMenuItemsParams) => (string | MenuItemDef)[]>();
 
   readonly rowClicked = output<any>();
   readonly cellDoubleClicked = output<any>();

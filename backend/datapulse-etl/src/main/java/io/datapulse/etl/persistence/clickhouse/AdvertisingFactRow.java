@@ -1,6 +1,7 @@
 package io.datapulse.etl.persistence.clickhouse;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 /**
@@ -24,4 +25,21 @@ public record AdvertisingFactRow(
     BigDecimal cpc,
     float cr,
     long jobExecutionId
-) {}
+) {
+
+  public static AdvertisingFactRow fromOzon(
+      long connectionId, long campaignId, LocalDate adDate,
+      String sku, long views, long clicks, BigDecimal spend,
+      int orders, BigDecimal revenue, long jobExecutionId) {
+    float ctr = views > 0 ? (float) clicks / views : 0f;
+    BigDecimal cpc = clicks > 0
+        ? spend.divide(BigDecimal.valueOf(clicks), 2, RoundingMode.HALF_UP)
+        : BigDecimal.ZERO;
+    float cr = clicks > 0 ? (float) orders / clicks : 0f;
+
+    return new AdvertisingFactRow(
+        connectionId, "OZON", campaignId, adDate, sku,
+        views, clicks, spend, orders, orders, revenue,
+        0, ctr, cpc, cr, jobExecutionId);
+  }
+}

@@ -77,6 +77,7 @@ import { formatMoney } from '@shared/utils/format.utils';
             [pagination]="false"
             [pageSize]="25"
             height="calc(100vh - 320px)"
+            [clickableRows]="true"
             (rowClicked)="selectProduct($event)"
             (gridReady)="onGridReady($event)"
           />

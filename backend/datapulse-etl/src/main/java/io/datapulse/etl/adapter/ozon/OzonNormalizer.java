@@ -276,7 +276,8 @@ public class OzonNormalizer {
                 item.returnReasonName(),
                 currency,
                 returnDate,
-                item.status()
+                item.status(),
+                null
         );
     }
 

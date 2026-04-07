@@ -132,13 +132,13 @@ public class PricingConstraintResolver {
 
     private BigDecimal applyRounding(BigDecimal price, PolicySnapshot policy,
                                      List<ConstraintRecord> applied) {
-        TargetMarginParams params = tryParseTargetMarginParams(policy);
-        if (params == null) {
+        RoundingConfig config = tryParseRoundingConfig(policy);
+        if (config == null || config.roundingStep() == null) {
             return price;
         }
 
-        BigDecimal step = params.effectiveRoundingStep();
-        TargetMarginParams.RoundingDirection direction = params.effectiveRoundingDirection();
+        BigDecimal step = config.effectiveRoundingStep();
+        TargetMarginParams.RoundingDirection direction = config.effectiveRoundingDirection();
 
         BigDecimal rounded = switch (direction) {
             case FLOOR -> price.divide(step, 0, RoundingMode.FLOOR).multiply(step);
@@ -152,12 +152,10 @@ public class PricingConstraintResolver {
         return rounded;
     }
 
-    private TargetMarginParams tryParseTargetMarginParams(PolicySnapshot policy) {
-        if (policy.strategyType() != PolicyType.TARGET_MARGIN) {
-            return null;
-        }
+    private RoundingConfig tryParseRoundingConfig(PolicySnapshot policy) {
         try {
-            return objectMapper.readValue(policy.strategyParams(), TargetMarginParams.class);
+            return objectMapper.readValue(
+                policy.strategyParams(), RoundingConfig.class);
         } catch (JsonProcessingException e) {
             return null;
         }

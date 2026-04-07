@@ -194,6 +194,7 @@ const DECISION_COLOR: Record<string, string> = {
               [pageSize]="100"
               [getRowId]="getRowId"
               [height]="'100%'"
+              [clickableRows]="true"
               (rowClicked)="onDecisionRowClicked($event)"
             />
           }

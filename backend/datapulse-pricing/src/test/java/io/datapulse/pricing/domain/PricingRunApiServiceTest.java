@@ -34,6 +34,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
+import io.datapulse.pricing.persistence.PricePolicyRepository;
 import io.datapulse.pricing.persistence.PricingRunEntity;
 import io.datapulse.pricing.persistence.PricingRunReadRepository;
 import io.datapulse.pricing.persistence.PricingRunRepository;
@@ -43,6 +44,7 @@ class PricingRunApiServiceTest {
 
   @Mock private PricingRunRepository runRepository;
   @Mock private PricingRunReadRepository runReadRepository;
+  @Mock private PricePolicyRepository policyRepository;
   @Mock private PricingRunMapper runMapper;
   @Mock private OutboxService outboxService;
 

@@ -26,7 +26,7 @@ import {
 } from 'lucide-angular';
 
 import { PricingAiApiService } from '@core/api/pricing-ai-api.service';
-import { InsightSeverity, InsightType, PricingInsight } from '@core/models';
+import { InsightSeverity, InsightType, Page, PricingInsight } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 
@@ -175,9 +175,17 @@ export class InsightsPageComponent {
       this.filterType(),
       this.filterAcknowledged(),
     ],
-    queryFn: () => {
+    queryFn: (): Promise<Page<PricingInsight>> => {
       const wsId = this.wsStore.currentWorkspaceId();
-      if (!wsId) return Promise.resolve({ content: [], totalElements: 0 });
+      if (!wsId) {
+        return Promise.resolve({
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          number: 0,
+          size: 0,
+        });
+      }
       return lastValueFrom(
         this.aiApi.listInsights(
           wsId,

@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.datapulse.common.exception.NotFoundException;
+import io.datapulse.platform.audit.AuditPublisher;
 import io.datapulse.platform.security.WorkspaceAccessService;
 import io.datapulse.platform.security.WorkspaceContext;
 import io.datapulse.sellerops.api.OfferController;
@@ -51,6 +52,9 @@ class OfferControllerSliceTest {
 
   @MockitoBean
   private WorkspaceMemberRepository workspaceMemberRepository;
+
+  @MockitoBean
+  private AuditPublisher auditPublisher;
 
   @BeforeEach
   void setUp() {

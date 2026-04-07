@@ -48,6 +48,10 @@ services:
       OUTBOX_ENABLED: ${OUTBOX_ENABLED:-true}
       OUTBOX_RUNTIME: ${OUTBOX_RUNTIME:-ALL}
       MANAGEMENT_ENDPOINTS_INCLUDE: ${MANAGEMENT_ENDPOINTS_INCLUDE:-health,info,prometheus,metrics}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-datapulse}
+      LLM_TIMEOUT_FAST: ${LLM_TIMEOUT_FAST:-2000}
+      LLM_TIMEOUT_SLOW: ${LLM_TIMEOUT_SLOW:-15000}
     depends_on:
       postgres:
         condition: service_healthy

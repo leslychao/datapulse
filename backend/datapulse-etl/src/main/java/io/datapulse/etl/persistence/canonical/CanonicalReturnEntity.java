@@ -52,6 +52,9 @@ public class CanonicalReturnEntity extends BaseEntity {
     @Column(nullable = false, length = 3)
     private String currency;
 
+    @Column(name = "fulfillment_type", length = 10)
+    private String fulfillmentType;
+
     @Column(name = "job_execution_id", nullable = false)
     private Long jobExecutionId;
 }
