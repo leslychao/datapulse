@@ -41,6 +41,7 @@ interface ColumnDef {
   defaultWidth: number;
   minWidth: number;
   align: 'left' | 'right';
+  flex?: boolean;
 }
 
 const RUN_STATUS_COLOR: Record<string, string> = {
@@ -130,7 +131,7 @@ export class RunsListPageComponent {
   readonly columnDefs: ColumnDef[] = [
     { key: 'id', label: '#', sortField: 'id', defaultWidth: 50, minWidth: 40, align: 'right' },
     { key: 'trigger', label: this.translate.instant('pricing.runs.col.trigger'), sortField: 'triggerType', defaultWidth: 110, minWidth: 80, align: 'left' },
-    { key: 'connection', label: this.translate.instant('pricing.runs.col.connection'), sortField: 'connectionName', defaultWidth: 180, minWidth: 100, align: 'left' },
+    { key: 'connection', label: this.translate.instant('pricing.runs.col.connection'), sortField: 'connectionName', defaultWidth: 180, minWidth: 100, align: 'left', flex: true },
     { key: 'status', label: this.translate.instant('pricing.runs.col.status'), sortField: 'status', defaultWidth: 130, minWidth: 90, align: 'left' },
     { key: 'total', label: this.translate.instant('pricing.runs.col.total'), sortField: 'totalOffers', defaultWidth: 60, minWidth: 45, align: 'right' },
     { key: 'change', label: this.translate.instant('pricing.runs.col.change'), sortField: 'changeCount', defaultWidth: 65, minWidth: 45, align: 'right' },

@@ -14,6 +14,7 @@ import {
   GridApi,
   GridReadyEvent,
   MenuItemDef,
+  RowClassRules,
   RowClickedEvent,
   RowDoubleClickedEvent,
   RowDataUpdatedEvent,
@@ -56,6 +57,7 @@ const DEFAULT_COL_DEF: ColDef = {
           [getRowId]="getRowId()"
           [selectionColumnDef]="selectionColumnDef"
           [suppressCellFocus]="suppressCellFocus()"
+          [rowClassRules]="rowClassRules()"
           [suppressRowClickSelection]="true"
           [alwaysShowVerticalScroll]="true"
           [animateRows]="false"
@@ -88,6 +90,7 @@ export class DataGridComponent {
   readonly density = input<'compact' | 'comfortable' | 'normal'>('normal');
   readonly selectable = input(false);
 
+  readonly rowClassRules = input<RowClassRules>({});
   readonly clickableRows = input(false);
   readonly suppressCellFocus = input(true);
   readonly enableFlash = input(false);

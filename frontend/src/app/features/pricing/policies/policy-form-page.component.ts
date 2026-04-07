@@ -441,7 +441,19 @@ export class PolicyFormPageComponent implements AfterViewInit, OnDestroy {
 
     if (policy.strategyType === 'TARGET_MARGIN') {
       const params = policy.strategyParams as TargetMarginParams;
-      this.form.get('targetMargin')!.patchValue(params);
+      this.form.get('targetMargin')!.patchValue({
+        targetMarginPct: params.targetMarginPct != null ? Math.round(params.targetMarginPct * 100) : null,
+        commissionSource: params.commissionSource,
+        commissionManualPct: params.commissionManualPct != null ? Math.round(params.commissionManualPct * 100) : null,
+        commissionLookbackDays: params.commissionLookbackDays,
+        commissionMinTransactions: params.commissionMinTransactions,
+        logisticsSource: params.logisticsSource,
+        logisticsManualAmount: params.logisticsManualAmount,
+        includeReturnAdjustment: params.includeReturnAdjustment,
+        includeAdCost: params.includeAdCost,
+        roundingStep: params.roundingStep,
+        roundingDirection: params.roundingDirection,
+      });
     } else if (policy.strategyType === 'VELOCITY_ADAPTIVE') {
       const params = policy.strategyParams as VelocityAdaptiveParams;
       this.form.get('velocity')!.patchValue({

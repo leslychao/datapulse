@@ -2,7 +2,11 @@
 <ng-template #colGroup>
   <colgroup>
     @for (col of columnDefs; track col.key) {
-      <col [style.width.px]="colWidth(col.key)" />
+      @if (col.flex) {
+        <col />
+      } @else {
+        <col [style.width.px]="colWidth(col.key)" />
+      }
     }
   </colgroup>
 </ng-template>
@@ -159,6 +163,14 @@
                   ></span>
                   {{ 'pricing.runs.status.' + run.status | translate }}
                 </span>
+                @if (run.simulatedDecisionCount > 0) {
+                  <span
+                    class="ml-1 inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--status-info)_12%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--status-info)]"
+                    [title]="'pricing.execution_mode.SIMULATED' | translate"
+                  >
+                    {{ 'pricing.execution_mode.sim_badge' | translate }}
+                  </span>
+                }
               </td>
               <td class="px-2 py-2.5 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
                 {{ run.totalOffers }}
@@ -314,6 +326,11 @@
                                     <span class="inline-block h-1.5 w-1.5 rounded-full" [style.background-color]="decisionColor(d.decisionType)"></span>
                                     {{ 'pricing.decisions.type.' + d.decisionType | translate }}
                                   </span>
+                                  @if (d.executionMode === 'SIMULATED') {
+                                    <span class="ml-1 inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--status-info)_12%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--status-info)]">
+                                      {{ 'pricing.execution_mode.sim_badge' | translate }}
+                                    </span>
+                                  }
                                 </td>
                                 <td class="py-1.5 pr-3 text-right font-mono text-[length:var(--text-sm)] text-[var(--text-secondary)]">
                                   {{ formatPrice(d.currentPrice) }}

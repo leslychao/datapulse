@@ -1,6 +1,10 @@
 package io.datapulse.pricing.domain;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
@@ -10,6 +14,7 @@ import io.datapulse.platform.outbox.OutboxService;
 import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
+import io.datapulse.pricing.persistence.PriceDecisionRepository;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
 import io.datapulse.pricing.persistence.PricingRunEntity;
 import io.datapulse.pricing.persistence.PricingRunReadRepository;
@@ -30,6 +35,7 @@ public class PricingRunApiService {
 
     private final PricingRunRepository runRepository;
     private final PricingRunReadRepository runReadRepository;
+    private final PriceDecisionRepository decisionRepository;
     private final PricePolicyRepository policyRepository;
     private final PricingRunMapper runMapper;
     private final OutboxService outboxService;
@@ -152,14 +158,41 @@ public class PricingRunApiService {
                                              Pageable pageable) {
         Page<PricingRunEntity> page = runReadRepository.findByFilter(
                 workspaceId, filter, pageable);
-        return page.map(runMapper::toResponse);
+
+        List<Long> runIds = page.getContent().stream()
+                .map(PricingRunEntity::getId)
+                .toList();
+
+        Map<Long, Integer> simCounts = runIds.isEmpty()
+                ? Collections.emptyMap()
+                : decisionRepository.countSimulatedByRunIds(runIds).stream()
+                        .collect(Collectors.toMap(
+                                r -> (Long) r[0],
+                                r -> ((Number) r[1]).intValue()));
+
+        Map<Long, String> connNames = runReadRepository.findConnectionNames(
+                page.getContent().stream()
+                        .map(PricingRunEntity::getConnectionId)
+                        .collect(Collectors.toSet()));
+
+        return page.map(entity -> runMapper.toResponse(entity)
+                .withEnrichment(
+                        connNames.getOrDefault(entity.getConnectionId(), ""),
+                        simCounts.getOrDefault(entity.getId(), 0)));
     }
 
     @Transactional(readOnly = true)
     public PricingRunResponse getRun(long runId, long workspaceId) {
         PricingRunEntity entity = runRepository.findByIdAndWorkspaceId(runId, workspaceId)
                 .orElseThrow(() -> NotFoundException.entity("PricingRun", runId));
-        return runMapper.toResponse(entity);
+
+        Map<Long, String> connNames = runReadRepository.findConnectionNames(
+                Set.of(entity.getConnectionId()));
+
+        return runMapper.toResponse(entity)
+                .withEnrichment(
+                        connNames.getOrDefault(entity.getConnectionId(), ""),
+                        0);
     }
 
     @Transactional

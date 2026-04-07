@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 public record PricingRunResponse(
         Long id,
         Long connectionId,
+        String connectionName,
         RunTriggerType triggerType,
         RunStatus status,
         Integer totalOffers,
@@ -18,6 +19,15 @@ public record PricingRunResponse(
         OffsetDateTime startedAt,
         OffsetDateTime completedAt,
         Object errorDetails,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        int simulatedDecisionCount
 ) {
+
+    public PricingRunResponse withEnrichment(String name, int simCount) {
+        return new PricingRunResponse(
+            id, connectionId, name, triggerType, status,
+            totalOffers, eligibleCount, changeCount,
+            skipCount, holdCount, startedAt, completedAt,
+            errorDetails, createdAt, simCount);
+    }
 }

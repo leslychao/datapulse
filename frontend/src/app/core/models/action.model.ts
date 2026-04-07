@@ -111,32 +111,33 @@ export interface ReconcileRequest {
   manualOverrideReason: string;
 }
 
-export interface SimulationComparison {
-  simulatedActionsCount: number;
-  averagePriceDeltaPct: number;
-  directionDistribution: {
-    up: number;
-    down: number;
-    unchanged: number;
-  };
-  coveragePct: number;
-  totalOffers: number;
-  coveredOffers: number;
-  estimatedMarginImpact: number;
-  perConnectionBreakdown: SimulationConnectionBreakdown[];
-  deltaDistribution: DeltaBucket[];
-}
-
-export interface SimulationConnectionBreakdown {
+export interface SimulationComparisonResponse {
   connectionId: number;
-  connectionName: string;
-  marketplace: string;
-  simulatedCount: number;
-  avgDeltaPct: number;
-  marginImpact: number;
+  summary: SimulationSummary;
+  items: SimulationComparisonItem[];
 }
 
-export interface DeltaBucket {
-  bucket: string;
-  count: number;
+export interface SimulationSummary {
+  totalSimulatedActions: number;
+  avgDeltaPct: number;
+  countIncrease: number;
+  countDecrease: number;
+  countUnchanged: number;
+  totalDeltaSum: number;
+  simulatedOfferCount: number;
+  totalOfferCount: number;
+  coveragePct: number;
+}
+
+export interface SimulationComparisonItem {
+  marketplaceOfferId: number;
+  marketplaceSku: string;
+  simulatedPrice: number;
+  canonicalPriceAtSimulation: number;
+  currentRealPrice: number;
+  priceDelta: number;
+  priceDeltaPct: number;
+  previousSimulatedPrice: number | null;
+  simulatedAt: string;
+  priceActionId: number;
 }

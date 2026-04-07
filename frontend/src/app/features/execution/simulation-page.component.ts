@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery, injectMutation, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -14,11 +16,9 @@ import { BarChart3, Percent, TrendingUp, Target } from 'lucide-angular';
 import { ActionApiService } from '@core/api/action-api.service';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
-import { SimulationComparison } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
-import { ChartComponent } from '@shared/components/chart/chart.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
@@ -29,7 +29,8 @@ import { ToastService } from '@shared/shell/toast/toast.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    TranslatePipe, KpiCardComponent, SectionCardComponent, ChartComponent,
+    TranslatePipe, DecimalPipe, DatePipe,
+    KpiCardComponent, SectionCardComponent,
     ConfirmationModalComponent, EmptyStateComponent, SpinnerComponent,
   ],
   template: `
@@ -53,66 +54,92 @@ import { ToastService } from '@shared/shell/toast/toast.service';
         </div>
       </div>
 
-      @if (simulationQuery.isPending()) {
+      @if (connectionsQuery.isPending() || (canQuery() && simulationQuery.isPending())) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (!canQuery()) {
+        <dp-empty-state [message]="'execution.simulation.select_connection' | translate" />
       } @else if (simulationQuery.isError()) {
         <dp-empty-state
           [message]="'execution.simulation.empty_no_policies' | translate"
           [actionLabel]="'execution.simulation.go_to_pricing' | translate"
           (action)="navigateToPricing()"
         />
-      } @else if (!simulationQuery.data() || simulationQuery.data()!.simulatedActionsCount === 0) {
+      } @else if (!hasResults()) {
         <dp-empty-state [message]="'execution.simulation.empty_no_results' | translate" />
       } @else {
-        @if (simulationQuery.data(); as sim) {
+        @if (simulationQuery.data(); as report) {
           <!-- KPI Strip -->
           <div class="grid grid-cols-4 gap-4">
             <dp-kpi-card
               [label]="'execution.simulation.kpi.sim_actions' | translate"
-              [value]="sim.simulatedActionsCount.toLocaleString('ru-RU')"
+              [value]="report.summary.totalSimulatedActions.toLocaleString('ru-RU')"
               [icon]="BarChart3Icon"
               accent="primary"
             />
             <dp-kpi-card
               [label]="'execution.simulation.kpi.avg_delta' | translate"
-              [value]="formatAvgDelta(sim.averagePriceDeltaPct)"
+              [value]="formatAvgDelta(report.summary.avgDeltaPct)"
               [icon]="PercentIcon"
-              [accent]="sim.averagePriceDeltaPct >= 0 ? 'success' : 'error'"
+              [accent]="report.summary.avgDeltaPct >= 0 ? 'success' : 'error'"
             />
             <dp-kpi-card
               [label]="'execution.simulation.kpi.direction' | translate"
-              [value]="formatDirection(sim.directionDistribution)"
+              [value]="formatDirection(report.summary)"
               [icon]="TrendingUpIcon"
               accent="info"
             />
             <dp-kpi-card
               [label]="'execution.simulation.kpi.coverage' | translate"
-              [value]="formatCoverage(sim.coveragePct)"
-              [subtitle]="translate.instant('execution.simulation.kpi.coverage_detail', { covered: sim.coveredOffers, total: sim.totalOffers })"
+              [value]="formatCoverage(report.summary.coveragePct)"
+              [subtitle]="translate.instant('execution.simulation.kpi.coverage_detail', { covered: report.summary.simulatedOfferCount, total: report.summary.totalOfferCount })"
               [icon]="TargetIcon"
-              [accent]="sim.coveragePct < 0.5 ? 'warning' : 'primary'"
-              [tooltip]="sim.coveragePct < 0.5 ? ('execution.simulation.kpi.coverage_low_tooltip' | translate) : ''"
+              [accent]="report.summary.coveragePct < 0.5 ? 'warning' : 'primary'"
+              [tooltip]="report.summary.coveragePct < 0.5 ? ('execution.simulation.kpi.coverage_low_tooltip' | translate) : ''"
             />
           </div>
 
-          <!-- Margin Impact Chart -->
-          <dp-section-card [title]="'execution.simulation.margin_impact' | translate">
-            <div [attr.aria-label]="marginChartAriaLabel()" role="img">
-              <dp-chart [options]="marginChartOptions()" height="300px" />
-            </div>
-          </dp-section-card>
-
-          <!-- Distribution Chart -->
-          <dp-section-card [title]="'execution.simulation.distribution_title' | translate">
-            <div [attr.aria-label]="distributionChartAriaLabel()" role="img">
-              <dp-chart [options]="distributionChartOptions()" height="250px" />
-            </div>
-          </dp-section-card>
+          <!-- Items Table -->
+          @if (report.items.length) {
+            <dp-section-card [title]="'execution.simulation.items_title' | translate">
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b border-[var(--border-default)] text-left text-[var(--text-secondary)]">
+                      <th class="px-3 py-2 font-medium">{{ 'execution.simulation.col.sku' | translate }}</th>
+                      <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.current_price' | translate }}</th>
+                      <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.simulated_price' | translate }}</th>
+                      <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.delta' | translate }}</th>
+                      <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.delta_pct' | translate }}</th>
+                      <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.simulated_at' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of report.items; track item.marketplaceOfferId) {
+                      <tr class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]">
+                        <td class="px-3 py-2 font-mono text-[var(--text-primary)]">{{ item.marketplaceSku }}</td>
+                        <td class="px-3 py-2 text-right font-mono text-[var(--text-secondary)]">{{ item.canonicalPriceAtSimulation | number:'1.0-2':'ru' }} ₽</td>
+                        <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">{{ item.simulatedPrice | number:'1.0-2':'ru' }} ₽</td>
+                        <td class="px-3 py-2 text-right font-mono"
+                            [class]="item.priceDelta >= 0 ? 'text-[var(--finance-positive)]' : 'text-[var(--finance-negative)]'">
+                          {{ item.priceDelta >= 0 ? '+' : '' }}{{ item.priceDelta | number:'1.0-2':'ru' }} ₽
+                        </td>
+                        <td class="px-3 py-2 text-right font-mono"
+                            [class]="item.priceDeltaPct >= 0 ? 'text-[var(--finance-positive)]' : 'text-[var(--finance-negative)]'">
+                          {{ item.priceDeltaPct >= 0 ? '+' : '' }}{{ item.priceDeltaPct | number:'1.1-1':'ru' }}%
+                        </td>
+                        <td class="px-3 py-2 text-right text-[var(--text-secondary)]">{{ item.simulatedAt | date:'dd.MM.yy HH:mm' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </dp-section-card>
+          }
         }
       }
 
       <!-- Danger Zone -->
-      @if (rbac.canResetSimulation()) {
+      @if (canQuery() && rbac.canResetSimulation()) {
         <div class="rounded-[var(--radius-lg)] border-2 border-dashed border-[var(--status-error)] p-5">
           <h3 class="mb-2 text-sm font-semibold text-[var(--status-error)]">{{ 'execution.simulation.danger_zone_title' | translate }}</h3>
           <p class="mb-4 text-sm text-[var(--text-secondary)]">{{ 'execution.simulation.danger_zone_desc' | translate }}</p>
@@ -161,9 +188,18 @@ export class SimulationPageComponent {
     staleTime: 120_000,
   }));
 
-  private readonly canQuery = computed(
+  protected readonly canQuery = computed(
     () => !!this.wsStore.currentWorkspaceId() && this.connectionId() > 0,
   );
+
+  constructor() {
+    effect(() => {
+      const connections = this.connectionsQuery.data();
+      if (connections?.length && this.connectionId() === 0) {
+        this.connectionId.set(connections[0].id);
+      }
+    });
+  }
 
   protected readonly simulationQuery = injectQuery(() => {
     const wsId = this.wsStore.currentWorkspaceId();
@@ -177,58 +213,9 @@ export class SimulationPageComponent {
     };
   });
 
-  protected readonly marginChartOptions = computed(() => {
-    const sim = this.simulationQuery.data();
-    if (!sim) return {};
-    const breakdown = sim.perConnectionBreakdown;
-    return {
-      tooltip: { trigger: 'axis' as const },
-      xAxis: { type: 'value' as const },
-      yAxis: {
-        type: 'category' as const,
-        data: breakdown.map(b => b.connectionName),
-      },
-      series: [{
-        type: 'bar' as const,
-        data: breakdown.map(b => ({
-          value: b.marginImpact,
-          itemStyle: {
-            color: b.marginImpact >= 0
-              ? 'var(--finance-positive)'
-              : 'var(--finance-negative)',
-          },
-        })),
-        label: {
-          show: true,
-          position: 'right' as const,
-          formatter: (p: any) => {
-            const v = p.value;
-            return `${v >= 0 ? '+' : ''}${v.toLocaleString('ru-RU')}₽`;
-          },
-        },
-      }],
-      grid: { left: 120, right: 100, top: 10, bottom: 10 },
-    };
-  });
-
-  protected readonly distributionChartOptions = computed(() => {
-    const sim = this.simulationQuery.data();
-    if (!sim) return {};
-    const dist = sim.deltaDistribution;
-    return {
-      tooltip: { trigger: 'axis' as const },
-      xAxis: {
-        type: 'category' as const,
-        data: dist.map(d => d.bucket),
-      },
-      yAxis: { type: 'value' as const },
-      series: [{
-        type: 'bar' as const,
-        data: dist.map(d => d.count),
-        itemStyle: { color: 'var(--accent-primary)', borderRadius: [4, 4, 0, 0] },
-      }],
-      grid: { left: 50, right: 20, top: 10, bottom: 30 },
-    };
+  protected readonly hasResults = computed(() => {
+    const data = this.simulationQuery.data();
+    return !!data && data.summary.totalSimulatedActions > 0;
   });
 
   protected readonly resetMutation = injectMutation(() => ({
@@ -264,28 +251,11 @@ export class SimulationPageComponent {
     return `→ 0%`;
   }
 
-  protected formatDirection(dist: SimulationComparison['directionDistribution']): string {
-    const fmt = (v: number) => `${Math.round(v * 100)}%`;
-    return `↑ ${fmt(dist.up)}  ↓ ${fmt(dist.down)}  → ${fmt(dist.unchanged)}`;
+  protected formatDirection(summary: { countIncrease: number; countDecrease: number; countUnchanged: number }): string {
+    return `↑ ${summary.countIncrease}  ↓ ${summary.countDecrease}  → ${summary.countUnchanged}`;
   }
 
   protected formatCoverage(pct: number): string {
     return `${Math.round(pct * 100)}%`;
   }
-
-  protected readonly marginChartAriaLabel = computed(() => {
-    const sim = this.simulationQuery.data();
-    if (!sim) return '';
-    const items = sim.perConnectionBreakdown.map(b =>
-      `${b.connectionName}: ${b.marginImpact >= 0 ? '+' : ''}${b.marginImpact.toLocaleString('ru-RU')}₽`,
-    );
-    return this.translate.instant('execution.simulation.margin_impact') + ': ' + items.join(', ');
-  });
-
-  protected readonly distributionChartAriaLabel = computed(() => {
-    const sim = this.simulationQuery.data();
-    if (!sim) return '';
-    const items = sim.deltaDistribution.map(d => `${d.bucket}: ${d.count}`);
-    return this.translate.instant('execution.simulation.distribution_title') + ': ' + items.join(', ');
-  });
 }

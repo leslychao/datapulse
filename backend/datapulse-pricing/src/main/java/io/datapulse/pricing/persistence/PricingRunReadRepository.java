@@ -7,16 +7,21 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
 public class PricingRunReadRepository {
 
     private final EntityManager entityManager;
+    private final NamedParameterJdbcTemplate jdbc;
 
     public Page<PricingRunEntity> findByFilter(long workspaceId, PricingRunFilter filter,
                                                Pageable pageable) {
@@ -40,6 +45,21 @@ public class PricingRunReadRepository {
         dataQuery.setMaxResults(pageable.getPageSize());
 
         return new PageImpl<>(dataQuery.getResultList(), pageable, total);
+    }
+
+    private static final String CONNECTION_NAMES_SQL = """
+            SELECT id, name FROM marketplace_connection WHERE id IN (:ids)
+            """;
+
+    public Map<Long, String> findConnectionNames(Collection<Long> connectionIds) {
+        if (connectionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(CONNECTION_NAMES_SQL,
+                Map.of("ids", connectionIds),
+                (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("name")))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private void appendFilters(PricingRunFilter filter, StringBuilder where,

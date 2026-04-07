@@ -19,7 +19,7 @@ import { CompetitorPriceAggregation, RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="positionFactor" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.competitor.position_factor' | translate }}
+              {{ 'pricing.form.competitor.position_factor' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -40,7 +40,7 @@ import { CompetitorPriceAggregation, RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="minMarginPct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.competitor.min_margin' | translate }}
+              {{ 'pricing.form.competitor.min_margin' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"

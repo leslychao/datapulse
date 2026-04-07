@@ -14,7 +14,7 @@ import {
   BulkRejectRequest,
   Page,
   ReconcileRequest,
-  SimulationComparison,
+  SimulationComparisonResponse,
 } from '@core/models';
 
 @Injectable({ providedIn: 'root' })
@@ -152,9 +152,9 @@ export class ActionApiService {
   getSimulationComparison(
     workspaceId: number,
     connectionId: number,
-  ): Observable<SimulationComparison> {
+  ): Observable<SimulationComparisonResponse> {
     const params = new HttpParams().set('connectionId', connectionId);
-    return this.http.get<SimulationComparison>(
+    return this.http.get<SimulationComparisonResponse>(
       `${this.base}/workspaces/${workspaceId}/simulation/comparison`,
       { params },
     );

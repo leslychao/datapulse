@@ -8,10 +8,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface PriceDecisionRepository extends JpaRepository<PriceDecisionEntity, Long> {
+
+    @Query("""
+            SELECT d.pricingRunId, COUNT(d) FROM PriceDecisionEntity d
+            WHERE d.pricingRunId IN :runIds AND d.executionMode = 'SIMULATED'
+            GROUP BY d.pricingRunId
+            """)
+    List<Object[]> countSimulatedByRunIds(@Param("runIds") Collection<Long> runIds);
 
     Page<PriceDecisionEntity> findAllByWorkspaceId(Long workspaceId, Pageable pageable);
 

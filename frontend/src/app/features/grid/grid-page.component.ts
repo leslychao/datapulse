@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, HostListener, inject, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { GetContextMenuItemsParams, GridApi, MenuItemDef } from 'ag-grid-community';
+import { GetContextMenuItemsParams, GridApi, MenuItemDef, RowClassRules } from 'ag-grid-community';
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { OfferSummary } from '@core/models';
@@ -94,6 +94,7 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
             [pagination]="false"
             [rowSelection]="rowSelectionConfig"
             [getRowId]="getRowId"
+            [rowClassRules]="activeRowClassRules"
             [height]="'100%'"
             [suppressCellFocus]="!gridStore.draftMode()"
             [getContextMenuItems]="contextMenuItems()"
@@ -162,6 +163,18 @@ export class GridPageComponent implements OnInit, OnDestroy {
   };
 
   protected readonly getRowId = (params: any): string => String(params.data.offerId);
+
+  protected readonly activeRowClassRules: RowClassRules = {
+    'dp-row-active': (params) =>
+      this.detailPanelService.isOpen()
+      && params.data?.offerId === this.detailPanelService.entityId(),
+  };
+
+  private readonly activeRowEffect = effect(() => {
+    this.detailPanelService.entityId();
+    this.detailPanelService.isOpen();
+    this.gridApi?.redrawRows();
+  });
 
   protected readonly showDraftExitConfirm = signal(false);
 
@@ -343,7 +356,10 @@ export class GridPageComponent implements OnInit, OnDestroy {
         }),
       );
     },
-    onSuccess: () => this.offersQuery.refetch(),
+    onSuccess: () => {
+      this.offersQuery.refetch();
+      this.queryClient.invalidateQueries({ queryKey: ['offer-detail'] });
+    },
     onError: () => this.toast.error(this.translate.instant('grid.lock_toggle_error')),
   }));
 

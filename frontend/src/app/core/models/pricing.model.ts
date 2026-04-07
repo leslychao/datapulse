@@ -191,6 +191,7 @@ export interface PricingRunSummary {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  simulatedDecisionCount: number;
 }
 
 export interface PricingRunDetail extends PricingRunSummary {

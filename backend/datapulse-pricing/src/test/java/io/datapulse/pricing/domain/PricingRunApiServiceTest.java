@@ -34,6 +34,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.pricing.api.PricingRunFilter;
 import io.datapulse.pricing.api.PricingRunMapper;
 import io.datapulse.pricing.api.PricingRunResponse;
+import io.datapulse.pricing.persistence.PriceDecisionRepository;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
 import io.datapulse.pricing.persistence.PricingRunEntity;
 import io.datapulse.pricing.persistence.PricingRunReadRepository;
@@ -44,6 +45,7 @@ class PricingRunApiServiceTest {
 
   @Mock private PricingRunRepository runRepository;
   @Mock private PricingRunReadRepository runReadRepository;
+  @Mock private PriceDecisionRepository decisionRepository;
   @Mock private PricePolicyRepository policyRepository;
   @Mock private PricingRunMapper runMapper;
   @Mock private OutboxService outboxService;
@@ -106,17 +108,25 @@ class PricingRunApiServiceTest {
   class GetRun {
 
     @Test
-    @DisplayName("returns response when run exists")
+    @DisplayName("returns response enriched with connection name")
     void should_returnResponse_when_runExists() {
       var entity = new PricingRunEntity();
       entity.setId(1L);
+      entity.setConnectionId(CONNECTION_ID);
+
+      var baseResponse = new PricingRunResponse(
+          1L, CONNECTION_ID, null, RunTriggerType.MANUAL, RunStatus.COMPLETED,
+          10, 8, 5, 2, 1, null, null, null, null, 0);
+
       when(runRepository.findByIdAndWorkspaceId(1L, WORKSPACE_ID))
           .thenReturn(Optional.of(entity));
-      when(runMapper.toResponse(entity)).thenReturn(null);
+      when(runMapper.toResponse(entity)).thenReturn(baseResponse);
+      when(runReadRepository.findConnectionNames(java.util.Set.of(CONNECTION_ID)))
+          .thenReturn(Map.of(CONNECTION_ID, "My Shop"));
 
-      service.getRun(1L, WORKSPACE_ID);
+      PricingRunResponse result = service.getRun(1L, WORKSPACE_ID);
 
-      verify(runMapper).toResponse(entity);
+      assertThat(result.connectionName()).isEqualTo("My Shop");
     }
 
     @Test
@@ -135,18 +145,31 @@ class PricingRunApiServiceTest {
   class ListRuns {
 
     @Test
-    @DisplayName("delegates to read repo and maps results")
+    @DisplayName("delegates to read repo, enriches with connection names and simulated counts")
     void should_delegateToReadRepo_when_listing() {
       PricingRunFilter filter = new PricingRunFilter(null, null, null, null);
       Pageable pageable = PageRequest.of(0, 20);
-      Page<PricingRunEntity> page = new PageImpl<>(List.of(new PricingRunEntity()));
+      var entity = new PricingRunEntity();
+      entity.setId(1L);
+      entity.setConnectionId(CONNECTION_ID);
+      Page<PricingRunEntity> page = new PageImpl<>(List.of(entity));
+
+      var baseResponse = new PricingRunResponse(
+          1L, CONNECTION_ID, null, RunTriggerType.MANUAL, RunStatus.COMPLETED,
+          10, 8, 5, 2, 1, null, null, null, null, 0);
 
       when(runReadRepository.findByFilter(WORKSPACE_ID, filter, pageable)).thenReturn(page);
-      when(runMapper.toResponse(any(PricingRunEntity.class))).thenReturn(null);
+      when(runMapper.toResponse(entity)).thenReturn(baseResponse);
+      when(decisionRepository.countSimulatedByRunIds(List.of(1L)))
+          .thenReturn(List.of(new Object[]{1L, 3L}));
+      when(runReadRepository.findConnectionNames(java.util.Set.of(CONNECTION_ID)))
+          .thenReturn(Map.of(CONNECTION_ID, "Test Connection"));
 
-      service.listRuns(WORKSPACE_ID, filter, pageable);
+      Page<PricingRunResponse> result = service.listRuns(WORKSPACE_ID, filter, pageable);
 
       verify(runReadRepository).findByFilter(WORKSPACE_ID, filter, pageable);
+      assertThat(result.getContent().get(0).connectionName()).isEqualTo("Test Connection");
+      assertThat(result.getContent().get(0).simulatedDecisionCount()).isEqualTo(3);
     }
   }
 }

@@ -17,6 +17,8 @@ public abstract class PricingRunMapper {
     private ObjectMapper objectMapper;
 
     @Mapping(source = "errorDetails", target = "errorDetails", qualifiedByName = "jsonToObject")
+    @Mapping(target = "connectionName", ignore = true)
+    @Mapping(target = "simulatedDecisionCount", constant = "0")
     public abstract PricingRunResponse toResponse(PricingRunEntity entity);
 
     @Named("jsonToObject")

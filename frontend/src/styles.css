@@ -275,6 +275,15 @@ router-outlet + * {
   background-color: var(--bg-active) !important;
 }
 
+/* Active row — the one whose detail panel is open */
+.dp-grid-clickable .ag-row.dp-row-active {
+  background-color: var(--bg-active) !important;
+}
+
+.dp-grid-clickable .ag-pinned-left-cols-container .ag-row.dp-row-active {
+  box-shadow: inset 3px 0 0 var(--accent-primary);
+}
+
 /* Action buttons inside AG Grid cells */
 .action-btn {
   display: inline-flex;

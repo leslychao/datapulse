@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { injectQuery } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { LucideAngularModule, X, PanelLeftClose, Lock, Unlock, Check, Ban, Pause, Play } from 'lucide-angular';
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
-import { StatusColor } from '@shared/components/status-badge.component';
+import { ToastService } from '@shared/shell/toast/toast.service';
 import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 import { OfferOverviewTabComponent } from './offer-overview-tab.component';
 import { OfferPriceJournalTabComponent } from './offer-price-journal-tab.component';
@@ -101,18 +101,22 @@ export type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action
           <div class="flex-1"></div>
 
           @if (offer.manualLock) {
-            <button (click)="unlockClicked.set(true)"
+            <button (click)="toggleLock(offer.offerId, true, offer.currentPrice)"
+                    [disabled]="lockMutation.isPending()"
                     class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)]
                            border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)]
-                           font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]">
+                           font-medium text-[var(--text-primary)] transition-colors
+                           hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50">
               <lucide-icon [img]="unlockIcon" [size]="14" />
               {{ 'detail.actions.unlock' | translate }}
             </button>
           } @else {
-            <button (click)="lockClicked.set(true)"
+            <button (click)="toggleLock(offer.offerId, false, offer.currentPrice)"
+                    [disabled]="lockMutation.isPending()"
                     class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)]
                            border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)]
-                           font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]">
+                           font-medium text-[var(--text-primary)] transition-colors
+                           hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50">
               <lucide-icon [img]="lockIcon" [size]="14" />
               {{ 'detail.actions.lock' | translate }}
             </button>
@@ -167,6 +171,9 @@ export class OfferDetailPanelComponent {
   protected readonly panelService = inject(DetailPanelService);
   private readonly offerApi = inject(OfferApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly queryClient = injectQueryClient();
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly closeIcon = X;
   readonly collapseIcon = PanelLeftClose;
@@ -183,8 +190,6 @@ export class OfferDetailPanelComponent {
   readonly rejectClicked = signal(false);
   readonly holdClicked = signal(false);
   readonly resumeClicked = signal(false);
-  readonly lockClicked = signal(false);
-  readonly unlockClicked = signal(false);
 
   readonly tabs: { key: DetailTab; label: string }[] = [
     { key: 'overview', label: 'detail.tab.overview' },
@@ -204,4 +209,27 @@ export class OfferDetailPanelComponent {
       && !!this.wsStore.currentWorkspaceId(),
     staleTime: 30_000,
   }));
+
+  readonly lockMutation = injectMutation(() => ({
+    mutationFn: (params: { offerId: number; locked: boolean; currentPrice: number | null }) => {
+      const wsId = this.wsStore.currentWorkspaceId()!;
+      if (params.locked) {
+        return lastValueFrom(this.offerApi.unlockOffer(wsId, params.offerId));
+      }
+      return lastValueFrom(
+        this.offerApi.lockOffer(wsId, params.offerId, {
+          lockedPrice: params.currentPrice ?? 0,
+        }),
+      );
+    },
+    onSuccess: () => {
+      this.offerQuery.refetch();
+      this.queryClient.invalidateQueries({ queryKey: ['offers'] });
+    },
+    onError: () => this.toast.error(this.translate.instant('grid.lock_toggle_error')),
+  }));
+
+  toggleLock(offerId: number, currentlyLocked: boolean, currentPrice: number | null): void {
+    this.lockMutation.mutate({ offerId, locked: currentlyLocked, currentPrice });
+  }
 }

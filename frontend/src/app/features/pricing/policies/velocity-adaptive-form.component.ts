@@ -19,7 +19,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="decelerationThreshold" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.velocity.deceleration_threshold' | translate }}
+              {{ 'pricing.form.velocity.deceleration_threshold' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -43,7 +43,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="accelerationThreshold" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.velocity.acceleration_threshold' | translate }}
+              {{ 'pricing.form.velocity.acceleration_threshold' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -69,7 +69,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="decelerationDiscountPct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.velocity.deceleration_discount' | translate }}
+              {{ 'pricing.form.velocity.deceleration_discount' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -93,7 +93,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="accelerationMarkupPct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.velocity.acceleration_markup' | translate }}
+              {{ 'pricing.form.velocity.acceleration_markup' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -118,7 +118,7 @@ import { RoundingDirection } from '@core/models';
       <div class="max-w-xs">
         <div class="mb-1 flex items-center gap-1.5">
           <label for="minBaselineSales" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-            {{ 'pricing.form.velocity.min_baseline_sales' | translate }}
+            {{ 'pricing.form.velocity.min_baseline_sales' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
           </label>
           <span class="group relative inline-flex">
             <lucide-icon [name]="icons.Info" [size]="13"
@@ -140,7 +140,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="velocityWindowShortDays" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.velocity.short_window' | translate }}
+              {{ 'pricing.form.velocity.short_window' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -161,7 +161,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="velocityWindowLongDays" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.velocity.long_window' | translate }}
+              {{ 'pricing.form.velocity.long_window' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"

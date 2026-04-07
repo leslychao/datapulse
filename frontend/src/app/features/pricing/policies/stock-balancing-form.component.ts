@@ -19,7 +19,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="criticalDaysOfCover" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.stock.critical_days' | translate }}
+              {{ 'pricing.form.stock.critical_days' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -39,7 +39,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="overstockDaysOfCover" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.stock.overstock_days' | translate }}
+              {{ 'pricing.form.stock.overstock_days' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -65,7 +65,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="stockoutMarkupPct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.stock.stockout_markup' | translate }}
+              {{ 'pricing.form.stock.stockout_markup' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -88,7 +88,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="overstockDiscountFactor" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.stock.overstock_discount_factor' | translate }}
+              {{ 'pricing.form.stock.overstock_discount_factor' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -113,7 +113,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="maxDiscountPct" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.stock.max_discount' | translate }}
+              {{ 'pricing.form.stock.max_discount' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"
@@ -136,7 +136,7 @@ import { RoundingDirection } from '@core/models';
         <div>
           <div class="mb-1 flex items-center gap-1.5">
             <label for="leadTimeDays" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-              {{ 'pricing.form.stock.lead_time' | translate }}
+              {{ 'pricing.form.stock.lead_time' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
             </label>
             <span class="group relative inline-flex">
               <lucide-icon [name]="icons.Info" [size]="13"

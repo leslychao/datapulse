@@ -91,7 +91,7 @@
             <div>
               <div class="mb-1 flex items-center gap-1.5">
                 <label for="name" class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
-                  {{ 'pricing.form.name' | translate }}
+                  {{ 'pricing.form.name' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
                 </label>
                 <span class="group relative inline-flex">
                   <lucide-icon [name]="icons.Info" [size]="13"
@@ -212,7 +212,7 @@
               <div>
                 <div class="mb-1 flex items-center gap-1.5">
                   <label for="priority" class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
-                    {{ 'pricing.form.priority' | translate }}
+                    {{ 'pricing.form.priority' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
                   </label>
                   <span class="group relative inline-flex">
                     <lucide-icon [name]="icons.Info" [size]="13"
@@ -242,7 +242,7 @@
                 <div>
                   <div class="mb-1 flex items-center gap-1.5">
                     <label for="approvalTimeoutHours" class="text-[var(--text-sm)] font-medium text-[var(--text-secondary)]">
-                      {{ 'pricing.form.approval_timeout' | translate }}
+                      {{ 'pricing.form.approval_timeout' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
                     </label>
                     <span class="group relative inline-flex">
                       <lucide-icon [name]="icons.Info" [size]="13"
@@ -365,7 +365,7 @@
                 <div>
                   <div class="mb-1 flex items-center gap-1.5">
                     <label for="corridorMinPrice" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-                      {{ 'pricing.form.corridor_min_price' | translate }}
+                      {{ 'pricing.form.corridor_min_price' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
                     </label>
                     <span class="group relative inline-flex">
                       <lucide-icon [name]="icons.Info" [size]="13"
@@ -391,7 +391,7 @@
                 <div>
                   <div class="mb-1 flex items-center gap-1.5">
                     <label for="corridorMaxPrice" class="text-[var(--text-sm)] text-[var(--text-secondary)]">
-                      {{ 'pricing.form.corridor_max_price' | translate }}
+                      {{ 'pricing.form.corridor_max_price' | translate }}<span class="ml-0.5 text-[var(--status-error)]">*</span>
                     </label>
                     <span class="group relative inline-flex">
                       <lucide-icon [name]="icons.Info" [size]="13"
