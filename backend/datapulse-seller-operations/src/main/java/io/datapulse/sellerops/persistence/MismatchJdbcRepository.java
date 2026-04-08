@@ -147,7 +147,6 @@ public class MismatchJdbcRepository {
         WHERE workspace_id = :workspaceId
           AND id IN (:ids)
           AND status = 'OPEN'
-          AND details->>'mismatch_type' IS NOT NULL
         """;
     var params = new MapSqlParameterSource()
         .addValue("workspaceId", workspaceId)
@@ -409,7 +408,8 @@ public class MismatchJdbcRepository {
     return jdbc.update(sql, params);
   }
 
-  public int autoResolveClearedStock(long workspaceId, int absoluteThreshold) {
+  public int autoResolveClearedStock(
+      long workspaceId, int absoluteThreshold, double percentThreshold) {
     String sql = """
         UPDATE alert_event
         SET status = 'AUTO_RESOLVED',
@@ -418,17 +418,33 @@ public class MismatchJdbcRepository {
         WHERE workspace_id = :workspaceId
           AND status = 'OPEN'
           AND details->>'mismatch_type' = 'STOCK'
+          AND details->>'offer_id' IS NOT NULL
+          AND details->>'expected_value' IS NOT NULL
           AND NOT EXISTS (
               SELECT 1
-              FROM canonical_stock_current csc
-              WHERE csc.marketplace_offer_id = (alert_event.details->>'offer_id')::bigint
-                AND ABS(csc.quantity - (alert_event.details->>'actual_value')::int)
-                    > :absoluteThreshold
+              FROM (
+                  SELECT
+                      (
+                          SELECT COALESCE(SUM(csc.available), 0)
+                          FROM canonical_stock_current csc
+                          WHERE csc.marketplace_offer_id
+                              = (alert_event.details->>'offer_id')::bigint
+                      ) AS total_avail,
+                      (alert_event.details->>'expected_value')::int AS expected_ch
+              ) calc
+              WHERE ABS(calc.total_avail - calc.expected_ch) > :absoluteThreshold
+                 OR (
+                     CASE WHEN calc.expected_ch = 0 THEN 100.0
+                          ELSE 100.0 * ABS(calc.total_avail - calc.expected_ch)
+                              / NULLIF(calc.expected_ch::double precision, 0)
+                     END
+                 ) > :percentThreshold
           )
         """;
     var params = new MapSqlParameterSource()
         .addValue("workspaceId", workspaceId)
-        .addValue("absoluteThreshold", absoluteThreshold);
+        .addValue("absoluteThreshold", absoluteThreshold)
+        .addValue("percentThreshold", percentThreshold);
     return jdbc.update(sql, params);
   }
 

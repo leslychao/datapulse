@@ -217,7 +217,9 @@ public class MismatchMonitorService {
                 workspaceId, mismatchProperties.getPriceWarningThresholdPct());
         int promoResolved = mismatchJdbcRepository.autoResolveClearedPromo(workspaceId);
         int stockResolved = mismatchJdbcRepository.autoResolveClearedStock(
-                workspaceId, mismatchProperties.getStockAbsoluteThreshold());
+                workspaceId,
+                mismatchProperties.getStockAbsoluteThreshold(),
+                mismatchProperties.getStockPercentThreshold());
         int financeResolved = mismatchJdbcRepository.autoResolveClearedFinance(
                 workspaceId, mismatchProperties.getFinanceGapHoursThreshold());
 
