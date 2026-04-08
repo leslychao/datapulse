@@ -135,6 +135,27 @@ public class MismatchJdbcRepository {
     return jdbc.update(sql, params);
   }
 
+  public int bulkAcknowledge(long workspaceId, List<Long> ids, long userId) {
+    if (CollectionUtils.isEmpty(ids)) {
+      return 0;
+    }
+    String sql = """
+        UPDATE alert_event
+        SET status = 'ACKNOWLEDGED',
+            acknowledged_at = NOW(),
+            acknowledged_by = :userId
+        WHERE workspace_id = :workspaceId
+          AND id IN (:ids)
+          AND status = 'OPEN'
+          AND details->>'mismatch_type' IS NOT NULL
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("ids", ids)
+        .addValue("userId", userId);
+    return jdbc.update(sql, params);
+  }
+
   public int resolve(long id, long workspaceId, String resolution, String note,
                      long userId) {
     String sql = """
