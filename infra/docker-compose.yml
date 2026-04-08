@@ -89,8 +89,8 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-8180}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME:?KEYCLOAK_PUBLIC_HOSTNAME is required}
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PUBLIC_PORT:?KEYCLOAK_PUBLIC_PORT is required}
       KC_HOSTNAME_STRICT: "false"
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
@@ -141,13 +141,13 @@ services:
       OAUTH2_PROXY_PROVIDER: keycloak-oidc
       OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID:-datapulse-proxy}
       OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:?OAUTH2_PROXY_CLIENT_SECRET is required}
-      OAUTH2_PROXY_OIDC_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-8180}/realms/${KEYCLOAK_REALM:-datapulse}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${PUBLIC_KEYCLOAK_URL:?PUBLIC_KEYCLOAK_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}
       OAUTH2_PROXY_REVERSE_PROXY: "true"
-      OAUTH2_PROXY_LOGIN_URL: http://localhost:${KEYCLOAK_PORT:-8180}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/auth
-      OAUTH2_PROXY_REDEEM_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/token
-      OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
-      OAUTH2_PROXY_PROFILE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo
-      OAUTH2_PROXY_VALIDATE_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_LOGIN_URL: ${PUBLIC_KEYCLOAK_URL:?PUBLIC_KEYCLOAK_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_VALIDATE_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/userinfo
       OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
       OAUTH2_PROXY_UPSTREAM: static://202
       OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180

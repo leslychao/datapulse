@@ -1,5 +1,9 @@
 # Docker environment: backend + frontend run as containers.
 services:
+  oauth2-proxy:
+    environment:
+      OAUTH2_PROXY_REDIRECT_URL: ${PUBLIC_EDGE_URL:?PUBLIC_EDGE_URL is required}/oauth2/callback
+
   backend:
     build:
       context: ../backend
@@ -27,9 +31,9 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-noreply@datapulse.io}
-      INVITATION_BASE_URL: ${INVITATION_BASE_URL:-http://localhost/invitation/accept}
-      KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8180}/realms/${KEYCLOAK_REALM:-datapulse}
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
+      INVITATION_BASE_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}/invitation/accept
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_KEYCLOAK_URL:?PUBLIC_KEYCLOAK_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL is required}/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
       S3_HOST: minio
       S3_PORT: 9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-datapulse}

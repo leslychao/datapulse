@@ -134,7 +134,7 @@ frontend/
 ├── angular.json                          # Angular CLI config (prefix: dp, builder: @angular/build)
 ├── tsconfig.json                         # TypeScript config (strict, path aliases)
 ├── package.json
-└── proxy.conf.json                       # Dev proxy: /api → localhost:8081, /ws → localhost:8081
+└── proxy.conf.cjs                        # Dev proxy: /api,/ws,/oauth2,/auth → NG_PROXY_TARGET / PUBLIC_EDGE_URL
 ```
 
 ### Dependency direction
@@ -193,12 +193,14 @@ export const environment = {
 };
 ```
 
-### Dev proxy (`proxy.conf.json`)
+### Dev proxy (`proxy.conf.cjs`)
 
 | Path | Target | Notes |
 |---|---|---|
-| `/api` | `http://localhost:8081` | REST API |
-| `/ws` | `http://localhost:8081` | WebSocket (STOMP) |
+| `/api` | `NG_PROXY_TARGET` or `PUBLIC_EDGE_URL` | REST API via edge nginx/oauth2-proxy |
+| `/ws` | `NG_PROXY_TARGET` or `PUBLIC_EDGE_URL` | WebSocket (STOMP) via edge nginx |
+| `/oauth2` | `NG_PROXY_TARGET` or `PUBLIC_EDGE_URL` | OAuth2 proxy endpoints (`/oauth2/start`, `/oauth2/callback`) |
+| `/auth` | `NG_PROXY_TARGET` or `PUBLIC_EDGE_URL` | Keycloak browser endpoints (local dev) |
 
 Production: nginx handles the same routing (see `infra/nginx/prod.conf`).
 
