@@ -121,12 +121,24 @@ class ConnectionRepositoryIntegrationTest extends AbstractIntegrationTest {
       connectionRepository.save(
           aConnection().withWorkspaceId(workspaceId)
               .withMarketplaceType("WB").withExternalAccountId("acc-1")
-              .withStatus("ACTIVE")
+              .withStatus("ARCHIVED")
               .withSecretReferenceId(secret2.getId()).build());
 
       assertThat(connectionRepository
           .existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNotAndStatusNot(
-              workspaceId, "WB", "acc-1", conn.getId(), "ARCHIVED")).isTrue();
+              workspaceId, "WB", "acc-1", conn.getId(), "ARCHIVED")).isFalse();
+
+      var secret3 = secretRefRepository.save(
+          aSecretReference().withWorkspaceId(workspaceId).build());
+      connectionRepository.save(
+          aConnection().withWorkspaceId(workspaceId)
+              .withMarketplaceType("OZON").withExternalAccountId("acc-1")
+              .withStatus("ACTIVE")
+              .withSecretReferenceId(secret3.getId()).build());
+
+      assertThat(connectionRepository
+          .existsByWorkspaceIdAndMarketplaceTypeAndExternalAccountIdAndIdNotAndStatusNot(
+              workspaceId, "WB", "acc-1", conn.getId(), "ARCHIVED")).isFalse();
     }
   }
 

@@ -215,7 +215,6 @@ export interface SyncDomainInfo {
   domain: string;
   lastSuccessAt: string | null;
   status: SyncDomainStatus;
-  recordCount: number;
 }
 
 export interface ConnectionDataQuality {
@@ -224,6 +223,7 @@ export interface ConnectionDataQuality {
   marketplaceType: string;
   automationBlocked: boolean;
   blockReason: string | null;
+  blockReasonArgs: Record<string, unknown> | null;
   domains: SyncDomainInfo[];
 }
 

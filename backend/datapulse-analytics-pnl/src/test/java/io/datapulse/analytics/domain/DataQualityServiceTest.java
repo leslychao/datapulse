@@ -157,7 +157,11 @@ class DataQualityServiceTest {
 
       ConnectionDataQuality conn = result.connections().get(0);
       assertThat(conn.automationBlocked()).isTrue();
-      assertThat(conn.blockReason()).contains("finance");
+      assertThat(conn.blockReason())
+          .isEqualTo("analytics.data_quality.block_reason.stale_domain");
+      assertThat(conn.blockReasonArgs())
+          .containsEntry("domain", "finance")
+          .containsEntry("hours", 24);
     }
 
     @Test
@@ -364,6 +368,34 @@ class DataQualityServiceTest {
       var conn = result.connections().get(0);
       assertThat(conn.status()).isEqualTo("NORMAL");
       assertThat(conn.baselineRatioPct()).isNotEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("should match baseline when CH source_platform is uppercase")
+    void should_matchBaseline_when_chPlatformUppercase() {
+      var connRow = new ConnectionRow(10L, "WB Shop", "WB");
+      when(connectionRepository.findActiveByWorkspaceIdAsMap(WORKSPACE_ID))
+          .thenReturn(Map.of(10L, connRow));
+
+      var row = new ReconciliationRow(
+          10L, "WB", 202504,
+          new BigDecimal("500000"), new BigDecimal("2500"),
+          new BigDecimal("0.005"));
+
+      when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
+          .thenReturn(List.of(row));
+      when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
+          .thenReturn(Map.of("10:wb", new BaselineStat(
+              new BigDecimal("0.008"), new BigDecimal("0.003"), 10)));
+
+      ReconciliationResultResponse result =
+          service.getReconciliation(WORKSPACE_ID, null);
+
+      var conn = result.connections().get(0);
+      assertThat(conn.status()).isEqualTo("NORMAL");
+      assertThat(conn.baselineRatioPct()).isNotEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.trend().get(0).baselineRatioPct())
+          .isNotEqualByComparingTo(BigDecimal.ZERO);
     }
   }
 }

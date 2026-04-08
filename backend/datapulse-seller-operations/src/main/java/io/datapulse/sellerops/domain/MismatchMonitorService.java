@@ -84,7 +84,12 @@ public class MismatchMonitorService {
         List<PriceMismatchCandidate> mismatches = priceMismatchRepository.findPriceMismatches(
                 workspaceId, mismatchProperties.getPriceWarningThresholdPct());
 
+        int published = 0;
         for (PriceMismatchCandidate mismatch : mismatches) {
+            if (mismatchJdbcRepository.existsOpenMismatch(
+                    workspaceId, mismatch.offerId(), MismatchType.PRICE.name())) {
+                continue;
+            }
             BigDecimal deltaPct = computeDeltaPct(mismatch.currentPrice(), mismatch.expectedPrice());
             String severity = determinePriceSeverity(deltaPct);
 
@@ -95,11 +100,12 @@ public class MismatchMonitorService {
                     "Price mismatch: %s (%s)".formatted(mismatch.skuCode(), mismatch.offerName()),
                     buildPriceDetailsJson(mismatch, deltaPct)
             );
+            published++;
         }
 
-        if (!mismatches.isEmpty()) {
-            log.info("Price mismatch check completed: workspaceId={}, mismatchesFound={}",
-                    workspaceId, mismatches.size());
+        if (published > 0) {
+            log.info("Price mismatch check completed: workspaceId={}, candidates={}, published={}",
+                    workspaceId, mismatches.size(), published);
         }
     }
 
@@ -108,7 +114,12 @@ public class MismatchMonitorService {
         List<PromoMismatchCandidate> mismatches =
                 promoMismatchRepository.findPromoMismatches(workspaceId);
 
+        int published = 0;
         for (PromoMismatchCandidate mismatch : mismatches) {
+            if (mismatchJdbcRepository.existsOpenMismatch(
+                    workspaceId, mismatch.offerId(), MismatchType.PROMO.name())) {
+                continue;
+            }
             publishMismatch(
                     mismatch.workspaceId(),
                     mismatch.connectionId(),
@@ -116,11 +127,12 @@ public class MismatchMonitorService {
                     "Promo mismatch: %s (%s)".formatted(mismatch.skuCode(), mismatch.offerName()),
                     buildPromoDetailsJson(mismatch)
             );
+            published++;
         }
 
-        if (!mismatches.isEmpty()) {
-            log.info("Promo mismatch check completed: workspaceId={}, mismatchesFound={}",
-                    workspaceId, mismatches.size());
+        if (published > 0) {
+            log.info("Promo mismatch check completed: workspaceId={}, candidates={}, published={}",
+                    workspaceId, mismatches.size(), published);
         }
     }
 
@@ -129,7 +141,12 @@ public class MismatchMonitorService {
         List<FinanceGapCandidate> gaps = financeMismatchRepository.findFinanceGaps(
                 workspaceId, mismatchProperties.getFinanceGapHoursThreshold());
 
+        int published = 0;
         for (FinanceGapCandidate gap : gaps) {
+            if (mismatchJdbcRepository.existsOpenMismatchByConnection(
+                    workspaceId, gap.connectionId(), MismatchType.FINANCE.name())) {
+                continue;
+            }
             publishMismatch(
                     gap.workspaceId(),
                     gap.connectionId(),
@@ -137,11 +154,12 @@ public class MismatchMonitorService {
                     "Finance gap: %s (%s)".formatted(gap.connectionName(), gap.marketplaceType()),
                     buildFinanceDetailsJson(gap)
             );
+            published++;
         }
 
-        if (!gaps.isEmpty()) {
-            log.info("Finance mismatch check completed: workspaceId={}, gapsFound={}",
-                    workspaceId, gaps.size());
+        if (published > 0) {
+            log.info("Finance mismatch check completed: workspaceId={}, candidates={}, published={}",
+                    workspaceId, gaps.size(), published);
         }
     }
 
@@ -172,6 +190,10 @@ public class MismatchMonitorService {
                     || deltaPct > mismatchProperties.getStockPercentThreshold();
 
             if (thresholdBreached) {
+                if (mismatchJdbcRepository.existsOpenMismatch(
+                        workspaceId, pg.offerId(), MismatchType.STOCK.name())) {
+                    continue;
+                }
                 found++;
                 publishMismatch(
                         pg.workspaceId(),
@@ -191,10 +213,18 @@ public class MismatchMonitorService {
 
     @Transactional
     public void autoResolveClearedMismatches(long workspaceId) {
-        int resolved = mismatchJdbcRepository.autoResolveCleared(workspaceId);
-        if (resolved > 0) {
-            log.info("Auto-resolved cleared mismatches: workspaceId={}, count={}",
-                    workspaceId, resolved);
+        int priceResolved = mismatchJdbcRepository.autoResolveClearedPrice(
+                workspaceId, mismatchProperties.getPriceWarningThresholdPct());
+        int promoResolved = mismatchJdbcRepository.autoResolveClearedPromo(workspaceId);
+        int stockResolved = mismatchJdbcRepository.autoResolveClearedStock(
+                workspaceId, mismatchProperties.getStockAbsoluteThreshold());
+        int financeResolved = mismatchJdbcRepository.autoResolveClearedFinance(
+                workspaceId, mismatchProperties.getFinanceGapHoursThreshold());
+
+        int total = priceResolved + promoResolved + stockResolved + financeResolved;
+        if (total > 0) {
+            log.info("Auto-resolved cleared mismatches: workspaceId={}, price={}, promo={}, stock={}, finance={}",
+                    workspaceId, priceResolved, promoResolved, stockResolved, financeResolved);
         }
     }
 

@@ -181,6 +181,8 @@ public final class MessageCodes {
     public static final String MISMATCH_TIMELINE_ACKNOWLEDGED = "mismatches.timeline.acknowledged";
     public static final String MISMATCH_TIMELINE_RESOLVED = "mismatches.timeline.resolved";
     public static final String MISMATCH_TIMELINE_IGNORED = "mismatches.timeline.ignored";
+    public static final String MISMATCH_INVALID_RESOLUTION = "mismatches.invalid_resolution";
+    public static final String MISMATCH_ESCALATE_MESSAGE = "mismatches.escalate.message";
 
     // --- Seller Operations ---
     public static final String GRID_EXPORT_TOO_MANY_ROWS = "grid.export.too_many_rows";
@@ -222,6 +224,7 @@ public final class MessageCodes {
 
     // --- Analytics ---
     public static final String ANALYTICS_CLICKHOUSE_UNAVAILABLE = "analytics.clickhouse.unavailable";
+    public static final String DATA_QUALITY_STALE_DOMAIN = "analytics.data_quality.block_reason.stale_domain";
 
     // --- Seller Operations: Working Queues ---
     public static final String QUEUE_NOT_FOUND = "queue.not_found";

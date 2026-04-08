@@ -18,7 +18,6 @@ import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.com
 import { formatMoney } from '@shared/utils/format.utils';
 
 const COLLAPSED_ROW_LIMIT = 5;
-const MIN_COL_WIDTH = 50;
 
 function resolveCssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name;
@@ -29,22 +28,6 @@ function resolveCssVar(name: string): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, ChartComponent, StockRiskBadgeComponent],
-  styles: [`
-    .dp-col-resize {
-      position: absolute;
-      right: -2px;
-      top: 0;
-      width: 5px;
-      height: 100%;
-      cursor: col-resize;
-      z-index: 1;
-      background: transparent;
-      transition: background-color 0.15s;
-    }
-    .dp-col-resize:hover {
-      background-color: var(--accent-primary);
-    }
-  `],
   template: `
     <div class="flex flex-col gap-4">
       <!-- KPI cards -->
@@ -130,55 +113,43 @@ function resolveCssVar(name: string): string {
             {{ 'analytics.inventory.no_critical' | translate }}
           </p>
         } @else {
-          <div class="overflow-x-auto">
-            <table class="w-full table-fixed text-left text-sm">
-              <colgroup>
-                <col [style.width.px]="colWidths()[0]" />
-                <col />
-                <col [style.width.px]="colWidths()[2]" />
-                <col [style.width.px]="colWidths()[3]" />
-                <col [style.width.px]="colWidths()[4]" />
-              </colgroup>
+          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
+            <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                  <th class="relative truncate pb-2 pr-4 font-medium">
-                    SKU
-                    <div class="dp-col-resize" (mousedown)="onColResize($event, 0)"></div>
-                  </th>
-                  <th class="relative truncate pb-2 pr-4 font-medium">
+                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">SKU</th>
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
                     {{ 'analytics.inventory.col.product' | translate }}
                   </th>
-                  <th class="relative truncate pb-2 pr-4 text-right font-medium">
+                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
                     {{ 'analytics.inventory.col.available' | translate }}
-                    <div class="dp-col-resize" (mousedown)="onColResize($event, 2)"></div>
                   </th>
-                  <th class="relative truncate pb-2 pr-4 text-right font-medium">
+                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
                     {{ 'analytics.inventory.col.days_of_cover' | translate }}
-                    <div class="dp-col-resize" (mousedown)="onColResize($event, 3)"></div>
                   </th>
-                  <th class="relative truncate pb-2 font-medium">
+                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
                     {{ 'analytics.inventory.col.risk' | translate }}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 @for (item of visibleCritical(); track item.productId) {
-                  <tr class="border-b border-[var(--border-subtle)] last:border-0">
-                    <td class="truncate py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]"
+                  <tr class="border-b border-[var(--border-subtle)] transition-colors last:border-0 hover:bg-[var(--bg-secondary)]">
+                    <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-[var(--text-secondary)]"
                         [title]="item.skuCode">
                       {{ item.skuCode }}
                     </td>
-                    <td class="truncate py-2 pr-4 text-[var(--text-primary)]"
+                    <td class="max-w-xs truncate px-4 py-2.5 text-[var(--text-primary)]"
                         [title]="item.productName">
                       {{ item.productName }}
                     </td>
-                    <td class="truncate py-2 pr-4 text-right font-mono">
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
                       {{ item.available }}
                     </td>
-                    <td class="truncate py-2 pr-4 text-right font-mono">
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
                       {{ item.daysOfCover ?? '—' }}
                     </td>
-                    <td class="truncate py-2">
+                    <td class="px-4 py-2.5">
                       <dp-stock-risk-badge [risk]="item.stockOutRisk" />
                     </td>
                   </tr>
@@ -233,7 +204,6 @@ export class InventoryOverviewPageComponent {
   );
 
   readonly tableExpanded = signal(false);
-  readonly colWidths = signal([180, 0, 80, 100, 90]);
 
   readonly canExpandTable = computed(() =>
     this.topCritical().length > COLLAPSED_ROW_LIMIT,
@@ -296,33 +266,6 @@ export class InventoryOverviewPageComponent {
       tooltip: { show: false },
     };
   });
-
-  onColResize(event: MouseEvent, col: number): void {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startW = this.colWidths()[col];
-
-    const onMove = (e: MouseEvent) => {
-      const w = Math.max(MIN_COL_WIDTH, startW + e.clientX - startX);
-      this.colWidths.update(ws => {
-        const next = [...ws];
-        next[col] = w;
-        return next;
-      });
-    };
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);

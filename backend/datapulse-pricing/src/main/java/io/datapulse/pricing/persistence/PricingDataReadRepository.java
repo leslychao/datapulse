@@ -222,16 +222,18 @@ public class PricingDataReadRepository {
                    mo.category_id,
                    mo.marketplace_connection_id,
                    mo.status,
-                   mo.sku_code,
-                   mo.product_name,
+                   ss.sku_code,
+                   mo.name AS product_name,
                    cpc.price AS current_price,
                    cpc.discount_price,
                    cp.cost_price AS cogs
             FROM marketplace_offer mo
+            JOIN marketplace_connection mc ON mc.id = mo.marketplace_connection_id
+            JOIN seller_sku ss ON ss.id = mo.seller_sku_id
             LEFT JOIN canonical_price_current cpc ON cpc.marketplace_offer_id = mo.id
             LEFT JOIN cost_profile cp ON cp.seller_sku_id = mo.seller_sku_id AND cp.valid_to IS NULL
             WHERE mo.id IN (:offerIds)
-              AND mo.workspace_id = :workspaceId
+              AND mc.workspace_id = :workspaceId
             """;
 
     public List<EnrichedOfferRow> findOffersByIds(List<Long> offerIds, long workspaceId) {
@@ -388,7 +390,8 @@ public class PricingDataReadRepository {
             SELECT mo.id, mo.seller_sku_id, mo.category_id,
                    mo.marketplace_connection_id, mo.status
             FROM marketplace_offer mo
-            WHERE mo.workspace_id = :workspaceId
+            JOIN marketplace_connection mc ON mc.id = mo.marketplace_connection_id
+            WHERE mc.workspace_id = :workspaceId
               AND CAST(mo.seller_sku_id AS varchar) IN (:skuCodes)
             """;
 

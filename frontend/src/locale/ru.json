@@ -2684,6 +2684,8 @@
   "analytics.data_quality.domain.catalog": "Каталог",
   "analytics.data_quality.domain.advertising": "Реклама",
 
+  "analytics.data_quality.block_reason.stale_domain": "Данные домена {{domain}} устарели (порог: {{hours}} ч)",
+
   "analytics.data_quality.sync_status.FRESH": "Актуально",
   "analytics.data_quality.sync_status.STALE": "Устарело",
   "analytics.data_quality.sync_status.OVERDUE": "Просрочено",

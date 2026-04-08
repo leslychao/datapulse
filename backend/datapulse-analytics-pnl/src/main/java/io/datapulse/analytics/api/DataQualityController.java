@@ -1,8 +1,10 @@
 package io.datapulse.analytics.api;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import io.datapulse.analytics.domain.DataQualityService;
+import io.datapulse.common.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,13 +46,13 @@ public class DataQualityController {
     return dataQualityService.getReconciliation(workspaceId, periodInt);
   }
 
+  private static final Pattern PERIOD_PATTERN = Pattern.compile("^\\d{4}-(0[1-9]|1[0-2])$");
+
   private static Integer parsePeriod(String period) {
     if (period == null || period.isBlank()) return null;
-    try {
-      String cleaned = period.replace("-", "");
-      return Integer.parseInt(cleaned);
-    } catch (NumberFormatException e) {
-      return null;
+    if (!PERIOD_PATTERN.matcher(period).matches()) {
+      throw BadRequestException.of("validation.failed", "period");
     }
+    return Integer.parseInt(period.replace("-", ""));
   }
 }

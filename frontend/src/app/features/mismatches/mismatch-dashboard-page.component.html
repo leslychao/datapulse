@@ -6,40 +6,53 @@
 
     <!-- KPI -->
     <div class="flex flex-wrap gap-3 px-4 pt-3">
-      <dp-kpi-card
-        [label]="'mismatches.kpi.active' | translate"
-        [value]="summaryQuery.data()?.totalActive ?? null"
-        [icon]="ActivityIcon"
-        accent="warning"
-        [trend]="summaryQuery.data()?.totalActiveDelta7d ?? null"
-        [trendDirection]="(summaryQuery.data()?.totalActiveDelta7d ?? 0) >= 0 ? 'up' : 'down'"
-        [loading]="summaryQuery.isPending()"
-      />
-      <dp-kpi-card
-        [label]="'mismatches.kpi.critical' | translate"
-        [value]="summaryQuery.data()?.criticalCount ?? null"
-        [icon]="AlertTriangleIcon"
-        accent="error"
-        [trend]="summaryQuery.data()?.criticalDelta7d ?? null"
-        [trendDirection]="(summaryQuery.data()?.criticalDelta7d ?? 0) <= 0 ? 'down' : 'up'"
-        [loading]="summaryQuery.isPending()"
-      />
-      <dp-kpi-card
-        [label]="'mismatches.kpi.avg_hours' | translate"
-        [value]="avgHoursDisplay()"
-        [icon]="ClockIcon"
-        accent="info"
-        [trend]="summaryQuery.data()?.avgHoursUnresolvedDelta7d ?? null"
-        [trendDirection]="(summaryQuery.data()?.avgHoursUnresolvedDelta7d ?? 0) <= 0 ? 'down' : 'up'"
-        [loading]="summaryQuery.isPending()"
-      />
-      <dp-kpi-card
-        [label]="'mismatches.kpi.auto_resolved' | translate"
-        [value]="summaryQuery.data()?.autoResolvedToday ?? null"
-        [icon]="CheckCircleIcon"
-        accent="success"
-        [loading]="summaryQuery.isPending()"
-      />
+      @if (summaryQuery.isError()) {
+        <div class="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] px-4 py-3">
+          <span class="text-sm text-[var(--status-error)]">{{ 'mismatches.kpi.error' | translate }}</span>
+          <button
+            type="button"
+            (click)="summaryQuery.refetch()"
+            class="ml-auto text-sm font-medium text-[var(--accent-primary)] hover:underline"
+          >
+            {{ 'actions.retry' | translate }}
+          </button>
+        </div>
+      } @else {
+        <dp-kpi-card
+          [label]="'mismatches.kpi.active' | translate"
+          [value]="summaryQuery.data()?.totalActive ?? null"
+          [icon]="ActivityIcon"
+          accent="warning"
+          [trend]="summaryQuery.data()?.totalActiveDelta7d ?? null"
+          [trendDirection]="(summaryQuery.data()?.totalActiveDelta7d ?? 0) >= 0 ? 'up' : 'down'"
+          [loading]="summaryQuery.isPending()"
+        />
+        <dp-kpi-card
+          [label]="'mismatches.kpi.critical' | translate"
+          [value]="summaryQuery.data()?.criticalCount ?? null"
+          [icon]="AlertTriangleIcon"
+          accent="error"
+          [trend]="summaryQuery.data()?.criticalDelta7d ?? null"
+          [trendDirection]="(summaryQuery.data()?.criticalDelta7d ?? 0) <= 0 ? 'down' : 'up'"
+          [loading]="summaryQuery.isPending()"
+        />
+        <dp-kpi-card
+          [label]="'mismatches.kpi.avg_hours' | translate"
+          [value]="avgHoursDisplay()"
+          [icon]="ClockIcon"
+          accent="info"
+          [trend]="summaryQuery.data()?.avgHoursUnresolvedDelta7d ?? null"
+          [trendDirection]="(summaryQuery.data()?.avgHoursUnresolvedDelta7d ?? 0) <= 0 ? 'down' : 'up'"
+          [loading]="summaryQuery.isPending()"
+        />
+        <dp-kpi-card
+          [label]="'mismatches.kpi.auto_resolved' | translate"
+          [value]="summaryQuery.data()?.autoResolvedToday ?? null"
+          [icon]="CheckCircleIcon"
+          accent="success"
+          [loading]="summaryQuery.isPending()"
+        />
+      }
     </div>
 
     <!-- Charts -->
@@ -254,9 +267,11 @@
             <button type="button" (click)="contextOpenDetail()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
               {{ 'mismatches.context.open' | translate }}
             </button>
-            <button type="button" (click)="contextGoToProduct()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-              {{ 'mismatches.context.go_product' | translate }}
-            </button>
+            @if (ctx.row.offerId) {
+              <button type="button" (click)="contextGoToProduct()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+                {{ 'mismatches.context.go_product' | translate }}
+              </button>
+            }
             <button type="button" (click)="contextCopySku()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
               {{ 'mismatches.context.copy_sku' | translate }}
             </button>

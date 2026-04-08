@@ -296,8 +296,14 @@ export class InventoryByProductPageComponent {
     {
       field: 'sourcePlatform',
       headerName: this.t.instant('analytics.inventory.col.platform'),
-      cellRenderer: (p: { value: string }) =>
-        `<span class="rounded-full border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">${p.value}</span>`,
+      cellRenderer: (p: { value: string }) => {
+        const cls = p.value === 'WB'
+          ? 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]'
+          : p.value === 'OZON'
+            ? 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]'
+            : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
+        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${p.value}</span>`;
+      },
     },
     {
       field: 'available',

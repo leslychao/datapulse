@@ -24,7 +24,8 @@ public final class MismatchStatus {
     if (DB_OPEN.equals(dbStatus)) {
       return API_ACTIVE;
     }
-    if (RESOLVED.equals(dbStatus) && IGNORED.equals(resolvedReason)) {
+    if (RESOLVED.equals(dbStatus) && resolvedReason != null
+        && resolvedReason.startsWith(IGNORED)) {
       return IGNORED;
     }
     return dbStatus;

@@ -27,8 +27,8 @@ public class DataQualityReadRepository {
           connection_id,
           source_platform,
           toYYYYMM(finance_date) AS period,
-          sum(net_payout) AS total_net_payout,
-          sum(reconciliation_residual) AS total_residual
+          coalesce(sum(net_payout), 0) AS total_net_payout,
+          coalesce(sum(reconciliation_residual), 0) AS total_residual
       FROM mart_posting_pnl
       WHERE workspace_id = :workspaceId
       GROUP BY connection_id, source_platform, period
@@ -66,15 +66,18 @@ public class DataQualityReadRepository {
       BigDecimal netPayout = rs.getBigDecimal("total_net_payout");
       BigDecimal residual = rs.getBigDecimal("total_residual");
 
+      BigDecimal safeResidual = residual != null ? residual : BigDecimal.ZERO;
+      BigDecimal safeNetPayout = netPayout != null ? netPayout : BigDecimal.ZERO;
+
       BigDecimal residualRatio = BigDecimal.ZERO;
-      if (netPayout != null && netPayout.compareTo(BigDecimal.ZERO) != 0) {
-        residualRatio = residual.abs()
-            .divide(netPayout.abs(), 6, RoundingMode.HALF_UP);
+      if (safeNetPayout.compareTo(BigDecimal.ZERO) != 0) {
+        residualRatio = safeResidual.abs()
+            .divide(safeNetPayout.abs(), 6, RoundingMode.HALF_UP);
       }
 
       return new ReconciliationRow(
           connId, platform, rs.getInt("period"),
-          netPayout, residual, residualRatio);
+          safeNetPayout, safeResidual, residualRatio);
     });
   }
 
@@ -82,7 +85,8 @@ public class DataQualityReadRepository {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var rows = jdbc.ch().query(BASELINE_SQL, params,
         (rs, rowNum) -> Map.entry(
-            rs.getLong("connection_id") + ":" + rs.getString("source_platform"),
+            rs.getLong("connection_id") + ":"
+                + rs.getString("source_platform").toLowerCase(),
             new BaselineStat(
                 rs.getBigDecimal("baseline_ratio"),
                 rs.getBigDecimal("residual_std"),

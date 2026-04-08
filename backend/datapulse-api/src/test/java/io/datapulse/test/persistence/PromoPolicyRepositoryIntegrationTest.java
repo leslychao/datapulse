@@ -102,6 +102,7 @@ class PromoPolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     var offer = new MarketplaceOfferEntity();
     offer.setSellerSkuId(sku.getId());
     offer.setMarketplaceConnectionId(conn.getId());
+    offer.setMarketplaceType("WB");
     offer.setMarketplaceSku("test-msku");
     offer.setName("Test Offer");
     offer.setStatus("ACTIVE");
@@ -109,6 +110,7 @@ class PromoPolicyRepositoryIntegrationTest extends AbstractIntegrationTest {
     em.persist(offer);
 
     var campaign = new CanonicalPromoCampaignEntity();
+    campaign.setWorkspaceId(workspaceId);
     campaign.setConnectionId(conn.getId());
     campaign.setExternalPromoId("PROMO-001");
     campaign.setSourcePlatform("WB");

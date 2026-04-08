@@ -78,7 +78,14 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
       }
       <div class="flex items-start justify-between gap-3 border-b border-[var(--border-default)] px-4 py-3">
         <div class="min-w-0 flex-1">
-          @if (detailQuery.isPending()) {
+          @if (detailQuery.isError()) {
+            <div class="flex flex-col items-center gap-2 py-6 text-center">
+              <span class="text-sm text-[var(--status-error)]">{{ 'mismatches.detail.error' | translate }}</span>
+              <button type="button" (click)="detailQuery.refetch()" class="text-sm font-medium text-[var(--accent-primary)] hover:underline">
+                {{ 'actions.retry' | translate }}
+              </button>
+            </div>
+          } @else if (detailQuery.isPending()) {
             <div class="dp-shimmer mb-2 h-4 w-3/4 rounded-[var(--radius-sm)]"></div>
             <div class="dp-shimmer h-3 w-1/2 rounded-[var(--radius-sm)]"></div>
           } @else {
@@ -288,7 +295,13 @@ export class MismatchDetailPanelComponent {
         sourceType: 'MISMATCH',
         sourceId: d.mismatchId,
         severity: d.severity,
-        message: `${d.type} mismatch: ${d.offer.offerName} (${d.offer.skuCode}), expected=${d.expectedValue}, actual=${d.actualValue}`,
+        message: this.translate.instant('mismatches.escalate.message', {
+          type: this.translate.instant('mismatches.type.' + d.type),
+          offerName: d.offer.offerName,
+          skuCode: d.offer.skuCode,
+          expected: d.expectedValue,
+          actual: d.actualValue,
+        }),
       }));
     },
     onSuccess: () => {

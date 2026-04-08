@@ -230,12 +230,16 @@ export class ReconciliationPageComponent {
       });
     });
 
+    const legendItems = connIds.flatMap((id) => {
+      const name = connMap.get(id) ?? `#${id}`;
+      return [name, `${name} baseline`];
+    });
+
     return {
       tooltip: { trigger: 'axis' },
       legend: {
-        data: connIds.map((id) => connMap.get(id) ?? `#${id}`),
+        data: legendItems,
         bottom: 0,
-        textStyle: { color: 'var(--text-secondary)', fontSize: 11 },
       },
       grid: { left: 50, right: 20, top: 12, bottom: 40 },
       xAxis: {

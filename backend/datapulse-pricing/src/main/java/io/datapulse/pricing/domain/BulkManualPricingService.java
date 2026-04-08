@@ -306,7 +306,7 @@ public class BulkManualPricingService {
     private void ensureNotDuplicate(String hash) {
         boolean duplicate = runRepository.existsByRequestHashAndTriggerTypeAndStatusNotIn(
                 hash, RunTriggerType.MANUAL_BULK,
-                List.of(RunStatus.COMPLETED, RunStatus.COMPLETED_WITH_ERRORS, RunStatus.FAILED));
+                List.of(RunStatus.FAILED));
         if (duplicate) {
             throw BadRequestException.of(MessageCodes.PRICING_BULK_DUPLICATE);
         }

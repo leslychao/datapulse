@@ -72,6 +72,7 @@ class BulkManualPricingIntegrationTest extends AbstractIntegrationTest {
   private Long workspaceId;
   private Long userId;
   private Long connectionId;
+  private Long jobId;
   private Long offerIdA;
   private Long offerIdB;
 
@@ -91,7 +92,7 @@ class BulkManualPricingIntegrationTest extends AbstractIntegrationTest {
             .withSecretReferenceId(secret.getId()).build());
     connectionId = conn.getId();
 
-    long jobId = jobExecutionRepository.insert(conn.getId(), "FULL_SYNC");
+    jobId = jobExecutionRepository.insert(conn.getId(), "FULL_SYNC");
 
     var pm = new ProductMasterEntity();
     pm.setWorkspaceId(workspaceId);
@@ -115,6 +116,7 @@ class BulkManualPricingIntegrationTest extends AbstractIntegrationTest {
     var offerA = new MarketplaceOfferEntity();
     offerA.setSellerSkuId(skuA.getId());
     offerA.setMarketplaceConnectionId(conn.getId());
+    offerA.setMarketplaceType("WB");
     offerA.setMarketplaceSku("msku-a");
     offerA.setName("Offer A");
     offerA.setStatus("ACTIVE");
@@ -124,6 +126,7 @@ class BulkManualPricingIntegrationTest extends AbstractIntegrationTest {
     var offerB = new MarketplaceOfferEntity();
     offerB.setSellerSkuId(skuB.getId());
     offerB.setMarketplaceConnectionId(conn.getId());
+    offerB.setMarketplaceType("WB");
     offerB.setMarketplaceSku("msku-b");
     offerB.setName("Offer B");
     offerB.setStatus("ACTIVE");
@@ -225,8 +228,10 @@ class BulkManualPricingIntegrationTest extends AbstractIntegrationTest {
                                      BigDecimal discountPrice, BigDecimal minPrice) {
     jdbc.update("""
         INSERT INTO canonical_price_current
-            (marketplace_offer_id, price, discount_price, min_price, source, captured_at)
-        VALUES (:offerId, :price, :discountPrice, :minPrice, 'ETL', now())
+            (marketplace_offer_id, price, discount_price, min_price,
+             job_execution_id, captured_at)
+        VALUES (:offerId, :price, :discountPrice, :minPrice,
+                :jobId, now())
         ON CONFLICT (marketplace_offer_id) DO UPDATE SET
             price = EXCLUDED.price,
             discount_price = EXCLUDED.discount_price,
@@ -235,7 +240,8 @@ class BulkManualPricingIntegrationTest extends AbstractIntegrationTest {
         "offerId", offerId,
         "price", price,
         "discountPrice", discountPrice != null ? discountPrice : price,
-        "minPrice", minPrice != null ? minPrice : BigDecimal.ZERO));
+        "minPrice", minPrice != null ? minPrice : BigDecimal.ZERO,
+        "jobId", jobId));
   }
 
   private void insertCostProfile(long sellerSkuId, BigDecimal costPrice, LocalDate validFrom) {

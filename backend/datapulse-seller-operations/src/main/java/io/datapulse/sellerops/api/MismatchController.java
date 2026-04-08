@@ -78,6 +78,16 @@ public class MismatchController {
         workspaceContext.getUserId());
   }
 
+  @PostMapping("/bulk-acknowledge")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public BulkAcknowledgeResponse bulkAcknowledge(
+      @PathVariable("workspaceId") Long workspaceId,
+      @Valid @RequestBody BulkAcknowledgeRequest request) {
+    int updated = mismatchService.bulkAcknowledge(
+        workspaceId, request.ids(), workspaceContext.getUserId());
+    return new BulkAcknowledgeResponse(updated);
+  }
+
   @PostMapping("/bulk-ignore")
   @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public BulkIgnoreResponse bulkIgnore(
@@ -132,5 +142,13 @@ public class MismatchController {
   }
 
   public record BulkIgnoreResponse(int updated) {
+  }
+
+  public record BulkAcknowledgeRequest(
+      @jakarta.validation.constraints.NotEmpty List<Long> ids
+  ) {
+  }
+
+  public record BulkAcknowledgeResponse(int updated) {
   }
 }

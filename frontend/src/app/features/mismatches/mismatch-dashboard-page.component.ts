@@ -599,6 +599,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       detectedAt: 'detectedAt',
       status: 'status',
       severity: 'severity',
+      resolution: 'resolution',
     };
     const apiField = fieldMap[colId] ?? 'detectedAt';
     const dir = c.sort === 'asc' ? 'asc' : 'desc';
@@ -625,14 +626,16 @@ export class MismatchDashboardPageComponent implements OnInit {
   exportCsv(): void {
     const ws = this.ws.currentWorkspaceId();
     if (!ws) return;
-    lastValueFrom(this.api.exportCsv(ws, this.mismatchFilter())).then(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'mismatches.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    lastValueFrom(this.api.exportCsv(ws, this.mismatchFilter()))
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mismatches.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(() => this.toast.error(this.translate.instant('mismatches.export.error')));
   }
 
   toggleColumn(colId: string): void {
@@ -672,6 +675,7 @@ export class MismatchDashboardPageComponent implements OnInit {
     this.periodTo.set('');
     this.searchQuery.set('');
     this.currentPage.set(0);
+    this.persistFilters();
     this.invalidateList();
   }
 
@@ -792,8 +796,9 @@ export class MismatchDashboardPageComponent implements OnInit {
   contextCopySku(): void {
     const ctx = this.contextMenu();
     if (!ctx) return;
-    navigator.clipboard.writeText(ctx.row.skuCode);
-    this.toast.info(this.translate.instant('mismatches.context.sku_copied'));
+    navigator.clipboard.writeText(ctx.row.skuCode)
+      .then(() => this.toast.info(this.translate.instant('mismatches.context.sku_copied')))
+      .catch(() => this.toast.error(this.translate.instant('mismatches.context.copy_failed')));
     this.contextMenu.set(null);
   }
 

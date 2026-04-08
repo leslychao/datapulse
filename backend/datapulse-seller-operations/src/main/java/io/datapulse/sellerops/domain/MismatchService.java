@@ -105,7 +105,11 @@ public class MismatchService {
   @Transactional
   public MismatchResponse resolve(long workspaceId, long mismatchId,
                                    String resolution, String note, long userId) {
-    MismatchResolutionType.valueOf(resolution);
+    try {
+      MismatchResolutionType.valueOf(resolution);
+    } catch (IllegalArgumentException e) {
+      throw BadRequestException.of(MessageCodes.MISMATCH_INVALID_RESOLUTION);
+    }
 
     int updated = mismatchRepository.resolve(mismatchId, workspaceId,
         resolution, note, userId);
@@ -129,6 +133,11 @@ public class MismatchService {
     }
 
     return response;
+  }
+
+  @Transactional
+  public int bulkAcknowledge(long workspaceId, List<Long> ids, long userId) {
+    return mismatchRepository.bulkAcknowledge(workspaceId, ids, userId);
   }
 
   @Transactional

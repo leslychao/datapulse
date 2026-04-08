@@ -23,12 +23,12 @@ public class EtlEventsMismatchConsumer {
 
   @RabbitListener(queues = RabbitTopologyConfig.ETL_EVENTS_MISMATCH_QUEUE)
   public void onEtlEvent(Message message) {
-    try {
-      String eventType = extractHeader(message, "x-event-type");
-      if (!"ETL_SYNC_COMPLETED".equals(eventType)) {
-        return;
-      }
+    String eventType = extractHeader(message, "x-event-type");
+    if (!"ETL_SYNC_COMPLETED".equals(eventType)) {
+      return;
+    }
 
+    try {
       Map<String, Object> payload = objectMapper.readValue(
           message.getBody(), new TypeReference<>() {});
 
@@ -47,6 +47,7 @@ public class EtlEventsMismatchConsumer {
     } catch (Exception e) {
       log.error("Error processing ETL event for mismatch check: messageId={}, error={}",
           message.getMessageProperties().getMessageId(), e.getMessage(), e);
+      throw new RuntimeException("Mismatch check failed, message will be requeued", e);
     }
   }
 

@@ -21,6 +21,7 @@ public class MismatchRetentionCleanupScheduler {
             DELETE FROM alert_event
             WHERE status IN ('RESOLVED', 'AUTO_RESOLVED')
               AND resolved_at < NOW() - make_interval(days => :retentionDays)
+              AND details->>'mismatch_type' IS NOT NULL
             """;
 
     @Scheduled(cron = "${datapulse.mismatch.retention-cleanup-cron:0 0 4 * * *}")

@@ -114,6 +114,7 @@ class PriceActionRepositoryIntegrationTest extends AbstractIntegrationTest {
     var offer = new MarketplaceOfferEntity();
     offer.setSellerSkuId(sku.getId());
     offer.setMarketplaceConnectionId(conn.getId());
+    offer.setMarketplaceType("WB");
     offer.setMarketplaceSku("test-msku");
     offer.setName("Test Offer");
     offer.setStatus("ACTIVE");

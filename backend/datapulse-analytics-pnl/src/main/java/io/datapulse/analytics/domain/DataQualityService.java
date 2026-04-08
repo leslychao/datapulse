@@ -11,6 +11,7 @@ import java.util.Map;
 import io.datapulse.analytics.api.DataQualityStatusResponse;
 import io.datapulse.analytics.api.DataQualityStatusResponse.ConnectionDataQuality;
 import io.datapulse.analytics.api.DataQualityStatusResponse.SyncDomainInfo;
+import io.datapulse.common.error.MessageCodes;
 import io.datapulse.analytics.api.ReconciliationResultResponse;
 import io.datapulse.analytics.api.ReconciliationResultResponse.ConnectionReconciliation;
 import io.datapulse.analytics.api.ReconciliationResultResponse.ResidualBucket;
@@ -68,19 +69,22 @@ public class DataQualityService {
       String status = computeSyncStatus(row.lastSuccessAt(), thresholdHours, now);
 
       builder.domains.add(new SyncDomainInfo(
-          row.dataDomain(), row.lastSuccessAt(), status, 0));
+          row.dataDomain(), row.lastSuccessAt(), status));
 
       if (isBlockingDomain(row.dataDomain()) && !"FRESH".equals(status)) {
         builder.automationBlocked = true;
-        builder.blockReason = "Stale %s data (>%dh)".formatted(
-            row.dataDomain(), thresholdHours);
+        builder.blockReason = MessageCodes.DATA_QUALITY_STALE_DOMAIN;
+        builder.blockReasonArgs = Map.of(
+            "domain", row.dataDomain(),
+            "hours", thresholdHours);
       }
     }
 
     List<ConnectionDataQuality> connections = grouped.values().stream()
         .map(b -> new ConnectionDataQuality(
             b.connectionId, b.connectionName, b.marketplaceType,
-            b.automationBlocked, b.blockReason, List.copyOf(b.domains)))
+            b.automationBlocked, b.blockReason, b.blockReasonArgs,
+            List.copyOf(b.domains)))
         .toList();
 
     return new DataQualityStatusResponse(connections);
@@ -221,12 +225,16 @@ public class DataQualityService {
 
   private List<ReconciliationRow> latestPeriodPerConnection(
       List<ReconciliationRow> rows) {
-    var latest = new LinkedHashMap<Long, Integer>();
+    var latest = new LinkedHashMap<String, Integer>();
     for (var row : rows) {
-      latest.merge(row.connectionId(), row.period(), Math::max);
+      String key = row.connectionId() + ":" + row.sourcePlatform();
+      latest.merge(key, row.period(), Math::max);
     }
     return rows.stream()
-        .filter(r -> r.period() == latest.getOrDefault(r.connectionId(), 0))
+        .filter(r -> {
+          String key = r.connectionId() + ":" + r.sourcePlatform();
+          return r.period() == latest.getOrDefault(key, 0);
+        })
         .toList();
   }
 
@@ -238,7 +246,7 @@ public class DataQualityService {
       BigDecimal ratioPct = row.residualRatio()
           .multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP);
 
-      String key = row.connectionId() + ":" + row.sourcePlatform();
+      String key = row.connectionId() + ":" + row.sourcePlatform().toLowerCase();
       BaselineStat baseline = baselines.getOrDefault(key, BaselineStat.EMPTY);
       BigDecimal baselinePct = baseline.mean() != null
           ? baseline.mean().multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP)
@@ -304,6 +312,7 @@ public class DataQualityService {
     final List<SyncDomainInfo> domains = new ArrayList<>();
     boolean automationBlocked;
     String blockReason;
+    Map<String, Object> blockReasonArgs;
 
     ConnectionBuilder(long connectionId, String connectionName,
         String marketplaceType) {

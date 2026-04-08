@@ -10,7 +10,7 @@ export interface Mismatch {
   mismatchId: number;
   type: MismatchType;
   severity: MismatchSeverity;
-  offerId: number;
+  offerId: number | null;
   offerName: string;
   skuCode: string;
   marketplaceType: string;

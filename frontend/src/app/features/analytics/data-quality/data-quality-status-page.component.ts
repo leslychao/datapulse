@@ -11,7 +11,7 @@ import { lastValueFrom } from 'rxjs';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ConnectionDataQuality, SyncDomainStatus } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { formatDateTime, formatInteger } from '@shared/utils/format.utils';
+import { formatDateTime } from '@shared/utils/format.utils';
 
 const DOMAIN_LABEL_KEYS: Record<string, string> = {
   finance: 'analytics.data_quality.domain.finance',
@@ -79,40 +79,36 @@ const STATUS_DOT_CLASS: Record<SyncDomainStatus, string> = {
 
               @if (conn.automationBlocked && conn.blockReason) {
                 <div class="border-b border-[var(--border-default)] bg-[color-mix(in_srgb,var(--status-warning)_6%,transparent)] px-4 py-2 text-xs text-[var(--status-warning)]">
-                  {{ conn.blockReason }}
+                  {{ conn.blockReason | translate:conn.blockReasonArgs }}
                 </div>
               }
 
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
-                    <tr class="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
-                      <th class="px-4 py-2 font-medium">{{ 'analytics.data_quality.domain' | translate }}</th>
-                      <th class="w-px whitespace-nowrap px-4 py-2 font-medium">{{ 'analytics.data_quality.last_sync' | translate }}</th>
-                      <th class="w-px whitespace-nowrap px-4 py-2 font-medium">{{ 'analytics.data_quality.status' | translate }}</th>
-                      <th class="w-px whitespace-nowrap px-4 py-2 text-right font-medium">{{ 'analytics.data_quality.records' | translate }}</th>
+                    <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
+                      <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'analytics.data_quality.domain' | translate }}</th>
+                      <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'analytics.data_quality.last_sync' | translate }}</th>
+                      <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'analytics.data_quality.status' | translate }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (domain of conn.domains; track domain.domain) {
                       <tr class="border-b border-[var(--border-subtle)] last:border-b-0">
-                        <td class="px-4 py-2 text-[var(--text-primary)]">
+                        <td class="px-4 py-2.5 font-medium text-[var(--text-primary)]">
                           {{ domainLabel(domain.domain) }}
                         </td>
-                        <td class="whitespace-nowrap px-4 py-2 text-[var(--text-secondary)]">
+                        <td class="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">
                           {{ fmtDateTime(domain.lastSuccessAt) }}
                         </td>
-                        <td class="whitespace-nowrap px-4 py-2">
-                          <span class="inline-flex items-center gap-1.5 text-[length:var(--text-xs)]">
+                        <td class="whitespace-nowrap px-4 py-2.5">
+                          <span class="inline-flex items-center gap-1.5">
                             <span
                               class="h-1.5 w-1.5 rounded-full"
                               [class]="syncStatusDotClass(domain.status)"
                             ></span>
-                            {{ syncStatusLabel(domain.status) }}
+                            <span class="text-[var(--text-primary)]">{{ syncStatusLabel(domain.status) }}</span>
                           </span>
-                        </td>
-                        <td class="whitespace-nowrap px-4 py-2 text-right font-mono text-[var(--text-secondary)]">
-                          {{ fmtInteger(domain.recordCount) }}
                         </td>
                       </tr>
                     }
@@ -168,9 +164,5 @@ export class DataQualityStatusPageComponent {
 
   fmtDateTime(iso: string | null): string {
     return formatDateTime(iso);
-  }
-
-  fmtInteger(value: number): string {
-    return formatInteger(value);
   }
 }

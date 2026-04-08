@@ -74,7 +74,8 @@ public class MismatchJdbcRepository {
       "deltaPct", "(ae.details->>'delta_pct')::numeric",
       "offerName", "ae.details->>'offer_name'",
       "expectedValue", "ae.details->>'expected_value'",
-      "actualValue", "ae.details->>'actual_value'"
+      "actualValue", "ae.details->>'actual_value'",
+      "resolution", "ae.resolved_reason"
   );
 
   public Page<MismatchRow> findAll(long workspaceId, MismatchFilter filter,
@@ -159,7 +160,7 @@ public class MismatchJdbcRepository {
         UPDATE alert_event
         SET status = 'RESOLVED',
             resolved_at = NOW(),
-            resolved_reason = 'IGNORED',
+            resolved_reason = :resolvedReason,
             resolved_by = :userId
         WHERE workspace_id = :workspaceId
           AND id IN (:ids)
@@ -169,6 +170,7 @@ public class MismatchJdbcRepository {
     var params = new MapSqlParameterSource()
         .addValue("workspaceId", workspaceId)
         .addValue("ids", ids)
+        .addValue("resolvedReason", buildResolvedReason("IGNORED", reason))
         .addValue("userId", userId);
     return jdbc.update(sql, params);
   }
@@ -176,26 +178,29 @@ public class MismatchJdbcRepository {
   public SummaryData getSummaryData(long workspaceId) {
     String sql = """
         SELECT
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN')
+            COUNT(*) FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED'))
                 AS active_count,
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN'
+            COUNT(*) FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED')
                 AND ae.opened_at >= NOW() - INTERVAL '7 days')
                 AS active_last_7d,
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN'
+            COUNT(*) FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED')
                 AND ae.opened_at >= NOW() - INTERVAL '14 days'
                 AND ae.opened_at < NOW() - INTERVAL '7 days')
                 AS active_prev_7d,
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN' AND ae.severity = 'CRITICAL')
+            COUNT(*) FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED')
+                AND ae.severity = 'CRITICAL')
                 AS critical_count,
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN' AND ae.severity = 'CRITICAL'
+            COUNT(*) FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED')
+                AND ae.severity = 'CRITICAL'
                 AND ae.opened_at >= NOW() - INTERVAL '7 days')
                 AS critical_last_7d,
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN' AND ae.severity = 'CRITICAL'
+            COUNT(*) FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED')
+                AND ae.severity = 'CRITICAL'
                 AND ae.opened_at >= NOW() - INTERVAL '14 days'
                 AND ae.opened_at < NOW() - INTERVAL '7 days')
                 AS critical_prev_7d,
             AVG(EXTRACT(EPOCH FROM (NOW() - ae.opened_at)) / 3600)
-                FILTER (WHERE ae.status = 'OPEN')
+                FILTER (WHERE ae.status IN ('OPEN', 'ACKNOWLEDGED'))
                 AS avg_hours_unresolved,
             COUNT(*) FILTER (WHERE ae.status = 'AUTO_RESOLVED'
                 AND ae.resolved_at::date = CURRENT_DATE)
@@ -228,7 +233,7 @@ public class MismatchJdbcRepository {
         FROM alert_event ae
         WHERE ae.workspace_id = :workspaceId
           AND ae.details->>'mismatch_type' IS NOT NULL
-          AND ae.status = 'OPEN'
+          AND ae.status IN ('OPEN', 'ACKNOWLEDGED')
         GROUP BY ae.details->>'mismatch_type'
         ORDER BY cnt DESC
         """;
@@ -327,7 +332,7 @@ public class MismatchJdbcRepository {
     return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
   }
 
-  public int autoResolveCleared(long workspaceId) {
+  public int autoResolveClearedPrice(long workspaceId, BigDecimal thresholdPct) {
     String sql = """
         UPDATE alert_event
         SET status = 'AUTO_RESOLVED',
@@ -335,7 +340,7 @@ public class MismatchJdbcRepository {
             resolved_reason = 'AUTO_RESOLVED'
         WHERE workspace_id = :workspaceId
           AND status = 'OPEN'
-          AND details->>'mismatch_type' IS NOT NULL
+          AND details->>'mismatch_type' = 'PRICE'
           AND NOT EXISTS (
               SELECT 1
               FROM canonical_price_current cpc
@@ -352,13 +357,84 @@ public class MismatchJdbcRepository {
               ) latest_pa ON true
               WHERE mo.id = (alert_event.details->>'offer_id')::bigint
                 AND mc.workspace_id = :workspaceId
-                AND alert_event.details->>'mismatch_type' = 'PRICE'
                 AND ABS(cpc.price - latest_pa.target_price)
-                    / NULLIF(latest_pa.target_price, 0) * 100 > 1
+                    / NULLIF(latest_pa.target_price, 0) * 100 > :thresholdPct
           )
-          AND details->>'mismatch_type' = 'PRICE'
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("thresholdPct", thresholdPct);
+    return jdbc.update(sql, params);
+  }
+
+  public int autoResolveClearedPromo(long workspaceId) {
+    String sql = """
+        UPDATE alert_event
+        SET status = 'AUTO_RESOLVED',
+            resolved_at = NOW(),
+            resolved_reason = 'AUTO_RESOLVED'
+        WHERE workspace_id = :workspaceId
+          AND status = 'OPEN'
+          AND details->>'mismatch_type' = 'PROMO'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM canonical_promo_product cpp
+              JOIN marketplace_offer mo ON mo.id = cpp.marketplace_offer_id
+              WHERE mo.id = (alert_event.details->>'offer_id')::bigint
+                AND cpp.participation_status != (alert_event.details->>'expected_value')
+          )
         """;
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
+    return jdbc.update(sql, params);
+  }
+
+  public int autoResolveClearedStock(long workspaceId, int absoluteThreshold) {
+    String sql = """
+        UPDATE alert_event
+        SET status = 'AUTO_RESOLVED',
+            resolved_at = NOW(),
+            resolved_reason = 'AUTO_RESOLVED'
+        WHERE workspace_id = :workspaceId
+          AND status = 'OPEN'
+          AND details->>'mismatch_type' = 'STOCK'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM canonical_stock_current csc
+              WHERE csc.marketplace_offer_id = (alert_event.details->>'offer_id')::bigint
+                AND ABS(csc.quantity - (alert_event.details->>'actual_value')::int)
+                    > :absoluteThreshold
+          )
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("absoluteThreshold", absoluteThreshold);
+    return jdbc.update(sql, params);
+  }
+
+  public int autoResolveClearedFinance(long workspaceId, int gapHoursThreshold) {
+    String sql = """
+        UPDATE alert_event
+        SET status = 'AUTO_RESOLVED',
+            resolved_at = NOW(),
+            resolved_reason = 'AUTO_RESOLVED'
+        WHERE workspace_id = :workspaceId
+          AND status = 'OPEN'
+          AND details->>'mismatch_type' = 'FINANCE'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM marketplace_connection mc2
+              WHERE mc2.id = alert_event.connection_id
+                AND mc2.status = 'ACTIVE'
+                AND NOT EXISTS (
+                    SELECT 1 FROM canonical_finance_entry cfe
+                    WHERE cfe.connection_id = mc2.id
+                      AND cfe.entry_date >= CURRENT_DATE - make_interval(hours => :gapHours)
+                )
+          )
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("gapHours", gapHoursThreshold);
     return jdbc.update(sql, params);
   }
 
@@ -371,6 +447,42 @@ public class MismatchJdbcRepository {
 
     String sql = BASE_SELECT + FROM_JOINS + where + " ORDER BY ae.opened_at DESC LIMIT 10000";
     return jdbc.query(sql, params, this::mapRow);
+  }
+
+  public boolean existsOpenMismatch(long workspaceId, long offerId, String mismatchType) {
+    String sql = """
+        SELECT EXISTS (
+            SELECT 1 FROM alert_event
+            WHERE workspace_id = :workspaceId
+              AND status IN ('OPEN', 'ACKNOWLEDGED')
+              AND details->>'mismatch_type' = :mismatchType
+              AND (details->>'offer_id')::bigint = :offerId
+        )
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("offerId", offerId)
+        .addValue("mismatchType", mismatchType);
+    return Boolean.TRUE.equals(jdbc.queryForObject(sql, params, Boolean.class));
+  }
+
+  public boolean existsOpenMismatchByConnection(long workspaceId, long connectionId,
+                                                 String mismatchType) {
+    String sql = """
+        SELECT EXISTS (
+            SELECT 1 FROM alert_event
+            WHERE workspace_id = :workspaceId
+              AND status IN ('OPEN', 'ACKNOWLEDGED')
+              AND details->>'mismatch_type' = :mismatchType
+              AND connection_id = :connectionId
+              AND details->>'offer_id' IS NULL
+        )
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("connectionId", connectionId)
+        .addValue("mismatchType", mismatchType);
+    return Boolean.TRUE.equals(jdbc.queryForObject(sql, params, Boolean.class));
   }
 
   public record SummaryData(
@@ -411,10 +523,10 @@ public class MismatchJdbcRepository {
       }
       if (includeIgnored && !dbStatuses.isEmpty()) {
         where.append(" AND (ae.status IN (:statuses) OR ")
-            .append("(ae.status = 'RESOLVED' AND ae.resolved_reason = 'IGNORED'))");
+            .append("(ae.status = 'RESOLVED' AND ae.resolved_reason LIKE 'IGNORED%'))");
         params.addValue("statuses", dbStatuses);
       } else if (includeIgnored) {
-        where.append(" AND ae.status = 'RESOLVED' AND ae.resolved_reason = 'IGNORED'");
+        where.append(" AND ae.status = 'RESOLVED' AND ae.resolved_reason LIKE 'IGNORED%'");
       } else if (!dbStatuses.isEmpty()) {
         where.append(" AND ae.status IN (:statuses)");
         params.addValue("statuses", dbStatuses);
