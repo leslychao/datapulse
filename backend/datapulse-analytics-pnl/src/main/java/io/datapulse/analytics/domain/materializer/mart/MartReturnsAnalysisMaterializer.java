@@ -11,11 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Materializes mart_returns_analysis from fact_returns + fact_finance + fact_sales.
+ * Materializes mart_returns_analysis from fact_returns + fact_sales.
  *
- * <p>Aggregates return metrics per (connection_id, seller_sku_id, period):
+ * <p>Aggregates operational return metrics per (connection_id, seller_sku_id, period):
  * return count/quantity/amount, sale count/quantity, return rate,
- * financial refund impact, penalties, and top return reason.</p>
+ * and top return reason. Financial impact (refund, penalties) lives
+ * exclusively in P&L marts.</p>
  */
 @Slf4j
 @Component
@@ -38,16 +39,12 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                 r.return_amount,
                 coalesce(s.sale_count, 0) AS sale_count,
                 coalesce(s.sale_quantity, 0) AS sale_quantity,
-                -- return_rate_pct
                 if(s.sale_quantity IS NOT NULL AND s.sale_quantity > 0,
                    toDecimal64(r.return_quantity, 2) / s.sale_quantity * 100,
                    NULL) AS return_rate_pct,
-                coalesce(fin.financial_refund_amount, toDecimal64(0, 2)) AS financial_refund_amount,
-                coalesce(fin.penalties_amount, toDecimal64(0, 2)) AS penalties_amount,
                 r.top_return_reason,
                 %d AS ver
             FROM (
-                -- Returns aggregation (GROUP BY raw keys; coalesce only in SELECT for CH compatibility)
                 SELECT
                     connection_id,
                     any(workspace_id) AS workspace_id,
@@ -62,7 +59,6 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                 FROM fact_returns
                 GROUP BY connection_id, product_id, seller_sku_id, toYYYYMM(return_date)
             ) r
-            -- Sales for the same product x period (for return rate)
             LEFT JOIN (
                 SELECT
                     connection_id,
@@ -77,20 +73,6 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                 AND r.product_id = s.product_id
                 AND r.seller_sku_id = s.seller_sku_id
                 AND r.period = s.period
-            -- Financial impact from fact_finance
-            LEFT JOIN (
-                SELECT
-                    connection_id,
-                    coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,
-                    toYYYYMM(finance_date) AS period,
-                    sum(refund_amount) AS financial_refund_amount,
-                    sum(penalties_amount) AS penalties_amount
-                FROM fact_finance
-                WHERE attribution_level = 'POSTING'
-                GROUP BY connection_id, seller_sku_id, toYYYYMM(finance_date)
-            ) fin ON r.connection_id = fin.connection_id
-                AND r.seller_sku_id = fin.seller_sku_id
-                AND r.period = fin.period
             SETTINGS final = 1
             """;
 

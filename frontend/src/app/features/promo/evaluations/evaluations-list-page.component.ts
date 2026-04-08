@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
@@ -16,6 +17,7 @@ import { PromoApiService } from '@core/api/promo-api.service';
 import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
 import { EvaluationResult, PromoEvaluationFilter } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -78,28 +80,28 @@ const MP_BADGE: Record<
           [value]="kpiTotal()"
           [icon]="ClipboardListIcon"
           accent="primary"
-          [loading]="evalsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.evaluations.kpi.profitable' | translate"
           [value]="kpiProfitable()"
           [icon]="TrendingUpIcon"
           accent="success"
-          [loading]="evalsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.evaluations.kpi.marginal' | translate"
           [value]="kpiMarginal()"
           [icon]="AlertCircleIcon"
           accent="warning"
-          [loading]="evalsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.evaluations.kpi.unprofitable' | translate"
           [value]="kpiUnprofitable()"
           [icon]="TrendingDownIcon"
           accent="error"
-          [loading]="evalsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
       </div>
 
@@ -137,8 +139,8 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="initialSortModel()"
+            (sortChanged)="onSortChanged($event)"
           />
         }
       </div>
@@ -150,11 +152,19 @@ export class EvaluationsListPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly translate = inject(TranslateService);
   private readonly detailPanel = inject(DetailPanelService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly ClipboardListIcon = ClipboardList;
   protected readonly TrendingUpIcon = TrendingUp;
   protected readonly AlertCircleIcon = AlertCircle;
   protected readonly TrendingDownIcon = TrendingDown;
+
+  readonly currentSort = signal<SortUrlState>({ column: 'evaluatedAt', direction: 'desc' });
+  readonly initialSortModel = computed(() => {
+    const s = this.currentSort();
+    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  });
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
@@ -195,11 +205,15 @@ export class EvaluationsListPageComponent {
         sortable: true,
         cellRenderer: (params: any) => {
           if (!params.data) return '';
-          return `<span class="font-medium" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+        },
+        onCellClicked: (params: any) => {
+          if (params.data) this.onRowClicked(params.data);
         },
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.marketplace'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.marketplace'),
         field: 'sourcePlatform',
         width: 100,
         cellClass: 'text-center',
@@ -217,12 +231,15 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.sku'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.sku'),
         field: 'marketplaceSku',
+        tooltipField: 'marketplaceSku',
         width: 120,
         cellClass: 'font-mono',
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.promo_price'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.promo_price'),
         field: 'promoPrice',
         width: 100,
         cellClass: 'font-mono text-right',
@@ -231,6 +248,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.regular_price'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.regular_price'),
         field: 'regularPrice',
         width: 110,
         cellClass: 'font-mono text-right',
@@ -238,6 +256,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.discount'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.discount'),
         field: 'discountPct',
         width: 80,
         cellClass: 'font-mono text-right',
@@ -247,6 +266,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.cogs'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.cogs'),
         field: 'cogs',
         width: 100,
         cellClass: 'font-mono text-right',
@@ -254,6 +274,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.margin_promo'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.margin_promo'),
         field: 'marginAtPromoPrice',
         width: 110,
         cellClass: 'font-mono text-right',
@@ -266,6 +287,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.margin_regular'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.margin_regular'),
         field: 'marginAtRegularPrice',
         width: 110,
         cellClass: 'font-mono text-right',
@@ -277,6 +299,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.margin_delta'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.margin_delta'),
         field: 'marginDeltaPct',
         width: 100,
         cellClass: 'font-mono text-right',
@@ -289,6 +312,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.stock'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.stock'),
         field: 'stockAvailable',
         width: 80,
         cellClass: 'font-mono text-right',
@@ -298,6 +322,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.stock_days'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.stock_days'),
         field: 'stockDaysOfCover',
         width: 90,
         cellClass: 'font-mono text-right',
@@ -306,6 +331,7 @@ export class EvaluationsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.stock_sufficient'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.stock_sufficient'),
         field: 'stockSufficient',
         width: 100,
         cellRenderer: (params: any) => {
@@ -335,15 +361,16 @@ export class EvaluationsListPageComponent {
       {
         headerName: this.translate.instant('promo.evaluations.col.policy'),
         field: 'policyName',
+        tooltipField: 'policyName',
         width: 150,
         sortable: true,
       },
       {
         headerName: this.translate.instant('promo.evaluations.col.evaluated_at'),
+        headerTooltip: this.translate.instant('promo.evaluations.col.evaluated_at'),
         field: 'evaluatedAt',
         width: 130,
         sortable: true,
-        sort: 'desc' as const,
         valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
       },
     ];
@@ -380,18 +407,30 @@ export class EvaluationsListPageComponent {
 
   readonly rows = computed(() => this.evalsQuery.data()?.content ?? []);
 
-  readonly kpiTotal = computed(() => this.evalsQuery.data()?.totalElements ?? 0);
-  readonly kpiProfitable = computed(() =>
-    this.rows().filter((e) => e.evaluationResult === 'PROFITABLE').length,
-  );
-  readonly kpiMarginal = computed(() =>
-    this.rows().filter((e) => e.evaluationResult === 'MARGINAL').length,
-  );
-  readonly kpiUnprofitable = computed(() =>
-    this.rows().filter((e) =>
-      ['UNPROFITABLE', 'INSUFFICIENT_STOCK', 'INSUFFICIENT_DATA'].includes(e.evaluationResult),
-    ).length,
-  );
+  readonly kpiQuery = injectQuery(() => ({
+    queryKey: ['promo-evaluations-kpi', this.wsStore.currentWorkspaceId()],
+    queryFn: () =>
+      lastValueFrom(this.promoApi.getEvaluationKpi(this.wsStore.currentWorkspaceId()!)),
+    enabled: !!this.wsStore.currentWorkspaceId(),
+    staleTime: 30_000,
+  }));
+
+  readonly kpiTotal = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.total.toLocaleString('ru-RU') : null;
+  });
+  readonly kpiProfitable = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.profitableCount.toLocaleString('ru-RU') : null;
+  });
+  readonly kpiMarginal = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.marginalCount.toLocaleString('ru-RU') : null;
+  });
+  readonly kpiUnprofitable = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.unprofitableCount.toLocaleString('ru-RU') : null;
+  });
 
   readonly hasActiveFilters = computed(() =>
     Object.values(this.filterValues()).some(
@@ -400,6 +439,19 @@ export class EvaluationsListPageComponent {
   );
 
   readonly getRowId = (params: any) => String(params.data.id);
+
+  constructor() {
+    readSortFromUrl(this.route, this.currentSort);
+    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'evaluatedAt', direction: 'desc' });
+  }
+
+  onSortChanged(sort: { column: string; direction: string }): void {
+    if (sort.column) {
+      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
+    } else {
+      this.currentSort.set({ column: 'evaluatedAt', direction: 'desc' });
+    }
+  }
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);

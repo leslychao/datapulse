@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
@@ -19,6 +20,7 @@ import {
   PromoDecisionType,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -80,21 +82,21 @@ const MP_BADGE: Record<
           [value]="kpiParticipate()"
           [icon]="CheckCircleIcon"
           accent="success"
-          [loading]="decisionsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.decisions.kpi.decline' | translate"
           [value]="kpiDecline()"
           [icon]="XCircleIcon"
           accent="neutral"
-          [loading]="decisionsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.decisions.kpi.pending_review' | translate"
           [value]="kpiPendingReview()"
           [icon]="ClockIcon"
           accent="warning"
-          [loading]="decisionsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
       </div>
 
@@ -132,8 +134,8 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="initialSortModel()"
+            (sortChanged)="onSortChanged($event)"
           />
         }
       </div>
@@ -145,10 +147,18 @@ export class DecisionsListPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly translate = inject(TranslateService);
   private readonly detailPanel = inject(DetailPanelService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly CheckCircleIcon = CheckCircle;
   protected readonly XCircleIcon = XCircle;
   protected readonly ClockIcon = Clock;
+
+  readonly currentSort = signal<SortUrlState>({ column: 'createdAt', direction: 'desc' });
+  readonly initialSortModel = computed(() => {
+    const s = this.currentSort();
+    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  });
 
   readonly filterValues = signal<Record<string, any>>({});
   readonly currentPage = signal(0);
@@ -190,11 +200,15 @@ export class DecisionsListPageComponent {
         sortable: true,
         cellRenderer: (params: any) => {
           if (!params.data) return '';
-          return `<span class="font-medium" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline" title="${params.data.campaignName}">${params.data.campaignName}</span>`;
+        },
+        onCellClicked: (params: any) => {
+          if (params.data) this.onRowClicked(params.data);
         },
       },
       {
         headerName: this.translate.instant('promo.decisions.col.marketplace'),
+        headerTooltip: this.translate.instant('promo.decisions.col.marketplace'),
         field: 'sourcePlatform',
         width: 100,
         cellClass: 'text-center',
@@ -212,12 +226,15 @@ export class DecisionsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.decisions.col.sku'),
+        headerTooltip: this.translate.instant('promo.decisions.col.sku'),
         field: 'marketplaceSku',
+        tooltipField: 'marketplaceSku',
         width: 120,
         cellClass: 'font-mono',
       },
       {
         headerName: this.translate.instant('promo.decisions.col.decision'),
+        headerTooltip: this.translate.instant('promo.decisions.col.decision'),
         field: 'decisionType',
         width: 130,
         sortable: true,
@@ -225,6 +242,7 @@ export class DecisionsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.decisions.col.mode'),
+        headerTooltip: this.translate.instant('promo.decisions.col.mode'),
         field: 'participationMode',
         width: 120,
         valueFormatter: (params: any) =>
@@ -232,6 +250,7 @@ export class DecisionsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.decisions.col.target_price'),
+        headerTooltip: this.translate.instant('promo.decisions.col.target_price'),
         field: 'targetPromoPrice',
         width: 130,
         cellClass: 'font-mono text-right',
@@ -251,7 +270,9 @@ export class DecisionsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.decisions.col.decided_by'),
+        headerTooltip: this.translate.instant('promo.decisions.col.decided_by'),
         field: 'decidedByName',
+        tooltipField: 'decidedByName',
         width: 130,
         valueFormatter: (params: any) =>
           params.value ?? this.translate.instant('promo.decisions.col.decided_by_auto'),
@@ -260,6 +281,12 @@ export class DecisionsListPageComponent {
         headerName: this.translate.instant('promo.decisions.col.policy'),
         field: 'policyName',
         width: 160,
+        tooltipValueGetter: (params: any) => {
+          if (!params.data) return '';
+          const name = params.data.policyName ?? '';
+          const ver = params.data.policyVersion != null ? ` v${params.data.policyVersion}` : '';
+          return `${name}${ver}`;
+        },
         cellRenderer: (params: any) => {
           if (!params.data) return '';
           const name = params.data.policyName ?? '';
@@ -269,10 +296,10 @@ export class DecisionsListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.decisions.col.date'),
+        headerTooltip: this.translate.instant('promo.decisions.col.date'),
         field: 'createdAt',
         width: 130,
         sortable: true,
-        sort: 'desc' as const,
         valueFormatter: (params: any) => formatDateTime(params.value, 'full'),
       },
     ];
@@ -309,15 +336,26 @@ export class DecisionsListPageComponent {
 
   readonly rows = computed(() => this.decisionsQuery.data()?.content ?? []);
 
-  readonly kpiParticipate = computed(() =>
-    this.rows().filter((d) => d.decisionType === 'PARTICIPATE').length,
-  );
-  readonly kpiDecline = computed(() =>
-    this.rows().filter((d) => d.decisionType === 'DECLINE').length,
-  );
-  readonly kpiPendingReview = computed(() =>
-    this.rows().filter((d) => d.decisionType === 'PENDING_REVIEW').length,
-  );
+  readonly kpiQuery = injectQuery(() => ({
+    queryKey: ['promo-decisions-kpi', this.wsStore.currentWorkspaceId()],
+    queryFn: () =>
+      lastValueFrom(this.promoApi.getDecisionKpi(this.wsStore.currentWorkspaceId()!)),
+    enabled: !!this.wsStore.currentWorkspaceId(),
+    staleTime: 30_000,
+  }));
+
+  readonly kpiParticipate = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.participateCount.toLocaleString('ru-RU') : null;
+  });
+  readonly kpiDecline = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.declineCount.toLocaleString('ru-RU') : null;
+  });
+  readonly kpiPendingReview = computed(() => {
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.pendingReviewCount.toLocaleString('ru-RU') : null;
+  });
 
   readonly hasActiveFilters = computed(() =>
     Object.values(this.filterValues()).some(
@@ -326,6 +364,19 @@ export class DecisionsListPageComponent {
   );
 
   readonly getRowId = (params: any) => String(params.data.id);
+
+  constructor() {
+    readSortFromUrl(this.route, this.currentSort);
+    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'createdAt', direction: 'desc' });
+  }
+
+  onSortChanged(sort: { column: string; direction: string }): void {
+    if (sort.column) {
+      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
+    } else {
+      this.currentSort.set({ column: 'createdAt', direction: 'desc' });
+    }
+  }
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);

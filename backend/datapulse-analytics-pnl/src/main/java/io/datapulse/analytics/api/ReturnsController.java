@@ -23,7 +23,7 @@ public class ReturnsController {
 
     @GetMapping("/summary")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-    public List<ReturnsSummaryResponse> getSummary(
+    public ReturnsSummaryResponse getSummary(
             @PathVariable("workspaceId") long workspaceId,
             ReturnsFilter filter) {
         return returnsAnalysisService.getSummary(workspaceId, filter);

@@ -30,6 +30,9 @@ import {
   FilterBarUrlDef,
   readFilterBarFromUrl,
   syncFilterBarToUrl,
+  SortUrlState,
+  readSortFromUrl,
+  syncSortToUrl,
 } from '@shared/utils/url-filters';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -174,8 +177,8 @@ interface ContextMenuState {
             [height]="'100%'"
             [enableFlash]="true"
             [contextMenuEnabled]="true"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="initialSortModel()"
+            (sortChanged)="onSortChangedEvent($event)"
             (cellDoubleClicked)="onRowDoubleClicked($event)"
             (selectionChanged)="onSelectionChanged($event)"
             (contextMenu)="onContextMenu($event)"
@@ -384,7 +387,12 @@ export class ActionsListPageComponent {
   readonly bulkCancelReason = signal('');
   readonly exportPending = signal(false);
   readonly currentPage = signal(0);
-  readonly currentSort = signal('createdAt,desc');
+  readonly currentSort = signal<SortUrlState>({ column: 'createdAt', direction: 'desc' });
+  private readonly sortString = computed(() => `${this.currentSort().column},${this.currentSort().direction}`);
+  readonly initialSortModel = computed(() => {
+    const s = this.currentSort();
+    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  });
   readonly ctxMenu = signal<ContextMenuState>({ visible: false, x: 0, y: 0, row: null });
   readonly showColumnsPopover = signal(false);
   readonly columnVisibility = signal<Record<string, boolean>>({});
@@ -393,6 +401,8 @@ export class ActionsListPageComponent {
   constructor() {
     readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
     syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
+    readSortFromUrl(this.route, this.currentSort);
+    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'createdAt', direction: 'desc' });
   }
 
   @HostListener('document:click')
@@ -477,16 +487,21 @@ export class ActionsListPageComponent {
       minWidth: 250,
       pinned: 'left' as const,
       sortable: true,
+      tooltipValueGetter: (params: any) => params.data?.offerName ?? '',
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         return `<div class="leading-tight py-1.5">
-          <div class="font-medium text-[var(--text-primary)]">${params.data.offerName}</div>
+          <div class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.data.offerName}</div>
           <div class="text-[11px] text-[var(--text-secondary)]">${params.data.sku}</div>
         </div>`;
+      },
+      onCellClicked: (params: any) => {
+        if (params.data) this.onRowClicked(params.data);
       },
     },
     {
       headerName: this.translate.instant('execution.col.target_price'),
+      headerTooltip: this.translate.instant('execution.col.target_price'),
       field: 'targetPrice',
       width: 110,
       sortable: true,
@@ -495,6 +510,7 @@ export class ActionsListPageComponent {
     },
     {
       headerName: this.translate.instant('execution.col.current_price'),
+      headerTooltip: this.translate.instant('execution.col.current_price'),
       field: 'currentPriceAtCreation',
       width: 110,
       sortable: true,
@@ -503,6 +519,7 @@ export class ActionsListPageComponent {
     },
     {
       headerName: this.translate.instant('execution.col.price_delta'),
+      headerTooltip: this.translate.instant('execution.col.price_delta'),
       field: 'priceDeltaPct',
       width: 80,
       sortable: true,
@@ -539,6 +556,7 @@ export class ActionsListPageComponent {
     },
     {
       headerName: this.translate.instant('execution.col.execution_mode'),
+      headerTooltip: this.translate.instant('execution.col.execution_mode'),
       field: 'executionMode',
       width: 80,
       sortable: true,
@@ -557,6 +575,7 @@ export class ActionsListPageComponent {
     },
     {
       headerName: this.translate.instant('execution.col.attempts'),
+      headerTooltip: this.translate.instant('execution.col.attempts'),
       field: 'attemptCount',
       width: 70,
       sortable: true,
@@ -568,10 +587,10 @@ export class ActionsListPageComponent {
     },
     {
       headerName: this.translate.instant('execution.col.created_at'),
+      headerTooltip: this.translate.instant('execution.col.created_at'),
       field: 'createdAt',
       width: 120,
       sortable: true,
-      sort: 'desc' as const,
       valueFormatter: (params: any) => this.formatRelativeTime(params.value),
       tooltipValueGetter: (params: any) => formatDateTime(params.value, 'full'),
     },
@@ -590,7 +609,7 @@ export class ActionsListPageComponent {
   });
 
   readonly actionsQuery = injectQuery(() => ({
-    queryKey: ['actions', this.wsStore.currentWorkspaceId(), this.filter(), this.currentPage(), this.currentSort()],
+    queryKey: ['actions', this.wsStore.currentWorkspaceId(), this.filter(), this.currentPage(), this.sortString()],
     queryFn: () =>
       lastValueFrom(
         this.actionApi.listActions(
@@ -598,7 +617,7 @@ export class ActionsListPageComponent {
           this.filter(),
           this.currentPage(),
           50,
-          this.currentSort(),
+          this.sortString(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -750,6 +769,15 @@ export class ActionsListPageComponent {
 
   onSelectionChanged(rows: any[]): void {
     this.selectedRows.set(rows);
+  }
+
+  onSortChangedEvent(sort: { column: string; direction: string }): void {
+    if (sort.column) {
+      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
+    } else {
+      this.currentSort.set({ column: 'createdAt', direction: 'desc' });
+    }
+    this.currentPage.set(0);
   }
 
   onContextMenu(event: { event: MouseEvent; data: any }): void {

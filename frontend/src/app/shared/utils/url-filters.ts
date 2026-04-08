@@ -1,6 +1,63 @@
 import { computed, effect, Signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
+// ---------------------------------------------------------------------------
+// Sort URL persistence
+// ---------------------------------------------------------------------------
+
+export interface SortUrlState {
+  column: string;
+  direction: 'asc' | 'desc';
+}
+
+/**
+ * Reads sort state from URL query params (sortBy, sortDir).
+ * Call from constructor or field initializer.
+ */
+export function readSortFromUrl(
+  route: ActivatedRoute,
+  target: WritableSignal<SortUrlState>,
+): void {
+  const qp = route.snapshot.queryParams;
+  const sortBy = qp['sortBy'];
+  const sortDir = qp['sortDir'];
+  if (sortBy) {
+    target.set({
+      column: sortBy,
+      direction: sortDir === 'asc' ? 'asc' : 'desc',
+    });
+  }
+}
+
+/**
+ * Creates an effect that writes sort state to URL (sortBy, sortDir).
+ * Default sort is omitted from URL to keep it clean.
+ * Must be called from an injection context.
+ */
+export function syncSortToUrl(
+  router: Router,
+  route: ActivatedRoute,
+  source: Signal<SortUrlState>,
+  defaultSort: SortUrlState,
+): void {
+  effect(() => {
+    const sort = source();
+    const isDefault =
+      sort.column === defaultSort.column &&
+      sort.direction === defaultSort.direction;
+    const params: Record<string, string | null> = {
+      sortBy: isDefault ? null : sort.column,
+      sortDir: isDefault ? null : sort.direction,
+    };
+    router.navigate([], {
+      relativeTo: route,
+      queryParams: params,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  });
+}
+
 export interface UrlFilterDef {
   key: string;
   signal: WritableSignal<string>;
@@ -35,17 +92,16 @@ export function syncFiltersToUrl(
   defs: UrlFilterDef[],
 ): void {
   effect(() => {
-    const params: Record<string, string> = {};
+    const params: Record<string, string | null> = {};
     for (const def of defs) {
       const value = def.signal();
-      if (value !== '' && value !== def.defaultValue) {
-        params[def.key] = value;
-      }
+      params[def.key] =
+        value !== '' && value !== def.defaultValue ? value : null;
     }
     router.navigate([], {
       relativeTo: route,
       queryParams: params,
-      queryParamsHandling: 'replace',
+      queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   });
@@ -128,28 +184,25 @@ export function syncFilterBarToUrl(
 ): void {
   effect(() => {
     const vals = source();
-    const params: Record<string, string> = {};
+    const params: Record<string, string | null> = {};
     for (const def of defs) {
       if (def.type === 'date-range') {
         const range = vals[def.key];
-        if (range?.from) params[def.key + '_from'] = range.from;
-        if (range?.to) params[def.key + '_to'] = range.to;
+        params[def.key + '_from'] = range?.from || null;
+        params[def.key + '_to'] = range?.to || null;
       } else if (def.type === 'csv') {
         const arr = vals[def.key];
-        if (Array.isArray(arr) && arr.length > 0) {
-          params[def.key] = arr.join(',');
-        }
+        params[def.key] =
+          Array.isArray(arr) && arr.length > 0 ? arr.join(',') : null;
       } else {
         const v = vals[def.key];
-        if (v != null && v !== '') {
-          params[def.key] = String(v);
-        }
+        params[def.key] = v != null && v !== '' ? String(v) : null;
       }
     }
     router.navigate([], {
       relativeTo: route,
       queryParams: params,
-      queryParamsHandling: 'replace',
+      queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   });

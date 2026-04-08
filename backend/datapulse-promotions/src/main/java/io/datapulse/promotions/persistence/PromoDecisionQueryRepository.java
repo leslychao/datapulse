@@ -20,6 +20,25 @@ public class PromoDecisionQueryRepository {
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
+  private static final String KPI_SELECT = """
+      SELECT COUNT(*) FILTER (WHERE pd.decision_type = 'PARTICIPATE')::bigint AS participate_count,
+             COUNT(*) FILTER (WHERE pd.decision_type = 'DECLINE')::bigint AS decline_count,
+             COUNT(*) FILTER (WHERE pd.decision_type = 'PENDING_REVIEW')::bigint AS pending_review_count
+      FROM promo_decision pd
+      WHERE pd.workspace_id = :workspaceId
+      """;
+
+  public PromoDecisionKpiRow findKpi(long workspaceId) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
+    return jdbcTemplate.queryForObject(
+        KPI_SELECT,
+        params,
+        (rs, rowNum) -> new PromoDecisionKpiRow(
+            rs.getLong("participate_count"),
+            rs.getLong("decline_count"),
+            rs.getLong("pending_review_count")));
+  }
+
   public Page<PromoDecisionEntity> findFiltered(long workspaceId,
       PromoDecisionType decisionType,
       Long campaignId,

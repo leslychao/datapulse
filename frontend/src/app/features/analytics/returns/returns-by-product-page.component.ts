@@ -25,6 +25,7 @@ import {
 } from '@shared/utils/format.utils';
 import {
   UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  SortUrlState, readSortFromUrl, syncSortToUrl,
 } from '@shared/utils/url-filters';
 
 @Component({
@@ -71,8 +72,8 @@ import {
           [pagination]="false"
           [pageSize]="50"
           height="calc(100vh - 320px)"
-          [clickableRows]="true"
-          (rowClicked)="onRowClicked($event)"
+          [initialSortModel]="initialSortModel()"
+          (sortChanged)="onSortChanged($event)"
           (gridReady)="onGridReady($event)"
         />
       </div>
@@ -165,28 +166,22 @@ import {
               </div>
             </section>
 
-            <!-- Financial Impact -->
+            <!-- Sales Context -->
             <section>
               <h4 class="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
-                {{ 'analytics.returns.detail.financial' | translate }}
+                {{ 'analytics.returns.detail.sales_context' | translate }}
               </h4>
               <div class="space-y-2">
-                <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.refund_amount' | translate }}</span>
-                  <span class="font-mono text-sm text-[var(--status-error)]">
-                    {{ formatMoney(selectedProduct()!.financialRefundAmount) }}
-                  </span>
-                </div>
-                <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.penalties_amount' | translate }}</span>
-                  <span class="font-mono text-sm text-[var(--status-error)]">
-                    {{ formatMoney(selectedProduct()!.penaltiesAmount) }}
-                  </span>
-                </div>
                 <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
                   <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.sales' | translate }}</span>
                   <span class="font-mono text-sm text-[var(--text-primary)]">
                     {{ selectedProduct()!.saleCount }} / {{ selectedProduct()!.saleQuantity }} {{ 'common.pcs' | translate }}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
+                  <span class="text-sm text-[var(--text-secondary)]">{{ 'analytics.returns.detail.return_amount' | translate }}</span>
+                  <span class="font-mono text-sm text-[var(--text-primary)]">
+                    {{ formatMoney(selectedProduct()!.returnAmount) }}
                   </span>
                 </div>
               </div>
@@ -216,7 +211,12 @@ export class ReturnsByProductPageComponent {
   readonly search = signal('');
   readonly selectedProduct = signal<ReturnsByProduct | null>(null);
   readonly currentPage = signal(0);
-  readonly currentSort = signal('return_rate_pct,desc');
+  readonly currentSort = signal<SortUrlState>({ column: 'return_rate_pct', direction: 'desc' });
+  readonly sortString = computed(() => `${this.currentSort().column},${this.currentSort().direction}`);
+  readonly initialSortModel = computed(() => {
+    const s = this.currentSort();
+    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  });
   readonly pageSize = signal(50);
 
   private readonly filterDefs: UrlFilterDef[] = [
@@ -230,6 +230,8 @@ export class ReturnsByProductPageComponent {
   constructor() {
     readFiltersFromUrl(this.route, this.filterDefs);
     syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    readSortFromUrl(this.route, this.currentSort);
+    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'return_rate_pct', direction: 'desc' });
   }
 
   onResetFilters(): void {
@@ -244,7 +246,7 @@ export class ReturnsByProductPageComponent {
       this.period(),
       this.search(),
       this.currentPage(),
-      this.currentSort(),
+      this.sortString(),
     ],
     queryFn: () =>
       lastValueFrom(
@@ -253,7 +255,7 @@ export class ReturnsByProductPageComponent {
           { period: this.period(), search: this.search() || undefined },
           this.currentPage(),
           this.pageSize(),
-          this.currentSort(),
+          this.sortString(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -266,6 +268,13 @@ export class ReturnsByProductPageComponent {
       field: 'skuCode',
       headerName: 'SKU',
       cellClass: 'font-mono text-[11px]',
+      cellRenderer: (params: any) => {
+        if (!params.value) return '';
+        return `<span class="text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
+      },
+      onCellClicked: (params: any) => {
+        if (params.data) this.onRowClicked(params.data);
+      },
     },
     {
       field: 'productName',
@@ -303,20 +312,16 @@ export class ReturnsByProductPageComponent {
       },
     },
     {
-      field: 'financialRefundAmount',
-      headerName: this.t.instant('analytics.returns.col.refund'),
+      field: 'returnQuantity',
+      headerName: this.t.instant('analytics.returns.col.return_quantity'),
       type: 'rightAligned',
       cellClass: 'font-mono',
-      valueFormatter: (p) => formatMoney(p.value, 0),
-      cellStyle: () => ({ color: 'var(--status-error)' }),
     },
     {
-      field: 'penaltiesAmount',
-      headerName: this.t.instant('analytics.returns.col.penalties'),
+      field: 'saleQuantity',
+      headerName: this.t.instant('analytics.returns.col.sale_quantity'),
       type: 'rightAligned',
       cellClass: 'font-mono',
-      valueFormatter: (p) => formatMoney(p.value, 0),
-      cellStyle: () => ({ color: 'var(--status-error)' }),
     },
     {
       field: 'topReturnReason',
@@ -348,6 +353,15 @@ export class ReturnsByProductPageComponent {
 
   onRowClicked(row: ReturnsByProduct): void {
     this.selectedProduct.set(row);
+  }
+
+  onSortChanged(sort: { column: string; direction: string }): void {
+    if (sort.column) {
+      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
+    } else {
+      this.currentSort.set({ column: 'return_rate_pct', direction: 'desc' });
+    }
+    this.currentPage.set(0);
   }
 
   prevPage(): void {

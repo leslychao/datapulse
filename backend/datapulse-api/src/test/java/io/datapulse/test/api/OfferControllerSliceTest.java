@@ -67,7 +67,7 @@ class OfferControllerSliceTest {
     void should_return_offer_detail_200() throws Exception {
       var now = OffsetDateTime.now();
       var response = new OfferDetailResponse(
-          100L, "SKU-001", "Test Product", "WB", "WB Main",
+          100L, 200L, "SKU-001", "Test Product", "WB", "WB Main",
           "ACTIVE", "Electronics",
           new BigDecimal("1000"), new BigDecimal("900"), new BigDecimal("500"),
           new BigDecimal("50.00"), 100,
@@ -132,7 +132,7 @@ class OfferControllerSliceTest {
     @WithMockUser(roles = "ANALYST")
     void should_serialize_null_sections_correctly() throws Exception {
       var response = new OfferDetailResponse(
-          100L, "SKU-001", "Test Product", "WB", "WB Main",
+          100L, 200L, "SKU-001", "Test Product", "WB", "WB Main",
           "ACTIVE", null,
           new BigDecimal("1000"), null, null,
           null, null,
@@ -160,7 +160,7 @@ class OfferControllerSliceTest {
     @WithMockUser(roles = "ANALYST")
     void should_serialize_bigdecimal_as_number() throws Exception {
       var response = new OfferDetailResponse(
-          100L, "SKU-001", "Product", "WB", "WB Main",
+          100L, 200L, "SKU-001", "Product", "WB", "WB Main",
           "ACTIVE", null,
           new BigDecimal("1000.50"), null, null,
           new BigDecimal("42.35"), null,
@@ -184,7 +184,7 @@ class OfferControllerSliceTest {
     void should_serialize_offsetdatetime_as_iso() throws Exception {
       var syncAt = OffsetDateTime.parse("2025-06-15T10:30:00+03:00");
       var response = new OfferDetailResponse(
-          100L, "SKU-001", "Product", "WB", "WB Main",
+          100L, 200L, "SKU-001", "Product", "WB", "WB Main",
           "ACTIVE", null,
           null, null, null, null, null,
           null, null, null, null, null, null,

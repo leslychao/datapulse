@@ -4,6 +4,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.promotions.api.PromoCampaignDetailResponse;
 import io.datapulse.promotions.api.PromoCampaignProductResponse;
 import io.datapulse.promotions.api.PromoCampaignSummaryResponse;
+import io.datapulse.promotions.persistence.PromoCampaignKpiRow;
 import io.datapulse.promotions.persistence.PromoCampaignQueryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,11 @@ import java.util.List;
 public class PromoCampaignService {
 
     private final PromoCampaignQueryRepository campaignQueryRepository;
+
+    @Transactional(readOnly = true)
+    public PromoCampaignKpiRow getCampaignKpi(long workspaceId) {
+        return campaignQueryRepository.findKpi(workspaceId);
+    }
 
     @Transactional(readOnly = true)
     public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,

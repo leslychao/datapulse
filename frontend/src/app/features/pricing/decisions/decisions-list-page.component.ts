@@ -3,9 +3,7 @@ import {
   Component,
   computed,
   inject,
-  signal,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -18,11 +16,8 @@ import {
 
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
-import {
-  FilterBarUrlDef,
-  readFilterBarFromUrl,
-  syncFilterBarToUrl,
-} from '@shared/utils/url-filters';
+import { FilterBarUrlDef } from '@shared/utils/url-filters';
+import { createListPageState } from '@shared/utils/list-page-state';
 import { PricingDecisionFilter, PricingDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
@@ -32,6 +27,7 @@ import {
 } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 
 const DECISION_TYPE_COLOR: Record<string, string> = {
   CHANGE: 'success',
@@ -48,6 +44,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
     FilterBarComponent,
     DataGridComponent,
     EmptyStateComponent,
+    PaginationBarComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
@@ -55,8 +52,8 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
       <div data-tour="decisions-filter-bar" class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
         />
       </div>
 
@@ -69,13 +66,13 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
           />
         } @else if (!decisionsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="hasActiveFilters()
+            [message]="listState.hasActiveFilters()
               ? ('pricing.decisions.empty_filtered' | translate)
               : ('pricing.decisions.empty' | translate)"
-            [actionLabel]="hasActiveFilters()
+            [actionLabel]="listState.hasActiveFilters()
               ? ('filter_bar.reset_all' | translate)
               : ''"
-            (action)="onFiltersChanged({})"
+            (action)="listState.resetFilters()"
           />
         } @else {
           <dp-data-grid
@@ -86,8 +83,15 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
             [pageSize]="100"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
+          />
+          <dp-pagination-bar
+            [totalItems]="decisionsQuery.data()?.totalElements ?? 0"
+            [pageSize]="listState.pageSize()"
+            [currentPage]="listState.currentPage()"
+            [pageSizeOptions]="[50, 100, 200]"
+            (pageChange)="listState.onPageChanged($event)"
           />
         }
       </div>
@@ -97,25 +101,18 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
 export class DecisionsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
   private readonly detailPanel = inject(DetailPanelService);
 
-  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
-    { key: 'decisionType', type: 'csv' },
-    { key: 'executionMode', type: 'string' },
-    { key: 'period', type: 'date-range' },
-  ];
-
-  readonly filterValues = signal<Record<string, any>>({});
-  readonly currentPage = signal(0);
-  readonly currentSort = signal('createdAt,desc');
-
-  constructor() {
-    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
-    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
-  }
+  readonly listState = createListPageState({
+    defaultSort: { column: 'createdAt', direction: 'desc' },
+    defaultPageSize: 100,
+    filterBarDefs: [
+      { key: 'decisionType', type: 'csv' },
+      { key: 'executionMode', type: 'string' },
+      { key: 'period', type: 'date-range' },
+    ] satisfies FilterBarUrlDef[],
+  });
 
   readonly filterConfigs: FilterConfig[] = [
     {
@@ -157,12 +154,21 @@ export class DecisionsListPageComponent {
       minWidth: 220,
       flex: 1,
       sortable: true,
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
+        if (!params.data) return '';
+        return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline" title="${params.data.offerName}">${params.data.offerName}</span>`;
+      },
+      onCellClicked: (params: any) => {
+        if (params.data) this.onRowClicked(params.data);
+      },
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.sku'),
+      headerTooltip: this.translate.instant('pricing.decisions.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
+      tooltipField: 'sellerSku',
       cellClass: 'font-mono',
     },
     {
@@ -170,9 +176,11 @@ export class DecisionsListPageComponent {
       field: 'connectionName',
       width: 160,
       sortable: true,
+      tooltipField: 'connectionName',
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.decision'),
+      headerTooltip: this.translate.instant('pricing.decisions.col.decision'),
       field: 'decisionType',
       width: 130,
       sortable: true,
@@ -186,6 +194,7 @@ export class DecisionsListPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.current_price'),
+      headerTooltip: this.translate.instant('pricing.decisions.col.current_price'),
       field: 'currentPrice',
       width: 110,
       sortable: true,
@@ -195,6 +204,7 @@ export class DecisionsListPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.target_price'),
+      headerTooltip: this.translate.instant('pricing.decisions.col.target_price'),
       field: 'targetPrice',
       width: 110,
       sortable: true,
@@ -224,6 +234,7 @@ export class DecisionsListPageComponent {
       field: 'policyName',
       width: 160,
       sortable: true,
+      tooltipField: 'policyName',
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.strategy'),
@@ -239,6 +250,7 @@ export class DecisionsListPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.execution_mode'),
+      headerTooltip: this.translate.instant('pricing.decisions.col.execution_mode'),
       field: 'executionMode',
       width: 100,
       sortable: true,
@@ -256,6 +268,7 @@ export class DecisionsListPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.run'),
+      headerTooltip: this.translate.instant('pricing.decisions.col.run'),
       field: 'pricingRunId',
       width: 80,
       sortable: true,
@@ -275,20 +288,20 @@ export class DecisionsListPageComponent {
         if (!params.value) return '—';
         return this.translate.instant(params.value);
       },
+      tooltipValueGetter: (params: any) => params.value ? this.translate.instant(params.value) : '',
     },
     {
       headerName: this.translate.instant('pricing.decisions.col.date'),
       field: 'createdAt',
       width: 140,
       sortable: true,
-      sort: 'desc' as const,
       valueFormatter: (params: ValueFormatterParams<PricingDecisionSummary>) =>
         this.formatTimestamp(params.value),
     },
   ];
 
   private readonly filter = computed<PricingDecisionFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PricingDecisionFilter = {};
     if (vals['decisionType']?.length) f.decisionType = vals['decisionType'];
     if (vals['executionMode']) f.executionMode = vals['executionMode'];
@@ -302,17 +315,18 @@ export class DecisionsListPageComponent {
       'decisions',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
-      this.currentPage(),
-      this.currentSort(),
+      this.listState.currentPage(),
+      this.listState.pageSize(),
+      this.listState.sortParam(),
     ],
     queryFn: () =>
       lastValueFrom(
         this.pricingApi.listDecisions(
           this.wsStore.currentWorkspaceId()!,
           this.filter(),
-          this.currentPage(),
-          100,
-          this.currentSort(),
+          this.listState.currentPage(),
+          this.listState.pageSize(),
+          this.listState.sortParam(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -321,23 +335,8 @@ export class DecisionsListPageComponent {
 
   readonly rows = computed(() => this.decisionsQuery.data()?.content ?? []);
 
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) =>
-        v !== '' &&
-        v !== null &&
-        v !== undefined &&
-        (!Array.isArray(v) || v.length > 0),
-    ),
-  );
-
   readonly getRowId = (params: GetRowIdParams<PricingDecisionSummary>) =>
     String(params.data.id);
-
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-    this.currentPage.set(0);
-  }
 
   onRowClicked(row: PricingDecisionSummary): void {
     this.detailPanel.open('pricing-decision', row.id);

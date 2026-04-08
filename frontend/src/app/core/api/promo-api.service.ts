@@ -11,12 +11,15 @@ import {
   PromoActionFilter,
   PromoCampaign,
   PromoCampaignFilter,
+  PromoCampaignKpi,
   PromoCampaignSummary,
   PromoDecision,
   PromoDecisionDetail,
   PromoDecisionFilter,
+  PromoDecisionKpi,
   PromoEvaluation,
   PromoEvaluationFilter,
+  PromoEvaluationKpi,
   PromoPolicy,
   PromoPolicyAssignment,
   PromoPolicyFilter,
@@ -427,6 +430,26 @@ export class PromoApiService {
     return this.http.post<void>(
       `${this.base}/workspaces/${workspaceId}/promo/actions/bulk-reject`,
       body,
+    );
+  }
+
+  // --- KPIs ---
+
+  getCampaignKpi(workspaceId: number): Observable<PromoCampaignKpi> {
+    return this.http.get<PromoCampaignKpi>(
+      `${this.base}/workspaces/${workspaceId}/promo/campaigns/kpi`,
+    );
+  }
+
+  getEvaluationKpi(workspaceId: number): Observable<PromoEvaluationKpi> {
+    return this.http.get<PromoEvaluationKpi>(
+      `${this.base}/workspaces/${workspaceId}/promo/evaluations/kpi`,
+    );
+  }
+
+  getDecisionKpi(workspaceId: number): Observable<PromoDecisionKpi> {
+    return this.http.get<PromoDecisionKpi>(
+      `${this.base}/workspaces/${workspaceId}/promo/decisions/kpi`,
     );
   }
 }

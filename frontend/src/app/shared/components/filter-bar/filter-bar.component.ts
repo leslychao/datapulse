@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  ElementRef,
   HostListener,
   input,
   output,
@@ -61,9 +60,10 @@ export interface FilterConfig {
           <div class="relative">
             <button
               type="button"
-              (click)="toggleDropdown(filter.key, $event)"
-              class="flex h-8 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)]
-                     border px-3 text-[length:var(--text-sm)] transition-colors"
+              (click)="toggleDropdown(filter.key)"
+              class="relative z-[45] flex h-8 cursor-pointer items-center gap-1.5
+                     rounded-[var(--radius-md)] border px-3 text-[length:var(--text-sm)]
+                     transition-colors"
               [class]="selectedCount(filter.key) > 0
                 ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)] text-[var(--accent-primary)]'
                 : 'border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]'"
@@ -92,6 +92,10 @@ export interface FilterConfig {
             </button>
 
             @if (openDropdown() === filter.key) {
+              <div
+                class="fixed inset-0 z-40"
+                (click)="openDropdown.set(null)"
+              ></div>
               <div
                 class="absolute left-0 top-[calc(100%+4px)] z-50 min-w-[180px]
                        rounded-[var(--radius-md)] border border-[var(--border-default)]
@@ -162,18 +166,6 @@ export class FilterBarComponent {
 
   protected readonly openDropdown = signal<string | null>(null);
 
-  constructor(private readonly elementRef: ElementRef) {}
-
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    if (
-      this.openDropdown() &&
-      !this.elementRef.nativeElement.contains(event.target)
-    ) {
-      this.openDropdown.set(null);
-    }
-  }
-
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.openDropdown.set(null);
@@ -210,8 +202,7 @@ export class FilterBarComponent {
     return Array.isArray(selected) ? selected.length : 0;
   }
 
-  protected toggleDropdown(key: string, event: Event): void {
-    event.stopPropagation();
+  protected toggleDropdown(key: string): void {
     this.openDropdown.set(this.openDropdown() === key ? null : key);
   }
 

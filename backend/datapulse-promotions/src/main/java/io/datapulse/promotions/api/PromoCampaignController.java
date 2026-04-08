@@ -24,6 +24,15 @@ public class PromoCampaignController {
 
     private final PromoCampaignService campaignService;
 
+    @GetMapping("/kpi")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PromoCampaignKpiResponse getCampaignKpi(
+            @PathVariable("workspaceId") long workspaceId) {
+        var row = campaignService.getCampaignKpi(workspaceId);
+        return new PromoCampaignKpiResponse(
+            row.activeCount(), row.upcomingCount(), row.productsParticipating());
+    }
+
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoCampaignSummaryResponse> listCampaigns(
@@ -41,7 +50,7 @@ public class PromoCampaignController {
                 marketplaceType, from, to, pageable);
     }
 
-    @GetMapping("/{campaignId}")
+    @GetMapping("/{campaignId:\\d+}")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public PromoCampaignDetailResponse getCampaign(
             @PathVariable("workspaceId") long workspaceId,
@@ -49,7 +58,7 @@ public class PromoCampaignController {
         return campaignService.getCampaign(campaignId, workspaceId);
     }
 
-    @GetMapping("/{campaignId}/products")
+    @GetMapping("/{campaignId:\\d+}/products")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoCampaignProductResponse> getCampaignProducts(
             @PathVariable("workspaceId") long workspaceId,

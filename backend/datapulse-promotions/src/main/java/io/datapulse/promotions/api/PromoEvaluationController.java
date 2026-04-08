@@ -21,6 +21,16 @@ public class PromoEvaluationController {
 
     private final PromoEvaluationApiService evaluationApiService;
 
+    @GetMapping("/kpi")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PromoEvaluationKpiResponse getEvaluationKpi(
+            @PathVariable("workspaceId") long workspaceId) {
+        var row = evaluationApiService.getEvaluationKpi(workspaceId);
+        return new PromoEvaluationKpiResponse(
+            row.total(), row.profitableCount(),
+            row.marginalCount(), row.unprofitableCount());
+    }
+
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoEvaluationResponse> listEvaluations(

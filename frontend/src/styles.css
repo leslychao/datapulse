@@ -284,6 +284,26 @@ router-outlet + * {
   box-shadow: inset 3px 0 0 var(--accent-primary);
 }
 
+/* Editable cell indicator */
+.ag-theme-alpine .dp-editable-cell {
+  border-bottom: 1px dashed var(--border-default);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ag-theme-alpine .dp-editable-cell:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+  border-bottom-color: var(--accent-primary);
+}
+
+/* Flash animation for saved cells */
+.ag-theme-alpine .ag-cell-data-changed {
+  background-color: color-mix(in srgb, var(--status-success) 15%, transparent) !important;
+}
+
+.ag-theme-alpine .ag-cell-data-changed-animation {
+  transition: background-color 1s ease-out;
+}
+
 /* Action buttons inside AG Grid cells */
 .action-btn {
   display: inline-flex;

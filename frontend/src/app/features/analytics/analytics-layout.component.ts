@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { filter, map } from 'rxjs';
 
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { NavigationStore } from '@shared/stores/navigation.store';
 
 import { AnalyticsHealthService } from './analytics-health.service';
 
@@ -16,8 +17,10 @@ interface NavTab {
 interface SubNavLink {
   labelKey: string;
   path: string;
-  exact: boolean;
 }
+
+const MODULE = 'analytics';
+const DEFAULT_TAB = 'pnl/summary';
 
 const SECTION_TABS: NavTab[] = [
   { labelKey: 'analytics.nav.pnl', path: 'pnl' },
@@ -28,24 +31,24 @@ const SECTION_TABS: NavTab[] = [
 
 const SUB_NAV: Record<string, SubNavLink[]> = {
   pnl: [
-    { labelKey: 'analytics.subnav.pnl.summary', path: 'pnl/summary', exact: true },
-    { labelKey: 'analytics.subnav.pnl.by_product', path: 'pnl/by-product', exact: true },
-    { labelKey: 'analytics.subnav.pnl.by_posting', path: 'pnl/by-posting', exact: true },
-    { labelKey: 'analytics.subnav.pnl.trend', path: 'pnl/trend', exact: true },
+    { labelKey: 'analytics.subnav.pnl.summary', path: 'pnl/summary' },
+    { labelKey: 'analytics.subnav.pnl.by_product', path: 'pnl/by-product' },
+    { labelKey: 'analytics.subnav.pnl.by_posting', path: 'pnl/by-posting' },
+    { labelKey: 'analytics.subnav.pnl.trend', path: 'pnl/trend' },
   ],
   inventory: [
-    { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory/overview', exact: true },
-    { labelKey: 'analytics.subnav.inventory.by_product', path: 'inventory/by-product', exact: true },
-    { labelKey: 'analytics.subnav.inventory.history', path: 'inventory/stock-history', exact: true },
+    { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory/overview' },
+    { labelKey: 'analytics.subnav.inventory.by_product', path: 'inventory/by-product' },
+    { labelKey: 'analytics.subnav.inventory.history', path: 'inventory/stock-history' },
   ],
   returns: [
-    { labelKey: 'analytics.subnav.returns.summary', path: 'returns/summary', exact: true },
-    { labelKey: 'analytics.subnav.returns.by_product', path: 'returns/by-product', exact: true },
-    { labelKey: 'analytics.subnav.returns.trend', path: 'returns/trend', exact: true },
+    { labelKey: 'analytics.subnav.returns.summary', path: 'returns/summary' },
+    { labelKey: 'analytics.subnav.returns.by_product', path: 'returns/by-product' },
+    { labelKey: 'analytics.subnav.returns.trend', path: 'returns/trend' },
   ],
   'data-quality': [
-    { labelKey: 'analytics.subnav.data_quality.status', path: 'data-quality/status', exact: true },
-    { labelKey: 'analytics.subnav.data_quality.reconciliation', path: 'data-quality/reconciliation', exact: true },
+    { labelKey: 'analytics.subnav.data_quality.status', path: 'data-quality/status' },
+    { labelKey: 'analytics.subnav.data_quality.reconciliation', path: 'data-quality/reconciliation' },
   ],
 };
 
@@ -90,7 +93,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
             <a
               [routerLink]="link.path"
               routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: link.exact }"
+              [routerLinkActiveOptions]="subNavMatchOptions"
               class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
                      font-medium text-[var(--text-secondary)] transition-colors
                      hover:text-[var(--text-primary)]
@@ -114,6 +117,15 @@ export class AnalyticsLayoutComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
+
+  private readonly currentChild = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => this.extractChild(e.urlAfterRedirects)),
+    ),
+    { initialValue: this.extractChild(this.router.url) },
+  );
 
   constructor() {
     effect(() => {
@@ -122,9 +134,32 @@ export class AnalyticsLayoutComponent {
         this.healthService.checkHealth(wsId);
       }
     });
+
+    const lastTab = this.navStore.getLastTab(MODULE);
+    if (lastTab && lastTab !== DEFAULT_TAB) {
+      const wsId = this.wsStore.currentWorkspaceId();
+      if (wsId) {
+        this.router.navigate(
+          ['/workspace', String(wsId), MODULE, lastTab],
+          { replaceUrl: true },
+        );
+      }
+    }
+
+    effect(() => {
+      const child = this.currentChild();
+      if (child) this.navStore.setLastTab(MODULE, child);
+    });
   }
 
   readonly sectionTabs = SECTION_TABS;
+
+  readonly subNavMatchOptions = {
+    paths: 'exact' as const,
+    queryParams: 'ignored' as const,
+    matrixParams: 'ignored' as const,
+    fragment: 'ignored' as const,
+  };
 
   private static readonly SHORTCUT_ROUTES: Record<string, string> = {
     '1': 'pnl/summary',
@@ -159,4 +194,11 @@ export class AnalyticsLayoutComponent {
     }
     return SUB_NAV['pnl'];
   });
+
+  private extractChild(url: string): string | null {
+    const marker = `/${MODULE}/`;
+    const idx = url.indexOf(marker);
+    if (idx < 0) return null;
+    return url.substring(idx + marker.length).split('?')[0] || null;
+  }
 }

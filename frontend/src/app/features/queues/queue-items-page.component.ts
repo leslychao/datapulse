@@ -16,7 +16,14 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, GridApi, GridReadyEvent, SelectionChangedEvent } from 'ag-grid-community';
+import {
+  CellClickedEvent,
+  ColDef,
+  GridApi,
+  GridReadyEvent,
+  ICellRendererParams,
+  SelectionChangedEvent,
+} from 'ag-grid-community';
 import {
   injectMutation,
   injectQuery,
@@ -928,10 +935,27 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     const skuCol: ColDef<QueueItem> = {
       colId: 'sku_code',
       headerName: this.translate.instant('queues.grid.sku'),
+      headerTooltip: this.translate.instant('queues.grid.sku'),
       pinned: 'left',
       width: 120,
       cellClass: 'font-mono',
       valueGetter: (p) => this.summary(p.data, 'skuCode'),
+      cellRenderer: (params: ICellRendererParams<QueueItem>) => {
+        const v = params.value;
+        if (v == null || v === '') {
+          return '';
+        }
+        const span = document.createElement('span');
+        span.className =
+          'text-[var(--accent-primary)] cursor-pointer hover:underline';
+        span.textContent = String(v);
+        return span;
+      },
+      onCellClicked: (params: CellClickedEvent<QueueItem>) => {
+        if (params.data) {
+          this.onRowClicked(params.data);
+        }
+      },
     };
 
     const productCol: ColDef<QueueItem> = {
@@ -945,6 +969,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     const mpCol: ColDef<QueueItem> = {
       colId: 'marketplace',
       headerName: this.translate.instant('queues.grid.marketplace'),
+      headerTooltip: this.translate.instant('queues.grid.marketplace'),
       width: 60,
       valueGetter: (p) => this.summary(p.data, 'marketplaceType'),
     };
@@ -952,6 +977,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     const currentPriceCol: ColDef<QueueItem> = {
       colId: 'current_price',
       headerName: this.translate.instant('queues.grid.current_price'),
+      headerTooltip: this.translate.instant('queues.grid.current_price'),
       width: 110,
       cellClass: 'font-mono text-right',
       valueGetter: (p) => this.summaryNum(p.data, 'currentPrice'),
@@ -961,6 +987,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     const costCol: ColDef<QueueItem> = {
       colId: 'cost_price',
       headerName: this.translate.instant('queues.grid.cost_price'),
+      headerTooltip: this.translate.instant('queues.grid.cost_price'),
       width: 110,
       cellClass: 'font-mono text-right',
       valueGetter: (p) => this.summaryNum(p.data, 'costPrice'),
@@ -970,6 +997,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     const marginCol: ColDef<QueueItem> = {
       colId: 'margin_pct',
       headerName: this.translate.instant('queues.grid.margin'),
+      headerTooltip: this.translate.instant('queues.grid.margin'),
       width: 80,
       cellClass: 'font-mono text-right',
       valueGetter: (p) => this.summaryNum(p.data, 'marginPct'),
@@ -1107,18 +1135,24 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     width: number,
     formatter: (data: QueueItem | undefined) => string,
   ): ColDef<QueueItem> {
-    return {
+    const name = this.translate.instant(headerKey);
+    const def: ColDef<QueueItem> = {
       colId: id,
-      headerName: this.translate.instant(headerKey),
+      headerName: name,
       width,
       valueGetter: (p) => formatter(p.data),
     };
+    if (width < 140) {
+      def.headerTooltip = name;
+    }
+    return def;
   }
 
   private priceDeltaCol(summaryKey = 'priceChangePct'): ColDef<QueueItem> {
     return {
       colId: 'price_change_pct',
       headerName: this.translate.instant('queues.grid.delta_pct'),
+      headerTooltip: this.translate.instant('queues.grid.delta_pct'),
       width: 80,
       cellClass: 'font-mono text-right',
       valueGetter: (p) => this.summaryNum(p.data, summaryKey),
@@ -1159,14 +1193,21 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     return {
       colId: 'severity',
       headerName: this.translate.instant('queues.grid.severity'),
+      headerTooltip: this.translate.instant('queues.grid.severity'),
       width: 100,
       valueGetter: (p) => this.summary(p.data, 'severity'),
+      valueFormatter: (params) =>
+        params.value
+          ? this.translate.instant('queues.severity.' + params.value)
+          : '—',
       cellRenderer: (params: { value: string | null }) => {
         const v = params.value;
         if (!v) return '';
         const color = v === 'CRITICAL' ? 'error' : v === 'WARNING' ? 'warning' : 'neutral';
         const cssVar = `var(--status-${color})`;
-        return renderBadge(v, cssVar);
+        const key = 'queues.severity.' + v;
+        const label = this.translate.instant(key);
+        return renderBadge(label !== key ? label : v, cssVar);
       },
     };
   }
@@ -1175,6 +1216,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     return {
       colId: 'mode',
       headerName: this.translate.instant('queues.grid.mode'),
+      headerTooltip: this.translate.instant('queues.grid.mode'),
       width: 110,
       valueGetter: (p) => this.summary(p.data, 'executionMode'),
       cellRenderer: (params: { value: string | null }) => {

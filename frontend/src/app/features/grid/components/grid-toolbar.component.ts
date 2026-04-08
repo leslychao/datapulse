@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
-import { LucideAngularModule, Download, AlignJustify, Pencil } from 'lucide-angular';
+import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
+import { LucideAngularModule, Download, AlignJustify, Pencil, DollarSign, Upload } from 'lucide-angular';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import { GridStore } from '@shared/stores/grid.store';
+import { RbacService } from '@core/auth/rbac.service';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { SearchInputComponent } from '@shared/components/form/search-input.component';
 
@@ -61,6 +62,41 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
           <lucide-icon [img]="DownloadIcon" [size]="14" />
           {{ 'grid.export' | translate }}
         </button>
+
+        @if (rbac.canEditCostProfiles()) {
+          <div class="relative">
+            <button
+              (click)="showCostMenu.set(!showCostMenu())"
+              class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+            >
+              <lucide-icon [img]="CostIcon" [size]="14" />
+              {{ 'grid.toolbar.cost' | translate }}
+            </button>
+
+            @if (showCostMenu()) {
+              <div class="absolute right-0 top-full z-50 mt-1 w-48 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] py-1 shadow-[var(--shadow-md)]"
+                   (click)="showCostMenu.set(false)">
+                <button
+                  (click)="onCostImportClick()"
+                  class="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                >
+                  <lucide-icon [img]="UploadIcon" [size]="14" />
+                  {{ 'grid.toolbar.cost_import' | translate }}
+                </button>
+                <button
+                  (click)="costExportClicked.emit()"
+                  class="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                >
+                  <lucide-icon [img]="DownloadIcon" [size]="14" />
+                  {{ 'grid.toolbar.cost_export' | translate }}
+                </button>
+              </div>
+            }
+
+            <input #costFileInput type="file" accept=".csv" class="hidden"
+                   (change)="onCostFileSelected($event)" />
+          </div>
+        }
       </div>
     </div>
 
@@ -76,13 +112,20 @@ import { SearchInputComponent } from '@shared/components/form/search-input.compo
 })
 export class GridToolbarComponent {
   protected readonly gridStore = inject(GridStore);
+  protected readonly rbac = inject(RbacService);
 
   protected readonly DownloadIcon = Download;
   protected readonly DensityIcon = AlignJustify;
   protected readonly PencilIcon = Pencil;
+  protected readonly CostIcon = DollarSign;
+  protected readonly UploadIcon = Upload;
 
   readonly exportClicked = output<void>();
   readonly draftToggle = output<void>();
+  readonly costImportFile = output<File>();
+  readonly costExportClicked = output<void>();
+
+  readonly showCostMenu = signal(false);
 
   protected readonly gridFilters: FilterConfig[] = [
     {
@@ -150,5 +193,21 @@ export class GridToolbarComponent {
 
   protected onSearch(term: string): void {
     this.gridStore.setSearchTerm(term);
+  }
+
+  protected onCostImportClick(): void {
+    const input = document.querySelector<HTMLInputElement>(
+      'dp-grid-toolbar input[type="file"]',
+    );
+    input?.click();
+  }
+
+  protected onCostFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) {
+      this.costImportFile.emit(file);
+    }
+    input.value = '';
   }
 }

@@ -236,3 +236,22 @@ export interface PromoDecisionFilter {
   to?: string;
   search?: string;
 }
+
+export interface PromoCampaignKpi {
+  activeCount: number;
+  upcomingCount: number;
+  productsParticipating: number;
+}
+
+export interface PromoEvaluationKpi {
+  total: number;
+  profitableCount: number;
+  marginalCount: number;
+  unprofitableCount: number;
+}
+
+export interface PromoDecisionKpi {
+  participateCount: number;
+  declineCount: number;
+  pendingReviewCount: number;
+}

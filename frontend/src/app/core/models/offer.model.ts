@@ -32,6 +32,7 @@ export type ActionStatus =
 
 export interface OfferSummary {
   offerId: number;
+  sellerSkuId: number;
   skuCode: string;
   productName: string;
   marketplaceType: MarketplaceType;

@@ -221,19 +221,24 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: 'SKU',
+      headerTooltip: 'SKU',
       field: 'marketplaceSku',
+      tooltipField: 'marketplaceSku',
       width: 120,
       cellClass: 'font-mono',
     },
     {
       headerName: this.translate.instant('promo.detail.col.seller_sku'),
+      headerTooltip: this.translate.instant('promo.detail.col.seller_sku'),
       field: 'sellerSkuCode',
+      tooltipField: 'sellerSkuCode',
       width: 120,
       cellClass: 'font-mono',
       valueFormatter: (params: any) => params.value ?? '—',
     },
     {
       headerName: this.translate.instant('promo.detail.col.promo_price'),
+      headerTooltip: this.translate.instant('promo.detail.col.promo_price'),
       field: 'requiredPrice',
       width: 110,
       cellClass: 'font-mono text-right',
@@ -242,6 +247,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.max_promo_price'),
+      headerTooltip: this.translate.instant('promo.detail.col.max_promo_price'),
       field: 'maxPromoPrice',
       width: 120,
       cellClass: 'font-mono text-right',
@@ -249,6 +255,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.current_price'),
+      headerTooltip: this.translate.instant('promo.detail.col.current_price'),
       field: 'currentPrice',
       width: 110,
       cellClass: 'font-mono text-right',
@@ -257,6 +264,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.discount'),
+      headerTooltip: this.translate.instant('promo.detail.col.discount'),
       field: 'discountPct',
       width: 80,
       cellClass: 'font-mono text-right',
@@ -268,6 +276,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.margin'),
+      headerTooltip: this.translate.instant('promo.detail.col.margin'),
       field: 'marginAtPromoPrice',
       width: 100,
       cellClass: 'font-mono text-right',
@@ -280,6 +289,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.stock'),
+      headerTooltip: this.translate.instant('promo.detail.col.stock'),
       field: 'stockAvailable',
       width: 80,
       cellClass: 'font-mono text-right',
@@ -288,6 +298,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.stock_days'),
+      headerTooltip: this.translate.instant('promo.detail.col.stock_days'),
       field: 'stockDaysOfCover',
       width: 90,
       cellClass: 'font-mono text-right',
@@ -295,6 +306,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.evaluation'),
+      headerTooltip: this.translate.instant('promo.detail.col.evaluation'),
       field: 'evaluationResult',
       width: 130,
       sortable: true,
@@ -302,6 +314,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.decision'),
+      headerTooltip: this.translate.instant('promo.detail.col.decision'),
       field: 'decisionType',
       width: 130,
       sortable: true,
@@ -322,6 +335,7 @@ export class CampaignDetailPageComponent {
     },
     {
       headerName: this.translate.instant('promo.detail.col.actions'),
+      headerTooltip: this.translate.instant('promo.detail.col.actions'),
       colId: 'actions',
       width: 120,
       sortable: false,

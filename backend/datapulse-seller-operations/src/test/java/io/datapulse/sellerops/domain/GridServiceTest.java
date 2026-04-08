@@ -71,6 +71,7 @@ class GridServiceTest {
 
       GridRow row = GridRow.builder()
           .offerId(1L)
+          .sellerSkuId(10L)
           .skuCode("SKU-001")
           .productName("Test Product")
           .marketplaceType("WB")

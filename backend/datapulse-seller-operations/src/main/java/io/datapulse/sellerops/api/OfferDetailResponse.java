@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 
 public record OfferDetailResponse(
         long offerId,
+        long sellerSkuId,
         String skuCode,
         String productName,
         String marketplaceType,

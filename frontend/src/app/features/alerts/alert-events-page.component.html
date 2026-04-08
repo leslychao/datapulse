@@ -108,7 +108,7 @@
       }
     } @else {
       <ag-grid-angular
-        class="ag-theme-alpine dp-grid-clickable min-h-[360px] w-full flex-1"
+        class="ag-theme-alpine min-h-[360px] w-full flex-1"
         [columnDefs]="columnDefs"
         [rowData]="rows()"
         [localeText]="localeText"
@@ -116,7 +116,6 @@
         [suppressCellFocus]="true"
         [animateRows]="false"
         [getRowId]="getRowId"
-        (rowClicked)="onRowClicked($event)"
         (sortChanged)="onSortChanged($event)"
       />
     }

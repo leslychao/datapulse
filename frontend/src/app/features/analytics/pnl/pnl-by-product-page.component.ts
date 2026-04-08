@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -16,7 +16,10 @@ import { LucideAngularModule, Download } from 'lucide-angular';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
+import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import { formatMoney, financeColor, currentMonth } from '@shared/utils/format.utils';
 import {
   UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
@@ -38,7 +41,13 @@ const COGS_STATUS_COLOR: Record<string, string> = {
   selector: 'dp-pnl-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, MonthPickerComponent, DataGridComponent, LucideAngularModule],
+  imports: [
+    TranslatePipe,
+    MonthPickerComponent,
+    DataGridComponent,
+    LucideAngularModule,
+    PaginationBarComponent,
+  ],
   template: `
     <div class="flex flex-col gap-4">
       <!-- Filter bar -->
@@ -80,49 +89,28 @@ const COGS_STATUS_COLOR: Record<string, string> = {
         (gridReady)="onGridReady($event)"
       />
 
-      @if (productsQuery.data(); as page) {
-        <div class="flex items-center justify-between text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-          <span>
-            {{ 'pagination.showing' | translate:{
-              from: page.number * page.size + 1,
-              to: page.number * page.size + page.content.length,
-              total: page.totalElements
-            } }}
-          </span>
-          <div class="flex items-center gap-2">
-            <button
-              (click)="prevPage()"
-              [disabled]="currentPage() === 0"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
-                     text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {{ 'pagination.prev' | translate }}
-            </button>
-            <button
-              (click)="nextPage()"
-              [disabled]="currentPage() >= page.totalPages - 1"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
-                     text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {{ 'pagination.next' | translate }}
-            </button>
-          </div>
-        </div>
-      }
+      <dp-pagination-bar
+        [totalItems]="productsQuery.data()?.totalElements ?? 0"
+        [pageSize]="pageSize()"
+        [currentPage]="currentPage()"
+        [pageSizeOptions]="[25, 50, 100]"
+        (pageChange)="onPageChange($event)"
+      />
     </div>
   `,
 })
 export class PnlByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
   private readonly t = inject(TranslateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
   readonly downloadIcon = Download;
-  readonly period = signal(currentMonth());
+  readonly period = signal(
+    this.navStore.getSectionFilterValue<string>('analytics:pnl', 'period') ?? currentMonth(),
+  );
   readonly search = signal('');
   readonly currentPage = signal(0);
   readonly pageSize = signal(50);
@@ -134,14 +122,15 @@ export class PnlByProductPageComponent {
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   private gridApi: GridApi | null = null;
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  readonly onSearchInput = createDebouncedSearch(this.search);
 
   constructor() {
+    effect(() => {
+      this.navStore.setSectionFilter('analytics:pnl', { period: this.period() });
+    });
     readFiltersFromUrl(this.route, this.filterDefs);
     syncFiltersToUrl(this.router, this.route, this.filterDefs);
-    inject(DestroyRef).onDestroy(() => {
-      if (this.searchTimer) clearTimeout(this.searchTimer);
-    });
   }
 
   onResetFilters(): void {
@@ -212,8 +201,24 @@ export class PnlByProductPageComponent {
       cellStyle: () => ({ color: 'var(--finance-negative)' }),
     },
     {
+      field: 'acquiringCommissionAmount',
+      headerName: this.t.instant('analytics.pnl.col.acquiring'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: () => ({ color: 'var(--finance-negative)' }),
+    },
+    {
       field: 'logisticsCostAmount',
       headerName: this.t.instant('analytics.pnl.col.logistics'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatMoney(p.value, 0),
+      cellStyle: () => ({ color: 'var(--finance-negative)' }),
+    },
+    {
+      field: 'penaltiesAmount',
+      headerName: this.t.instant('analytics.pnl.col.penalties'),
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
@@ -233,7 +238,7 @@ export class PnlByProductPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
       valueFormatter: (p) => formatMoney(p.value, 0),
-      cellStyle: (p) => ({ color: financeColor(p.value) }),
+      cellStyle: () => ({ color: 'var(--finance-negative)' }),
     },
     {
       field: 'fullPnl',

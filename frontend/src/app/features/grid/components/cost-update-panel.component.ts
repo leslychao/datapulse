@@ -200,7 +200,7 @@ export class CostUpdatePanelComponent {
     const v = this.value();
     if (v === null || v <= 0) return;
 
-    const sellerSkuIds = this.offers().map(o => o.offerId);
+    const sellerSkuIds = this.offers().map(o => o.sellerSkuId);
 
     this.bulkFormulaMutation.mutate({
       sellerSkuIds,

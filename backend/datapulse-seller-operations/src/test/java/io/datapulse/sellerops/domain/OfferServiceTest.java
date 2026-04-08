@@ -283,6 +283,7 @@ class OfferServiceTest {
                                         boolean withAction, boolean withPromo) {
     var builder = OfferDetailRow.builder()
         .offerId(OFFER_ID)
+        .sellerSkuId(200L)
         .skuCode("SKU-001")
         .productName("Test Product")
         .marketplaceType("WB")

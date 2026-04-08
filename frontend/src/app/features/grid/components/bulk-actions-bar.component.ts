@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angu
 import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { LucideAngularModule, Check, X, Pause, Lock, Unlock, Calculator, Coins } from 'lucide-angular';
+import { LucideAngularModule, Check, X, Pause, Calculator, Coins } from 'lucide-angular';
 import { CdkOverlayOrigin, CdkConnectedOverlay, ConnectedPosition } from '@angular/cdk/overlay';
 
 import { ActionApiService } from '@core/api/action-api.service';
@@ -174,8 +174,6 @@ export class BulkActionsBarComponent {
   readonly checkIcon = Check;
   readonly xIcon = X;
   readonly pauseIcon = Pause;
-  readonly lockIcon = Lock;
-  readonly unlockIcon = Unlock;
   readonly calculatorIcon = Calculator;
   readonly coinsIcon = Coins;
 

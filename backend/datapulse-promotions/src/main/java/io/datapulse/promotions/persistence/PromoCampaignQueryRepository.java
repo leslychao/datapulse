@@ -23,6 +23,28 @@ public class PromoCampaignQueryRepository {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
+    private static final String KPI_SELECT = """
+            WITH campaign_stats AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE cpc.status = 'ACTIVE')::bigint AS active_count,
+                    COUNT(*) FILTER (WHERE cpc.status = 'UPCOMING')::bigint AS upcoming_count
+                FROM canonical_promo_campaign cpc
+                JOIN marketplace_connection mc ON cpc.connection_id = mc.id
+                WHERE mc.workspace_id = :workspaceId
+            ),
+            product_stats AS (
+                SELECT COUNT(*)::bigint AS products_participating
+                FROM canonical_promo_product cpp
+                JOIN canonical_promo_campaign cpc ON cpp.canonical_promo_campaign_id = cpc.id
+                JOIN marketplace_connection mc ON cpc.connection_id = mc.id
+                WHERE mc.workspace_id = :workspaceId
+                  AND cpc.status = 'ACTIVE'
+                  AND cpp.participation_status = 'PARTICIPATING'
+            )
+            SELECT cs.active_count, cs.upcoming_count, ps.products_participating
+            FROM campaign_stats cs, product_stats ps
+            """;
+
     private static final String BASE_SELECT = """
             SELECT cpc.id, cpc.promo_name, cpc.source_platform,
                    cpc.promo_type, cpc.mechanic, cpc.status,
@@ -38,6 +60,17 @@ public class PromoCampaignQueryRepository {
             JOIN marketplace_connection mc ON cpc.connection_id = mc.id
             WHERE mc.workspace_id = :workspaceId
             """;
+
+    public PromoCampaignKpiRow findKpi(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        return jdbcTemplate.queryForObject(
+            KPI_SELECT,
+            params,
+            (rs, rowNum) -> new PromoCampaignKpiRow(
+                rs.getLong("active_count"),
+                rs.getLong("upcoming_count"),
+                rs.getLong("products_participating")));
+    }
 
     public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
                                                              Collection<String> statuses,

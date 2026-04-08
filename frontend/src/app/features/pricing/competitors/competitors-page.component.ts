@@ -186,8 +186,6 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
           />
         }
       </div>
@@ -251,14 +249,26 @@ export class CompetitorsPageComponent {
     {
       field: 'marketplaceOfferId',
       headerName: this.translate.instant('pricing.competitors.col.sku'),
+      headerTooltip: this.translate.instant('pricing.competitors.col.sku'),
       width: 120,
+      tooltipField: 'marketplaceOfferId',
       cellClass: 'font-mono',
+      cellRenderer: (params: { value: unknown }) => {
+        if (params.value == null || params.value === '') return '';
+        return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
+      },
+      onCellClicked: (params: { data?: CompetitorMatch }) => {
+        if (params.data) {
+          this.onRowClicked(params.data);
+        }
+      },
     },
     {
       field: 'competitorName',
       headerName: this.translate.instant('pricing.competitors.col.competitor'),
       flex: 1,
       minWidth: 180,
+      tooltipField: 'competitorName',
     },
     {
       field: 'trustLevel',
@@ -269,8 +279,13 @@ export class CompetitorsPageComponent {
     },
     {
       field: 'matchMethod',
-      headerName: 'Match',
+      headerName: this.translate.instant('pricing.competitors.col.match_method'),
+      headerTooltip: this.translate.instant('pricing.competitors.col.match_method'),
       width: 100,
+      valueFormatter: (params: ValueFormatterParams<CompetitorMatch>) =>
+        params.value
+          ? this.translate.instant(`pricing.competitors.match_method.${params.value}`)
+          : '—',
     },
     {
       field: 'createdAt',

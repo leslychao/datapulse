@@ -3,6 +3,7 @@ package io.datapulse.promotions.domain;
 import io.datapulse.promotions.api.PromoEvaluationMapper;
 import io.datapulse.promotions.api.PromoEvaluationResponse;
 import io.datapulse.promotions.persistence.PromoEvaluationEntity;
+import io.datapulse.promotions.persistence.PromoEvaluationKpiRow;
 import io.datapulse.promotions.persistence.PromoEvaluationQueryRepository;
 import io.datapulse.promotions.persistence.PromoEvaluationRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,10 @@ public class PromoEvaluationApiService {
     private final PromoEvaluationRepository evaluationRepository;
     private final PromoEvaluationQueryRepository evaluationQueryRepository;
     private final PromoEvaluationMapper evaluationMapper;
+
+    public PromoEvaluationKpiRow getEvaluationKpi(long workspaceId) {
+        return evaluationQueryRepository.findKpi(workspaceId);
+    }
 
     public Page<PromoEvaluationResponse> listEvaluations(long workspaceId, Long runId,
                                                           Long campaignId, Long marketplaceOfferId,

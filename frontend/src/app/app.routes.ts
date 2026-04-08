@@ -56,8 +56,8 @@ export const routes: Routes = [
       },
       {
         path: 'catalog',
-        loadChildren: () => import('./features/catalog/catalog.routes'),
-        data: { breadcrumb: 'Товары' },
+        redirectTo: 'grid',
+        pathMatch: 'prefix',
       },
       {
         path: 'analytics',

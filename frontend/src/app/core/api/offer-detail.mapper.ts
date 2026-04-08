@@ -14,6 +14,7 @@ import {
  */
 export interface OfferDetailApiJson {
   offerId: number;
+  sellerSkuId: number;
   skuCode: string;
   productName: string;
   marketplaceType: string;
@@ -127,6 +128,7 @@ export function mapOfferDetailApiResponse(raw: OfferDetailApiJson): OfferDetail 
 
   return {
     offerId: raw.offerId,
+    sellerSkuId: raw.sellerSkuId,
     skuCode: raw.skuCode,
     productName: raw.productName,
     marketplaceType: raw.marketplaceType as MarketplaceType,

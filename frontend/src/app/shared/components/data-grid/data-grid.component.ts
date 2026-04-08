@@ -58,6 +58,7 @@ const DEFAULT_COL_DEF: ColDef = {
           [selectionColumnDef]="selectionColumnDef"
           [suppressCellFocus]="suppressCellFocus()"
           [rowClassRules]="rowClassRules()"
+          [stopEditingWhenCellsLoseFocus]="stopEditingWhenCellsLoseFocus()"
           [suppressRowClickSelection]="true"
           [alwaysShowVerticalScroll]="true"
           [animateRows]="false"
@@ -93,9 +94,11 @@ export class DataGridComponent {
   readonly rowClassRules = input<RowClassRules>({});
   readonly clickableRows = input(false);
   readonly suppressCellFocus = input(true);
+  readonly stopEditingWhenCellsLoseFocus = input(false);
   readonly enableFlash = input(false);
   readonly contextMenuEnabled = input(false);
   readonly getContextMenuItems = input<(params: GetContextMenuItemsParams) => (string | MenuItemDef)[]>();
+  readonly initialSortModel = input<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
 
   readonly rowClicked = output<any>();
   readonly cellDoubleClicked = output<any>();
@@ -117,6 +120,13 @@ export class DataGridComponent {
 
   onGridReady(event: GridReadyEvent<any>): void {
     this.gridApi = event.api;
+    const sortModel = this.initialSortModel();
+    if (sortModel.length > 0) {
+      event.api.applyColumnState({
+        state: sortModel,
+        defaultState: { sort: null },
+      });
+    }
     this.gridReady.emit(event.api);
   }
 
@@ -136,11 +146,13 @@ export class DataGridComponent {
   }
 
   onSortChanged(event: SortChangedEvent<any>): void {
-    const sortModel = event.api.getColumnState()
+    const sorted = event.api.getColumnState()
       ?.filter((c) => c.sort)
       .map((c) => ({ column: c.colId ?? '', direction: c.sort ?? '' }));
-    if (sortModel?.length) {
-      this.sortChanged.emit(sortModel[0]);
+    if (sorted?.length) {
+      this.sortChanged.emit(sorted[0]);
+    } else {
+      this.sortChanged.emit({ column: '', direction: '' });
     }
   }
 

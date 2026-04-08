@@ -28,7 +28,7 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-noreply@datapulse.io}
       INVITATION_BASE_URL: ${INVITATION_BASE_URL:-http://localhost/invitation/accept}
-      KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-datapulse}
+      KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8180}/realms/${KEYCLOAK_REALM:-datapulse}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-datapulse}/protocol/openid-connect/certs
       S3_HOST: minio
       S3_PORT: 9000

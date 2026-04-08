@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
@@ -20,6 +20,7 @@ import {
   PromoCampaignFilter,
   PromoCampaignSummary,
 } from '@core/models';
+import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
@@ -80,28 +81,28 @@ const MP_BADGE: Record<
           [value]="kpiActive()"
           [icon]="ZapIcon"
           accent="success"
-          [loading]="campaignsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.upcoming' | translate"
           [value]="kpiUpcoming()"
           [icon]="CalendarIcon"
           accent="info"
-          [loading]="campaignsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.products_participating' | translate"
           [value]="kpiProductsParticipating()"
           [icon]="PackageIcon"
           accent="primary"
-          [loading]="campaignsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
         <dp-kpi-card
           [label]="'promo.campaigns.kpi.pending_decisions' | translate"
           [value]="kpiPendingDecisions()"
           [icon]="ClockIcon"
           accent="warning"
-          [loading]="campaignsQuery.isPending()"
+          [loading]="kpiQuery.isPending()"
         />
       </div>
 
@@ -139,8 +140,8 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="initialSortModel()"
+            (sortChanged)="onSortChanged($event)"
           />
         }
       </div>
@@ -151,6 +152,7 @@ export class CampaignListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
 
   protected readonly ZapIcon = Zap;
@@ -162,7 +164,17 @@ export class CampaignListPageComponent {
     status: ['UPCOMING', 'ACTIVE'],
   });
   readonly currentPage = signal(0);
-  readonly currentSort = signal('dateFrom,desc');
+  readonly currentSort = signal<SortUrlState>({ column: 'dateFrom', direction: 'desc' });
+  private readonly sortString = computed(() => `${this.currentSort().column},${this.currentSort().direction}`);
+  readonly initialSortModel = computed(() => {
+    const s = this.currentSort();
+    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  });
+
+  constructor() {
+    readSortFromUrl(this.route, this.currentSort);
+    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'dateFrom', direction: 'desc' });
+  }
 
   private readonly translationChange = toSignal(
     this.translate.onTranslationChange.pipe(startWith(null)),
@@ -211,11 +223,15 @@ export class CampaignListPageComponent {
         sortable: true,
         cellRenderer: (params: any) => {
           if (!params.data) return '';
-          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.data.promoName}</span>`;
+          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline" title="${params.data.promoName}">${params.data.promoName}</span>`;
+        },
+        onCellClicked: (params: any) => {
+          if (params.data) this.onRowClicked(params.data);
         },
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.marketplace'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.marketplace'),
         field: 'sourcePlatform',
         width: 100,
         cellClass: 'text-center',
@@ -228,25 +244,32 @@ export class CampaignListPageComponent {
       {
         headerName: this.translate.instant('promo.campaigns.col.type'),
         field: 'promoType',
+        tooltipField: 'promoType',
         width: 140,
         sortable: true,
+        valueFormatter: (params: any) =>
+          params.value ? this.translate.instant('promo.promo_type.' + params.value) : '—',
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.mechanic'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.mechanic'),
         field: 'mechanic',
         width: 120,
         sortable: true,
+        valueFormatter: (params: any) =>
+          params.value ? this.translate.instant('promo.mechanic.' + params.value) : '—',
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.date_from'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.date_from'),
         field: 'dateFrom',
         width: 110,
         sortable: true,
-        sort: 'desc' as const,
         valueFormatter: (params: any) => this.formatDate(params.value),
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.date_to'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.date_to'),
         field: 'dateTo',
         width: 110,
         sortable: true,
@@ -257,6 +280,7 @@ export class CampaignListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.eligible'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.eligible'),
         field: 'eligibleCount',
         width: 100,
         sortable: true,
@@ -265,6 +289,7 @@ export class CampaignListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.participating'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.participating'),
         field: 'participatedCount',
         width: 100,
         sortable: true,
@@ -273,6 +298,7 @@ export class CampaignListPageComponent {
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.freeze_at'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.freeze_at'),
         field: 'freezeAt',
         width: 110,
         sortable: true,
@@ -282,11 +308,13 @@ export class CampaignListPageComponent {
       {
         headerName: this.translate.instant('promo.campaigns.col.connection'),
         field: 'connectionName',
+        tooltipField: 'connectionName',
         width: 140,
         sortable: true,
       },
       {
         headerName: this.translate.instant('promo.campaigns.col.status'),
+        headerTooltip: this.translate.instant('promo.campaigns.col.status'),
         field: 'status',
         width: 130,
         sortable: true,
@@ -316,7 +344,7 @@ export class CampaignListPageComponent {
       this.wsStore.currentWorkspaceId(),
       this.filter(),
       this.currentPage(),
-      this.currentSort(),
+      this.sortString(),
     ],
     queryFn: () =>
       lastValueFrom(
@@ -325,7 +353,7 @@ export class CampaignListPageComponent {
           this.filter(),
           this.currentPage(),
           50,
-          this.currentSort(),
+          this.sortString(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -334,29 +362,30 @@ export class CampaignListPageComponent {
 
   readonly rows = computed(() => this.campaignsQuery.data()?.content ?? []);
 
+  readonly kpiQuery = injectQuery(() => ({
+    queryKey: ['promo-campaigns-kpi', this.wsStore.currentWorkspaceId()],
+    queryFn: () =>
+      lastValueFrom(this.promoApi.getCampaignKpi(this.wsStore.currentWorkspaceId()!)),
+    enabled: !!this.wsStore.currentWorkspaceId(),
+    staleTime: 30_000,
+  }));
+
   readonly kpiActive = computed(() => {
-    const data = this.rows();
-    return data.filter((c) => c.status === 'ACTIVE').length;
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.activeCount.toLocaleString('ru-RU') : null;
   });
 
   readonly kpiUpcoming = computed(() => {
-    const data = this.rows();
-    return data.filter((c) => c.status === 'UPCOMING').length;
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.upcomingCount.toLocaleString('ru-RU') : null;
   });
 
   readonly kpiProductsParticipating = computed(() => {
-    const data = this.rows();
-    return data
-      .filter((c) => c.status === 'ACTIVE')
-      .reduce((sum, c) => sum + c.participatedCount, 0);
+    const kpi = this.kpiQuery.data();
+    return kpi ? kpi.productsParticipating.toLocaleString('ru-RU') : null;
   });
 
-  readonly kpiPendingDecisions = computed(() => {
-    const data = this.rows();
-    return data
-      .filter((c) => c.status === 'ACTIVE' || c.status === 'UPCOMING')
-      .reduce((sum, c) => sum + (c.pendingReviewCount ?? 0), 0);
-  });
+  readonly kpiPendingDecisions = computed(() => 0);
 
   readonly hasActiveFilters = computed(() =>
     Object.values(this.filterValues()).some(
@@ -372,6 +401,15 @@ export class CampaignListPageComponent {
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);
+    this.currentPage.set(0);
+  }
+
+  onSortChanged(sort: { column: string; direction: string }): void {
+    if (sort.column) {
+      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
+    } else {
+      this.currentSort.set({ column: 'dateFrom', direction: 'desc' });
+    }
     this.currentPage.set(0);
   }
 

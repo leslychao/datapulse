@@ -1,7 +1,13 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { injectMutation, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
 
 import { OfferDetail } from '@core/models';
+import { CostProfileApiService } from '@core/api/cost-profile-api.service';
+import { RbacService } from '@core/auth/rbac.service';
+import { ToastService } from '@shared/shell/toast/toast.service';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
 import { MoneyDisplayComponent } from '@shared/components/money-display.component';
 import { PercentDisplayComponent } from '@shared/components/percent-display.component';
@@ -13,6 +19,7 @@ import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     TranslatePipe,
     StatusBadgeComponent,
     MoneyDisplayComponent,
@@ -60,7 +67,35 @@ import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.
           <dp-money-display [value]="offer().discountPrice" />
 
           <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.cost_price' | translate }}</span>
-          <dp-money-display [value]="offer().costPrice" />
+          @if (editingCost()) {
+            <div class="flex items-center gap-1">
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                [ngModel]="costEditValue()"
+                (ngModelChange)="costEditValue.set($event)"
+                (blur)="saveCostEdit()"
+                (keydown.enter)="saveCostEdit()"
+                (keydown.escape)="editingCost.set(false)"
+                class="w-24 rounded-[var(--radius-sm)] border border-[var(--accent-primary)] bg-[var(--bg-primary)] px-2 py-0.5 font-mono text-[length:var(--text-sm)] text-[var(--text-primary)] outline-none"
+              />
+              <span class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">₽</span>
+            </div>
+          } @else {
+            <span
+              class="cursor-pointer font-mono text-[length:var(--text-sm)] text-[var(--text-primary)] hover:text-[var(--accent-primary)]"
+              [class.cursor-default]="!rbac.canEditCostProfiles()"
+              (dblclick)="beginCostEdit()"
+              [title]="rbac.canEditCostProfiles() ? ('detail.overview.cost_edit_hint' | translate) : ''"
+            >
+              @if (offer().costPrice !== null) {
+                <dp-money-display [value]="offer().costPrice" />
+              } @else {
+                <span class="text-[var(--text-tertiary)]">—</span>
+              }
+            </span>
+          }
 
           <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">{{ 'detail.overview.margin' | translate }}</span>
           <dp-percent-display [value]="offer().marginPct" />
@@ -249,6 +284,56 @@ import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.
 })
 export class OfferOverviewTabComponent {
   readonly offer = input.required<OfferDetail>();
+
+  protected readonly rbac = inject(RbacService);
+  private readonly costApi = inject(CostProfileApiService);
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
+  private readonly queryClient = injectQueryClient();
+
+  readonly editingCost = signal(false);
+  readonly costEditValue = signal<number | null>(null);
+
+  private readonly costMutation = injectMutation(() => ({
+    mutationFn: (params: { sellerSkuId: number; costPrice: number }) => {
+      const today = new Date().toISOString().slice(0, 10);
+      return lastValueFrom(this.costApi.bulkFormula({
+        sellerSkuIds: [params.sellerSkuId],
+        operation: 'FIXED',
+        value: params.costPrice,
+        validFrom: today,
+      }));
+    },
+    onSuccess: () => {
+      this.editingCost.set(false);
+      this.toast.success(this.translate.instant('grid.cost.updated'));
+      this.queryClient.invalidateQueries({ queryKey: ['offer-detail'] });
+      this.queryClient.invalidateQueries({ queryKey: ['offers'] });
+    },
+    onError: () => {
+      this.editingCost.set(false);
+      this.toast.error(this.translate.instant('grid.cost.update_error'));
+    },
+  }));
+
+  beginCostEdit(): void {
+    if (!this.rbac.canEditCostProfiles()) return;
+    this.costEditValue.set(this.offer().costPrice ?? 0);
+    this.editingCost.set(true);
+  }
+
+  saveCostEdit(): void {
+    const val = this.costEditValue();
+    if (val === null || val <= 0) {
+      this.editingCost.set(false);
+      return;
+    }
+    if (val === this.offer().costPrice) {
+      this.editingCost.set(false);
+      return;
+    }
+    this.costMutation.mutate({ sellerSkuId: this.offer().sellerSkuId, costPrice: val });
+  }
 
   protected offerStatusColor(): StatusColor {
     switch (this.offer().status) {

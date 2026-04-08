@@ -497,7 +497,7 @@ export class ConnectionDetailPageComponent {
       flex: 2,
       valueFormatter: (params) => formatDateTime(params.value),
     },
-    { headerName: this.translate.instant('settings.connection_detail.col_method'), field: 'httpMethod', width: 80 },
+    { headerName: this.translate.instant('settings.connection_detail.col_method'), headerTooltip: this.translate.instant('settings.connection_detail.col_method'), field: 'httpMethod', width: 80 },
     {
       headerName: this.translate.instant('settings.connection_detail.col_endpoint'),
       field: 'endpoint',
@@ -505,6 +505,7 @@ export class ConnectionDetailPageComponent {
     },
     {
       headerName: this.translate.instant('settings.connection_detail.col_http_status'),
+      headerTooltip: this.translate.instant('settings.connection_detail.col_http_status'),
       field: 'httpStatus',
       width: 80,
       cellStyle: (params) => {
@@ -514,9 +515,10 @@ export class ConnectionDetailPageComponent {
         return null;
       },
     },
-    { headerName: this.translate.instant('settings.connection_detail.col_duration'), field: 'durationMs', width: 100 },
+    { headerName: this.translate.instant('settings.connection_detail.col_duration'), headerTooltip: this.translate.instant('settings.connection_detail.col_duration'), field: 'durationMs', width: 100 },
     {
       headerName: this.translate.instant('settings.connection_detail.col_retry'),
+      headerTooltip: this.translate.instant('settings.connection_detail.col_retry'),
       field: 'retryAttempt',
       width: 70,
     },

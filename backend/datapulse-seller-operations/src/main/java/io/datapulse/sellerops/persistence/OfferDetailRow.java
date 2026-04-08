@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 public class OfferDetailRow {
 
   private long offerId;
+  private long sellerSkuId;
   private String skuCode;
   private String productName;
   private String marketplaceType;

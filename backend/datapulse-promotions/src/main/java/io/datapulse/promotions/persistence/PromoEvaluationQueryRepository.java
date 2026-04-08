@@ -20,6 +20,27 @@ public class PromoEvaluationQueryRepository {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
+    private static final String KPI_SELECT = """
+        SELECT COUNT(*)::bigint AS total,
+               COUNT(*) FILTER (WHERE pe.evaluation_result = 'PROFITABLE')::bigint AS profitable_count,
+               COUNT(*) FILTER (WHERE pe.evaluation_result = 'MARGINAL')::bigint AS marginal_count,
+               COUNT(*) FILTER (WHERE pe.evaluation_result IN ('UNPROFITABLE', 'INSUFFICIENT_STOCK', 'INSUFFICIENT_DATA'))::bigint AS unprofitable_count
+        FROM promo_evaluation pe
+        WHERE pe.workspace_id = :workspaceId
+        """;
+
+    public PromoEvaluationKpiRow findKpi(long workspaceId) {
+        var params = new MapSqlParameterSource("workspaceId", workspaceId);
+        return jdbcTemplate.queryForObject(
+            KPI_SELECT,
+            params,
+            (rs, rowNum) -> new PromoEvaluationKpiRow(
+                rs.getLong("total"),
+                rs.getLong("profitable_count"),
+                rs.getLong("marginal_count"),
+                rs.getLong("unprofitable_count")));
+    }
+
     public Page<PromoEvaluationEntity> findFiltered(long workspaceId, Long runId,
                                                       Long campaignId, Long marketplaceOfferId,
                                                       PromoEvaluationResult evaluationResult,

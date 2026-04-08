@@ -50,7 +50,6 @@ const ICON_PATHS: Record<string, string> = {
 
 const STATIC_COMMANDS: { labelKey: string; path: string }[] = [
   { labelKey: 'shell.command_palette.go_grid', path: 'grid' },
-  { labelKey: 'shell.command_palette.go_catalog', path: 'catalog' },
   { labelKey: 'shell.command_palette.go_analytics', path: 'analytics' },
   { labelKey: 'shell.command_palette.go_pricing', path: 'pricing' },
   { labelKey: 'shell.command_palette.go_price_actions', path: 'pricing/price-actions' },

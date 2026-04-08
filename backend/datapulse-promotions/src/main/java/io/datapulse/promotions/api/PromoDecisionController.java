@@ -23,7 +23,16 @@ public class PromoDecisionController {
 
     private final PromoDecisionService decisionService;
 
-    @GetMapping("/{decisionId}")
+    @GetMapping("/kpi")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public PromoDecisionKpiResponse getDecisionKpi(
+            @PathVariable("workspaceId") long workspaceId) {
+        var row = decisionService.getDecisionKpi(workspaceId);
+        return new PromoDecisionKpiResponse(
+            row.participateCount(), row.declineCount(), row.pendingReviewCount());
+    }
+
+    @GetMapping("/{decisionId:\\d+}")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public PromoDecisionResponse getDecision(
             @PathVariable("workspaceId") long workspaceId,

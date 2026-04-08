@@ -285,7 +285,7 @@ Phase G retention targets:
 | `mart_posting_pnl` | P&L по отправке (posting grain) + `reconciliation_residual` | fact_finance (POSTING: measures + refund_ratio), fact_sales (qty), fact_product_cost (COGS) | A/B |
 | `mart_product_pnl` | P&L по продукту за период (cash-basis) + account_level_charges row | mart_posting_pnl + fact_finance (PRODUCT, ACCOUNT) | A/B |
 | `mart_inventory_analysis` | Inventory intelligence | fact_inventory_snapshot, fact_sales, fact_product_cost | B |
-| `mart_returns_analysis` | Returns & penalties | fact_returns, fact_finance, fact_sales | B |
+| `mart_returns_analysis` | Operational returns analysis | fact_returns, fact_sales | B |
 | `mart_promo_product_analysis` | Эффективность промо | **Phase F/G** |
 
 ### ClickHouse column-level schemas
@@ -624,10 +624,13 @@ ORDER BY (connection_id, product_id, warehouse_id, analysis_date)
 
 Grain: connection × seller_sku × period. Phase B.
 
+Operational returns analysis from fact_returns + fact_sales. No financial data from fact_finance. Financial impact (refund, penalties) lives exclusively in P&L via mart_product_pnl/mart_posting_pnl. This prevents duplication and misleading penalty attribution.
+
 > **NULL seller_sku_id handling:** `fact_returns.seller_sku_id` nullable. При материализации `NULL` маппится в sentinel `0` (аналогично `mart_product_pnl`). Строка с `seller_sku_id = 0` агрегирует все возвраты без привязки к SKU. Аналогично `product_id NULL → 0`.
 
 | Column | Type | Source | Nullable | Notes |
 |--------|------|--------|----------|-------|
+| `workspace_id` | UInt32 | — | No | FK workspace |
 | `connection_id` | UInt32 | — | No | FK marketplace_connection |
 | `source_platform` | LowCardinality(String) | — | No | |
 | `product_id` | UInt64 | — | No | FK dim_product; 0 = unattributed |
@@ -639,15 +642,13 @@ Grain: connection × seller_sku × period. Phase B.
 | `sale_count` | UInt32 | COUNT(fact_sales) | No | Продаж за период |
 | `sale_quantity` | Int32 | SUM(fact_sales.quantity) | No | Единиц продано |
 | `return_rate_pct` | Decimal(18,2) | return_quantity / NULLIF(sale_quantity, 0) × 100 | Yes | % возвратов |
-| `financial_refund_amount` | Decimal(18,2) | SUM(fact_finance.refund_amount) | No | Финансовый impact (signed: < 0 = debit, хранится в signed convention; для UI display → ABS) |
-| `penalties_amount` | Decimal(18,2) | SUM(fact_finance.penalties_amount) | No | Штрафы за период |
 | `top_return_reason` | String | `topK(1)(fact_returns.return_reason)` | Yes | Самая частая причина. ClickHouse не имеет MODE(); используется topK(1) |
 | `ver` | UInt64 | — | No | Materialization timestamp |
 
 ```
 ENGINE = ReplacingMergeTree(ver)
 PARTITION BY period
-ORDER BY (connection_id, source_platform, seller_sku_id, period)
+ORDER BY (workspace_id, source_platform, seller_sku_id, period)
 ```
 
 ### dim_advertising_campaign

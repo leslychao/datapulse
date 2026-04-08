@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -23,6 +24,7 @@ import {
 } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { GuidedTourService } from '@shared/services/guided-tour.service';
 import { TourProgressStore } from '@shared/stores/tour-progress.store';
@@ -138,10 +140,14 @@ interface KpiItem {
 export class PnlSummaryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
   private readonly tourService = inject(GuidedTourService);
   private readonly tourProgress = inject(TourProgressStore);
 
   constructor() {
+    effect(() => {
+      this.navStore.setSectionFilter('analytics:pnl', { period: this.period() });
+    });
     readFiltersFromUrl(this.route, this.filterDefs);
     syncFiltersToUrl(this.router, this.route, this.filterDefs);
     if (PNL_OVERVIEW_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PNL_OVERVIEW_TOUR.id)) {
@@ -152,7 +158,7 @@ export class PnlSummaryPageComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  readonly period = signal(currentMonth());
+  readonly period = signal(this.navStore.getSectionFilterValue<string>('analytics:pnl', 'period') ?? currentMonth());
   readonly shimmerCards = Array.from({ length: 8 });
 
   private readonly filterDefs: UrlFilterDef[] = [
@@ -251,7 +257,7 @@ export class PnlSummaryPageComponent {
           center: ['50%', '50%'],
           label: { show: false },
           data: items.map((it) => ({
-            value: it.amount,
+            value: Math.abs(it.amount),
             name: this.t.instant(`analytics.pnl.cost_category.${it.category}`),
           })),
           emphasis: {

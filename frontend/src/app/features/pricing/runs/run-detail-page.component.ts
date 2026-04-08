@@ -199,8 +199,6 @@ const DECISION_COLOR: Record<string, string> = {
               [pageSize]="100"
               [getRowId]="getRowId"
               [height]="'100%'"
-              [clickableRows]="true"
-              (rowClicked)="onDecisionRowClicked($event)"
             />
           }
         </div>
@@ -316,9 +314,20 @@ export class RunDetailPageComponent {
       minWidth: 200,
       flex: 1,
       sortable: true,
+      tooltipField: 'offerName',
+      cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
+        if (!params.value) return '';
+        return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
+      },
+      onCellClicked: (params: { data?: PricingDecisionSummary }) => {
+        if (params.data) {
+          this.onDecisionRowClicked(params.data);
+        }
+      },
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.sku'),
+      headerTooltip: this.translate.instant('pricing.runs.detail.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
@@ -326,6 +335,7 @@ export class RunDetailPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.decision'),
+      headerTooltip: this.translate.instant('pricing.runs.detail.col.decision'),
       field: 'decisionType',
       width: 120,
       sortable: true,
@@ -339,6 +349,7 @@ export class RunDetailPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.current_price'),
+      headerTooltip: this.translate.instant('pricing.runs.detail.col.current_price'),
       field: 'currentPrice',
       width: 120,
       sortable: true,
@@ -349,6 +360,7 @@ export class RunDetailPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.target_price'),
+      headerTooltip: this.translate.instant('pricing.runs.detail.col.target_price'),
       field: 'targetPrice',
       width: 120,
       sortable: true,
@@ -359,6 +371,7 @@ export class RunDetailPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.price_delta'),
+      headerTooltip: this.translate.instant('pricing.runs.detail.col.price_delta'),
       field: 'changePct',
       width: 90,
       sortable: true,
@@ -377,6 +390,7 @@ export class RunDetailPageComponent {
       field: 'policyName',
       width: 160,
       sortable: true,
+      tooltipField: 'policyName',
     },
     {
       headerName: this.translate.instant('pricing.runs.detail.col.strategy'),
@@ -400,6 +414,7 @@ export class RunDetailPageComponent {
         if (!params.value) return '—';
         return this.translate.instant(params.value);
       },
+      tooltipField: 'skipReason',
     },
   ];
 

@@ -20,7 +20,7 @@ public class MismatchRetentionCleanupScheduler {
     private static final String CLEANUP_SQL = """
             DELETE FROM alert_event
             WHERE status IN ('RESOLVED', 'AUTO_RESOLVED')
-              AND updated_at < NOW() - make_interval(days => :retentionDays)
+              AND resolved_at < NOW() - make_interval(days => :retentionDays)
             """;
 
     @Scheduled(cron = "${datapulse.mismatch.retention-cleanup-cron:0 0 4 * * *}")

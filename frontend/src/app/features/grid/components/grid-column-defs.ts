@@ -1,4 +1,10 @@
-import { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
+import {
+  CellClickedEvent,
+  ColDef,
+  ICellRendererParams,
+  ValueFormatterParams,
+} from 'ag-grid-community';
+import { TranslateService } from '@ngx-translate/core';
 
 import { DraftPriceChange } from '@core/models';
 
@@ -41,44 +47,24 @@ function stockFormatter(params: ValueFormatterParams): string {
   return v.toLocaleString('ru-RU');
 }
 
-const MARKETPLACE_LABELS: Record<string, string> = { WB: 'WB', OZON: 'Ozon' };
-const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: 'Активный',
-  ARCHIVED: 'Архив',
-  BLOCKED: 'Заблокирован',
-  INACTIVE: 'Неактивен',
-};
-const DECISION_LABELS: Record<string, string> = { CHANGE: 'Изменение', SKIP: 'Пропуск', HOLD: 'Удержание' };
-const ACTION_STATUS_LABELS: Record<string, string> = {
-  PENDING_APPROVAL: 'Ожидает',
-  APPROVED: 'Одобрено',
-  SCHEDULED: 'Запланировано',
-  EXECUTING: 'Выполняется',
-  SUCCEEDED: 'Выполнено',
-  FAILED: 'Ошибка',
-  ON_HOLD: 'Приостановлено',
-  EXPIRED: 'Просрочено',
-  CANCELLED: 'Отменено',
-  SUPERSEDED: 'Заменено',
-  RETRY_SCHEDULED: 'Повтор',
-  RECONCILIATION_PENDING: 'Сверка',
-};
-const STOCK_RISK_LABELS: Record<string, string> = { CRITICAL: 'Критический', WARNING: 'Предупреждение', NORMAL: 'Нормальный' };
-const PROMO_LABELS: Record<string, string> = { PARTICIPATING: 'Участвует', ELIGIBLE: 'Доступно' };
-
 export interface GridColumnCallbacks {
   onLockToggle?: (offerId: number, currentlyLocked: boolean, currentPrice: number | null) => void;
   onDraftPriceChange?: (offerId: number, newPrice: number, originalPrice: number, costPrice: number | null) => void;
   getDraftChange?: (offerId: number) => DraftPriceChange | undefined;
+  onCostPriceChange?: (sellerSkuId: number, offerId: number, newCostPrice: number) => void;
+  canEditCost?: boolean;
+  onNavigate?: (offerId: number) => void;
 }
 
 function buildCurrentPriceCol(
+    translate: TranslateService,
     callbacks: GridColumnCallbacks | undefined,
     draftMode: boolean,
 ): ColDef {
   const base: ColDef = {
     field: 'currentPrice',
-    headerName: 'Текущая цена',
+    headerName: translate.instant('grid.col.current_price'),
+    headerTooltip: translate.instant('grid.col.current_price'),
     width: draftMode ? 180 : 120,
     sortable: true,
     type: 'rightAligned',
@@ -137,17 +123,18 @@ function buildCurrentPriceCol(
       return null;
     },
     tooltipValueGetter: (params) => {
-      if (params.data?.manualLock) return 'Ручная блокировка цены — редактирование недоступно';
-      if (params.data?.promoStatus === 'PARTICIPATING') return 'Товар в активном промо — редактирование недоступно';
+      if (params.data?.manualLock) return translate.instant('grid.tooltip.manual_lock');
+      if (params.data?.promoStatus === 'PARTICIPATING') return translate.instant('grid.tooltip.promo_lock');
       return undefined;
     },
   };
 }
 
-function buildProjectedMarginCol(callbacks: GridColumnCallbacks | undefined): ColDef {
+function buildProjectedMarginCol(translate: TranslateService, callbacks: GridColumnCallbacks | undefined): ColDef {
   return {
     colId: 'projectedMargin',
-    headerName: 'Проект. маржа',
+    headerName: translate.instant('grid.col.projected_margin'),
+    headerTooltip: translate.instant('grid.col.projected_margin_full'),
     width: 110,
     sortable: false,
     type: 'rightAligned',
@@ -171,23 +158,75 @@ function buildProjectedMarginCol(callbacks: GridColumnCallbacks | undefined): Co
   };
 }
 
+function buildCostPriceCol(translate: TranslateService, callbacks: GridColumnCallbacks | undefined): ColDef {
+  const base: ColDef = {
+    field: 'costPrice',
+    headerName: translate.instant('grid.col.cost_price'),
+    headerTooltip: translate.instant('grid.col.cost_price'),
+    width: 120,
+    sortable: true,
+    type: 'rightAligned',
+    cellClass: 'font-mono text-[length:var(--text-sm)]',
+    valueFormatter: moneyFormatter,
+  };
+
+  if (!callbacks?.canEditCost) return base;
+
+  return {
+    ...base,
+    editable: true,
+    cellEditor: 'agNumberCellEditor',
+    cellEditorParams: { min: 0.01, precision: 2 },
+    valueSetter: (params) => {
+      const newValue = params.newValue;
+      if (newValue == null || newValue <= 0) return false;
+      if (newValue === params.data.costPrice) return false;
+      params.data.costPrice = newValue;
+      if (params.data.currentPrice && newValue > 0) {
+        params.data.marginPct =
+          ((params.data.currentPrice - newValue) / params.data.currentPrice) * 100;
+      }
+      callbacks?.onCostPriceChange?.(params.data.sellerSkuId, params.data.offerId, newValue);
+      return true;
+    },
+    cellClass: 'font-mono text-[length:var(--text-sm)] dp-editable-cell',
+    cellStyle: () => ({
+      cursor: 'text',
+    }),
+    tooltipValueGetter: () => translate.instant('grid.tooltip.double_click_edit'),
+  };
+}
+
 export function buildGridColumnDefs(
+    translate: TranslateService,
     callbacks?: GridColumnCallbacks,
     draftMode = false,
 ): ColDef[] {
   const cols: ColDef[] = [
     {
       field: 'skuCode',
-      headerName: 'Артикул',
+      headerName: translate.instant('grid.col.sku'),
+      headerTooltip: translate.instant('grid.col.sku'),
       width: 130,
       pinned: 'left' as const,
       lockPosition: true,
       sortable: true,
+      tooltipField: 'skuCode',
       cellClass: 'font-mono text-[length:var(--text-sm)]',
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return '';
+        return `<span class="text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
+      },
+      onCellClicked: (params: CellClickedEvent) => {
+        const offerId = params.data?.offerId;
+        if (offerId != null && callbacks?.onNavigate) {
+          callbacks.onNavigate(offerId);
+        }
+      },
     },
     {
       field: 'productName',
-      headerName: 'Название',
+      headerName: translate.instant('grid.col.name'),
       width: 250,
       minWidth: 150,
       sortable: true,
@@ -196,16 +235,19 @@ export function buildGridColumnDefs(
     },
     {
       field: 'marketplaceType',
-      headerName: 'МП',
+      headerName: translate.instant('grid.col.marketplace'),
+      headerTooltip: translate.instant('grid.col.marketplace_full'),
       width: 65,
       sortable: false,
       cellClass: 'text-center',
-      valueFormatter: (p: ValueFormatterParams) => MARKETPLACE_LABELS[p.value] ?? p.value,
+      valueFormatter: (p: ValueFormatterParams) =>
+        translate.instant('grid.marketplace.' + p.value),
     },
-    buildCurrentPriceCol(callbacks, draftMode),
+    buildCurrentPriceCol(translate, callbacks, draftMode),
     {
       field: 'marginPct',
-      headerName: 'Маржа',
+      headerName: translate.instant('grid.col.margin'),
+      headerTooltip: translate.instant('grid.col.margin'),
       width: 90,
       sortable: true,
       type: 'rightAligned',
@@ -220,16 +262,18 @@ export function buildGridColumnDefs(
         return null;
       },
     },
+    buildCostPriceCol(translate, callbacks),
   ];
 
   if (draftMode) {
-    cols.push(buildProjectedMarginCol(callbacks));
+    cols.push(buildProjectedMarginCol(translate, callbacks));
   }
 
   cols.push(
     {
       field: 'availableStock',
-      headerName: 'Остаток',
+      headerName: translate.instant('grid.col.stock'),
+      headerTooltip: translate.instant('grid.col.stock'),
       width: 90,
       sortable: true,
       type: 'rightAligned',
@@ -242,7 +286,8 @@ export function buildGridColumnDefs(
     },
     {
       field: 'velocity14d',
-      headerName: 'Скорость',
+      headerName: translate.instant('grid.col.velocity'),
+      headerTooltip: translate.instant('grid.col.velocity_full'),
       width: 90,
       sortable: true,
       type: 'rightAligned',
@@ -255,34 +300,38 @@ export function buildGridColumnDefs(
     },
     {
       field: 'lastDecision',
-      headerName: 'Решение',
+      headerName: translate.instant('grid.col.decision'),
+      headerTooltip: translate.instant('grid.col.decision'),
       width: 110,
       sortable: false,
       cellClass: 'text-center',
       valueFormatter: (p: ValueFormatterParams) =>
-        p.value ? (DECISION_LABELS[p.value] ?? p.value) : '—',
+        p.value ? translate.instant('grid.decision.' + p.value) : '—',
     },
     {
       field: 'lastActionStatus',
-      headerName: 'Статус действия',
+      headerName: translate.instant('grid.col.action_status'),
+      headerTooltip: translate.instant('grid.col.action_status'),
       width: 130,
       sortable: false,
       cellClass: 'text-center',
       valueFormatter: (p: ValueFormatterParams) =>
-        p.value ? (ACTION_STATUS_LABELS[p.value] ?? p.value) : '—',
+        p.value ? translate.instant('grid.action_status.' + p.value) : '—',
     },
     {
       field: 'promoStatus',
-      headerName: 'Промо',
+      headerName: translate.instant('grid.col.promo'),
+      headerTooltip: translate.instant('grid.col.promo'),
       width: 110,
       sortable: false,
       cellClass: 'text-center',
       valueFormatter: (p: ValueFormatterParams) =>
-        p.value ? (PROMO_LABELS[p.value] ?? p.value) : '—',
+        p.value ? translate.instant('grid.promo_status.' + p.value) : '—',
     },
     {
       field: 'manualLock',
-      headerName: 'Блоки...',
+      headerName: translate.instant('grid.col.lock'),
+      headerTooltip: translate.instant('grid.col.lock_full'),
       width: 80,
       sortable: false,
       cellRenderer: (params: ICellRendererParams) => {
@@ -305,7 +354,8 @@ export function buildGridColumnDefs(
     },
     {
       field: 'dataFreshness',
-      headerName: 'Свежесть',
+      headerName: translate.instant('grid.col.freshness'),
+      headerTooltip: translate.instant('grid.col.freshness_full'),
       width: 80,
       sortable: false,
       cellClass: 'text-center',
@@ -319,42 +369,37 @@ export function buildGridColumnDefs(
     },
     {
       field: 'connectionName',
-      headerName: 'Подключение',
+      headerName: translate.instant('grid.col.connection'),
       width: 150,
       sortable: false,
       hide: true,
+      tooltipField: 'connectionName',
       cellClass: 'text-[length:var(--text-sm)]',
     },
     {
       field: 'status',
-      headerName: 'Статус',
+      headerName: translate.instant('grid.col.status'),
+      headerTooltip: translate.instant('grid.col.status'),
       width: 100,
       sortable: false,
       hide: true,
       cellClass: 'text-center',
-      valueFormatter: (p: ValueFormatterParams) => STATUS_LABELS[p.value] ?? p.value,
+      valueFormatter: (p: ValueFormatterParams) =>
+        translate.instant('grid.offer_status.' + p.value),
     },
     {
       field: 'category',
-      headerName: 'Категория',
+      headerName: translate.instant('grid.col.category'),
       width: 140,
       sortable: false,
       hide: true,
+      tooltipField: 'category',
       cellClass: 'text-[length:var(--text-sm)]',
     },
     {
       field: 'discountPrice',
-      headerName: 'Цена со скидкой',
-      width: 110,
-      sortable: false,
-      hide: true,
-      type: 'rightAligned',
-      cellClass: 'font-mono text-[length:var(--text-sm)]',
-      valueFormatter: moneyFormatter,
-    },
-    {
-      field: 'costPrice',
-      headerName: 'Себестоимость',
+      headerName: translate.instant('grid.col.discount_price'),
+      headerTooltip: translate.instant('grid.col.discount_price'),
       width: 110,
       sortable: false,
       hide: true,
@@ -364,7 +409,8 @@ export function buildGridColumnDefs(
     },
     {
       field: 'daysOfCover',
-      headerName: 'Дней покрытия',
+      headerName: translate.instant('grid.col.days_of_cover'),
+      headerTooltip: translate.instant('grid.col.days_of_cover'),
       width: 90,
       sortable: true,
       hide: true,
@@ -381,17 +427,19 @@ export function buildGridColumnDefs(
     },
     {
       field: 'stockRisk',
-      headerName: 'Риск остатка',
+      headerName: translate.instant('grid.col.stock_risk'),
+      headerTooltip: translate.instant('grid.col.stock_risk'),
       width: 100,
       sortable: false,
       hide: true,
       cellClass: 'text-center',
       valueFormatter: (p: ValueFormatterParams) =>
-        p.value ? (STOCK_RISK_LABELS[p.value] ?? p.value) : '—',
+        p.value ? translate.instant('grid.stock_risk.' + p.value) : '—',
     },
     {
       field: 'revenue30d',
-      headerName: 'Выручка 30д',
+      headerName: translate.instant('grid.col.revenue_30d'),
+      headerTooltip: translate.instant('grid.col.revenue_30d_full'),
       width: 120,
       sortable: true,
       hide: true,
@@ -401,7 +449,8 @@ export function buildGridColumnDefs(
     },
     {
       field: 'netPnl30d',
-      headerName: 'P&L 30д',
+      headerName: translate.instant('grid.col.pnl_30d'),
+      headerTooltip: translate.instant('grid.col.pnl_30d_full'),
       width: 120,
       sortable: true,
       hide: true,
@@ -418,7 +467,8 @@ export function buildGridColumnDefs(
     },
     {
       field: 'returnRatePct',
-      headerName: '% возвратов',
+      headerName: translate.instant('grid.col.return_rate'),
+      headerTooltip: translate.instant('grid.col.return_rate'),
       width: 90,
       sortable: true,
       hide: true,
@@ -435,16 +485,18 @@ export function buildGridColumnDefs(
     },
     {
       field: 'activePolicy',
-      headerName: 'Ценовая политика',
+      headerName: translate.instant('grid.col.policy'),
       width: 160,
       sortable: false,
       hide: true,
+      tooltipField: 'activePolicy',
       cellClass: 'text-[length:var(--text-sm)]',
       valueFormatter: (p: ValueFormatterParams) => p.value ?? '—',
     },
     {
       field: 'lastSyncAt',
-      headerName: 'Последняя синхр.',
+      headerName: translate.instant('grid.col.last_sync'),
+      headerTooltip: translate.instant('grid.col.last_sync_full'),
       width: 120,
       sortable: true,
       hide: true,
@@ -455,12 +507,12 @@ export function buildGridColumnDefs(
         if (isNaN(date.getTime())) return '—';
         const diffMs = Date.now() - date.getTime();
         const minutes = Math.floor(diffMs / 60_000);
-        if (minutes < 1) return 'только что';
-        if (minutes < 60) return `${minutes} мин назад`;
+        if (minutes < 1) return translate.instant('grid.sync.just_now');
+        if (minutes < 60) return translate.instant('grid.sync.minutes_ago', { minutes });
         const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours} ч назад`;
+        if (hours < 24) return translate.instant('grid.sync.hours_ago', { hours });
         const days = Math.floor(hours / 24);
-        return `${days} дн назад`;
+        return translate.instant('grid.sync.days_ago', { days });
       },
     },
   );

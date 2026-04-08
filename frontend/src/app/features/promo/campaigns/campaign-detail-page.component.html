@@ -4,9 +4,10 @@
     <div class="flex items-center gap-2">
       <button
         (click)="navigateBack()"
-        class="cursor-pointer text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+        class="-ml-2 inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 py-1 text-[length:var(--text-sm)] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
       >
-        ← {{ 'promo.campaigns.title' | translate }}
+        <span class="text-base leading-none">←</span>
+        {{ 'promo.campaigns.title' | translate }}
       </button>
     </div>
 

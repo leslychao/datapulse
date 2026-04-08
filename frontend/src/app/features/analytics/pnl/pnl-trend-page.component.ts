@@ -107,8 +107,8 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
                     <td class="px-3 py-2 text-right font-mono text-[var(--finance-negative)]">
                       {{ formatMoney(pt.totalCostsAmount) }}
                     </td>
-                    <td class="px-3 py-2 text-right font-mono">{{ formatMoney(pt.cogsAmount) }}</td>
-                    <td class="px-3 py-2 text-right font-mono">{{ formatMoney(pt.advertisingCostAmount) }}</td>
+                    <td class="px-3 py-2 text-right font-mono text-[var(--finance-negative)]">{{ formatMoney(pt.cogsAmount) }}</td>
+                    <td class="px-3 py-2 text-right font-mono text-[var(--finance-negative)]">{{ formatMoney(pt.advertisingCostAmount) }}</td>
                     <td class="px-3 py-2 text-right font-mono font-semibold" [class]="moneyColorClass(pt.fullPnl)">
                       {{ formatMoney(pt.fullPnl) }}
                     </td>

@@ -10,7 +10,6 @@ import { BottomPanelComponent } from './bottom-panel/bottom-panel.component';
 import { StatusBarComponent } from './status-bar/status-bar.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
 import { ToastContainerComponent } from './toast/toast-container.component';
-import { OfferDetailPanelComponent } from '@features/grid/components/offer-detail/offer-detail-panel.component';
 import { AlertDetailPanelComponent } from '@features/alerts/alert-detail-panel.component';
 import { PolicyDetailPanelComponent } from '@features/pricing/policies/policy-detail-panel.component';
 import { DecisionDetailPanelComponent } from '@features/pricing/decisions/decision-detail-panel.component';
@@ -39,7 +38,6 @@ import { lastValueFrom } from 'rxjs';
     StatusBarComponent,
     CommandPaletteComponent,
     ToastContainerComponent,
-    OfferDetailPanelComponent,
     AlertDetailPanelComponent,
     PolicyDetailPanelComponent,
     DecisionDetailPanelComponent,
@@ -68,9 +66,6 @@ import { lastValueFrom } from 'rxjs';
       @if (detailPanel.isOpen()) {
         <dp-detail-panel style="grid-area: detail"
                          class="border-l border-[var(--border-default)]">
-          @if (detailPanel.entityType() === 'offer') {
-            <dp-offer-detail-panel />
-          }
           @if (detailPanel.entityType() === 'alert') {
             <dp-alert-detail-panel />
           }

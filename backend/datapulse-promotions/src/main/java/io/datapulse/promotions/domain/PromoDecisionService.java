@@ -12,6 +12,7 @@ import io.datapulse.promotions.api.PromoDecisionResponse;
 import io.datapulse.promotions.persistence.PromoActionEntity;
 import io.datapulse.promotions.persistence.PromoActionRepository;
 import io.datapulse.promotions.persistence.PromoDecisionEntity;
+import io.datapulse.promotions.persistence.PromoDecisionKpiRow;
 import io.datapulse.promotions.persistence.PromoDecisionQueryRepository;
 import io.datapulse.promotions.persistence.PromoDecisionRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
@@ -40,6 +41,11 @@ public class PromoDecisionService {
     private final ObjectMapper objectMapper;
     private final PromoDecisionMapper decisionMapper;
     private final AuditPublisher auditPublisher;
+
+    @Transactional(readOnly = true)
+    public PromoDecisionKpiRow getDecisionKpi(long workspaceId) {
+        return decisionQueryRepository.findKpi(workspaceId);
+    }
 
     @Transactional(readOnly = true)
     public PromoDecisionResponse getDecision(long decisionId, long workspaceId) {

@@ -27,26 +27,47 @@ public class ReturnsReadRepository {
       "returnRatePct", "return_rate_pct",
       "returnQuantity", "return_quantity",
       "returnAmount", "return_amount",
-      "financialRefundAmount", "financial_refund_amount",
-      "penaltiesAmount", "penalties_amount",
+      "returnCount", "return_count",
+      "saleQuantity", "sale_quantity",
       "sellerSkuId", "m.seller_sku_id"
   );
 
   private static final String SUMMARY_SQL = """
       SELECT
-          source_platform,
-          sum(return_count) AS return_count,
+          sum(return_count) AS total_return_count,
           sum(return_quantity) AS total_return_quantity,
           sum(return_amount) AS return_amount,
           sum(sale_count) AS sale_count,
           sum(sale_quantity) AS total_sale_quantity,
           if(total_sale_quantity > 0,
              total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct,
-          sum(financial_refund_amount) AS financial_refund_amount,
-          sum(penalties_amount) AS penalties_amount,
           topK(1)(top_return_reason)[1] AS top_return_reason
       FROM mart_returns_analysis
       WHERE workspace_id = :workspaceId
+      """;
+
+  private static final String RETURN_RATE_SQL = """
+      SELECT
+          sum(return_quantity) AS total_return_quantity,
+          sum(sale_quantity) AS total_sale_quantity,
+          if(total_sale_quantity > 0,
+             total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct
+      FROM mart_returns_analysis
+      WHERE workspace_id = :workspaceId
+        AND period = :period
+      """;
+
+  private static final String REASON_BREAKDOWN_SQL = """
+      SELECT
+          return_reason,
+          count() AS cnt
+      FROM fact_returns
+      WHERE workspace_id = :workspaceId
+        AND toYYYYMM(return_date) = :period
+      GROUP BY return_reason
+      ORDER BY cnt DESC
+      LIMIT 10
+      SETTINGS final = 1
       """;
 
   private static final String BY_PRODUCT_SQL = """
@@ -60,10 +81,9 @@ public class ReturnsReadRepository {
           m.return_count AS return_count,
           m.return_quantity AS return_quantity,
           m.return_amount AS return_amount,
+          m.sale_count AS sale_count,
           m.sale_quantity AS sale_quantity,
           m.return_rate_pct AS return_rate_pct,
-          m.financial_refund_amount AS financial_refund_amount,
-          m.penalties_amount AS penalties_amount,
           m.top_return_reason AS top_return_reason
       FROM mart_returns_analysis AS m
       LEFT JOIN dim_product AS p ON m.product_id = p.product_id
@@ -76,20 +96,56 @@ public class ReturnsReadRepository {
           sum(return_quantity) AS total_return_quantity,
           sum(sale_quantity) AS total_sale_quantity,
           if(total_sale_quantity > 0,
-             total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct,
-          sum(financial_refund_amount) AS financial_refund_amount
+             total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct
       FROM mart_returns_analysis
       WHERE workspace_id = :workspaceId
       """;
 
-  public List<ReturnsSummaryResponse> findSummary(long workspaceId, ReturnsFilter filter) {
+  public record SummaryRow(
+      int totalReturnCount,
+      int totalReturnQuantity,
+      BigDecimal returnAmount,
+      int saleCount,
+      int totalSaleQuantity,
+      BigDecimal returnRatePct,
+      String topReturnReason
+  ) {}
+
+  public record ReasonRow(String reason, int count) {}
+
+  public SummaryRow findSummary(long workspaceId, ReturnsFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(SUMMARY_SQL);
     appendFilter(sb, params, filter);
-    sb.append(" GROUP BY source_platform");
     sb.append(SETTINGS_FINAL);
 
-    return jdbc.ch().query(sb.toString(), params, this::mapSummary);
+    return jdbc.ch().queryForObject(sb.toString(), params, (rs, rowNum) -> new SummaryRow(
+        rs.getInt("total_return_count"),
+        rs.getInt("total_return_quantity"),
+        rs.getBigDecimal("return_amount"),
+        rs.getInt("sale_count"),
+        rs.getInt("total_sale_quantity"),
+        rs.getBigDecimal("return_rate_pct"),
+        rs.getString("top_return_reason")
+    ));
+  }
+
+  public BigDecimal findReturnRateForPeriod(long workspaceId, int period) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId)
+        .addValue("period", period);
+
+    return jdbc.ch().queryForObject(
+        RETURN_RATE_SQL + SETTINGS_FINAL,
+        params,
+        (rs, rowNum) -> rs.getBigDecimal("return_rate_pct"));
+  }
+
+  public List<ReasonRow> findReasonBreakdown(long workspaceId, int period) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId)
+        .addValue("period", period);
+
+    return jdbc.ch().query(REASON_BREAKDOWN_SQL, params,
+        (rs, rowNum) -> new ReasonRow(rs.getString("return_reason"), rs.getInt("cnt")));
   }
 
   public List<ProductReturnResponse> findByProduct(long workspaceId, ReturnsFilter filter,
@@ -135,8 +191,7 @@ public class ReturnsReadRepository {
         rs.getInt("period"),
         rs.getInt("total_return_quantity"),
         rs.getInt("total_sale_quantity"),
-        rs.getBigDecimal("return_rate_pct"),
-        rs.getBigDecimal("financial_refund_amount")
+        rs.getBigDecimal("return_rate_pct")
     ));
   }
 
@@ -157,21 +212,6 @@ public class ReturnsReadRepository {
     }
   }
 
-  private ReturnsSummaryResponse mapSummary(ResultSet rs, int rowNum) throws SQLException {
-    return new ReturnsSummaryResponse(
-        rs.getString("source_platform"),
-        rs.getInt("return_count"),
-        rs.getInt("total_return_quantity"),
-        rs.getBigDecimal("return_amount"),
-        rs.getInt("sale_count"),
-        rs.getInt("total_sale_quantity"),
-        rs.getBigDecimal("return_rate_pct"),
-        rs.getBigDecimal("financial_refund_amount"),
-        rs.getBigDecimal("penalties_amount"),
-        rs.getString("top_return_reason")
-    );
-  }
-
   private ProductReturnResponse mapProductReturn(ResultSet rs, int rowNum) throws SQLException {
     return new ProductReturnResponse(
         rs.getString("source_platform"),
@@ -183,10 +223,9 @@ public class ReturnsReadRepository {
         rs.getInt("return_count"),
         rs.getInt("return_quantity"),
         rs.getBigDecimal("return_amount"),
+        rs.getInt("sale_count"),
         rs.getInt("sale_quantity"),
         rs.getBigDecimal("return_rate_pct"),
-        rs.getBigDecimal("financial_refund_amount"),
-        rs.getBigDecimal("penalties_amount"),
         rs.getString("top_return_reason")
     );
   }

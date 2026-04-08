@@ -90,8 +90,8 @@ class MartReturnsAnalysisMaterializerTest {
     }
 
     @Test
-    @DisplayName("SQL should join fact_returns with fact_sales and fact_finance")
-    void should_joinThreeFactTables_when_sqlGenerated() {
+    @DisplayName("SQL should join fact_returns with fact_sales (no fact_finance)")
+    void should_joinTwoFactTables_when_sqlGenerated() {
       when(jdbc.ch()).thenReturn(chTemplate);
       when(chTemplate.queryForObject(anyString(), eq(Long.class))).thenReturn(0L);
       doAnswer(invocation -> {
@@ -112,7 +112,7 @@ class MartReturnsAnalysisMaterializerTest {
 
       assertThat(sql).contains("fact_returns");
       assertThat(sql).contains("fact_sales");
-      assertThat(sql).contains("fact_finance");
+      assertThat(sql).doesNotContain("fact_finance");
     }
 
     @Test

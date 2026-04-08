@@ -10,9 +10,9 @@ import {
 import { Router } from '@angular/router';
 import { AgGridAngular } from 'ag-grid-angular';
 import {
+  CellClickedEvent,
   ColDef,
   ICellRendererParams,
-  RowClickedEvent,
   SortChangedEvent,
 } from 'ag-grid-community';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -228,7 +228,8 @@ export class AlertEventsPageComponent {
         icon.textContent = t ? RULE_ICON[t] ?? '•' : '•';
         icon.title = t ?? '';
         const label = document.createElement('span');
-        label.className = 'text-[length:var(--text-sm)] text-[var(--text-primary)]';
+        label.className =
+          'text-[length:var(--text-sm)] text-[var(--accent-primary)] cursor-pointer hover:underline';
         label.textContent = t
           ? this.translate.instant(`alerts.rule_type.${t}`)
           : '';
@@ -236,10 +237,16 @@ export class AlertEventsPageComponent {
         wrap.appendChild(label);
         return wrap;
       },
+      onCellClicked: (params: CellClickedEvent<AlertEvent>) => {
+        if (params.data) {
+          this.onRowClicked(params.data);
+        }
+      },
     },
     {
       field: 'severity',
       headerValueGetter: () => this.translate.instant('alerts.col.severity'),
+      headerTooltip: this.translate.instant('alerts.col.severity'),
       width: 120,
       cellRenderer: (params: ICellRendererParams<AlertEvent>) => {
         const sev = params.data?.severity;
@@ -259,6 +266,7 @@ export class AlertEventsPageComponent {
     {
       field: 'connectionName',
       headerValueGetter: () => this.translate.instant('alerts.col.connection'),
+      tooltipField: 'connectionName',
       flex: 1,
       minWidth: 120,
       valueFormatter: (p) => p.value ?? '—',
@@ -279,6 +287,7 @@ export class AlertEventsPageComponent {
     {
       field: 'title',
       headerValueGetter: () => this.translate.instant('alerts.col.title'),
+      tooltipField: 'title',
       flex: 2,
       minWidth: 160,
     },
@@ -370,11 +379,7 @@ export class AlertEventsPageComponent {
     this.pageIndex.set(0);
   }
 
-  onRowClicked(event: RowClickedEvent<AlertEvent>): void {
-    const row = event.data;
-    if (!row) {
-      return;
-    }
+  onRowClicked(row: AlertEvent): void {
     const ws = this.workspaceId();
     if (ws == null) {
       return;

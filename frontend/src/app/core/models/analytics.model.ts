@@ -178,22 +178,16 @@ export interface StockHistoryPoint {
 export interface ReturnsSummary {
   returnRatePct: number;
   returnRateDeltaPct: number | null;
-  totalRefundAmount: number;
+  totalReturnAmount: number;
+  totalReturnCount: number;
   topReturnReason: string;
   reasonBreakdown: ReturnReasonItem[];
-  penaltyBreakdown: PenaltyItem[];
-  totalPenalties: number;
 }
 
 export interface ReturnReasonItem {
   reason: string;
   count: number;
   percent: number;
-}
-
-export interface PenaltyItem {
-  type: string;
-  amount: number;
 }
 
 export interface ReturnsByProduct {
@@ -203,9 +197,8 @@ export interface ReturnsByProduct {
   sourcePlatform: string;
   returnCount: number;
   returnQuantity: number;
+  returnAmount: number;
   returnRatePct: number;
-  financialRefundAmount: number;
-  penaltiesAmount: number;
   topReturnReason: string;
   saleCount: number;
   saleQuantity: number;

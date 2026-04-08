@@ -301,9 +301,11 @@ export class ImpactPreviewModalComponent {
       minWidth: 250,
       flex: 1,
       sortable: true,
+      tooltipField: 'offerName',
     },
     {
       headerName: this.translate.instant('pricing.preview.col.sku'),
+      headerTooltip: this.translate.instant('pricing.preview.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
@@ -311,6 +313,7 @@ export class ImpactPreviewModalComponent {
     },
     {
       headerName: this.translate.instant('pricing.preview.col.current_price'),
+      headerTooltip: this.translate.instant('pricing.preview.col.current_price'),
       field: 'currentPrice',
       width: 120,
       sortable: true,
@@ -320,6 +323,7 @@ export class ImpactPreviewModalComponent {
     },
     {
       headerName: this.translate.instant('pricing.preview.col.target_price'),
+      headerTooltip: this.translate.instant('pricing.preview.col.target_price'),
       field: 'targetPrice',
       width: 120,
       sortable: true,
@@ -329,6 +333,7 @@ export class ImpactPreviewModalComponent {
     },
     {
       headerName: this.translate.instant('pricing.preview.col.change_pct'),
+      headerTooltip: this.translate.instant('pricing.preview.col.change_pct'),
       field: 'changePct',
       width: 80,
       sortable: true,
@@ -346,6 +351,7 @@ export class ImpactPreviewModalComponent {
     },
     {
       headerName: this.translate.instant('pricing.preview.col.change_amount'),
+      headerTooltip: this.translate.instant('pricing.preview.col.change_amount'),
       field: 'changeAmount',
       width: 100,
       sortable: true,
@@ -361,6 +367,7 @@ export class ImpactPreviewModalComponent {
     },
     {
       headerName: this.translate.instant('pricing.preview.col.decision'),
+      headerTooltip: this.translate.instant('pricing.preview.col.decision'),
       field: 'decisionType',
       width: 100,
       sortable: true,
@@ -385,6 +392,7 @@ export class ImpactPreviewModalComponent {
         }
         return this.translate.instant(key);
       },
+      tooltipField: 'skipReason',
     },
   ];
 

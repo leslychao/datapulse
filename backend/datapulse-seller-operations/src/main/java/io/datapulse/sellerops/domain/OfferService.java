@@ -127,6 +127,7 @@ public class OfferService {
 
     return new OfferDetailResponse(
         row.getOfferId(),
+        row.getSellerSkuId(),
         row.getSkuCode(),
         row.getProductName(),
         row.getMarketplaceType(),

@@ -16,6 +16,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AgGridAngular } from 'ag-grid-angular';
 import {
+  CellClickedEvent,
   CellContextMenuEvent,
   ColDef,
   GetRowIdParams,
@@ -23,7 +24,6 @@ import {
   GridReadyEvent,
   ICellRendererParams,
   RowClassParams,
-  RowClickedEvent,
   SelectionChangedEvent,
   SortChangedEvent,
   ValueFormatterParams,
@@ -399,14 +399,21 @@ export class MismatchDashboardPageComponent implements OnInit {
         minWidth: 240,
         pinned: 'left' as const,
         sortable: true,
+        tooltipValueGetter: (p: any) => p.data?.offerName ?? '',
         cellRenderer: (p: ICellRendererParams<Mismatch>) => {
           const d = p.data;
           if (!d) return '';
-          return `<div class="leading-tight py-1"><div class="font-medium">${escapeHtml(d.offerName)}</div><div class="font-mono text-[11px] text-[var(--text-secondary)]">${escapeHtml(d.skuCode)}</div></div>`;
+          return `<div class="leading-tight py-1"><div class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${escapeHtml(d.offerName)}</div><div class="font-mono text-[11px] text-[var(--text-secondary)]">${escapeHtml(d.skuCode)}</div></div>`;
+        },
+        onCellClicked: (params: CellClickedEvent<Mismatch>) => {
+          if (params.data) {
+            this.navigateToMismatchDetail(params.data);
+          }
         },
       },
       {
         headerName: 'MP',
+        headerTooltip: 'Marketplace',
         colId: 'marketplaceType',
         field: 'marketplaceType',
         width: 80,
@@ -421,6 +428,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       },
       {
         headerName: tr.instant('mismatches.grid.type'),
+        headerTooltip: tr.instant('mismatches.grid.type'),
         colId: 'type',
         field: 'type',
         width: 100,
@@ -435,6 +443,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       },
       {
         headerName: tr.instant('mismatches.grid.expected'),
+        headerTooltip: tr.instant('mismatches.grid.expected'),
         colId: 'expectedValue',
         field: 'expectedValue',
         width: 120,
@@ -444,6 +453,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       },
       {
         headerName: tr.instant('mismatches.grid.actual'),
+        headerTooltip: tr.instant('mismatches.grid.actual'),
         colId: 'actualValue',
         field: 'actualValue',
         width: 120,
@@ -461,6 +471,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       },
       {
         headerName: tr.instant('mismatches.grid.delta'),
+        headerTooltip: tr.instant('mismatches.grid.delta'),
         colId: 'deltaPct',
         field: 'deltaPct',
         width: 70,
@@ -471,6 +482,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       },
       {
         headerName: tr.instant('mismatches.grid.detected'),
+        headerTooltip: tr.instant('mismatches.grid.detected'),
         colId: 'detectedAt',
         field: 'detectedAt',
         width: 120,
@@ -485,6 +497,7 @@ export class MismatchDashboardPageComponent implements OnInit {
       },
       {
         headerName: tr.instant('mismatches.grid.status'),
+        headerTooltip: tr.instant('mismatches.grid.status'),
         colId: 'status',
         field: 'status',
         width: 130,
@@ -514,12 +527,14 @@ export class MismatchDashboardPageComponent implements OnInit {
         headerName: tr.instant('mismatches.grid.connection'),
         colId: 'connectionName',
         field: 'connectionName',
+        tooltipField: 'connectionName',
         width: 160,
         sortable: false,
         hide: true,
       },
       {
         headerName: tr.instant('mismatches.grid.severity'),
+        headerTooltip: tr.instant('mismatches.grid.severity'),
         colId: 'severity',
         field: 'severity',
         width: 90,
@@ -548,13 +563,7 @@ export class MismatchDashboardPageComponent implements OnInit {
     this.searchSubject.next(value);
   }
 
-  onRowClicked(e: RowClickedEvent<Mismatch>): void {
-    const target = e.event?.target as HTMLElement | undefined;
-    if (target?.closest('.ag-checkbox-input,.ag-selection-checkbox')) {
-      return;
-    }
-    const row = e.data;
-    if (!row) return;
+  private navigateToMismatchDetail(row: Mismatch): void {
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { selected: row.mismatchId },

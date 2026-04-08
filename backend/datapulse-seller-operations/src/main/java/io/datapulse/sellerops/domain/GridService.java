@@ -175,6 +175,7 @@ public class GridService {
     private GridRowResponse toGridRowResponse(GridRow row, ClickHouseEnrichment ch) {
         return new GridRowResponse(
                 row.getOfferId(),
+                row.getSellerSkuId(),
                 row.getSkuCode(),
                 row.getProductName(),
                 row.getMarketplaceType(),

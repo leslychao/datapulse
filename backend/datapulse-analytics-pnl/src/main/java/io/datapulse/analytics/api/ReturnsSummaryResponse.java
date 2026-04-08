@@ -1,16 +1,20 @@
 package io.datapulse.analytics.api;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record ReturnsSummaryResponse(
-        String sourcePlatform,
-        int returnCount,
-        int returnQuantity,
-        BigDecimal returnAmount,
-        int saleCount,
-        int saleQuantity,
-        BigDecimal returnRatePct,
-        BigDecimal financialRefundAmount,
-        BigDecimal penaltiesAmount,
-        String topReturnReason
-) {}
+    BigDecimal returnRatePct,
+    BigDecimal returnRateDeltaPct,
+    BigDecimal totalReturnAmount,
+    int totalReturnCount,
+    String topReturnReason,
+    List<ReasonBreakdownItem> reasonBreakdown
+) {
+
+  public record ReasonBreakdownItem(
+      String reason,
+      int count,
+      BigDecimal percent
+  ) {}
+}

@@ -20,6 +20,7 @@ public class OfferDetailJdbcRepository {
   private static final String DETAIL_QUERY = """
       SELECT
           mo.id                       AS offer_id,
+          ss.id                       AS seller_sku_id,
           ss.sku_code,
           mo.name                     AS product_name,
           mc.marketplace_type,
@@ -171,6 +172,7 @@ public class OfferDetailJdbcRepository {
   private OfferDetailRow mapRow(ResultSet rs, int rowNum) throws SQLException {
     return OfferDetailRow.builder()
         .offerId(rs.getLong("offer_id"))
+        .sellerSkuId(rs.getLong("seller_sku_id"))
         .skuCode(rs.getString("sku_code"))
         .productName(rs.getString("product_name"))
         .marketplaceType(rs.getString("marketplace_type"))

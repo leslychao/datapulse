@@ -285,6 +285,7 @@ export class NotificationsPageComponent {
       {
         field: 'severity',
         headerValueGetter: () => this.translate.instant('alerts.col.severity'),
+        headerTooltip: this.translate.instant('alerts.col.severity'),
         width: 56,
         sortable: false,
         cellRenderer: (params: ICellRendererParams<AppNotification>) => {
@@ -309,6 +310,7 @@ export class NotificationsPageComponent {
         flex: 1,
         minWidth: 140,
         valueGetter: (p) => this.resolveI18nNotificationField(p.data, 'title'),
+        tooltipValueGetter: (p: any) => this.resolveI18nNotificationField(p.data, 'title'),
       },
       {
         colId: 'body',
@@ -362,6 +364,7 @@ export class NotificationsPageComponent {
       {
         colId: 'source',
         headerValueGetter: () => this.translate.instant('alerts.notifications.col.source'),
+        headerTooltip: this.translate.instant('alerts.notifications.col.source'),
         width: 120,
         valueGetter: (p) => p.data?.alertEventId,
         valueFormatter: (p) => (p.value != null ? String(p.value) : '—'),
@@ -375,6 +378,7 @@ export class NotificationsPageComponent {
       {
         field: 'read',
         headerValueGetter: () => this.translate.instant('alerts.notifications.col.read'),
+        headerTooltip: this.translate.instant('alerts.notifications.col.read'),
         width: 120,
         cellRenderer: (params: ICellRendererParams<AppNotification>) => {
           const span = document.createElement('span');

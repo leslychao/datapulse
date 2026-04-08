@@ -5,7 +5,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -25,11 +24,8 @@ import {
 import { PricingApiService } from '@core/api/pricing-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { formatMoney, formatDateTime } from '@shared/utils/format.utils';
-import {
-  FilterBarUrlDef,
-  readFilterBarFromUrl,
-  syncFilterBarToUrl,
-} from '@shared/utils/url-filters';
+import type { FilterBarUrlDef } from '@shared/utils/url-filters';
+import { createListPageState } from '@shared/utils/list-page-state';
 import {
   CreateLockRequest,
   ManualPriceLock,
@@ -42,6 +38,7 @@ import {
   FilterConfig,
 } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 
@@ -56,6 +53,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
     DataGridComponent,
     EmptyStateComponent,
     ConfirmationModalComponent,
+    PaginationBarComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
@@ -150,8 +148,8 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
       <div class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
         />
       </div>
 
@@ -165,11 +163,11 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           />
         } @else if (!locksQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="hasActiveFilters()
+            [message]="listState.hasActiveFilters()
               ? ('pricing.locks.empty_filtered' | translate)
               : ('pricing.locks.empty' | translate)"
-            [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
-            (action)="onFiltersChanged({})"
+            [actionLabel]="listState.hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
+            (action)="listState.resetFilters()"
           />
         } @else {
           <dp-data-grid
@@ -177,9 +175,18 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
             [rowData]="rows()"
             [loading]="locksQuery.isPending()"
             [pagination]="true"
-            [pageSize]="50"
+            [pageSize]="listState.pageSize()"
             [getRowId]="getRowId"
             [height]="'100%'"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
+          />
+          <dp-pagination-bar
+            [totalItems]="locksQuery.data()?.totalElements ?? 0"
+            [pageSize]="listState.pageSize()"
+            [currentPage]="listState.currentPage()"
+            [pageSizeOptions]="[25, 50, 100]"
+            (pageChange)="listState.onPageChanged($event)"
           />
         }
       </div>
@@ -198,25 +205,18 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
 export class LocksPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
 
-  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
-    { key: 'search', type: 'string' },
-  ];
-
-  readonly filterValues = signal<Record<string, any>>({});
-
-  constructor() {
-    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
-    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
-  }
-  readonly currentPage = signal(0);
-  readonly currentSort = signal('lockedAt,desc');
+  readonly listState = createListPageState({
+    defaultSort: { column: 'lockedAt', direction: 'desc' },
+    defaultPageSize: 50,
+    filterBarDefs: [
+      { key: 'search', type: 'string' },
+    ] satisfies FilterBarUrlDef[],
+  });
 
   readonly showCreateForm = signal(false);
   readonly showUnlockModal = signal(false);
@@ -238,9 +238,11 @@ export class LocksPageComponent {
       minWidth: 250,
       flex: 1,
       sortable: true,
+      tooltipField: 'offerName',
     },
     {
       headerName: this.translate.instant('pricing.locks.col.sku'),
+      headerTooltip: this.translate.instant('pricing.locks.col.sku'),
       field: 'sellerSku',
       width: 120,
       sortable: true,
@@ -251,9 +253,11 @@ export class LocksPageComponent {
       field: 'connectionName',
       width: 160,
       sortable: true,
+      tooltipField: 'connectionName',
     },
     {
       headerName: this.translate.instant('pricing.locks.col.price'),
+      headerTooltip: this.translate.instant('pricing.locks.col.price'),
       field: 'lockedPrice',
       width: 120,
       sortable: true,
@@ -267,6 +271,7 @@ export class LocksPageComponent {
       minWidth: 200,
       flex: 1,
       sortable: false,
+      tooltipField: 'reason',
       valueFormatter: (params: ValueFormatterParams<ManualPriceLock>) =>
         params.value ?? '—',
     },
@@ -275,13 +280,13 @@ export class LocksPageComponent {
       field: 'lockedByName',
       width: 140,
       sortable: true,
+      tooltipField: 'lockedByName',
     },
     {
       headerName: this.translate.instant('pricing.locks.col.locked_at'),
       field: 'lockedAt',
       width: 140,
       sortable: true,
-      sort: 'desc' as const,
       valueFormatter: (params: ValueFormatterParams<ManualPriceLock>) =>
         this.formatTimestamp(params.value),
     },
@@ -297,6 +302,7 @@ export class LocksPageComponent {
     },
     {
       headerName: this.translate.instant('pricing.locks.col.remaining'),
+      headerTooltip: this.translate.instant('pricing.locks.col.remaining'),
       field: 'expiresAt',
       colId: 'timeRemaining',
       width: 120,
@@ -354,7 +360,7 @@ export class LocksPageComponent {
   );
 
   private readonly filter = computed<PricingLockFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PricingLockFilter = {};
     if (vals['search']) f.search = vals['search'];
     return f;
@@ -365,17 +371,18 @@ export class LocksPageComponent {
       'locks',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
-      this.currentPage(),
-      this.currentSort(),
+      this.listState.currentPage(),
+      this.listState.pageSize(),
+      this.listState.sortParam(),
     ],
     queryFn: () =>
       lastValueFrom(
         this.pricingApi.listLocks(
           this.wsStore.currentWorkspaceId()!,
           this.filter(),
-          this.currentPage(),
-          50,
-          this.currentSort(),
+          this.listState.currentPage(),
+          this.listState.pageSize(),
+          this.listState.sortParam(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -428,17 +435,6 @@ export class LocksPageComponent {
 
   readonly getRowId = (params: GetRowIdParams<ManualPriceLock>) =>
     String(params.data.id);
-
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0),
-    ),
-  );
-
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-    this.currentPage.set(0);
-  }
 
   isFormValid(): boolean {
     return this.formOfferId !== null && this.formPrice !== null;

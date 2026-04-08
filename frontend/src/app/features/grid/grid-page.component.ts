@@ -3,14 +3,15 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { injectMutation, injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { GetContextMenuItemsParams, GridApi, MenuItemDef, RowClassRules } from 'ag-grid-community';
+import { GetContextMenuItemsParams, GridApi, MenuItemDef } from 'ag-grid-community';
 
 import { OfferApiService } from '@core/api/offer-api.service';
-import { OfferFilter, OfferSummary } from '@core/models';
+import { CostProfileApiService } from '@core/api/cost-profile-api.service';
+import { CostProfileImportResult, OfferFilter, OfferSummary } from '@core/models';
+import { RbacService } from '@core/auth/rbac.service';
 import { WebSocketService } from '@core/websocket/websocket.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { GridStore } from '@shared/stores/grid.store';
-import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { GuidedTourService } from '@shared/services/guided-tour.service';
 import { TourProgressStore } from '@shared/stores/tour-progress.store';
@@ -20,6 +21,7 @@ import { PaginationBarComponent } from '@shared/components/pagination-bar/pagina
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { LoadingSkeletonComponent } from '@shared/components/loading-skeleton.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
+import { FormModalComponent } from '@shared/components/form-modal.component';
 import { KpiStripComponent } from './components/kpi-strip.component';
 import { ViewTabsComponent } from './components/view-tabs.component';
 import { GridToolbarComponent } from './components/grid-toolbar.component';
@@ -37,6 +39,7 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
     EmptyStateComponent,
     LoadingSkeletonComponent,
     ConfirmationModalComponent,
+    FormModalComponent,
     KpiStripComponent,
     ViewTabsComponent,
     GridToolbarComponent,
@@ -48,7 +51,12 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
     <div class="flex h-full flex-col overflow-hidden">
       <dp-kpi-strip />
 
-      <dp-grid-toolbar (exportClicked)="exportData()" (draftToggle)="onDraftToggle()">
+      <dp-grid-toolbar
+        (exportClicked)="exportData()"
+        (draftToggle)="onDraftToggle()"
+        (costImportFile)="importCostCsv($event)"
+        (costExportClicked)="exportCostCsv()"
+      >
         <dp-view-tabs />
       </dp-grid-toolbar>
 
@@ -94,12 +102,11 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
             [pagination]="false"
             [rowSelection]="rowSelectionConfig"
             [getRowId]="getRowId"
-            [rowClassRules]="activeRowClassRules"
+            [rowClassRules]="{}"
             [height]="'100%'"
             [suppressCellFocus]="!gridStore.draftMode()"
+            [stopEditingWhenCellsLoseFocus]="true"
             [getContextMenuItems]="contextMenuItems()"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
             (selectionChanged)="onSelectionChanged($event)"
             (sortChanged)="onSortChanged($event)"
             (gridReady)="onGridReady($event)"
@@ -129,18 +136,47 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
       (confirmed)="confirmDraftExit()"
       (cancelled)="cancelDraftExit()"
     />
+
+    @if (showImportResult()) {
+      <dp-form-modal
+        [title]="'grid.cost.import_result_title' | translate"
+        [submitLabel]="'actions.close' | translate"
+        (submitted)="showImportResult.set(false)"
+        (cancelled)="showImportResult.set(false)"
+      >
+        <div class="space-y-2 text-[length:var(--text-sm)]">
+          <p class="text-[var(--text-primary)]">
+            {{ 'grid.cost.import_imported' | translate }}: <strong>{{ importResult()?.imported }}</strong>
+          </p>
+          <p class="text-[var(--text-primary)]">
+            {{ 'grid.cost.import_skipped' | translate }}: <strong>{{ importResult()?.skipped }}</strong>
+          </p>
+          @if (importResult()?.errors?.length) {
+            <p class="text-[var(--status-error)]">
+              {{ 'grid.cost.import_errors' | translate }}: {{ importResult()!.errors.length }}
+            </p>
+            <ul class="max-h-40 overflow-auto text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+              @for (err of importResult()!.errors; track err.row) {
+                <li>{{ 'grid.cost.import_error_row' | translate }} {{ err.row }}: {{ err.message }}</li>
+              }
+            </ul>
+          }
+        </div>
+      </dp-form-modal>
+    }
   `,
 })
 export class GridPageComponent implements OnInit, OnDestroy {
   private readonly offerApi = inject(OfferApiService);
+  private readonly costApi = inject(CostProfileApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly detailPanelService = inject(DetailPanelService);
   private readonly webSocket = inject(WebSocketService);
   private readonly queryClient = injectQueryClient();
   protected readonly gridStore = inject(GridStore);
   private readonly zone = inject(NgZone);
+  private readonly rbac = inject(RbacService);
 
   private static readonly URL_FILTER_KEYS = [
     'marketplace', 'status', 'decision', 'actionStatus', 'search', 'sort', 'dir',
@@ -202,10 +238,15 @@ export class GridPageComponent implements OnInit, OnDestroy {
     onDraftPriceChange: (offerId, newPrice, originalPrice, costPrice) =>
       this.zone.run(() => this.handleDraftPriceChange(offerId, newPrice, originalPrice, costPrice)),
     getDraftChange: (offerId) => this.gridStore.draftChanges().get(offerId),
+    onCostPriceChange: (sellerSkuId, offerId, newCostPrice) =>
+      this.zone.run(() => this.handleCostPriceChange(sellerSkuId, offerId, newCostPrice)),
+    canEditCost: this.rbac.canEditCostProfiles(),
+    onNavigate: (offerId) =>
+      this.zone.run(() => this.onRowClicked({ offerId } as OfferSummary)),
   };
 
   protected readonly columnDefs = computed(() =>
-    buildGridColumnDefs(this.gridCallbacks, this.gridStore.draftMode()),
+    buildGridColumnDefs(this.translate, this.gridCallbacks, this.gridStore.draftMode()),
   );
 
   protected readonly rowSelectionConfig = {
@@ -217,19 +258,9 @@ export class GridPageComponent implements OnInit, OnDestroy {
 
   protected readonly getRowId = (params: any): string => String(params.data.offerId);
 
-  protected readonly activeRowClassRules: RowClassRules = {
-    'dp-row-active': (params) =>
-      this.detailPanelService.isOpen()
-      && params.data?.offerId === this.detailPanelService.entityId(),
-  };
-
-  private readonly activeRowEffect = effect(() => {
-    this.detailPanelService.entityId();
-    this.detailPanelService.isOpen();
-    this.gridApi?.redrawRows();
-  });
-
   protected readonly showDraftExitConfirm = signal(false);
+  protected readonly showImportResult = signal(false);
+  protected readonly importResult = signal<CostProfileImportResult | null>(null);
 
   protected readonly contextMenuItems = computed(() => {
     if (!this.gridStore.draftMode()) return undefined;
@@ -336,14 +367,7 @@ export class GridPageComponent implements OnInit, OnDestroy {
   }
 
   onRowClicked(row: OfferSummary): void {
-    this.detailPanelService.open('offer', row.offerId);
-    const wsId = this.wsStore.currentWorkspaceId();
-    if (wsId) {
-      this.router.navigate([], {
-        queryParams: { offerId: row.offerId },
-        queryParamsHandling: 'merge',
-      });
-    }
+    this.router.navigate(['offer', row.offerId], { relativeTo: this.route });
   }
 
   onSelectionChanged(rows: OfferSummary[]): void {
@@ -418,6 +442,73 @@ export class GridPageComponent implements OnInit, OnDestroy {
 
   toggleLock(offerId: number, currentlyLocked: boolean, currentPrice: number | null): void {
     this.lockMutation.mutate({ offerId, locked: currentlyLocked, currentPrice });
+  }
+
+  private lastCostSavedOfferId: number | null = null;
+
+  private readonly costSaveMutation = injectMutation(() => ({
+    mutationFn: (params: { sellerSkuId: number; offerId: number; costPrice: number }) => {
+      this.lastCostSavedOfferId = params.offerId;
+      const today = new Date().toISOString().slice(0, 10);
+      return lastValueFrom(this.costApi.bulkFormula({
+        sellerSkuIds: [params.sellerSkuId],
+        operation: 'FIXED',
+        value: params.costPrice,
+        validFrom: today,
+      }));
+    },
+    onSuccess: () => {
+      this.toast.success(this.translate.instant('grid.cost.updated'));
+      if (this.lastCostSavedOfferId != null) {
+        const rowNode = this.gridApi?.getRowNode(String(this.lastCostSavedOfferId));
+        if (rowNode) {
+          this.gridApi?.flashCells({
+            rowNodes: [rowNode],
+            columns: ['costPrice', 'marginPct'],
+          });
+        }
+      }
+      this.offersQuery.refetch();
+      this.queryClient.invalidateQueries({ queryKey: ['offer-detail'] });
+    },
+    onError: () => this.toast.error(this.translate.instant('grid.cost.update_error')),
+  }));
+
+  private handleCostPriceChange(sellerSkuId: number, offerId: number, newCostPrice: number): void {
+    this.costSaveMutation.mutate({ sellerSkuId, offerId, costPrice: newCostPrice });
+  }
+
+  importCostCsv(file: File): void {
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      this.toast.error(this.translate.instant('grid.cost.file_too_large'));
+      return;
+    }
+    lastValueFrom(this.costApi.importCsv(file)).then(
+      (result) => {
+        this.importResult.set(result);
+        this.showImportResult.set(true);
+        this.offersQuery.refetch();
+        this.queryClient.invalidateQueries({ queryKey: ['offer-detail'] });
+      },
+      () => this.toast.error(this.translate.instant('grid.cost.import_failed')),
+    );
+  }
+
+  exportCostCsv(): void {
+    this.toast.info(this.translate.instant('grid.cost.export_preparing'));
+    lastValueFrom(this.costApi.exportCsv()).then(
+      (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cost-profiles.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toast.success(this.translate.instant('grid.cost.export_done'));
+      },
+      () => this.toast.error(this.translate.instant('grid.cost.error_export')),
+    );
   }
 
   protected onGridReady(api: GridApi): void {

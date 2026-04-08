@@ -246,7 +246,7 @@
       }
       <div class="h-[min(560px,calc(100vh-260px))] w-full min-h-[320px]">
         <ag-grid-angular
-          class="ag-theme-alpine dp-grid-clickable h-full w-full"
+          class="ag-theme-alpine h-full w-full"
           [columnDefs]="columnDefs()"
           [defaultColDef]="defaultColDef"
           [rowData]="rowData()"
@@ -260,7 +260,6 @@
           [loading]="itemsQuery.isPending()"
           (gridReady)="onGridReady($event)"
           (selectionChanged)="onSelectionChanged($event)"
-          (rowClicked)="$event.data && onRowClicked($event.data)"
           (cellContextMenu)="onCellContextMenu({ event: $event.event ?? null, data: $event.data })"
         />
       </div>

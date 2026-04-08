@@ -8,7 +8,7 @@ import {
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { ColDef, GridApi } from 'ag-grid-community';
+import { ColDef, GridApi, ValueFormatterParams } from 'ag-grid-community';
 import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AdvertisingApiService } from '@core/api/advertising-api.service';
@@ -191,12 +191,14 @@ export class CampaignsPageComponent {
     {
       field: 'name',
       headerName: this.t.instant('advertising.campaigns.col.name'),
+      tooltipField: 'name',
       minWidth: 220,
       flex: 1,
     },
     {
       field: 'sourcePlatform',
       headerName: this.t.instant('advertising.campaigns.col.platform'),
+      headerTooltip: this.t.instant('advertising.campaigns.col.platform'),
       width: 90,
       cellRenderer: (p: { value: string }) => {
         const cls = p.value === 'WB'
@@ -210,12 +212,23 @@ export class CampaignsPageComponent {
     {
       field: 'campaignType',
       headerName: this.t.instant('advertising.campaigns.col.type'),
+      headerTooltip: this.t.instant('advertising.campaigns.col.type'),
       width: 120,
-      cellRenderer: (p: { value: string }) => renderOutlineBadge(p.value ?? '—'),
+      valueFormatter: (params: ValueFormatterParams) =>
+        params.value
+          ? this.t.instant('advertising.campaign_type.' + params.value)
+          : '—',
+      cellRenderer: (p: { value: string }) => {
+        if (!p.value) return '—';
+        const key = 'advertising.campaign_type.' + p.value;
+        const label = this.t.instant(key);
+        return renderOutlineBadge(label !== key ? label : p.value);
+      },
     },
     {
       field: 'status',
       headerName: this.t.instant('advertising.campaigns.col.status'),
+      headerTooltip: this.t.instant('advertising.campaigns.col.status'),
       width: 120,
       cellRenderer: (p: { value: string }) => {
         const color = STATUS_COLORS[p.value] ?? 'var(--status-neutral)';
@@ -243,6 +256,7 @@ export class CampaignsPageComponent {
     {
       field: 'ordersForPeriod',
       headerName: this.t.instant('advertising.campaigns.col.orders'),
+      headerTooltip: this.t.instant('advertising.campaigns.col.orders'),
       type: 'rightAligned',
       width: 100,
       cellClass: 'font-mono',
@@ -252,6 +266,7 @@ export class CampaignsPageComponent {
     {
       field: 'drrPct',
       headerName: this.t.instant('advertising.campaigns.col.drr'),
+      headerTooltip: this.t.instant('advertising.campaigns.col.drr'),
       type: 'rightAligned',
       width: 100,
       cellClass: 'font-mono',
@@ -260,6 +275,7 @@ export class CampaignsPageComponent {
     {
       field: 'drrTrend',
       headerName: this.t.instant('advertising.campaigns.col.drr_trend'),
+      headerTooltip: this.t.instant('advertising.campaigns.col.drr_trend'),
       width: 80,
       cellRenderer: (p: { value: string | null }) => {
         if (!p.value) return '—';

@@ -2,7 +2,6 @@ import { Injectable, signal } from '@angular/core';
 
 export type DetailPanelEntityType =
   | 'connection'
-  | 'offer'
   | 'alert'
   | 'policy'
   | 'pricing-decision'

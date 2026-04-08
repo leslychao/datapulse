@@ -67,10 +67,10 @@ import {
           </div>
           <div class="flex flex-1 flex-col gap-1 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
             <span class="text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-              {{ 'analytics.returns.kpi.total_refund' | translate }}
+              {{ 'analytics.returns.kpi.return_count' | translate }}
             </span>
-            <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--status-error)]">
-              {{ formatMoney(s.totalRefundAmount) }}
+            <span class="font-mono text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
+              {{ s.totalReturnCount }}
             </span>
           </div>
           <div class="flex flex-1 flex-col gap-1 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
@@ -84,7 +84,7 @@ import {
         </div>
       }
 
-      <!-- Chart + Penalties side-by-side -->
+      <!-- Chart + Return Amount side-by-side -->
       <div class="grid grid-cols-2 gap-4 pb-4">
         <!-- Return Reasons Chart -->
         <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
@@ -98,38 +98,20 @@ import {
           />
         </div>
 
-        <!-- Penalties Breakdown -->
+        <!-- Return Amount -->
         <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
           <h3 class="mb-3 text-sm font-medium text-[var(--text-primary)]">
-            {{ 'analytics.returns.penalties_title' | translate }}
+            {{ 'analytics.returns.kpi.return_amount' | translate }}
           </h3>
-
           @if (summaryQuery.isPending()) {
-            <div class="space-y-2">
-              @for (_ of [1, 2, 3]; track $index) {
-                <div class="dp-shimmer h-5 w-full rounded-[var(--radius-sm)]"></div>
-              }
-            </div>
-          } @else {
-            <ul class="space-y-2">
-              @for (item of penaltyBreakdown(); track item.type) {
-                <li class="flex items-center justify-between text-sm">
-                  <span class="text-[var(--text-secondary)]">{{ item.type }}</span>
-                  <span class="font-mono text-[var(--status-error)]">
-                    {{ formatMoney(item.amount) }}
-                  </span>
-                </li>
-              }
-            </ul>
-
-            <div class="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3 text-sm font-medium">
-              <span class="text-[var(--text-primary)]">
-                {{ 'analytics.returns.penalties_total' | translate }}
-              </span>
-              <span class="font-mono text-[var(--status-error)]">
-                {{ formatMoney(totalPenalties()) }}
-              </span>
-            </div>
+            <div class="dp-shimmer h-10 w-40 rounded-[var(--radius-sm)]"></div>
+          } @else if (summaryQuery.data(); as s) {
+            <span class="font-mono text-2xl font-bold text-[var(--text-primary)]">
+              {{ formatMoney(s.totalReturnAmount) }}
+            </span>
+            <p class="mt-2 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+              {{ 'analytics.returns.kpi.return_amount_hint' | translate }}
+            </p>
           }
         </div>
       </div>
@@ -169,14 +151,6 @@ export class ReturnsSummaryPageComponent {
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
-
-  readonly penaltyBreakdown = computed(() =>
-    this.summaryQuery.data()?.penaltyBreakdown ?? [],
-  );
-
-  readonly totalPenalties = computed(() =>
-    this.summaryQuery.data()?.totalPenalties ?? 0,
-  );
 
   readonly reasonChartOptions = computed<EChartsOption>(() => {
     const items = this.summaryQuery.data()?.reasonBreakdown ?? [];

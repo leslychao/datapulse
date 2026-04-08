@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
@@ -25,6 +25,7 @@ import {
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { RbacService } from '@core/auth/rbac.service';
+import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -107,8 +108,8 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="initialSortModel()"
+            (sortChanged)="onSortChanged($event)"
           />
         }
       </div>
@@ -129,10 +130,17 @@ export class PromoPolicyListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
+
+  readonly currentSort = signal<SortUrlState>({ column: '', direction: 'desc' });
+  readonly initialSortModel = computed(() => {
+    const s = this.currentSort();
+    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  });
 
   readonly filterValues = signal<Record<string, any>>({
     status: ['DRAFT', 'ACTIVE', 'PAUSED'],
@@ -173,11 +181,15 @@ export class PromoPolicyListPageComponent {
       sortable: true,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
-        return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.data.name}</span>`;
+        return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline" title="${params.data.name}">${params.data.name}</span>`;
+      },
+      onCellClicked: (params: any) => {
+        if (params.data) this.onRowClicked(params.data);
       },
     },
     {
       headerName: this.translate.instant('promo.policies.col.status'),
+      headerTooltip: this.translate.instant('promo.policies.col.status'),
       field: 'status',
       width: 130,
       sortable: true,
@@ -199,6 +211,7 @@ export class PromoPolicyListPageComponent {
     },
     {
       headerName: this.translate.instant('promo.policies.col.min_margin'),
+      headerTooltip: this.translate.instant('promo.policies.col.min_margin'),
       field: 'minMarginPct',
       width: 100,
       cellClass: 'font-mono text-right',
@@ -208,6 +221,7 @@ export class PromoPolicyListPageComponent {
     },
     {
       headerName: this.translate.instant('promo.policies.col.min_stock_days'),
+      headerTooltip: this.translate.instant('promo.policies.col.min_stock_days'),
       field: 'minStockDaysOfCover',
       width: 120,
       cellClass: 'font-mono text-right',
@@ -219,6 +233,7 @@ export class PromoPolicyListPageComponent {
     },
     {
       headerName: this.translate.instant('promo.policies.col.max_discount'),
+      headerTooltip: this.translate.instant('promo.policies.col.max_discount'),
       field: 'maxPromoDiscountPct',
       width: 110,
       cellClass: 'font-mono text-right',
@@ -228,6 +243,7 @@ export class PromoPolicyListPageComponent {
     },
     {
       headerName: this.translate.instant('promo.policies.col.version'),
+      headerTooltip: this.translate.instant('promo.policies.col.version'),
       field: 'version',
       width: 70,
       cellClass: 'font-mono text-center',
@@ -237,6 +253,7 @@ export class PromoPolicyListPageComponent {
     },
     {
       headerName: this.translate.instant('promo.policies.col.assignments'),
+      headerTooltip: this.translate.instant('promo.policies.col.assignments'),
       field: 'assignmentCount',
       width: 100,
       cellClass: 'font-mono text-center',
@@ -244,12 +261,14 @@ export class PromoPolicyListPageComponent {
     },
     {
       headerName: this.translate.instant('promo.policies.col.created_by'),
+      headerTooltip: this.translate.instant('promo.policies.col.created_by'),
       field: 'createdByName',
       width: 130,
       sortable: true,
     },
     {
       headerName: this.translate.instant('promo.policies.col.updated_at'),
+      headerTooltip: this.translate.instant('promo.policies.col.updated_at'),
       field: 'updatedAt',
       width: 130,
       sortable: true,
@@ -382,6 +401,18 @@ export class PromoPolicyListPageComponent {
   }));
 
   readonly getRowId = (params: any) => String(params.data.id);
+
+  constructor() {
+    readSortFromUrl(this.route, this.currentSort);
+    syncSortToUrl(this.router, this.route, this.currentSort, { column: '', direction: 'desc' });
+  }
+
+  onSortChanged(sort: { column: string; direction: string }): void {
+    this.currentSort.set({
+      column: sort.column,
+      direction: (sort.direction as 'asc' | 'desc') || 'desc',
+    });
+  }
 
   onFiltersChanged(values: Record<string, any>): void {
     this.filterValues.set(values);

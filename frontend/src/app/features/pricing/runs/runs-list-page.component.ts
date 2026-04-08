@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -32,11 +32,7 @@ import {
   formatMoney,
   renderBadge,
 } from '@shared/utils/format.utils';
-import {
-  FilterBarUrlDef,
-  readFilterBarFromUrl,
-  syncFilterBarToUrl,
-} from '@shared/utils/url-filters';
+import { createListPageState } from '@shared/utils/list-page-state';
 
 const RUN_STATUS_COLOR: Record<string, string> = {
   PENDING: 'info',
@@ -97,7 +93,7 @@ const DECISION_COLOR: Record<string, string> = {
       <div class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
+          [values]="listState.filterValues()"
           (filtersChanged)="onFiltersChanged($event)"
         />
       </div>
@@ -113,10 +109,10 @@ const DECISION_COLOR: Record<string, string> = {
             />
           } @else if (!runsQuery.isPending() && rows().length === 0) {
             <dp-empty-state
-              [message]="hasActiveFilters()
+              [message]="listState.hasActiveFilters()
                 ? ('pricing.runs.empty_filtered' | translate)
                 : ('pricing.runs.empty' | translate)"
-              [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
+              [actionLabel]="listState.hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
               (action)="onFiltersChanged({})"
             />
           } @else {
@@ -128,8 +124,7 @@ const DECISION_COLOR: Record<string, string> = {
               [pageSize]="50"
               [getRowId]="getRowId"
               [height]="'100%'"
-              [clickableRows]="true"
-              (rowClicked)="onRowClicked($event)"
+              [initialSortModel]="listState.initialSortModel()"
               (sortChanged)="onSortChanged($event)"
             />
           }
@@ -316,40 +311,26 @@ const DECISION_COLOR: Record<string, string> = {
 export class RunsListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   protected readonly wsStore = inject(WorkspaceContextStore);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
 
-  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
-    { key: 'status', type: 'csv' },
-    { key: 'triggerType', type: 'csv' },
-    { key: 'period', type: 'date-range' },
-  ];
+  readonly listState = createListPageState({
+    defaultSort: { column: 'createdAt', direction: 'desc' },
+    defaultPageSize: 50,
+    filterBarDefs: [
+      { key: 'status', type: 'csv' },
+      { key: 'triggerType', type: 'csv' },
+      { key: 'period', type: 'date-range' },
+    ],
+  });
 
-  constructor() {
-    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
-    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
-  }
+  readonly expandedRunId = signal<number | null>(null);
 
   private readonly translationChange = toSignal(
     this.translate.onTranslationChange.pipe(startWith(null)),
   );
-
-  readonly filterValues = signal<Record<string, any>>({});
-  readonly expandedRunId = signal<number | null>(null);
-
-  readonly currentSort = signal<{ field: string; dir: 'asc' | 'desc' }>({
-    field: 'createdAt',
-    dir: 'desc',
-  });
-
-  readonly sortParam = computed(() => {
-    const s = this.currentSort();
-    return `${s.field},${s.dir}`;
-  });
 
   readonly filterConfigs: FilterConfig[] = [
     {
@@ -382,9 +363,19 @@ export class RunsListPageComponent {
         width: 70,
         sortable: true,
         cellClass: 'font-mono text-right',
+        cellRenderer: (params: { value: unknown }) => {
+          if (params.value == null || params.value === '') return '';
+          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
+        },
+        onCellClicked: (params: { data?: PricingRunSummary }) => {
+          if (params.data) {
+            this.onRowClicked(params.data);
+          }
+        },
       },
       {
         headerName: this.translate.instant('pricing.runs.col.trigger'),
+        headerTooltip: this.translate.instant('pricing.runs.col.trigger'),
         field: 'triggerType',
         width: 130,
         sortable: true,
@@ -420,6 +411,7 @@ export class RunsListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.runs.col.total'),
+        headerTooltip: this.translate.instant('pricing.runs.col.total'),
         field: 'totalOffers',
         width: 80,
         sortable: true,
@@ -427,6 +419,7 @@ export class RunsListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.runs.col.change'),
+        headerTooltip: this.translate.instant('pricing.runs.col.change'),
         field: 'changeCount',
         width: 80,
         sortable: true,
@@ -435,6 +428,7 @@ export class RunsListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.runs.col.skip'),
+        headerTooltip: this.translate.instant('pricing.runs.col.skip'),
         field: 'skipCount',
         width: 80,
         sortable: true,
@@ -443,6 +437,7 @@ export class RunsListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.runs.col.duration'),
+        headerTooltip: this.translate.instant('pricing.runs.col.duration'),
         field: '_duration',
         width: 100,
         sortable: false,
@@ -454,17 +449,17 @@ export class RunsListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.runs.col.created_at'),
+        headerTooltip: this.translate.instant('pricing.runs.col.created_at'),
         field: 'createdAt',
         width: 120,
         sortable: true,
-        sort: 'desc' as const,
         valueFormatter: (params: any) => formatRelativeTime(params.value),
       },
     ];
   });
 
   private readonly filter = computed<PricingRunFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PricingRunFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
     if (vals['triggerType']?.length) f.triggerType = vals['triggerType'];
@@ -478,7 +473,7 @@ export class RunsListPageComponent {
       'pricing-runs',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
-      this.sortParam(),
+      this.listState.sortParam(),
     ],
     queryFn: () =>
       lastValueFrom(
@@ -487,7 +482,7 @@ export class RunsListPageComponent {
           this.filter(),
           0,
           50,
-          this.sortParam(),
+          this.listState.sortParam(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -518,16 +513,6 @@ export class RunsListPageComponent {
   }));
 
   readonly rows = computed(() => this.runsQuery.data()?.content ?? []);
-
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) =>
-        v !== '' &&
-        v !== null &&
-        v !== undefined &&
-        (!Array.isArray(v) || v.length > 0),
-    ),
-  );
 
   readonly expandedRun = computed(() => {
     const id = this.expandedRunId();
@@ -577,10 +562,7 @@ export class RunsListPageComponent {
   }
 
   onSortChanged(sort: { column: string; direction: string }): void {
-    this.currentSort.set({
-      field: sort.column,
-      dir: sort.direction.toLowerCase() as 'asc' | 'desc',
-    });
+    this.listState.onSortChanged(sort);
     this.expandedRunId.set(null);
   }
 
@@ -589,7 +571,7 @@ export class RunsListPageComponent {
   }
 
   onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
+    this.listState.onFiltersChanged(values);
     this.expandedRunId.set(null);
   }
 

@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -32,11 +32,8 @@ import { DataGridComponent } from '@shared/components/data-grid/data-grid.compon
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
 import { formatRelativeTime, renderBadge } from '@shared/utils/format.utils';
-import {
-  FilterBarUrlDef,
-  readFilterBarFromUrl,
-  syncFilterBarToUrl,
-} from '@shared/utils/url-filters';
+import { FilterBarUrlDef } from '@shared/utils/url-filters';
+import { createListPageState } from '@shared/utils/list-page-state';
 
 const POLICY_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'] as const;
 const EXECUTION_MODES = [
@@ -106,8 +103,8 @@ const MODE_COLOR: Record<string, string> = {
       <div data-tour="policy-filter-bar" class="border-b border-[var(--border-default)] px-4 py-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
         />
       </div>
 
@@ -120,16 +117,16 @@ const MODE_COLOR: Record<string, string> = {
           />
         } @else if (!policiesQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="hasActiveFilters()
+            [message]="listState.hasActiveFilters()
               ? ('pricing.policies.empty_filtered' | translate)
               : ('pricing.policies.empty' | translate)"
-            [actionLabel]="hasActiveFilters()
+            [actionLabel]="listState.hasActiveFilters()
               ? ('filter_bar.reset_all' | translate)
               : (rbac.canWritePolicies()
                 ? ('pricing.policies.create' | translate)
                 : '')"
-            (action)="hasActiveFilters()
-              ? onFiltersChanged({})
+            (action)="listState.hasActiveFilters()
+              ? listState.resetFilters()
               : navigateToCreate()"
           />
         } @else {
@@ -141,8 +138,8 @@ const MODE_COLOR: Record<string, string> = {
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [clickableRows]="true"
-            (rowClicked)="onRowClicked($event)"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
           />
         }
       </div>
@@ -182,7 +179,6 @@ export class PolicyListPageComponent {
   private readonly pricingApi = inject(PricingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
@@ -190,24 +186,33 @@ export class PolicyListPageComponent {
   private readonly tourProgress = inject(TourProgressStore);
   protected readonly rbac = inject(RbacService);
 
-  private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
-    { key: 'status', type: 'csv' },
-    { key: 'strategyType', type: 'string' },
-    { key: 'executionMode', type: 'csv' },
-  ];
+  readonly listState = createListPageState({
+    defaultSort: { column: '', direction: 'desc' },
+    filterBarDefs: [
+      { key: 'status', type: 'csv' },
+      { key: 'strategyType', type: 'string' },
+      { key: 'executionMode', type: 'csv' },
+    ] satisfies FilterBarUrlDef[],
+  });
 
   constructor() {
-    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
-    syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
+    if (
+      !Object.values(this.listState.filterValues()).some(
+        (v) =>
+          v !== '' &&
+          v !== null &&
+          v !== undefined &&
+          (!Array.isArray(v) || v.length > 0),
+      )
+    ) {
+      this.listState.filterValues.set({ status: ['DRAFT', 'ACTIVE', 'PAUSED'] });
+    }
 
     if (PRICING_POLICIES_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PRICING_POLICIES_TOUR.id)) {
       this.tourService.startWhenReady(PRICING_POLICIES_TOUR);
     }
   }
 
-  readonly filterValues = signal<Record<string, any>>({
-    status: ['DRAFT', 'ACTIVE', 'PAUSED'],
-  });
   readonly showActivateModal = signal(false);
   readonly activateTarget = signal<PricingPolicySummary | null>(null);
   readonly showPauseModal = signal(false);
@@ -259,11 +264,15 @@ export class PolicyListPageComponent {
         sortable: true,
         cellRenderer: (params: any) => {
           if (!params.data) return '';
-          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${params.data.name}</span>`;
+          return `<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline" title="${params.data.name}">${params.data.name}</span>`;
+        },
+        onCellClicked: (params: any) => {
+          if (params.data) this.onRowClicked(params.data);
         },
       },
       {
         headerName: this.translate.instant('pricing.policies.col.status'),
+        headerTooltip: this.translate.instant('pricing.policies.col.status'),
         field: 'status',
         width: 130,
         sortable: true,
@@ -294,6 +303,7 @@ export class PolicyListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.policies.col.priority'),
+        headerTooltip: this.translate.instant('pricing.policies.col.priority'),
         field: 'priority',
         width: 100,
         sortable: true,
@@ -301,6 +311,7 @@ export class PolicyListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.policies.col.assignments_count'),
+        headerTooltip: this.translate.instant('pricing.policies.col.assignments_count'),
         field: 'assignmentsCount',
         width: 110,
         sortable: true,
@@ -320,6 +331,7 @@ export class PolicyListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.policies.col.version'),
+        headerTooltip: this.translate.instant('pricing.policies.col.version'),
         field: 'version',
         width: 80,
         sortable: true,
@@ -329,6 +341,7 @@ export class PolicyListPageComponent {
       },
       {
         headerName: this.translate.instant('pricing.policies.col.updated_at'),
+        headerTooltip: this.translate.instant('pricing.policies.col.updated_at'),
         field: 'updatedAt',
         width: 130,
         sortable: true,
@@ -387,7 +400,7 @@ export class PolicyListPageComponent {
   });
 
   private readonly filter = computed<PricingFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PricingFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
     if (vals['strategyType']) f.strategyType = vals['strategyType'];
@@ -412,16 +425,6 @@ export class PolicyListPageComponent {
   }));
 
   readonly rows = computed(() => this.policiesQuery.data()?.content ?? []);
-
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) =>
-        v !== '' &&
-        v !== null &&
-        v !== undefined &&
-        (!Array.isArray(v) || v.length > 0),
-    ),
-  );
 
   readonly statusSummary = computed(() => {
     const all = this.policiesQuery.data()?.content;
@@ -513,10 +516,6 @@ export class PolicyListPageComponent {
   }));
 
   readonly getRowId = (params: any) => String(params.data.id);
-
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-  }
 
   onRowClicked(row: PricingPolicySummary): void {
     this.navigateToEdit(row);

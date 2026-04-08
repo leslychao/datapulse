@@ -81,8 +81,6 @@ import {
             [pagination]="false"
             [pageSize]="25"
             height="calc(100vh - 320px)"
-            [clickableRows]="true"
-            (rowClicked)="selectProduct($event)"
             (gridReady)="onGridReady($event)"
           />
 
@@ -294,7 +292,13 @@ export class InventoryByProductPageComponent {
       field: 'skuCode',
       headerName: 'SKU',
       cellClass: 'font-mono text-[11px]',
-      cellStyle: () => ({ color: 'var(--text-secondary)' }),
+      cellRenderer: (params: any) => {
+        if (!params.value) return '';
+        return `<span class="text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
+      },
+      onCellClicked: (params: any) => {
+        if (params.data) this.selectProduct(params.data);
+      },
     },
     {
       field: 'productName',
