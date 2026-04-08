@@ -285,7 +285,7 @@ export class PnlByPostingPageComponent {
     this.currentPage.set(0);
   }
 
-  readonly onSearchInput = createDebouncedSearch(this.search);
+  readonly onSearchInput = createDebouncedSearch(this.search, 300, () => this.currentPage.set(0));
 
   onRowClicked(row: PnlByPosting): void {
     this.router.navigate([

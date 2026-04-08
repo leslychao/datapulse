@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -12,6 +13,7 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
@@ -105,13 +107,15 @@ import {
           </h3>
           @if (summaryQuery.isPending()) {
             <div class="dp-shimmer h-10 w-40 rounded-[var(--radius-sm)]"></div>
-          } @else if (summaryQuery.data(); as s) {
-            <span class="font-mono text-2xl font-bold text-[var(--text-primary)]">
-              {{ formatMoney(s.totalReturnAmount) }}
-            </span>
-            <p class="mt-2 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
-              {{ 'analytics.returns.kpi.return_amount_hint' | translate }}
-            </p>
+          } @else {
+            @if (summaryQuery.data(); as s) {
+              <span class="font-mono text-2xl font-bold text-[var(--text-primary)]">
+                {{ formatMoney(s.totalReturnAmount) }}
+              </span>
+              <p class="mt-2 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+                {{ 'analytics.returns.kpi.return_amount_hint' | translate }}
+              </p>
+            }
           }
         </div>
       </div>
@@ -121,10 +125,13 @@ import {
 export class ReturnsSummaryPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  readonly period = signal(currentMonth());
+  readonly period = signal(
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'period') ?? currentMonth()
+  );
 
   private readonly filterDefs: UrlFilterDef[] = [
     { key: 'period', signal: this.period, defaultValue: currentMonth() },
@@ -134,6 +141,9 @@ export class ReturnsSummaryPageComponent {
   constructor() {
     readFiltersFromUrl(this.route, this.filterDefs);
     syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    effect(() => {
+      this.navStore.setSectionFilter('analytics:returns', { period: this.period() });
+    });
   }
 
   onResetFilters(): void {

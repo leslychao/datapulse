@@ -123,7 +123,7 @@ export class PnlByProductPageComponent {
 
   private gridApi: GridApi | null = null;
 
-  readonly onSearchInput = createDebouncedSearch(this.search);
+  readonly onSearchInput = createDebouncedSearch(this.search, 300, () => this.currentPage.set(0));
 
   constructor() {
     effect(() => {
@@ -273,20 +273,8 @@ export class PnlByProductPageComponent {
     this.currentPage.set(0);
   }
 
-  onSearchInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => {
-      this.search.set(input.value);
-      this.currentPage.set(0);
-    }, 300);
-  }
-
-  prevPage(): void {
-    this.currentPage.update((p) => Math.max(0, p - 1));
-  }
-
-  nextPage(): void {
-    this.currentPage.update((p) => p + 1);
+  onPageChange(event: { page: number; pageSize: number }): void {
+    this.currentPage.set(event.page);
+    this.pageSize.set(event.pageSize);
   }
 }

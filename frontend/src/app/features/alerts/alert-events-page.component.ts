@@ -36,6 +36,7 @@ import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { LucideAngularModule, AlertCircle, AlertTriangle, Eye, CheckCircle2 } from 'lucide-angular';
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 import { formatDateTime, renderBadge } from '@shared/utils/format.utils';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 
 const RULE_TYPES: AlertRuleType[] = [
   'STALE_DATA',
@@ -100,6 +101,7 @@ function buildAlertFilter(values: Record<string, unknown>): AlertFilter {
     KpiCardComponent,
     EmptyStateComponent,
     LucideAngularModule,
+    PaginationBarComponent,
   ],
   templateUrl: './alert-events-page.component.html',
 })
@@ -312,8 +314,6 @@ export class AlertEventsPageComponent {
 
   readonly rows = computed(() => this.alertsQuery.data()?.content ?? []);
 
-  readonly totalPages = computed(() => this.alertsQuery.data()?.totalPages ?? 0);
-
   readonly totalElements = computed(() => this.alertsQuery.data()?.totalElements ?? 0);
 
   readonly hasActiveFilters = computed(() => {
@@ -393,18 +393,8 @@ export class AlertEventsPageComponent {
     this.pageIndex.set(0);
   }
 
-  prevPage(): void {
-    const p = this.pageIndex();
-    if (p > 0) {
-      this.pageIndex.set(p - 1);
-    }
-  }
-
-  nextPage(): void {
-    const p = this.pageIndex();
-    const tp = this.totalPages();
-    if (p + 1 < tp) {
-      this.pageIndex.set(p + 1);
-    }
+  onPageChange(event: { page: number; pageSize: number }): void {
+    this.pageIndex.set(event.page);
+    this.pageSize.set(event.pageSize);
   }
 }

@@ -79,38 +79,13 @@
   </div>
 
   @if (!notificationsQuery.isPending() && !notificationsQuery.isError() && totalFiltered() > 0) {
-    <div
-      class="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
-    >
-      <span class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-        {{
-          'alerts.pagination.summary'
-            | translate
-              : {
-                  page: pageIndex() + 1,
-                  total: totalPages(),
-                  count: totalFiltered(),
-                }
-        }}
-      </span>
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
-          [disabled]="pageIndex() <= 0"
-          (click)="prevPage()"
-        >
-          {{ 'alerts.pagination.prev' | translate }}
-        </button>
-        <button
-          type="button"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
-          [disabled]="pageIndex() + 1 >= totalPages()"
-          (click)="nextPage()"
-        >
-          {{ 'alerts.pagination.next' | translate }}
-        </button>
-      </div>
+    <div class="shrink-0 border-t border-[var(--border-default)] bg-[var(--bg-secondary)]">
+      <dp-pagination-bar
+        [totalItems]="totalFiltered()"
+        [pageSize]="pageSize()"
+        [currentPage]="pageIndex()"
+        (pageChange)="onPageChange($event)"
+      />
     </div>
   }
 </div>

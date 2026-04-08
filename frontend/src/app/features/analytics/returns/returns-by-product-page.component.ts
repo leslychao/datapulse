@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   HostListener,
   inject,
   signal,
@@ -17,7 +18,10 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { ReturnsByProduct } from '@core/models';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
+import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import {
   formatMoney,
   formatPercent,
@@ -32,7 +36,7 @@ import {
   selector: 'dp-returns-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DataGridComponent, LucideAngularModule, MonthPickerComponent],
+  imports: [TranslatePipe, DataGridComponent, LucideAngularModule, MonthPickerComponent, PaginationBarComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
@@ -79,35 +83,12 @@ import {
       </div>
 
       @if (returnsQuery.data(); as page) {
-        <div class="flex items-center justify-between pb-4 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-          <span>
-            {{ 'pagination.showing' | translate:{
-              from: page.number * page.size + 1,
-              to: page.number * page.size + page.content.length,
-              total: page.totalElements
-            } }}
-          </span>
-          <div class="flex items-center gap-2">
-            <button
-              (click)="prevPage()"
-              [disabled]="currentPage() === 0"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
-                     text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {{ 'pagination.prev' | translate }}
-            </button>
-            <button
-              (click)="nextPage()"
-              [disabled]="currentPage() >= page.totalPages - 1"
-              class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1
-                     text-[length:var(--text-sm)] transition-colors hover:bg-[var(--bg-tertiary)]
-                     disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {{ 'pagination.next' | translate }}
-            </button>
-          </div>
-        </div>
+        <dp-pagination-bar
+          [totalItems]="page.totalElements"
+          [pageSize]="pageSize()"
+          [currentPage]="currentPage()"
+          (pageChange)="onPageChange($event)"
+        />
       }
 
       <!-- Detail Panel -->
@@ -195,6 +176,7 @@ import {
 export class ReturnsByProductPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
   private readonly t = inject(TranslateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -207,7 +189,9 @@ export class ReturnsByProductPageComponent {
     this.selectedProduct.set(null);
   }
 
-  readonly period = signal(currentMonth());
+  readonly period = signal(
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'period') ?? currentMonth()
+  );
   readonly search = signal('');
   readonly selectedProduct = signal<ReturnsByProduct | null>(null);
   readonly currentPage = signal(0);
@@ -225,13 +209,16 @@ export class ReturnsByProductPageComponent {
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly onSearchInput = createDebouncedSearch(this.search, 300, () => this.currentPage.set(0));
 
   constructor() {
     readFiltersFromUrl(this.route, this.filterDefs);
     syncFiltersToUrl(this.router, this.route, this.filterDefs);
     readSortFromUrl(this.route, this.currentSort);
     syncSortToUrl(this.router, this.route, this.currentSort, { column: 'return_rate_pct', direction: 'desc' });
+    effect(() => {
+      this.navStore.setSectionFilter('analytics:returns', { period: this.period() });
+    });
   }
 
   onResetFilters(): void {
@@ -342,13 +329,9 @@ export class ReturnsByProductPageComponent {
     this.currentPage.set(0);
   }
 
-  onSearchInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => {
-      this.search.set(input.value);
-      this.currentPage.set(0);
-    }, 300);
+  onPageChange(event: { page: number; pageSize: number }): void {
+    this.currentPage.set(event.page);
+    this.pageSize.set(event.pageSize);
   }
 
   onRowClicked(row: ReturnsByProduct): void {
@@ -362,14 +345,6 @@ export class ReturnsByProductPageComponent {
       this.currentSort.set({ column: 'return_rate_pct', direction: 'desc' });
     }
     this.currentPage.set(0);
-  }
-
-  prevPage(): void {
-    this.currentPage.update((p) => Math.max(0, p - 1));
-  }
-
-  nextPage(): void {
-    this.currentPage.update((p) => p + 1);
   }
 
   returnRateClass(rate: number): string {

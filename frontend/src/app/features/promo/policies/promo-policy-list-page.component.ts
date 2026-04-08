@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   injectQuery,
@@ -22,10 +22,10 @@ import {
   PromoPolicySummary,
   PromoPolicyStatus,
 } from '@core/models';
+import { createListPageState } from '@shared/utils/list-page-state';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { RbacService } from '@core/auth/rbac.service';
-import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -77,8 +77,8 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
       <div class="px-6 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
         />
       </div>
 
@@ -91,13 +91,13 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
           />
         } @else if (!policiesQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="hasActiveFilters()
+            [message]="listState.hasActiveFilters()
               ? ('promo.policies.empty_filtered' | translate)
               : ('promo.policies.empty' | translate)"
-            [actionLabel]="hasActiveFilters()
+            [actionLabel]="listState.hasActiveFilters()
               ? ('filter_bar.reset_all' | translate)
               : ('promo.policies.create' | translate)"
-            (action)="hasActiveFilters() ? onFiltersChanged({}) : navigateToCreate()"
+            (action)="listState.hasActiveFilters() ? listState.resetFilters() : navigateToCreate()"
           />
         } @else {
           <dp-data-grid
@@ -108,8 +108,8 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [initialSortModel]="initialSortModel()"
-            (sortChanged)="onSortChanged($event)"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
           />
         }
       </div>
@@ -130,22 +130,15 @@ export class PromoPolicyListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
 
-  readonly currentSort = signal<SortUrlState>({ column: '', direction: 'desc' });
-  readonly initialSortModel = computed(() => {
-    const s = this.currentSort();
-    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  readonly listState = createListPageState({
+    defaultSort: { column: '', direction: 'desc' },
+    defaultPageSize: 50,
   });
-
-  readonly filterValues = signal<Record<string, any>>({
-    status: ['DRAFT', 'ACTIVE', 'PAUSED'],
-  });
-  readonly currentPage = signal(0);
 
   readonly showArchiveModal = signal(false);
   readonly archiveTarget = signal<PromoPolicySummary | null>(null);
@@ -324,7 +317,7 @@ export class PromoPolicyListPageComponent {
   ].filter((col: any) => col.field !== '_actions' || this.rbac.canWritePromo()));
 
   private readonly filter = computed<PromoPolicyFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PromoPolicyFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
     if (vals['participationMode']?.length) f.participationMode = vals['participationMode'];
@@ -337,14 +330,14 @@ export class PromoPolicyListPageComponent {
       'promo-policies',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
-      this.currentPage(),
+      this.listState.currentPage(),
     ],
     queryFn: () =>
       lastValueFrom(
         this.promoApi.listPolicies(
           this.wsStore.currentWorkspaceId()!,
           this.filter(),
-          this.currentPage(),
+          this.listState.currentPage(),
           50,
         ),
       ),
@@ -353,12 +346,6 @@ export class PromoPolicyListPageComponent {
   }));
 
   readonly rows = computed(() => this.policiesQuery.data()?.content ?? []);
-
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) => v !== '' && v !== null && v !== undefined && (!Array.isArray(v) || v.length > 0),
-    ),
-  );
 
   readonly archiveMessage = computed(() => {
     const p = this.archiveTarget();
@@ -403,20 +390,7 @@ export class PromoPolicyListPageComponent {
   readonly getRowId = (params: any) => String(params.data.id);
 
   constructor() {
-    readSortFromUrl(this.route, this.currentSort);
-    syncSortToUrl(this.router, this.route, this.currentSort, { column: '', direction: 'desc' });
-  }
-
-  onSortChanged(sort: { column: string; direction: string }): void {
-    this.currentSort.set({
-      column: sort.column,
-      direction: (sort.direction as 'asc' | 'desc') || 'desc',
-    });
-  }
-
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-    this.currentPage.set(0);
+    this.listState.filterValues.set({ status: ['DRAFT', 'ACTIVE', 'PAUSED'] });
   }
 
   onRowClicked(row: PromoPolicySummary): void {

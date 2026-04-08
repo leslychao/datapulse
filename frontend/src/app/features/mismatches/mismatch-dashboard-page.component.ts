@@ -59,10 +59,10 @@ import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { renderBadge } from '@shared/utils/format.utils';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 import { MismatchDetailPanelComponent } from './mismatch-detail-panel.component';
 
 const DEFAULT_PAGE_SIZE = 50;
-const PAGE_SIZES = [50, 100, 200] as const;
 
 const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'info' | 'neutral'> = {
   ACTIVE: 'error',
@@ -92,6 +92,7 @@ const TYPE_COLORS: Record<MismatchType, { bg: string; text: string }> = {
     EmptyStateComponent,
     ChartComponent,
     MismatchDetailPanelComponent,
+    PaginationBarComponent,
   ],
   templateUrl: './mismatch-dashboard-page.component.html',
 })
@@ -111,7 +112,6 @@ export class MismatchDashboardPageComponent implements OnInit {
   protected readonly AlertTriangleIcon = AlertTriangle;
   protected readonly ClockIcon = Clock;
   protected readonly CheckCircleIcon = CheckCircle;
-  protected readonly pageSizes = PAGE_SIZES;
 
   private gridApi: GridApi<Mismatch> | null = null;
   private readonly searchSubject = new Subject<string>();
@@ -216,7 +216,6 @@ export class MismatchDashboardPageComponent implements OnInit {
   }));
 
   readonly rows = computed(() => this.listQuery.data()?.content ?? []);
-  readonly totalPages = computed(() => this.listQuery.data()?.totalPages ?? 0);
   readonly totalElements = computed(() => this.listQuery.data()?.totalElements ?? 0);
 
   readonly paginationLabel = computed(() => {
@@ -698,21 +697,9 @@ export class MismatchDashboardPageComponent implements OnInit {
     this.applyFilters();
   }
 
-  onPageSizeChange(size: number): void {
-    this.pageSize.set(size);
-    this.currentPage.set(0);
-  }
-
-  prevPage(): void {
-    if (this.currentPage() > 0) {
-      this.currentPage.update((p) => p - 1);
-    }
-  }
-
-  nextPage(): void {
-    if (this.currentPage() < this.totalPages() - 1) {
-      this.currentPage.update((p) => p + 1);
-    }
+  onPageChange(event: { page: number; pageSize: number }): void {
+    this.currentPage.set(event.page);
+    this.pageSize.set(event.pageSize);
   }
 
   bulkAcknowledge(): void {

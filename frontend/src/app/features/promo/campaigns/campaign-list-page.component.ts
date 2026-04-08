@@ -3,10 +3,9 @@ import {
   Component,
   computed,
   inject,
-  signal,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
@@ -20,7 +19,7 @@ import {
   PromoCampaignFilter,
   PromoCampaignSummary,
 } from '@core/models';
-import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
+import { createListPageState } from '@shared/utils/list-page-state';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
@@ -109,8 +108,8 @@ const MP_BADGE: Record<
       <div class="px-4 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
         />
       </div>
 
@@ -123,13 +122,13 @@ const MP_BADGE: Record<
           />
         } @else if (!campaignsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="hasActiveFilters()
+            [message]="listState.hasActiveFilters()
               ? ('promo.campaigns.empty_filtered' | translate)
               : ('promo.campaigns.empty' | translate)"
-            [actionLabel]="hasActiveFilters()
+            [actionLabel]="listState.hasActiveFilters()
               ? ('filter_bar.reset_all' | translate)
               : ''"
-            (action)="onFiltersChanged({})"
+            (action)="listState.resetFilters()"
           />
         } @else {
           <dp-data-grid
@@ -140,8 +139,8 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [initialSortModel]="initialSortModel()"
-            (sortChanged)="onSortChanged($event)"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
           />
         }
       </div>
@@ -152,7 +151,6 @@ export class CampaignListPageComponent {
   private readonly promoApi = inject(PromoApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
 
   protected readonly ZapIcon = Zap;
@@ -160,20 +158,13 @@ export class CampaignListPageComponent {
   protected readonly PackageIcon = Package;
   protected readonly ClockIcon = Clock;
 
-  readonly filterValues = signal<Record<string, any>>({
-    status: ['UPCOMING', 'ACTIVE'],
-  });
-  readonly currentPage = signal(0);
-  readonly currentSort = signal<SortUrlState>({ column: 'dateFrom', direction: 'desc' });
-  private readonly sortString = computed(() => `${this.currentSort().column},${this.currentSort().direction}`);
-  readonly initialSortModel = computed(() => {
-    const s = this.currentSort();
-    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  readonly listState = createListPageState({
+    defaultSort: { column: 'dateFrom', direction: 'desc' },
+    defaultPageSize: 50,
   });
 
   constructor() {
-    readSortFromUrl(this.route, this.currentSort);
-    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'dateFrom', direction: 'desc' });
+    this.listState.filterValues.set({ status: ['UPCOMING', 'ACTIVE'] });
   }
 
   private readonly translationChange = toSignal(
@@ -329,7 +320,7 @@ export class CampaignListPageComponent {
   });
 
   private readonly filter = computed<PromoCampaignFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PromoCampaignFilter = {};
     if (vals['status']?.length) f.status = vals['status'];
     if (vals['marketplaceType']?.length) f.marketplaceType = vals['marketplaceType'];
@@ -343,17 +334,17 @@ export class CampaignListPageComponent {
       'promo-campaigns',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
-      this.currentPage(),
-      this.sortString(),
+      this.listState.currentPage(),
+      this.listState.sortParam(),
     ],
     queryFn: () =>
       lastValueFrom(
         this.promoApi.listCampaigns(
           this.wsStore.currentWorkspaceId()!,
           this.filter(),
-          this.currentPage(),
+          this.listState.currentPage(),
           50,
-          this.sortString(),
+          this.listState.sortParam(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
@@ -387,31 +378,7 @@ export class CampaignListPageComponent {
 
   readonly kpiPendingDecisions = computed(() => 0);
 
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) =>
-        v !== '' &&
-        v !== null &&
-        v !== undefined &&
-        (!Array.isArray(v) || v.length > 0),
-    ),
-  );
-
   readonly getRowId = (params: any) => String(params.data.id);
-
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-    this.currentPage.set(0);
-  }
-
-  onSortChanged(sort: { column: string; direction: string }): void {
-    if (sort.column) {
-      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
-    } else {
-      this.currentSort.set({ column: 'dateFrom', direction: 'desc' });
-    }
-    this.currentPage.set(0);
-  }
 
   onRowClicked(row: PromoCampaignSummary): void {
     const wsId = this.wsStore.currentWorkspaceId();

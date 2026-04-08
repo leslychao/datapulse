@@ -20,8 +20,10 @@ import {
   StockOutRisk,
 } from '@core/models';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import { formatMoney } from '@shared/utils/format.utils';
 import {
   UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
@@ -31,7 +33,7 @@ import {
   selector: 'dp-inventory-by-product-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DataGridComponent, LucideAngularModule, StockRiskBadgeComponent],
+  imports: [TranslatePipe, DataGridComponent, LucideAngularModule, StockRiskBadgeComponent, PaginationBarComponent],
   template: `
     <div class="flex h-full">
       <!-- Main content -->
@@ -85,30 +87,12 @@ import {
           />
 
           @if (gridRows().length > 0) {
-            <div class="mt-3 flex items-center justify-between text-sm text-[var(--text-secondary)]">
-              <span>
-                {{ 'analytics.inventory.showing' | translate }}
-                {{ gridRows().length }}
-                {{ 'analytics.inventory.of' | translate }}
-                {{ totalElements() }}
-              </span>
-              <div class="flex gap-2">
-                <button
-                  class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-sm transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-40"
-                  [disabled]="page() === 0"
-                  (click)="prevPage()"
-                >
-                  {{ 'common.prev' | translate }}
-                </button>
-                <button
-                  class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-sm transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-40"
-                  [disabled]="page() >= totalPages() - 1"
-                  (click)="nextPage()"
-                >
-                  {{ 'common.next' | translate }}
-                </button>
-              </div>
-            </div>
+            <dp-pagination-bar
+              [totalItems]="totalElements()"
+              [pageSize]="size()"
+              [currentPage]="page()"
+              (pageChange)="onPageChange($event)"
+            />
           }
         </div>
       </div>
@@ -243,6 +227,8 @@ export class InventoryByProductPageComponent {
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
+  readonly onSearchInput = createDebouncedSearch(this.searchTerm, 300, () => this.page.set(0));
+
   constructor() {
     readFiltersFromUrl(this.route, this.filterDefs);
     syncFiltersToUrl(this.router, this.route, this.filterDefs);
@@ -285,7 +271,6 @@ export class InventoryByProductPageComponent {
 
   readonly gridRows = computed(() => this.productsQuery.data()?.content ?? []);
   readonly totalElements = computed(() => this.productsQuery.data()?.totalElements ?? 0);
-  readonly totalPages = computed(() => this.productsQuery.data()?.totalPages ?? 0);
 
   readonly columnDefs = computed<ColDef[]>(() => [
     {
@@ -365,23 +350,15 @@ export class InventoryByProductPageComponent {
     this.page.set(0);
   }
 
-  onSearchInput(event: Event): void {
-    this.searchTerm.set((event.target as HTMLInputElement).value);
-    this.page.set(0);
+  onPageChange(event: { page: number; pageSize: number }): void {
+    this.page.set(event.page);
+    this.size.set(event.pageSize);
   }
 
   selectProduct(product: InventoryByProduct): void {
     this.selectedProduct.set(
       this.selectedProduct()?.productId === product.productId ? null : product,
     );
-  }
-
-  prevPage(): void {
-    this.page.update((p) => Math.max(0, p - 1));
-  }
-
-  nextPage(): void {
-    this.page.update((p) => p + 1);
   }
 
   formatMoney(value: number | null): string {

@@ -3,10 +3,8 @@ import {
   Component,
   computed,
   inject,
-  signal,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
@@ -16,8 +14,8 @@ import { ClipboardList, TrendingUp, AlertCircle, TrendingDown } from 'lucide-ang
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
 import { EvaluationResult, PromoEvaluationFilter } from '@core/models';
+import { createListPageState } from '@shared/utils/list-page-state';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { SortUrlState, readSortFromUrl, syncSortToUrl } from '@shared/utils/url-filters';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -108,8 +106,8 @@ const MP_BADGE: Record<
       <div class="px-6 pt-2">
         <dp-filter-bar
           [filters]="filterConfigs"
-          [values]="filterValues()"
-          (filtersChanged)="onFiltersChanged($event)"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
         />
       </div>
 
@@ -122,13 +120,13 @@ const MP_BADGE: Record<
           />
         } @else if (!evalsQuery.isPending() && rows().length === 0) {
           <dp-empty-state
-            [message]="hasActiveFilters()
+            [message]="listState.hasActiveFilters()
               ? ('promo.evaluations.empty_filtered' | translate)
               : ('promo.evaluations.empty' | translate)"
-            [actionLabel]="hasActiveFilters()
+            [actionLabel]="listState.hasActiveFilters()
               ? ('filter_bar.reset_all' | translate)
               : ''"
-            (action)="onFiltersChanged({})"
+            (action)="listState.resetFilters()"
           />
         } @else {
           <dp-data-grid
@@ -139,8 +137,8 @@ const MP_BADGE: Record<
             [pageSize]="50"
             [getRowId]="getRowId"
             [height]="'100%'"
-            [initialSortModel]="initialSortModel()"
-            (sortChanged)="onSortChanged($event)"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
           />
         }
       </div>
@@ -152,22 +150,16 @@ export class EvaluationsListPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly translate = inject(TranslateService);
   private readonly detailPanel = inject(DetailPanelService);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
 
   protected readonly ClipboardListIcon = ClipboardList;
   protected readonly TrendingUpIcon = TrendingUp;
   protected readonly AlertCircleIcon = AlertCircle;
   protected readonly TrendingDownIcon = TrendingDown;
 
-  readonly currentSort = signal<SortUrlState>({ column: 'evaluatedAt', direction: 'desc' });
-  readonly initialSortModel = computed(() => {
-    const s = this.currentSort();
-    return s.column ? [{ colId: s.column, sort: s.direction }] : [];
+  readonly listState = createListPageState({
+    defaultSort: { column: 'evaluatedAt', direction: 'desc' },
+    defaultPageSize: 50,
   });
-
-  readonly filterValues = signal<Record<string, any>>({});
-  readonly currentPage = signal(0);
 
   private readonly translationChange = toSignal(
     this.translate.onTranslationChange.pipe(startWith(null)),
@@ -377,7 +369,7 @@ export class EvaluationsListPageComponent {
   });
 
   private readonly filter = computed<PromoEvaluationFilter>(() => {
-    const vals = this.filterValues();
+    const vals = this.listState.filterValues();
     const f: PromoEvaluationFilter = {};
     if (vals['evaluationResult']?.length) f.evaluationResult = vals['evaluationResult'];
     if (vals['marketplaceType']?.length) f.marketplaceType = vals['marketplaceType'];
@@ -390,14 +382,14 @@ export class EvaluationsListPageComponent {
       'promo-evaluations',
       this.wsStore.currentWorkspaceId(),
       this.filter(),
-      this.currentPage(),
+      this.listState.currentPage(),
     ],
     queryFn: () =>
       lastValueFrom(
         this.promoApi.listEvaluations(
           this.wsStore.currentWorkspaceId()!,
           this.filter(),
-          this.currentPage(),
+          this.listState.currentPage(),
           50,
         ),
       ),
@@ -432,31 +424,7 @@ export class EvaluationsListPageComponent {
     return kpi ? kpi.unprofitableCount.toLocaleString('ru-RU') : null;
   });
 
-  readonly hasActiveFilters = computed(() =>
-    Object.values(this.filterValues()).some(
-      (v) => v !== '' && v !== null && v !== undefined && (!Array.isArray(v) || v.length > 0),
-    ),
-  );
-
   readonly getRowId = (params: any) => String(params.data.id);
-
-  constructor() {
-    readSortFromUrl(this.route, this.currentSort);
-    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'evaluatedAt', direction: 'desc' });
-  }
-
-  onSortChanged(sort: { column: string; direction: string }): void {
-    if (sort.column) {
-      this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
-    } else {
-      this.currentSort.set({ column: 'evaluatedAt', direction: 'desc' });
-    }
-  }
-
-  onFiltersChanged(values: Record<string, any>): void {
-    this.filterValues.set(values);
-    this.currentPage.set(0);
-  }
 
   onRowClicked(row: any): void {
     this.detailPanel.open('promo-evaluation', row.id);

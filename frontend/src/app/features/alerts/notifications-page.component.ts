@@ -26,6 +26,7 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 import { formatDateTime } from '@shared/utils/format.utils';
+import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
 
 const NOTIFICATION_TYPES: NotificationType[] = [
   'ALERT',
@@ -44,6 +45,7 @@ const NOTIFICATION_TYPES: NotificationType[] = [
     FilterBarComponent,
     EmptyStateComponent,
     LucideAngularModule,
+    PaginationBarComponent,
   ],
   templateUrl: './notifications-page.component.html',
 })
@@ -186,10 +188,6 @@ export class NotificationsPageComponent {
 
   readonly totalFiltered = computed(() => this.filteredRows().length);
 
-  readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.totalFiltered() / this.pageSize())),
-  );
-
   readonly hasNoServerRows = computed(
     () => (this.notificationsQuery.data()?.length ?? 0) === 0,
   );
@@ -252,18 +250,9 @@ export class NotificationsPageComponent {
     this.markAllReadMutation.mutate();
   }
 
-  prevPage(): void {
-    const p = this.pageIndex();
-    if (p > 0) {
-      this.pageIndex.set(p - 1);
-    }
-  }
-
-  nextPage(): void {
-    const p = this.pageIndex();
-    if (p + 1 < this.totalPages()) {
-      this.pageIndex.set(p + 1);
-    }
+  onPageChange(event: { page: number; pageSize: number }): void {
+    this.pageIndex.set(event.page);
+    this.pageSize.set(event.pageSize);
   }
 
   private resolveI18nNotificationField(
