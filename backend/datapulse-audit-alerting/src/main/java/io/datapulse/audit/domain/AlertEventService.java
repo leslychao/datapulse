@@ -96,7 +96,7 @@ public class AlertEventService {
 
         eventPublisher.publishEvent(new AlertEventCreatedEvent(
                 alertEventId, workspaceId, connectionId,
-                ruleType, severity, title, "OPEN", blocksAutomation));
+                ruleType, severity, title, "OPEN", blocksAutomation, details));
 
         log.info("Rule-based alert created: alertEventId={}, ruleType={}, severity={}, connectionId={}",
                 alertEventId, ruleType, severity, connectionId);

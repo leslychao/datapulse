@@ -136,8 +136,8 @@ class InventoryAnalysisServiceTest {
   class GetStockHistory {
 
     @Test
-    @DisplayName("should delegate date range to repository")
-    void should_delegateDateRange() {
+    @DisplayName("should delegate per-product query when productId is provided")
+    void should_delegatePerProduct_when_productIdProvided() {
       LocalDate from = LocalDate.of(2025, 1, 1);
       LocalDate to = LocalDate.of(2025, 1, 31);
 
@@ -151,6 +151,25 @@ class InventoryAnalysisServiceTest {
       assertThat(result).hasSize(1);
       assertThat(result.get(0).available()).isEqualTo(450);
       verify(inventoryReadRepository).findStockHistory(WORKSPACE_ID, 100L, from, to);
+    }
+
+    @Test
+    @DisplayName("should delegate aggregate query when productId is null")
+    void should_delegateAggregate_when_productIdIsNull() {
+      LocalDate from = LocalDate.of(2025, 1, 1);
+      LocalDate to = LocalDate.of(2025, 1, 31);
+
+      var aggregated = new StockHistoryResponse(
+          LocalDate.of(2025, 1, 15), 12000, 3200, null, null);
+      when(inventoryReadRepository.findAggregateStockHistory(WORKSPACE_ID, from, to))
+          .thenReturn(List.of(aggregated));
+
+      List<StockHistoryResponse> result = service.getStockHistory(WORKSPACE_ID, null, from, to);
+
+      assertThat(result).hasSize(1);
+      assertThat(result.get(0).available()).isEqualTo(12000);
+      assertThat(result.get(0).warehouseId()).isNull();
+      verify(inventoryReadRepository).findAggregateStockHistory(WORKSPACE_ID, from, to);
     }
   }
 }

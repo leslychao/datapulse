@@ -22,6 +22,19 @@ function moneyFormatter(params: ValueFormatterParams): string {
   return formatMoney(params.value);
 }
 
+function parsePositiveNumber(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(/\s+/g, '').replace(',', '.');
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
 function percentFormatter(params: ValueFormatterParams): string {
   const v = params.value;
   if (v === null || v === undefined) return '—';
@@ -178,8 +191,8 @@ function buildCostPriceCol(translate: TranslateService, callbacks: GridColumnCal
     cellEditor: 'agNumberCellEditor',
     cellEditorParams: { min: 0.01, precision: 2 },
     valueSetter: (params) => {
-      const newValue = params.newValue;
-      if (newValue == null || newValue <= 0) return false;
+      const newValue = parsePositiveNumber(params.newValue);
+      if (newValue == null) return false;
       if (newValue === params.data.costPrice) return false;
       params.data.costPrice = newValue;
       if (params.data.currentPrice && newValue > 0) {

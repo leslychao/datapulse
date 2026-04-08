@@ -176,10 +176,30 @@ public final class MessageCodes {
     public static final String PROMO_CAMPAIGN_FROZEN = "promo.campaign.frozen";
     public static final String PROMO_WB_WRITE_UNAVAILABLE = "promo.wb.write_unavailable";
 
+    // --- Mismatch Monitor ---
+    public static final String MISMATCH_TIMELINE_DETECTED = "mismatches.timeline.detected";
+    public static final String MISMATCH_TIMELINE_ACKNOWLEDGED = "mismatches.timeline.acknowledged";
+    public static final String MISMATCH_TIMELINE_RESOLVED = "mismatches.timeline.resolved";
+    public static final String MISMATCH_TIMELINE_IGNORED = "mismatches.timeline.ignored";
+
     // --- Seller Operations ---
     public static final String GRID_EXPORT_TOO_MANY_ROWS = "grid.export.too_many_rows";
     public static final String SAVED_VIEW_NOT_FOUND = "saved_view.not_found";
     public static final String SAVED_VIEW_SYSTEM_READONLY = "saved_view.system_readonly";
+
+    // --- Event-driven alert titles ---
+    public static final String ALERT_ACTION_FAILED_TITLE = "alert.action_failed.title";
+    public static final String ALERT_CONNECTION_HEALTH_DEGRADED_TITLE =
+            "alert.connection_health_degraded.title";
+    public static final String ALERT_PRICING_RUN_FAILED_TITLE = "alert.pricing_run_failed.title";
+    public static final String ALERT_PROMO_EVALUATION_FAILED_TITLE =
+            "alert.promo_evaluation_failed.title";
+
+    // --- Notification titles ---
+    public static final String NOTIFICATION_APPROVAL_REQUEST_TITLE =
+            "notification.approval_request.title";
+    public static final String NOTIFICATION_APPROVAL_REQUEST_BODY =
+            "notification.approval_request.body";
 
     // --- Advertising Alerts ---
     public static final String AD_DRR_THRESHOLD_TITLE = "advertising.alert.drr_threshold.title";

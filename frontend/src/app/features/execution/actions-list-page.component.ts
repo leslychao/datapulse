@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   HostListener,
   inject,
   signal,
@@ -15,9 +16,7 @@ import {
   keepPreviousData,
 } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { FormsModule } from '@angular/forms';
-
-import { LucideAngularModule, ClipboardList, Clock, Play, XCircle, Download, Columns3 } from 'lucide-angular';
+import { LucideAngularModule, ClipboardList, Clock, Play, XCircle, Columns3 } from 'lucide-angular';
 import { GridApi } from 'ag-grid-community';
 
 import { ActionApiService } from '@core/api/action-api.service';
@@ -33,7 +32,9 @@ import {
   SortUrlState,
   readSortFromUrl,
   syncSortToUrl,
+  hasUrlState,
 } from '@shared/utils/url-filters';
+import { ViewStateService } from '@shared/services/view-state.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -74,7 +75,7 @@ interface ContextMenuState {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    TranslatePipe, FormsModule,
+    TranslatePipe,
     KpiCardComponent, FilterBarComponent, DataGridComponent,
     EmptyStateComponent, FormModalComponent,
     LucideAngularModule,
@@ -141,14 +142,6 @@ interface ContextMenuState {
             </div>
           }
         </div>
-        <button
-          (click)="exportCsv()"
-          [disabled]="exportPending()"
-          class="flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:opacity-50"
-          [attr.aria-label]="'execution.list.export' | translate"
-        >
-          {{ 'execution.list.export' | translate }}
-        </button>
       </div>
 
       <!-- Data Grid -->
@@ -167,6 +160,7 @@ interface ContextMenuState {
           />
         } @else {
           <dp-data-grid
+            viewStateKey="execution:actions"
             [columnDefs]="columnDefs"
             [rowData]="rows()"
             [loading]="actionsQuery.isPending()"
@@ -204,21 +198,6 @@ interface ContextMenuState {
               {{ 'execution.bulk.approve_selected' | translate }}
             </button>
           }
-          @if (rbac.canOperateActions()) {
-            <button
-              (click)="openBulkCancel()"
-              class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--status-error)] px-4 py-1.5 text-sm font-medium text-[var(--status-error)] transition-colors hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)]"
-            >
-              {{ 'execution.bulk.cancel_selected' | translate }}
-            </button>
-          }
-          <button
-            (click)="exportSelectedCsv()"
-            [disabled]="exportPending()"
-            class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
-          >
-            {{ 'execution.list.export' | translate }}
-          </button>
           <button
             (click)="clearSelection()"
             class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -283,28 +262,6 @@ interface ContextMenuState {
       </div>
     </dp-form-modal>
 
-    <!-- Bulk Cancel Modal -->
-    <dp-form-modal
-      [title]="'execution.bulk.cancel_title' | translate"
-      [isOpen]="showBulkCancelModal()"
-      [submitLabel]="bulkCancelLabel()"
-      [isPending]="bulkCancelMutation.isPending()"
-      [submitDisabled]="bulkCancelReason().length < 5"
-      (submit)="executeBulkCancel()"
-      (close)="showBulkCancelModal.set(false)"
-    >
-      <div class="flex flex-col gap-3">
-        <p class="text-sm text-[var(--text-secondary)]">{{ bulkCancelMessage() }}</p>
-        <label class="text-sm text-[var(--text-secondary)]">{{ 'execution.detail.reason_label' | translate }} *</label>
-        <textarea
-          [ngModel]="bulkCancelReason()"
-          (ngModelChange)="bulkCancelReason.set($event)"
-          class="min-h-[80px] max-h-[200px] resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-          [placeholder]="'execution.detail.cancel_placeholder' | translate"
-        ></textarea>
-      </div>
-    </dp-form-modal>
-
     <!-- Context Menu -->
     @if (ctxMenu().visible) {
       <div
@@ -357,6 +314,7 @@ export class ActionsListPageComponent {
   private readonly actionApi = inject(ActionApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly viewState = inject(ViewStateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
@@ -369,7 +327,6 @@ export class ActionsListPageComponent {
   protected readonly ClockIcon = Clock;
   protected readonly PlayIcon = Play;
   protected readonly XCircleIcon = XCircle;
-  protected readonly DownloadIcon = Download;
   protected readonly ColumnsIcon = Columns3;
 
   private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
@@ -383,9 +340,6 @@ export class ActionsListPageComponent {
   readonly filterValues = signal<Record<string, any>>({});
   readonly selectedRows = signal<ActionSummary[]>([]);
   readonly showBulkApproveModal = signal(false);
-  readonly showBulkCancelModal = signal(false);
-  readonly bulkCancelReason = signal('');
-  readonly exportPending = signal(false);
   readonly currentPage = signal(0);
   readonly currentSort = signal<SortUrlState>({ column: 'createdAt', direction: 'desc' });
   private readonly sortString = computed(() => `${this.currentSort().column},${this.currentSort().direction}`);
@@ -398,11 +352,31 @@ export class ActionsListPageComponent {
   readonly columnVisibility = signal<Record<string, boolean>>({});
   private gridApiRef: GridApi | null = null;
 
+  private static readonly PAGE_KEY = 'execution:actions';
+
   constructor() {
-    readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
+    const urlKeys = this.filterBarUrlDefs.flatMap((d) =>
+      d.type === 'date-range' ? [d.key + '_from', d.key + '_to'] : [d.key],
+    );
+    urlKeys.push('sortBy', 'sortDir');
+    const urlPresent = hasUrlState(this.route, urlKeys);
+
+    if (!urlPresent) {
+      const persisted = this.viewState.restore(ActionsListPageComponent.PAGE_KEY);
+      if (persisted?.filters) this.filterValues.set(persisted.filters);
+      if (persisted?.sort) this.currentSort.set(persisted.sort);
+    }
+
+    if (urlPresent) readFilterBarFromUrl(this.route, this.filterValues, this.filterBarUrlDefs);
     syncFilterBarToUrl(this.router, this.route, this.filterValues, this.filterBarUrlDefs);
-    readSortFromUrl(this.route, this.currentSort);
+    if (urlPresent) readSortFromUrl(this.route, this.currentSort);
     syncSortToUrl(this.router, this.route, this.currentSort, { column: 'createdAt', direction: 'desc' });
+
+    effect(() => {
+      const filters = this.filterValues();
+      const sort = this.currentSort();
+      this.viewState.save(ActionsListPageComponent.PAGE_KEY, { filters, sort });
+    });
   }
 
   @HostListener('document:click')
@@ -657,10 +631,6 @@ export class ActionsListPageComponent {
     this.selectedRows().filter((r) => r.status === 'PENDING_APPROVAL'),
   );
 
-  private readonly cancellableSelected = computed(() =>
-    this.selectedRows().filter((r) => CANCELLABLE.has(r.status)),
-  );
-
   readonly bulkApproveMessage = computed(() => {
     const total = this.selectedRows().length;
     const eligible = this.pendingSelected().length;
@@ -678,25 +648,6 @@ export class ActionsListPageComponent {
     return count > 0
       ? this.translate.instant('execution.bulk.approve_count', { count })
       : this.translate.instant('execution.bulk.approve');
-  });
-
-  readonly bulkCancelMessage = computed(() => {
-    const total = this.selectedRows().length;
-    const eligible = this.cancellableSelected().length;
-    const skipped = total - eligible;
-    if (eligible === 0) return this.translate.instant('execution.bulk.no_cancellable');
-    let msg = this.translate.instant('execution.bulk.cancel_confirm', { count: eligible });
-    if (skipped > 0) {
-      msg += '\n' + this.translate.instant('execution.bulk.cancel_partial', { total, eligible, skipped });
-    }
-    return msg;
-  });
-
-  readonly bulkCancelLabel = computed(() => {
-    const count = this.cancellableSelected().length;
-    return count > 0
-      ? this.translate.instant('execution.bulk.cancel_count', { count })
-      : this.translate.instant('execution.bulk.cancel');
   });
 
   readonly getRowId = (params: any) => String(params.data.id);
@@ -720,29 +671,6 @@ export class ActionsListPageComponent {
     onError: (err) => {
       this.showBulkApproveModal.set(false);
       this.toast.error(translateApiErrorMessage(this.translate, err, 'execution.bulk.approve_error'));
-    },
-  }));
-
-  readonly bulkCancelMutation = injectMutation(() => ({
-    mutationFn: (req: { actionIds: number[]; cancelReason: string }) =>
-      lastValueFrom(this.actionApi.bulkCancel(this.wsStore.currentWorkspaceId()!, req)),
-    onSuccess: (result) => {
-      this.showBulkCancelModal.set(false);
-      this.bulkCancelReason.set('');
-      this.selectedRows.set([]);
-      this.invalidateAll();
-      const failed = result.skipped + result.errored;
-      if (failed === 0) {
-        this.toast.success(this.translate.instant('execution.bulk.cancel_success', { count: result.processed }));
-      } else {
-        this.toast.warning(this.translate.instant('execution.bulk.cancel_partial_success', {
-          processed: result.processed, total: result.processed + failed, failed,
-        }));
-      }
-    },
-    onError: (err) => {
-      this.showBulkCancelModal.set(false);
-      this.toast.error(translateApiErrorMessage(this.translate, err, 'execution.bulk.cancel_error'));
     },
   }));
 
@@ -797,25 +725,9 @@ export class ActionsListPageComponent {
     }
   }
 
-  openBulkCancel(): void {
-    if (this.cancellableSelected().length > 0) {
-      this.bulkCancelReason.set('');
-      this.showBulkCancelModal.set(true);
-    } else {
-      this.toast.warning(this.translate.instant('execution.bulk.no_cancellable'));
-    }
-  }
-
   executeBulkApprove(): void {
     const ids = this.pendingSelected().map((r) => r.id);
     if (ids.length > 0) this.bulkApproveMutation.mutate(ids);
-  }
-
-  executeBulkCancel(): void {
-    const ids = this.cancellableSelected().map((r) => r.id);
-    if (ids.length > 0) {
-      this.bulkCancelMutation.mutate({ actionIds: ids, cancelReason: this.bulkCancelReason() });
-    }
   }
 
   onGridReady(api: GridApi): void {
@@ -844,36 +756,6 @@ export class ActionsListPageComponent {
     const current = this.columnVisibility()[field] !== false;
     this.gridApiRef.setColumnsVisible([field], !current);
     this.columnVisibility.update(v => ({ ...v, [field]: !current }));
-  }
-
-  exportCsv(): void {
-    this.exportPending.set(true);
-    lastValueFrom(
-      this.actionApi.exportActions(this.wsStore.currentWorkspaceId()!, this.filter()),
-    ).then((blob) => {
-      this.downloadBlob(blob, `actions-${new Date().toISOString().slice(0, 10)}.csv`);
-      this.exportPending.set(false);
-      this.toast.success(this.translate.instant('execution.list.export_success'));
-    }).catch(() => {
-      this.exportPending.set(false);
-      this.toast.error(this.translate.instant('execution.list.export_error'));
-    });
-  }
-
-  exportSelectedCsv(): void {
-    if (!this.gridApiRef) return;
-    this.exportPending.set(true);
-    const ids = this.selectedRows().map(r => r.id);
-    lastValueFrom(
-      this.actionApi.exportActions(this.wsStore.currentWorkspaceId()!, { ...this.filter(), actionIds: ids }),
-    ).then((blob) => {
-      this.downloadBlob(blob, `actions-selected-${new Date().toISOString().slice(0, 10)}.csv`);
-      this.exportPending.set(false);
-      this.toast.success(this.translate.instant('execution.list.export_success'));
-    }).catch(() => {
-      this.exportPending.set(false);
-      this.toast.error(this.translate.instant('execution.list.export_error'));
-    });
   }
 
   clearSelection(): void {
@@ -954,12 +836,4 @@ export class ActionsListPageComponent {
     return formatRelativeTime(iso);
   }
 
-  private downloadBlob(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 }

@@ -179,6 +179,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           <dp-empty-state [message]="'pricing.competitors.empty' | translate" />
         } @else {
           <dp-data-grid
+            viewStateKey="pricing:competitors"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="matchesQuery.isPending()"

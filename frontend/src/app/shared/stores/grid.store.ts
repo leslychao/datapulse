@@ -85,6 +85,7 @@ export const GridStore = signalStore(
     },
 
     setSort(column: string, direction: 'ASC' | 'DESC'): void {
+      if (store.sortColumn() === column && store.sortDirection() === direction) return;
       patchState(store, { sortColumn: column, sortDirection: direction, page: 0 });
     },
 

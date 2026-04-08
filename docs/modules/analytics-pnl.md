@@ -626,6 +626,12 @@ Grain: connection × seller_sku × period. Phase B.
 
 Operational returns analysis from fact_returns + fact_sales. No financial data from fact_finance. Financial impact (refund, penalties) lives exclusively in P&L via mart_product_pnl/mart_posting_pnl. This prevents duplication and misleading penalty attribution.
 
+`/analytics/returns/trend` uses date-range filters (`from`, `to`) and `granularity`
+(`DAILY|WEEKLY|MONTHLY`). Aggregation is built on-the-fly from `fact_returns` +
+`fact_sales` to support daily/weekly buckets; monthly remains semantically aligned
+with `mart_returns_analysis`. If only `period` is provided, API derives month bounds
+for backward compatibility.
+
 > **NULL seller_sku_id handling:** `fact_returns.seller_sku_id` nullable. При материализации `NULL` маппится в sentinel `0` (аналогично `mart_product_pnl`). Строка с `seller_sku_id = 0` агрегирует все возвраты без привязки к SKU. Аналогично `product_id NULL → 0`.
 
 | Column | Type | Source | Nullable | Notes |
@@ -1028,7 +1034,7 @@ Pricing pipeline (Phase C) **блокируется** для account/marketplace
 
 **Residual calibration (empirically verified 2026-03-31):**
 
-- Minimum sample size: alert активируется только при N > 100 операций за rolling period. Для малых аккаунтов (<100 ops/month) — высокая дисперсия residual, ложные anomalies.
+- Minimum sample size: anomaly detection активируется при ≥ 6 месяцев данных (distinct period count). При меньшем количестве — статус CALIBRATION. Configurable через `residualMinSampleSize`.
 - Provider-default baselines (fallback при недостаточных данных): Ozon ≈ 0%, WB ≈ 4%.
 - Tenant-specific baselines — Phase G (требуется достаточная история данных).
 

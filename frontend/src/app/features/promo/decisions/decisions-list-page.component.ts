@@ -125,6 +125,7 @@ const MP_BADGE: Record<
           />
         } @else {
           <dp-data-grid
+            viewStateKey="promo:decisions"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="decisionsQuery.isPending()"
@@ -151,6 +152,7 @@ export class DecisionsListPageComponent {
   protected readonly ClockIcon = Clock;
 
   readonly listState = createListPageState({
+    pageKey: 'promo:decisions',
     defaultSort: { column: 'createdAt', direction: 'desc' },
     defaultPageSize: 50,
   });

@@ -1,5 +1,7 @@
-import { computed, effect, Signal, WritableSignal } from '@angular/core';
+import { computed, effect, inject, Signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+
+import { ViewStateService } from '@shared/services/view-state.service';
 
 // ---------------------------------------------------------------------------
 // Sort URL persistence
@@ -40,6 +42,7 @@ export function syncSortToUrl(
   source: Signal<SortUrlState>,
   defaultSort: SortUrlState,
 ): void {
+  let lastSerialized = '';
   effect(() => {
     const sort = source();
     const isDefault =
@@ -49,6 +52,9 @@ export function syncSortToUrl(
       sortBy: isDefault ? null : sort.column,
       sortDir: isDefault ? null : sort.direction,
     };
+    const serialized = JSON.stringify(params);
+    if (serialized === lastSerialized) return;
+    lastSerialized = serialized;
     router.navigate([], {
       relativeTo: route,
       queryParams: params,
@@ -56,6 +62,15 @@ export function syncSortToUrl(
       replaceUrl: true,
     });
   });
+}
+
+/**
+ * Returns true if any of the given query-param keys are present in the URL.
+ * Used to decide whether URL or persisted localStorage state takes priority.
+ */
+export function hasUrlState(route: ActivatedRoute, keys: string[]): boolean {
+  const qp = route.snapshot.queryParams;
+  return keys.some((k) => qp[k] != null && qp[k] !== '');
 }
 
 export interface UrlFilterDef {
@@ -91,6 +106,7 @@ export function syncFiltersToUrl(
   route: ActivatedRoute,
   defs: UrlFilterDef[],
 ): void {
+  let lastSerialized = '';
   effect(() => {
     const params: Record<string, string | null> = {};
     for (const def of defs) {
@@ -98,6 +114,9 @@ export function syncFiltersToUrl(
       params[def.key] =
         value !== '' && value !== def.defaultValue ? value : null;
     }
+    const serialized = JSON.stringify(params);
+    if (serialized === lastSerialized) return;
+    lastSerialized = serialized;
     router.navigate([], {
       relativeTo: route,
       queryParams: params,
@@ -182,6 +201,7 @@ export function syncFilterBarToUrl(
   source: Signal<Record<string, any>>,
   defs: FilterBarUrlDef[],
 ): void {
+  let lastSerialized = '';
   effect(() => {
     const vals = source();
     const params: Record<string, string | null> = {};
@@ -199,6 +219,9 @@ export function syncFilterBarToUrl(
         params[def.key] = v != null && v !== '' ? String(v) : null;
       }
     }
+    const serialized = JSON.stringify(params);
+    if (serialized === lastSerialized) return;
+    lastSerialized = serialized;
     router.navigate([], {
       relativeTo: route,
       queryParams: params,
@@ -224,5 +247,65 @@ export function isFilterBarDefault(
         (Array.isArray(v) && v.length === 0) ||
         (typeof v === 'object' && v !== null && !Array.isArray(v) && !v.from && !v.to),
     );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Persisted URL filter integration
+// ---------------------------------------------------------------------------
+
+export interface PersistedFilterConfig {
+  pageKey: string;
+  filterDefs: UrlFilterDef[];
+  sortSignal?: WritableSignal<SortUrlState>;
+  defaultSort?: SortUrlState;
+}
+
+/**
+ * Wires up URL filter/sort sync with ViewStateService persistence.
+ * Restores from localStorage when URL has no query params.
+ * Must be called from an injection context (constructor or field initializer).
+ */
+export function initPersistedFilters(
+  router: Router,
+  route: ActivatedRoute,
+  config: PersistedFilterConfig,
+): void {
+  const viewState = inject(ViewStateService);
+  const urlKeys = config.filterDefs.map((d) => d.key);
+  if (config.sortSignal) urlKeys.push('sortBy', 'sortDir');
+
+  const urlPresent = hasUrlState(route, urlKeys);
+
+  if (!urlPresent) {
+    const persisted = viewState.restore(config.pageKey);
+    if (persisted?.filters) {
+      for (const def of config.filterDefs) {
+        const val = persisted.filters[def.key];
+        if (val != null && val !== '') def.signal.set(val);
+      }
+    }
+    if (config.sortSignal && persisted?.sort) {
+      config.sortSignal.set(persisted.sort);
+    }
+  }
+
+  if (urlPresent) readFiltersFromUrl(route, config.filterDefs);
+  syncFiltersToUrl(router, route, config.filterDefs);
+
+  if (config.sortSignal) {
+    if (urlPresent) readSortFromUrl(route, config.sortSignal);
+    if (config.defaultSort) {
+      syncSortToUrl(router, route, config.sortSignal, config.defaultSort);
+    }
+  }
+
+  effect(() => {
+    const filters: Record<string, any> = {};
+    for (const def of config.filterDefs) {
+      filters[def.key] = def.signal();
+    }
+    const sort = config.sortSignal?.() ?? undefined;
+    viewState.save(config.pageKey, { filters, sort });
   });
 }

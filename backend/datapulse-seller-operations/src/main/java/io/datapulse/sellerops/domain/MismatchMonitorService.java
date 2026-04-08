@@ -236,7 +236,7 @@ public class MismatchMonitorService {
 
     private String buildPromoDetailsJson(PromoMismatchCandidate mismatch) {
         return toJson(Map.of(
-                "mismatch_type", MismatchType.PROMO_PARTICIPATION.name(),
+                "mismatch_type", MismatchType.PROMO.name(),
                 "offer_id", mismatch.offerId(),
                 "offer_name", mismatch.offerName(),
                 "sku_code", mismatch.skuCode(),
@@ -249,7 +249,7 @@ public class MismatchMonitorService {
     private String buildStockDetailsJson(StockCandidate pg, int chStock,
                                              int delta, double deltaPct) {
         return toJson(Map.of(
-                "mismatch_type", MismatchType.STOCK_INCONSISTENCY.name(),
+                "mismatch_type", MismatchType.STOCK.name(),
                 "offer_id", pg.offerId(),
                 "offer_name", pg.offerName(),
                 "sku_code", pg.skuCode(),
@@ -261,7 +261,7 @@ public class MismatchMonitorService {
 
     private String buildFinanceDetailsJson(FinanceGapCandidate gap) {
         return toJson(Map.of(
-                "mismatch_type", MismatchType.FINANCE_GAP.name(),
+                "mismatch_type", MismatchType.FINANCE.name(),
                 "connection_name", gap.connectionName(),
                 "marketplace_type", gap.marketplaceType(),
                 "expected_value", "finance data present",

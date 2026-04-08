@@ -1,6 +1,9 @@
 package io.datapulse.sellerops.persistence;
 
 import io.datapulse.sellerops.api.MismatchFilter;
+import io.datapulse.sellerops.api.MismatchSummaryResponse.TimelinePoint;
+import io.datapulse.sellerops.api.MismatchSummaryResponse.TypeDistribution;
+import io.datapulse.sellerops.domain.MismatchStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -12,9 +15,12 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,23 +33,34 @@ public class MismatchJdbcRepository {
 
   private static final String BASE_SELECT = """
       SELECT
-          ae.id                                     AS mismatch_id,
-          ae.details->>'mismatch_type'              AS mismatch_type,
-          (ae.details->>'offer_id')::bigint          AS offer_id,
-          ae.details->>'offer_name'                  AS offer_name,
-          ae.details->>'sku_code'                    AS sku_code,
-          ae.details->>'expected_value'              AS expected_value,
-          ae.details->>'actual_value'                AS actual_value,
-          (ae.details->>'delta_pct')::numeric        AS delta_pct,
+          ae.id                                      AS mismatch_id,
+          ae.details->>'mismatch_type'               AS mismatch_type,
+          (ae.details->>'offer_id')::bigint           AS offer_id,
+          ae.details->>'offer_name'                   AS offer_name,
+          ae.details->>'sku_code'                     AS sku_code,
+          ae.details->>'expected_value'               AS expected_value,
+          ae.details->>'actual_value'                 AS actual_value,
+          (ae.details->>'delta_pct')::numeric         AS delta_pct,
           ae.severity,
           ae.status,
-          ae.opened_at                               AS detected_at,
-          mc.name                                    AS connection_name
+          ae.resolved_reason,
+          ae.opened_at                                AS detected_at,
+          ae.resolved_at,
+          mc.name                                     AS connection_name,
+          mc.marketplace_type                         AS marketplace_type,
+          pa_latest.id                                AS related_action_id
       """;
 
   private static final String FROM_JOINS = """
       FROM alert_event ae
       LEFT JOIN marketplace_connection mc ON mc.id = ae.connection_id
+      LEFT JOIN LATERAL (
+          SELECT pa2.id
+          FROM price_action pa2
+          WHERE pa2.marketplace_offer_id = (ae.details->>'offer_id')::bigint
+          ORDER BY pa2.created_at DESC
+          LIMIT 1
+      ) pa_latest ON ae.details->>'mismatch_type' = 'PRICE'
       """;
 
   private static final String MISMATCH_CONDITION =
@@ -55,7 +72,9 @@ public class MismatchJdbcRepository {
       "status", "ae.status",
       "type", "ae.details->>'mismatch_type'",
       "deltaPct", "(ae.details->>'delta_pct')::numeric",
-      "offerName", "ae.details->>'offer_name'"
+      "offerName", "ae.details->>'offer_name'",
+      "expectedValue", "ae.details->>'expected_value'",
+      "actualValue", "ae.details->>'actual_value'"
   );
 
   public Page<MismatchRow> findAll(long workspaceId, MismatchFilter filter,
@@ -66,8 +85,12 @@ public class MismatchJdbcRepository {
 
     appendFilters(filter, where, params);
 
-    String countSql = "SELECT COUNT(*) " + FROM_JOINS + where;
-    Long total = jdbc.queryForObject(countSql, params, Long.class);
+    String countSql = "SELECT COUNT(*) FROM alert_event ae WHERE ae.workspace_id = :workspaceId AND "
+        + MISMATCH_CONDITION + where.toString().substring(
+        where.indexOf("AND " + MISMATCH_CONDITION) + ("AND " + MISMATCH_CONDITION).length());
+
+    Long total = jdbc.queryForObject(
+        "SELECT COUNT(*) " + FROM_JOINS + where, params, Long.class);
     if (total == null || total == 0) {
       return Page.empty(pageable);
     }
@@ -111,40 +134,146 @@ public class MismatchJdbcRepository {
     return jdbc.update(sql, params);
   }
 
-  public int resolve(long id, long workspaceId, String resolvedReason) {
+  public int resolve(long id, long workspaceId, String resolution, String note,
+                     long userId) {
     String sql = """
         UPDATE alert_event
         SET status = 'RESOLVED',
             resolved_at = NOW(),
-            resolved_reason = :resolvedReason
+            resolved_reason = :resolvedReason,
+            resolved_by = :userId
         WHERE id = :id
           AND workspace_id = :workspaceId
-          AND status = 'ACKNOWLEDGED'
+          AND status IN ('OPEN', 'ACKNOWLEDGED')
         """;
     var params = new MapSqlParameterSource()
         .addValue("id", id)
         .addValue("workspaceId", workspaceId)
-        .addValue("resolvedReason", resolvedReason);
+        .addValue("resolvedReason", buildResolvedReason(resolution, note))
+        .addValue("userId", userId);
     return jdbc.update(sql, params);
   }
 
-  public MismatchStatusCounts countByStatus(long workspaceId) {
+  public int bulkIgnore(long workspaceId, List<Long> ids, String reason, long userId) {
+    String sql = """
+        UPDATE alert_event
+        SET status = 'RESOLVED',
+            resolved_at = NOW(),
+            resolved_reason = 'IGNORED',
+            resolved_by = :userId
+        WHERE workspace_id = :workspaceId
+          AND id IN (:ids)
+          AND status IN ('OPEN', 'ACKNOWLEDGED')
+          AND details->>'mismatch_type' IS NOT NULL
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("ids", ids)
+        .addValue("userId", userId);
+    return jdbc.update(sql, params);
+  }
+
+  public SummaryData getSummaryData(long workspaceId) {
     String sql = """
         SELECT
-            COUNT(*)                                        AS total,
-            COUNT(*) FILTER (WHERE ae.status = 'OPEN')      AS open,
-            COUNT(*) FILTER (WHERE ae.status = 'ACKNOWLEDGED') AS acknowledged,
-            COUNT(*) FILTER (WHERE ae.status = 'RESOLVED')  AS resolved
-        """ + FROM_JOINS
-        + " WHERE ae.workspace_id = :workspaceId AND " + MISMATCH_CONDITION;
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN')
+                AS active_count,
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN'
+                AND ae.opened_at >= NOW() - INTERVAL '7 days')
+                AS active_last_7d,
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN'
+                AND ae.opened_at >= NOW() - INTERVAL '14 days'
+                AND ae.opened_at < NOW() - INTERVAL '7 days')
+                AS active_prev_7d,
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN' AND ae.severity = 'CRITICAL')
+                AS critical_count,
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN' AND ae.severity = 'CRITICAL'
+                AND ae.opened_at >= NOW() - INTERVAL '7 days')
+                AS critical_last_7d,
+            COUNT(*) FILTER (WHERE ae.status = 'OPEN' AND ae.severity = 'CRITICAL'
+                AND ae.opened_at >= NOW() - INTERVAL '14 days'
+                AND ae.opened_at < NOW() - INTERVAL '7 days')
+                AS critical_prev_7d,
+            AVG(EXTRACT(EPOCH FROM (NOW() - ae.opened_at)) / 3600)
+                FILTER (WHERE ae.status = 'OPEN')
+                AS avg_hours_unresolved,
+            COUNT(*) FILTER (WHERE ae.status = 'AUTO_RESOLVED'
+                AND ae.resolved_at::date = CURRENT_DATE)
+                AS auto_resolved_today,
+            COUNT(*) FILTER (WHERE ae.status = 'AUTO_RESOLVED'
+                AND ae.resolved_at::date = CURRENT_DATE - 1)
+                AS auto_resolved_yesterday
+        FROM alert_event ae
+        WHERE ae.workspace_id = :workspaceId
+          AND ae.details->>'mismatch_type' IS NOT NULL
+        """;
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
-    return jdbc.queryForObject(sql, params, (rs, rowNum) ->
-        new MismatchStatusCounts(
-            rs.getLong("total"),
-            rs.getLong("open"),
-            rs.getLong("acknowledged"),
-            rs.getLong("resolved")
-        ));
+    return jdbc.queryForObject(sql, params, (rs, rowNum) -> new SummaryData(
+        rs.getLong("active_count"),
+        rs.getLong("active_last_7d"),
+        rs.getLong("active_prev_7d"),
+        rs.getLong("critical_count"),
+        rs.getLong("critical_last_7d"),
+        rs.getLong("critical_prev_7d"),
+        rs.getBigDecimal("avg_hours_unresolved"),
+        rs.getLong("auto_resolved_today"),
+        rs.getLong("auto_resolved_yesterday")
+    ));
+  }
+
+  public List<TypeDistribution> getDistributionByType(long workspaceId) {
+    String sql = """
+        SELECT ae.details->>'mismatch_type' AS mismatch_type,
+               COUNT(*)                      AS cnt
+        FROM alert_event ae
+        WHERE ae.workspace_id = :workspaceId
+          AND ae.details->>'mismatch_type' IS NOT NULL
+          AND ae.status = 'OPEN'
+        GROUP BY ae.details->>'mismatch_type'
+        ORDER BY cnt DESC
+        """;
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
+    return jdbc.query(sql, params, (rs, rowNum) ->
+        new TypeDistribution(rs.getString("mismatch_type"), rs.getLong("cnt")));
+  }
+
+  public List<TimelinePoint> getTimeline(long workspaceId, int days) {
+    String sql = """
+        SELECT d.day::text AS day,
+               COALESCE(n.cnt, 0) AS new_count,
+               COALESCE(r.cnt, 0) AS resolved_count
+        FROM generate_series(
+                 CURRENT_DATE - :days,
+                 CURRENT_DATE,
+                 '1 day'::interval
+             ) AS d(day)
+        LEFT JOIN (
+            SELECT ae.opened_at::date AS day, COUNT(*) AS cnt
+            FROM alert_event ae
+            WHERE ae.workspace_id = :workspaceId
+              AND ae.details->>'mismatch_type' IS NOT NULL
+              AND ae.opened_at >= CURRENT_DATE - :days
+            GROUP BY ae.opened_at::date
+        ) n ON n.day = d.day
+        LEFT JOIN (
+            SELECT ae.resolved_at::date AS day, COUNT(*) AS cnt
+            FROM alert_event ae
+            WHERE ae.workspace_id = :workspaceId
+              AND ae.details->>'mismatch_type' IS NOT NULL
+              AND ae.status IN ('RESOLVED', 'AUTO_RESOLVED')
+              AND ae.resolved_at >= CURRENT_DATE - :days
+            GROUP BY ae.resolved_at::date
+        ) r ON r.day = d.day
+        ORDER BY d.day
+        """;
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("days", days);
+    return jdbc.query(sql, params, (rs, rowNum) ->
+        new TimelinePoint(
+            rs.getString("day").substring(0, 10),
+            rs.getLong("new_count"),
+            rs.getLong("resolved_count")));
   }
 
   public Optional<MismatchDetailRow> findDetailById(long id, long workspaceId) {
@@ -160,6 +289,7 @@ public class MismatchJdbcRepository {
             (ae.details->>'delta_pct')::numeric         AS delta_pct,
             ae.severity,
             ae.status,
+            ae.resolved_reason,
             ae.opened_at                                AS detected_at,
             mc.name                                     AS connection_name,
             mc.marketplace_type                         AS marketplace_type,
@@ -167,7 +297,7 @@ public class MismatchJdbcRepository {
             ae.acknowledged_at,
             ack_user.name                               AS acknowledged_by_name,
             ae.resolved_at,
-            ae.resolved_reason,
+            res_user.name                               AS resolved_by_name,
             pa.id                                       AS related_action_id,
             pa.status                                   AS related_action_status,
             pa.target_price                             AS related_action_target_price,
@@ -176,6 +306,7 @@ public class MismatchJdbcRepository {
         FROM alert_event ae
         LEFT JOIN marketplace_connection mc ON mc.id = ae.connection_id
         LEFT JOIN app_user ack_user ON ack_user.id = ae.acknowledged_by
+        LEFT JOIN app_user res_user ON res_user.id = ae.resolved_by
         LEFT JOIN LATERAL (
             SELECT pa2.id, pa2.status, pa2.target_price, pa2.updated_at,
                    pa2.reconciliation_source
@@ -231,7 +362,28 @@ public class MismatchJdbcRepository {
     return jdbc.update(sql, params);
   }
 
-  public record MismatchStatusCounts(long total, long open, long acknowledged, long resolved) {
+  public List<MismatchRow> findAllForExport(long workspaceId, MismatchFilter filter) {
+    var where = new StringBuilder(" WHERE ae.workspace_id = :workspaceId AND ")
+        .append(MISMATCH_CONDITION);
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
+
+    appendFilters(filter, where, params);
+
+    String sql = BASE_SELECT + FROM_JOINS + where + " ORDER BY ae.opened_at DESC LIMIT 10000";
+    return jdbc.query(sql, params, this::mapRow);
+  }
+
+  public record SummaryData(
+      long activeCount,
+      long activeLast7d,
+      long activePrev7d,
+      long criticalCount,
+      long criticalLast7d,
+      long criticalPrev7d,
+      BigDecimal avgHoursUnresolved,
+      long autoResolvedToday,
+      long autoResolvedYesterday
+  ) {
   }
 
   private void appendFilters(MismatchFilter filter, StringBuilder where,
@@ -248,8 +400,25 @@ public class MismatchJdbcRepository {
       params.addValue("connectionIds", filter.connectionId());
     }
     if (!CollectionUtils.isEmpty(filter.status())) {
-      where.append(" AND ae.status IN (:statuses)");
-      params.addValue("statuses", filter.status());
+      List<String> dbStatuses = new ArrayList<>();
+      boolean includeIgnored = false;
+      for (String s : filter.status()) {
+        if (MismatchStatus.IGNORED.equals(s)) {
+          includeIgnored = true;
+        } else {
+          dbStatuses.add(MismatchStatus.toDb(s));
+        }
+      }
+      if (includeIgnored && !dbStatuses.isEmpty()) {
+        where.append(" AND (ae.status IN (:statuses) OR ")
+            .append("(ae.status = 'RESOLVED' AND ae.resolved_reason = 'IGNORED'))");
+        params.addValue("statuses", dbStatuses);
+      } else if (includeIgnored) {
+        where.append(" AND ae.status = 'RESOLVED' AND ae.resolved_reason = 'IGNORED'");
+      } else if (!dbStatuses.isEmpty()) {
+        where.append(" AND ae.status IN (:statuses)");
+        params.addValue("statuses", dbStatuses);
+      }
     }
     if (!CollectionUtils.isEmpty(filter.severity())) {
       where.append(" AND ae.severity IN (:severities)");
@@ -293,7 +462,16 @@ public class MismatchJdbcRepository {
     return sb.toString();
   }
 
+  private String buildResolvedReason(String resolution, String note) {
+    if (StringUtils.hasText(note)) {
+      return resolution + ": " + note;
+    }
+    return resolution;
+  }
+
   private MismatchRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+    String dbStatus = rs.getString("status");
+    String resolvedReason = rs.getString("resolved_reason");
     return MismatchRow.builder()
         .alertEventId(rs.getLong("mismatch_id"))
         .mismatchType(rs.getString("mismatch_type"))
@@ -304,9 +482,13 @@ public class MismatchJdbcRepository {
         .actualValue(rs.getString("actual_value"))
         .deltaPct(rs.getBigDecimal("delta_pct"))
         .severity(rs.getString("severity"))
-        .status(rs.getString("status"))
+        .status(dbStatus)
+        .resolvedReason(resolvedReason)
         .detectedAt(rs.getObject("detected_at", OffsetDateTime.class))
+        .resolvedAt(rs.getObject("resolved_at", OffsetDateTime.class))
         .connectionName(rs.getString("connection_name"))
+        .marketplaceType(rs.getString("marketplace_type"))
+        .relatedActionId(getBoxedLong(rs, "related_action_id"))
         .build();
   }
 
@@ -322,6 +504,7 @@ public class MismatchJdbcRepository {
         .deltaPct(rs.getBigDecimal("delta_pct"))
         .severity(rs.getString("severity"))
         .status(rs.getString("status"))
+        .resolvedReason(rs.getString("resolved_reason"))
         .detectedAt(rs.getObject("detected_at", OffsetDateTime.class))
         .connectionName(rs.getString("connection_name"))
         .marketplaceType(rs.getString("marketplace_type"))
@@ -329,7 +512,7 @@ public class MismatchJdbcRepository {
         .acknowledgedAt(rs.getObject("acknowledged_at", OffsetDateTime.class))
         .acknowledgedByName(rs.getString("acknowledged_by_name"))
         .resolvedAt(rs.getObject("resolved_at", OffsetDateTime.class))
-        .resolvedReason(rs.getString("resolved_reason"))
+        .resolvedByName(rs.getString("resolved_by_name"))
         .relatedActionId(getBoxedLong(rs, "related_action_id"))
         .relatedActionStatus(rs.getString("related_action_status"))
         .relatedActionTargetPrice(rs.getBigDecimal("related_action_target_price"))

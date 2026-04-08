@@ -130,6 +130,7 @@ const MP_BADGE: Record<
           />
         } @else {
           <dp-data-grid
+            viewStateKey="promo:evaluations"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="evalsQuery.isPending()"
@@ -157,6 +158,7 @@ export class EvaluationsListPageComponent {
   protected readonly TrendingDownIcon = TrendingDown;
 
   readonly listState = createListPageState({
+    pageKey: 'promo:evaluations',
     defaultSort: { column: 'evaluatedAt', direction: 'desc' },
     defaultPageSize: 50,
   });

@@ -4,6 +4,7 @@ import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.sellerops.api.MismatchFilter;
 import io.datapulse.sellerops.api.MismatchResponse;
+import io.datapulse.sellerops.config.MismatchProperties;
 import io.datapulse.sellerops.persistence.MismatchJdbcRepository;
 import io.datapulse.sellerops.persistence.MismatchRow;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +39,15 @@ class MismatchServiceTest {
   private static final long MISMATCH_ID = 100L;
   private static final long USER_ID = 10L;
 
-  /** All filter dimensions unset — matches {@link MismatchFilter} record arity. */
   private static final MismatchFilter EMPTY_FILTER =
       new MismatchFilter(null, null, null, null, null, null, null, null);
 
   @Mock
   private MismatchJdbcRepository mismatchRepository;
+  @Mock
+  private MismatchProperties mismatchProperties;
+  @Mock
+  private MismatchStompPublisher stompPublisher;
 
   @InjectMocks
   private MismatchService service;
@@ -64,6 +72,21 @@ class MismatchServiceTest {
       assertThat(response.mismatchId()).isEqualTo(MISMATCH_ID);
       assertThat(response.type()).isEqualTo("PRICE");
       assertThat(response.severity()).isEqualTo("WARNING");
+      assertThat(response.status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void should_map_ignored_status_from_resolved_reason() {
+      Pageable pageable = PageRequest.of(0, 20);
+      var row = buildMismatchRow("RESOLVED");
+      row.setResolvedReason("IGNORED");
+
+      when(mismatchRepository.findAll(WORKSPACE_ID, EMPTY_FILTER, pageable))
+          .thenReturn(new PageImpl<>(List.of(row), pageable, 1));
+
+      Page<MismatchResponse> result = service.listMismatches(WORKSPACE_ID, EMPTY_FILTER, pageable);
+
+      assertThat(result.getContent().get(0).status()).isEqualTo("IGNORED");
     }
 
     @Test
@@ -94,6 +117,9 @@ class MismatchServiceTest {
       MismatchResponse result = service.acknowledge(WORKSPACE_ID, MISMATCH_ID, USER_ID);
 
       assertThat(result.status()).isEqualTo("ACKNOWLEDGED");
+      verify(stompPublisher).publishAcknowledged(
+          eq(WORKSPACE_ID), eq(MISMATCH_ID),
+          any(), any(), any(), any());
     }
 
     @Test
@@ -126,46 +152,69 @@ class MismatchServiceTest {
   class Resolve {
 
     @Test
-    void should_resolve_acknowledged_mismatch() {
-      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID, "ACCEPTED"))
+    void should_resolve_mismatch() {
+      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID,
+          "ACCEPTED", "ok", USER_ID))
           .thenReturn(1);
       when(mismatchRepository.findById(MISMATCH_ID, WORKSPACE_ID))
           .thenReturn(Optional.of(buildMismatchRow("RESOLVED")));
 
       MismatchResponse result = service.resolve(
-          WORKSPACE_ID, MISMATCH_ID, "ACCEPTED", "ok");
+          WORKSPACE_ID, MISMATCH_ID, "ACCEPTED", "ok", USER_ID);
 
       assertThat(result.status()).isEqualTo("RESOLVED");
+      verify(stompPublisher).publishResolved(
+          eq(WORKSPACE_ID), eq(MISMATCH_ID),
+          any(), any(), any(), any());
+    }
+
+    @Test
+    void should_publish_ignored_event_for_ignored_resolution() {
+      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID,
+          "IGNORED", "not relevant", USER_ID))
+          .thenReturn(1);
+      var row = buildMismatchRow("RESOLVED");
+      row.setResolvedReason("IGNORED");
+      when(mismatchRepository.findById(MISMATCH_ID, WORKSPACE_ID))
+          .thenReturn(Optional.of(row));
+
+      service.resolve(WORKSPACE_ID, MISMATCH_ID, "IGNORED", "not relevant", USER_ID);
+
+      verify(stompPublisher).publishIgnored(
+          eq(WORKSPACE_ID), eq(MISMATCH_ID),
+          any(), any(), any(), any());
     }
 
     @Test
     void should_throw_for_invalid_resolution_type() {
       assertThatThrownBy(() ->
-          service.resolve(WORKSPACE_ID, MISMATCH_ID, "INVALID_TYPE", null))
+          service.resolve(WORKSPACE_ID, MISMATCH_ID, "INVALID_TYPE", null, USER_ID))
           .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void should_throw_bad_request_when_not_acknowledged() {
-      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID, "REPRICED"))
+    void should_throw_bad_request_when_already_resolved() {
+      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID,
+          "REPRICED", null, USER_ID))
           .thenReturn(0);
       when(mismatchRepository.findById(MISMATCH_ID, WORKSPACE_ID))
-          .thenReturn(Optional.of(buildMismatchRow("OPEN")));
+          .thenReturn(Optional.of(buildMismatchRow("RESOLVED")));
 
       assertThatThrownBy(() ->
-          service.resolve(WORKSPACE_ID, MISMATCH_ID, "REPRICED", null))
+          service.resolve(WORKSPACE_ID, MISMATCH_ID, "REPRICED", null, USER_ID))
           .isInstanceOf(BadRequestException.class);
     }
 
     @Test
     void should_throw_not_found_when_row_missing_on_resolve() {
-      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID, "INVESTIGATED"))
+      when(mismatchRepository.resolve(MISMATCH_ID, WORKSPACE_ID,
+          "INVESTIGATED", null, USER_ID))
           .thenReturn(0);
       when(mismatchRepository.findById(MISMATCH_ID, WORKSPACE_ID))
           .thenReturn(Optional.empty());
 
       assertThatThrownBy(() ->
-          service.resolve(WORKSPACE_ID, MISMATCH_ID, "INVESTIGATED", null))
+          service.resolve(WORKSPACE_ID, MISMATCH_ID, "INVESTIGATED", null, USER_ID))
           .isInstanceOf(NotFoundException.class);
     }
   }
@@ -182,8 +231,12 @@ class MismatchServiceTest {
         .deltaPct(new BigDecimal("10"))
         .severity("WARNING")
         .status(status)
+        .resolvedReason(null)
         .detectedAt(OffsetDateTime.now())
         .connectionName("WB Connection")
+        .marketplaceType("WB")
+        .resolvedAt(null)
+        .relatedActionId(null)
         .build();
   }
 }

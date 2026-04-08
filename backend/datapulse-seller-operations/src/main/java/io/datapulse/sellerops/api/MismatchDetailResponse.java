@@ -21,6 +21,7 @@ public record MismatchDetailResponse(
     String acknowledgedBy,
     String resolvedBy,
     OffsetDateTime resolvedAt,
+    String resolution,
     String resolutionNote,
     RelatedAction relatedAction,
     Thresholds thresholds,

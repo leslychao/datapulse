@@ -35,8 +35,7 @@ public class SimulationComparisonService {
         BigDecimal coveragePct = BigDecimal.ZERO;
         if (coverage.totalOffers() > 0) {
             coveragePct = BigDecimal.valueOf(coverage.simulatedCount())
-                    .divide(BigDecimal.valueOf(coverage.totalOffers()), 4, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100));
+                    .divide(BigDecimal.valueOf(coverage.totalOffers()), 4, RoundingMode.HALF_UP);
         }
 
         return new SimulationComparisonReport(

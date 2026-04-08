@@ -122,6 +122,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
               <input
                 type="date"
                 [(ngModel)]="formExpiresAt"
+                [min]="today"
                 class="h-8 w-40 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
@@ -171,6 +172,7 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           />
         } @else {
           <dp-data-grid
+            viewStateKey="pricing:locks"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="locksQuery.isPending()"
@@ -211,6 +213,7 @@ export class LocksPageComponent {
   protected readonly rbac = inject(RbacService);
 
   readonly listState = createListPageState({
+    pageKey: 'pricing:locks',
     defaultSort: { column: 'lockedAt', direction: 'desc' },
     defaultPageSize: 50,
     filterBarDefs: [
@@ -226,6 +229,7 @@ export class LocksPageComponent {
   formPrice: number | null = null;
   formReason = '';
   formExpiresAt = '';
+  protected readonly today = new Date().toISOString().slice(0, 10);
 
   readonly filterConfigs: FilterConfig[] = [
     { key: 'search', label: 'pricing.locks.filter.search', type: 'text' },

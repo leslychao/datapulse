@@ -1,11 +1,15 @@
 package io.datapulse.analytics.api;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 
 public record ReturnsFilter(
+        LocalDate from,
+        LocalDate to,
         String period,
-        String search
+        String search,
+        TrendGranularity granularity
 ) {
 
     /**
@@ -21,5 +25,9 @@ public record ReturnsFilter(
         } catch (DateTimeParseException e) {
             return null;
         }
+    }
+
+    public TrendGranularity granularityOrDefault() {
+        return granularity != null ? granularity : TrendGranularity.MONTHLY;
     }
 }

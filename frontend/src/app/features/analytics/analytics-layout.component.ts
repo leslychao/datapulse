@@ -181,7 +181,10 @@ export class AnalyticsLayoutComponent {
   }
 
   private readonly url = toSignal(
-    this.router.events.pipe(map(() => this.router.url)),
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url),
+    ),
     { initialValue: this.router.url },
   );
 

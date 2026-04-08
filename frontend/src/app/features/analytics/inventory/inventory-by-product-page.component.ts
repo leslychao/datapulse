@@ -11,7 +11,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { ColDef, GridApi } from 'ag-grid-community';
-import { LucideAngularModule, Download } from 'lucide-angular';
+import { LucideAngularModule, Download, History } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import {
@@ -26,7 +26,7 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import { formatMoney } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
 @Component({
@@ -77,6 +77,7 @@ import {
 
         <div class="flex-1 py-2">
           <dp-data-grid
+            viewStateKey="analytics:inventory:by-product"
             [columnDefs]="columnDefs()"
             [rowData]="gridRows()"
             [loading]="productsQuery.isPending()"
@@ -208,6 +209,7 @@ export class InventoryByProductPageComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly downloadIcon = Download;
+  readonly historyIcon = History;
   private gridApi: GridApi | null = null;
 
   @HostListener('document:keydown.escape')
@@ -230,8 +232,9 @@ export class InventoryByProductPageComponent {
   readonly onSearchInput = createDebouncedSearch(this.searchTerm, 300, () => this.page.set(0));
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:inventory:by-product', filterDefs: this.filterDefs,
+    });
   }
 
   onResetFilters(): void {
@@ -335,6 +338,23 @@ export class InventoryByProductPageComponent {
       type: 'rightAligned',
       cellClass: 'font-mono',
     },
+    {
+      headerName: '',
+      width: 48,
+      maxWidth: 48,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      cellRenderer: () =>
+        `<button class="flex h-full w-full cursor-pointer items-center justify-center text-[var(--text-tertiary)] transition-colors hover:text-[var(--accent-primary)]" title="${this.t.instant('analytics.inventory.col.history')}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        </button>`,
+      onCellClicked: (params: any) => {
+        if (params.data) {
+          this.navigateToHistory(params.data.productId);
+        }
+      },
+    },
   ]);
 
   onGridReady(api: GridApi): void {
@@ -359,6 +379,13 @@ export class InventoryByProductPageComponent {
     this.selectedProduct.set(
       this.selectedProduct()?.productId === product.productId ? null : product,
     );
+  }
+
+  navigateToHistory(productId: number): void {
+    this.router.navigate(['../stock-history'], {
+      relativeTo: this.route,
+      queryParams: { productId },
+    });
   }
 
   formatMoney(value: number | null): string {

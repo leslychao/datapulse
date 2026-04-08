@@ -151,7 +151,7 @@ public class OfferDetailJdbcRepository {
             AND lock2.unlocked_at IS NULL
           LIMIT 1
       ) mpl ON true
-      LEFT JOIN simulated_offer_state sos ON sos.marketplace_offer_id = mo.id
+      LEFT JOIN simulated_offer_state sos ON sos.marketplace_offer_id = mo.id AND sos.workspace_id = mc.workspace_id
       LEFT JOIN LATERAL (
           SELECT MIN(last_success_at) AS last_success_at
           FROM marketplace_sync_state

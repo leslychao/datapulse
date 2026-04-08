@@ -22,7 +22,7 @@ import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import { formatMoney, financeColor, currentMonth } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
 const COGS_STATUS_KEY: Record<string, string> = {
@@ -79,7 +79,12 @@ const COGS_STATUS_COLOR: Record<string, string> = {
         </button>
       </div>
 
+      <p class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+        {{ 'analytics.pnl.note.financial_refunds_scope' | translate }}
+      </p>
+
       <dp-data-grid
+        viewStateKey="analytics:pnl:by-product"
         [columnDefs]="columnDefs()"
         [rowData]="gridRows()"
         [loading]="productsQuery.isPending()"
@@ -129,8 +134,9 @@ export class PnlByProductPageComponent {
     effect(() => {
       this.navStore.setSectionFilter('analytics:pnl', { period: this.period() });
     });
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:pnl:by-product', filterDefs: this.filterDefs,
+    });
   }
 
   onResetFilters(): void {

@@ -28,7 +28,7 @@ import {
   currentMonth,
 } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
 function monthStart(period: string): string {
@@ -84,6 +84,7 @@ function monthEnd(period: string): string {
       </div>
 
       <dp-data-grid
+        viewStateKey="analytics:pnl:by-posting"
         [columnDefs]="columnDefs()"
         [rowData]="gridRows()"
         [loading]="postingsQuery.isPending()"
@@ -128,8 +129,9 @@ export class PnlByPostingPageComponent {
   private gridApi: GridApi | null = null;
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:pnl:by-posting', filterDefs: this.filterDefs,
+    });
     effect(() => {
       this.navStore.setSectionFilter('analytics:pnl', { period: this.period() });
     });

@@ -88,6 +88,7 @@ const INPUT_CLASS =
         <input type="date"
                [ngModel]="validFrom()"
                (ngModelChange)="validFrom.set($event)"
+               [max]="today"
                [class]="inputClass" />
       </label>
 
@@ -142,6 +143,7 @@ export class CostUpdatePanelComponent {
 
   readonly alertTriangleIcon = AlertTriangle;
   readonly inputClass = INPUT_CLASS;
+  protected readonly today = new Date().toISOString().slice(0, 10);
 
   readonly operationOptions: OperationOption[] = [
     { value: 'FIXED', labelKey: 'grid.cost.op.fixed' },

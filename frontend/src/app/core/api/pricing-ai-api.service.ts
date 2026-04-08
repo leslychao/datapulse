@@ -3,22 +3,12 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '@env';
-import { AdvisorResponse, PricingInsight, Page } from '@core/models';
+import { PricingInsight, Page } from '@core/models';
 
 @Injectable({ providedIn: 'root' })
 export class PricingAiApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
-
-  generateAdvice(
-    workspaceId: number,
-    offerId: number,
-  ): Observable<AdvisorResponse> {
-    return this.http.post<AdvisorResponse>(
-      `${this.base}/workspaces/${workspaceId}/pricing/advisor/${offerId}`,
-      {},
-    );
-  }
 
   listInsights(
     workspaceId: number,

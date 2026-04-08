@@ -157,8 +157,9 @@ public class CostProfileRepository {
             SELECT cp.id
             FROM cost_profile cp
             JOIN seller_sku ss ON ss.id = cp.seller_sku_id
+            JOIN product_master pm ON pm.id = ss.product_master_id
             WHERE cp.seller_sku_id = :sellerSkuId
-              AND ss.workspace_id = :workspaceId
+              AND pm.workspace_id = :workspaceId
               AND cp.valid_to IS NULL
             LIMIT 1
             """;
@@ -180,8 +181,9 @@ public class CostProfileRepository {
                    cp.created_at, cp.updated_at
             FROM cost_profile cp
             JOIN seller_sku ss ON ss.id = cp.seller_sku_id
+            JOIN product_master pm ON pm.id = ss.product_master_id
             WHERE cp.seller_sku_id = :sellerSkuId
-              AND ss.workspace_id = :workspaceId
+              AND pm.workspace_id = :workspaceId
               AND cp.valid_to IS NULL
             LIMIT 1
             """;

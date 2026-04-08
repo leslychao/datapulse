@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  signal,
 } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
@@ -16,6 +17,9 @@ import { ChartComponent } from '@shared/components/chart/chart.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { formatMoney } from '@shared/utils/format.utils';
 
+const COLLAPSED_ROW_LIMIT = 5;
+const MIN_COL_WIDTH = 50;
+
 function resolveCssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name;
 }
@@ -25,8 +29,24 @@ function resolveCssVar(name: string): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, ChartComponent, StockRiskBadgeComponent],
+  styles: [`
+    .dp-col-resize {
+      position: absolute;
+      right: -2px;
+      top: 0;
+      width: 5px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 1;
+      background: transparent;
+      transition: background-color 0.15s;
+    }
+    .dp-col-resize:hover {
+      background-color: var(--accent-primary);
+    }
+  `],
   template: `
-    <div class="flex h-full flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <!-- KPI cards -->
       <div class="grid grid-cols-3 gap-3">
         <!-- Total SKUs -->
@@ -111,40 +131,54 @@ function resolveCssVar(name: string): string {
           </p>
         } @else {
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <table class="w-full table-fixed text-left text-sm">
+              <colgroup>
+                <col [style.width.px]="colWidths()[0]" />
+                <col />
+                <col [style.width.px]="colWidths()[2]" />
+                <col [style.width.px]="colWidths()[3]" />
+                <col [style.width.px]="colWidths()[4]" />
+              </colgroup>
               <thead>
                 <tr class="border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                  <th class="pb-2 pr-4 font-medium">SKU</th>
-                  <th class="pb-2 pr-4 font-medium">
+                  <th class="relative truncate pb-2 pr-4 font-medium">
+                    SKU
+                    <div class="dp-col-resize" (mousedown)="onColResize($event, 0)"></div>
+                  </th>
+                  <th class="relative truncate pb-2 pr-4 font-medium">
                     {{ 'analytics.inventory.col.product' | translate }}
                   </th>
-                  <th class="pb-2 pr-4 text-right font-medium">
+                  <th class="relative truncate pb-2 pr-4 text-right font-medium">
                     {{ 'analytics.inventory.col.available' | translate }}
+                    <div class="dp-col-resize" (mousedown)="onColResize($event, 2)"></div>
                   </th>
-                  <th class="pb-2 pr-4 text-right font-medium">
+                  <th class="relative truncate pb-2 pr-4 text-right font-medium">
                     {{ 'analytics.inventory.col.days_of_cover' | translate }}
+                    <div class="dp-col-resize" (mousedown)="onColResize($event, 3)"></div>
                   </th>
-                  <th class="pb-2 font-medium">
+                  <th class="relative truncate pb-2 font-medium">
                     {{ 'analytics.inventory.col.risk' | translate }}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                @for (item of topCritical(); track item.productId) {
+                @for (item of visibleCritical(); track item.productId) {
                   <tr class="border-b border-[var(--border-subtle)] last:border-0">
-                    <td class="py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]">
+                    <td class="truncate py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]"
+                        [title]="item.skuCode">
                       {{ item.skuCode }}
                     </td>
-                    <td class="max-w-[200px] truncate py-2 pr-4 text-[var(--text-primary)]">
+                    <td class="truncate py-2 pr-4 text-[var(--text-primary)]"
+                        [title]="item.productName">
                       {{ item.productName }}
                     </td>
-                    <td class="py-2 pr-4 text-right font-mono">
+                    <td class="truncate py-2 pr-4 text-right font-mono">
                       {{ item.available }}
                     </td>
-                    <td class="py-2 pr-4 text-right font-mono">
-                      {{ item.daysOfCover }}
+                    <td class="truncate py-2 pr-4 text-right font-mono">
+                      {{ item.daysOfCover ?? '—' }}
                     </td>
-                    <td class="py-2">
+                    <td class="truncate py-2">
                       <dp-stock-risk-badge [risk]="item.stockOutRisk" />
                     </td>
                   </tr>
@@ -152,6 +186,21 @@ function resolveCssVar(name: string): string {
               </tbody>
             </table>
           </div>
+          @if (canExpandTable()) {
+            <button
+              type="button"
+              (click)="tableExpanded.set(!tableExpanded())"
+              class="mt-2 w-full rounded-[var(--radius-md)] py-1.5 text-[length:var(--text-sm)]
+                     font-medium text-[var(--accent-primary)] transition-colors
+                     hover:bg-[var(--bg-secondary)]"
+            >
+              @if (tableExpanded()) {
+                {{ 'common.collapse' | translate }}
+              } @else {
+                {{ 'analytics.inventory.show_all_critical' | translate:{ count: topCritical().length } }}
+              }
+            </button>
+          }
         }
       </div>
     </div>
@@ -182,6 +231,21 @@ export class InventoryOverviewPageComponent {
   readonly topCritical = computed<InventoryByProduct[]>(() =>
     this.overview()?.topCritical ?? [],
   );
+
+  readonly tableExpanded = signal(false);
+  readonly colWidths = signal([180, 0, 80, 100, 90]);
+
+  readonly canExpandTable = computed(() =>
+    this.topCritical().length > COLLAPSED_ROW_LIMIT,
+  );
+
+  readonly visibleCritical = computed<InventoryByProduct[]>(() => {
+    const all = this.topCritical();
+    if (this.tableExpanded() || all.length <= COLLAPSED_ROW_LIMIT) {
+      return all;
+    }
+    return all.slice(0, COLLAPSED_ROW_LIMIT);
+  });
 
   readonly riskChartOptions = computed<EChartsOption>(() => {
     const data = this.overview();
@@ -232,6 +296,33 @@ export class InventoryOverviewPageComponent {
       tooltip: { show: false },
     };
   });
+
+  onColResize(event: MouseEvent, col: number): void {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startW = this.colWidths()[col];
+
+    const onMove = (e: MouseEvent) => {
+      const w = Math.max(MIN_COL_WIDTH, startW + e.clientX - startX);
+      this.colWidths.update(ws => {
+        const next = [...ws];
+        next[col] = w;
+        return next;
+      });
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);

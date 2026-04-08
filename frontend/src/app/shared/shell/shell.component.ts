@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnDestroy, OnInit, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, OnDestroy, OnInit, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet, ActivatedRoute } from '@angular/router';
 
@@ -18,6 +18,7 @@ import { AutomationBlockerBannerComponent } from './automation-blocker-banner.co
 import { ConnectionLostBannerComponent } from './connection-lost-banner.component';
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { NavigationStore } from '@shared/stores/navigation.store';
 import { SyncStatusStore } from '@shared/stores/sync-status.store';
 import { ShortcutService } from '@shared/services/shortcut.service';
 import { WebSocketService } from '@core/websocket/websocket.service';
@@ -103,6 +104,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly commandPalette = viewChild.required(CommandPaletteComponent);
   protected readonly detailPanel = inject(DetailPanelService);
   private readonly workspaceStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
   private readonly route = inject(ActivatedRoute);
   private readonly shortcuts = inject(ShortcutService);
   private readonly webSocket = inject(WebSocketService);
@@ -112,6 +114,12 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   constructor() {
     this.shortcuts.init();
+    effect(() => {
+      this.navStore.lastTabByModule();
+      this.navStore.sectionFilters();
+      const wsId = this.workspaceStore.currentWorkspaceId();
+      if (wsId) this.navStore.persist(wsId);
+    });
   }
 
   protected openCommandPalette(): void {
@@ -123,6 +131,7 @@ export class ShellComponent implements OnInit, OnDestroy {
       const wsId = Number(params['workspaceId']);
       if (!isNaN(wsId) && wsId > 0) {
         this.workspaceStore.setWorkspace(wsId, '');
+        this.navStore.restore(wsId);
         this.webSocket.connect(wsId);
         this.webSocket.subscribeToWorkspace(wsId);
         void lastValueFrom(this.connectionApi.listSyncHealth())
@@ -133,6 +142,8 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    const wsId = this.workspaceStore.currentWorkspaceId();
+    if (wsId) this.navStore.persist(wsId);
     this.webSocket.disconnect();
   }
 }

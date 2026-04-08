@@ -3,6 +3,7 @@ package io.datapulse.analytics.persistence;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import io.datapulse.analytics.api.ProductReturnResponse;
 import io.datapulse.analytics.api.ReturnsFilter;
 import io.datapulse.analytics.api.ReturnsSummaryResponse;
 import io.datapulse.analytics.api.ReturnsTrendResponse;
+import io.datapulse.analytics.api.TrendGranularity;
 import io.datapulse.analytics.config.ClickHouseReadJdbc;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -92,13 +94,35 @@ public class ReturnsReadRepository {
 
   private static final String TREND_SQL = """
       SELECT
-          period,
+          period_label,
           sum(return_quantity) AS total_return_quantity,
           sum(sale_quantity) AS total_sale_quantity,
           if(total_sale_quantity > 0,
-             total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct
-      FROM mart_returns_analysis
-      WHERE workspace_id = :workspaceId
+             toDecimal64(total_return_quantity, 2) / total_sale_quantity * 100, NULL)
+              AS return_rate_pct
+      FROM (
+          SELECT
+              %s AS period_label,
+              sum(quantity) AS return_quantity,
+              toInt64(0) AS sale_quantity
+          FROM fact_returns
+          WHERE workspace_id = :workspaceId
+          %s
+          GROUP BY period_label
+
+          UNION ALL
+
+          SELECT
+              %s AS period_label,
+              toInt64(0) AS return_quantity,
+              sum(quantity) AS sale_quantity
+          FROM fact_sales
+          WHERE workspace_id = :workspaceId
+          %s
+          GROUP BY period_label
+      ) t
+      GROUP BY period_label
+      ORDER BY period_label
       """;
 
   public record SummaryRow(
@@ -180,15 +204,19 @@ public class ReturnsReadRepository {
     return result != null ? result : 0L;
   }
 
-  public List<ReturnsTrendResponse> findTrend(long workspaceId, ReturnsFilter filter) {
+  public List<ReturnsTrendResponse> findTrend(long workspaceId, ReturnsFilter filter,
+      TrendGranularity granularity) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
-    var sb = new StringBuilder(TREND_SQL);
-    appendFilter(sb, params, filter);
-    sb.append(" GROUP BY period ORDER BY period");
+    String periodExprReturns = periodExpr(granularity, "return_date");
+    String periodExprSales = periodExpr(granularity, "sale_date");
+    var sb = new StringBuilder(
+        TREND_SQL.formatted(
+            periodExprReturns, buildDateFilter("return_date", filter, params),
+            periodExprSales, buildDateFilter("sale_date", filter, params)));
     sb.append(SETTINGS_FINAL);
 
     return jdbc.ch().query(sb.toString(), params, (rs, rowNum) -> new ReturnsTrendResponse(
-        rs.getInt("period"),
+        rs.getString("period_label"),
         rs.getInt("total_return_quantity"),
         rs.getInt("total_sale_quantity"),
         rs.getBigDecimal("return_rate_pct")
@@ -210,6 +238,30 @@ public class ReturnsReadRepository {
       sb.append(" AND (p.product_name ILIKE :search OR p.sku_code ILIKE :search)");
       params.addValue("search", "%%" + filter.search().trim() + "%%");
     }
+  }
+
+  private String periodExpr(TrendGranularity granularity, String dateColumn) {
+    return switch (granularity) {
+      case DAILY -> "toString(%s)".formatted(dateColumn);
+      case WEEKLY -> "toString(toStartOfWeek(%s))".formatted(dateColumn);
+      case MONTHLY -> "toString(toYYYYMM(%s))".formatted(dateColumn);
+    };
+  }
+
+  private String buildDateFilter(String column, ReturnsFilter filter,
+      MapSqlParameterSource params) {
+    StringBuilder sb = new StringBuilder();
+    LocalDate from = filter.from();
+    LocalDate to = filter.to();
+    if (from != null) {
+      sb.append(" AND ").append(column).append(" >= :dateFrom");
+      params.addValue("dateFrom", from);
+    }
+    if (to != null) {
+      sb.append(" AND ").append(column).append(" <= :dateTo");
+      params.addValue("dateTo", to);
+    }
+    return sb.toString();
   }
 
   private ProductReturnResponse mapProductReturn(ResultSet rs, int rowNum) throws SQLException {

@@ -101,6 +101,7 @@ const PARTICIPATION_MODES: ParticipationMode[] = [
           />
         } @else {
           <dp-data-grid
+            viewStateKey="promo:policies"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="policiesQuery.isPending()"
@@ -136,6 +137,7 @@ export class PromoPolicyListPageComponent {
   protected readonly rbac = inject(RbacService);
 
   readonly listState = createListPageState({
+    pageKey: 'promo:policies',
     defaultSort: { column: '', direction: 'desc' },
     defaultPageSize: 50,
   });

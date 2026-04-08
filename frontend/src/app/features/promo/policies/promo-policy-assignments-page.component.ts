@@ -140,6 +140,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
           />
         } @else {
           <dp-data-grid
+            viewStateKey="promo:policy-assignments"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="assignmentsQuery.isPending()"

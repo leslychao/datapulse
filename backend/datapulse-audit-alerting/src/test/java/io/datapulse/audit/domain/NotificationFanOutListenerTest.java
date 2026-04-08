@@ -42,7 +42,7 @@ class NotificationFanOutListenerTest {
     void should_push_to_workspace_topic_and_fan_out_notifications() {
       var event = new AlertEventCreatedEvent(
           42L, 1L, 10L, "STALE_DATA",
-          "WARNING", "Stale data detected", "OPEN", false);
+          "WARNING", "Stale data detected", "OPEN", false, null);
 
       when(notificationService.fanOut(
           eq(1L), eq(42L), eq("ALERT"),
@@ -73,7 +73,7 @@ class NotificationFanOutListenerTest {
     void should_not_throw_when_messaging_fails() {
       var event = new AlertEventCreatedEvent(
           42L, 1L, 10L, null,
-          "CRITICAL", "Error", "OPEN", true);
+          "CRITICAL", "Error", "OPEN", true, null);
 
       doThrow(new RuntimeException("WS down"))
           .when(workspaceAlertTopicStompPublisher).publishAlertCreated(any());

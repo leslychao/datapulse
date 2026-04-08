@@ -206,8 +206,9 @@ export interface ReturnsByProduct {
 
 export interface ReturnsTrendPoint {
   period: string;
-  returnRatePct: number;
   returnQuantity: number;
+  saleQuantity: number;
+  returnRatePct: number;
 }
 
 export interface SyncDomainInfo {

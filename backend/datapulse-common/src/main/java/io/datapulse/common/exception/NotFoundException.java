@@ -1,5 +1,7 @@
 package io.datapulse.common.exception;
 
+import io.datapulse.common.error.MessageCodes;
+
 public class NotFoundException extends AppException {
 
     private NotFoundException(String messageKey, Object... args) {
@@ -11,14 +13,14 @@ public class NotFoundException extends AppException {
     }
 
     public static NotFoundException entity(String entityName, Object id) {
-        return new NotFoundException("entity.not.found", entityName, id);
+        return new NotFoundException(MessageCodes.ENTITY_NOT_FOUND, entityName, id);
     }
 
     public static NotFoundException workspace(Long workspaceId) {
-        return new NotFoundException("workspace.not.found", workspaceId);
+        return new NotFoundException(MessageCodes.WORKSPACE_NOT_FOUND, workspaceId);
     }
 
     public static NotFoundException connection(Long connectionId) {
-        return new NotFoundException("connection.not.found", connectionId);
+        return new NotFoundException(MessageCodes.CONNECTION_NOT_FOUND, connectionId);
     }
 }

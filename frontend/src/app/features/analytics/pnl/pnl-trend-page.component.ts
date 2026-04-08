@@ -18,7 +18,7 @@ import { ChartComponent } from '@shared/components/chart/chart.component';
 import { DateRangePickerComponent } from '@shared/components/form/date-range-picker.component';
 import { formatMoney } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
 function daysAgo(n: number): string {
@@ -142,8 +142,9 @@ export class PnlTrendPageComponent {
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:pnl:trend', filterDefs: this.filterDefs,
+    });
   }
 
   onResetFilters(): void {

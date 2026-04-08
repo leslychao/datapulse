@@ -128,6 +128,7 @@
             class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm"
             [ngModel]="periodFrom()"
             (ngModelChange)="periodFrom.set($event); applyFilters()"
+            [max]="periodTo() || today"
           />
           <span class="text-[var(--text-secondary)]">—</span>
           <input
@@ -135,6 +136,8 @@
             class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm"
             [ngModel]="periodTo()"
             (ngModelChange)="periodTo.set($event); applyFilters()"
+            [max]="today"
+            [min]="periodFrom()"
           />
         </div>
       </div>

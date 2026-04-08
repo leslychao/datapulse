@@ -21,7 +21,6 @@ export interface ActionSummary {
   maxAttempts: number;
   createdAt: string;
   updatedAt: string;
-  initiatedBy: string | null;
 }
 
 export interface ActionAttempt {
@@ -92,11 +91,6 @@ export interface BulkApproveRequest {
 export interface BulkRejectRequest {
   actionIds: number[];
   cancelReason?: string;
-}
-
-export interface BulkCancelRequest {
-  actionIds: number[];
-  cancelReason: string;
 }
 
 export interface ActionsKpi {

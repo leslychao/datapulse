@@ -1,4 +1,4 @@
-import { computed, inject, signal, Signal, WritableSignal } from '@angular/core';
+import { computed, effect, inject, signal, Signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import {
@@ -14,7 +14,9 @@ import {
   syncFiltersToUrl,
   isFiltersDefault,
   resetFilters,
+  hasUrlState,
 } from './url-filters';
+import { ViewStateService } from '@shared/services/view-state.service';
 
 export interface ListPageStateConfig {
   defaultSort: SortUrlState;
@@ -22,6 +24,7 @@ export interface ListPageStateConfig {
   filterBarDefs?: FilterBarUrlDef[];
   filterDefs?: UrlFilterDef[];
   syncToUrl?: boolean;
+  pageKey?: string;
 }
 
 export interface ListPageState {
@@ -58,23 +61,59 @@ export function createListPageState(config: ListPageStateConfig): ListPageState 
   const currentSort = signal<SortUrlState>(config.defaultSort);
   const pageSize = signal(config.defaultPageSize ?? 50);
 
+  const viewState = config.pageKey ? inject(ViewStateService) : null;
+  const pageKey = config.pageKey;
+
+  const allUrlKeys = [
+    ...(config.filterBarDefs ?? []).flatMap((d) =>
+      d.type === 'date-range' ? [d.key + '_from', d.key + '_to'] : [d.key],
+    ),
+    ...(config.filterDefs ?? []).map((d) => d.key),
+    'sortBy',
+    'sortDir',
+  ];
+  const urlHasState = syncToUrl && hasUrlState(route, allUrlKeys);
+
+  if (!urlHasState && viewState && pageKey) {
+    const persisted = viewState.restore(pageKey);
+    if (persisted) {
+      if (persisted.filters) filterValues.set(persisted.filters);
+      if (persisted.sort) currentSort.set(persisted.sort);
+    }
+  }
+
   if (syncToUrl) {
     if (config.filterBarDefs) {
-      readFilterBarFromUrl(route, filterValues, config.filterBarDefs);
+      if (urlHasState) readFilterBarFromUrl(route, filterValues, config.filterBarDefs);
       syncFilterBarToUrl(router, route, filterValues, config.filterBarDefs);
     }
     if (config.filterDefs) {
-      readFiltersFromUrl(route, config.filterDefs);
+      if (urlHasState) readFiltersFromUrl(route, config.filterDefs);
       syncFiltersToUrl(router, route, config.filterDefs);
     }
-    readSortFromUrl(route, currentSort);
+    if (urlHasState) readSortFromUrl(route, currentSort);
     syncSortToUrl(router, route, currentSort, config.defaultSort);
   }
 
-  const hasActiveFilters: Signal<boolean> = config.filterBarDefs
-    ? computed(() => !isFilterBarDefault(filterValues)())
-    : config.filterDefs
-      ? isFiltersDefault(config.filterDefs)
+  if (viewState && pageKey) {
+    effect(() => {
+      const filters = filterValues();
+      const sort = currentSort();
+      viewState.save(pageKey, { filters, sort });
+    });
+  }
+
+  const filterBarDefaultSignal = config.filterBarDefs
+    ? isFilterBarDefault(filterValues)
+    : null;
+  const filtersDefaultSignal = config.filterDefs
+    ? isFiltersDefault(config.filterDefs)
+    : null;
+
+  const hasActiveFilters: Signal<boolean> = filterBarDefaultSignal
+    ? computed(() => !filterBarDefaultSignal())
+    : filtersDefaultSignal
+      ? computed(() => !filtersDefaultSignal())
       : computed(() => false);
 
   const sortParam = computed(() => {

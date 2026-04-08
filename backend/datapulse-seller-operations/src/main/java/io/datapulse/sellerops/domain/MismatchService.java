@@ -11,9 +11,12 @@ import io.datapulse.sellerops.api.MismatchDetailResponse.TimelineEvent;
 import io.datapulse.sellerops.api.MismatchFilter;
 import io.datapulse.sellerops.api.MismatchResponse;
 import io.datapulse.sellerops.api.MismatchSummaryResponse;
+import io.datapulse.sellerops.api.MismatchSummaryResponse.TimelinePoint;
+import io.datapulse.sellerops.api.MismatchSummaryResponse.TypeDistribution;
 import io.datapulse.sellerops.config.MismatchProperties;
 import io.datapulse.sellerops.persistence.MismatchDetailRow;
 import io.datapulse.sellerops.persistence.MismatchJdbcRepository;
+import io.datapulse.sellerops.persistence.MismatchJdbcRepository.SummaryData;
 import io.datapulse.sellerops.persistence.MismatchRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,19 +35,33 @@ public class MismatchService {
 
   private final MismatchJdbcRepository mismatchRepository;
   private final MismatchProperties mismatchProperties;
+  private final MismatchStompPublisher stompPublisher;
 
   @Transactional(readOnly = true)
   public MismatchSummaryResponse getSummary(long workspaceId) {
-    var counts = mismatchRepository.countByStatus(workspaceId);
-    return new MismatchSummaryResponse(
-        counts.total(), counts.open(), counts.acknowledged(), counts.resolved());
-  }
+    SummaryData data = mismatchRepository.getSummaryData(workspaceId);
+    List<TypeDistribution> distribution = mismatchRepository.getDistributionByType(workspaceId);
+    List<TimelinePoint> timeline = mismatchRepository.getTimeline(workspaceId, 14);
 
-  @Transactional(readOnly = true)
-  public MismatchResponse getMismatch(long workspaceId, long mismatchId) {
-    return mismatchRepository.findById(mismatchId, workspaceId)
-        .map(this::toResponse)
-        .orElseThrow(() -> NotFoundException.entity("mismatch", mismatchId));
+    long activeDelta = data.activeLast7d() - data.activePrev7d();
+    long criticalDelta = data.criticalLast7d() - data.criticalPrev7d();
+
+    BigDecimal avgHoursDelta = BigDecimal.ZERO;
+
+    return new MismatchSummaryResponse(
+        data.activeCount(),
+        activeDelta,
+        data.criticalCount(),
+        criticalDelta,
+        data.avgHoursUnresolved() != null
+            ? data.avgHoursUnresolved().setScale(1, java.math.RoundingMode.HALF_UP)
+            : BigDecimal.ZERO,
+        avgHoursDelta,
+        data.autoResolvedToday(),
+        data.autoResolvedYesterday(),
+        distribution,
+        timeline
+    );
   }
 
   @Transactional(readOnly = true)
@@ -69,31 +87,58 @@ public class MismatchService {
   public MismatchResponse acknowledge(long workspaceId, long mismatchId, long userId) {
     int updated = mismatchRepository.acknowledge(mismatchId, workspaceId, userId);
     if (updated == 0) {
-      MismatchRow row = mismatchRepository.findById(mismatchId, workspaceId)
+      mismatchRepository.findById(mismatchId, workspaceId)
           .orElseThrow(() -> NotFoundException.entity("mismatch", mismatchId));
-      throw BadRequestException.of(
-          MessageCodes.ALERT_EVENT_INVALID_STATE, row.getStatus());
+      throw BadRequestException.of(MessageCodes.ALERT_EVENT_INVALID_STATE);
     }
-    return mismatchRepository.findById(mismatchId, workspaceId)
+    MismatchResponse response = mismatchRepository.findById(mismatchId, workspaceId)
         .map(this::toResponse)
         .orElseThrow(() -> NotFoundException.entity("mismatch", mismatchId));
+
+    stompPublisher.publishAcknowledged(workspaceId, mismatchId,
+        response.type(), response.severity(),
+        response.offerName(), response.deltaPct());
+
+    return response;
   }
 
   @Transactional
   public MismatchResponse resolve(long workspaceId, long mismatchId,
-                                   String resolution, String note) {
+                                   String resolution, String note, long userId) {
     MismatchResolutionType.valueOf(resolution);
 
-    int updated = mismatchRepository.resolve(mismatchId, workspaceId, resolution);
+    int updated = mismatchRepository.resolve(mismatchId, workspaceId,
+        resolution, note, userId);
     if (updated == 0) {
-      MismatchRow row = mismatchRepository.findById(mismatchId, workspaceId)
+      mismatchRepository.findById(mismatchId, workspaceId)
           .orElseThrow(() -> NotFoundException.entity("mismatch", mismatchId));
-      throw BadRequestException.of(
-          MessageCodes.ALERT_EVENT_INVALID_STATE, row.getStatus());
+      throw BadRequestException.of(MessageCodes.ALERT_EVENT_INVALID_STATE);
     }
-    return mismatchRepository.findById(mismatchId, workspaceId)
+    MismatchResponse response = mismatchRepository.findById(mismatchId, workspaceId)
         .map(this::toResponse)
         .orElseThrow(() -> NotFoundException.entity("mismatch", mismatchId));
+
+    if (MismatchResolutionType.IGNORED.name().equals(resolution)) {
+      stompPublisher.publishIgnored(workspaceId, mismatchId,
+          response.type(), response.severity(),
+          response.offerName(), response.deltaPct());
+    } else {
+      stompPublisher.publishResolved(workspaceId, mismatchId,
+          response.type(), response.severity(),
+          response.offerName(), response.deltaPct());
+    }
+
+    return response;
+  }
+
+  @Transactional
+  public int bulkIgnore(long workspaceId, List<Long> ids, String reason, long userId) {
+    return mismatchRepository.bulkIgnore(workspaceId, ids, reason, userId);
+  }
+
+  @Transactional(readOnly = true)
+  public List<MismatchRow> findAllForExport(long workspaceId, MismatchFilter filter) {
+    return mismatchRepository.findAllForExport(workspaceId, filter);
   }
 
   private MismatchDetailResponse toDetailResponse(MismatchDetailRow row) {
@@ -123,14 +168,16 @@ public class MismatchService {
 
     String expectedSource = resolveExpectedSource(row);
     String actualSource = resolveActualSource(row);
-
-    List<TimelineEvent> timeline = buildTimeline(row);
+    String apiStatus = MismatchStatus.toApi(row.getStatus(), row.getResolvedReason());
+    String resolution = extractResolution(row.getResolvedReason());
+    String note = extractNote(row.getResolvedReason());
+    List<TimelineEvent> timeline = buildTimeline(row, apiStatus);
 
     return new MismatchDetailResponse(
         row.getAlertEventId(),
         row.getMismatchType(),
         row.getSeverity(),
-        row.getStatus(),
+        apiStatus,
         row.getExpectedValue(),
         row.getActualValue(),
         row.getDeltaPct(),
@@ -143,7 +190,8 @@ public class MismatchService {
         row.getAcknowledgedByName(),
         row.getResolvedByName(),
         row.getResolvedAt(),
-        row.getResolvedReason(),
+        resolution,
+        note,
         relatedAction,
         thresholds,
         timeline
@@ -164,14 +212,13 @@ public class MismatchService {
     return "marketplace_api";
   }
 
-  private List<TimelineEvent> buildTimeline(MismatchDetailRow row) {
+  private List<TimelineEvent> buildTimeline(MismatchDetailRow row, String apiStatus) {
     var events = new ArrayList<TimelineEvent>();
 
     events.add(new TimelineEvent(
         "DETECTED",
         row.getDetectedAt(),
-        "Mismatch detected: expected %s, actual %s".formatted(
-            row.getExpectedValue(), row.getActualValue()),
+        "mismatches.timeline.detected",
         "system"
     ));
 
@@ -179,21 +226,21 @@ public class MismatchService {
       events.add(new TimelineEvent(
           "ACKNOWLEDGED",
           row.getAcknowledgedAt(),
-          "Mismatch acknowledged",
+          "mismatches.timeline.acknowledged",
           row.getAcknowledgedByName() != null
-              ? row.getAcknowledgedByName() : "unknown"
+              ? row.getAcknowledgedByName() : "system"
       ));
     }
 
     if (row.getResolvedAt() != null) {
-      String description = "Mismatch resolved";
-      if (row.getResolvedReason() != null) {
-        description = "Mismatch resolved: %s".formatted(row.getResolvedReason());
-      }
+      String descKey = MismatchStatus.IGNORED.equals(apiStatus)
+          ? "mismatches.timeline.ignored"
+          : "mismatches.timeline.resolved";
+
       events.add(new TimelineEvent(
           "RESOLVED",
           row.getResolvedAt(),
-          description,
+          descKey,
           row.getResolvedByName() != null
               ? row.getResolvedByName() : "system"
       ));
@@ -203,19 +250,42 @@ public class MismatchService {
   }
 
   private MismatchResponse toResponse(MismatchRow row) {
+    String apiStatus = MismatchStatus.toApi(row.getStatus(), row.getResolvedReason());
+    String resolution = extractResolution(row.getResolvedReason());
+
     return new MismatchResponse(
         row.getAlertEventId(),
         row.getMismatchType(),
         row.getOfferId(),
         row.getOfferName(),
         row.getSkuCode(),
+        row.getMarketplaceType(),
+        row.getConnectionName(),
         row.getExpectedValue(),
         row.getActualValue(),
         row.getDeltaPct(),
         row.getSeverity(),
-        row.getStatus(),
+        apiStatus,
+        resolution,
         row.getDetectedAt(),
-        row.getConnectionName()
+        row.getResolvedAt(),
+        row.getRelatedActionId()
     );
+  }
+
+  private String extractResolution(String resolvedReason) {
+    if (resolvedReason == null) {
+      return null;
+    }
+    int colonIndex = resolvedReason.indexOf(": ");
+    return colonIndex > 0 ? resolvedReason.substring(0, colonIndex) : resolvedReason;
+  }
+
+  private String extractNote(String resolvedReason) {
+    if (resolvedReason == null) {
+      return null;
+    }
+    int colonIndex = resolvedReason.indexOf(": ");
+    return colonIndex > 0 ? resolvedReason.substring(colonIndex + 2) : null;
   }
 }

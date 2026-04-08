@@ -35,7 +35,8 @@ function quarterRange(): { from: string; to: string } {
   const now = new Date();
   const qMonth = Math.floor(now.getMonth() / 3) * 3;
   const from = new Date(now.getFullYear(), qMonth, 1);
-  const to = new Date(now.getFullYear(), qMonth + 3, 0);
+  const endOfQuarter = new Date(now.getFullYear(), qMonth + 3, 0);
+  const to = endOfQuarter > now ? now : endOfQuarter;
   return { from: toIsoDate(from), to: toIsoDate(to) };
 }
 
@@ -69,6 +70,7 @@ function quarterRange(): { from: string; to: string } {
         <input
           type="date"
           [value]="from()"
+          [max]="to() || today()"
           (change)="onFromChange($event)"
           class="h-6 border-none bg-transparent text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none"
@@ -77,6 +79,8 @@ function quarterRange(): { from: string; to: string } {
         <input
           type="date"
           [value]="to()"
+          [max]="today()"
+          [min]="from()"
           (change)="onToChange($event)"
           class="h-6 border-none bg-transparent text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none"
@@ -99,6 +103,7 @@ export class DateRangePickerComponent {
 
   protected readonly CalendarIcon = Calendar;
   protected readonly presets = PRESETS;
+  protected readonly today = computed(() => toIsoDate(new Date()));
 
   protected readonly rangeError = computed(() => {
     const f = this.from();

@@ -52,6 +52,12 @@ public class AuditPublisher {
         "SUCCESS", null);
   }
 
+  public void publishSystemWithWorkspace(Long workspaceId, String actionType,
+      String entityType, String entityId, String details) {
+    doPublish(workspaceId, "SYSTEM", null, actionType, entityType, entityId,
+        "SUCCESS", details);
+  }
+
   private void doPublish(Long wsId, String actorType, Long actorUserId,
       String actionType, String entityType, String entityId,
       String outcome, String details) {

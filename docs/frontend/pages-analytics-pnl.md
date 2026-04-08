@@ -1388,6 +1388,10 @@ Query params: `?productId=...&from=...&to=...`
 | Компонент | API endpoint | ClickHouse source |
 |-----------|-------------|-------------------|
 | KPI + charts | `GET /api/analytics/returns/summary?connectionId=...&period=YYYYMM` | `mart_returns_analysis` (aggregated) |
+> Важно по семантике: этот экран использует **операционные** возвраты (`fact_returns`/`return_date`).
+> Поэтому значения могут отличаться от `refund_amount` в P&L, где используется
+> финансовая дата события (`fact_finance`/`finance_date`).
+
 
 ### 9.7. Screen states
 
@@ -1499,6 +1503,8 @@ Query params: `?productId=...&from=...&to=...`
 | Компонент | API endpoint | ClickHouse source |
 |-----------|-------------|-------------------|
 | Таблица | `GET /api/analytics/returns/by-product?connectionId=...&period=YYYYMM&search=...&page=0&size=50` | `mart_returns_analysis` JOIN `dim_product` |
+> Фильтр периода синхронизирован с `Returns Summary` (месяц `YYYYMM`).
+
 
 ### 10.7. Screen states
 
@@ -1659,7 +1665,10 @@ Query params: `?productId=...&from=...&to=...`
 
 | Компонент | API endpoint | ClickHouse source |
 |-----------|-------------|-------------------|
-| Chart | `GET /api/analytics/returns/trend?connectionId=...&from=...&to=...&granularity=MONTHLY` | `mart_returns_analysis` |
+| Chart | `GET /api/analytics/returns/trend?connectionId=...&from=...&to=...&granularity=MONTHLY` | `fact_returns` + `fact_sales` (on-the-fly aggregation) |
+
+> Поведение фильтров: `returns/trend` принимает `from/to + granularity` (`DAILY`, `WEEKLY`, `MONTHLY`).
+> Для обратной совместимости при отсутствии `from/to` backend строит диапазон из `period` (если передан).
 
 ### 11.7. Screen states
 

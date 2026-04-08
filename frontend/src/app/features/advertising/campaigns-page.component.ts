@@ -100,6 +100,7 @@ const TREND_COLOR: Record<string, string> = {
 
       <!-- Grid -->
       <dp-data-grid
+        viewStateKey="advertising:campaigns"
         [columnDefs]="columnDefs()"
         [rowData]="gridRows()"
         [loading]="campaignsQuery.isPending()"

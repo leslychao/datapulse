@@ -60,9 +60,9 @@ import { ToastService } from '@shared/shell/toast/toast.service';
         <dp-empty-state [message]="'execution.simulation.select_connection' | translate" />
       } @else if (simulationQuery.isError()) {
         <dp-empty-state
-          [message]="'execution.simulation.empty_no_policies' | translate"
-          [actionLabel]="'execution.simulation.go_to_pricing' | translate"
-          (action)="navigateToPricing()"
+          [message]="'execution.simulation.load_error' | translate"
+          [actionLabel]="'execution.simulation.retry' | translate"
+          (action)="simulationQuery.refetch()"
         />
       } @else if (!hasResults()) {
         <dp-empty-state [message]="'execution.simulation.empty_no_results' | translate" />
@@ -107,6 +107,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
                     <tr class="border-b border-[var(--border-default)] text-left text-[var(--text-secondary)]">
                       <th class="px-3 py-2 font-medium">{{ 'execution.simulation.col.sku' | translate }}</th>
                       <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.current_price' | translate }}</th>
+                      <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.price_at_simulation' | translate }}</th>
                       <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.simulated_price' | translate }}</th>
                       <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.delta' | translate }}</th>
                       <th class="px-3 py-2 font-medium text-right">{{ 'execution.simulation.col.delta_pct' | translate }}</th>
@@ -117,7 +118,14 @@ import { ToastService } from '@shared/shell/toast/toast.service';
                     @for (item of report.items; track item.marketplaceOfferId) {
                       <tr class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]">
                         <td class="px-3 py-2 font-mono text-[var(--text-primary)]">{{ item.marketplaceSku }}</td>
-                        <td class="px-3 py-2 text-right font-mono text-[var(--text-secondary)]">{{ item.canonicalPriceAtSimulation | number:'1.0-2':'ru' }} ₽</td>
+                        <td class="px-3 py-2 text-right font-mono text-[var(--text-secondary)]">
+                          @if (item.currentRealPrice != null) {
+                            {{ item.currentRealPrice | number:'1.0-2':'ru' }} ₽
+                          } @else {
+                            <span class="text-[var(--text-tertiary)]">—</span>
+                          }
+                        </td>
+                        <td class="px-3 py-2 text-right font-mono text-[var(--text-tertiary)]">{{ item.canonicalPriceAtSimulation | number:'1.0-2':'ru' }} ₽</td>
                         <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">{{ item.simulatedPrice | number:'1.0-2':'ru' }} ₽</td>
                         <td class="px-3 py-2 text-right font-mono"
                             [class]="item.priceDelta >= 0 ? 'text-[var(--finance-positive)]' : 'text-[var(--finance-negative)]'">

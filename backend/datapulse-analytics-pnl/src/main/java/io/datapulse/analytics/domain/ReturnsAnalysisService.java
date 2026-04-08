@@ -2,7 +2,9 @@ package io.datapulse.analytics.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import io.datapulse.analytics.api.ProductReturnResponse;
@@ -63,7 +65,9 @@ public class ReturnsAnalysisService {
   }
 
   public List<ReturnsTrendResponse> getTrend(long workspaceId, ReturnsFilter filter) {
-    return returnsReadRepository.findTrend(workspaceId, filter);
+    ReturnsFilter bounded = ensureTrendBounds(filter);
+    return returnsReadRepository.findTrend(
+        workspaceId, bounded, bounded.granularityOrDefault());
   }
 
   private List<ReasonBreakdownItem> buildReasonBreakdown(long workspaceId, int period) {
@@ -102,5 +106,28 @@ public class ReturnsAnalysisService {
     }
 
     return currentRate.subtract(previousRate).setScale(2, RoundingMode.HALF_UP);
+  }
+
+  private ReturnsFilter ensureTrendBounds(ReturnsFilter filter) {
+    if (filter.from() != null || filter.to() != null) {
+      return filter;
+    }
+    YearMonth period = filter.period() != null && !filter.period().isBlank()
+        ? parseYearMonth(filter.period())
+        : YearMonth.now();
+    if (period == null) {
+      period = YearMonth.now();
+    }
+    LocalDate from = period.atDay(1);
+    LocalDate to = period.atEndOfMonth();
+    return new ReturnsFilter(from, to, filter.period(), filter.search(), filter.granularity());
+  }
+
+  private YearMonth parseYearMonth(String period) {
+    try {
+      return YearMonth.parse(period);
+    } catch (DateTimeParseException e) {
+      return null;
+    }
   }
 }

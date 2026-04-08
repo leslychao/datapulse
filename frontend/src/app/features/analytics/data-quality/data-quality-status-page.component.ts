@@ -88,9 +88,9 @@ const STATUS_DOT_CLASS: Record<SyncDomainStatus, string> = {
                   <thead>
                     <tr class="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
                       <th class="px-4 py-2 font-medium">{{ 'analytics.data_quality.domain' | translate }}</th>
-                      <th class="px-4 py-2 font-medium">{{ 'analytics.data_quality.last_sync' | translate }}</th>
-                      <th class="px-4 py-2 font-medium">{{ 'analytics.data_quality.status' | translate }}</th>
-                      <th class="px-4 py-2 text-right font-medium">{{ 'analytics.data_quality.records' | translate }}</th>
+                      <th class="w-px whitespace-nowrap px-4 py-2 font-medium">{{ 'analytics.data_quality.last_sync' | translate }}</th>
+                      <th class="w-px whitespace-nowrap px-4 py-2 font-medium">{{ 'analytics.data_quality.status' | translate }}</th>
+                      <th class="w-px whitespace-nowrap px-4 py-2 text-right font-medium">{{ 'analytics.data_quality.records' | translate }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -99,10 +99,10 @@ const STATUS_DOT_CLASS: Record<SyncDomainStatus, string> = {
                         <td class="px-4 py-2 text-[var(--text-primary)]">
                           {{ domainLabel(domain.domain) }}
                         </td>
-                        <td class="px-4 py-2 text-[var(--text-secondary)]">
+                        <td class="whitespace-nowrap px-4 py-2 text-[var(--text-secondary)]">
                           {{ fmtDateTime(domain.lastSuccessAt) }}
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="whitespace-nowrap px-4 py-2">
                           <span class="inline-flex items-center gap-1.5 text-[length:var(--text-xs)]">
                             <span
                               class="h-1.5 w-1.5 rounded-full"
@@ -111,7 +111,7 @@ const STATUS_DOT_CLASS: Record<SyncDomainStatus, string> = {
                             {{ syncStatusLabel(domain.status) }}
                           </span>
                         </td>
-                        <td class="px-4 py-2 text-right font-mono text-[var(--text-secondary)]">
+                        <td class="whitespace-nowrap px-4 py-2 text-right font-mono text-[var(--text-secondary)]">
                           {{ fmtInteger(domain.recordCount) }}
                         </td>
                       </tr>

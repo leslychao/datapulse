@@ -117,6 +117,7 @@ const DECISION_COLOR: Record<string, string> = {
             />
           } @else {
             <dp-data-grid
+              viewStateKey="pricing:runs"
               [columnDefs]="columnDefs()"
               [rowData]="rows()"
               [loading]="runsQuery.isPending()"
@@ -317,6 +318,7 @@ export class RunsListPageComponent {
   protected readonly rbac = inject(RbacService);
 
   readonly listState = createListPageState({
+    pageKey: 'pricing:runs',
     defaultSort: { column: 'createdAt', direction: 'desc' },
     defaultPageSize: 50,
     filterBarDefs: [

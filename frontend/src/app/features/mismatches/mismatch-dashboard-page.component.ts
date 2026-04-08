@@ -54,6 +54,7 @@ import {
 import { WebSocketService } from '@core/websocket/websocket.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { ViewStateService } from '@shared/services/view-state.service';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
@@ -100,6 +101,7 @@ export class MismatchDashboardPageComponent implements OnInit {
   private readonly api = inject(MismatchApiService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly ws = inject(WorkspaceContextStore);
+  private readonly viewState = inject(ViewStateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
@@ -134,6 +136,7 @@ export class MismatchDashboardPageComponent implements OnInit {
   readonly filterSeverities = signal<MismatchSeverity[]>([]);
   readonly periodFrom = signal('');
   readonly periodTo = signal('');
+  protected readonly today = new Date().toISOString().slice(0, 10);
   readonly searchQuery = signal('');
 
   readonly currentPage = signal(0);
@@ -836,32 +839,30 @@ export class MismatchDashboardPageComponent implements OnInit {
     );
   }
 
+  private static readonly PAGE_KEY = 'mismatches:dashboard';
+
   private persistFilters(): void {
-    const key = `dp-mismatch-filters-${this.ws.currentWorkspaceId()}`;
-    const state = {
-      connectionId: this.connectionId(),
-      types: this.filterTypes(),
-      statuses: this.filterStatuses(),
-      severities: this.filterSeverities(),
-      from: this.periodFrom(),
-      to: this.periodTo(),
-    };
-    localStorage.setItem(key, JSON.stringify(state));
+    this.viewState.save(MismatchDashboardPageComponent.PAGE_KEY, {
+      filters: {
+        connectionId: this.connectionId(),
+        types: this.filterTypes(),
+        statuses: this.filterStatuses(),
+        severities: this.filterSeverities(),
+        from: this.periodFrom(),
+        to: this.periodTo(),
+      },
+    });
   }
 
   private restoreFilters(): void {
-    const key = `dp-mismatch-filters-${this.ws.currentWorkspaceId()}`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    try {
-      const state = JSON.parse(raw);
-      if (state.connectionId != null) this.connectionId.set(state.connectionId);
-      if (state.types?.length) this.filterTypes.set(state.types);
-      if (state.statuses?.length) this.filterStatuses.set(state.statuses);
-      if (state.severities?.length) this.filterSeverities.set(state.severities);
-      if (state.from) this.periodFrom.set(state.from);
-      if (state.to) this.periodTo.set(state.to);
-    } catch { /* ignore corrupt data */ }
+    const persisted = this.viewState.restoreFilters(MismatchDashboardPageComponent.PAGE_KEY);
+    if (!persisted) return;
+    if (persisted['connectionId'] != null) this.connectionId.set(persisted['connectionId']);
+    if (persisted['types']?.length) this.filterTypes.set(persisted['types']);
+    if (persisted['statuses']?.length) this.filterStatuses.set(persisted['statuses']);
+    if (persisted['severities']?.length) this.filterSeverities.set(persisted['severities']);
+    if (persisted['from']) this.periodFrom.set(persisted['from']);
+    if (persisted['to']) this.periodTo.set(persisted['to']);
   }
 
   private clearGridSelection(): void {

@@ -61,7 +61,7 @@ class SimulationComparisonServiceTest {
       assertThat(report.countUnchanged()).isEqualTo(5);
       assertThat(report.simulatedOfferCount()).isEqualTo(50);
       assertThat(report.totalOfferCount()).isEqualTo(200);
-      assertThat(report.coveragePct()).isEqualByComparingTo(BigDecimal.valueOf(25));
+      assertThat(report.coveragePct()).isEqualByComparingTo(new BigDecimal("0.2500"));
       assertThat(report.items()).hasSize(1);
     }
 

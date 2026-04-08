@@ -1,4 +1,4 @@
-import { computed } from '@angular/core';
+import { untracked } from '@angular/core';
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 
 export interface NavigationState {
@@ -20,8 +20,10 @@ export const NavigationStore = signalStore(
   withState(initialState),
   withMethods((store) => ({
     setLastTab(module: string, path: string): void {
+      const current = untracked(store.lastTabByModule);
+      if (current[module] === path) return;
       patchState(store, {
-        lastTabByModule: { ...store.lastTabByModule(), [module]: path },
+        lastTabByModule: { ...current, [module]: path },
       });
     },
 
@@ -30,8 +32,11 @@ export const NavigationStore = signalStore(
     },
 
     setSectionFilter(key: string, filters: Record<string, any>): void {
+      const current = untracked(store.sectionFilters);
+      const existing = current[key];
+      if (existing && JSON.stringify(existing) === JSON.stringify(filters)) return;
       patchState(store, {
-        sectionFilters: { ...store.sectionFilters(), [key]: filters },
+        sectionFilters: { ...current, [key]: filters },
       });
     },
 
@@ -45,19 +50,19 @@ export const NavigationStore = signalStore(
       return (filters[field] as T) ?? null;
     },
 
-    persistToSession(workspaceId: number): void {
+    persist(workspaceId: number): void {
       const payload = {
         lastTabByModule: store.lastTabByModule(),
         sectionFilters: store.sectionFilters(),
       };
       try {
-        sessionStorage.setItem(storageKey(workspaceId), JSON.stringify(payload));
+        localStorage.setItem(storageKey(workspaceId), JSON.stringify(payload));
       } catch { /* storage full — ignore */ }
     },
 
-    restoreFromSession(workspaceId: number): void {
+    restore(workspaceId: number): void {
       try {
-        const raw = sessionStorage.getItem(storageKey(workspaceId));
+        const raw = localStorage.getItem(storageKey(workspaceId));
         if (!raw) return;
         const data = JSON.parse(raw) as Partial<NavigationState>;
         patchState(store, {

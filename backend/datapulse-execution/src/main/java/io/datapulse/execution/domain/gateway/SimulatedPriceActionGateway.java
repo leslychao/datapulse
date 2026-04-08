@@ -68,6 +68,8 @@ public class SimulatedPriceActionGateway implements PriceActionGateway {
             state.setPriceDeltaPct(delta
                     .divide(canonicalPrice, 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100)));
+        } else {
+            state.setPriceDeltaPct(null);
         }
 
         simulatedStateRepository.save(state);

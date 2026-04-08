@@ -127,6 +127,20 @@ public class InventoryReadRepository {
       SETTINGS final = 1
       """;
 
+  private static final String AGGREGATE_STOCK_HISTORY_SQL = """
+      SELECT
+          toDate(captured_at) AS date,
+          sum(available) AS available,
+          sum(reserved) AS reserved
+      FROM fact_inventory_snapshot
+      WHERE workspace_id = :workspaceId
+        AND captured_date >= :dateFrom
+        AND captured_date <= :dateTo
+      GROUP BY date
+      ORDER BY date
+      SETTINGS final = 1
+      """;
+
   public InventoryOverviewResponse findOverview(
       long workspaceId, InventoryFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
@@ -205,6 +219,23 @@ public class InventoryReadRepository {
             getBoxedInt(rs, "reserved"),
             getBoxedInt(rs, "warehouse_id"),
             rs.getString("warehouse_name")
+        ));
+  }
+
+  public List<StockHistoryResponse> findAggregateStockHistory(
+      long workspaceId, LocalDate from, LocalDate to) {
+    var params = new MapSqlParameterSource()
+        .addValue("workspaceId", workspaceId)
+        .addValue("dateFrom", from)
+        .addValue("dateTo", to);
+
+    return jdbc.ch().query(AGGREGATE_STOCK_HISTORY_SQL, params, (rs, rowNum) ->
+        new StockHistoryResponse(
+            rs.getDate("date").toLocalDate(),
+            rs.getInt("available"),
+            getBoxedInt(rs, "reserved"),
+            null,
+            null
         ));
   }
 

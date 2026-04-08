@@ -7,10 +7,16 @@ import { GetContextMenuItemsParams, GridApi, MenuItemDef } from 'ag-grid-communi
 
 import { OfferApiService } from '@core/api/offer-api.service';
 import { CostProfileApiService } from '@core/api/cost-profile-api.service';
-import { CostProfileImportResult, OfferFilter, OfferSummary } from '@core/models';
+import {
+  BulkFormulaCostResponse,
+  CostProfileImportResult,
+  OfferFilter,
+  OfferSummary,
+} from '@core/models';
 import { RbacService } from '@core/auth/rbac.service';
 import { WebSocketService } from '@core/websocket/websocket.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { ViewStateService } from '@shared/services/view-state.service';
 import { GridStore } from '@shared/stores/grid.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { GuidedTourService } from '@shared/services/guided-tour.service';
@@ -96,6 +102,7 @@ import { buildGridColumnDefs, GridColumnCallbacks } from './components/grid-colu
       } @else {
         <div class="flex-1 overflow-hidden px-4 pt-2" data-tour="grid-table">
           <dp-data-grid
+            viewStateKey="grid:offers"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="false"
@@ -170,6 +177,7 @@ export class GridPageComponent implements OnInit, OnDestroy {
   private readonly offerApi = inject(OfferApiService);
   private readonly costApi = inject(CostProfileApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly viewState = inject(ViewStateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly webSocket = inject(WebSocketService);
@@ -185,6 +193,8 @@ export class GridPageComponent implements OnInit, OnDestroy {
   constructor() {
     this.restoreFiltersFromUrl();
   }
+
+  private lastUrlParams = '';
 
   private readonly urlSyncEffect = effect(() => {
     const f = this.gridStore.filters();
@@ -204,6 +214,10 @@ export class GridPageComponent implements OnInit, OnDestroy {
       params['dir'] = sortDir;
     }
 
+    const serialized = JSON.stringify(params);
+    if (serialized === this.lastUrlParams) return;
+    this.lastUrlParams = serialized;
+
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: params,
@@ -211,24 +225,59 @@ export class GridPageComponent implements OnInit, OnDestroy {
     });
   });
 
+  private static readonly VIEW_STATE_KEY = 'grid:offers';
+
   private restoreFiltersFromUrl(): void {
     const qp = this.route.snapshot.queryParams;
-    const hasUrlState = GridPageComponent.URL_FILTER_KEYS.some((k) => qp[k]);
-    if (!hasUrlState) return;
+    const hasUrl = GridPageComponent.URL_FILTER_KEYS.some((k) => qp[k]);
 
-    const filters: OfferFilter = {};
-    if (qp['marketplace']) filters.marketplaceType = qp['marketplace'].split(',');
-    if (qp['status']) filters.status = qp['status'].split(',');
-    if (qp['decision']) filters.lastDecision = qp['decision'].split(',');
-    if (qp['actionStatus']) filters.lastActionStatus = qp['actionStatus'].split(',');
-    const search = qp['search'] ?? '';
-    if (search) filters.skuCode = search;
+    if (hasUrl) {
+      const filters: OfferFilter = {};
+      if (qp['marketplace']) filters.marketplaceType = qp['marketplace'].split(',');
+      if (qp['status']) filters.status = qp['status'].split(',');
+      if (qp['decision']) filters.lastDecision = qp['decision'].split(',');
+      if (qp['actionStatus']) filters.lastActionStatus = qp['actionStatus'].split(',');
+      const search = qp['search'] ?? '';
+      if (search) filters.skuCode = search;
+      const sortColumn = qp['sort'] || 'skuCode';
+      const sortDirection = (qp['dir']?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC') as 'ASC' | 'DESC';
+      this.gridStore.restoreUrlState(filters, search, sortColumn, sortDirection);
+      return;
+    }
 
-    const sortColumn = qp['sort'] || 'skuCode';
-    const sortDirection = (qp['dir']?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC') as 'ASC' | 'DESC';
-
-    this.gridStore.restoreUrlState(filters, search, sortColumn, sortDirection);
+    const persisted = this.viewState.restore(GridPageComponent.VIEW_STATE_KEY);
+    if (persisted?.filters) {
+      const pf = persisted.filters;
+      const filters: OfferFilter = {};
+      if (pf['marketplace']) filters.marketplaceType = pf['marketplace'];
+      if (pf['status']) filters.status = pf['status'];
+      if (pf['decision']) filters.lastDecision = pf['decision'];
+      if (pf['actionStatus']) filters.lastActionStatus = pf['actionStatus'];
+      const search = pf['search'] ?? '';
+      if (search) filters.skuCode = search;
+      const sort = persisted.sort;
+      const sortColumn = sort?.column || 'skuCode';
+      const sortDirection = (sort?.direction?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC') as 'ASC' | 'DESC';
+      this.gridStore.restoreUrlState(filters, search, sortColumn, sortDirection);
+    }
   }
+
+  private readonly viewStateSyncEffect = effect(() => {
+    const f = this.gridStore.filters();
+    const sortCol = this.gridStore.sortColumn();
+    const sortDir = this.gridStore.sortDirection();
+    const search = this.gridStore.searchTerm();
+    const filters: Record<string, any> = {};
+    if (f.marketplaceType?.length) filters['marketplace'] = f.marketplaceType;
+    if (f.status?.length) filters['status'] = f.status;
+    if (f.lastDecision?.length) filters['decision'] = f.lastDecision;
+    if (f.lastActionStatus?.length) filters['actionStatus'] = f.lastActionStatus;
+    if (search) filters['search'] = search;
+    this.viewState.save(GridPageComponent.VIEW_STATE_KEY, {
+      filters,
+      sort: { column: sortCol ?? '', direction: sortDir.toLowerCase() as 'asc' | 'desc' },
+    });
+  });
 
   private gridApi: GridApi | null = null;
 
@@ -457,8 +506,11 @@ export class GridPageComponent implements OnInit, OnDestroy {
         validFrom: today,
       }));
     },
-    onSuccess: () => {
-      this.toast.success(this.translate.instant('grid.cost.updated'));
+    onSuccess: (result: BulkFormulaCostResponse, params) => {
+      if (result.updated > 0) {
+        this.patchCostRowValues(params.offerId, params.costPrice);
+      }
+      this.showCostSaveToast(result);
       if (this.lastCostSavedOfferId != null) {
         const rowNode = this.gridApi?.getRowNode(String(this.lastCostSavedOfferId));
         if (rowNode) {
@@ -475,7 +527,53 @@ export class GridPageComponent implements OnInit, OnDestroy {
   }));
 
   private handleCostPriceChange(sellerSkuId: number, offerId: number, newCostPrice: number): void {
+    this.patchCostRowValues(offerId, newCostPrice);
     this.costSaveMutation.mutate({ sellerSkuId, offerId, costPrice: newCostPrice });
+  }
+
+  private patchCostRowValues(offerId: number, costPrice: number): void {
+    const rowNode = this.gridApi?.getRowNode(String(offerId));
+    if (!rowNode?.data) return;
+
+    rowNode.setDataValue('costPrice', costPrice);
+    const currentPrice = rowNode.data.currentPrice as number | null;
+    const marginPct =
+      currentPrice && currentPrice > 0
+        ? ((currentPrice - costPrice) / currentPrice) * 100
+        : null;
+    rowNode.setDataValue('marginPct', marginPct);
+
+    this.gridApi?.refreshCells({
+      rowNodes: [rowNode],
+      columns: ['costPrice', 'marginPct'],
+      force: true,
+    });
+  }
+
+  private showCostSaveToast(result: BulkFormulaCostResponse): void {
+    if (result.updated > 0) {
+      if (result.skipped > 0) {
+        this.toast.warning(this.translate.instant('grid.cost.update_partial', {
+          updated: result.updated,
+          skipped: result.skipped,
+        }));
+        return;
+      }
+      this.toast.success(this.translate.instant('grid.cost.update_success', { count: result.updated }));
+      return;
+    }
+
+    const firstError = result.errors[0];
+    if (firstError) {
+      const translated = this.translate.instant(firstError);
+      this.toast.error(translated === firstError ? firstError : translated);
+      return;
+    }
+
+    this.toast.warning(this.translate.instant('grid.cost.update_partial', {
+      updated: result.updated,
+      skipped: result.skipped,
+    }));
   }
 
   importCostCsv(file: File): void {

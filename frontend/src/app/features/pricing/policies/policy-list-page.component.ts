@@ -131,6 +131,7 @@ const MODE_COLOR: Record<string, string> = {
           />
         } @else {
           <dp-data-grid
+            viewStateKey="pricing:policies"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="policiesQuery.isPending()"
@@ -187,6 +188,7 @@ export class PolicyListPageComponent {
   protected readonly rbac = inject(RbacService);
 
   readonly listState = createListPageState({
+    pageKey: 'pricing:policies',
     defaultSort: { column: '', direction: 'desc' },
     filterBarDefs: [
       { key: 'status', type: 'csv' },

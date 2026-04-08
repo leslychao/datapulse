@@ -49,7 +49,7 @@ public class AlertEventListener {
             eventPublisher.publishEvent(new AlertEventCreatedEvent(
                     alertEventId, event.workspaceId(), event.connectionId(),
                     null, event.severity(), event.title(), "OPEN",
-                    event.blocksAutomation()));
+                    event.blocksAutomation(), event.details()));
 
         } catch (Exception e) {
             log.error("Failed to create alert event: severity={}, title={}, error={}",

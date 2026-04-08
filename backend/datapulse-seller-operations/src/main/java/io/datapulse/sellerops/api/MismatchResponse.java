@@ -9,12 +9,16 @@ public record MismatchResponse(
     Long offerId,
     String offerName,
     String skuCode,
+    String marketplaceType,
+    String connectionName,
     String expectedValue,
     String actualValue,
     BigDecimal deltaPct,
     String severity,
     String status,
+    String resolution,
     OffsetDateTime detectedAt,
-    String connectionName
+    OffsetDateTime resolvedAt,
+    Long relatedActionId
 ) {
 }

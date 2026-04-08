@@ -192,6 +192,7 @@ const DECISION_COLOR: Record<string, string> = {
             />
           } @else {
             <dp-data-grid
+              viewStateKey="pricing:run-detail"
               [columnDefs]="decisionColumnDefs"
               [rowData]="decisionRows()"
               [loading]="decisionsQuery.isPending()"

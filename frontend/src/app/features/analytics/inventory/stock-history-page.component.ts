@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
@@ -12,14 +13,12 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
-import { InventoryByProduct } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { DateRangePickerComponent } from '@shared/components/form/date-range-picker.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
-import { formatMoney } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters, syncFiltersToUrl,
 } from '@shared/utils/url-filters';
 
 function resolveCssVar(name: string): string {
@@ -32,11 +31,16 @@ function daysAgo(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function pctDelta(first: number, last: number): number | null {
+  if (first === 0) return null;
+  return ((last - first) / first) * 100;
+}
+
 @Component({
   selector: 'dp-stock-history-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent, DateRangePickerComponent, StockRiskBadgeComponent],
+  imports: [DecimalPipe, TranslatePipe, ChartComponent, DateRangePickerComponent, StockRiskBadgeComponent],
   template: `
     <div class="flex h-full flex-col gap-4">
       <!-- Filter bar -->
@@ -46,7 +50,7 @@ function daysAgo(n: number): string {
           [value]="productIdStr()"
           (change)="onProductSelect($event)"
         >
-          <option value="">{{ 'analytics.inventory.stock_history.select_product' | translate }}</option>
+          <option value="">{{ 'analytics.inventory.stock_history.all_products' | translate }}</option>
           @for (p of productsQuery.data() ?? []; track p.productId) {
             <option [value]="p.productId">{{ p.skuCode }} — {{ p.productName }}</option>
           }
@@ -72,24 +76,73 @@ function daysAgo(n: number): string {
       <!-- Chart -->
       <div class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4">
         <p class="mb-2 text-sm font-medium text-[var(--text-primary)]">
-          {{ 'analytics.inventory.stock_history.title' | translate }}
+          @if (productId()) {
+            {{ 'analytics.inventory.stock_history.title' | translate }}
+          } @else {
+            {{ 'analytics.inventory.stock_history.aggregate_title' | translate }}
+          }
         </p>
-        @if (!productId()) {
-          <div class="flex h-[360px] items-center justify-center">
-            <p class="text-sm text-[var(--text-tertiary)]">
-              {{ 'analytics.inventory.stock_history.select_product' | translate }}
-            </p>
-          </div>
-        } @else {
-          <dp-chart
-            [options]="chartOptions()"
-            [loading]="historyQuery.isPending()"
-            height="360px"
-          />
-        }
+        <dp-chart
+          [options]="chartOptions()"
+          [loading]="activeQueryPending()"
+          height="360px"
+        />
       </div>
 
-      <!-- Summary strip -->
+      <!-- Aggregate KPI strip (no product selected) -->
+      @if (!productId()) {
+        <div
+          class="grid grid-cols-3 gap-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4"
+        >
+          <div>
+            <p class="text-xs text-[var(--text-secondary)]">
+              {{ 'analytics.inventory.stock_history.total_available' | translate }}
+            </p>
+            @if (aggregateQuery.isPending()) {
+              <div class="dp-shimmer mt-1 h-7 w-20 rounded"></div>
+            } @else {
+              <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
+                {{ aggregateKpi().lastAvailable?.toLocaleString('ru-RU') ?? '—' }}
+              </p>
+            }
+          </div>
+          <div>
+            <p class="text-xs text-[var(--text-secondary)]">
+              {{ 'analytics.inventory.stock_history.total_reserved' | translate }}
+            </p>
+            @if (aggregateQuery.isPending()) {
+              <div class="dp-shimmer mt-1 h-7 w-20 rounded"></div>
+            } @else {
+              <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
+                {{ aggregateKpi().lastReserved?.toLocaleString('ru-RU') ?? '—' }}
+              </p>
+            }
+          </div>
+          <div>
+            <p class="text-xs text-[var(--text-secondary)]">
+              {{ 'analytics.inventory.stock_history.change' | translate }}
+            </p>
+            @if (aggregateQuery.isPending()) {
+              <div class="dp-shimmer mt-1 h-7 w-16 rounded"></div>
+            } @else {
+              @if (aggregateKpi().deltaPct !== null) {
+                <p
+                  class="mt-0.5 font-mono text-lg font-semibold"
+                  [class]="aggregateKpi().deltaPct! >= 0
+                    ? 'text-[var(--finance-positive)]'
+                    : 'text-[var(--finance-negative)]'"
+                >
+                  {{ aggregateKpi().deltaPct! >= 0 ? '+' : '' }}{{ aggregateKpi().deltaPct! | number:'1.1-1' }}%
+                </p>
+              } @else {
+                <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">—</p>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Per-product summary strip -->
       @if (productId() && inventoryQuery.data(); as product) {
         <div
           class="grid grid-cols-4 gap-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-4"
@@ -150,7 +203,9 @@ export class StockHistoryPageComponent {
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:inventory:stock-history', filterDefs: this.filterDefs,
+    });
     const qpProductId = this.route.snapshot.queryParams['productId'];
     if (qpProductId) this.productId.set(Number(qpProductId));
     syncFiltersToUrl(this.router, this.route, [
@@ -178,6 +233,28 @@ export class StockHistoryPageComponent {
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
+  readonly aggregateQuery = injectQuery(() => ({
+    queryKey: [
+      'analytics', 'stock-history-aggregate',
+      this.wsStore.currentWorkspaceId(),
+      this.dateFrom(),
+      this.dateTo(),
+    ],
+    queryFn: () =>
+      lastValueFrom(
+        this.analyticsApi.getStockHistory(
+          this.wsStore.currentWorkspaceId()!,
+          this.dateFrom(),
+          this.dateTo(),
+        ),
+      ),
+    enabled: !!this.wsStore.currentWorkspaceId()
+      && !this.productId()
+      && !!this.dateFrom()
+      && !!this.dateTo(),
+    staleTime: 60_000,
+  }));
+
   readonly historyQuery = injectQuery(() => ({
     queryKey: [
       'analytics', 'stock-history',
@@ -190,9 +267,9 @@ export class StockHistoryPageComponent {
       lastValueFrom(
         this.analyticsApi.getStockHistory(
           this.wsStore.currentWorkspaceId()!,
-          this.productId()!,
           this.dateFrom(),
           this.dateTo(),
+          this.productId(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId()
@@ -217,8 +294,28 @@ export class StockHistoryPageComponent {
     staleTime: 60_000,
   }));
 
+  readonly activeQueryPending = computed(() =>
+    this.productId() ? this.historyQuery.isPending() : this.aggregateQuery.isPending(),
+  );
+
+  readonly aggregateKpi = computed(() => {
+    const points = this.aggregateQuery.data() ?? [];
+    if (points.length === 0) {
+      return { lastAvailable: null, lastReserved: null, deltaPct: null };
+    }
+    const first = points[0];
+    const last = points[points.length - 1];
+    return {
+      lastAvailable: last.available,
+      lastReserved: last.reserved ?? 0,
+      deltaPct: pctDelta(first.available, last.available),
+    };
+  });
+
   readonly chartOptions = computed<EChartsOption>(() => {
-    const points = this.historyQuery.data() ?? [];
+    const points = this.productId()
+      ? (this.historyQuery.data() ?? [])
+      : (this.aggregateQuery.data() ?? []);
     const dates = points.map((p) => p.date);
     const availableData = points.map((p) => p.available);
     const reservedData = points.map((p) => p.reserved ?? 0);
@@ -290,9 +387,5 @@ export class StockHistoryPageComponent {
   onProductSelect(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
     this.productId.set(value ? Number(value) : null);
-  }
-
-  formatMoney(value: number | null): string {
-    return formatMoney(value, 0);
   }
 }

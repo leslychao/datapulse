@@ -172,6 +172,32 @@ class SimulatedPriceActionGatewayTest {
           .isEqualByComparingTo(BigDecimal.valueOf(500));
       assertThat(captor.getValue().getPriceDeltaPct()).isNull();
     }
+
+    @Test
+    @DisplayName("should reset stale deltaPct when canonical becomes zero on update")
+    void should_resetDeltaPct_when_canonicalBecomesZeroOnExisting() {
+      var action = simulatedAction(BigDecimal.valueOf(500), BigDecimal.ZERO);
+      var context = simulatedContext();
+
+      var existing = new SimulatedOfferStateEntity();
+      existing.setId(42L);
+      existing.setSimulatedPrice(BigDecimal.valueOf(900));
+      existing.setPriceDeltaPct(BigDecimal.valueOf(12.5));
+      existing.setWorkspaceId(10L);
+      existing.setMarketplaceOfferId(100L);
+
+      when(simulatedStateRepository.findByWorkspaceIdAndMarketplaceOfferId(10L, 100L))
+          .thenReturn(Optional.of(existing));
+
+      gateway.execute(action, context);
+
+      var captor = ArgumentCaptor.forClass(SimulatedOfferStateEntity.class);
+      verify(simulatedStateRepository).save(captor.capture());
+
+      assertThat(captor.getValue().getPriceDelta())
+          .isEqualByComparingTo(BigDecimal.valueOf(500));
+      assertThat(captor.getValue().getPriceDeltaPct()).isNull();
+    }
   }
 
   private PriceActionEntity simulatedAction(BigDecimal targetPrice, BigDecimal canonicalPrice) {

@@ -2,19 +2,22 @@ package io.datapulse.analytics.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import io.datapulse.analytics.api.ProductReturnResponse;
 import io.datapulse.analytics.api.ReturnsFilter;
 import io.datapulse.analytics.api.ReturnsSummaryResponse;
+import io.datapulse.analytics.api.TrendGranularity;
 import io.datapulse.analytics.api.ReturnsTrendResponse;
 import io.datapulse.analytics.persistence.ReturnsReadRepository;
+import io.datapulse.analytics.persistence.ReturnsReadRepository.ReasonRow;
+import io.datapulse.analytics.persistence.ReturnsReadRepository.SummaryRow;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -36,45 +39,49 @@ class ReturnsAnalysisServiceTest {
   private ReturnsAnalysisService service;
 
   private static final long WORKSPACE_ID = 1L;
-  private static final ReturnsFilter EMPTY_FILTER = new ReturnsFilter(null, null);
+  private static final ReturnsFilter EMPTY_FILTER =
+      new ReturnsFilter(null, null, null, null, null);
 
   @Nested
   @DisplayName("getSummary")
   class GetSummary {
 
     @Test
-    @DisplayName("should return summary with return rate calculation")
-    void should_returnSummary() {
-      var summary = new ReturnsSummaryResponse(
-          "WB", 25, 30, new BigDecimal("15000.00"),
-          500, 600, new BigDecimal("5.00"),
-          new BigDecimal("-12000.00"), new BigDecimal("-500.00"),
-          "Defective product");
+    @DisplayName("should include reason breakdown and delta for period filter")
+    void should_includeReasonBreakdownAndDelta_when_periodProvided() {
+      var filter = new ReturnsFilter(null, null, "2025-03", null, null);
+      var summary = new SummaryRow(
+          20, 30, new BigDecimal("15000.00"),
+          100, 200, new BigDecimal("15.00"), "Damaged");
 
-      when(returnsReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
-          .thenReturn(List.of(summary));
+      when(returnsReadRepository.findSummary(WORKSPACE_ID, filter)).thenReturn(summary);
+      when(returnsReadRepository.findReasonBreakdown(WORKSPACE_ID, 202503))
+          .thenReturn(List.of(new ReasonRow("Damaged", 6), new ReasonRow("Wrong size", 4)));
+      when(returnsReadRepository.findReturnRateForPeriod(WORKSPACE_ID, 202502))
+          .thenReturn(new BigDecimal("12.00"));
 
-      List<ReturnsSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
+      ReturnsSummaryResponse result = service.getSummary(WORKSPACE_ID, filter);
 
-      assertThat(result).hasSize(1);
-      assertThat(result.get(0).returnRatePct()).isEqualByComparingTo("5.00");
-      assertThat(result.get(0).topReturnReason()).isEqualTo("Defective product");
+      assertThat(result.returnRatePct()).isEqualByComparingTo("15.00");
+      assertThat(result.returnRateDeltaPct()).isEqualByComparingTo("3.00");
+      assertThat(result.reasonBreakdown()).hasSize(2);
+      assertThat(result.reasonBreakdown().get(0).reason()).isEqualTo("Damaged");
+      assertThat(result.reasonBreakdown().get(0).percent()).isEqualByComparingTo("60.0");
     }
 
     @Test
-    @DisplayName("should handle zero return rate when no returns")
-    void should_returnZeroRate_when_noReturns() {
-      var summary = new ReturnsSummaryResponse(
-          "WB", 0, 0, BigDecimal.ZERO,
-          500, 600, BigDecimal.ZERO,
-          BigDecimal.ZERO, BigDecimal.ZERO, null);
+    @DisplayName("should skip reason breakdown and delta when period absent")
+    void should_skipPeriodSpecificData_when_periodMissing() {
+      var summary = new SummaryRow(
+          2, 3, new BigDecimal("1200.00"),
+          10, 20, new BigDecimal("15.00"), "Damaged");
 
-      when(returnsReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER))
-          .thenReturn(List.of(summary));
+      when(returnsReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(summary);
 
-      List<ReturnsSummaryResponse> result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
+      ReturnsSummaryResponse result = service.getSummary(WORKSPACE_ID, EMPTY_FILTER);
 
-      assertThat(result.get(0).returnRatePct()).isEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.returnRateDeltaPct()).isNull();
+      assertThat(result.reasonBreakdown()).isEmpty();
     }
   }
 
@@ -112,17 +119,16 @@ class ReturnsAnalysisServiceTest {
     }
 
     @Test
-    @DisplayName("should include reasons breakdown in product response")
+    @DisplayName("should return page content from repository")
     void should_includeReasons_when_productReturnsRetrieved() {
       var product = new ProductReturnResponse(
-          "WB", 100L, 1L, "SKU001", "Product A",
-          202501, 10, 12, new BigDecimal("6000.00"),
-          100, new BigDecimal("12.00"),
-          new BigDecimal("-5000.00"), new BigDecimal("-200.00"),
+          "WB", 100L, 1L, "SKU001", "Product A", 202501,
+          10, 12, new BigDecimal("6000.00"), 100, 120,
+          new BigDecimal("10.00"),
           "Wrong size");
 
       when(returnsReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
-          anyString(), eq(20), eq(0L)))
+          eq("returnRatePct"), eq(20), eq(0L)))
           .thenReturn(List.of(product));
       when(returnsReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(1L);
 
@@ -132,7 +138,7 @@ class ReturnsAnalysisServiceTest {
       assertThat(result.getContent()).hasSize(1);
       assertThat(result.getContent().get(0).topReturnReason()).isEqualTo("Wrong size");
       assertThat(result.getContent().get(0).returnRatePct())
-          .isEqualByComparingTo("12.00");
+          .isEqualByComparingTo("10.00");
     }
   }
 
@@ -141,17 +147,52 @@ class ReturnsAnalysisServiceTest {
   class GetTrend {
 
     @Test
-    @DisplayName("should delegate to repository and return trend data")
-    void should_returnTrend() {
-      var trend = new ReturnsTrendResponse(
-          202501, 30, 600, new BigDecimal("5.00"), new BigDecimal("-12000.00"));
-      when(returnsReadRepository.findTrend(WORKSPACE_ID, EMPTY_FILTER))
+    @DisplayName("should build month bounds from period when from/to absent")
+    void should_buildBoundsFromPeriod_when_fromToMissing() {
+      var filter = new ReturnsFilter(null, null, "2025-03", null, TrendGranularity.DAILY);
+      var trend = new ReturnsTrendResponse("2025-03-10", 2, 10, new BigDecimal("20.00"));
+      when(returnsReadRepository.findTrend(
+          eq(WORKSPACE_ID),
+          eq(new ReturnsFilter(
+              LocalDate.of(2025, 3, 1),
+              LocalDate.of(2025, 3, 31),
+              "2025-03",
+              null,
+              TrendGranularity.DAILY)),
+          eq(TrendGranularity.DAILY)))
           .thenReturn(List.of(trend));
 
-      List<ReturnsTrendResponse> result = service.getTrend(WORKSPACE_ID, EMPTY_FILTER);
+      List<ReturnsTrendResponse> result = service.getTrend(WORKSPACE_ID, filter);
 
       assertThat(result).hasSize(1);
-      assertThat(result.get(0).returnRatePct()).isEqualByComparingTo("5.00");
+      verify(returnsReadRepository).findTrend(
+          eq(WORKSPACE_ID),
+          eq(new ReturnsFilter(
+              LocalDate.of(2025, 3, 1),
+              LocalDate.of(2025, 3, 31),
+              "2025-03",
+              null,
+              TrendGranularity.DAILY)),
+          eq(TrendGranularity.DAILY));
+    }
+
+    @Test
+    @DisplayName("should keep explicit date range as is")
+    void should_keepExplicitRange_when_fromToProvided() {
+      var filter = new ReturnsFilter(
+          LocalDate.of(2025, 4, 1),
+          LocalDate.of(2025, 4, 30),
+          null,
+          null,
+          TrendGranularity.MONTHLY);
+      when(returnsReadRepository.findTrend(
+          eq(WORKSPACE_ID), eq(filter), eq(TrendGranularity.MONTHLY)))
+          .thenReturn(List.of());
+
+      service.getTrend(WORKSPACE_ID, filter);
+
+      verify(returnsReadRepository).findTrend(
+          eq(WORKSPACE_ID), eq(filter), eq(TrendGranularity.MONTHLY));
     }
   }
 }

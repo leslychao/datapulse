@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -13,21 +14,33 @@ import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { AnalyticsFilter, Granularity } from '@core/models';
+import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { DateRangePickerComponent } from '@shared/components/form/date-range-picker.component';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
-function defaultDateFrom(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 3);
-  return d.toISOString().slice(0, 10);
+function monthStart(period: string): string {
+  return `${period}-01`;
 }
 
-function defaultDateTo(): string {
-  return new Date().toISOString().slice(0, 10);
+function monthEnd(period: string): string {
+  const [y, m] = period.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${period}-${String(last).padStart(2, '0')}`;
+}
+
+function inferMonthPeriod(from: string, to: string): string | null {
+  const fromPeriod = from.slice(0, 7);
+  const toPeriod = to.slice(0, 7);
+  if (fromPeriod !== toPeriod) {
+    return null;
+  }
+  return from === monthStart(fromPeriod) && to === monthEnd(fromPeriod)
+    ? fromPeriod
+    : null;
 }
 
 const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
@@ -96,25 +109,44 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
 export class ReturnsTrendPageComponent {
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
+  private readonly navStore = inject(NavigationStore);
   private readonly t = inject(TranslateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  readonly dateFrom = signal(defaultDateFrom());
-  readonly dateTo = signal(defaultDateTo());
+  private readonly initialPeriod =
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'period')
+    ?? new Date().toISOString().slice(0, 7);
+  private readonly defaultFrom =
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'from')
+    ?? monthStart(this.initialPeriod);
+  private readonly defaultTo =
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'to')
+    ?? monthEnd(this.initialPeriod);
+
+  readonly dateFrom = signal(this.defaultFrom);
+  readonly dateTo = signal(this.defaultTo);
   readonly granularity = signal<Granularity>('MONTHLY');
   readonly granularityOptions = GRANULARITY_OPTIONS;
 
   private readonly filterDefs: UrlFilterDef[] = [
-    { key: 'from', signal: this.dateFrom, defaultValue: defaultDateFrom() },
-    { key: 'to', signal: this.dateTo, defaultValue: defaultDateTo() },
+    { key: 'from', signal: this.dateFrom, defaultValue: this.defaultFrom },
+    { key: 'to', signal: this.dateTo, defaultValue: this.defaultTo },
     { key: 'granularity', signal: this.granularity as any, defaultValue: 'MONTHLY' },
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:returns:trend', filterDefs: this.filterDefs,
+    });
+    const periodHint = inferMonthPeriod(this.dateFrom(), this.dateTo()) ?? this.initialPeriod;
+    this.navStore.setSectionFilter('analytics:returns', {
+      period: periodHint,
+      from: this.dateFrom(),
+      to: this.dateTo(),
+    });
+    this.syncSectionFilter();
   }
 
   onResetFilters(): void {
@@ -213,5 +245,17 @@ export class ReturnsTrendPageComponent {
 
   setGranularity(g: Granularity): void {
     this.granularity.set(g);
+  }
+
+  private syncSectionFilter(): void {
+    effect(() => {
+      const from = this.dateFrom();
+      const to = this.dateTo();
+      this.navStore.setSectionFilter('analytics:returns', {
+        period: inferMonthPeriod(from, to) ?? from.slice(0, 7),
+        from,
+        to,
+      });
+    });
   }
 }

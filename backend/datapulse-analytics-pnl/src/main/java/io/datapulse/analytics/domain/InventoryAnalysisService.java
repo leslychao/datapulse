@@ -57,7 +57,10 @@ public class InventoryAnalysisService {
   }
 
   public List<StockHistoryResponse> getStockHistory(
-      long workspaceId, long productId, LocalDate from, LocalDate to) {
+      long workspaceId, Long productId, LocalDate from, LocalDate to) {
+    if (productId == null) {
+      return inventoryReadRepository.findAggregateStockHistory(workspaceId, from, to);
+    }
     return inventoryReadRepository.findStockHistory(workspaceId, productId, from, to);
   }
 }

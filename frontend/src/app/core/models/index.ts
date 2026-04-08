@@ -17,5 +17,4 @@ export * from './advertising.model';
 export * from './alert.model';
 export * from './mismatch.model';
 export * from './queue.model';
-export * from './job.model';
 export * from './tour.model';

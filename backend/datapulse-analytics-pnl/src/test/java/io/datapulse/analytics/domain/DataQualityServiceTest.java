@@ -45,7 +45,7 @@ class DataQualityServiceTest {
 
   @BeforeEach
   void setUp() {
-    var dqProps = new DataQualityProperties(24, 48, 2, 100, 3, 30, 0.05, 30);
+    var dqProps = new DataQualityProperties(24, 48, 2, 6, 3, 30, 0.05, 30);
     var queryProps = new AnalyticsQueryProperties(null, dqProps);
     service = new DataQualityService(
         dataQualityReadRepository, syncStateReadRepository,
@@ -273,14 +273,14 @@ class DataQualityServiceTest {
           .thenReturn(Map.of(10L, connRow));
 
       var row = new ReconciliationRow(
-          10L, "WB", 202504,
+          10L, "wb", 202504,
           new BigDecimal("500000"), new BigDecimal("5000"),
           new BigDecimal("0.01"));
 
       when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
           .thenReturn(List.of(row));
       when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
-          .thenReturn(Map.of("10:WB", new BaselineStat(
+          .thenReturn(Map.of("10:wb", new BaselineStat(
               new BigDecimal("0.015"), new BigDecimal("0.005"), 5)));
 
       ReconciliationResultResponse result =
@@ -300,14 +300,14 @@ class DataQualityServiceTest {
           .thenReturn(Map.of(10L, connRow));
 
       var row = new ReconciliationRow(
-          10L, "WB", 202504,
+          10L, "wb", 202504,
           new BigDecimal("500000"), new BigDecimal("50000"),
           new BigDecimal("0.10"));
 
       when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
           .thenReturn(List.of(row));
       when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
-          .thenReturn(Map.of("10:WB", new BaselineStat(
+          .thenReturn(Map.of("10:wb", new BaselineStat(
               new BigDecimal("0.02"), new BigDecimal("0.01"), 200)));
 
       ReconciliationResultResponse result =
@@ -324,20 +324,46 @@ class DataQualityServiceTest {
           .thenReturn(Map.of(10L, connRow));
 
       var row = new ReconciliationRow(
-          10L, "WB", 202504,
+          10L, "wb", 202504,
           new BigDecimal("500000"), new BigDecimal("1000"),
           new BigDecimal("0.002"));
 
       when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
           .thenReturn(List.of(row));
       when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
-          .thenReturn(Map.of("10:WB", new BaselineStat(
+          .thenReturn(Map.of("10:wb", new BaselineStat(
               new BigDecimal("0.002"), new BigDecimal("0.001"), 3)));
 
       ReconciliationResultResponse result =
           service.getReconciliation(WORKSPACE_ID, null);
 
       assertThat(result.connections().get(0).status()).isEqualTo("CALIBRATION");
+    }
+
+    @Test
+    @DisplayName("should match baseline despite uppercase marketplace_type in PostgreSQL")
+    void should_matchBaseline_when_casesDiffer() {
+      var connRow = new ConnectionRow(10L, "Ozon Store", "OZON");
+      when(connectionRepository.findActiveByWorkspaceIdAsMap(WORKSPACE_ID))
+          .thenReturn(Map.of(10L, connRow));
+
+      var row = new ReconciliationRow(
+          10L, "ozon", 202504,
+          new BigDecimal("1000000"), new BigDecimal("1000"),
+          new BigDecimal("0.001"));
+
+      when(dataQualityReadRepository.findReconciliationRows(WORKSPACE_ID))
+          .thenReturn(List.of(row));
+      when(dataQualityReadRepository.findBaselineStats(WORKSPACE_ID))
+          .thenReturn(Map.of("10:ozon", new BaselineStat(
+              new BigDecimal("0.005"), new BigDecimal("0.002"), 12)));
+
+      ReconciliationResultResponse result =
+          service.getReconciliation(WORKSPACE_ID, null);
+
+      var conn = result.connections().get(0);
+      assertThat(conn.status()).isEqualTo("NORMAL");
+      assertThat(conn.baselineRatioPct()).isNotEqualByComparingTo(BigDecimal.ZERO);
     }
   }
 }

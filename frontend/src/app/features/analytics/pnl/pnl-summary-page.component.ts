@@ -36,7 +36,7 @@ import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, currentMonth } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
 type TrendDir = 'up' | 'down' | 'neutral';
@@ -148,8 +148,9 @@ export class PnlSummaryPageComponent {
     effect(() => {
       this.navStore.setSectionFilter('analytics:pnl', { period: this.period() });
     });
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:pnl:summary', filterDefs: this.filterDefs,
+    });
     if (PNL_OVERVIEW_TOUR.triggerOnFirstVisit && !this.tourProgress.isCompleted(PNL_OVERVIEW_TOUR.id)) {
       this.tourService.startWhenReady(PNL_OVERVIEW_TOUR);
     }

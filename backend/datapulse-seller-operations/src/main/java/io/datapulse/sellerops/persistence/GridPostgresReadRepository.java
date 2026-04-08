@@ -130,7 +130,7 @@ public class GridPostgresReadRepository {
             LEFT JOIN manual_price_lock mpl
                 ON mpl.marketplace_offer_id = mo.id AND mpl.unlocked_at IS NULL
             LEFT JOIN simulated_offer_state sos
-                ON sos.marketplace_offer_id = mo.id
+                ON sos.marketplace_offer_id = mo.id AND sos.workspace_id = mc.workspace_id
             LEFT JOIN LATERAL (
                 SELECT MIN(last_success_at) AS last_success_at
                 FROM marketplace_sync_state

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  inject,
   input,
   output,
 } from '@angular/core';
@@ -9,6 +10,9 @@ import { AgGridAngular } from 'ag-grid-angular';
 import {
   CellContextMenuEvent,
   ColDef,
+  ColumnMovedEvent,
+  ColumnResizedEvent,
+  ColumnVisibleEvent,
   GetContextMenuItemsParams,
   GetRowIdParams,
   GridApi,
@@ -25,6 +29,7 @@ import {
 } from 'ag-grid-community';
 
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
+import { ViewStateService, PersistedColumnState } from '@shared/services/view-state.service';
 
 const DEFAULT_COL_DEF: ColDef = {
   resizable: true,
@@ -71,6 +76,9 @@ const DEFAULT_COL_DEF: ColDef = {
           (rowDataUpdated)="onRowDataUpdated($event)"
           (cellContextMenu)="onCellContextMenu($event)"
           (gridReady)="onGridReady($event)"
+          (columnResized)="onColumnStateChanged($event)"
+          (columnMoved)="onColumnStateChanged($event)"
+          (columnVisible)="onColumnStateChanged($event)"
           [suppressContextMenu]="!getContextMenuItems()"
           [getContextMenuItems]="getContextMenuItems()"
         ></ag-grid-angular>
@@ -99,6 +107,7 @@ export class DataGridComponent {
   readonly contextMenuEnabled = input(false);
   readonly getContextMenuItems = input<(params: GetContextMenuItemsParams) => (string | MenuItemDef)[]>();
   readonly initialSortModel = input<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+  readonly viewStateKey = input<string>();
 
   readonly rowClicked = output<any>();
   readonly cellDoubleClicked = output<any>();
@@ -111,8 +120,10 @@ export class DataGridComponent {
   protected readonly defaultColDef = DEFAULT_COL_DEF;
   protected readonly localeText = AG_GRID_LOCALE_RU;
   protected readonly selectionColumnDef = { pinned: 'left' as const, lockPosition: true };
+  private readonly viewStateService = inject(ViewStateService);
   private previousRowIds = new Set<string>();
   private gridApi: GridApi | null = null;
+  private columnSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   getApi(): GridApi | null {
     return this.gridApi;
@@ -127,6 +138,7 @@ export class DataGridComponent {
         defaultState: { sort: null },
       });
     }
+    this.restoreColumnState(event.api);
     this.gridReady.emit(event.api);
   }
 
@@ -191,5 +203,44 @@ export class DataGridComponent {
       }
     });
     this.previousRowIds = currentIds;
+  }
+
+  onColumnStateChanged(_event: ColumnResizedEvent | ColumnMovedEvent | ColumnVisibleEvent): void {
+    if (!this.viewStateKey() || !this.gridApi) return;
+    if (this.columnSaveTimer) clearTimeout(this.columnSaveTimer);
+    this.columnSaveTimer = setTimeout(() => this.persistColumnState(), 500);
+  }
+
+  private persistColumnState(): void {
+    const key = this.viewStateKey();
+    if (!key || !this.gridApi) return;
+    const cols = this.gridApi.getColumnState();
+    const columnState: PersistedColumnState[] = cols
+      .filter((c) => c.colId !== '__selection__')
+      .map((c) => ({
+        colId: c.colId ?? '',
+        width: c.width ?? undefined,
+        hide: c.hide ?? undefined,
+        pinned: typeof c.pinned === 'string' ? c.pinned : c.pinned ? 'left' : undefined,
+      }));
+    this.viewStateService.save(key, { columnState });
+  }
+
+  private restoreColumnState(api: GridApi): void {
+    const key = this.viewStateKey();
+    if (!key) return;
+    const persisted = this.viewStateService.restoreColumnState(key);
+    if (!persisted?.length) return;
+    const stateMap = new Map(persisted.map((c) => [c.colId, c]));
+    const currentCols = api.getColumnState();
+    const merged = currentCols.map((col) => {
+      const saved = stateMap.get(col.colId ?? '');
+      if (!saved) return col;
+      const pinned = saved.pinned !== undefined
+        ? (saved.pinned as 'left' | 'right' | null)
+        : col.pinned;
+      return { ...col, width: saved.width ?? col.width, hide: saved.hide ?? col.hide, pinned };
+    });
+    api.applyColumnState({ state: merged, applyOrder: true });
   }
 }

@@ -153,7 +153,8 @@ public class ActionService {
 
         eventPublisher.publishEvent(new ActionCreatedEvent(
                 action.getId(), workspaceId, marketplaceOfferId,
-                priceDecisionId, executionMode, targetPrice, currentPrice
+                priceDecisionId, executionMode, action.getStatus(),
+                targetPrice, currentPrice
         ));
 
         log.info("Action created: actionId={}, offerId={}, mode={}, status={}, targetPrice={}",

@@ -76,6 +76,7 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
           />
         } @else {
           <dp-data-grid
+            viewStateKey="pricing:decisions"
             [columnDefs]="columnDefs"
             [rowData]="rows()"
             [loading]="decisionsQuery.isPending()"
@@ -105,6 +106,7 @@ export class DecisionsListPageComponent {
   private readonly detailPanel = inject(DetailPanelService);
 
   readonly listState = createListPageState({
+    pageKey: 'pricing:decisions',
     defaultSort: { column: 'createdAt', direction: 'desc' },
     defaultPageSize: 100,
     filterBarDefs: [

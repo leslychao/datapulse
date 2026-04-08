@@ -30,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class DataQualityService {
 
   private static final int OVERDUE_MULTIPLIER = 3;
@@ -49,6 +48,7 @@ public class DataQualityService {
 
   // ── Status ──────────────────────────────────────────────────────────
 
+  @Transactional(readOnly = true)
   public DataQualityStatusResponse getStatus(long workspaceId) {
     List<SyncFreshnessRow> rows = syncStateReadRepository.findSyncFreshness(workspaceId);
     if (rows.isEmpty()) {
@@ -88,6 +88,7 @@ public class DataQualityService {
 
   // ── Reconciliation ──────────────────────────────────────────────────
 
+  @Transactional(readOnly = true)
   public ReconciliationResultResponse getReconciliation(
       long workspaceId, Integer periodFilter) {
 
@@ -115,7 +116,10 @@ public class DataQualityService {
 
     List<TrendPoint> trend = buildTrend(allRows, baselines);
 
-    List<ResidualBucket> distribution = buildDistribution(allRows);
+    var distributionRows = periodFilter != null
+        ? allRows.stream().filter(r -> r.period() == periodFilter).toList()
+        : allRows;
+    List<ResidualBucket> distribution = buildDistribution(distributionRows);
 
     return new ReconciliationResultResponse(connections, trend, distribution);
   }
@@ -198,7 +202,7 @@ public class DataQualityService {
             .setScale(2, RoundingMode.HALF_UP);
       }
 
-      String key = connId + ":" + conn.marketplaceType();
+      String key = connId + ":" + conn.marketplaceType().toLowerCase();
       BaselineStat baseline = baselines.getOrDefault(key, BaselineStat.EMPTY);
 
       BigDecimal baselinePct = baseline.mean() != null

@@ -18,7 +18,7 @@ import { ChartComponent } from '@shared/components/chart/chart.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
 type ReconStatus = ReconciliationConnection['status'];
@@ -168,8 +168,9 @@ export class ReconciliationPageComponent {
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:data-quality:reconciliation', filterDefs: this.filterDefs,
+    });
   }
 
   onResetFilters(): void {

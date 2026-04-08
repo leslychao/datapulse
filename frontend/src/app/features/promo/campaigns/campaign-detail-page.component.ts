@@ -662,6 +662,10 @@ export class CampaignDetailPageComponent {
     return val.toLocaleString('ru-RU');
   }
 
+  protected inputValue(event: Event): string {
+    return (event.target as HTMLTextAreaElement).value;
+  }
+
   private badgeCell(
     value: string | null,
     i18nPrefix: string,

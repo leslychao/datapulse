@@ -5,5 +5,6 @@ public enum MismatchResolutionType {
     REPRICED,
     INVESTIGATED,
     EXTERNAL,
+    IGNORED,
     AUTO_RESOLVED
 }

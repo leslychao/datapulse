@@ -10,7 +10,6 @@ import {
   ActionsKpi,
   BulkActionResponse,
   BulkApproveRequest,
-  BulkCancelRequest,
   BulkRejectRequest,
   Page,
   ReconcileRequest,
@@ -113,29 +112,9 @@ export class ActionApiService {
     );
   }
 
-  bulkCancel(workspaceId: number, req: BulkCancelRequest): Observable<BulkActionResponse> {
-    return this.http.post<BulkActionResponse>(
-      `${this.base}/workspaces/${workspaceId}/actions/bulk-cancel`, req,
-    );
-  }
-
   getActionsKpi(workspaceId: number): Observable<ActionsKpi> {
     return this.http.get<ActionsKpi>(
       `${this.base}/workspaces/${workspaceId}/actions/kpi`,
-    );
-  }
-
-  exportActions(workspaceId: number, filter: ActionFilter): Observable<Blob> {
-    let params = new HttpParams().set('format', 'csv');
-    if (filter.connectionId) params = params.set('connectionId', filter.connectionId);
-    if (filter.status?.length) params = params.set('status', filter.status.join(','));
-    if (filter.executionMode) params = params.set('executionMode', filter.executionMode);
-    if (filter.search) params = params.set('search', filter.search);
-    if (filter.from) params = params.set('from', filter.from);
-    if (filter.to) params = params.set('to', filter.to);
-    return this.http.get(
-      `${this.base}/workspaces/${workspaceId}/actions/export`,
-      { params, responseType: 'blob' },
     );
   }
 

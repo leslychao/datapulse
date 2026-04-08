@@ -28,9 +28,19 @@ import {
   currentMonth,
 } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
-  SortUrlState, readSortFromUrl, syncSortToUrl,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
+  SortUrlState,
 } from '@shared/utils/url-filters';
+
+function monthStart(period: string): string {
+  return `${period}-01`;
+}
+
+function monthEnd(period: string): string {
+  const [y, m] = period.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${period}-${String(last).padStart(2, '0')}`;
+}
 
 @Component({
   selector: 'dp-returns-by-product-page',
@@ -70,6 +80,7 @@ import {
 
       <div class="flex-1">
         <dp-data-grid
+          viewStateKey="analytics:returns:by-product"
           [columnDefs]="columnDefs()"
           [rowData]="gridRows()"
           [loading]="returnsQuery.isPending()"
@@ -212,12 +223,19 @@ export class ReturnsByProductPageComponent {
   readonly onSearchInput = createDebouncedSearch(this.search, 300, () => this.currentPage.set(0));
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
-    readSortFromUrl(this.route, this.currentSort);
-    syncSortToUrl(this.router, this.route, this.currentSort, { column: 'return_rate_pct', direction: 'desc' });
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:returns:by-product',
+      filterDefs: this.filterDefs,
+      sortSignal: this.currentSort,
+      defaultSort: { column: 'return_rate_pct', direction: 'desc' },
+    });
     effect(() => {
-      this.navStore.setSectionFilter('analytics:returns', { period: this.period() });
+      const period = this.period();
+      this.navStore.setSectionFilter('analytics:returns', {
+        period,
+        from: monthStart(period),
+        to: monthEnd(period),
+      });
     });
   }
 

@@ -118,14 +118,16 @@ export class AnalyticsApiService {
 
   getStockHistory(
     workspaceId: number,
-    productId: number,
     from: string,
     to: string,
+    productId?: number | null,
   ): Observable<StockHistoryPoint[]> {
-    const params = new HttpParams()
-      .set('productId', productId)
+    let params = new HttpParams()
       .set('from', from)
       .set('to', to);
+    if (productId != null) {
+      params = params.set('productId', productId);
+    }
     return this.http.get<StockHistoryPoint[]>(
       `${this.base}/workspaces/${workspaceId}/analytics/inventory/stock-history`,
       { params },

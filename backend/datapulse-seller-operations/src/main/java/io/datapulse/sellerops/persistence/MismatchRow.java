@@ -24,6 +24,10 @@ public class MismatchRow {
     private BigDecimal deltaPct;
     private String severity;
     private String status;
+    private String resolvedReason;
     private OffsetDateTime detectedAt;
     private String connectionName;
+    private String marketplaceType;
+    private OffsetDateTime resolvedAt;
+    private Long relatedActionId;
 }

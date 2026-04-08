@@ -369,13 +369,6 @@ export interface BulkCompetitorUploadResponse {
   errors: string[];
 }
 
-export interface AdvisorResponse {
-  advice: string | null;
-  error: string | null;
-  generatedAt: string | null;
-  cachedUntil: string | null;
-}
-
 export type InsightType =
   | 'PRICE_INCREASE_CANDIDATE'
   | 'OVERSTOCK_LIQUIDATION'

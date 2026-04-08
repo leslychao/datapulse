@@ -5,6 +5,10 @@ import io.datapulse.execution.domain.ActionReconciliationSource;
 
 import java.math.BigDecimal;
 
+/**
+ * Published when a price action succeeds (confirmed by reconciliation).
+ * No listeners yet — intended for STOMP push (action list / grid refresh).
+ */
 public record ActionCompletedEvent(
         long actionId,
         long workspaceId,

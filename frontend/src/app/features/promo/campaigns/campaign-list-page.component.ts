@@ -132,6 +132,7 @@ const MP_BADGE: Record<
           />
         } @else {
           <dp-data-grid
+            viewStateKey="promo:campaigns"
             [columnDefs]="columnDefs()"
             [rowData]="rows()"
             [loading]="campaignsQuery.isPending()"
@@ -159,6 +160,7 @@ export class CampaignListPageComponent {
   protected readonly ClockIcon = Clock;
 
   readonly listState = createListPageState({
+    pageKey: 'promo:campaigns',
     defaultSort: { column: 'dateFrom', direction: 'desc' },
     defaultPageSize: 50,
   });

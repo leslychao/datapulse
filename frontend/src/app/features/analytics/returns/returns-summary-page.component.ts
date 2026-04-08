@@ -19,8 +19,18 @@ import { ChartComponent } from '@shared/components/chart/chart.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
 import {
-  UrlFilterDef, readFiltersFromUrl, syncFiltersToUrl, isFiltersDefault, resetFilters,
+  UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
+
+function monthStart(period: string): string {
+  return `${period}-01`;
+}
+
+function monthEnd(period: string): string {
+  const [y, m] = period.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${period}-${String(last).padStart(2, '0')}`;
+}
 
 @Component({
   selector: 'dp-returns-summary-page',
@@ -41,6 +51,9 @@ import {
           </button>
         }
       </div>
+      <p class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+        {{ 'analytics.returns.note.operational_scope' | translate }}
+      </p>
 
       @if (summaryQuery.isPending()) {
         <div class="flex gap-3">
@@ -51,6 +64,16 @@ import {
       }
 
       @if (summaryQuery.data(); as s) {
+        @if (s.totalReturnCount === 0) {
+          <div
+            class="rounded-[var(--radius-md)] border border-[var(--border-default)]
+                   bg-[var(--bg-secondary)] px-3 py-2 text-[length:var(--text-xs)]
+                   text-[var(--text-secondary)]"
+          >
+            {{ 'analytics.returns.empty_operational_month' | translate }}
+          </div>
+        }
+
         <!-- KPI Cards -->
         <div class="flex gap-3">
           <div class="flex flex-1 flex-col gap-1 rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-3 shadow-[var(--shadow-sm)]">
@@ -139,10 +162,16 @@ export class ReturnsSummaryPageComponent {
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
   constructor() {
-    readFiltersFromUrl(this.route, this.filterDefs);
-    syncFiltersToUrl(this.router, this.route, this.filterDefs);
+    initPersistedFilters(this.router, this.route, {
+      pageKey: 'analytics:returns:summary', filterDefs: this.filterDefs,
+    });
     effect(() => {
-      this.navStore.setSectionFilter('analytics:returns', { period: this.period() });
+      const period = this.period();
+      this.navStore.setSectionFilter('analytics:returns', {
+        period,
+        from: monthStart(period),
+        to: monthEnd(period),
+      });
     });
   }
 

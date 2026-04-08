@@ -44,7 +44,7 @@ public class InventoryController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public List<StockHistoryResponse> getStockHistory(
             @PathVariable("workspaceId") long workspaceId,
-            @RequestParam long productId,
+            @RequestParam(required = false) Long productId,
             @RequestParam LocalDate from,
             @RequestParam LocalDate to) {
         return inventoryAnalysisService.getStockHistory(workspaceId, productId, from, to);
