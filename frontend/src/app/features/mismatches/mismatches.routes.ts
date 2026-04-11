@@ -9,6 +9,14 @@ const routes: Routes = [
       ),
     data: { breadcrumb: 'Расхождения' },
   },
+  {
+    path: ':mismatchId',
+    loadComponent: () =>
+      import('./mismatch-detail-page.component').then(
+        (m) => m.MismatchDetailPageComponent,
+      ),
+    data: { breadcrumb: 'Детали' },
+  },
 ];
 
 export default routes;

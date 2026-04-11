@@ -95,14 +95,14 @@ const routes: Routes = [
       },
 
       // Returns
-      { path: 'returns', redirectTo: 'returns/summary', pathMatch: 'full' },
+      { path: 'returns', redirectTo: 'returns/overview', pathMatch: 'full' },
       {
-        path: 'returns/summary',
+        path: 'returns/overview',
         loadComponent: () =>
-          import('./returns/returns-summary-page.component').then(
-            (m) => m.ReturnsSummaryPageComponent,
+          import('./returns/returns-overview-page.component').then(
+            (m) => m.ReturnsOverviewPageComponent,
           ),
-        data: { breadcrumb: 'Сводка', section: 'returns' },
+        data: { breadcrumb: 'Обзор', section: 'returns' },
       },
       {
         path: 'returns/by-product',
@@ -110,15 +110,15 @@ const routes: Routes = [
           import('./returns/returns-by-product-page.component').then(
             (m) => m.ReturnsByProductPageComponent,
           ),
-        data: { breadcrumb: 'По товарам', section: 'returns' },
+        data: { breadcrumb: 'Товары', section: 'returns' },
       },
       {
-        path: 'returns/trend',
+        path: 'returns/reasons',
         loadComponent: () =>
-          import('./returns/returns-trend-page.component').then(
-            (m) => m.ReturnsTrendPageComponent,
+          import('./returns/returns-reasons-page.component').then(
+            (m) => m.ReturnsReasonsPageComponent,
           ),
-        data: { breadcrumb: 'Тренд', section: 'returns' },
+        data: { breadcrumb: 'Причины', section: 'returns' },
       },
 
       // Data Quality
@@ -129,7 +129,7 @@ const routes: Routes = [
           import('./data-quality/data-quality-status-page.component').then(
             (m) => m.DataQualityStatusPageComponent,
           ),
-        data: { breadcrumb: 'Статус', section: 'data-quality' },
+        data: { breadcrumb: 'Обзор', section: 'data-quality' },
       },
       {
         path: 'data-quality/reconciliation',

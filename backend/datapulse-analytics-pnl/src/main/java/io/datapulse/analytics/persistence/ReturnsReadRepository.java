@@ -6,10 +6,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import io.datapulse.analytics.api.ProductReturnResponse;
 import io.datapulse.analytics.api.ReturnsFilter;
-import io.datapulse.analytics.api.ReturnsSummaryResponse;
 import io.datapulse.analytics.api.ReturnsTrendResponse;
 import io.datapulse.analytics.api.TrendGranularity;
 import io.datapulse.analytics.config.ClickHouseReadJdbc;
@@ -31,8 +31,11 @@ public class ReturnsReadRepository {
       "returnAmount", "return_amount",
       "returnCount", "return_count",
       "saleQuantity", "sale_quantity",
-      "sellerSkuId", "m.seller_sku_id"
+      "sellerSkuId", "m.seller_sku_id",
+      "distinctReasonCount", "distinct_reason_count"
   );
+
+  private static final Set<String> SORT_DIRECTIONS = Set.of("ASC", "DESC");
 
   private static final String SUMMARY_SQL = """
       SELECT
@@ -43,7 +46,8 @@ public class ReturnsReadRepository {
           sum(sale_quantity) AS total_sale_quantity,
           if(total_sale_quantity > 0,
              total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct,
-          topK(1)(top_return_reason)[1] AS top_return_reason
+          topK(1)(top_return_reason)[1] AS top_return_reason,
+          countDistinctIf(seller_sku_id, seller_sku_id > 0) AS products_with_returns
       FROM mart_returns_analysis
       WHERE workspace_id = :workspaceId
       """;
@@ -62,13 +66,30 @@ public class ReturnsReadRepository {
   private static final String REASON_BREAKDOWN_SQL = """
       SELECT
           return_reason,
-          count() AS cnt
+          count() AS cnt,
+          sum(ifNull(return_amount, toDecimal64(0, 2))) AS reason_amount,
+          uniqExact(seller_sku_id) AS product_count
       FROM fact_returns
       WHERE workspace_id = :workspaceId
         AND toYYYYMM(return_date) = :period
       GROUP BY return_reason
       ORDER BY cnt DESC
       LIMIT 10
+      SETTINGS final = 1
+      """;
+
+  private static final String REASONS_SQL = """
+      SELECT
+          return_reason,
+          count() AS cnt,
+          sum(quantity) AS total_quantity,
+          sum(ifNull(return_amount, toDecimal64(0, 2))) AS reason_amount,
+          uniqExact(seller_sku_id) AS product_count
+      FROM fact_returns
+      WHERE workspace_id = :workspaceId
+        AND toYYYYMM(return_date) = :period
+      GROUP BY return_reason
+      ORDER BY cnt DESC
       SETTINGS final = 1
       """;
 
@@ -86,7 +107,8 @@ public class ReturnsReadRepository {
           m.sale_count AS sale_count,
           m.sale_quantity AS sale_quantity,
           m.return_rate_pct AS return_rate_pct,
-          m.top_return_reason AS top_return_reason
+          m.top_return_reason AS top_return_reason,
+          m.distinct_reason_count AS distinct_reason_count
       FROM mart_returns_analysis AS m
       LEFT JOIN dim_product AS p ON m.product_id = p.product_id
       WHERE m.workspace_id = :workspaceId
@@ -132,10 +154,24 @@ public class ReturnsReadRepository {
       int saleCount,
       int totalSaleQuantity,
       BigDecimal returnRatePct,
-      String topReturnReason
+      String topReturnReason,
+      int productsWithReturns
   ) {}
 
-  public record ReasonRow(String reason, int count) {}
+  public record ReasonRow(
+      String reason,
+      int count,
+      BigDecimal amount,
+      int productCount
+  ) {}
+
+  public record FullReasonRow(
+      String reason,
+      int count,
+      int totalQuantity,
+      BigDecimal amount,
+      int productCount
+  ) {}
 
   public SummaryRow findSummary(long workspaceId, ReturnsFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
@@ -150,7 +186,8 @@ public class ReturnsReadRepository {
         rs.getInt("sale_count"),
         rs.getInt("total_sale_quantity"),
         rs.getBigDecimal("return_rate_pct"),
-        rs.getString("top_return_reason")
+        rs.getString("top_return_reason"),
+        rs.getInt("products_with_returns")
     ));
   }
 
@@ -169,18 +206,37 @@ public class ReturnsReadRepository {
         .addValue("period", period);
 
     return jdbc.ch().query(REASON_BREAKDOWN_SQL, params,
-        (rs, rowNum) -> new ReasonRow(rs.getString("return_reason"), rs.getInt("cnt")));
+        (rs, rowNum) -> new ReasonRow(
+            rs.getString("return_reason"),
+            rs.getInt("cnt"),
+            rs.getBigDecimal("reason_amount"),
+            rs.getInt("product_count")));
+  }
+
+  public List<FullReasonRow> findReasons(long workspaceId, int period) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId)
+        .addValue("period", period);
+
+    return jdbc.ch().query(REASONS_SQL, params,
+        (rs, rowNum) -> new FullReasonRow(
+            rs.getString("return_reason"),
+            rs.getInt("cnt"),
+            rs.getInt("total_quantity"),
+            rs.getBigDecimal("reason_amount"),
+            rs.getInt("product_count")));
   }
 
   public List<ProductReturnResponse> findByProduct(long workspaceId, ReturnsFilter filter,
-      String sortColumn, int limit, long offset) {
+      String sortColumn, String sortDirection, int limit, long offset) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(BY_PRODUCT_SQL);
     appendFilter(sb, params, filter);
     appendSearchFilter(sb, params, filter);
 
     String orderBy = SORT_WHITELIST.getOrDefault(sortColumn, "return_rate_pct");
-    sb.append(" ORDER BY ").append(orderBy).append(" DESC NULLS LAST");
+    String dir = SORT_DIRECTIONS.contains(sortDirection.toUpperCase())
+        ? sortDirection.toUpperCase() : "DESC";
+    sb.append(" ORDER BY ").append(orderBy).append(" ").append(dir).append(" NULLS LAST");
     sb.append(" LIMIT :limit OFFSET :offset");
     params.addValue("limit", limit);
     params.addValue("offset", offset);
@@ -278,7 +334,8 @@ public class ReturnsReadRepository {
         rs.getInt("sale_count"),
         rs.getInt("sale_quantity"),
         rs.getBigDecimal("return_rate_pct"),
-        rs.getString("top_return_reason")
+        rs.getString("top_return_reason"),
+        rs.getInt("distinct_reason_count")
     );
   }
 }

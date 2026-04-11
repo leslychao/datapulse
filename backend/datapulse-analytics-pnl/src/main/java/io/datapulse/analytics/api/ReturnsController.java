@@ -45,4 +45,12 @@ public class ReturnsController {
             ReturnsFilter filter) {
         return returnsAnalysisService.getTrend(workspaceId, filter);
     }
+
+    @GetMapping("/reasons")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+    public List<ReturnReasonResponse> getReasons(
+            @PathVariable("workspaceId") long workspaceId,
+            ReturnsFilter filter) {
+        return returnsAnalysisService.getReasons(workspaceId, filter);
+    }
 }

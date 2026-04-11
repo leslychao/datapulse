@@ -34,6 +34,35 @@ public class InventoryReadRepository {
       "skuCode", "p.sku_code"
   );
 
+  /**
+   * One logical row per offer × warehouse: {@code ReplacingMergeTree} ORDER BY includes
+   * {@code analysis_date}, so several physical rows can coexist; we take the row with highest
+   * {@code ver} (materialization batch). Using {@code GROUP BY} + {@code argMax(col, ver)} is the
+   * standard ClickHouse pattern — single scan, all measures from the winning row; avoids
+   * self-join and global {@code max(analysis_date)} which hid most SKUs.
+   */
+  private static final String MART_INVENTORY_LATEST = """
+      SELECT
+          workspace_id,
+          product_id,
+          warehouse_id,
+          argMax(connection_id, ver) AS connection_id,
+          argMax(source_platform, ver) AS source_platform,
+          argMax(seller_sku_id, ver) AS seller_sku_id,
+          argMax(analysis_date, ver) AS analysis_date,
+          argMax(available, ver) AS available,
+          argMax(reserved, ver) AS reserved,
+          argMax(avg_daily_sales_14d, ver) AS avg_daily_sales_14d,
+          argMax(days_of_cover, ver) AS days_of_cover,
+          argMax(stock_out_risk, ver) AS stock_out_risk,
+          argMax(cost_price, ver) AS cost_price,
+          argMax(frozen_capital, ver) AS frozen_capital,
+          argMax(recommended_replenishment, ver) AS recommended_replenishment
+      FROM mart_inventory_analysis FINAL
+      WHERE workspace_id = :workspaceId
+      GROUP BY workspace_id, product_id, warehouse_id
+      """;
+
   private static final String OVERVIEW_SQL = """
       SELECT
           count(DISTINCT m.product_id) AS total_skus,
@@ -41,12 +70,9 @@ public class InventoryReadRepository {
           countIf(m.stock_out_risk = 'WARNING') AS warning_count,
           countIf(m.stock_out_risk = 'NORMAL') AS normal_count,
           sum(m.frozen_capital) AS frozen_capital
-      FROM mart_inventory_analysis AS m
-      WHERE m.workspace_id = :workspaceId
-        AND m.analysis_date = (
-            SELECT max(analysis_date) FROM mart_inventory_analysis
-            WHERE workspace_id = :workspaceId
-        )
+      FROM (
+      """ + MART_INVENTORY_LATEST + """
+      ) AS m
       """;
 
   private static final String TOP_CRITICAL_SQL = """
@@ -67,16 +93,13 @@ public class InventoryReadRepository {
           m.cost_price AS cost_price,
           m.frozen_capital AS frozen_capital,
           m.recommended_replenishment AS recommended_replenishment
-      FROM mart_inventory_analysis AS m
+      FROM (
+      """ + MART_INVENTORY_LATEST + """
+      ) AS m
       LEFT JOIN dim_product AS p
-          ON m.product_id = p.product_id
+          ON m.product_id = p.product_id AND m.connection_id = p.connection_id
       LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
-      WHERE m.workspace_id = :workspaceId
-        AND m.stock_out_risk = 'CRITICAL'
-        AND m.analysis_date = (
-            SELECT max(analysis_date) FROM mart_inventory_analysis
-            WHERE workspace_id = :workspaceId
-        )
+      WHERE m.stock_out_risk = 'CRITICAL'
       ORDER BY m.days_of_cover ASC NULLS FIRST, m.available ASC
       LIMIT 10
       """;
@@ -99,15 +122,13 @@ public class InventoryReadRepository {
           m.cost_price AS cost_price,
           m.frozen_capital AS frozen_capital,
           m.recommended_replenishment AS recommended_replenishment
-      FROM mart_inventory_analysis AS m
+      FROM (
+      """ + MART_INVENTORY_LATEST + """
+      ) AS m
       LEFT JOIN dim_product AS p
-          ON m.product_id = p.product_id
+          ON m.product_id = p.product_id AND m.connection_id = p.connection_id
       LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
-      WHERE m.workspace_id = :workspaceId
-        AND m.analysis_date = (
-            SELECT max(analysis_date) FROM mart_inventory_analysis
-            WHERE workspace_id = :workspaceId
-        )
+      WHERE 1 = 1
       """;
 
   private static final String STOCK_HISTORY_SQL = """
@@ -187,14 +208,12 @@ public class InventoryReadRepository {
   public long countByProduct(long workspaceId, InventoryFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder("""
-        SELECT count(*) FROM mart_inventory_analysis AS m
+        SELECT count(*) FROM (
+        """ + MART_INVENTORY_LATEST + """
+        ) AS m
         LEFT JOIN dim_product AS p
-            ON m.product_id = p.product_id
-        WHERE m.workspace_id = :workspaceId
-          AND m.analysis_date = (
-              SELECT max(analysis_date) FROM mart_inventory_analysis
-              WHERE workspace_id = :workspaceId
-          )
+            ON m.product_id = p.product_id AND m.connection_id = p.connection_id
+        WHERE 1 = 1
         """);
     appendProductFilter(sb, params, filter);
     sb.append(SETTINGS_FINAL);

@@ -14,6 +14,7 @@ import {
   PnlTrendPoint,
   PostingDetail,
   ReconciliationResult,
+  ReturnReason,
   ReturnsByProduct,
   ReturnsSummary,
   ReturnsTrendPoint,
@@ -167,6 +168,16 @@ export class AnalyticsApiService {
   ): Observable<ReturnsTrendPoint[]> {
     return this.http.get<ReturnsTrendPoint[]>(
       `${this.base}/workspaces/${workspaceId}/analytics/returns/trend`,
+      { params: this.buildParams(filter) },
+    );
+  }
+
+  listReturnReasons(
+    workspaceId: number,
+    filter: AnalyticsFilter,
+  ): Observable<ReturnReason[]> {
+    return this.http.get<ReturnReason[]>(
+      `${this.base}/workspaces/${workspaceId}/analytics/returns/reasons`,
       { params: this.buildParams(filter) },
     );
   }

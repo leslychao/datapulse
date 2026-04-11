@@ -15,5 +15,6 @@ public record ProductReturnResponse(
     int saleCount,
     int saleQuantity,
     BigDecimal returnRatePct,
-    String topReturnReason
+    String topReturnReason,
+    int distinctReasonCount
 ) {}

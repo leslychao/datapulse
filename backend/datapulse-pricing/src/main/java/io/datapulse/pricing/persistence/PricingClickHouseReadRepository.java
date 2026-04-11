@@ -272,13 +272,20 @@ public class PricingClickHouseReadRepository {
                 avg(m.days_of_cover) AS avg_days_of_cover,
                 sum(m.frozen_capital) AS frozen_capital,
                 anyLast(m.stock_out_risk) AS stock_out_risk
-            FROM mart_inventory_analysis AS m
-            WHERE m.connection_id = :connectionId
-              AND m.seller_sku_id IN (:sellerSkuIds)
-              AND m.analysis_date = (
-                  SELECT max(analysis_date) FROM mart_inventory_analysis
-                  WHERE connection_id = :connectionId
-              )
+            FROM (
+                SELECT
+                    connection_id,
+                    product_id,
+                    warehouse_id,
+                    argMax(seller_sku_id, ver) AS seller_sku_id,
+                    argMax(days_of_cover, ver) AS days_of_cover,
+                    argMax(frozen_capital, ver) AS frozen_capital,
+                    argMax(stock_out_risk, ver) AS stock_out_risk
+                FROM mart_inventory_analysis FINAL
+                WHERE connection_id = :connectionId
+                GROUP BY connection_id, product_id, warehouse_id
+            ) AS m
+            WHERE m.seller_sku_id IN (:sellerSkuIds)
             GROUP BY m.seller_sku_id
             SETTINGS final = 1
             """;

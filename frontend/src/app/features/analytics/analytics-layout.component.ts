@@ -42,9 +42,9 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
     { labelKey: 'analytics.subnav.inventory.history', path: 'inventory/stock-history' },
   ],
   returns: [
-    { labelKey: 'analytics.subnav.returns.summary', path: 'returns/summary' },
+    { labelKey: 'analytics.subnav.returns.overview', path: 'returns/overview' },
     { labelKey: 'analytics.subnav.returns.by_product', path: 'returns/by-product' },
-    { labelKey: 'analytics.subnav.returns.trend', path: 'returns/trend' },
+    { labelKey: 'analytics.subnav.returns.reasons', path: 'returns/reasons' },
   ],
   'data-quality': [
     { labelKey: 'analytics.subnav.data_quality.status', path: 'data-quality/status' },
@@ -164,7 +164,7 @@ export class AnalyticsLayoutComponent {
   private static readonly SHORTCUT_ROUTES: Record<string, string> = {
     '1': 'pnl/summary',
     '2': 'inventory/overview',
-    '3': 'returns/summary',
+    '3': 'returns/overview',
     '4': 'data-quality/status',
   };
 

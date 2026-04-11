@@ -78,20 +78,29 @@ function monthEnd(period: string): string {
         </button>
       </div>
 
-      <div class="flex-1">
-        <dp-data-grid
-          viewStateKey="analytics:returns:by-product"
-          [columnDefs]="columnDefs()"
-          [rowData]="gridRows()"
-          [loading]="returnsQuery.isPending()"
-          [pagination]="false"
-          [pageSize]="50"
-          height="calc(100vh - 320px)"
-          [initialSortModel]="initialSortModel()"
-          (sortChanged)="onSortChanged($event)"
-          (gridReady)="onGridReady($event)"
-        />
-      </div>
+      @if (!returnsQuery.isPending() && gridRows().length === 0) {
+        <div class="rounded-[var(--radius-md)] border border-[var(--border-default)]
+                    bg-[var(--bg-secondary)] px-4 py-8 text-center">
+          <p class="text-[length:var(--text-sm)] text-[var(--text-secondary)]">
+            {{ 'analytics.returns.by_product.empty' | translate }}
+          </p>
+        </div>
+      } @else {
+        <div class="flex-1">
+          <dp-data-grid
+            viewStateKey="analytics:returns:by-product"
+            [columnDefs]="columnDefs()"
+            [rowData]="gridRows()"
+            [loading]="returnsQuery.isPending()"
+            [pagination]="false"
+            [pageSize]="50"
+            height="calc(100vh - 320px)"
+            [initialSortModel]="initialSortModel()"
+            (sortChanged)="onSortChanged($event)"
+            (gridReady)="onGridReady($event)"
+          />
+        </div>
+      }
 
       @if (returnsQuery.data(); as page) {
         <dp-pagination-bar
@@ -150,9 +159,9 @@ function monthEnd(period: string): string {
                   </div>
                 </div>
                 <div class="rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
-                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.returns.detail.reason' | translate }}</div>
-                  <div class="text-sm text-[var(--text-primary)]">
-                    {{ selectedProduct()!.topReturnReason }}
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ 'analytics.returns.detail.return_amount' | translate }}</div>
+                  <div class="font-mono text-lg font-bold text-[var(--text-primary)]">
+                    {{ formatMoney(selectedProduct()!.returnAmount) }}
                   </div>
                 </div>
               </div>
@@ -176,6 +185,23 @@ function monthEnd(period: string): string {
                     {{ formatMoney(selectedProduct()!.returnAmount) }}
                   </span>
                 </div>
+              </div>
+            </section>
+
+            <!-- Reason info -->
+            <section>
+              <h4 class="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                {{ 'analytics.returns.detail.reason' | translate }}
+              </h4>
+              <div class="rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] p-3">
+                <div class="text-sm text-[var(--text-primary)]">
+                  {{ selectedProduct()!.topReturnReason || '—' }}
+                </div>
+                @if (selectedProduct()!.distinctReasonCount > 1) {
+                  <div class="mt-1 text-[11px] text-[var(--text-tertiary)]">
+                    {{ 'analytics.returns.detail.reason_count' | translate:{ count: selectedProduct()!.distinctReasonCount } }}
+                  </div>
+                }
               </div>
             </section>
           </div>
@@ -329,8 +355,23 @@ export class ReturnsByProductPageComponent {
       cellClass: 'font-mono',
     },
     {
+      field: 'returnAmount',
+      headerName: this.t.instant('analytics.returns.col.return_amount'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      valueFormatter: (p) => formatMoney(p.value, 0),
+    },
+    {
       field: 'topReturnReason',
-      headerName: this.t.instant('analytics.returns.col.reason'),
+      headerName: this.t.instant('analytics.returns.col.top_reason'),
+      cellRenderer: (p: any) => {
+        if (!p.value) return '—';
+        const cnt = p.data?.distinctReasonCount ?? 1;
+        const badge = cnt > 1
+          ? ` <span class="ml-1 rounded-[var(--radius-sm)] bg-[var(--bg-tertiary)] px-1 py-0.5 text-[10px] text-[var(--text-tertiary)]">+${cnt - 1}</span>`
+          : '';
+        return `<span>${p.value}${badge}</span>`;
+      },
     },
   ]);
 

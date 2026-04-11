@@ -2,6 +2,7 @@ package io.datapulse.analytics.domain.materializer.fact;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -98,10 +99,10 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
             ps.setBigDecimal(3, (BigDecimal) row.get("cost_price"));
             ps.setString(4, (String) row.get("currency"));
 
-            LocalDate validFrom = (LocalDate) row.get("valid_from");
+            LocalDate validFrom = toLocalDate(row.get("valid_from"));
             ps.setDate(5, Date.valueOf(validFrom));
 
-            LocalDate validTo = (LocalDate) row.get("valid_to");
+            LocalDate validTo = toLocalDate(row.get("valid_to"));
             if (validTo != null) {
                 ps.setDate(6, Date.valueOf(validTo));
             } else {
@@ -110,6 +111,23 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
 
             ps.setLong(7, ver);
         });
+    }
+
+    // queryForList maps PostgreSQL date columns to java.sql.Date, not LocalDate.
+    private static LocalDate toLocalDate(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof Date sqlDate) {
+            return sqlDate.toLocalDate();
+        }
+        if (value instanceof Timestamp ts) {
+            return ts.toLocalDateTime().toLocalDate();
+        }
+        throw new IllegalStateException("Unexpected date type: " + value.getClass().getName());
     }
 
     @Override

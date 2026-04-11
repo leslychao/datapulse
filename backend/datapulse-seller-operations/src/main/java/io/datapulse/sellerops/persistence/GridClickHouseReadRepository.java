@@ -49,12 +49,17 @@ public class GridClickHouseReadRepository {
                         countIf(stock_out_risk = 'WARNING') > 0, 'WARNING',
                         'NORMAL'
                     ) AS stock_out_risk
-                FROM mart_inventory_analysis
-                WHERE product_id IN (:offerIds)
-                  AND analysis_date = (
-                      SELECT max(analysis_date) FROM mart_inventory_analysis
-                      WHERE product_id IN (:offerIds)
-                  )
+                FROM (
+                    SELECT
+                        workspace_id,
+                        product_id,
+                        warehouse_id,
+                        argMax(days_of_cover, ver) AS days_of_cover,
+                        argMax(stock_out_risk, ver) AS stock_out_risk
+                    FROM mart_inventory_analysis FINAL
+                    WHERE product_id IN (:offerIds)
+                    GROUP BY workspace_id, product_id, warehouse_id
+                ) AS mart_slice
                 GROUP BY product_id
             ) inv
             LEFT JOIN (
@@ -142,11 +147,17 @@ public class GridClickHouseReadRepository {
                             countIf(stock_out_risk = 'WARNING') > 0, 'WARNING',
                             'NORMAL'
                         ) AS stock_out_risk
-                    FROM mart_inventory_analysis
-                    WHERE workspace_id = :workspaceId
-                      AND analysis_date = (SELECT max(analysis_date)
-                                           FROM mart_inventory_analysis
-                                           WHERE workspace_id = :workspaceId)
+                    FROM (
+                        SELECT
+                            workspace_id,
+                            product_id,
+                            warehouse_id,
+                            argMax(days_of_cover, ver) AS days_of_cover,
+                            argMax(stock_out_risk, ver) AS stock_out_risk
+                        FROM mart_inventory_analysis FINAL
+                        WHERE workspace_id = :workspaceId
+                        GROUP BY workspace_id, product_id, warehouse_id
+                    ) AS mart_slice
                     GROUP BY product_id
                 ) inv
                 LEFT JOIN (
@@ -187,13 +198,18 @@ public class GridClickHouseReadRepository {
 
     public List<Long> findOfferIdsByStockRisk(long workspaceId, String stockRisk) {
         String sql = """
-                SELECT DISTINCT product_id
-                FROM mart_inventory_analysis
-                WHERE workspace_id = :workspaceId
-                  AND stock_out_risk = :stockRisk
-                  AND analysis_date = (SELECT max(analysis_date)
-                                       FROM mart_inventory_analysis
-                                       WHERE workspace_id = :workspaceId)
+                SELECT DISTINCT m.product_id
+                FROM (
+                    SELECT
+                        workspace_id,
+                        product_id,
+                        warehouse_id,
+                        argMax(stock_out_risk, ver) AS stock_out_risk
+                    FROM mart_inventory_analysis FINAL
+                    WHERE workspace_id = :workspaceId
+                    GROUP BY workspace_id, product_id, warehouse_id
+                ) AS m
+                WHERE m.stock_out_risk = :stockRisk
                 LIMIT 10000
                 SETTINGS final = 1
                 """;
@@ -227,15 +243,18 @@ public class GridClickHouseReadRepository {
                          / prev.revenue_prev_30d * 100, 2),
                    NULL) AS revenue_30d_trend
             FROM (
-                SELECT countDistinct(product_id) AS critical_stock_count
-                FROM mart_inventory_analysis
-                WHERE workspace_id = :workspaceId
-                  AND stock_out_risk = 'CRITICAL'
-                  AND analysis_date = (
-                      SELECT max(analysis_date)
-                      FROM mart_inventory_analysis
-                      WHERE workspace_id = :workspaceId
-                  )
+                SELECT countDistinct(m.product_id) AS critical_stock_count
+                FROM (
+                    SELECT
+                        workspace_id,
+                        product_id,
+                        warehouse_id,
+                        argMax(stock_out_risk, ver) AS stock_out_risk
+                    FROM mart_inventory_analysis FINAL
+                    WHERE workspace_id = :workspaceId
+                    GROUP BY workspace_id, product_id, warehouse_id
+                ) AS m
+                WHERE m.stock_out_risk = 'CRITICAL'
             ) inv
             CROSS JOIN (
                 SELECT coalesce(sum(ff.revenue_amount), 0) AS revenue_30d_total
@@ -285,13 +304,18 @@ public class GridClickHouseReadRepository {
             SELECT
                 product_id AS offer_id,
                 toInt32(sum(available)) AS snapshot_stock
-            FROM fact_inventory_snapshot
-            WHERE workspace_id = :workspaceId
-              AND captured_date = (
-                  SELECT max(captured_date) FROM fact_inventory_snapshot
-                  WHERE workspace_id = :workspaceId
-              )
+            FROM (
+                SELECT
+                    workspace_id,
+                    product_id,
+                    warehouse_id,
+                    argMax(available, ver) AS available
+                FROM fact_inventory_snapshot FINAL
+                WHERE workspace_id = :workspaceId
+                GROUP BY workspace_id, product_id, warehouse_id
+            ) AS latest_rows
             GROUP BY product_id
+            SETTINGS final = 1
             """;
 
     public Map<Long, Integer> findLatestSnapshotStocks(long workspaceId) {

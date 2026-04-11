@@ -7,7 +7,8 @@ export type DetailPanelEntityType =
   | 'pricing-decision'
   | 'action'
   | 'promo-evaluation'
-  | 'promo-decision';
+  | 'promo-decision'
+  | 'mismatch';
 
 const MIN_WIDTH = 320;
 const MAX_VIEWPORT_RATIO = 0.5;

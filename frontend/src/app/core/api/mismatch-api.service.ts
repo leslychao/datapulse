@@ -44,6 +44,11 @@ export class MismatchApiService {
     return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/mismatches/${mismatchId}/resolve`, body);
   }
 
+  bulkAcknowledge(workspaceId: number, ids: number[]): Observable<{ updated: number }> {
+    return this.http.post<{ updated: number }>(
+      `${this.base}/workspaces/${workspaceId}/mismatches/bulk-acknowledge`, { ids });
+  }
+
   bulkIgnore(workspaceId: number, ids: number[], reason: string): Observable<void> {
     return this.http.post<void>(`${this.base}/workspaces/${workspaceId}/mismatches/bulk-ignore`, { ids, reason });
   }

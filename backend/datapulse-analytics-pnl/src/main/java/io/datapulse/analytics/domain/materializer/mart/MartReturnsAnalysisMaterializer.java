@@ -43,6 +43,7 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                    toDecimal64(r.return_quantity, 2) / s.sale_quantity * 100,
                    NULL) AS return_rate_pct,
                 r.top_return_reason,
+                r.distinct_reason_count,
                 %d AS ver
             FROM (
                 SELECT
@@ -55,7 +56,8 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                     count() AS return_count,
                     sum(quantity) AS return_quantity,
                     sum(ifNull(return_amount, toDecimal64(0, 2))) AS return_amount,
-                    topK(1)(return_reason)[1] AS top_return_reason
+                    topK(1)(return_reason)[1] AS top_return_reason,
+                    uniqExact(return_reason) AS distinct_reason_count
                 FROM fact_returns
                 GROUP BY connection_id, product_id, seller_sku_id, toYYYYMM(return_date)
             ) r

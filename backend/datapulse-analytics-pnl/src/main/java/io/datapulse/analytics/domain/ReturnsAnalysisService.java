@@ -8,17 +8,20 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import io.datapulse.analytics.api.ProductReturnResponse;
+import io.datapulse.analytics.api.ReturnReasonResponse;
 import io.datapulse.analytics.api.ReturnsFilter;
 import io.datapulse.analytics.api.ReturnsSummaryResponse;
 import io.datapulse.analytics.api.ReturnsSummaryResponse.ReasonBreakdownItem;
 import io.datapulse.analytics.api.ReturnsTrendResponse;
 import io.datapulse.analytics.persistence.ReturnsReadRepository;
+import io.datapulse.analytics.persistence.ReturnsReadRepository.FullReasonRow;
 import io.datapulse.analytics.persistence.ReturnsReadRepository.ReasonRow;
 import io.datapulse.analytics.persistence.ReturnsReadRepository.SummaryRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +49,7 @@ public class ReturnsAnalysisService {
         returnRateDeltaPct,
         summary.returnAmount(),
         summary.totalReturnCount(),
+        summary.productsWithReturns(),
         summary.topReturnReason(),
         reasonBreakdown
     );
@@ -53,12 +57,16 @@ public class ReturnsAnalysisService {
 
   public Page<ProductReturnResponse> getByProduct(long workspaceId, ReturnsFilter filter,
       Pageable pageable) {
-    String sortColumn = pageable.getSort().isSorted()
-        ? pageable.getSort().iterator().next().getProperty()
-        : "returnRatePct";
+    Sort.Order order = pageable.getSort().isSorted()
+        ? pageable.getSort().iterator().next()
+        : Sort.Order.desc("returnRatePct");
 
     List<ProductReturnResponse> content = returnsReadRepository.findByProduct(
-        workspaceId, filter, sortColumn, pageable.getPageSize(), pageable.getOffset());
+        workspaceId, filter,
+        order.getProperty(),
+        order.getDirection().name(),
+        pageable.getPageSize(),
+        pageable.getOffset());
     long total = returnsReadRepository.countByProduct(workspaceId, filter);
 
     return new PageImpl<>(content, pageable, total);
@@ -68,6 +76,32 @@ public class ReturnsAnalysisService {
     ReturnsFilter bounded = ensureTrendBounds(filter);
     return returnsReadRepository.findTrend(
         workspaceId, bounded, bounded.granularityOrDefault());
+  }
+
+  public List<ReturnReasonResponse> getReasons(long workspaceId, ReturnsFilter filter) {
+    Integer currentPeriod = filter.periodAsInt();
+    if (currentPeriod == null) {
+      return List.of();
+    }
+
+    List<FullReasonRow> rows = returnsReadRepository.findReasons(workspaceId, currentPeriod);
+    int totalCount = rows.stream().mapToInt(FullReasonRow::count).sum();
+
+    if (totalCount == 0) {
+      return List.of();
+    }
+
+    return rows.stream()
+        .map(r -> new ReturnReasonResponse(
+            r.reason(),
+            r.count(),
+            r.totalQuantity(),
+            r.amount(),
+            BigDecimal.valueOf(r.count())
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(totalCount), 1, RoundingMode.HALF_UP),
+            r.productCount()))
+        .toList();
   }
 
   private List<ReasonBreakdownItem> buildReasonBreakdown(long workspaceId, int period) {
@@ -84,7 +118,9 @@ public class ReturnsAnalysisService {
             r.count(),
             BigDecimal.valueOf(r.count())
                 .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(totalCount), 1, RoundingMode.HALF_UP)))
+                .divide(BigDecimal.valueOf(totalCount), 1, RoundingMode.HALF_UP),
+            r.amount(),
+            r.productCount()))
         .toList();
   }
 

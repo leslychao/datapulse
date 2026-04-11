@@ -8,6 +8,7 @@ public record ReturnsSummaryResponse(
     BigDecimal returnRateDeltaPct,
     BigDecimal totalReturnAmount,
     int totalReturnCount,
+    int productsWithReturnsCount,
     String topReturnReason,
     List<ReasonBreakdownItem> reasonBreakdown
 ) {
@@ -15,6 +16,8 @@ public record ReturnsSummaryResponse(
   public record ReasonBreakdownItem(
       String reason,
       int count,
-      BigDecimal percent
+      BigDecimal percent,
+      BigDecimal amount,
+      int productCount
   ) {}
 }

@@ -158,7 +158,7 @@ router-outlet + * {
 
 /* CRITICAL row left border in AG Grid */
 .dp-critical-row {
-  border-left: 2px solid var(--status-error) !important;
+  border-left: 4px solid var(--status-error) !important;
 }
 
 /* Pulse animations for WebSocket-updated rows */

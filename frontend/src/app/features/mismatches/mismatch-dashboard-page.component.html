@@ -1,220 +1,47 @@
 <div class="flex h-full min-h-0 flex-1">
   <div class="flex min-w-0 min-h-0 flex-1 flex-col">
-    <div class="border-b border-[var(--border-default)] px-4 py-4">
-      <h1 class="text-lg font-semibold text-[var(--text-primary)]">{{ 'mismatches.title' | translate }}</h1>
+    <!-- Header + compact KPI strip -->
+    <div class="flex items-center gap-4 border-b border-[var(--border-default)] px-4 py-3">
+      <h1 class="shrink-0 text-lg font-semibold text-[var(--text-primary)]">
+        {{ 'mismatches.title' | translate }}
+      </h1>
+      <dp-mismatch-kpi-strip
+        [summary]="summaryQuery.data() ?? null"
+        [loading]="summaryQuery.isPending()"
+      />
     </div>
 
-    <!-- KPI -->
-    <div class="flex flex-wrap gap-3 px-4 pt-3">
-      @if (summaryQuery.isError()) {
-        <div class="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] px-4 py-3">
-          <span class="text-sm text-[var(--status-error)]">{{ 'mismatches.kpi.error' | translate }}</span>
-          <button
-            type="button"
-            (click)="summaryQuery.refetch()"
-            class="ml-auto text-sm font-medium text-[var(--accent-primary)] hover:underline"
-          >
-            {{ 'actions.retry' | translate }}
-          </button>
-        </div>
-      } @else {
-        <dp-kpi-card
-          [label]="'mismatches.kpi.active' | translate"
-          [value]="summaryQuery.data()?.totalActive ?? null"
-          [icon]="ActivityIcon"
-          accent="warning"
-          [trend]="summaryQuery.data()?.totalActiveDelta7d ?? null"
-          [trendDirection]="(summaryQuery.data()?.totalActiveDelta7d ?? 0) >= 0 ? 'up' : 'down'"
-          [loading]="summaryQuery.isPending()"
-        />
-        <dp-kpi-card
-          [label]="'mismatches.kpi.critical' | translate"
-          [value]="summaryQuery.data()?.criticalCount ?? null"
-          [icon]="AlertTriangleIcon"
-          accent="error"
-          [trend]="summaryQuery.data()?.criticalDelta7d ?? null"
-          [trendDirection]="(summaryQuery.data()?.criticalDelta7d ?? 0) <= 0 ? 'down' : 'up'"
-          [loading]="summaryQuery.isPending()"
-        />
-        <dp-kpi-card
-          [label]="'mismatches.kpi.avg_hours' | translate"
-          [value]="avgHoursDisplay()"
-          [icon]="ClockIcon"
-          accent="info"
-          [trend]="summaryQuery.data()?.avgHoursUnresolvedDelta7d ?? null"
-          [trendDirection]="(summaryQuery.data()?.avgHoursUnresolvedDelta7d ?? 0) <= 0 ? 'down' : 'up'"
-          [loading]="summaryQuery.isPending()"
-        />
-        <dp-kpi-card
-          [label]="'mismatches.kpi.auto_resolved' | translate"
-          [value]="summaryQuery.data()?.autoResolvedToday ?? null"
-          [icon]="CheckCircleIcon"
-          accent="success"
-          [loading]="summaryQuery.isPending()"
-        />
-      }
+    <!-- Unified filter bar -->
+    <div class="px-4 pt-3">
+      <dp-filter-bar
+        [filters]="filterConfigs()"
+        [values]="filterBarValues()"
+        (filtersChanged)="onFiltersChanged($event)"
+      />
     </div>
 
-    <!-- Charts -->
-    <div class="grid grid-cols-[2fr_3fr] gap-3 px-4 py-3">
-      <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2">
-        <dp-chart [options]="donutOptions()" height="180px" [loading]="summaryQuery.isPending()" (chartClick)="onChartClick($event)" />
-      </div>
-      <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2">
-        <dp-chart [options]="timelineOptions()" height="180px" [loading]="summaryQuery.isPending()" />
-      </div>
-    </div>
+    <!-- Toolbar -->
+    <dp-mismatch-toolbar
+      [paginationLabel]="paginationLabel()"
+      [totalElements]="totalElements()"
+      [toggleableColumns]="toggleableColumns()"
+      [chartsCollapsed]="chartsCollapsed()"
+      (columnToggled)="toggleColumn($event)"
+      (exportClicked)="exportCsv()"
+      (chartsToggled)="toggleCharts()"
+    />
 
-    <!-- Filters -->
-    <div
-      class="flex flex-wrap items-end gap-3 px-4 pt-2"
-    >
-      <div class="flex min-w-[160px] flex-col gap-1">
-        <label class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.connection' | translate }}</label>
-        <select
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
-          [ngModel]="connectionId()"
-          (ngModelChange)="onConnectionChange($event)"
-        >
-          <option [ngValue]="null">{{ 'mismatches.filter.all' | translate }}</option>
-          @for (c of connectionsQuery.data(); track c.id) {
-            <option [ngValue]="c.id">{{ c.name }}</option>
-          }
-        </select>
-      </div>
-      <div class="flex flex-col gap-1">
-        <label class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.type' | translate }}</label>
-        <div class="flex flex-wrap gap-1">
-          @for (t of typeOptions; track t) {
-            <button
-              type="button"
-              (click)="toggleType(t)"
-              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
-              [class]="filterTypes().includes(t)
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'"
-            >
-              {{ 'mismatches.type.' + t | translate }}
-            </button>
-          }
-        </div>
-      </div>
-      <div class="flex flex-col gap-1">
-        <label class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.status' | translate }}</label>
-        <div class="flex flex-wrap gap-1">
-          @for (s of statusOptions; track s) {
-            <button
-              type="button"
-              (click)="toggleStatus(s)"
-              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
-              [class]="filterStatuses().includes(s)
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'"
-            >
-              {{ 'mismatches.status.' + s | translate }}
-            </button>
-          }
-        </div>
-      </div>
-      <div class="flex flex-col gap-1">
-        <label class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.severity' | translate }}</label>
-        <div class="flex flex-wrap gap-1">
-          @for (sev of severityOptions; track sev) {
-            <button
-              type="button"
-              (click)="toggleSeverity(sev)"
-              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
-              [class]="filterSeverities().includes(sev)
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'"
-            >
-              {{ 'mismatches.severity.' + sev | translate }}
-            </button>
-          }
-        </div>
-      </div>
-      <div class="flex flex-col gap-1">
-        <span class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.period' | translate }}</span>
-        <div class="flex items-center gap-2">
-          <input
-            type="date"
-            class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm"
-            [ngModel]="periodFrom()"
-            (ngModelChange)="periodFrom.set($event); applyFilters()"
-            [max]="periodTo() || today"
-          />
-          <span class="text-[var(--text-secondary)]">—</span>
-          <input
-            type="date"
-            class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 py-1.5 text-sm"
-            [ngModel]="periodTo()"
-            (ngModelChange)="periodTo.set($event); applyFilters()"
-            [max]="today"
-            [min]="periodFrom()"
-          />
-        </div>
-      </div>
-      <div class="min-w-[180px] flex-1 flex-col gap-1">
-        <label class="text-[var(--text-xs)] text-[var(--text-secondary)]">{{ 'mismatches.filter.search' | translate }}</label>
-        <input
-          #searchInput
-          type="search"
-          class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]"
-          [ngModel]="searchQuery()"
-          (ngModelChange)="onSearchInput($event)"
-        />
-      </div>
-      <button
-        type="button"
-        (click)="resetFilters()"
-        class="rounded-[var(--radius-md)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-      >
-        {{ 'filter_bar.reset_all' | translate }}
-      </button>
-    </div>
-
-    <!-- Grid toolbar -->
-    <div class="flex items-center justify-between px-4 pb-1 pt-2">
-      <span class="text-sm text-[var(--text-secondary)]">
-        {{ 'mismatches.pagination.showing' | translate: { range: paginationLabel(), total: totalElements() } }}
-      </span>
-      <div class="flex items-center gap-2">
-        <div class="relative">
-          <button
-            type="button"
-            (click)="showColumnsPanel.set(!showColumnsPanel())"
-            class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-          >
-            {{ 'mismatches.toolbar.columns' | translate }}
-          </button>
-          @if (showColumnsPanel()) {
-            <div class="absolute right-0 top-full z-20 mt-1 w-56 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-2 shadow-[var(--shadow-md)]">
-              @for (col of toggleableColumns(); track col.colId) {
-                <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-                  <input
-                    type="checkbox"
-                    [checked]="isColumnVisible(col.colId)"
-                    (change)="toggleColumn(col.colId)"
-                    class="accent-[var(--accent-primary)]"
-                  />
-                  {{ col.headerName }}
-                </label>
-              }
-            </div>
-          }
-        </div>
-        <button
-          type="button"
-          (click)="exportCsv()"
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-        >
-          {{ 'mismatches.toolbar.export' | translate }}
-        </button>
-      </div>
-    </div>
+    <!-- Collapsible charts -->
+    <dp-mismatch-charts-section
+      [collapsed]="chartsCollapsed()"
+      [loading]="summaryQuery.isPending()"
+      [donutOptions]="donutOptions()"
+      [timelineOptions]="timelineOptions()"
+      (chartClick)="onChartClick($event)"
+    />
 
     <!-- Grid -->
-    <div class="relative min-h-0 flex-1 px-4 py-3">
+    <div class="relative min-h-0 flex-1 px-4 pb-1">
       @if (listQuery.isError()) {
         <dp-empty-state
           [message]="'mismatches.list.error' | translate"
@@ -223,66 +50,57 @@
         />
       } @else if (!listQuery.isPending() && rows().length === 0) {
         <dp-empty-state
-          [message]="
-            hasActiveFilters() ? ('mismatches.list.empty_filtered' | translate) : ('mismatches.list.empty' | translate)
-          "
+          [message]="hasActiveFilters()
+            ? ('mismatches.list.empty_filtered' | translate)
+            : ('mismatches.list.empty' | translate)"
           [actionLabel]="hasActiveFilters() ? ('filter_bar.reset_all' | translate) : ''"
           (action)="resetFilters()"
         />
       } @else {
-        @if (listQuery.isPending()) {
-          <div class="absolute inset-0 z-10 flex items-center justify-center bg-[color-mix(in_srgb,var(--bg-primary)_70%,transparent)]">
-            <span
-              class="dp-spinner inline-block h-10 w-10 rounded-full border-2 border-[var(--border-default)]"
-              style="border-top-color: var(--accent-primary)"
-            ></span>
-          </div>
-        }
-        <ag-grid-angular
-          class="ag-theme-alpine h-[min(560px,calc(100vh-420px))] w-full"
-          [columnDefs]="columnDefs"
-          [defaultColDef]="defaultColDef"
-          [rowData]="rows()"
-          [getRowId]="getRowId"
-          [getRowClass]="getRowClass"
-          [rowSelection]="rowSelectionConfig"
-          [suppressCellFocus]="true"
-          [animateRows]="false"
-          [pagination]="false"
-          [preventDefaultOnContextMenu]="true"
-          (gridReady)="onGridReady($event)"
-          (selectionChanged)="onSelectionChanged($event)"
+        <dp-mismatch-grid
+          #mismatchGrid
+          [rows]="rows()"
+          [loading]="listQuery.isPending()"
+          (offerClicked)="openDetailPage($event.mismatchId)"
+          (quickAckClicked)="quickAckMutation.mutate($event.mismatchId)"
+          (selectionChanged)="selectedRows.set($event)"
           (sortChanged)="onSortChanged($event)"
-          (cellContextMenu)="onCellContextMenu($event)"
+          (contextMenuEvent)="contextMenu.set($event)"
+          (gridApiReady)="onGridApiReady($event)"
         />
+      }
 
-        <!-- Context menu -->
-        @if (contextMenu(); as ctx) {
-          <div
-            class="fixed z-50 min-w-[180px] rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] py-1 shadow-[var(--shadow-md)]"
-            [style.left.px]="ctx.x"
-            [style.top.px]="ctx.y"
-            (click)="$event.stopPropagation()"
-          >
-            <button type="button" (click)="contextOpenDetail()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-              {{ 'mismatches.context.open' | translate }}
+      <!-- Context menu -->
+      @if (contextMenu(); as ctx) {
+        <div
+          class="fixed z-50 min-w-[180px] rounded-[var(--radius-md)] border border-[var(--border-default)]
+                 bg-[var(--bg-primary)] py-1 shadow-[var(--shadow-md)]"
+          [style.left.px]="ctx.x"
+          [style.top.px]="ctx.y"
+          (click)="$event.stopPropagation()"
+        >
+          <button type="button" (click)="onContextMenuAction('open')"
+            class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+            {{ 'mismatches.context.open' | translate }}
+          </button>
+          @if (ctx.row.offerId) {
+            <button type="button" (click)="onContextMenuAction('goProduct')"
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+              {{ 'mismatches.context.go_product' | translate }}
             </button>
-            @if (ctx.row.offerId) {
-              <button type="button" (click)="contextGoToProduct()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-                {{ 'mismatches.context.go_product' | translate }}
-              </button>
-            }
-            <button type="button" (click)="contextCopySku()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-              {{ 'mismatches.context.copy_sku' | translate }}
+          }
+          <button type="button" (click)="onContextMenuAction('copySku')"
+            class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+            {{ 'mismatches.context.copy_sku' | translate }}
+          </button>
+          @if (rbac.canIgnoreMismatches()) {
+            <div class="my-1 border-t border-[var(--border-default)]"></div>
+            <button type="button" (click)="onContextMenuAction('ignore')"
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--status-error)] hover:bg-[var(--bg-tertiary)]">
+              {{ 'mismatches.context.ignore' | translate }}
             </button>
-            @if (rbac.canIgnoreMismatches()) {
-              <div class="my-1 border-t border-[var(--border-default)]"></div>
-              <button type="button" (click)="contextIgnore()" class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--status-error)] hover:bg-[var(--bg-tertiary)]">
-                {{ 'mismatches.context.ignore' | translate }}
-              </button>
-            }
-          </div>
-        }
+          }
+        </div>
       }
     </div>
 
@@ -298,10 +116,11 @@
       </div>
     }
 
-    <!-- Bulk bar -->
+    <!-- Bulk action bar -->
     @if (selectedRows().length > 0) {
       <div
-        class="flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5"
+        class="flex items-center gap-4 border-t border-[var(--border-default)]
+               bg-[var(--bg-secondary)] px-4 py-2.5"
         aria-live="polite"
       >
         <span class="text-sm text-[var(--text-secondary)]">
@@ -312,7 +131,9 @@
             type="button"
             (click)="bulkAcknowledge()"
             [disabled]="bulkAckMutation.isPending()"
-            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
+            class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)]
+                   px-4 py-1.5 text-sm font-medium text-white
+                   hover:bg-[var(--accent-primary-hover)] disabled:opacity-50"
           >
             {{ 'mismatches.bulk.acknowledge' | translate }}
           </button>
@@ -322,15 +143,18 @@
             type="button"
             (click)="openBulkIgnoreModal()"
             [disabled]="bulkIgnoreMutation.isPending()"
-            class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-1.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+            class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)]
+                   px-4 py-1.5 text-sm font-medium text-[var(--text-primary)]
+                   hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
           >
             {{ 'mismatches.bulk.ignore' | translate }}
           </button>
         }
         <button
           type="button"
-          (click)="clearBulkSelection()"
-          class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+          (click)="selectedRows.set([])"
+          class="cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 text-sm
+                 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
         >
           {{ 'actions.cancel' | translate }}
         </button>
@@ -338,8 +162,15 @@
     }
   </div>
 
+  <!-- Detail panel -->
   @if (selectedMismatchId(); as mid) {
-    <dp-mismatch-detail-panel [mismatchId]="mid" (closed)="closeDetail()" />
+    <dp-mismatch-detail-panel
+      [mismatchId]="mid"
+      [prevId]="prevMismatchId()"
+      [nextId]="nextMismatchId()"
+      (closed)="closeDetail()"
+      (navigated)="navigateToMismatch($event)"
+    />
   }
 </div>
 
@@ -347,7 +178,10 @@
 @if (showBulkIgnoreModal()) {
   <div class="fixed inset-0 z-[9000] flex items-center justify-center">
     <div class="absolute inset-0 bg-[var(--bg-overlay)]" (click)="cancelBulkIgnore()"></div>
-    <div class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]">
+    <div
+      class="relative z-10 w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)]
+             bg-[var(--bg-primary)] p-6 shadow-[var(--shadow-md)]"
+    >
       <h3 class="text-base font-semibold text-[var(--text-primary)]">
         {{ 'mismatches.bulk_ignore.title' | translate }}
       </h3>
@@ -355,11 +189,15 @@
         {{ 'mismatches.bulk_ignore.message' | translate: { count: selectedRows().length } }}
       </p>
       <div class="mt-4 flex flex-col gap-1.5">
-        <label class="text-sm text-[var(--text-secondary)]">{{ 'mismatches.bulk_ignore.reason_label' | translate }}</label>
+        <label class="text-sm text-[var(--text-secondary)]">
+          {{ 'mismatches.bulk_ignore.reason_label' | translate }}
+        </label>
         <textarea
           rows="3"
           required
-          class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          class="rounded-[var(--radius-md)] border border-[var(--border-default)]
+                 bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]
+                 outline-none focus:border-[var(--accent-primary)]"
           [ngModel]="bulkIgnoreReason()"
           (ngModelChange)="bulkIgnoreReason.set($event)"
         ></textarea>
@@ -368,7 +206,8 @@
         <button
           type="button"
           (click)="cancelBulkIgnore()"
-          class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+          class="cursor-pointer rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium
+                 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
         >
           {{ 'actions.cancel' | translate }}
         </button>
@@ -376,7 +215,9 @@
           type="button"
           (click)="confirmBulkIgnore()"
           [disabled]="!bulkIgnoreReason().trim() || bulkIgnoreMutation.isPending()"
-          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          class="cursor-pointer rounded-[var(--radius-md)] bg-[var(--status-error)]
+                 px-4 py-2 text-sm font-medium text-white transition-colors
+                 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {{ 'mismatches.bulk_ignore.confirm' | translate }}
         </button>

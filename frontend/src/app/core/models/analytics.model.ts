@@ -180,6 +180,7 @@ export interface ReturnsSummary {
   returnRateDeltaPct: number | null;
   totalReturnAmount: number;
   totalReturnCount: number;
+  productsWithReturnsCount: number;
   topReturnReason: string;
   reasonBreakdown: ReturnReasonItem[];
 }
@@ -188,6 +189,8 @@ export interface ReturnReasonItem {
   reason: string;
   count: number;
   percent: number;
+  amount: number;
+  productCount: number;
 }
 
 export interface ReturnsByProduct {
@@ -200,6 +203,7 @@ export interface ReturnsByProduct {
   returnAmount: number;
   returnRatePct: number;
   topReturnReason: string;
+  distinctReasonCount: number;
   saleCount: number;
   saleQuantity: number;
 }
@@ -209,6 +213,15 @@ export interface ReturnsTrendPoint {
   returnQuantity: number;
   saleQuantity: number;
   returnRatePct: number;
+}
+
+export interface ReturnReason {
+  reason: string;
+  returnCount: number;
+  returnQuantity: number;
+  returnAmount: number;
+  percent: number;
+  productCount: number;
 }
 
 export interface SyncDomainInfo {
@@ -260,3 +273,27 @@ export interface ReconciliationResult {
   trend: ReconciliationTrendPoint[];
   distribution: ResidualBucket[];
 }
+
+export type DataTrustLevel = 'trusted' | 'limited' | 'unreliable';
+export type DomainSeverity = 'critical' | 'warning' | 'info';
+
+export interface DomainImpact {
+  severity: DomainSeverity;
+  affectedAreasKey: string;
+  reportLink: string | null;
+}
+
+export const DOMAIN_IMPACT: Record<string, DomainImpact> = {
+  finance: { severity: 'critical', affectedAreasKey: 'analytics.data_quality.impact.finance', reportLink: 'pnl/summary' },
+  orders: { severity: 'critical', affectedAreasKey: 'analytics.data_quality.impact.orders', reportLink: 'pnl/summary' },
+  stock: { severity: 'warning', affectedAreasKey: 'analytics.data_quality.impact.stock', reportLink: 'inventory/overview' },
+  catalog: { severity: 'info', affectedAreasKey: 'analytics.data_quality.impact.catalog', reportLink: null },
+  advertising: { severity: 'info', affectedAreasKey: 'analytics.data_quality.impact.advertising', reportLink: 'pnl/summary' },
+  returns: { severity: 'warning', affectedAreasKey: 'analytics.data_quality.impact.returns', reportLink: 'returns/overview' },
+};
+
+export const SEVERITY_ORDER: Record<DomainSeverity, number> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+};
