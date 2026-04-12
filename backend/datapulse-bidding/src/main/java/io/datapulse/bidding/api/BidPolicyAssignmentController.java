@@ -23,7 +23,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping(
-    value = "/api/workspaces/{workspaceId}/bid-policies/{policyId}/assignments",
+    value = "/api/workspaces/{workspaceId}/bidding/policies/{policyId}/assignments",
     produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class BidPolicyAssignmentController {

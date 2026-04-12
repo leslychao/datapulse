@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(
-    value = "/api/workspaces/{workspaceId}/bidding-runs",
+    value = "/api/workspaces/{workspaceId}/bidding/runs",
     produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class BiddingRunController {
@@ -34,7 +34,16 @@ public class BiddingRunController {
         .map(mapper::toSummary);
   }
 
-  @PostMapping("/trigger")
+  @GetMapping("/{runId}")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
+  public BiddingRunSummaryResponse getRunDetail(
+      @PathVariable("workspaceId") long workspaceId,
+      @PathVariable("runId") long runId) {
+
+    return mapper.toSummary(biddingRunApiService.getRunDetail(runId));
+  }
+
+  @PostMapping
   @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
   public void triggerRun(
       @PathVariable("workspaceId") long workspaceId,

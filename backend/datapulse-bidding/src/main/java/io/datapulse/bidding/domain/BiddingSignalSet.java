@@ -7,7 +7,7 @@ import java.math.BigDecimal;
  * All wrapper-type fields are nullable — absence of a signal is meaningful
  * (e.g. missing margin → guard blocks BID_UP).
  *
- * @param currentBid            current bid in kopecks (minor currency unit)
+ * @param currentBid            current bid in marketplace-native units
  * @param drrPct                ad cost share of revenue (%)
  * @param cpoPct                cost per order as % of revenue
  * @param roas                  return on ad spend
@@ -17,12 +17,13 @@ import java.math.BigDecimal;
  * @param adSpend               total ad spend in roubles in lookback window
  * @param marginPct             product margin (%)
  * @param stockDays             days of cover (inventory)
- * @param competitiveBid        average competitive bid in kopecks
- * @param leadersBid            leaders' bid in kopecks
- * @param minBid                marketplace minimum allowed bid in kopecks
+ * @param competitiveBid        average competitive bid (marketplace-native units)
+ * @param leadersBid            leaders' bid (marketplace-native units)
+ * @param minBid                marketplace minimum allowed bid (marketplace-native units)
  * @param previousDecisionType  decision type from the most recent bidding run (nullable)
  * @param daysSinceLastChange   days since the bid was last changed (nullable)
  * @param campaignStatus        status of the advertising campaign
+ * @param bidUnit               unit of bid values: KOPECKS (WB/Ozon) or PERCENT_X100 (Yandex)
  */
 public record BiddingSignalSet(
     Integer currentBid,
@@ -40,6 +41,7 @@ public record BiddingSignalSet(
     Integer minBid,
     BidDecisionType previousDecisionType,
     Integer daysSinceLastChange,
-    String campaignStatus
+    String campaignStatus,
+    BidUnit bidUnit
 ) {
 }

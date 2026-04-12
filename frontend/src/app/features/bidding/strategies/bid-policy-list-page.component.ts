@@ -33,7 +33,7 @@ import { FilterBarUrlDef } from '@shared/utils/url-filters';
 import { createListPageState } from '@shared/utils/list-page-state';
 
 const BID_POLICY_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'] as const;
-const STRATEGY_TYPES = ['ECONOMY_HOLD', 'MINIMAL_PRESENCE'] as const;
+const STRATEGY_TYPES = ['ECONOMY_HOLD', 'MINIMAL_PRESENCE', 'GROWTH', 'POSITION_HOLD', 'LAUNCH', 'LIQUIDATION'] as const;
 const EXECUTION_MODES = ['RECOMMENDATION', 'SEMI_AUTO', 'FULL_AUTO'] as const;
 
 const STATUS_COLOR: Record<string, string> = {

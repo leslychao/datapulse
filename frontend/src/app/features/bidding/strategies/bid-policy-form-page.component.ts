@@ -44,6 +44,10 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 import { BidPolicyAssignmentsSectionComponent } from './bid-policy-assignments-section.component';
 import { EconomyHoldConfigFormComponent } from './economy-hold-config-form.component';
 import { MinimalPresenceConfigFormComponent } from './minimal-presence-config-form.component';
+import { GrowthConfigFormComponent } from './growth-config-form.component';
+import { PositionHoldConfigFormComponent } from './position-hold-config-form.component';
+import { LaunchConfigFormComponent } from './launch-config-form.component';
+import { LiquidationConfigFormComponent } from './liquidation-config-form.component';
 
 interface SectionDef {
   id: string;
@@ -62,6 +66,10 @@ interface SectionDef {
     BidPolicyAssignmentsSectionComponent,
     EconomyHoldConfigFormComponent,
     MinimalPresenceConfigFormComponent,
+    GrowthConfigFormComponent,
+    PositionHoldConfigFormComponent,
+    LaunchConfigFormComponent,
+    LiquidationConfigFormComponent,
   ],
   host: { class: 'flex flex-1 flex-col min-h-0 overflow-auto bg-[var(--bg-secondary)]' },
   template: `
@@ -130,7 +138,7 @@ interface SectionDef {
               <label class="mb-1 block text-[var(--text-xs)] font-medium text-[var(--text-secondary)]">
                 {{ 'bidding.form.strategy_type_label' | translate }}
               </label>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-3 gap-3">
                 @for (st of strategyTypes; track st.value) {
                   <label
                     class="relative flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border p-3 transition-all"
@@ -214,6 +222,30 @@ interface SectionDef {
               }
               @case ('MINIMAL_PRESENCE') {
                 <dp-minimal-presence-config-form />
+              }
+              @case ('GROWTH') {
+                <dp-growth-config-form
+                  [parentForm]="configGroup"
+                  [submitted]="submitted()"
+                />
+              }
+              @case ('POSITION_HOLD') {
+                <dp-position-hold-config-form
+                  [parentForm]="configGroup"
+                  [submitted]="submitted()"
+                />
+              }
+              @case ('LAUNCH') {
+                <dp-launch-config-form
+                  [parentForm]="configGroup"
+                  [submitted]="submitted()"
+                />
+              }
+              @case ('LIQUIDATION') {
+                <dp-liquidation-config-form
+                  [parentForm]="configGroup"
+                  [submitted]="submitted()"
+                />
               }
             }
           </section>
@@ -346,6 +378,26 @@ export class BidPolicyFormPageComponent implements AfterViewInit, OnDestroy {
       labelKey: 'bidding.policies.strategy.MINIMAL_PRESENCE',
       descKey: 'bidding.form.tooltip.strategy_type.MINIMAL_PRESENCE',
     },
+    {
+      value: 'GROWTH',
+      labelKey: 'bidding.policies.strategy.GROWTH',
+      descKey: 'bidding.form.tooltip.strategy_type.GROWTH',
+    },
+    {
+      value: 'POSITION_HOLD',
+      labelKey: 'bidding.policies.strategy.POSITION_HOLD',
+      descKey: 'bidding.form.tooltip.strategy_type.POSITION_HOLD',
+    },
+    {
+      value: 'LAUNCH',
+      labelKey: 'bidding.policies.strategy.LAUNCH',
+      descKey: 'bidding.form.tooltip.strategy_type.LAUNCH',
+    },
+    {
+      value: 'LIQUIDATION',
+      labelKey: 'bidding.policies.strategy.LIQUIDATION',
+      descKey: 'bidding.form.tooltip.strategy_type.LIQUIDATION',
+    },
   ];
 
   readonly executionModes: {
@@ -443,15 +495,15 @@ export class BidPolicyFormPageComponent implements AfterViewInit, OnDestroy {
 
   private buildConfig(): Record<string, unknown> {
     const strategyType = this.form.get('strategyType')?.value as BiddingStrategyType;
-    if (strategyType === 'ECONOMY_HOLD') {
-      const values = this.configGroup.getRawValue();
-      const config: Record<string, unknown> = {};
-      for (const [key, val] of Object.entries(values)) {
-        if (val !== null && val !== '') config[key] = val;
-      }
-      return config;
+    if (strategyType === 'MINIMAL_PRESENCE') {
+      return {};
     }
-    return {};
+    const values = this.configGroup.getRawValue();
+    const config: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(values)) {
+      if (val !== null && val !== '') config[key] = val;
+    }
+    return config;
   }
 
   cancel(): void {

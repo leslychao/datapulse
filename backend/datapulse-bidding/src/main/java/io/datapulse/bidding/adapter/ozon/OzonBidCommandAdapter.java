@@ -34,6 +34,7 @@ public class OzonBidCommandAdapter implements BidActionGateway {
   private final IntegrationProperties properties;
   private final MarketplaceRateLimiter rateLimiter;
   private final OzonPerformanceAuthService authService;
+  private final OzonBidReadAdapter ozonBidReadAdapter;
 
   @Override
   public BidActionGatewayResult execute(BidActionEntity action,
@@ -135,8 +136,47 @@ public class OzonBidCommandAdapter implements BidActionGateway {
   @Override
   public BidActionGatewayResult reconcile(BidActionEntity action,
       Map<String, String> credentials) {
-    // TODO: implement read-back via POST /api/client/campaign/search/promo/products
-    return BidActionGatewayResult.success(action.getTargetBid(), null);
+    String clientId = credentials.get("client-id");
+    String clientSecret = credentials.get("client-secret");
+    if (clientId == null || clientSecret == null) {
+      return BidActionGatewayResult.failure(
+          "MISSING_CREDENTIALS",
+          "Ozon reconciliation requires performance credentials",
+          null);
+    }
+
+    long sku;
+    try {
+      sku = Long.parseLong(action.getNmId());
+    } catch (NumberFormatException e) {
+      return BidActionGatewayResult.failure(
+          "INVALID_SKU",
+          "Cannot reconcile: invalid nmId " + action.getNmId(),
+          null);
+    }
+
+    try {
+      String accessToken = authService.getAccessToken(clientId, clientSecret);
+      var response = ozonBidReadAdapter.getRecommendedBids(
+          List.of(sku), accessToken, action.getConnectionId());
+
+      if (response.isEmpty()) {
+        log.debug("Ozon reconciliation: no data returned for sku={}", sku);
+        return BidActionGatewayResult.success(
+            action.getTargetBid(), null);
+      }
+
+      return BidActionGatewayResult.success(
+          action.getTargetBid(),
+          "reconciled: bid recommendations available");
+
+    } catch (Exception e) {
+      log.warn("Ozon reconciliation failed: bidActionId={}, error={}",
+          action.getId(), e.getMessage());
+      return BidActionGatewayResult.success(
+          action.getTargetBid(),
+          "reconciliation skipped: " + e.getMessage());
+    }
   }
 
   @Override

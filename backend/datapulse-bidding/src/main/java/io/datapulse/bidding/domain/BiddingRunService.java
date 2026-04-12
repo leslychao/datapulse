@@ -78,12 +78,14 @@ public class BiddingRunService {
       int totalBidDown = 0;
       int totalHold = 0;
       int totalPause = 0;
+      int maxAbsChangePctObserved = 0;
 
       for (EligibleProductRow product : eligible) {
         BiddingSignalSet signals = signalCollector.collect(
             workspaceId,
             product.marketplaceOfferId(),
             product.marketplaceSku(),
+            product.connectionId(),
             properties.getDefaultLookbackDays());
 
         if (!signalCollector.hasMinimumData(signals)) {
@@ -91,7 +93,7 @@ public class BiddingRunService {
               product.marketplaceOfferId());
           totalHold++;
           saveDecision(run.getId(), workspaceId, product, policy,
-              BiddingStrategyResult.hold(), null, configNode);
+              BiddingStrategyResult.hold(), null, signals);
           continue;
         }
 
@@ -100,7 +102,7 @@ public class BiddingRunService {
         if (result.decisionType() == BidDecisionType.HOLD) {
           totalHold++;
           saveDecision(run.getId(), workspaceId, product, policy,
-              result, null, configNode);
+              result, null, signals);
           continue;
         }
 
@@ -118,18 +120,27 @@ public class BiddingRunService {
         if (!guardResult.allPassed()) {
           totalHold++;
           saveDecision(run.getId(), workspaceId, product, policy,
-              holdWithGuardInfo(result, guardResult), guardResult, configNode);
+              holdWithGuardInfo(result, guardResult), guardResult, signals);
           continue;
         }
 
         saveDecision(run.getId(), workspaceId, product, policy,
-            result, guardResult, configNode);
+            result, guardResult, signals);
 
         switch (result.decisionType()) {
           case BID_UP -> totalBidUp++;
           case BID_DOWN -> totalBidDown++;
           case PAUSE -> totalPause++;
           default -> totalHold++;
+        }
+
+        if (signals.currentBid() != null && result.targetBid() != null
+            && signals.currentBid() > 0) {
+          int changePct = Math.abs(
+              (result.targetBid() - signals.currentBid()) * 100
+                  / signals.currentBid());
+          maxAbsChangePctObserved = Math.max(
+              maxAbsChangePctObserved, changePct);
         }
       }
 
@@ -139,13 +150,15 @@ public class BiddingRunService {
       run.setTotalHold(totalHold);
       run.setTotalPause(totalPause);
 
-      if (isBlastRadiusBreached(totalBidUp, eligible.size())) {
+      String blastRadiusReason = checkBlastRadius(
+          totalBidUp, eligible.size(), maxAbsChangePctObserved);
+      if (blastRadiusReason != null) {
         run.setStatus(BiddingRunStatus.PAUSED);
-        run.setErrorMessage("Blast radius breached: totalBidUp=%d exceeds %d%% of %d eligible"
-            .formatted(totalBidUp, properties.getMaxBidUpRatioPct(), eligible.size()));
+        run.setErrorMessage(blastRadiusReason);
         log.warn("Bidding run paused: runId={}, policy={}, reason=blast_radius, "
-                + "bidUp={}, eligible={}",
-            run.getId(), bidPolicyId, totalBidUp, eligible.size());
+                + "bidUp={}, eligible={}, maxChange={}%",
+            run.getId(), bidPolicyId, totalBidUp,
+            eligible.size(), maxAbsChangePctObserved);
       } else {
         run.setStatus(BiddingRunStatus.COMPLETED);
       }
@@ -192,12 +205,22 @@ public class BiddingRunService {
     runRepository.save(run);
   }
 
-  private boolean isBlastRadiusBreached(int totalBidUp, int totalEligible) {
-    if (totalEligible == 0) {
-      return false;
+  private String checkBlastRadius(int totalBidUp, int totalEligible,
+      int maxAbsChangePct) {
+    if (totalEligible > 0) {
+      int threshold = totalEligible * properties.getMaxBidUpRatioPct() / 100;
+      if (totalBidUp > threshold) {
+        return "Blast radius breached: totalBidUp=%d exceeds %d%% of %d eligible"
+            .formatted(totalBidUp, properties.getMaxBidUpRatioPct(),
+                totalEligible);
+      }
     }
-    int threshold = totalEligible * properties.getMaxBidUpRatioPct() / 100;
-    return totalBidUp > threshold;
+    int maxAllowedChangePct = properties.getMaxAbsChangePct();
+    if (maxAllowedChangePct > 0 && maxAbsChangePct > maxAllowedChangePct) {
+      return "Blast radius breached: maxAbsChangePct=%d%% exceeds limit %d%%"
+          .formatted(maxAbsChangePct, maxAllowedChangePct);
+    }
+    return null;
   }
 
   private BiddingStrategyResult holdWithGuardInfo(
@@ -218,7 +241,7 @@ public class BiddingRunService {
       BidPolicyEntity policy,
       BiddingStrategyResult result,
       GuardChainResult guardResult,
-      JsonNode configNode) {
+      BiddingSignalSet signals) {
 
     var entity = new BidDecisionEntity();
     entity.setBiddingRunId(biddingRunId);
@@ -227,10 +250,11 @@ public class BiddingRunService {
     entity.setBidPolicyId(policy.getId());
     entity.setStrategyType(policy.getStrategyType());
     entity.setDecisionType(result.decisionType());
+    entity.setCurrentBid(signals.currentBid());
     entity.setTargetBid(result.targetBid());
     entity.setExecutionMode(policy.getExecutionMode().name());
     entity.setExplanationSummary(result.explanation());
-    entity.setSignalSnapshot(serializeJson(configNode));
+    entity.setSignalSnapshot(serializeJson(signals));
     entity.setGuardsApplied(
         guardResult != null ? serializeJson(guardResult.evaluations()) : null);
 

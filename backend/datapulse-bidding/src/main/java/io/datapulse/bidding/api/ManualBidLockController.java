@@ -20,7 +20,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping(
-    value = "/api/workspaces/{workspaceId}/manual-bid-locks",
+    value = "/api/workspaces/{workspaceId}/bidding/locks",
     produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class ManualBidLockController {

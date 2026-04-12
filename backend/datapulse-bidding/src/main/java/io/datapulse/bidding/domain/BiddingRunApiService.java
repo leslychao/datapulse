@@ -50,4 +50,11 @@ public class BiddingRunApiService {
   public Page<BiddingRunEntity> listRuns(long workspaceId, Pageable pageable) {
     return runRepository.findByWorkspaceId(workspaceId, pageable);
   }
+
+  @Transactional(readOnly = true)
+  public BiddingRunEntity getRunDetail(long runId) {
+    return runRepository.findById(runId)
+        .orElseThrow(() -> NotFoundException.of(
+            MessageCodes.BIDDING_RUN_NOT_FOUND, runId));
+  }
 }

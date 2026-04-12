@@ -10,11 +10,6 @@ import io.datapulse.bidding.persistence.BidActionAttemptEntity;
 import io.datapulse.bidding.persistence.BidActionAttemptRepository;
 import io.datapulse.bidding.persistence.BidActionEntity;
 import io.datapulse.bidding.persistence.BidActionRepository;
-import io.datapulse.integration.domain.CredentialStore;
-import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
-import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
-import io.datapulse.integration.persistence.SecretReferenceEntity;
-import io.datapulse.integration.persistence.SecretReferenceRepository;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +23,7 @@ public class BidActionExecutor {
   private final BidActionRepository actionRepository;
   private final BidActionAttemptRepository attemptRepository;
   private final BidActionGatewayRegistry gatewayRegistry;
-  private final MarketplaceConnectionRepository connectionRepository;
-  private final SecretReferenceRepository secretReferenceRepository;
-  private final CredentialStore credentialStore;
+  private final BiddingCredentialResolver credentialResolver;
   private final OutboxService outboxService;
 
   @Transactional
@@ -98,19 +91,7 @@ public class BidActionExecutor {
   }
 
   private Map<String, String> resolveCredentials(long connectionId) {
-    MarketplaceConnectionEntity connection = connectionRepository
-        .findById(connectionId)
-        .orElseThrow(() -> new IllegalStateException(
-            "Connection not found: connectionId=%d".formatted(connectionId)));
-
-    SecretReferenceEntity secretRef = secretReferenceRepository
-        .findById(connection.getSecretReferenceId())
-        .orElseThrow(() -> new IllegalStateException(
-            "SecretReference not found: id=%d, connectionId=%d"
-                .formatted(connection.getSecretReferenceId(), connectionId)));
-
-    return credentialStore.read(
-        secretRef.getVaultPath(), secretRef.getVaultKey());
+    return credentialResolver.resolve(connectionId);
   }
 
   private void handleFailure(BidActionEntity action,

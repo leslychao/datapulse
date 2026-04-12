@@ -96,6 +96,7 @@ public final class MessageCodes {
     public static final String BIDDING_POLICY_ARCHIVED = "bidding.policy.archived";
     public static final String BIDDING_ASSIGNMENT_CONFLICT = "bidding.assignment.conflict";
     public static final String BIDDING_ASSIGNMENT_NOT_FOUND = "bidding.assignment.not_found";
+    public static final String BIDDING_RUN_NOT_FOUND = "bidding.run.not_found";
     public static final String BIDDING_RUN_COMPLETED = "bidding.run.completed";
     public static final String BIDDING_RUN_FAILED = "bidding.run.failed";
     public static final String BIDDING_RUN_PAUSED = "bidding.run.paused";
@@ -113,6 +114,9 @@ public final class MessageCodes {
     public static final String BIDDING_GUARD_LOW_STOCK = "bidding.guard.low_stock.blocked";
     public static final String BIDDING_GUARD_FREQUENCY = "bidding.guard.frequency.blocked";
     public static final String BIDDING_GUARD_DRR_CEILING = "bidding.guard.drr_ceiling.blocked";
+    public static final String BIDDING_GUARD_DAILY_SPEND_LIMIT = "bidding.guard.daily_spend_limit.blocked";
+    public static final String BIDDING_GUARD_VOLATILITY = "bidding.guard.volatility.blocked";
+    public static final String BIDDING_GUARD_PRICE_COMPETITIVENESS = "bidding.guard.price_competitiveness.blocked";
 
     // --- Pricing: Guards ---
     public static final String PRICING_GUARD_MANUAL_LOCK = "pricing.guard.manual_lock";

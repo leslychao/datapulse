@@ -1,12 +1,11 @@
 package io.datapulse.bidding.domain;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
-import io.datapulse.bidding.config.BiddingProperties;
 import io.datapulse.bidding.persistence.AdvertisingMetricsRow;
 import io.datapulse.bidding.persistence.BidDecisionRow;
 import io.datapulse.bidding.persistence.BiddingClickHouseReadRepository;
@@ -24,22 +23,25 @@ public class BiddingSignalCollector {
 
   private final BiddingDataReadRepository pgRepo;
   private final BiddingClickHouseReadRepository chRepo;
-  private final BiddingProperties properties;
+  private final BidReadAdapterRegistry readAdapterRegistry;
+  private final BiddingCredentialResolver credentialResolver;
 
   /**
    * Collects all available signals for a single marketplace offer.
    * Missing data is represented as null in the returned {@link BiddingSignalSet} —
    * the strategy and guards decide how to handle absent signals.
    *
-   * @param workspaceId      workspace scope
-   * @param marketplaceOfferId  PG marketplace_offer.id (used for PG lookups)
-   * @param marketplaceSku   external SKU (e.g. nmId) — used for ClickHouse lookups
-   * @param lookbackDays     number of days for aggregation window
+   * @param workspaceId        workspace scope
+   * @param marketplaceOfferId PG marketplace_offer.id (used for PG lookups)
+   * @param marketplaceSku     external SKU (e.g. nmId) — used for ClickHouse lookups
+   * @param connectionId       marketplace_connection.id — for credentials and rate limiting
+   * @param lookbackDays       number of days for aggregation window
    */
   public BiddingSignalSet collect(
       long workspaceId,
       long marketplaceOfferId,
       String marketplaceSku,
+      long connectionId,
       int lookbackDays) {
 
     CampaignInfoRow campaign = pgRepo.findCampaignInfo(marketplaceOfferId)
@@ -57,11 +59,18 @@ public class BiddingSignalCollector {
     BidDecisionRow lastDecision = pgRepo.findLastDecision(
         workspaceId, marketplaceOfferId).orElse(null);
 
-    BidDecisionType previousDecisionType = resolvePreviousDecisionType(lastDecision);
-    Integer daysSinceLastChange = resolveDaysSinceLastChange(lastDecision);
+    BidDecisionType previousDecisionType =
+        resolvePreviousDecisionType(lastDecision);
+    Integer daysSinceLastChange =
+        resolveDaysSinceLastChange(lastDecision);
+
+    BidReadResult bidInfo = readLiveBids(
+        campaign, marketplaceSku, connectionId);
+
+    BidUnit bidUnit = resolveBidUnit(campaign, connectionId);
 
     return new BiddingSignalSet(
-        null,
+        bidInfo.currentBid(),
         adMetrics != null ? adMetrics.drrPct() : null,
         adMetrics != null ? adMetrics.cpoPct() : null,
         adMetrics != null ? adMetrics.roas() : null,
@@ -71,22 +80,64 @@ public class BiddingSignalCollector {
         adMetrics != null ? adMetrics.totalSpend() : null,
         marginMetrics != null ? marginMetrics.marginPct() : null,
         stockMetrics != null ? stockMetrics.stockDays() : null,
-        null,
-        null,
-        null,
+        bidInfo.competitiveBid(),
+        bidInfo.leadersBid(),
+        bidInfo.minBid(),
         previousDecisionType,
         daysSinceLastChange,
-        campaign != null ? campaign.status() : null
+        campaign != null ? campaign.status() : null,
+        bidUnit
     );
   }
 
-  /**
-   * Checks whether the signal set contains minimum data for strategy evaluation.
-   * Currently only requires campaignStatus to be present — the rest is optional
-   * and the strategy decides what to do with missing signals.
-   */
   public boolean hasMinimumData(BiddingSignalSet signals) {
-    return signals.campaignStatus() != null;
+    return signals.campaignStatus() != null
+        || signals.currentBid() != null;
+  }
+
+  private BidUnit resolveBidUnit(
+      CampaignInfoRow campaign, long connectionId) {
+    String marketplaceType =
+        campaign != null ? campaign.marketplaceType() : null;
+    if (marketplaceType == null) {
+      marketplaceType = credentialResolver.resolveMarketplaceType(connectionId);
+    }
+    if ("YANDEX".equals(marketplaceType)) {
+      return BidUnit.PERCENT_X100;
+    }
+    return BidUnit.KOPECKS;
+  }
+
+  private BidReadResult readLiveBids(
+      CampaignInfoRow campaign,
+      String marketplaceSku,
+      long connectionId) {
+    String marketplaceType =
+        campaign != null ? campaign.marketplaceType() : null;
+
+    if (marketplaceType == null) {
+      marketplaceType = credentialResolver.resolveMarketplaceType(connectionId);
+    }
+
+    if (marketplaceType == null
+        || !readAdapterRegistry.supports(marketplaceType)) {
+      return BidReadResult.empty();
+    }
+
+    try {
+      Map<String, String> credentials =
+          credentialResolver.resolve(connectionId);
+      BidReadAdapter adapter = readAdapterRegistry.resolve(marketplaceType);
+      String campaignExternalId =
+          campaign != null ? campaign.campaignExternalId() : null;
+
+      return adapter.readCurrentBid(
+          campaignExternalId, marketplaceSku, connectionId, credentials);
+    } catch (Exception e) {
+      log.warn("Live bid read failed: connectionId={}, sku={}, error={}",
+          connectionId, marketplaceSku, e.getMessage());
+      return BidReadResult.empty();
+    }
   }
 
   private BidDecisionType resolvePreviousDecisionType(BidDecisionRow row) {

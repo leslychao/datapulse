@@ -23,7 +23,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/v1/bid-actions",
+@RequestMapping(
+    value = "/api/workspaces/{workspaceId}/bidding/actions",
     produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class BidActionController {
@@ -32,42 +33,51 @@ public class BidActionController {
   private final BidActionRepository actionRepository;
   private final BidDecisionRepository decisionRepository;
 
-  @GetMapping("/pending")
-  @PreAuthorize("@workspaceAccessService.canRead(#workspaceId)")
+  @GetMapping
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public Page<BidActionSummaryResponse> listPending(
-      @RequestParam("workspaceId") long workspaceId,
+      @PathVariable("workspaceId") long workspaceId,
       Pageable pageable) {
 
     return actionRepository
-        .findByWorkspaceIdAndStatus(workspaceId, BidActionStatus.PENDING_APPROVAL, pageable)
+        .findByWorkspaceIdAndStatus(
+            workspaceId, BidActionStatus.PENDING_APPROVAL, pageable)
         .map(this::toSummary);
   }
 
   @PostMapping("/{id}/approve")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-  public void approve(@PathVariable("id") long id) {
+  public void approve(
+      @PathVariable("workspaceId") long workspaceId,
+      @PathVariable("id") long id) {
     approvalService.approve(id);
   }
 
   @PostMapping("/{id}/reject")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-  public void reject(@PathVariable("id") long id) {
+  public void reject(
+      @PathVariable("workspaceId") long workspaceId,
+      @PathVariable("id") long id) {
     approvalService.reject(id);
   }
 
   @PostMapping("/bulk-approve")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-  public void bulkApprove(@Valid @RequestBody BulkActionRequest request) {
+  public void bulkApprove(
+      @PathVariable("workspaceId") long workspaceId,
+      @Valid @RequestBody BulkActionRequest request) {
     approvalService.bulkApprove(request.actionIds());
   }
 
   @PostMapping("/bulk-reject")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
-  public void bulkReject(@Valid @RequestBody BulkActionRequest request) {
+  public void bulkReject(
+      @PathVariable("workspaceId") long workspaceId,
+      @Valid @RequestBody BulkActionRequest request) {
     approvalService.bulkReject(request.actionIds());
   }
 

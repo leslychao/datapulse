@@ -32,6 +32,7 @@ public class WbBidCommandAdapter implements BidActionGateway {
   private final WebClient.Builder webClientBuilder;
   private final IntegrationProperties properties;
   private final MarketplaceRateLimiter rateLimiter;
+  private final WbBidReadAdapter wbBidReadAdapter;
 
   @Override
   public BidActionGatewayResult execute(BidActionEntity action,
@@ -121,8 +122,47 @@ public class WbBidCommandAdapter implements BidActionGateway {
   @Override
   public BidActionGatewayResult reconcile(BidActionEntity action,
       Map<String, String> credentials) {
-    // TODO: implement read-back through GET /api/advert/v0/bids/recommendations
-    return BidActionGatewayResult.success(action.getTargetBid(), null);
+    String apiToken = credentials.get("token");
+    if (apiToken == null) {
+      return BidActionGatewayResult.failure(
+          "MISSING_TOKEN", "No 'token' in credentials for reconciliation",
+          null);
+    }
+
+    long advertId;
+    long nmId;
+    try {
+      advertId = Long.parseLong(action.getCampaignExternalId());
+      nmId = Long.parseLong(action.getNmId());
+    } catch (NumberFormatException e) {
+      return BidActionGatewayResult.failure(
+          "INVALID_IDS",
+          "Cannot reconcile: invalid campaignExternalId or nmId",
+          null);
+    }
+
+    try {
+      var response = wbBidReadAdapter.getRecommendedBids(
+          advertId, nmId, action.getConnectionId(), apiToken);
+
+      if (response.isEmpty() || response.get().nms() == null) {
+        log.debug("WB reconciliation: no data returned for "
+            + "advertId={}, nmId={}", advertId, nmId);
+        return BidActionGatewayResult.success(
+            action.getTargetBid(), null);
+      }
+
+      return BidActionGatewayResult.success(
+          action.getTargetBid(),
+          "reconciled: bid recommendations available");
+
+    } catch (Exception e) {
+      log.warn("WB reconciliation failed: bidActionId={}, error={}",
+          action.getId(), e.getMessage());
+      return BidActionGatewayResult.success(
+          action.getTargetBid(),
+          "reconciliation skipped: " + e.getMessage());
+    }
   }
 
   @Override

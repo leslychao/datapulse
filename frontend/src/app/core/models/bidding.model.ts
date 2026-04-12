@@ -1,4 +1,4 @@
-export type BiddingStrategyType = 'ECONOMY_HOLD' | 'MINIMAL_PRESENCE';
+export type BiddingStrategyType = 'ECONOMY_HOLD' | 'MINIMAL_PRESENCE' | 'GROWTH' | 'POSITION_HOLD' | 'LAUNCH' | 'LIQUIDATION';
 export type BidDecisionType = 'BID_UP' | 'BID_DOWN' | 'HOLD' | 'PAUSE' | 'RESUME' | 'SET_MINIMUM' | 'EMERGENCY_CUT';
 export type BidPolicyStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
 export type BiddingExecutionMode = 'RECOMMENDATION' | 'SEMI_AUTO' | 'FULL_AUTO';

@@ -1263,4 +1263,74 @@ PENDING → IN_PROGRESS → COMPLETED
 
 ---
 
+## Implementation notes
+
+### Module structure
+
+MVP реализован в модуле `datapulse-bidding` со стандартной слоистой архитектурой:
+
+| Layer | Package | Key classes |
+|-------|---------|-------------|
+| API | `io.datapulse.bidding.api` | `BidPolicyController`, `BidPolicyAssignmentController`, `ManualBidLockController`, `BiddingRunController`, `BidDecisionController`, `BidActionController` |
+| Domain | `io.datapulse.bidding.domain` | `BiddingRunService`, `BidPolicyAssignmentService`, `ManualBidLockService`, `BiddingSignalCollector`, `BiddingActionScheduler` |
+| Strategy | `io.datapulse.bidding.domain.strategy` | `BiddingStrategy` (interface), `BiddingStrategyRegistry`, `EconomyHoldStrategy`, `MinimalPresenceStrategy` |
+| Guards | `io.datapulse.bidding.domain.guard` | `BiddingGuard` (interface), `BiddingGuardChain`, `ManualBidLockGuard`, `CampaignInactiveGuard`, `StaleAdvertisingDataGuard`, `StockOutGuard`, `LowStockGuard`, `EconomyGuard`, `FrequencyGuard`, `DrrCeilingGuard` |
+| Events | `io.datapulse.bidding.domain.event` | `BiddingRunCompletedEvent` |
+| Persistence | `io.datapulse.bidding.persistence` | JPA entities + repositories for all bidding tables |
+| Config | `io.datapulse.bidding.config` | `BiddingProperties` |
+
+### Strategies implemented
+
+| Strategy | Enum | Description |
+|----------|------|-------------|
+| Economy Hold | `ECONOMY_HOLD` | Keeps DRR within target band using step-up/step-down percentages |
+| Minimal Presence | `MINIMAL_PRESENCE` | Maintains bid at marketplace minimum allowed level |
+
+### Guards (ordered)
+
+| Order | Guard | Blocks |
+|-------|-------|--------|
+| 10 | `ManualBidLockGuard` | All decisions when manual lock exists |
+| 20 | `CampaignInactiveGuard` | All decisions when campaign is not active |
+| 30 | `StaleAdvertisingDataGuard` | All decisions when data is stale |
+| 40 | `StockOutGuard` | BID_UP when stock = 0 |
+| 45 | `LowStockGuard` | BID_UP when stock < threshold |
+| 50 | `EconomyGuard` | BID_UP when margin ≤ 0 |
+| 55 | `FrequencyGuard` | All decisions when last change < min interval |
+| 60 | `DrrCeilingGuard` | BID_UP when DRR > ceiling |
+
+### Alert checkers
+
+| Checker | AlertRuleType | Description |
+|---------|---------------|-------------|
+| `AutobidHighDrrClusterChecker` | `AUTOBID_HIGH_DRR_CLUSTER` | Alert when >20% of autobidding products have DRR > 1.5× target |
+| `AutobidSpendSpikeChecker` | `AUTOBID_SPEND_SPIKE` | Alert when today's spend > 2× 7-day average |
+
+### WebSocket topics
+
+| Topic | Event | When |
+|-------|-------|------|
+| `/topic/workspace/{id}/bidding-runs` | `BIDDING_RUN_COMPLETED` | Run finishes successfully |
+| `/topic/workspace/{id}/bidding-runs` | `BIDDING_RUN_PAUSED` | Blast radius breached |
+
+### Database tables
+
+All tables created by migrations `0031-autobidding-tables.sql` and `0032-autobidding-outbox-actions.sql`.
+
+### Frontend routes
+
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/bidding` | `BiddingLayoutComponent` | Tab-based layout |
+| `/bidding/strategies` | `BidPolicyListPage` | Strategy list |
+| `/bidding/strategies/new` | `BidPolicyFormPage` | Create strategy |
+| `/bidding/strategies/:id` | `BidPolicyFormPage` | Edit strategy |
+| `/bidding/runs` | `BiddingRunsListPage` | Run history |
+| `/bidding/runs/:id` | `BiddingRunDetailPage` | Run details |
+| `/bidding/decisions` | `BidDecisionsListPage` | Decision journal |
+| `/bidding/actions` | `BidActionsListPage` | Action queue |
+| `/bidding/locks` | `BidLocksPage` | Manual locks |
+
+---
+
 *Конец документа.*

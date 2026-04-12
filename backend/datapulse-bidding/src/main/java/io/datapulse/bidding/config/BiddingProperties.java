@@ -29,7 +29,16 @@ public class BiddingProperties {
 
   private final boolean enabled;
 
+  @Min(1)
+  private final int volatilityMaxReversals;
+
+  @Min(1)
+  private final int volatilityPeriodDays;
+
+  @Min(0)
+  private final int maxAbsChangePct;
+
   public BiddingProperties() {
-    this(7, 50, 4, 48, 7, true);
+    this(7, 50, 4, 48, 7, true, 3, 7, 30);
   }
 }

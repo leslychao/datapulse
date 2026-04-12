@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value = "/api/workspaces/{workspaceId}/bid-policies",
+@RequestMapping(value = "/api/workspaces/{workspaceId}/bidding/policies",
     produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class BidPolicyController {
