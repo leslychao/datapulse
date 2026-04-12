@@ -24,6 +24,7 @@ public class PnlAggregatedRow {
   private BigDecimal otherMarketplaceChargesAmount;
   private BigDecimal compensationAmount;
   private BigDecimal refundAmount;
+  private BigDecimal netPayout;
   private BigDecimal netCogs;
   private BigDecimal advertisingCost;
   private BigDecimal marketplacePnl;

@@ -46,7 +46,7 @@ public class PromoCampaignQueryRepository {
             """;
 
     private static final String BASE_SELECT = """
-            SELECT cpc.id, cpc.promo_name, cpc.source_platform,
+            SELECT cpc.id, cpc.promo_name, UPPER(cpc.source_platform) AS source_platform,
                    cpc.promo_type, cpc.mechanic, cpc.status,
                    cpc.date_from, cpc.date_to, cpc.freeze_at,
                    cpc.connection_id, mc.name AS connection_name,
@@ -89,7 +89,7 @@ public class PromoCampaignQueryRepository {
             params.addValue("statuses", statuses);
         }
         if (marketplaceTypes != null && !marketplaceTypes.isEmpty()) {
-            where.append(" AND cpc.source_platform IN (:marketplaceTypes)");
+            where.append(" AND UPPER(cpc.source_platform) IN (:marketplaceTypes)");
             params.addValue("marketplaceTypes", marketplaceTypes);
         }
         if (from != null) {
@@ -135,7 +135,12 @@ public class PromoCampaignQueryRepository {
                 .addValue("workspaceId", workspaceId);
 
         return jdbcTemplate.query("""
-                SELECT cpc.*,
+                SELECT cpc.id, cpc.connection_id, cpc.external_promo_id,
+                       UPPER(cpc.source_platform) AS source_platform,
+                       cpc.promo_name, cpc.promo_type, cpc.status,
+                       cpc.date_from, cpc.date_to, cpc.freeze_at,
+                       cpc.description, cpc.mechanic, cpc.is_participating,
+                       cpc.synced_at, cpc.created_at, cpc.updated_at,
                        (SELECT count(*) FROM canonical_promo_product cpp
                         WHERE cpp.canonical_promo_campaign_id = cpc.id) AS total_products,
                        (SELECT count(*) FROM canonical_promo_product cpp

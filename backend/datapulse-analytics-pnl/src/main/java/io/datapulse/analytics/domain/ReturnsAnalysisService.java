@@ -23,11 +23,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ReturnsAnalysisService {
 
   private final ReturnsReadRepository returnsReadRepository;
@@ -41,7 +39,8 @@ public class ReturnsAnalysisService {
 
     if (currentPeriod != null) {
       reasonBreakdown = buildReasonBreakdown(workspaceId, currentPeriod, filter);
-      returnRateDeltaPct = calculateDelta(workspaceId, currentPeriod, summary.returnRatePct());
+      returnRateDeltaPct = calculateDelta(
+          workspaceId, currentPeriod, summary.returnRatePct(), filter);
     }
 
     return new ReturnsSummaryResponse(
@@ -126,7 +125,7 @@ public class ReturnsAnalysisService {
   }
 
   private BigDecimal calculateDelta(long workspaceId, int currentPeriod,
-      BigDecimal currentRate) {
+      BigDecimal currentRate, ReturnsFilter filter) {
     if (currentRate == null) {
       return null;
     }
@@ -136,7 +135,7 @@ public class ReturnsAnalysisService {
     int previousPeriod = previous.getYear() * 100 + previous.getMonthValue();
 
     BigDecimal previousRate = returnsReadRepository
-        .findReturnRateForPeriod(workspaceId, previousPeriod);
+        .findReturnRateForPeriod(workspaceId, previousPeriod, filter);
 
     if (previousRate == null) {
       return null;

@@ -9,7 +9,8 @@ public record PnlFilter(
         LocalDate to,
         String period,
         Long sellerSkuId,
-        String search
+        String search,
+        String sourcePlatform
 ) {
 
     /**

@@ -22,9 +22,9 @@ public class InventoryAnalysisService {
 
   private final InventoryReadRepository inventoryReadRepository;
 
-  public InventoryOverviewResponse getOverview(long workspaceId, InventoryFilter filter) {
+  public InventoryOverviewResponse getOverview(long workspaceId) {
     InventoryOverviewResponse overview =
-        inventoryReadRepository.findOverview(workspaceId, filter);
+        inventoryReadRepository.findOverview(workspaceId);
     List<ProductInventoryResponse> topCritical =
         inventoryReadRepository.findTopCritical(workspaceId);
     return new InventoryOverviewResponse(

@@ -57,8 +57,8 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
           %d AS ver
       FROM (
           SELECT
-              connection_id,
-              any(workspace_id) AS workspace_id,
+              workspace_id,
+              any(connection_id) AS connection_id,
               source_platform,
               product_id,
               warehouse_id,
@@ -66,20 +66,20 @@ public class MartInventoryAnalysisMaterializer implements AnalyticsMaterializer 
               argMax(available, captured_at) AS available,
               argMax(reserved, captured_at) AS reserved
           FROM fact_inventory_snapshot
-          GROUP BY connection_id, source_platform, product_id, warehouse_id
+          GROUP BY workspace_id, source_platform, product_id, warehouse_id
       ) inv
       LEFT JOIN dim_product AS dp
-          ON inv.product_id = dp.product_id AND inv.connection_id = dp.connection_id
+          ON inv.product_id = dp.product_id AND inv.workspace_id = dp.workspace_id
       LEFT JOIN (
           SELECT
+              workspace_id,
               product_id,
-              connection_id,
               cast(sum(quantity) AS Decimal(18, 2)) / toDecimal32(%d, 0) AS avg_daily_sales
           FROM fact_sales
           WHERE sale_date >= today() - %d
-          GROUP BY product_id, connection_id
+          GROUP BY workspace_id, product_id
       ) sales_agg ON inv.product_id = sales_agg.product_id
-          AND inv.connection_id = sales_agg.connection_id
+          AND inv.workspace_id = sales_agg.workspace_id
       LEFT JOIN fact_product_cost AS fpc
           ON dp.seller_sku_id = fpc.seller_sku_id
           AND today() >= fpc.valid_from

@@ -130,7 +130,7 @@ function monthEnd(period: string): string {
         >
           <div class="flex items-center justify-between border-b border-[var(--border-default)] px-4 py-3">
             <h3 class="text-sm font-medium text-[var(--text-primary)]">
-              {{ selectedProduct()!.productName }}
+              {{ selectedProduct()!.productName || '—' }}
             </h3>
             <button
               (click)="selectedProduct.set(null)"
@@ -143,7 +143,7 @@ function monthEnd(period: string): string {
 
           <div class="flex-1 space-y-4 overflow-y-auto p-4">
             <div class="text-xs text-[var(--text-tertiary)]">
-              {{ selectedProduct()!.skuCode }} · {{ mpShortLabel(selectedProduct()!.sourcePlatform) }}
+              {{ selectedProduct()!.skuCode || '—' }} · {{ mpShortLabel(selectedProduct()!.sourcePlatform) }}
             </div>
 
             <!-- Return Stats -->
@@ -319,9 +319,10 @@ export class ReturnsByProductPageComponent {
     {
       field: 'skuCode',
       headerName: 'SKU',
+      width: 130,
       cellClass: 'font-mono text-[11px]',
       cellRenderer: (params: any) => {
-        if (!params.value) return '';
+        if (!params.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
         return `<span class="text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
       },
       onCellClicked: (params: any) => {
@@ -332,6 +333,10 @@ export class ReturnsByProductPageComponent {
       field: 'productName',
       headerName: this.t.instant('analytics.returns.col.product'),
       minWidth: 200,
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
+        return `<span title="${params.value}">${params.value}</span>`;
+      },
     },
     platformColumn(this.t, 'sourcePlatform', 'analytics.returns.col.platform'),
     {
@@ -339,13 +344,18 @@ export class ReturnsByProductPageComponent {
       headerName: this.t.instant('analytics.returns.col.return_count'),
       type: 'rightAligned',
       cellClass: 'font-mono',
+      width: 110,
+      sortable: true,
+      valueFormatter: (p) => p.value != null ? p.value.toLocaleString('ru-RU') : '—',
     },
     {
       field: 'returnRatePct',
       headerName: this.t.instant('analytics.returns.col.return_rate'),
       type: 'rightAligned',
       cellClass: 'font-mono',
-      valueFormatter: (p) => formatPercent(p.value),
+      width: 100,
+      sortable: true,
+      valueFormatter: (p) => p.value != null ? formatPercent(p.value) : '—',
       cellStyle: (p) => {
         if (p.value > 10) return { color: 'var(--status-error)' };
         if (p.value >= 5) return { color: 'var(--status-warning)' };
@@ -357,25 +367,34 @@ export class ReturnsByProductPageComponent {
       headerName: this.t.instant('analytics.returns.col.return_quantity'),
       type: 'rightAligned',
       cellClass: 'font-mono',
+      width: 100,
+      sortable: true,
+      valueFormatter: (p) => p.value != null ? p.value.toLocaleString('ru-RU') : '—',
     },
     {
       field: 'saleQuantity',
       headerName: this.t.instant('analytics.returns.col.sale_quantity'),
       type: 'rightAligned',
       cellClass: 'font-mono',
+      width: 100,
+      sortable: true,
+      valueFormatter: (p) => p.value != null ? p.value.toLocaleString('ru-RU') : '—',
     },
     {
       field: 'returnAmount',
       headerName: this.t.instant('analytics.returns.col.return_amount'),
       type: 'rightAligned',
       cellClass: 'font-mono',
+      width: 120,
+      sortable: true,
       valueFormatter: (p) => formatMoney(p.value, 0),
     },
     {
       field: 'topReturnReason',
       headerName: this.t.instant('analytics.returns.col.top_reason'),
+      minWidth: 160,
       cellRenderer: (p: any) => {
-        if (!p.value) return '—';
+        if (!p.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
         const cnt = p.data?.distinctReasonCount ?? 1;
         const badge = cnt > 1
           ? ` <span class="ml-1 rounded-[var(--radius-sm)] bg-[var(--bg-tertiary)] px-1 py-0.5 text-[10px] text-[var(--text-tertiary)]">+${cnt - 1}</span>`

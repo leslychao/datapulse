@@ -11,6 +11,8 @@
   @if (detailQuery.isPending()) {
     <div class="dp-shimmer h-40 rounded-[var(--radius-md)]"></div>
     <div class="dp-shimmer h-64 rounded-[var(--radius-md)]"></div>
+  } @else if (detailQuery.isError()) {
+    <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
   }
 
   @if (detailQuery.data(); as d) {

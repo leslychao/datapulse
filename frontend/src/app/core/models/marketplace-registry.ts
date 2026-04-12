@@ -75,7 +75,15 @@ export const MARKETPLACE_REGISTRY: MarketplaceConfig[] = [
 ];
 
 export function getMarketplaceConfig(type: MarketplaceType): MarketplaceConfig {
-  return MARKETPLACE_REGISTRY.find(m => m.type === type)!;
+  const upper = (type ?? '').toUpperCase() as MarketplaceType;
+  return MARKETPLACE_REGISTRY.find(m => m.type === upper) ?? {
+    type: upper,
+    label: upper,
+    shortLabel: upper,
+    badgeBg: 'var(--bg-tertiary)',
+    badgeText: 'var(--text-secondary)',
+    credentialFields: [],
+  };
 }
 
 export function getMarketplaceLabel(type: MarketplaceType): string {
@@ -83,6 +91,7 @@ export function getMarketplaceLabel(type: MarketplaceType): string {
 }
 
 export function getMarketplaceShortLabel(type: string): string {
-  const cfg = MARKETPLACE_REGISTRY.find(m => m.type === type);
+  const upper = (type ?? '').toUpperCase();
+  const cfg = MARKETPLACE_REGISTRY.find(m => m.type === upper);
   return cfg ? cfg.shortLabel : type;
 }

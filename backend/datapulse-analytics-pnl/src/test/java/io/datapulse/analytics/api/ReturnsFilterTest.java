@@ -17,6 +17,7 @@ class ReturnsFilterTest {
         LocalDate.of(2025, 3, 31),
         "2025-03",
         null,
+        null,
         TrendGranularity.MONTHLY);
 
     assertThat(filter.periodAsInt()).isEqualTo(202503);
@@ -25,7 +26,7 @@ class ReturnsFilterTest {
   @Test
   @DisplayName("periodAsInt should return null for invalid period")
   void shouldReturnNullForInvalidPeriod() {
-    ReturnsFilter filter = new ReturnsFilter(null, null, "03-2025", null, null);
+    ReturnsFilter filter = new ReturnsFilter(null, null, "03-2025", null, null, null);
 
     assertThat(filter.periodAsInt()).isNull();
   }
@@ -33,7 +34,7 @@ class ReturnsFilterTest {
   @Test
   @DisplayName("granularity should default to MONTHLY")
   void shouldUseMonthlyGranularityByDefault() {
-    ReturnsFilter filter = new ReturnsFilter(null, null, "2025-03", null, null);
+    ReturnsFilter filter = new ReturnsFilter(null, null, "2025-03", null, null, null);
 
     assertThat(filter.granularityOrDefault()).isEqualTo(TrendGranularity.MONTHLY);
   }

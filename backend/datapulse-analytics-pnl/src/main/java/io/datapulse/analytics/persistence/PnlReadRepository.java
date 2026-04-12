@@ -6,9 +6,9 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import io.datapulse.analytics.api.PnlFilter;
-import io.datapulse.analytics.api.PnlSummaryResponse;
 import io.datapulse.analytics.api.PnlTrendResponse;
 import io.datapulse.analytics.api.PostingDetailResponse;
 import io.datapulse.analytics.api.PostingPnlDetailResponse;
@@ -48,29 +48,7 @@ public class PnlReadRepository {
       Map.entry("posting_id", "posting_id")
   );
 
-  private static final String SUMMARY_SQL = """
-      SELECT
-          source_platform,
-          sum(revenue_amount) AS revenue_amount,
-          sum(marketplace_commission_amount) AS marketplace_commission_amount,
-          sum(acquiring_commission_amount) AS acquiring_commission_amount,
-          sum(logistics_cost_amount) AS logistics_cost_amount,
-          sum(storage_cost_amount) AS storage_cost_amount,
-          sum(penalties_amount) AS penalties_amount,
-          sum(marketing_cost_amount) AS marketing_cost_amount,
-          sum(acceptance_cost_amount) AS acceptance_cost_amount,
-          sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
-          sum(compensation_amount) AS compensation_amount,
-          sum(refund_amount) AS refund_amount,
-          sum(net_payout) AS net_payout,
-          sum(gross_cogs) AS gross_cogs,
-          sum(net_cogs) AS net_cogs,
-          sum(advertising_cost) AS advertising_cost,
-          sum(marketplace_pnl) AS marketplace_pnl,
-          sum(full_pnl) AS full_pnl
-      FROM mart_product_pnl
-      WHERE workspace_id = :workspaceId
-      """;
+  private static final Set<String> SORT_DIRECTIONS = Set.of("ASC", "DESC");
 
   private static final String AGGREGATED_SUMMARY_SQL = """
       SELECT
@@ -85,6 +63,7 @@ public class PnlReadRepository {
           sum(other_marketplace_charges_amount) AS other_marketplace_charges_amount,
           sum(compensation_amount) AS compensation_amount,
           sum(refund_amount) AS refund_amount,
+          sum(net_payout) AS net_payout,
           sum(coalesce(net_cogs, 0)) AS net_cogs,
           sum(coalesce(advertising_cost, 0)) AS advertising_cost,
           sum(marketplace_pnl) AS marketplace_pnl
@@ -141,18 +120,20 @@ public class PnlReadRepository {
       FROM mart_product_pnl AS m
       LEFT JOIN dim_product AS p_by_id
           ON m.product_id = p_by_id.product_id
+          AND m.workspace_id = p_by_id.workspace_id
       LEFT JOIN (
-          SELECT seller_sku_id,
+          SELECT workspace_id,
+                 seller_sku_id,
                  anyLast(sku_code) AS sku_code,
                  anyLast(marketplace_sku) AS marketplace_sku,
                  anyLast(product_name) AS product_name
           FROM dim_product
-          GROUP BY seller_sku_id
+          GROUP BY workspace_id, seller_sku_id
       ) AS p_by_sku
           ON m.seller_sku_id = p_by_sku.seller_sku_id
+          AND m.workspace_id = p_by_sku.workspace_id
       WHERE m.workspace_id = :workspaceId
         AND m.attribution_level = 'PRODUCT'
-        AND m.revenue_amount != 0
       """;
 
   private static final String BY_POSTING_SQL = """
@@ -232,12 +213,14 @@ public class PnlReadRepository {
       SETTINGS final = 1
       """;
 
-  public PnlAggregatedRow findAggregatedSummary(long workspaceId, int period) {
+  public PnlAggregatedRow findAggregatedSummary(long workspaceId, int period,
+      PnlFilter filter) {
     var params = new MapSqlParameterSource()
         .addValue("workspaceId", workspaceId)
         .addValue("period", period);
 
     var sb = new StringBuilder(AGGREGATED_SUMMARY_SQL);
+    appendSourcePlatformFilter(sb, params, filter);
     sb.append(SETTINGS_FINAL);
 
     List<PnlAggregatedRow> rows = jdbc.ch().query(sb.toString(), params,
@@ -245,35 +228,28 @@ public class PnlReadRepository {
     return rows.isEmpty() ? null : rows.get(0);
   }
 
-  public BigDecimal findReconciliationResidual(long workspaceId, int period) {
+  public BigDecimal findReconciliationResidual(long workspaceId, int period,
+      PnlFilter filter) {
     var params = new MapSqlParameterSource()
         .addValue("workspaceId", workspaceId)
         .addValue("period", period);
 
     var sb = new StringBuilder(AGGREGATED_RESIDUAL_SQL);
+    appendSourcePlatformFilter(sb, params, filter);
     sb.append(SETTINGS_FINAL);
 
     return jdbc.ch().queryForObject(sb.toString(), params, BigDecimal.class);
   }
 
-  public List<PnlSummaryResponse> findSummary(long workspaceId, PnlFilter filter) {
-    var params = new MapSqlParameterSource("workspaceId", workspaceId);
-    var sb = new StringBuilder(SUMMARY_SQL);
-    appendPeriodFilter(sb, params, filter);
-    sb.append(" GROUP BY source_platform");
-    sb.append(SETTINGS_FINAL);
-
-    return jdbc.ch().query(sb.toString(), params, this::mapSummary);
-  }
-
   public List<ProductPnlResponse> findByProduct(long workspaceId, PnlFilter filter,
-      String sortColumn, int limit, long offset) {
+      String sortColumn, String sortDirection, int limit, long offset) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(BY_PRODUCT_SQL);
     appendProductFilter(sb, params, filter);
 
     String orderBy = PRODUCT_SORT_WHITELIST.getOrDefault(sortColumn, "revenue_amount");
-    sb.append(" ORDER BY ").append(orderBy).append(" DESC NULLS LAST");
+    String dir = SORT_DIRECTIONS.contains(sortDirection) ? sortDirection : "DESC";
+    sb.append(" ORDER BY ").append(orderBy).append(" ").append(dir).append(" NULLS LAST");
     sb.append(" LIMIT :limit OFFSET :offset");
     params.addValue("limit", limit);
     params.addValue("offset", offset);
@@ -289,18 +265,20 @@ public class PnlReadRepository {
         FROM mart_product_pnl AS m
         LEFT JOIN dim_product AS p_by_id
             ON m.product_id = p_by_id.product_id
+            AND m.workspace_id = p_by_id.workspace_id
         LEFT JOIN (
-            SELECT seller_sku_id,
+            SELECT workspace_id,
+                   seller_sku_id,
                    anyLast(sku_code) AS sku_code,
                    anyLast(marketplace_sku) AS marketplace_sku,
                    anyLast(product_name) AS product_name
             FROM dim_product
-            GROUP BY seller_sku_id
+            GROUP BY workspace_id, seller_sku_id
         ) AS p_by_sku
             ON m.seller_sku_id = p_by_sku.seller_sku_id
+            AND m.workspace_id = p_by_sku.workspace_id
         WHERE m.workspace_id = :workspaceId
-          AND m.attribution_level = 'PRODUCT'
-          AND m.revenue_amount != 0""");
+          AND m.attribution_level = 'PRODUCT'""");
     appendProductFilter(sb, params, filter);
     sb.append(SETTINGS_FINAL);
 
@@ -309,13 +287,14 @@ public class PnlReadRepository {
   }
 
   public List<PostingPnlResponse> findByPosting(long workspaceId, PnlFilter filter,
-      String sortColumn, int limit, long offset) {
+      String sortColumn, String sortDirection, int limit, long offset) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(BY_POSTING_SQL);
     appendPostingFilter(sb, params, filter);
 
     String orderBy = POSTING_SORT_WHITELIST.getOrDefault(sortColumn, "finance_date");
-    sb.append(" ORDER BY ").append(orderBy).append(" DESC NULLS LAST");
+    String dir = SORT_DIRECTIONS.contains(sortDirection) ? sortDirection : "DESC";
+    sb.append(" ORDER BY ").append(orderBy).append(" ").append(dir).append(" NULLS LAST");
     sb.append(" LIMIT :limit OFFSET :offset");
     params.addValue("limit", limit);
     params.addValue("offset", offset);
@@ -384,10 +363,10 @@ public class PnlReadRepository {
         SELECT
             toString(period) AS period_label,
             sum(revenue_amount) AS revenue_amount,
-            sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
+            -(sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
                 + sum(logistics_cost_amount) + sum(storage_cost_amount)
                 + sum(penalties_amount) + sum(marketing_cost_amount)
-                + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount)
+                + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount))
                 AS total_costs_amount,
             sum(net_cogs) AS cogs_amount,
             sum(advertising_cost) AS advertising_cost_amount,
@@ -398,6 +377,7 @@ public class PnlReadRepository {
 
     var sb = new StringBuilder(sql);
     appendMonthlyTrendFilter(sb, params, filter);
+    appendSourcePlatformFilter(sb, params, filter);
     sb.append(" GROUP BY period_label ORDER BY period_label");
     sb.append(SETTINGS_FINAL);
 
@@ -416,10 +396,10 @@ public class PnlReadRepository {
         SELECT
             %s AS period_label,
             sum(revenue_amount) AS revenue_amount,
-            sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
+            -(sum(marketplace_commission_amount) + sum(acquiring_commission_amount)
                 + sum(logistics_cost_amount) + sum(storage_cost_amount)
                 + sum(penalties_amount) + sum(marketing_cost_amount)
-                + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount)
+                + sum(acceptance_cost_amount) + sum(other_marketplace_charges_amount))
                 AS total_costs_amount,
             sum(net_cogs) AS cogs_amount,
             toDecimal64(0, 2) AS advertising_cost_amount,
@@ -436,6 +416,7 @@ public class PnlReadRepository {
 
     var sb = new StringBuilder(sql);
     appendDateTrendFilter(sb, params, filter);
+    appendSourcePlatformFilter(sb, params, filter);
     sb.append(" GROUP BY period_label ORDER BY period_label");
     sb.append(SETTINGS_FINAL);
 
@@ -476,22 +457,6 @@ public class PnlReadRepository {
     }
   }
 
-  private void appendPeriodFilter(StringBuilder sb, MapSqlParameterSource params,
-      PnlFilter filter) {
-    if (filter.periodAsInt() != null) {
-      sb.append(" AND period = :period");
-      params.addValue("period", filter.periodAsInt());
-    }
-    if (filter.from() != null) {
-      sb.append(" AND period >= :periodFrom");
-      params.addValue("periodFrom", toPeriod(filter.from()));
-    }
-    if (filter.to() != null) {
-      sb.append(" AND period <= :periodTo");
-      params.addValue("periodTo", toPeriod(filter.to()));
-    }
-  }
-
   private void appendProductFilter(StringBuilder sb, MapSqlParameterSource params,
       PnlFilter filter) {
     if (filter.periodAsInt() != null) {
@@ -509,6 +474,7 @@ public class PnlReadRepository {
            OR m.marketplace_sku ILIKE :search)""");
       params.addValue("search", "%%" + filter.search().trim() + "%%");
     }
+    appendSourcePlatformFilter(sb, params, filter, "m.");
   }
 
   private void appendPostingFilter(StringBuilder sb, MapSqlParameterSource params,
@@ -531,33 +497,25 @@ public class PnlReadRepository {
               + " m.marketplace_sku ILIKE :search OR toString(m.posting_id) ILIKE :search)");
       params.addValue("search", "%%" + filter.search().trim() + "%%");
     }
+    appendSourcePlatformFilter(sb, params, filter, "m.");
+  }
+
+  private void appendSourcePlatformFilter(StringBuilder sb, MapSqlParameterSource params,
+      PnlFilter filter) {
+    appendSourcePlatformFilter(sb, params, filter, "");
+  }
+
+  private void appendSourcePlatformFilter(StringBuilder sb, MapSqlParameterSource params,
+      PnlFilter filter, String tablePrefix) {
+    if (filter != null && filter.sourcePlatform() != null
+        && !filter.sourcePlatform().isBlank()) {
+      sb.append(" AND ").append(tablePrefix).append("source_platform = :sourcePlatform");
+      params.addValue("sourcePlatform", filter.sourcePlatform().trim());
+    }
   }
 
   private int toPeriod(LocalDate date) {
     return date.getYear() * 100 + date.getMonthValue();
-  }
-
-  private PnlSummaryResponse mapSummary(ResultSet rs, int rowNum) throws SQLException {
-    return new PnlSummaryResponse(
-        rs.getString("source_platform"),
-        rs.getBigDecimal("revenue_amount"),
-        rs.getBigDecimal("marketplace_commission_amount"),
-        rs.getBigDecimal("acquiring_commission_amount"),
-        rs.getBigDecimal("logistics_cost_amount"),
-        rs.getBigDecimal("storage_cost_amount"),
-        rs.getBigDecimal("penalties_amount"),
-        rs.getBigDecimal("marketing_cost_amount"),
-        rs.getBigDecimal("acceptance_cost_amount"),
-        rs.getBigDecimal("other_marketplace_charges_amount"),
-        rs.getBigDecimal("compensation_amount"),
-        rs.getBigDecimal("refund_amount"),
-        rs.getBigDecimal("net_payout"),
-        rs.getBigDecimal("gross_cogs"),
-        rs.getBigDecimal("net_cogs"),
-        rs.getBigDecimal("advertising_cost"),
-        rs.getBigDecimal("marketplace_pnl"),
-        rs.getBigDecimal("full_pnl")
-    );
   }
 
   private ProductPnlResponse mapProductPnl(ResultSet rs, int rowNum) throws SQLException {
@@ -599,7 +557,7 @@ public class PnlReadRepository {
         getBoxedLong(rs, "product_id"),
         rs.getString("sku_code"),
         rs.getString("product_name"),
-        rs.getDate("finance_date").toLocalDate(),
+        getLocalDate(rs, "finance_date"),
         rs.getBigDecimal("revenue_amount"),
         rs.getBigDecimal("marketplace_commission_amount"),
         rs.getBigDecimal("acquiring_commission_amount"),
@@ -627,7 +585,7 @@ public class PnlReadRepository {
         rs.getString("sku_code"),
         rs.getString("product_name"),
         rs.getString("source_platform"),
-        rs.getDate("finance_date").toLocalDate(),
+        getLocalDate(rs, "finance_date"),
         rs.getBigDecimal("revenue_amount"),
         rs.getBigDecimal("total_costs_amount"),
         rs.getBigDecimal("net_payout"),
@@ -642,7 +600,7 @@ public class PnlReadRepository {
         rs.getLong("entry_id"),
         rs.getString("entry_type"),
         rs.getString("attribution_level"),
-        rs.getDate("finance_date").toLocalDate(),
+        getLocalDate(rs, "finance_date"),
         rs.getBigDecimal("revenue_amount"),
         rs.getBigDecimal("marketplace_commission_amount"),
         rs.getBigDecimal("acquiring_commission_amount"),
@@ -671,10 +629,16 @@ public class PnlReadRepository {
         .otherMarketplaceChargesAmount(rs.getBigDecimal("other_marketplace_charges_amount"))
         .compensationAmount(rs.getBigDecimal("compensation_amount"))
         .refundAmount(rs.getBigDecimal("refund_amount"))
+        .netPayout(rs.getBigDecimal("net_payout"))
         .netCogs(rs.getBigDecimal("net_cogs"))
         .advertisingCost(rs.getBigDecimal("advertising_cost"))
         .marketplacePnl(rs.getBigDecimal("marketplace_pnl"))
         .build();
+  }
+
+  private LocalDate getLocalDate(ResultSet rs, String column) throws SQLException {
+    java.sql.Date d = rs.getDate(column);
+    return d != null ? d.toLocalDate() : null;
   }
 
   private Long getBoxedLong(ResultSet rs, String column) throws SQLException {

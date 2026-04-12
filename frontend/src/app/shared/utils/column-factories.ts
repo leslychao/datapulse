@@ -94,7 +94,7 @@ export function platformColumn(
     width,
     cellRenderer: (p: ICellRendererParams) => {
       const val = p.value as string;
-      if (!val) return '';
+      if (!val) return '—';
       return renderMarketplaceBadge(val);
     },
   };

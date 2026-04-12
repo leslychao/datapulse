@@ -40,7 +40,7 @@ class ReturnsAnalysisServiceTest {
 
   private static final long WORKSPACE_ID = 1L;
   private static final ReturnsFilter EMPTY_FILTER =
-      new ReturnsFilter(null, null, null, null, null);
+      new ReturnsFilter(null, null, null, null, null, null);
 
   @Nested
   @DisplayName("getSummary")
@@ -49,15 +49,17 @@ class ReturnsAnalysisServiceTest {
     @Test
     @DisplayName("should include reason breakdown and delta for period filter")
     void should_includeReasonBreakdownAndDelta_when_periodProvided() {
-      var filter = new ReturnsFilter(null, null, "2025-03", null, null);
+      var filter = new ReturnsFilter(null, null, "2025-03", null, null, null);
       var summary = new SummaryRow(
           20, 30, new BigDecimal("15000.00"),
-          100, 200, new BigDecimal("15.00"), "Damaged");
+          100, 200, new BigDecimal("15.00"), "Damaged", 5);
 
       when(returnsReadRepository.findSummary(WORKSPACE_ID, filter)).thenReturn(summary);
-      when(returnsReadRepository.findReasonBreakdown(WORKSPACE_ID, 202503))
-          .thenReturn(List.of(new ReasonRow("Damaged", 6), new ReasonRow("Wrong size", 4)));
-      when(returnsReadRepository.findReturnRateForPeriod(WORKSPACE_ID, 202502))
+      when(returnsReadRepository.findReasonBreakdown(eq(WORKSPACE_ID), eq(202503), eq(filter)))
+          .thenReturn(List.of(
+              new ReasonRow("Damaged", 6, new BigDecimal("9000.00"), 3),
+              new ReasonRow("Wrong size", 4, new BigDecimal("6000.00"), 2)));
+      when(returnsReadRepository.findReturnRateForPeriod(eq(WORKSPACE_ID), eq(202502), eq(filter)))
           .thenReturn(new BigDecimal("12.00"));
 
       ReturnsSummaryResponse result = service.getSummary(WORKSPACE_ID, filter);
@@ -74,7 +76,7 @@ class ReturnsAnalysisServiceTest {
     void should_skipPeriodSpecificData_when_periodMissing() {
       var summary = new SummaryRow(
           2, 3, new BigDecimal("1200.00"),
-          10, 20, new BigDecimal("15.00"), "Damaged");
+          10, 20, new BigDecimal("15.00"), "Damaged", 2);
 
       when(returnsReadRepository.findSummary(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(summary);
 
@@ -94,13 +96,13 @@ class ReturnsAnalysisServiceTest {
     void should_useDefaultSort_when_noSortProvided() {
       when(returnsReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(0L);
       when(returnsReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
-          eq("returnRatePct"), eq(20), eq(0L)))
+          eq("returnRatePct"), eq("DESC"), eq(20), eq(0L)))
           .thenReturn(List.of());
 
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER, PageRequest.of(0, 20));
 
       verify(returnsReadRepository).findByProduct(WORKSPACE_ID, EMPTY_FILTER,
-          "returnRatePct", 20, 0L);
+          "returnRatePct", "DESC", 20, 0L);
     }
 
     @Test
@@ -108,14 +110,14 @@ class ReturnsAnalysisServiceTest {
     void should_extractSort_when_sortProvided() {
       when(returnsReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(0L);
       when(returnsReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
-          eq("returnQuantity"), eq(10), eq(0L)))
+          eq("returnQuantity"), eq("ASC"), eq(10), eq(0L)))
           .thenReturn(List.of());
 
       service.getByProduct(WORKSPACE_ID, EMPTY_FILTER,
           PageRequest.of(0, 10, Sort.by("returnQuantity")));
 
       verify(returnsReadRepository).findByProduct(WORKSPACE_ID, EMPTY_FILTER,
-          "returnQuantity", 10, 0L);
+          "returnQuantity", "ASC", 10, 0L);
     }
 
     @Test
@@ -125,10 +127,10 @@ class ReturnsAnalysisServiceTest {
           "WB", 100L, 1L, "SKU001", "Product A", 202501,
           10, 12, new BigDecimal("6000.00"), 100, 120,
           new BigDecimal("10.00"),
-          "Wrong size");
+          "Wrong size", 2);
 
       when(returnsReadRepository.findByProduct(eq(WORKSPACE_ID), eq(EMPTY_FILTER),
-          eq("returnRatePct"), eq(20), eq(0L)))
+          eq("returnRatePct"), eq("DESC"), eq(20), eq(0L)))
           .thenReturn(List.of(product));
       when(returnsReadRepository.countByProduct(WORKSPACE_ID, EMPTY_FILTER)).thenReturn(1L);
 
@@ -149,7 +151,7 @@ class ReturnsAnalysisServiceTest {
     @Test
     @DisplayName("should build month bounds from period when from/to absent")
     void should_buildBoundsFromPeriod_when_fromToMissing() {
-      var filter = new ReturnsFilter(null, null, "2025-03", null, TrendGranularity.DAILY);
+      var filter = new ReturnsFilter(null, null, "2025-03", null, null, TrendGranularity.DAILY);
       var trend = new ReturnsTrendResponse("2025-03-10", 2, 10, new BigDecimal("20.00"));
       when(returnsReadRepository.findTrend(
           eq(WORKSPACE_ID),
@@ -157,6 +159,7 @@ class ReturnsAnalysisServiceTest {
               LocalDate.of(2025, 3, 1),
               LocalDate.of(2025, 3, 31),
               "2025-03",
+              null,
               null,
               TrendGranularity.DAILY)),
           eq(TrendGranularity.DAILY)))
@@ -172,6 +175,7 @@ class ReturnsAnalysisServiceTest {
               LocalDate.of(2025, 3, 31),
               "2025-03",
               null,
+              null,
               TrendGranularity.DAILY)),
           eq(TrendGranularity.DAILY));
     }
@@ -182,6 +186,7 @@ class ReturnsAnalysisServiceTest {
       var filter = new ReturnsFilter(
           LocalDate.of(2025, 4, 1),
           LocalDate.of(2025, 4, 30),
+          null,
           null,
           null,
           TrendGranularity.MONTHLY);

@@ -48,7 +48,7 @@ class InventoryAnalysisServiceTest {
     void should_returnOverview_when_dataExists() {
       var overview = new InventoryOverviewResponse(
           150, 5, 20, 125, new BigDecimal("450000.00"), List.of());
-      when(inventoryReadRepository.findOverview(WORKSPACE_ID, EMPTY_FILTER))
+      when(inventoryReadRepository.findOverview(WORKSPACE_ID))
           .thenReturn(overview);
 
       var criticalProduct = new ProductInventoryResponse(
@@ -59,7 +59,7 @@ class InventoryAnalysisServiceTest {
       when(inventoryReadRepository.findTopCritical(WORKSPACE_ID))
           .thenReturn(List.of(criticalProduct));
 
-      InventoryOverviewResponse result = service.getOverview(WORKSPACE_ID, EMPTY_FILTER);
+      InventoryOverviewResponse result = service.getOverview(WORKSPACE_ID);
 
       assertThat(result.totalSkus()).isEqualTo(150);
       assertThat(result.criticalCount()).isEqualTo(5);

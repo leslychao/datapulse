@@ -39,6 +39,10 @@ import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
+function resolveCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name;
+}
+
 type TrendDir = 'up' | 'down' | 'neutral';
 
 interface KpiItem {
@@ -49,6 +53,7 @@ interface KpiItem {
   icon: LucideIconData;
   accent: KpiAccent;
   route: string;
+  invertTrend?: boolean;
 }
 
 @Component({
@@ -198,11 +203,11 @@ export class PnlSummaryPageComponent {
     if (!s) return [];
     return [
       this.buildKpi('analytics.pnl.kpi.revenue', s.revenueAmount, s.revenueDeltaPct, Banknote, 'success', 'pnl/by-product'),
-      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct, Receipt, 'error', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.total_costs', s.totalCostsAmount, s.costsDeltaPct, Receipt, 'error', 'pnl/by-product', true),
       this.buildKpi('analytics.pnl.kpi.compensation', s.compensationAmount, s.compensationDeltaPct, ShieldCheck, 'info', 'pnl/by-posting'),
-      this.buildKpi('analytics.pnl.kpi.refund', s.refundAmount, s.refundDeltaPct, RotateCcw, 'warning', 'pnl/by-posting'),
-      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct, Package, 'warning', 'pnl/by-product'),
-      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct, Megaphone, 'info', 'pnl/by-product'),
+      this.buildKpi('analytics.pnl.kpi.refund', s.refundAmount, s.refundDeltaPct, RotateCcw, 'warning', 'pnl/by-posting', true),
+      this.buildKpi('analytics.pnl.kpi.cogs', s.cogsAmount, s.cogsDeltaPct, Package, 'warning', 'pnl/by-product', true),
+      this.buildKpi('analytics.pnl.kpi.advertising', s.advertisingCostAmount, s.advertisingDeltaPct, Megaphone, 'info', 'pnl/by-product', true),
       this.buildKpi('analytics.pnl.kpi.pnl', s.fullPnl, s.pnlDeltaPct, ChartBar, 'primary', 'pnl/trend'),
       this.buildKpi('analytics.pnl.kpi.residual', s.reconciliationResidual, null, Scale, 'neutral', 'data-quality/reconciliation'),
     ];
@@ -223,24 +228,24 @@ export class PnlSummaryPageComponent {
           type: 'line',
           data: points.map((p) => p.revenueAmount),
           smooth: true,
-          itemStyle: { color: '#059669' },
-          areaStyle: { color: 'rgba(5,150,105,0.08)' },
+          itemStyle: { color: resolveCssVar('--finance-positive') },
+          areaStyle: { color: resolveCssVar('--finance-positive') + '14' },
         },
         {
           name: this.t.instant('analytics.pnl.chart.costs'),
           type: 'line',
           data: points.map((p) => p.totalCostsAmount),
           smooth: true,
-          itemStyle: { color: '#DC2626' },
-          areaStyle: { color: 'rgba(220,38,38,0.08)' },
+          itemStyle: { color: resolveCssVar('--finance-negative') },
+          areaStyle: { color: resolveCssVar('--finance-negative') + '14' },
         },
         {
           name: this.t.instant('analytics.pnl.chart.pnl'),
           type: 'line',
           data: points.map((p) => p.fullPnl),
           smooth: true,
-          itemStyle: { color: '#2563EB' },
-          areaStyle: { color: 'rgba(37,99,235,0.08)' },
+          itemStyle: { color: resolveCssVar('--accent-primary') },
+          areaStyle: { color: resolveCssVar('--accent-primary') + '14' },
         },
       ],
     };
@@ -276,15 +281,21 @@ export class PnlSummaryPageComponent {
     icon: LucideIconData,
     accent: KpiAccent,
     route: string,
+    invertTrend = false,
   ): KpiItem {
+    const rawDir = this.trendDir(deltaPct);
+    const direction: TrendDir = invertTrend
+      ? rawDir === 'up' ? 'down' : rawDir === 'down' ? 'up' : 'neutral'
+      : rawDir;
     return {
       labelKey,
       formattedValue: formatMoney(value, 0),
       deltaPct,
-      direction: this.trendDir(deltaPct),
+      direction,
       icon,
       accent,
       route,
+      invertTrend,
     };
   }
 

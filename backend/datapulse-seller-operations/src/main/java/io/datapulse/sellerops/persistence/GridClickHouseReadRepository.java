@@ -71,6 +71,7 @@ public class GridClickHouseReadRepository {
                 FROM fact_finance AS ff
                 JOIN dim_product AS dp
                     ON ff.seller_sku_id = dp.seller_sku_id
+                    AND ff.workspace_id = dp.workspace_id
                 WHERE dp.product_id IN (:offerIds)
                   AND ff.finance_date >= today() - 30
                 GROUP BY dp.product_id
@@ -167,6 +168,7 @@ public class GridClickHouseReadRepository {
                                  ff.attribution_level IN ('POSTING','PRODUCT')) AS net_pnl_30d
                     FROM fact_finance ff
                     JOIN dim_product dp ON ff.seller_sku_id = dp.seller_sku_id
+                        AND ff.workspace_id = dp.workspace_id
                     WHERE ff.workspace_id = :workspaceId
                       AND ff.finance_date >= today() - 30
                     GROUP BY dp.product_id

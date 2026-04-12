@@ -18,6 +18,7 @@ import { PnlByPosting } from '@core/models';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createDebouncedSearch } from '@shared/utils/debounced-search';
@@ -51,6 +52,7 @@ function monthEnd(period: string): string {
     DataGridComponent,
     LucideAngularModule,
     PaginationBarComponent,
+    EmptyStateComponent,
   ],
   template: `
     <div class="flex flex-col overflow-hidden gap-4">
@@ -83,6 +85,9 @@ function monthEnd(period: string): string {
         </button>
       </div>
 
+      @if (postingsQuery.isError()) {
+        <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
+      } @else {
       <dp-data-grid
         viewStateKey="analytics:pnl:by-posting"
         [columnDefs]="columnDefs()"
@@ -101,6 +106,7 @@ function monthEnd(period: string): string {
         [pageSizeOptions]="[25, 50, 100]"
         (pageChange)="onPageChange($event)"
       />
+      }
     </div>
   `,
 })
@@ -174,11 +180,11 @@ export class PnlByPostingPageComponent {
       field: 'postingId',
       headerName: this.t.instant('analytics.pnl.col.posting_id'),
       cellClass: 'font-mono text-[11px]',
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: { value: string }) => {
         if (!params.value) return '';
         return `<span class="text-[var(--accent-primary)] cursor-pointer hover:underline">${params.value}</span>`;
       },
-      onCellClicked: (params: any) => {
+      onCellClicked: (params: { data: PnlByPosting }) => {
         if (params.data) this.onRowClicked(params.data);
       },
     },

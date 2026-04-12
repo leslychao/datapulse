@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * Materializes mart_returns_analysis from fact_returns + fact_sales.
  *
- * <p>Aggregates operational return metrics per (connection_id, seller_sku_id, period):
+ * <p>Aggregates operational return metrics per (workspace_id, source_platform, seller_sku_id, period):
  * return count/quantity/amount, sale count/quantity, return rate,
  * and top return reason. Financial impact (refund, penalties) lives
  * exclusively in P&L marts.</p>
@@ -47,9 +47,9 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                 %d AS ver
             FROM (
                 SELECT
-                    connection_id,
-                    any(workspace_id) AS workspace_id,
-                    any(source_platform) AS source_platform,
+                    workspace_id,
+                    any(connection_id) AS connection_id,
+                    source_platform,
                     coalesce(product_id, toUInt64(0)) AS product_id,
                     coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,
                     toYYYYMM(return_date) AS period,
@@ -59,19 +59,21 @@ public class MartReturnsAnalysisMaterializer implements AnalyticsMaterializer {
                     topK(1)(return_reason)[1] AS top_return_reason,
                     uniqExact(return_reason) AS distinct_reason_count
                 FROM fact_returns
-                GROUP BY connection_id, product_id, seller_sku_id, toYYYYMM(return_date)
+                GROUP BY workspace_id, source_platform, product_id, seller_sku_id, toYYYYMM(return_date)
             ) r
             LEFT JOIN (
                 SELECT
-                    connection_id,
+                    workspace_id,
+                    source_platform,
                     coalesce(product_id, toUInt64(0)) AS product_id,
                     coalesce(seller_sku_id, toUInt64(0)) AS seller_sku_id,
                     toYYYYMM(sale_date) AS period,
                     count() AS sale_count,
                     sum(quantity) AS sale_quantity
                 FROM fact_sales
-                GROUP BY connection_id, product_id, seller_sku_id, toYYYYMM(sale_date)
-            ) s ON r.connection_id = s.connection_id
+                GROUP BY workspace_id, source_platform, product_id, seller_sku_id, toYYYYMM(sale_date)
+            ) s ON r.workspace_id = s.workspace_id
+                AND r.source_platform = s.source_platform
                 AND r.product_id = s.product_id
                 AND r.seller_sku_id = s.seller_sku_id
                 AND r.period = s.period

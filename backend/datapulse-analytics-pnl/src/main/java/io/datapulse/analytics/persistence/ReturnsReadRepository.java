@@ -47,7 +47,8 @@ public class ReturnsReadRepository {
           if(total_sale_quantity > 0,
              total_return_quantity / total_sale_quantity * 100, NULL) AS return_rate_pct,
           topK(1)(top_return_reason)[1] AS top_return_reason,
-          countDistinctIf(seller_sku_id, seller_sku_id > 0) AS products_with_returns
+          countDistinctIf(coalesce(seller_sku_id, product_id),
+              coalesce(seller_sku_id, product_id) > 0) AS products_with_returns
       FROM mart_returns_analysis
       WHERE workspace_id = :workspaceId
       """;
@@ -68,7 +69,7 @@ public class ReturnsReadRepository {
           return_reason,
           count() AS cnt,
           sum(ifNull(return_amount, toDecimal64(0, 2))) AS reason_amount,
-          uniqExact(seller_sku_id) AS product_count
+          uniqExact(coalesce(seller_sku_id, product_id)) AS product_count
       FROM fact_returns
       WHERE workspace_id = :workspaceId
         AND toYYYYMM(return_date) = :period
@@ -80,7 +81,7 @@ public class ReturnsReadRepository {
           count() AS cnt,
           sum(quantity) AS total_quantity,
           sum(ifNull(return_amount, toDecimal64(0, 2))) AS reason_amount,
-          uniqExact(seller_sku_id) AS product_count
+          uniqExact(coalesce(seller_sku_id, product_id)) AS product_count
       FROM fact_returns
       WHERE workspace_id = :workspaceId
         AND toYYYYMM(return_date) = :period
@@ -91,8 +92,16 @@ public class ReturnsReadRepository {
           m.source_platform AS source_platform,
           m.product_id AS product_id,
           m.seller_sku_id AS seller_sku_id,
-          p.sku_code AS sku_code,
-          p.product_name AS product_name,
+          coalesce(
+              nullIf(p_by_id.sku_code, ''),
+              nullIf(p_by_sku.sku_code, ''),
+              nullIf(p_by_id.marketplace_sku, ''),
+              nullIf(p_by_sku.marketplace_sku, '')
+          ) AS sku_code,
+          coalesce(
+              nullIf(p_by_id.product_name, ''),
+              nullIf(p_by_sku.product_name, '')
+          ) AS product_name,
           m.period AS period,
           m.return_count AS return_count,
           m.return_quantity AS return_quantity,
@@ -103,7 +112,20 @@ public class ReturnsReadRepository {
           m.top_return_reason AS top_return_reason,
           m.distinct_reason_count AS distinct_reason_count
       FROM mart_returns_analysis AS m
-      LEFT JOIN dim_product AS p ON m.product_id = p.product_id
+      LEFT JOIN dim_product AS p_by_id
+          ON m.product_id = p_by_id.product_id
+          AND m.workspace_id = p_by_id.workspace_id
+      LEFT JOIN (
+          SELECT workspace_id,
+                 seller_sku_id,
+                 anyLast(sku_code) AS sku_code,
+                 anyLast(marketplace_sku) AS marketplace_sku,
+                 anyLast(product_name) AS product_name
+          FROM dim_product
+          GROUP BY workspace_id, seller_sku_id
+      ) AS p_by_sku
+          ON m.seller_sku_id = p_by_sku.seller_sku_id
+          AND m.workspace_id = p_by_sku.workspace_id
       WHERE m.workspace_id = :workspaceId
       """;
 
@@ -184,12 +206,16 @@ public class ReturnsReadRepository {
     ));
   }
 
-  public BigDecimal findReturnRateForPeriod(long workspaceId, int period) {
+  public BigDecimal findReturnRateForPeriod(long workspaceId, int period,
+      ReturnsFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId)
         .addValue("period", period);
+    var sb = new StringBuilder(RETURN_RATE_SQL);
+    appendPlatformFilter(sb, params, filter);
+    sb.append(SETTINGS_FINAL);
 
     return jdbc.ch().queryForObject(
-        RETURN_RATE_SQL + SETTINGS_FINAL,
+        sb.toString(),
         params,
         (rs, rowNum) -> rs.getBigDecimal("return_rate_pct"));
   }
@@ -252,7 +278,20 @@ public class ReturnsReadRepository {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder("""
         SELECT count(*) FROM mart_returns_analysis AS m
-        LEFT JOIN dim_product AS p ON m.product_id = p.product_id
+        LEFT JOIN dim_product AS p_by_id
+            ON m.product_id = p_by_id.product_id
+            AND m.workspace_id = p_by_id.workspace_id
+        LEFT JOIN (
+            SELECT workspace_id,
+                   seller_sku_id,
+                   anyLast(sku_code) AS sku_code,
+                   anyLast(marketplace_sku) AS marketplace_sku,
+                   anyLast(product_name) AS product_name
+            FROM dim_product
+            GROUP BY workspace_id, seller_sku_id
+        ) AS p_by_sku
+            ON m.seller_sku_id = p_by_sku.seller_sku_id
+            AND m.workspace_id = p_by_sku.workspace_id
         WHERE m.workspace_id = :workspaceId
         """);
     appendFilter(sb, params, filter);
@@ -303,7 +342,9 @@ public class ReturnsReadRepository {
   private void appendSearchFilter(StringBuilder sb, MapSqlParameterSource params,
       ReturnsFilter filter) {
     if (filter.search() != null && !filter.search().isBlank()) {
-      sb.append(" AND (p.product_name ILIKE :search OR p.sku_code ILIKE :search)");
+      sb.append("""
+           AND (coalesce(p_by_id.product_name, p_by_sku.product_name) ILIKE :search\
+           OR coalesce(p_by_id.sku_code, p_by_sku.sku_code) ILIKE :search)""");
       params.addValue("search", "%%" + filter.search().trim() + "%%");
     }
   }

@@ -26,9 +26,8 @@ public class InventoryController {
     @GetMapping("/overview")
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public InventoryOverviewResponse getOverview(
-            @PathVariable("workspaceId") long workspaceId,
-            InventoryFilter filter) {
-        return inventoryAnalysisService.getOverview(workspaceId, filter);
+            @PathVariable("workspaceId") long workspaceId) {
+        return inventoryAnalysisService.getOverview(workspaceId);
     }
 
     @GetMapping("/by-product")

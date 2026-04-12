@@ -39,7 +39,6 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
   inventory: [
     { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory/overview' },
     { labelKey: 'analytics.subnav.inventory.by_product', path: 'inventory/by-product' },
-    { labelKey: 'analytics.subnav.inventory.history', path: 'inventory/stock-history' },
   ],
   returns: [
     { labelKey: 'analytics.subnav.returns.overview', path: 'returns/overview' },
@@ -136,7 +135,7 @@ export class AnalyticsLayoutComponent {
     });
 
     const lastTab = this.navStore.getLastTab(MODULE);
-    if (lastTab && lastTab !== DEFAULT_TAB) {
+    if (lastTab && lastTab !== DEFAULT_TAB && !lastTab.includes('stock-history')) {
       const wsId = this.wsStore.currentWorkspaceId();
       if (wsId) {
         this.router.navigate(

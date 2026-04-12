@@ -228,29 +228,29 @@ function monthEnd(period: string): string {
                 <table class="dp-table">
                   <thead>
                     <tr>
-                      <th>SKU</th>
-                      <th>{{ 'analytics.returns.col.product' | translate }}</th>
-                      <th class="text-right">{{ 'analytics.returns.col.return_rate' | translate }}</th>
-                      <th class="text-right">{{ 'analytics.returns.col.return_count' | translate }}</th>
-                      <th>{{ 'analytics.returns.col.top_reason' | translate }}</th>
+                      <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">SKU</th>
+                      <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.product' | translate }}</th>
+                      <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.return_rate' | translate }}</th>
+                      <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.return_count' | translate }}</th>
+                      <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.top_reason' | translate }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (item of topProducts(); track item.sellerSkuId) {
                       <tr>
-                        <td class="whitespace-nowrap font-mono text-xs text-[var(--text-secondary)]">
-                          {{ item.skuCode }}
+                        <td class="whitespace-nowrap font-mono text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+                          {{ item.skuCode || '—' }}
                         </td>
                         <td class="max-w-[200px] truncate text-[var(--text-primary)]"
-                            [title]="item.productName">
-                          {{ item.productName }}
+                            [title]="item.productName || ''">
+                          {{ item.productName || '—' }}
                         </td>
                         <td class="whitespace-nowrap text-right font-mono"
                             [class]="returnRateClass(item.returnRatePct)">
                           {{ formatPct(item.returnRatePct) }}
                         </td>
                         <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                          {{ item.returnCount }}
+                          {{ item.returnCount.toLocaleString('ru-RU') }}
                         </td>
                         <td class="text-[var(--text-secondary)]">
                           {{ item.topReturnReason || '—' }}

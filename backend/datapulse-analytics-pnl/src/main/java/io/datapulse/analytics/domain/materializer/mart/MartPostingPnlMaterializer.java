@@ -227,7 +227,7 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
               pm_c.workspace_id AS workspace_id,
               pm_c.source_platform AS source_platform,
               pm_c.posting_id AS posting_id,
-              any(fpc_inner.cost_price) AS cost_price
+              argMax(fpc_inner.cost_price, fpc_inner.valid_from) AS cost_price
           FROM (
               SELECT
                   workspace_id,

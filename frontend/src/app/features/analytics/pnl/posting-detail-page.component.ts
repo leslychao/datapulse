@@ -15,6 +15,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { PostingEntry } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { formatMoney } from '@shared/utils/format.utils';
 
 interface MeasureColumn {
@@ -42,7 +43,7 @@ const MEASURE_COLUMNS: MeasureColumn[] = [
   selector: 'dp-posting-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslatePipe, MarketplaceBadgeComponent],
+  imports: [DatePipe, TranslatePipe, MarketplaceBadgeComponent, EmptyStateComponent],
   templateUrl: './posting-detail-page.component.html',
 })
 export class PostingDetailPageComponent {
@@ -71,7 +72,7 @@ export class PostingDetailPageComponent {
     const result: Record<string, number> = {};
     for (const col of MEASURE_COLUMNS) {
       result[col.field] = entries.reduce(
-        (sum, e) => sum + (e[col.field] as number),
+        (sum, e) => sum + ((e[col.field] as number) ?? 0),
         0,
       );
     }
@@ -108,7 +109,7 @@ export class PostingDetailPageComponent {
   }
 
   entryMeasure(entry: PostingEntry, field: string): number {
-    return entry[field as keyof PostingEntry] as number;
+    return (entry[field as keyof PostingEntry] as number) ?? 0;
   }
 
 }

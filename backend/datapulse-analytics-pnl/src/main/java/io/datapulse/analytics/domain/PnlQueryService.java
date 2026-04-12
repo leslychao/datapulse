@@ -11,7 +11,6 @@ import java.util.List;
 import io.datapulse.analytics.api.PnlAggregatedSummaryResponse;
 import io.datapulse.analytics.api.PnlAggregatedSummaryResponse.CostBreakdownItem;
 import io.datapulse.analytics.api.PnlFilter;
-import io.datapulse.analytics.api.PnlSummaryResponse;
 import io.datapulse.analytics.api.PnlTrendResponse;
 import io.datapulse.analytics.api.PostingPnlDetailResponse;
 import io.datapulse.analytics.api.PostingPnlResponse;
@@ -23,12 +22,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class PnlQueryService {
 
   private final PnlReadRepository pnlReadRepository;
@@ -40,26 +38,28 @@ public class PnlQueryService {
     }
 
     PnlAggregatedRow current = pnlReadRepository.findAggregatedSummary(
-        workspaceId, currentPeriod);
+        workspaceId, currentPeriod, filter);
     if (current == null) {
       return emptyAggregatedSummary();
     }
 
     int prevPeriod = previousPeriod(currentPeriod);
     PnlAggregatedRow prev = pnlReadRepository.findAggregatedSummary(
-        workspaceId, prevPeriod);
+        workspaceId, prevPeriod, filter);
 
     BigDecimal totalCosts = sumCosts(current);
     BigDecimal prevTotalCosts = prev != null ? sumCosts(prev) : null;
 
     BigDecimal residual = pnlReadRepository.findReconciliationResidual(
-        workspaceId, currentPeriod);
-    BigDecimal revenue = orZero(current.getRevenueAmount());
-    BigDecimal reconciliationRatio = revenue.compareTo(BigDecimal.ZERO) != 0
-        ? orZero(residual).divide(revenue, 4, RoundingMode.HALF_UP)
+        workspaceId, currentPeriod, filter);
+    BigDecimal netPayout = orZero(current.getNetPayout());
+    BigDecimal reconciliationRatio = netPayout.compareTo(BigDecimal.ZERO) != 0
+        ? orZero(residual).abs()
+            .divide(netPayout.abs(), 4, RoundingMode.HALF_UP)
             .multiply(BigDecimal.valueOf(100))
         : BigDecimal.ZERO;
 
+    BigDecimal revenue = orZero(current.getRevenueAmount());
     BigDecimal compensation = orZero(current.getCompensationAmount());
     BigDecimal refund = orZero(current.getRefundAmount());
     BigDecimal marketplacePnl = orZero(current.getMarketplacePnl());
@@ -93,15 +93,18 @@ public class PnlQueryService {
     );
   }
 
-  public List<PnlSummaryResponse> getSummary(long workspaceId, PnlFilter filter) {
-    return pnlReadRepository.findSummary(workspaceId, filter);
-  }
-
   public Page<ProductPnlResponse> getByProduct(long workspaceId, PnlFilter filter,
       Pageable pageable) {
-    String sortColumn = extractSortColumn(pageable, "revenue_amount");
+    Sort.Order order = pageable.getSort().isSorted()
+        ? pageable.getSort().iterator().next()
+        : Sort.Order.desc("revenueAmount");
+
+    String sortColumn = camelToSnake(order.getProperty());
+    String sortDirection = order.getDirection().name();
+
     List<ProductPnlResponse> content = pnlReadRepository.findByProduct(
-        workspaceId, filter, sortColumn, pageable.getPageSize(), pageable.getOffset());
+        workspaceId, filter, sortColumn, sortDirection,
+        pageable.getPageSize(), pageable.getOffset());
     long total = pnlReadRepository.countByProduct(workspaceId, filter);
 
     return new PageImpl<>(content, pageable, total);
@@ -109,9 +112,16 @@ public class PnlQueryService {
 
   public Page<PostingPnlResponse> getByPosting(long workspaceId, PnlFilter filter,
       Pageable pageable) {
-    String sortColumn = extractSortColumn(pageable, "finance_date");
+    Sort.Order order = pageable.getSort().isSorted()
+        ? pageable.getSort().iterator().next()
+        : Sort.Order.desc("financeDate");
+
+    String sortColumn = camelToSnake(order.getProperty());
+    String sortDirection = order.getDirection().name();
+
     List<PostingPnlResponse> content = pnlReadRepository.findByPosting(
-        workspaceId, filter, sortColumn, pageable.getPageSize(), pageable.getOffset());
+        workspaceId, filter, sortColumn, sortDirection,
+        pageable.getPageSize(), pageable.getOffset());
     long total = pnlReadRepository.countByPosting(workspaceId, filter);
 
     return new PageImpl<>(content, pageable, total);
@@ -146,7 +156,8 @@ public class PnlQueryService {
     LocalDate to = anchor.atEndOfMonth();
     int monthsBack = granularity == TrendGranularity.MONTHLY ? 11 : 2;
     LocalDate from = anchor.minusMonths(monthsBack).atDay(1);
-    return new PnlFilter(from, to, filter.period(), filter.sellerSkuId(), filter.search());
+    return new PnlFilter(from, to, filter.period(), filter.sellerSkuId(),
+        filter.search(), filter.sourcePlatform());
   }
 
   private YearMonth parseYearMonth(String period) {
@@ -157,11 +168,8 @@ public class PnlQueryService {
     }
   }
 
-  private String extractSortColumn(Pageable pageable, String defaultColumn) {
-    if (pageable.getSort().isSorted()) {
-      return pageable.getSort().iterator().next().getProperty();
-    }
-    return defaultColumn;
+  private static String camelToSnake(String camel) {
+    return camel.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
   }
 
   private int parsePeriod(String period) {
@@ -186,6 +194,10 @@ public class PnlQueryService {
     return year * 100 + (month - 1);
   }
 
+  /**
+   * Costs in the mart are stored as negative (signed convention).
+   * For display purposes we return the absolute sum.
+   */
   private BigDecimal sumCosts(PnlAggregatedRow row) {
     return orZero(row.getMarketplaceCommissionAmount())
         .add(orZero(row.getAcquiringCommissionAmount()))
@@ -194,7 +206,8 @@ public class PnlQueryService {
         .add(orZero(row.getPenaltiesAmount()))
         .add(orZero(row.getMarketingCostAmount()))
         .add(orZero(row.getAcceptanceCostAmount()))
-        .add(orZero(row.getOtherMarketplaceChargesAmount()));
+        .add(orZero(row.getOtherMarketplaceChargesAmount()))
+        .abs();
   }
 
   private BigDecimal deltaPct(BigDecimal current, BigDecimal previous) {
@@ -225,7 +238,7 @@ public class PnlQueryService {
 
   private void addBreakdownItem(List<CostBreakdownItem> items, String category,
       BigDecimal amount, BigDecimal total) {
-    BigDecimal val = orZero(amount);
+    BigDecimal val = orZero(amount).abs();
     if (val.compareTo(BigDecimal.ZERO) == 0) {
       return;
     }

@@ -17,6 +17,7 @@ import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createDebouncedSearch } from '@shared/utils/debounced-search';
@@ -48,6 +49,7 @@ const COGS_STATUS_COLOR: Record<string, string> = {
     DataGridComponent,
     LucideAngularModule,
     PaginationBarComponent,
+    EmptyStateComponent,
   ],
   template: `
     <div class="flex flex-col gap-4">
@@ -84,6 +86,9 @@ const COGS_STATUS_COLOR: Record<string, string> = {
         {{ 'analytics.pnl.note.financial_refunds_scope' | translate }}
       </p>
 
+      @if (productsQuery.isError()) {
+        <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
+      } @else {
       <dp-data-grid
         viewStateKey="analytics:pnl:by-product"
         [columnDefs]="columnDefs()"
@@ -102,6 +107,7 @@ const COGS_STATUS_COLOR: Record<string, string> = {
         [pageSizeOptions]="[25, 50, 100]"
         (pageChange)="onPageChange($event)"
       />
+      }
     </div>
   `,
 })

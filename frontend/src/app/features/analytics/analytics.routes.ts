@@ -85,14 +85,6 @@ const routes: Routes = [
           ),
         data: { breadcrumb: 'breadcrumb.analytics.by_product', section: 'inventory' },
       },
-      {
-        path: 'inventory/stock-history',
-        loadComponent: () =>
-          import('./inventory/stock-history-page.component').then(
-            (m) => m.StockHistoryPageComponent,
-          ),
-        data: { breadcrumb: 'breadcrumb.analytics.history', section: 'inventory' },
-      },
 
       // Returns
       { path: 'returns', redirectTo: 'returns/overview', pathMatch: 'full' },

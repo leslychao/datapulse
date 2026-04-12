@@ -46,7 +46,6 @@ public class InventoryReadRepository {
           workspace_id,
           product_id,
           warehouse_id,
-          argMax(connection_id, ver) AS connection_id,
           argMax(source_platform, ver) AS source_platform,
           argMax(seller_sku_id, ver) AS seller_sku_id,
           argMax(analysis_date, ver) AS analysis_date,
@@ -97,7 +96,7 @@ public class InventoryReadRepository {
       """ + MART_INVENTORY_LATEST + """
       ) AS m
       LEFT JOIN dim_product AS p
-          ON m.product_id = p.product_id AND m.connection_id = p.connection_id
+          ON m.product_id = p.product_id AND m.workspace_id = p.workspace_id
       LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
       WHERE m.stock_out_risk = 'CRITICAL'
       ORDER BY m.days_of_cover ASC NULLS FIRST, m.available ASC
@@ -126,7 +125,7 @@ public class InventoryReadRepository {
       """ + MART_INVENTORY_LATEST + """
       ) AS m
       LEFT JOIN dim_product AS p
-          ON m.product_id = p.product_id AND m.connection_id = p.connection_id
+          ON m.product_id = p.product_id AND m.workspace_id = p.workspace_id
       LEFT JOIN dim_warehouse AS w ON m.warehouse_id = w.warehouse_id
       WHERE 1 = 1
       """;
@@ -162,8 +161,7 @@ public class InventoryReadRepository {
       SETTINGS final = 1
       """;
 
-  public InventoryOverviewResponse findOverview(
-      long workspaceId, InventoryFilter filter) {
+  public InventoryOverviewResponse findOverview(long workspaceId) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(OVERVIEW_SQL);
     sb.append(SETTINGS_FINAL);
@@ -212,7 +210,7 @@ public class InventoryReadRepository {
         """ + MART_INVENTORY_LATEST + """
         ) AS m
         LEFT JOIN dim_product AS p
-            ON m.product_id = p.product_id AND m.connection_id = p.connection_id
+            ON m.product_id = p.product_id AND m.workspace_id = p.workspace_id
         WHERE 1 = 1
         """);
     appendProductFilter(sb, params, filter);

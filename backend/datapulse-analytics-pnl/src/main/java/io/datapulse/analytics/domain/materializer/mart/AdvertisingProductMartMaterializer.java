@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * Materializes mart_advertising_product from fact_advertising + fact_finance.
  *
- * <p>Aggregates ad metrics per (connection_id, source_platform, marketplace_sku, period):
+ * <p>Aggregates ad metrics per (workspace_id, source_platform, marketplace_sku, period):
  * spend, impressions, clicks, ad_orders, ad_revenue, total_revenue,
  * and derived ratios DRR, CPO, ROAS, CPC, CTR, CR.</p>
  *
@@ -31,7 +31,7 @@ public class AdvertisingProductMartMaterializer implements AnalyticsMaterializer
       INSERT INTO %s
       SELECT
           fa.workspace_id,
-          fa.connection_id,
+          any(fa.connection_id) AS connection_id,
           fa.source_platform,
           fa.marketplace_sku,
           toYYYYMM(fa.ad_date) AS period,
@@ -69,7 +69,7 @@ public class AdvertisingProductMartMaterializer implements AnalyticsMaterializer
           ON fa.marketplace_sku = ff_rev.marketplace_sku
           AND toYYYYMM(fa.ad_date) = ff_rev.period
       GROUP BY
-          fa.workspace_id, fa.connection_id, fa.source_platform, fa.marketplace_sku,
+          fa.workspace_id, fa.source_platform, fa.marketplace_sku,
           period, ff_rev.total_revenue
       SETTINGS final = 1
       """;

@@ -16,6 +16,7 @@ import { Granularity, PnlTrendPoint } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
 import { DateRangePickerComponent } from '@shared/components/form/date-range-picker.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { formatMoney } from '@shared/utils/format.utils';
 import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
@@ -41,7 +42,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
   selector: 'dp-pnl-trend-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent, DateRangePickerComponent],
+  imports: [TranslatePipe, ChartComponent, DateRangePickerComponent, EmptyStateComponent],
   template: `
     <div class="flex flex-col gap-4">
       <!-- Filter bar -->
@@ -79,6 +80,9 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
         </div>
       </div>
 
+      @if (trendQuery.isError()) {
+        <dp-empty-state [message]="'analytics.pnl.load_error' | translate" />
+      } @else {
       <!-- Chart -->
       <div class="rounded-[var(--radius-md)] bg-[var(--bg-primary)] p-4 shadow-[var(--shadow-sm)]">
         <dp-chart
@@ -123,6 +127,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
           </div>
         }
       }
+      }
     </div>
   `,
 })
@@ -135,13 +140,13 @@ export class PnlTrendPageComponent {
 
   readonly dateFrom = signal(daysAgo(90));
   readonly dateTo = signal(daysAgo(0));
-  readonly granularity = signal<Granularity>('MONTHLY');
+  readonly granularity = signal<string>('MONTHLY');
   readonly granularityOptions = GRANULARITY_OPTIONS;
 
   private readonly filterDefs: UrlFilterDef[] = [
     { key: 'from', signal: this.dateFrom, defaultValue: daysAgo(90) },
     { key: 'to', signal: this.dateTo, defaultValue: daysAgo(0) },
-    { key: 'granularity', signal: this.granularity as any, defaultValue: 'MONTHLY' },
+    { key: 'granularity', signal: this.granularity, defaultValue: 'MONTHLY' },
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
@@ -168,7 +173,7 @@ export class PnlTrendPageComponent {
         this.analyticsApi.getPnlTrend(this.wsStore.currentWorkspaceId()!, {
           from: this.dateFrom(),
           to: this.dateTo(),
-          granularity: this.granularity(),
+          granularity: this.granularity() as Granularity,
         }),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),

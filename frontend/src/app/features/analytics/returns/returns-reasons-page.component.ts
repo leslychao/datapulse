@@ -100,18 +100,18 @@ function monthEnd(period: string): string {
             <table class="dp-table">
               <thead>
                 <tr>
-                  <th>{{ 'analytics.returns.reasons.col.reason' | translate }}</th>
-                  <th class="text-right">{{ 'analytics.returns.reasons.col.count' | translate }}</th>
-                  <th class="text-right">{{ 'analytics.returns.reasons.col.percent' | translate }}</th>
-                  <th class="text-right">{{ 'analytics.returns.reasons.col.amount' | translate }}</th>
-                  <th class="text-right">{{ 'analytics.returns.reasons.col.products' | translate }}</th>
+                  <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.reason' | translate }}</th>
+                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.count' | translate }}</th>
+                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.percent' | translate }}</th>
+                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.amount' | translate }}</th>
+                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.products' | translate }}</th>
                   <th class="w-20"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (r of reasons(); track r.reason) {
                   <tr>
-                    <td class="text-[var(--text-primary)]">{{ r.reason }}</td>
+                    <td class="text-[var(--text-primary)]">{{ r.reason || '—' }}</td>
                     <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ r.returnCount.toLocaleString('ru-RU') }}
                     </td>
@@ -122,7 +122,7 @@ function monthEnd(period: string): string {
                       {{ formatMoney(r.returnAmount) }}
                     </td>
                     <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                      {{ r.productCount }}
+                      {{ r.productCount > 0 ? r.productCount.toLocaleString('ru-RU') : '—' }}
                     </td>
                     <td class="text-right">
                       <button
