@@ -30,7 +30,7 @@ public class MarginGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 40;
+        return 22;
     }
 
     @Override

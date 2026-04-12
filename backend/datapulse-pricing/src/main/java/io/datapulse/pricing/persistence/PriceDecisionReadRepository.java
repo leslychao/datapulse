@@ -62,9 +62,14 @@ public class PriceDecisionReadRepository {
             params.put("marketplaceOfferId", filter.marketplaceOfferId());
         }
 
-        if (filter.decisionType() != null) {
-            whereClause.append(" AND d.decisionType = :decisionType");
-            params.put("decisionType", filter.decisionType());
+        if (filter.decisionType() != null && !filter.decisionType().isEmpty()) {
+            whereClause.append(" AND d.decisionType IN :decisionTypes");
+            params.put("decisionTypes", filter.decisionType());
+        }
+
+        if (filter.executionMode() != null) {
+            whereClause.append(" AND d.executionMode = :executionMode");
+            params.put("executionMode", filter.executionMode());
         }
 
         if (filter.from() != null) {

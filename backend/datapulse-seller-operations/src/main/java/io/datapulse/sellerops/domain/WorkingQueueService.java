@@ -262,7 +262,9 @@ public class WorkingQueueService {
         entity.getQueueType(),
         pendingCount,
         inProgressCount,
-        pendingCount + inProgressCount
+        pendingCount + inProgressCount,
+        entity.isSystem(),
+        entity.getAutoCriteria()
     );
   }
 

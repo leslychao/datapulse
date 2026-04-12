@@ -621,7 +621,12 @@ export class CampaignDetailPageComponent {
 
   bulkRejectAll(): void {
     const ids = this.pendingApprovalIds();
-    if (ids.length > 0) this.bulkRejectMutation.mutate({ actionIds: ids, reason: 'Bulk rejected' });
+    if (ids.length > 0) {
+      this.bulkRejectMutation.mutate({
+        actionIds: ids,
+        reason: this.translate.instant('promo.campaign.bulk_reject_reason'),
+      });
+    }
   }
 
   onFiltersChanged(values: Record<string, any>): void {

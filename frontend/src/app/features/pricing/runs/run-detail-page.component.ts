@@ -39,6 +39,8 @@ const RUN_STATUS_COLOR: Record<string, string> = {
   COMPLETED: 'var(--status-success)',
   COMPLETED_WITH_ERRORS: 'var(--status-warning)',
   FAILED: 'var(--status-error)',
+  PAUSED: 'var(--status-warning)',
+  CANCELLED: 'var(--status-neutral)',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {

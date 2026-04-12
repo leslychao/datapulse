@@ -24,6 +24,7 @@ public class RabbitTopologyConfig {
   public static final String PRICE_RECONCILIATION_WAIT_EXCHANGE = "price.reconciliation.wait";
   public static final String PROMO_EXECUTION_EXCHANGE = "promo.execution";
   public static final String PROMO_EVALUATION_EXCHANGE = "promo.evaluation";
+  public static final String PRICING_ACTION_MATERIALIZE_EXCHANGE = "pricing.action.materialize";
   public static final String BIDDING_RUN_EXCHANGE = "bidding.run";
   public static final String BID_EXECUTION_EXCHANGE = "bid.execution";
   public static final String BID_EXECUTION_WAIT_EXCHANGE = "bid.execution.wait";
@@ -42,6 +43,7 @@ public class RabbitTopologyConfig {
   public static final String PRICE_RECONCILIATION_WAIT_QUEUE = "price.reconciliation.wait";
   public static final String PROMO_EXECUTION_QUEUE = "promo.execution";
   public static final String PROMO_EVALUATION_QUEUE = "promo.evaluation";
+  public static final String PRICING_ACTION_MATERIALIZE_QUEUE = "pricing.action.materialize";
   public static final String BIDDING_RUN_QUEUE = "bidding.run";
   public static final String BID_EXECUTION_QUEUE = "bid.execution";
   public static final String BID_EXECUTION_WAIT_QUEUE = "bid.execution.wait";
@@ -69,6 +71,8 @@ public class RabbitTopologyConfig {
         true, false);
     var promoExecutionExchange = new DirectExchange(PROMO_EXECUTION_EXCHANGE, true, false);
     var promoEvaluationExchange = new DirectExchange(PROMO_EVALUATION_EXCHANGE, true, false);
+    var pricingActionMaterializeExchange = new DirectExchange(
+        PRICING_ACTION_MATERIALIZE_EXCHANGE, true, false);
     var biddingRunExchange = new DirectExchange(BIDDING_RUN_EXCHANGE, true, false);
     var bidExecutionExchange = new DirectExchange(BID_EXECUTION_EXCHANGE, true, false);
     var bidExecutionWaitExchange = new DirectExchange(BID_EXECUTION_WAIT_EXCHANGE, true, false);
@@ -81,6 +85,8 @@ public class RabbitTopologyConfig {
     var priceReconciliationQueue = QueueBuilder.durable(PRICE_RECONCILIATION_QUEUE).build();
     var promoExecutionQueue = QueueBuilder.durable(PROMO_EXECUTION_QUEUE).build();
     var promoEvaluationQueue = QueueBuilder.durable(PROMO_EVALUATION_QUEUE).build();
+    var pricingActionMaterializeQueue = QueueBuilder.durable(
+        PRICING_ACTION_MATERIALIZE_QUEUE).build();
     var biddingRunQueue = QueueBuilder.durable(BIDDING_RUN_QUEUE).build();
     var bidExecutionQueue = QueueBuilder.durable(BID_EXECUTION_QUEUE).build();
 
@@ -129,6 +135,8 @@ public class RabbitTopologyConfig {
         .to(promoExecutionExchange).with(PROMO_EXECUTION_QUEUE);
     Binding promoEvaluationBinding = BindingBuilder.bind(promoEvaluationQueue)
         .to(promoEvaluationExchange).with(PROMO_EVALUATION_QUEUE);
+    Binding pricingActionMaterializeBinding = BindingBuilder.bind(pricingActionMaterializeQueue)
+        .to(pricingActionMaterializeExchange).with(PRICING_ACTION_MATERIALIZE_QUEUE);
     Binding biddingRunBinding = BindingBuilder.bind(biddingRunQueue)
         .to(biddingRunExchange).with(BIDDING_RUN_QUEUE);
     Binding bidExecutionBinding = BindingBuilder.bind(bidExecutionQueue)
@@ -157,14 +165,14 @@ public class RabbitTopologyConfig {
     return new Declarables(
         // exchanges
         etlSyncExchange, etlSyncWaitExchange, etlEventsExchange,
-        pricingRunExchange,
+        pricingRunExchange, pricingActionMaterializeExchange,
         priceExecutionExchange, priceExecutionWaitExchange,
         priceReconciliationExchange, priceReconciliationWaitExchange,
         promoExecutionExchange, promoEvaluationExchange,
         biddingRunExchange, bidExecutionExchange, bidExecutionWaitExchange,
 
         // main queues
-        etlSyncQueue, pricingRunQueue, priceExecutionQueue,
+        etlSyncQueue, pricingRunQueue, pricingActionMaterializeQueue, priceExecutionQueue,
         priceReconciliationQueue, promoExecutionQueue, promoEvaluationQueue,
         biddingRunQueue, bidExecutionQueue,
 
@@ -176,7 +184,7 @@ public class RabbitTopologyConfig {
         bidExecutionWaitQueue,
 
         // bindings: direct
-        etlSyncBinding, pricingRunBinding, priceExecutionBinding,
+        etlSyncBinding, pricingRunBinding, pricingActionMaterializeBinding, priceExecutionBinding,
         priceReconciliationBinding, promoExecutionBinding, promoEvaluationBinding,
         biddingRunBinding, bidExecutionBinding,
 

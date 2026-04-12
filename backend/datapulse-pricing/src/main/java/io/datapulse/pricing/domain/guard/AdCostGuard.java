@@ -30,7 +30,7 @@ public class AdCostGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 70;
+        return 23;
     }
 
     @Override

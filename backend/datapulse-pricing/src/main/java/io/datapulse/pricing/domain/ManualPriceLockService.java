@@ -52,13 +52,20 @@ public class ManualPriceLockService {
 
     @Transactional(readOnly = true)
     public Page<ManualLockResponse> listActiveLocks(
-        long workspaceId, Long marketplaceOfferId, Pageable pageable) {
+        long workspaceId, Long marketplaceOfferId,
+        Long connectionId, String search, Pageable pageable) {
         if (marketplaceOfferId != null) {
             List<ManualLockResponse> content = lockRepository.findActiveLock(marketplaceOfferId)
                 .map(lockMapper::toResponse)
                 .map(List::of)
                 .orElse(List.of());
             return new PageImpl<>(content, pageable, content.size());
+        }
+
+        if (connectionId != null || (search != null && !search.isBlank())) {
+            return lockRepository.findActiveLocksFiltered(
+                    workspaceId, connectionId, search, pageable)
+                .map(lockMapper::toResponse);
         }
 
         return lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(workspaceId, pageable)

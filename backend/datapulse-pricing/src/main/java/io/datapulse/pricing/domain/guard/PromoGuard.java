@@ -19,7 +19,7 @@ public class PromoGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 35;
+        return 11;
     }
 
     @Override

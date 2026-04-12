@@ -15,13 +15,17 @@ import io.datapulse.etl.adapter.yandex.dto.YandexOrder;
 import io.datapulse.etl.adapter.yandex.dto.YandexOrderItem;
 import io.datapulse.etl.adapter.yandex.dto.YandexOrderPrice;
 import io.datapulse.etl.adapter.yandex.dto.YandexPromo;
+import io.datapulse.etl.adapter.yandex.dto.YandexRealizationReportRow;
 import io.datapulse.etl.adapter.yandex.dto.YandexReturn;
 import io.datapulse.etl.adapter.yandex.dto.YandexReturnItem;
+import io.datapulse.etl.adapter.yandex.dto.YandexServicesReportRow;
 import io.datapulse.etl.adapter.yandex.dto.YandexStockEntry;
 import io.datapulse.etl.adapter.yandex.dto.YandexStockOffer;
 import io.datapulse.etl.adapter.yandex.dto.YandexStockWarehouse;
 import io.datapulse.etl.adapter.yandex.dto.YandexWarehouse;
+import io.datapulse.etl.domain.FinanceEntryType;
 import io.datapulse.etl.domain.normalized.NormalizedCatalogItem;
+import io.datapulse.etl.domain.normalized.NormalizedFinanceItem;
 import io.datapulse.etl.domain.normalized.NormalizedOrderItem;
 import io.datapulse.etl.domain.normalized.NormalizedPriceItem;
 import io.datapulse.etl.domain.normalized.NormalizedPromoCampaign;
@@ -282,6 +286,131 @@ public class YandexNormalizer {
       return null;
     }
     return offer.barcodes().get(0);
+  }
+
+  /**
+   * Normalizes a services report row into a canonical finance item.
+   *
+   * <p>Sign convention (assumed, DD-26): {@code totalAmount} represents cost to seller,
+   * stored as negative (debit) in canonical. If real data shows different convention,
+   * negate here.</p>
+   */
+  public NormalizedFinanceItem normalizeServiceCharge(YandexServicesReportRow row) {
+    FinanceEntryType entryType = FinanceEntryType.fromYandexServiceName(row.serviceName());
+    BigDecimal amount = safe(row.totalAmount()).negate();
+
+    String externalId = "ym-svc-%s-%s-%s".formatted(
+        row.orderId() != null ? row.orderId() : "none",
+        row.shopSku() != null ? row.shopSku() : "none",
+        row.serviceName() != null ? row.serviceName().hashCode() : "0");
+
+    OffsetDateTime entryDate = parseDateTime(row.serviceDateTime());
+    if (entryDate == null) {
+      entryDate = parseDateTime(row.orderCreationDateTime());
+    }
+    if (entryDate == null) {
+      entryDate = parseDateOnly(row.actDate());
+    }
+
+    return new NormalizedFinanceItem(
+        externalId,
+        entryType,
+        null,
+        row.orderId() != null ? row.orderId().toString() : null,
+        null,
+        row.shopSku(),
+        null,
+        row.placementModel(),
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.REVENUE
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.MARKETPLACE_COMMISSION
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.ACQUIRING
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.LOGISTICS
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.STORAGE
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.PENALTIES
+            ? amount : BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.MARKETING
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.OTHER
+            ? amount : BigDecimal.ZERO,
+        entryType.primaryMeasure() == FinanceEntryType.MeasureColumn.COMPENSATION
+            ? amount : BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        amount,
+        "RUB",
+        entryDate
+    );
+  }
+
+  /**
+   * Normalizes a realization report row into a canonical revenue entry.
+   *
+   * <p>Revenue = {@code priceWithVatAndNoDiscount × transferredToDeliveryCount}.</p>
+   */
+  public NormalizedFinanceItem normalizeRealization(YandexRealizationReportRow row) {
+    BigDecimal unitPrice = safe(row.priceWithVatAndNoDiscount());
+    int quantity = row.transferredToDeliveryCount() != null
+        ? row.transferredToDeliveryCount() : 0;
+    BigDecimal revenue = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+    String externalId = "ym-rlz-%s-%s".formatted(
+        row.orderId() != null ? row.orderId() : "none",
+        row.shopSku() != null ? row.shopSku() : "none");
+
+    OffsetDateTime entryDate = parseDateOnly(row.deliveryDate());
+    if (entryDate == null) {
+      entryDate = parseDateOnly(row.orderCreationDate());
+    }
+
+    return new NormalizedFinanceItem(
+        externalId,
+        FinanceEntryType.YANDEX_SALE,
+        null,
+        row.orderId() != null ? row.orderId().toString() : null,
+        row.yourSku(),
+        row.shopSku(),
+        null,
+        row.placementModel(),
+        revenue,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        revenue,
+        "RUB",
+        entryDate
+    );
+  }
+
+  private static OffsetDateTime parseDateTime(String dateTimeStr) {
+    if (dateTimeStr == null || dateTimeStr.isBlank()) {
+      return null;
+    }
+    try {
+      if (dateTimeStr.length() <= 10) {
+        return parseDateOnly(dateTimeStr);
+      }
+      return OffsetDateTime.parse(dateTimeStr);
+    } catch (Exception e) {
+      try {
+        return LocalDate.parse(dateTimeStr.substring(0, 10), DATE_ONLY)
+            .atStartOfDay().atOffset(ZoneOffset.UTC);
+      } catch (Exception ex) {
+        log.warn("Failed to parse Yandex datetime: value={}", dateTimeStr);
+        return null;
+      }
+    }
   }
 
   /**

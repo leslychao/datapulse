@@ -14,7 +14,7 @@ export type PolicyExecutionMode = 'RECOMMENDATION' | 'SEMI_AUTO' | 'FULL_AUTO' |
 export type CommissionSource = 'AUTO' | 'MANUAL' | 'AUTO_WITH_MANUAL_FALLBACK';
 export type RoundingDirection = 'FLOOR' | 'NEAREST' | 'CEIL';
 export type RunTriggerType = 'POST_SYNC' | 'MANUAL' | 'SCHEDULED' | 'POLICY_CHANGE';
-export type RunStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED';
+export type RunStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED' | 'PAUSED' | 'CANCELLED';
 export type DecisionOutcome = 'CHANGE' | 'SKIP' | 'HOLD';
 export type AssignmentScopeType = 'CONNECTION' | 'CATEGORY' | 'SKU';
 

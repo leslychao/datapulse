@@ -9,9 +9,10 @@ import io.datapulse.pricing.domain.PricingRunCompletedEvent;
 import io.datapulse.pricing.domain.RunStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ public class BiddingPostPricingRunListener {
   private final OutboxService outboxService;
 
   @Async("notificationExecutor")
-  @EventListener
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onPricingRunCompleted(PricingRunCompletedEvent event) {
     if (event.finalStatus() != RunStatus.COMPLETED) {
       return;

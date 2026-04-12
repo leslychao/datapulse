@@ -60,6 +60,7 @@ public class GridPostgresReadRepository {
                 pp.name                     AS active_policy,
                 latest_pd.decision_type     AS last_decision,
                 latest_pa.status            AS last_action_status,
+                CASE WHEN latest_pa.status = 'PENDING_APPROVAL' THEN latest_pa.action_id ELSE NULL END AS pending_action_id,
                 active_promo.participation_status AS promo_status,
                 mpl.id IS NOT NULL          AS manual_lock,
                 sos.simulated_price,
@@ -69,7 +70,8 @@ public class GridPostgresReadRepository {
                 bid_asgn.strategy_type      AS bid_strategy_type,
                 latest_bd.current_bid,
                 latest_bd.decision_type     AS last_bid_decision_type,
-                mbl.id IS NOT NULL          AS manual_bid_lock
+                mbl.id IS NOT NULL          AS manual_bid_lock,
+                mbl.id                      AS bid_lock_id
             """;
 
     private static final String FROM_JOINS = """
@@ -117,7 +119,7 @@ public class GridPostgresReadRepository {
                 LIMIT 1
             ) latest_pd ON true
             LEFT JOIN LATERAL (
-                SELECT status
+                SELECT id AS action_id, status
                 FROM price_action
                 WHERE marketplace_offer_id = mo.id
                 ORDER BY created_at DESC
@@ -326,6 +328,7 @@ public class GridPostgresReadRepository {
                 .activePolicy(rs.getString("active_policy"))
                 .lastDecision(rs.getString("last_decision"))
                 .lastActionStatus(rs.getString("last_action_status"))
+                .pendingActionId(getBoxedLong(rs, "pending_action_id"))
                 .promoStatus(rs.getString("promo_status"))
                 .manualLock(rs.getBoolean("manual_lock"))
                 .simulatedPrice(rs.getBigDecimal("simulated_price"))
@@ -336,6 +339,7 @@ public class GridPostgresReadRepository {
                 .currentBid(getBoxedInt(rs, "current_bid"))
                 .lastBidDecisionType(rs.getString("last_bid_decision_type"))
                 .manualBidLock(rs.getBoolean("manual_bid_lock"))
+                .bidLockId(getBoxedLong(rs, "bid_lock_id"))
                 .build();
     }
 
@@ -416,6 +420,11 @@ public class GridPostgresReadRepository {
 
     private Integer getBoxedInt(ResultSet rs, String column) throws SQLException {
         int val = rs.getInt(column);
+        return rs.wasNull() ? null : val;
+    }
+
+    private Long getBoxedLong(ResultSet rs, String column) throws SQLException {
+        long val = rs.getLong(column);
         return rs.wasNull() ? null : val;
     }
 

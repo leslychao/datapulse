@@ -238,8 +238,10 @@ public class PricingRunApiService {
                     entity.getStatus().name());
         }
 
-        entity.setStatus(RunStatus.IN_PROGRESS);
+        entity.setStatus(RunStatus.PENDING);
         runRepository.save(entity);
+
+        enqueuePricingRunExecute(entity.getId());
         log.info("Pricing run resumed: id={}, workspaceId={}", runId, workspaceId);
     }
 

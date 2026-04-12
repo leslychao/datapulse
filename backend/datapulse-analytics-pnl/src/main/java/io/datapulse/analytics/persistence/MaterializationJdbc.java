@@ -1,5 +1,8 @@
 package io.datapulse.analytics.persistence;
 
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
 import java.util.function.Consumer;
 
 import lombok.extern.slf4j.Slf4j;
@@ -53,5 +56,24 @@ public class MaterializationJdbc {
     } finally {
       ch.execute("DROP TABLE IF EXISTS " + staging);
     }
+  }
+
+  public Instant getWatermark(String tableName) {
+    List<Timestamp> results = ch.query(
+        "SELECT last_materialized_at FROM materialization_watermark FINAL WHERE table_name = ?",
+        (rs, rowNum) -> rs.getTimestamp(1),
+        tableName);
+    if (results.isEmpty()) {
+      return null;
+    }
+    return results.get(0).toInstant();
+  }
+
+  public void updateWatermark(String tableName, Instant instant) {
+    ch.update("""
+        INSERT INTO materialization_watermark (table_name, last_materialized_at, ver)
+        VALUES (?, ?, ?)
+        """,
+        tableName, Timestamp.from(instant), System.currentTimeMillis());
   }
 }

@@ -1,5 +1,6 @@
 package io.datapulse.etl.domain;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -106,6 +107,19 @@ public enum FinanceEntryType {
     WB_LOYALTY_COMPENSATION("Компенсация скидки по программе лояльности", MeasureColumn.OTHER),
     WB_EARLY_WITHDRAWAL("Разовое изменение срока перечисления денежных средств", MeasureColumn.OTHER),
 
+    // --- Yandex Market entry types (from service report serviceName) ---
+    YANDEX_SALE("yandex_realization", MeasureColumn.REVENUE),
+    YANDEX_COMMISSION("yandex_sale_commission", MeasureColumn.MARKETPLACE_COMMISSION),
+    YANDEX_LOGISTICS("yandex_logistics", MeasureColumn.LOGISTICS),
+    YANDEX_RETURN_LOGISTICS("yandex_return_logistics", MeasureColumn.LOGISTICS),
+    YANDEX_STORAGE("yandex_storage", MeasureColumn.STORAGE),
+    YANDEX_PLACEMENT("yandex_placement", MeasureColumn.OTHER),
+    YANDEX_ACQUIRING("yandex_acquiring", MeasureColumn.ACQUIRING),
+    YANDEX_PENALTY("yandex_penalty", MeasureColumn.PENALTIES),
+    YANDEX_ADVERTISING("yandex_advertising", MeasureColumn.MARKETING),
+    YANDEX_SUBSIDY("yandex_subsidy", MeasureColumn.COMPENSATION),
+    YANDEX_CANCELLATION("yandex_cancellation", MeasureColumn.PENALTIES),
+
     OTHER("OTHER", MeasureColumn.OTHER);
 
     /**
@@ -131,7 +145,9 @@ public enum FinanceEntryType {
 
     private static final Map<String, FinanceEntryType> OZON_LOOKUP =
             Stream.of(values())
-                    .filter(t -> !t.name().startsWith("WB_") && t != OTHER)
+                    .filter(t -> !t.name().startsWith("WB_")
+                        && !t.name().startsWith("YANDEX_")
+                        && t != OTHER)
                     .collect(Collectors.toMap(
                             FinanceEntryType::getProviderCode,
                             t -> t,
@@ -185,6 +201,15 @@ public enum FinanceEntryType {
             case SHIPMENT_DELAY_FINE_FLAT -> SHIPMENT_DELAY_FINE.name();
             case SUPPLY_CARGO_SURPLUS -> SUPPLY_CARGO_SHORTAGE.name();
             case RETURNS_ASSORTMENT_INVALID -> DEFECT_PENALTY.name();
+            case YANDEX_SALE -> SALE_ACCRUAL.name();
+            case YANDEX_COMMISSION -> "MARKETPLACE_COMMISSION";
+            case YANDEX_LOGISTICS, YANDEX_RETURN_LOGISTICS -> "DELIVERY";
+            case YANDEX_STORAGE -> STORAGE.name();
+            case YANDEX_ACQUIRING -> ACQUIRING.name();
+            case YANDEX_PENALTY, YANDEX_CANCELLATION -> "PENALTY";
+            case YANDEX_ADVERTISING -> "ADVERTISING";
+            case YANDEX_PLACEMENT -> OTHER.name();
+            case YANDEX_SUBSIDY -> COMPENSATION.name();
             default -> this.name();
         };
     }
@@ -209,5 +234,53 @@ public enum FinanceEntryType {
             return OTHER;
         }
         return WB_LOOKUP.getOrDefault(supplierOperName.trim(), OTHER);
+    }
+
+    /**
+     * Pattern-based mapping for Yandex Market {@code serviceName} values.
+     * Yandex report structure may change without notice, so matching is
+     * keyword-based with fallback to {@link #OTHER}.
+     */
+    private static final List<Map.Entry<String, FinanceEntryType>> YANDEX_PATTERNS = List.of(
+        Map.entry("Обратная логистика", YANDEX_RETURN_LOGISTICS),
+        Map.entry("Return delivery", YANDEX_RETURN_LOGISTICS),
+        Map.entry("Возврат", YANDEX_RETURN_LOGISTICS),
+        Map.entry("Размещение заказа", YANDEX_COMMISSION),
+        Map.entry("Комиссия", YANDEX_COMMISSION),
+        Map.entry("Fee for order placement", YANDEX_COMMISSION),
+        Map.entry("Логистика", YANDEX_LOGISTICS),
+        Map.entry("Доставка", YANDEX_LOGISTICS),
+        Map.entry("Продвижение", YANDEX_ADVERTISING),
+        Map.entry("Boost", YANDEX_ADVERTISING),
+        Map.entry("Хранение", YANDEX_STORAGE),
+        Map.entry("Storage", YANDEX_STORAGE),
+        Map.entry("Размещение товаров на витрине", YANDEX_PLACEMENT),
+        Map.entry("Placement of goods", YANDEX_PLACEMENT),
+        Map.entry("Перечисление", YANDEX_ACQUIRING),
+        Map.entry("Transfer of payment", YANDEX_ACQUIRING),
+        Map.entry("Штраф", YANDEX_PENALTY),
+        Map.entry("Penalty", YANDEX_PENALTY),
+        Map.entry("Отмена", YANDEX_CANCELLATION),
+        Map.entry("Cancellation", YANDEX_CANCELLATION),
+        Map.entry("Субсидия", YANDEX_SUBSIDY),
+        Map.entry("Subsidy", YANDEX_SUBSIDY),
+        Map.entry("Компенсация", YANDEX_SUBSIDY)
+    );
+
+    /**
+     * Maps Yandex Market {@code serviceName} to entry type using keyword matching.
+     * Falls back to {@link #OTHER} if no pattern matches.
+     */
+    public static FinanceEntryType fromYandexServiceName(String serviceName) {
+        if (serviceName == null || serviceName.isBlank()) {
+            return OTHER;
+        }
+        String trimmed = serviceName.trim();
+        for (var entry : YANDEX_PATTERNS) {
+            if (trimmed.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return OTHER;
     }
 }

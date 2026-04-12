@@ -57,6 +57,13 @@ public class StreamingPageCapture {
         TempFileWriteResult writeResult = responseWriter.writeToTempFile(
                 responseBody, context.requestId(), pageNumber);
 
+        if (writeResult.byteSize() == 0) {
+            deleteTempFileSilently(writeResult.path());
+            throw new EmptyResponseException(
+                    "Empty response body: requestId=%s, page=%d"
+                            .formatted(context.requestId(), pageNumber));
+        }
+
         try {
             String cursor = cursorExtractor.extract(writeResult.path()).orElse(null);
 

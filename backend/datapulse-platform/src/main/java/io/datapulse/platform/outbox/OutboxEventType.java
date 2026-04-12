@@ -13,6 +13,7 @@ public enum OutboxEventType {
     ETL_POST_INGEST_MATERIALIZE("etl.sync", "etl.sync"),
     ETL_SYNC_COMPLETED("datapulse.etl.events", ""),
     PRICING_RUN_EXECUTE("pricing.run", "pricing.run"),
+    PRICING_ACTION_REQUESTED("pricing.action.materialize", "pricing.action.materialize"),
     PRICE_ACTION_EXECUTE("price.execution", "price.execution"),
     PRICE_ACTION_RETRY("price.execution.wait", "price.execution.wait"),
     RECONCILIATION_CHECK("price.reconciliation.wait", "price.reconciliation.wait"),
@@ -23,7 +24,7 @@ public enum OutboxEventType {
     BIDDING_RUN_EXECUTE("bidding.run", "bidding.run"),
     BID_ACTION_EXECUTE("bid.execution", "bid.execution"),
     BID_ACTION_RETRY("bid.execution.wait", "bid.execution.wait"),
-    BID_ACTION_RECONCILE("bid.execution.wait", "bid.execution.wait");
+    BID_ACTION_RECONCILE("bid.execution", "bid.execution");
 
     private final String exchange;
     private final String routingKey;

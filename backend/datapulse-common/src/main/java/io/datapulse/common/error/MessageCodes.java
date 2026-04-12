@@ -178,6 +178,8 @@ public final class MessageCodes {
     // --- Pricing: Impact Preview ---
     public static final String PRICING_PREVIEW_OFFER_INACTIVE = "pricing.preview.offer_inactive";
     public static final String PRICING_PREVIEW_MANUAL_OVERRIDE = "pricing.preview.manual_override";
+    public static final String PRICING_PREVIEW_NOT_SUPPORTED_FOR_STRATEGY =
+            "pricing.preview.not_supported_for_strategy";
 
     // --- Execution ---
     public static final String EXECUTION_ACTION_NOT_FOUND = "execution.action.not_found";

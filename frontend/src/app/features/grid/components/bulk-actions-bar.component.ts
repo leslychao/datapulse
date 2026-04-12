@@ -372,13 +372,23 @@ export class BulkActionsBarComponent {
   }
 
   onBulkApprove(): void {
-    const ids = Array.from(this.gridStore.selectedOfferIds());
-    this.bulkApproveMutation.mutate(ids);
+    const actionIds = this.extractPendingActionIds();
+    if (actionIds.length === 0) {
+      this.showApproveModal.set(false);
+      this.toast.warning(this.translate.instant('grid.bulk.no_pending_actions'));
+      return;
+    }
+    this.bulkApproveMutation.mutate(actionIds);
   }
 
   onBulkReject(): void {
-    const ids = Array.from(this.gridStore.selectedOfferIds());
-    this.bulkRejectMutation.mutate(ids);
+    const actionIds = this.extractPendingActionIds();
+    if (actionIds.length === 0) {
+      this.showRejectModal.set(false);
+      this.toast.warning(this.translate.instant('grid.bulk.no_pending_actions'));
+      return;
+    }
+    this.bulkRejectMutation.mutate(actionIds);
   }
 
   onBulkHold(): void {
@@ -471,8 +481,15 @@ export class BulkActionsBarComponent {
   }
 
   onBulkBidUnlock(): void {
-    const offerIds = Array.from(this.gridStore.selectedOfferIds());
-    this.bulkBidUnlockMutation.mutate(offerIds);
+    const lockIds = this.selectedOffers()
+      .filter((o) => o.bidLockId != null)
+      .map((o) => o.bidLockId!);
+    if (lockIds.length === 0) {
+      this.showBidUnlockModal.set(false);
+      this.toast.warning(this.translate.instant('grid.bulk.no_bid_locks'));
+      return;
+    }
+    this.bulkBidUnlockMutation.mutate(lockIds);
   }
 
   onBulkBidLock(): void {
@@ -484,6 +501,12 @@ export class BulkActionsBarComponent {
       return req;
     });
     this.bulkBidLockMutation.mutate(requests);
+  }
+
+  private extractPendingActionIds(): number[] {
+    return this.selectedOffers()
+      .filter((o) => o.pendingActionId != null)
+      .map((o) => o.pendingActionId!);
   }
 
   private invalidateQueries(): void {

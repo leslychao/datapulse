@@ -30,6 +30,7 @@ public class GridRow {
     private String activePolicy;
     private String lastDecision;
     private String lastActionStatus;
+    private Long pendingActionId;
     private String promoStatus;
     private boolean manualLock;
     private BigDecimal simulatedPrice;
@@ -40,4 +41,5 @@ public class GridRow {
     private Integer currentBid;
     private String lastBidDecisionType;
     private boolean manualBidLock;
+    private Long bidLockId;
 }

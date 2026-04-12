@@ -499,7 +499,7 @@ warehouse:
 | `ORDERS` | `SALES_FACT` | canonical_order | WB: orders endpoint; Ozon: postings endpoint |
 | `SALES` | `SALES_FACT` | canonical_sale | WB: statistics sales endpoint; Ozon: через postings (FBO/FBS) |
 | `RETURNS` | `SALES_FACT` | canonical_return | WB: analytics goods-return endpoint; Ozon: через returns/list |
-| `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list |
+| `FINANCE` | `FACT_FINANCE` | canonical_finance_entry | WB: reportDetailByPeriod; Ozon: finance/transaction/list; Yandex: services + realization async reports |
 | `PROMO` | `PROMO_SYNC` | canonical_promo_campaign, canonical_promo_product | WB: `WbPromoSyncSource` → calendar/promotions + nomenclatures; Ozon: `OzonPromoSyncSource` → actions + products/candidates |
 | `ADVERTISING` | `ADVERTISING_FACT` | `canonical_advertising_campaign` (DD-AD-1 revised: partial canonical) | **Stub (Phase A).** `WbAdvertisingFactSource` / `OzonAdvertisingFactSource` registered as no-op stubs. Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | `SUPPLY` | `SUPPLY_FACT` | — (no canonical entity, see G-3) | **Stub (Phase B).** WB only. `WbSupplyFactSource` registered as no-op stub. Pending `/api/v1/supplier/incomes` deprecation June 2026 |
@@ -544,6 +544,7 @@ CATEGORY_DICT ───────────────────┘      
 | Остатки | `INVENTORY_FACT` | `fact_inventory_snapshot` | `canonical_stock_current` |
 | Финансы (Ozon) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
 | Финансы (WB) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` |
+| Финансы (Yandex) | `FACT_FINANCE` | `fact_finance` | `canonical_finance_entry` — из services report (`serviceName` → `FinanceEntryType`) + realization report (revenue) |
 | Реклама | `ADVERTISING_FACT` | `dim_advertising_campaign`, `fact_advertising` | `canonical_advertising_campaign` (DD-AD-1 revised: partial canonical — campaigns in PG, facts directly to CH). **Stub (Phase A).** Full spec: [Advertising](advertising.md) |
 | Промо | `PROMO_SYNC` | `dim_promo_campaign`, `fact_promo_product` | `canonical_promo_campaign`, `canonical_promo_product`. Implemented |
 | Поставки | `SUPPLY_FACT` | — | — (no canonical entity, see G-3). **Stub (Phase B).** WB only |
@@ -875,9 +876,7 @@ State-based full scans (prices, stocks) используют offset-based pagina
 
 ### Materialization scope
 
-> **Implementation status (Phase A):** ClickHouse materializer реализован как **stub** — `ClickHouseMaterializer.materialize()` логирует вызов, но не выполняет записи в ClickHouse. Начальная миграция ClickHouse (`0001-initial.sql`) пуста (`SELECT 1`). Полная реализация materialization pipeline (создание dim/fact таблиц, batch INSERT, ReplacingMergeTree, job-scoped delta, daily re-materialization) запланирована на **Phase B (Trust Analytics)**.
-
-**Target design (Phase B):** Materializer обрабатывает **только записи текущего `job_execution_id`** (job-scoped materialization). Canonical → ClickHouse delta определяется по `job_execution_id`, не по timestamp diff. Full re-materialization (Phase B: daily) — отдельный scheduled job.
+Materialization реализована в модуле `datapulse-analytics-pnl` — star schema (dim/fact/mart таблицы) в ClickHouse. ETL stub `ClickHouseMaterializer` в `datapulse-etl` удалён. Materialization trigger: post-ingest hook через `MaterializationService` в analytics module.
 
 ### Consumer error handling
 
@@ -1582,7 +1581,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Area | Notes |
 |------|-------|
 | `ADVERTISING_FACT` full implementation | v2→v3 migration, Ozon OAuth2 token service, credential resolution. Full spec: [Advertising](advertising.md) §ETL Pipeline |
-| ClickHouse materialization | `ClickHouseMaterializer` is a stub. ClickHouse schema (`0001-initial.sql`) created but not populated |
+| ClickHouse materialization | Implemented in `datapulse-analytics-pnl`. ETL stub removed |
 
 ## Связанные модули
 

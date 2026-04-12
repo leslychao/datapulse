@@ -25,7 +25,8 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
     private static final String TABLE = "fact_product_cost";
 
     private static final String PG_QUERY = """
-            SELECT cp.id            AS cost_id,
+            SELECT cp.workspace_id,
+                   cp.id            AS cost_id,
                    cp.seller_sku_id,
                    cp.cost_price,
                    cp.currency,
@@ -38,8 +39,8 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
 
     private static final String CH_INSERT = """
             INSERT INTO %s
-            (cost_id, seller_sku_id, cost_price, currency, valid_from, valid_to, ver)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (workspace_id, cost_id, seller_sku_id, cost_price, currency, valid_from, valid_to, ver)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final MaterializationJdbc jdbc;
@@ -65,51 +66,61 @@ public class FactProductCostMaterializer implements AnalyticsMaterializer {
             }
         });
 
+        jdbc.updateWatermark(TABLE, Instant.now());
         log.info("Materialized {}", TABLE);
     }
 
     @Override
     public void materializeIncremental(long jobExecutionId) {
+        Instant watermark = jdbc.getWatermark(TABLE);
+        if (watermark == null) {
+            materializeFull();
+            return;
+        }
+
         long ver = Instant.now().toEpochMilli();
         String chInsert = CH_INSERT.formatted(TABLE);
 
         List<Map<String, Object>> rows = jdbc.pg().queryForList("""
-                SELECT cp.id            AS cost_id,
+                SELECT cp.workspace_id,
+                       cp.id            AS cost_id,
                        cp.seller_sku_id,
                        cp.cost_price,
                        cp.currency,
                        cp.valid_from,
                        cp.valid_to
                 FROM cost_profile cp
-                WHERE cp.updated_at > NOW() - INTERVAL '1 hour'
-                """, Map.of());
+                WHERE cp.updated_at > :watermark
+                """, Map.of("watermark", Timestamp.from(watermark)));
 
         if (rows.isEmpty()) {
             return;
         }
 
         insertBatch(rows, ver, chInsert);
+        jdbc.updateWatermark(TABLE, Instant.now());
         log.info("Incremental fact_product_cost: rows={}", rows.size());
     }
 
     private void insertBatch(List<Map<String, Object>> rows, long ver, String chInsert) {
         jdbc.ch().batchUpdate(chInsert, rows, rows.size(), (ps, row) -> {
-            ps.setLong(1, ((Number) row.get("cost_id")).longValue());
-            ps.setLong(2, ((Number) row.get("seller_sku_id")).longValue());
-            ps.setBigDecimal(3, (BigDecimal) row.get("cost_price"));
-            ps.setString(4, (String) row.get("currency"));
+            ps.setLong(1, ((Number) row.get("workspace_id")).longValue());
+            ps.setLong(2, ((Number) row.get("cost_id")).longValue());
+            ps.setLong(3, ((Number) row.get("seller_sku_id")).longValue());
+            ps.setBigDecimal(4, (BigDecimal) row.get("cost_price"));
+            ps.setString(5, (String) row.get("currency"));
 
             LocalDate validFrom = toLocalDate(row.get("valid_from"));
-            ps.setDate(5, Date.valueOf(validFrom));
+            ps.setDate(6, Date.valueOf(validFrom));
 
             LocalDate validTo = toLocalDate(row.get("valid_to"));
             if (validTo != null) {
-                ps.setDate(6, Date.valueOf(validTo));
+                ps.setDate(7, Date.valueOf(validTo));
             } else {
-                ps.setNull(6, java.sql.Types.DATE);
+                ps.setNull(7, java.sql.Types.DATE);
             }
 
-            ps.setLong(7, ver);
+            ps.setLong(8, ver);
         });
     }
 

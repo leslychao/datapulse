@@ -133,6 +133,47 @@ class SubSourceRunnerTest {
 
       verify(jobItemRepository).updateStatus(10L, JobItemStatus.FAILED);
     }
+
+    @Test
+    void should_returnFailed_and_markFailed_when_allBatchesSkipped() {
+      List<CaptureResult> pages = List.of(
+          new CaptureResult(10L, "s3://bucket/key1", "sha256", 1024L, 500L, null));
+
+      stubReadBatched("s3://bucket/key1", List.of("r1", "r2", "r3"));
+
+      SubSourceResult result = runner.processPages(
+          "TestSource", pages, String.class,
+          batch -> { throw new RuntimeException("UPSERT error"); });
+
+      assertThat(result.status()).isEqualTo(EventResultStatus.FAILED);
+      assertThat(result.lastCursor()).isEqualTo("500");
+      assertThat(result.errors()).hasSize(1);
+
+      verify(jobItemRepository).updateStatus(10L, JobItemStatus.FAILED);
+    }
+
+    @Test
+    void should_returnPartial_when_oneBatchSucceeds_and_anotherFails() {
+      List<CaptureResult> pages = List.of(
+          new CaptureResult(10L, "s3://bucket/key1", "sha256", 1024L));
+
+      stubReadBatchedTwoBatches("s3://bucket/key1",
+          List.of("r1", "r2"), List.of("r3"));
+
+      var callCount = new int[]{0};
+      SubSourceResult result = runner.processPages(
+          "TestSource", pages, String.class, batch -> {
+            if (callCount[0]++ == 1) {
+              throw new RuntimeException("Second batch failed");
+            }
+          });
+
+      assertThat(result.status()).isEqualTo(EventResultStatus.COMPLETED_WITH_ERRORS);
+      assertThat(result.recordsProcessed()).isEqualTo(2);
+      assertThat(result.recordsSkipped()).isEqualTo(1);
+
+      verify(jobItemRepository).updateStatus(10L, JobItemStatus.FAILED);
+    }
   }
 
   @SuppressWarnings("unchecked") // safe: test helper casting generic Consumer
@@ -140,6 +181,18 @@ class SubSourceRunnerTest {
     doAnswer(inv -> {
       Consumer<List<String>> consumer = inv.getArgument(2);
       consumer.accept(records);
+      return null;
+    }).when(rawPageReader).readBatched(eq(s3Key), eq(String.class), any());
+  }
+
+  @SuppressWarnings("unchecked") // safe: test helper casting generic Consumer
+  private void stubReadBatchedTwoBatches(String s3Key,
+                                         List<String> batch1,
+                                         List<String> batch2) {
+    doAnswer(inv -> {
+      Consumer<List<String>> consumer = inv.getArgument(2);
+      consumer.accept(batch1);
+      consumer.accept(batch2);
       return null;
     }).when(rawPageReader).readBatched(eq(s3Key), eq(String.class), any());
   }

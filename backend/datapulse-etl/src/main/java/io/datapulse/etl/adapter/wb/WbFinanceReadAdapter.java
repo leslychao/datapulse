@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.datapulse.etl.adapter.util.EmptyResponseException;
 import io.datapulse.etl.adapter.util.StreamingPageCapture;
 import io.datapulse.etl.domain.CaptureContext;
 import io.datapulse.etl.domain.CaptureResult;
@@ -56,28 +57,24 @@ public class WbFinanceReadAdapter {
                             .queryParam("limit", PAGE_LIMIT)
                             .queryParam("rrdid", currentRrdid)
                             .build(),
-                    apiToken, context.connectionId(), RateLimitGroup.WB_STATISTICS);
+                    apiToken, context.connectionId(), RateLimitGroup.WB_FINANCE);
 
             PageCaptureResult page;
             try {
                 page = pageCapture.capture(body, context, pageNumber, CURSOR_EXTRACTOR);
-            } catch (Exception e) {
-                log.warn("WB finance page capture failed (possibly empty 204 response): connectionId={}, page={}",
-                        context.connectionId(), pageNumber, e);
+            } catch (EmptyResponseException e) {
+                log.info("WB finance: end of data (empty response): connectionId={}, page={}",
+                        context.connectionId(), pageNumber);
                 hasMore = false;
                 break;
             }
 
-            if (page.captureResult().byteSize() < 10) {
-                hasMore = false;
+            results.add(page.captureResult());
+            String cursor = page.cursor();
+            if (cursor != null && !cursor.isEmpty()) {
+                rrdid = Long.parseLong(cursor);
             } else {
-                results.add(page.captureResult());
-                String cursor = page.cursor();
-                if (cursor != null && !cursor.isEmpty()) {
-                    rrdid = Long.parseLong(cursor);
-                } else {
-                    hasMore = false;
-                }
+                hasMore = false;
             }
 
             pageNumber++;

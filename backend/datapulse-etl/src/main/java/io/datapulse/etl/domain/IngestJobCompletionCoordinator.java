@@ -4,13 +4,18 @@ import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.config.IngestProperties.PostIngestMaterializationMode;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
+import io.datapulse.platform.audit.AlertTriggeredEvent;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;
 import io.datapulse.platform.etl.PostIngestMaterializationResult;
 import io.datapulse.platform.outbox.OutboxEventType;
 import io.datapulse.platform.outbox.OutboxService;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -30,11 +35,14 @@ public class IngestJobCompletionCoordinator {
   private final TransactionTemplate transactionTemplate;
   private final PostIngestMaterializationHook postIngestMaterialization;
   private final OutboxService outboxService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public void completeAfterDag(
       JobExecutionRow job, IngestContext context, Map<EtlEventType, EventResult> results) {
     long jobId = job.getId();
     JobExecutionStatus ingestStatus = determineFinalStatus(results);
+
+    publishUnmappedFinanceTypesAlert(context, results);
 
     boolean hasRetriableFailures = hasRetriableFailures(results);
     int retryCount = checkpointManager.extractRetryCount(job.getCheckpoint());
@@ -181,6 +189,37 @@ public class IngestJobCompletionCoordinator {
         .anyMatch(r -> r.isFailed() && !r.subSourceResults().isEmpty()
             && r.subSourceResults().stream()
             .anyMatch(s -> s.status() == EventResultStatus.FAILED));
+  }
+
+  private void publishUnmappedFinanceTypesAlert(
+      IngestContext context, Map<EtlEventType, EventResult> results) {
+    Set<String> allUnmapped = results.values().stream()
+        .flatMap(r -> r.subSourceResults().stream())
+        .flatMap(s -> s.unmappedTypeNames().stream())
+        .collect(Collectors.toCollection(TreeSet::new));
+
+    if (allUnmapped.isEmpty()) {
+      return;
+    }
+
+    String typeList = String.join(", ", allUnmapped);
+    String title = "etl.alert.unmapped_finance_types";
+    String details = "{\"unmappedTypes\":[%s],\"marketplace\":\"%s\",\"connectionId\":%d}"
+        .formatted(
+            allUnmapped.stream().map(t -> "\"" + t + "\"").collect(Collectors.joining(",")),
+            context.marketplace().name(),
+            context.connectionId());
+
+    eventPublisher.publishEvent(new AlertTriggeredEvent(
+        context.workspaceId(),
+        context.connectionId(),
+        "WARNING",
+        title,
+        details,
+        false));
+
+    log.warn("Unmapped finance types detected: marketplace={}, connectionId={}, types=[{}]",
+        context.marketplace(), context.connectionId(), typeList);
   }
 
   private boolean isPromoSyncCompleted(Map<EtlEventType, EventResult> results) {

@@ -19,7 +19,7 @@ public class StockOutGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 30;
+        return 12;
     }
 
     @Override

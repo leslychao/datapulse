@@ -522,10 +522,16 @@ public class AsyncReportCapture {
 
 ### 7.3 Маппинг report columns → canonical_finance_entry
 
-**Status: TBD (DD-23).** Полный маппинг заблокирован до:
-1. Получения реальных отчётов с активного аккаунта
-2. Верификации sign convention (DD-26)
-3. Инвентаризации всех колонок (report structure may change)
+**Status: IMPLEMENTED (baseline).** Базовый маппинг реализован (F-03):
+- Services report: `serviceName` → `FinanceEntryType.fromYandexServiceName()` (pattern-based matching)
+- Realization report: `priceWithVatAndNoDiscount × transferredToDeliveryCount` → revenue
+- Sign convention (assumed): `totalAmount` negated (debit to seller = negative in canonical)
+- Unmapped `serviceName` values tracked and alerted via F-06 mechanism
+
+**Remaining risks:**
+1. Sign convention not verified on real data — may need negation inversion
+2. `serviceName` patterns may not cover all real values — F-06 alerts will catch new types
+3. Report structure may change without notice — DTOs use `@JsonIgnoreProperties(ignoreUnknown = true)`
 
 **Предварительная модель:**
 - Revenue: из `goods-realization` report → `PRICE_WITH_VAT_AND_NO_DISCOUNT` × `TRANSFERRED_TO_DELIVERY_COUNT`

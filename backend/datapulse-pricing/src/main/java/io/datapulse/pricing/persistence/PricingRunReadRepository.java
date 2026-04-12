@@ -62,6 +62,58 @@ public class PricingRunReadRepository {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    private static final String OFFER_INFO_SQL = """
+            SELECT id, name, marketplace_sku, marketplace_connection_id
+            FROM marketplace_offer WHERE id IN (:ids)
+            """;
+
+    public Map<Long, OfferInfo> findOfferInfo(Collection<Long> offerIds) {
+        if (offerIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(OFFER_INFO_SQL,
+                Map.of("ids", offerIds),
+                (rs, rowNum) -> Map.entry(rs.getLong("id"),
+                    new OfferInfo(
+                        rs.getString("name"),
+                        rs.getString("marketplace_sku"),
+                        rs.getLong("marketplace_connection_id"))))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private static final String POLICY_NAMES_SQL = """
+            SELECT id, name FROM price_policy WHERE id IN (:ids)
+            """;
+
+    public Map<Long, String> findPolicyNames(Collection<Long> policyIds) {
+        if (policyIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(POLICY_NAMES_SQL,
+                Map.of("ids", policyIds),
+                (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("name")))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private static final String USER_NAMES_SQL = """
+            SELECT u.id, u.display_name FROM app_user u WHERE u.id IN (:ids)
+            """;
+
+    public Map<Long, String> findUserNames(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(USER_NAMES_SQL,
+                Map.of("ids", userIds),
+                (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("display_name")))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    public record OfferInfo(String name, String sellerSku, long connectionId) {}
+
     private void appendFilters(PricingRunFilter filter, StringBuilder where,
                                Map<String, Object> params) {
         if (filter == null) {
@@ -73,9 +125,14 @@ public class PricingRunReadRepository {
             params.put("connectionId", filter.connectionId());
         }
 
-        if (filter.status() != null) {
-            where.append(" AND r.status = :status");
-            params.put("status", filter.status());
+        if (filter.status() != null && !filter.status().isEmpty()) {
+            where.append(" AND r.status IN :statuses");
+            params.put("statuses", filter.status());
+        }
+
+        if (filter.triggerType() != null && !filter.triggerType().isEmpty()) {
+            where.append(" AND r.triggerType IN :triggerTypes");
+            params.put("triggerTypes", filter.triggerType());
         }
 
         if (filter.from() != null) {

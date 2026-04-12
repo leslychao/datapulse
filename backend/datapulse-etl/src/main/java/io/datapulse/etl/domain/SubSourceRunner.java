@@ -50,19 +50,22 @@ public class SubSourceRunner {
                 totalRecordsSkipped += counts[1];
 
                 jobItemRepository.updateStatus(page.jobItemId(), JobItemStatus.PROCESSED);
+            } catch (BatchSkipException e) {
+                log.error("Page partially failed (batch skips): sourceId={}, s3Key={}, "
+                        + "processed={}, skipped={}",
+                        sourceId, page.s3Key(), e.getProcessedCount(), e.getSkippedCount());
+                totalRecordsProcessed += e.getProcessedCount();
+                totalRecordsSkipped += e.getSkippedCount();
+                errors.add("Page %s: %s".formatted(page.s3Key(), e.getMessage()));
+                firstFailureResumeToken = captureResumeToken(
+                        firstFailureResumeToken, page);
+                jobItemRepository.updateStatus(page.jobItemId(), JobItemStatus.FAILED);
             } catch (Exception e) {
                 log.error("Page processing failed: sourceId={}, s3Key={}, error={}",
                         sourceId, page.s3Key(), e.getMessage(), e);
                 errors.add("Page %s: %s".formatted(page.s3Key(), e.getMessage()));
-
-                if (firstFailureResumeToken == null) {
-                    if (page.listResumeKey() != null && !page.listResumeKey().isBlank()) {
-                        firstFailureResumeToken = page.listResumeKey().trim();
-                    } else if (page.listRequestOffset() != null) {
-                        firstFailureResumeToken = String.valueOf(page.listRequestOffset());
-                    }
-                }
-
+                firstFailureResumeToken = captureResumeToken(
+                        firstFailureResumeToken, page);
                 jobItemRepository.updateStatus(page.jobItemId(), JobItemStatus.FAILED);
             }
         }
@@ -70,12 +73,25 @@ public class SubSourceRunner {
         if (!errors.isEmpty() && totalRecordsProcessed == 0) {
             return SubSourceResult.failed(sourceId, errors.get(0), firstFailureResumeToken);
         }
-        if (!errors.isEmpty()) {
+        if (!errors.isEmpty() || totalRecordsSkipped > 0) {
             return SubSourceResult.partial(sourceId, firstFailureResumeToken,
                     capturedPages.size(), totalRecordsProcessed, totalRecordsSkipped, errors);
         }
 
         return SubSourceResult.success(sourceId, capturedPages.size(), totalRecordsProcessed);
+    }
+
+    private static String captureResumeToken(String current, CaptureResult page) {
+        if (current != null) {
+            return current;
+        }
+        if (page.listResumeKey() != null && !page.listResumeKey().isBlank()) {
+            return page.listResumeKey().trim();
+        }
+        if (page.listRequestOffset() != null) {
+            return String.valueOf(page.listRequestOffset());
+        }
+        return null;
     }
 
     /**
@@ -97,6 +113,10 @@ public class SubSourceRunner {
                 counts[1] += batch.size();
             }
         });
+
+        if (counts[1] > 0) {
+            throw new BatchSkipException(counts[0], counts[1]);
+        }
 
         return counts;
     }

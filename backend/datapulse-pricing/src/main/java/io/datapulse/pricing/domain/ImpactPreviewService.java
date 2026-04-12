@@ -95,7 +95,7 @@ public class ImpactPreviewService {
       case PRICE_CORRIDOR -> evaluatePriceCorridor(row, policy);
       case MANUAL_OVERRIDE -> EvaluatedOffer.skip(row, MessageCodes.PRICING_PREVIEW_MANUAL_OVERRIDE);
       case VELOCITY_ADAPTIVE, STOCK_BALANCING, COMPOSITE, COMPETITOR_ANCHOR ->
-          EvaluatedOffer.hold(row, MessageCodes.PRICING_NO_CHANGE);
+          EvaluatedOffer.hold(row, MessageCodes.PRICING_PREVIEW_NOT_SUPPORTED_FOR_STRATEGY);
     };
   }
 

@@ -11,12 +11,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Schedules price actions via outbox for CHANGE decisions.
- * Action creation depends on execution mode:
- * - RECOMMENDATION → no action (shown in UI only)
- * - SEMI_AUTO → action PENDING_APPROVAL
- * - FULL_AUTO → action APPROVED
- * - SIMULATED → action APPROVED with execution_mode=SIMULATED
+ * Publishes PRICING_ACTION_REQUESTED events via outbox for CHANGE decisions.
+ * The materializer consumer in datapulse-api creates the actual PriceAction
+ * via ActionService, handling supersede/defer and scheduling execution.
+ * <p>
+ * RECOMMENDATION → no action (shown in UI only)
  */
 @Slf4j
 @Service
@@ -26,44 +25,36 @@ public class PricingActionScheduler {
     private final OutboxService outboxService;
 
     public void scheduleAction(long decisionId, long marketplaceOfferId,
-                               BigDecimal targetPrice, ExecutionMode executionMode,
-                               long workspaceId) {
+                               BigDecimal targetPrice, BigDecimal currentPrice,
+                               ExecutionMode executionMode,
+                               long connectionId, long workspaceId,
+                               int approvalTimeoutHours) {
         if (executionMode == ExecutionMode.RECOMMENDATION) {
             return;
         }
 
-        String actionStatus = resolveInitialActionStatus(executionMode);
-        String decisionExecutionMode = resolveDecisionExecutionMode(executionMode);
+        boolean autoApprove = executionMode == ExecutionMode.FULL_AUTO
+                || executionMode == ExecutionMode.SIMULATED;
 
         Map<String, Object> payload = Map.of(
                 "decisionId", decisionId,
                 "marketplaceOfferId", marketplaceOfferId,
                 "targetPrice", targetPrice.toPlainString(),
-                "actionStatus", actionStatus,
-                "executionMode", decisionExecutionMode,
+                "currentPrice", currentPrice != null ? currentPrice.toPlainString() : "0",
+                "executionMode", executionMode.name(),
+                "autoApprove", autoApprove,
+                "approvalTimeoutHours", approvalTimeoutHours,
+                "connectionId", connectionId,
                 "workspaceId", workspaceId
         );
 
         outboxService.createEvent(
-                OutboxEventType.PRICE_ACTION_EXECUTE,
+                OutboxEventType.PRICING_ACTION_REQUESTED,
                 "price_decision",
                 decisionId,
                 payload);
 
-        log.debug("Scheduled price action: decisionId={}, offerId={}, status={}, mode={}",
-                decisionId, marketplaceOfferId, actionStatus, decisionExecutionMode);
-    }
-
-    private String resolveInitialActionStatus(ExecutionMode mode) {
-        return switch (mode) {
-            case SEMI_AUTO -> "PENDING_APPROVAL";
-            case FULL_AUTO, SIMULATED -> "APPROVED";
-            case RECOMMENDATION -> throw new IllegalArgumentException(
-                    "RECOMMENDATION does not create actions");
-        };
-    }
-
-    private String resolveDecisionExecutionMode(ExecutionMode mode) {
-        return mode == ExecutionMode.SIMULATED ? "SIMULATED" : "LIVE";
+        log.debug("Pricing action requested: decisionId={}, offerId={}, mode={}, autoApprove={}",
+                decisionId, marketplaceOfferId, executionMode, autoApprove);
     }
 }

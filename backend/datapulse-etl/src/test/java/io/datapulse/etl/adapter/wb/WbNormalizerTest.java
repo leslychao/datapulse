@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.etl.adapter.wb.dto.WbCatalogCard;
@@ -18,6 +19,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -334,6 +338,87 @@ class WbNormalizerTest {
       var result = normalizer.normalizeFinance(row);
 
       assertThat(result.entryType()).isEqualTo(FinanceEntryType.OTHER);
+    }
+
+    @Test
+    @DisplayName("Commission and delivery are negated (debit convention)")
+    void should_negateCommission_and_delivery() {
+      var row = buildFinanceRow(
+          "Продажа", "Продажа", BigDecimal.valueOf(2000),
+          BigDecimal.valueOf(300), BigDecimal.valueOf(150),
+          "2024-01-15T10:30:00+03:00", "2024-01-15");
+
+      var result = normalizer.normalizeFinance(row);
+
+      assertThat(result.marketplaceCommissionAmount())
+          .as("commission negated")
+          .isNegative();
+      assertThat(result.logisticsCostAmount())
+          .as("delivery negated")
+          .isNegative();
+    }
+
+    @Test
+    @DisplayName("Return row: retailPrice goes to refundAmount (negated)")
+    void should_negateRetailPrice_for_return() {
+      var row = buildFinanceRow(
+          "Возврат", "Возврат", BigDecimal.valueOf(800),
+          BigDecimal.ZERO, BigDecimal.ZERO,
+          "2024-01-15T10:30:00+03:00", "2024-01-15");
+
+      var result = normalizer.normalizeFinance(row);
+
+      assertThat(result.refundAmount())
+          .as("refund is negated retailPrice")
+          .isEqualByComparingTo(BigDecimal.valueOf(-800));
+    }
+
+    static Stream<Arguments> allKnownSupplierOperNames() {
+      return Stream.of(
+          Arguments.of("Продажа", FinanceEntryType.WB_SALE),
+          Arguments.of("Возврат", FinanceEntryType.WB_RETURN),
+          Arguments.of("Логистика", FinanceEntryType.WB_LOGISTICS),
+          Arguments.of("Хранение", FinanceEntryType.WB_STORAGE),
+          Arguments.of("Обработка товара", FinanceEntryType.WB_ACCEPTANCE),
+          Arguments.of("Штраф", FinanceEntryType.WB_PENALTY),
+          Arguments.of("Удержания", FinanceEntryType.WB_DEDUCTION),
+          Arguments.of("Компенсация ущерба", FinanceEntryType.WB_COMPENSATION),
+          Arguments.of("Добровольная компенсация при возврате",
+              FinanceEntryType.WB_VOLUNTARY_COMPENSATION),
+          Arguments.of("Коррекция продаж", FinanceEntryType.WB_CORRECTION_SALES),
+          Arguments.of("Коррекция логистики", FinanceEntryType.WB_CORRECTION_LOGISTICS),
+          Arguments.of("Коррекция эквайринга", FinanceEntryType.WB_CORRECTION_ACQUIRING),
+          Arguments.of("Возмещение издержек по перевозке",
+              FinanceEntryType.WB_TRANSPORT_REIMBURSEMENT),
+          Arguments.of("Возмещение за выдачу и возврат товаров на ПВЗ",
+              FinanceEntryType.WB_PVZ_REIMBURSEMENT),
+          Arguments.of("Услуга платной доставки", FinanceEntryType.WB_PAID_DELIVERY),
+          Arguments.of("Бронирование товара через самовывоз",
+              FinanceEntryType.WB_CLICK_COLLECT),
+          Arguments.of("Стоимость участия в программе лояльности",
+              FinanceEntryType.WB_LOYALTY_FEE),
+          Arguments.of("Сумма, удержанная за начисленные баллы программы лояльности",
+              FinanceEntryType.WB_LOYALTY_DEDUCTION),
+          Arguments.of("Компенсация скидки по программе лояльности",
+              FinanceEntryType.WB_LOYALTY_COMPENSATION),
+          Arguments.of("Разовое изменение срока перечисления денежных средств",
+              FinanceEntryType.WB_EARLY_WITHDRAWAL)
+      );
+    }
+
+    @ParameterizedTest(name = "{0} → {1}")
+    @MethodSource("allKnownSupplierOperNames")
+    @DisplayName("All known WB supplier_oper_name values map correctly through normalizer")
+    void should_mapAllKnown_supplierOperNames(String supplierOperName,
+        FinanceEntryType expected) {
+      var row = buildFinanceRow(
+          "", supplierOperName, BigDecimal.valueOf(100),
+          BigDecimal.ZERO, BigDecimal.ZERO,
+          "2024-01-15T10:30:00+03:00", "2024-01-15");
+
+      var result = normalizer.normalizeFinance(row);
+
+      assertThat(result.entryType()).isEqualTo(expected);
     }
   }
 

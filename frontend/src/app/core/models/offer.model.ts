@@ -54,6 +54,7 @@ export interface OfferSummary {
   activePolicy: string | null;
   lastDecision: DecisionType | null;
   lastActionStatus: ActionStatus | null;
+  pendingActionId: number | null;
   promoStatus: PromoStatus;
   manualLock: boolean;
   simulatedPrice: number | null;
@@ -66,6 +67,7 @@ export interface OfferSummary {
   lastBidDecisionType: string | null;
   bidDrrPct: number | null;
   manualBidLock: boolean;
+  bidLockId: number | null;
 }
 
 export interface OfferDetail extends Omit<OfferSummary, 'promoStatus'> {

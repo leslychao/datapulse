@@ -30,6 +30,7 @@ public record GridRowResponse(
         String activePolicy,
         String lastDecision,
         String lastActionStatus,
+        Long pendingActionId,
         String promoStatus,
         boolean manualLock,
         BigDecimal simulatedPrice,
@@ -40,6 +41,7 @@ public record GridRowResponse(
         String bidStrategyType,
         Integer currentBid,
         String lastBidDecisionType,
-        boolean manualBidLock
+        boolean manualBidLock,
+        Long bidLockId
 ) {
 }

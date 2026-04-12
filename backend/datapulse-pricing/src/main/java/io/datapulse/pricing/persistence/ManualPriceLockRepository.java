@@ -41,4 +41,32 @@ public interface ManualPriceLockRepository extends JpaRepository<ManualPriceLock
               AND l.expiresAt < CURRENT_TIMESTAMP
             """)
     List<ManualPriceLockEntity> findExpiredLocks();
+
+    @Query(value = """
+            SELECT l.* FROM manual_price_lock l
+            JOIN marketplace_offer o ON o.id = l.marketplace_offer_id
+            WHERE l.workspace_id = :workspaceId
+              AND l.unlocked_at IS NULL
+              AND (:connectionId IS NULL OR o.marketplace_connection_id = :connectionId)
+              AND (:search IS NULL
+                   OR LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(o.marketplace_sku) LIKE LOWER(CONCAT('%', :search, '%')))
+            ORDER BY l.locked_at DESC
+            """,
+            countQuery = """
+            SELECT COUNT(*) FROM manual_price_lock l
+            JOIN marketplace_offer o ON o.id = l.marketplace_offer_id
+            WHERE l.workspace_id = :workspaceId
+              AND l.unlocked_at IS NULL
+              AND (:connectionId IS NULL OR o.marketplace_connection_id = :connectionId)
+              AND (:search IS NULL
+                   OR LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(o.marketplace_sku) LIKE LOWER(CONCAT('%', :search, '%')))
+            """,
+            nativeQuery = true)
+    Page<ManualPriceLockEntity> findActiveLocksFiltered(
+        @Param("workspaceId") Long workspaceId,
+        @Param("connectionId") Long connectionId,
+        @Param("search") String search,
+        Pageable pageable);
 }

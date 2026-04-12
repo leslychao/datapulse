@@ -155,6 +155,11 @@
   "shell.command_palette.start_sync": "Запустить синхронизацию",
   "shell.command_palette.create_policy": "Создать ценовую политику",
 
+  "shell.workspace_switcher.switch": "Переключить рабочее пространство",
+  "shell.workspace_switcher.title": "Рабочие пространства",
+  "shell.workspace_switcher.connections_count": "{{count}} подкл.",
+  "shell.workspace_switcher.manage": "Управление рабочими пространствами",
+
   "top_bar.search_placeholder": "Поиск товаров, политик, команд...",
 
   "notifications.title": "Уведомления",
@@ -946,6 +951,7 @@
   "promo.product.not_participating": "Товар не участвует в данной акции.",
   "promo.product.active_action_exists": "По этому товару уже выполняется действие. Отмените его перед созданием нового.",
   "promo.campaign.frozen": "Срок подачи заявки на участие в акции истёк.",
+  "promo.campaign.bulk_reject_reason": "Массовое отклонение оператором",
   "promo.wb.write_unavailable": "Автоматическое управление промо для WB временно недоступно. Используйте ЛК Wildberries.",
 
   "grid.export.too_many_rows": "Слишком много строк для экспорта ({{count}}). Максимум: {{max}}. Сузьте фильтры.",
@@ -1332,6 +1338,8 @@
   "grid.bulk.reject_label": "Отклонить {{count}}",
   "grid.bulk.hold_message": "Приостановить {{count}} выбранных действий?",
   "grid.bulk.hold_label": "Приостановить {{count}}",
+  "grid.bulk.no_pending_actions": "Среди выбранных нет действий, ожидающих одобрения",
+  "grid.bulk.no_bid_locks": "Среди выбранных нет зафиксированных ставок",
 
   "grid.formula.title": "Массовое изменение цены",
   "grid.formula.action_label": "Действие",
@@ -2372,6 +2380,8 @@
   "pricing.runs.status.COMPLETED": "Завершён",
   "pricing.runs.status.COMPLETED_WITH_ERRORS": "С ошибками",
   "pricing.runs.status.FAILED": "Ошибка",
+  "pricing.runs.status.PAUSED": "Приостановлен",
+  "pricing.runs.status.CANCELLED": "Отменён",
 
   "pricing.runs.kpi.total": "Всего товаров",
   "pricing.runs.kpi.eligible": "Подходящих",
@@ -3175,6 +3185,7 @@
   "pricing.preview.disclaimer": "Предпросмотр — оценка на текущий момент. Фактический результат может отличаться.",
   "pricing.preview.offer_inactive": "Товар неактивен на маркетплейсе.",
   "pricing.preview.manual_override": "Предпросмотр недоступен для стратегии ручного управления.",
+  "pricing.preview.not_supported_for_strategy": "Предпросмотр не поддерживается для данной стратегии. Результат будет рассчитан при запуске.",
   "pricing.preview.error": "Не удалось рассчитать предпросмотр.",
   "pricing.preview.summary.total_offers": "Всего товаров",
   "pricing.preview.summary.eligible": "Подходящих",
@@ -3779,9 +3790,6 @@
   "bidding.strategy.liquidation.bid_step_pct": "Шаг изменения ставки",
   "bidding.strategy.liquidation.bid_step_pct_hint": "На сколько процентов менять ставку за один шаг",
 
-  "bidding.detail.recent_decisions": "Последние решения по ставке",
-  "bidding.detail.no_decisions": "Нет решений по ставке для этого товара",
-  "bidding.detail.all_decisions": "Все решения",
   "bidding.detail.no_strategy": "Стратегия автобиддинга не назначена",
 
   "grid.col.bid_policy": "Bid-стратегия",

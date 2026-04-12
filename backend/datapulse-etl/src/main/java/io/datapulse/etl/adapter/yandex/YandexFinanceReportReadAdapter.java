@@ -110,7 +110,7 @@ public class YandexFinanceReportReadAdapter {
         connectionId, servicesRows.size(), allRealizationRows.size());
   }
 
-  static List<MonthPeriod> splitIntoMonths(LocalDate from, LocalDate to) {
+  public static List<MonthPeriod> splitIntoMonths(LocalDate from, LocalDate to) {
     List<MonthPeriod> months = new ArrayList<>();
     LocalDate cursor = from.withDayOfMonth(1);
     LocalDate end = to.withDayOfMonth(1);
@@ -123,5 +123,5 @@ public class YandexFinanceReportReadAdapter {
     return months;
   }
 
-  record MonthPeriod(int year, int month) {}
+  public record MonthPeriod(int year, int month) {}
 }

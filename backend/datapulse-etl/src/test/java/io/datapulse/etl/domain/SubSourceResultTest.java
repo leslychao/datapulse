@@ -3,6 +3,7 @@ package io.datapulse.etl.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -48,6 +49,24 @@ class SubSourceResultTest {
       assertThat(result.recordsProcessed()).isEqualTo(50);
       assertThat(result.recordsSkipped()).isEqualTo(5);
       assertThat(result.errors()).containsExactly("err");
+    }
+
+    @Test
+    void should_createSuccessWithWarnings_and_carryUnmappedTypes() {
+      var unmapped = Set.of("NewOperation", "AnotherUnknown");
+      var result = SubSourceResult.successWithWarnings("source", 5, 100, unmapped);
+
+      assertThat(result.status()).isEqualTo(EventResultStatus.COMPLETED);
+      assertThat(result.isSuccess()).isTrue();
+      assertThat(result.unmappedTypeNames()).containsExactlyInAnyOrder(
+          "NewOperation", "AnotherUnknown");
+    }
+
+    @Test
+    void should_defaultUnmappedTypeNames_to_emptySet() {
+      var result = SubSourceResult.success("source", 5, 100);
+
+      assertThat(result.unmappedTypeNames()).isEmpty();
     }
   }
 

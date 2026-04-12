@@ -13,13 +13,16 @@ import io.datapulse.etl.adapter.yandex.dto.YandexOfferMapping;
 import io.datapulse.etl.adapter.yandex.dto.YandexOrder;
 import io.datapulse.etl.adapter.yandex.dto.YandexOrderItem;
 import io.datapulse.etl.adapter.yandex.dto.YandexOrderPrice;
+import io.datapulse.etl.adapter.yandex.dto.YandexRealizationReportRow;
 import io.datapulse.etl.adapter.yandex.dto.YandexRegion;
 import io.datapulse.etl.adapter.yandex.dto.YandexReturn;
 import io.datapulse.etl.adapter.yandex.dto.YandexReturnItem;
 import io.datapulse.etl.adapter.yandex.dto.YandexReturnReason;
+import io.datapulse.etl.adapter.yandex.dto.YandexServicesReportRow;
 import io.datapulse.etl.adapter.yandex.dto.YandexStockEntry;
 import io.datapulse.etl.adapter.yandex.dto.YandexStockOffer;
 import io.datapulse.etl.adapter.yandex.dto.YandexStockWarehouse;
+import io.datapulse.etl.domain.FinanceEntryType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -367,5 +370,131 @@ class YandexNormalizerTest {
       String reasonType) {
     return new YandexReturnItem(null, shopSku, count, "REFUND_MONEY",
         new YandexReturnReason(reasonType, "Описание"));
+  }
+
+  @Nested
+  @DisplayName("normalizeServiceCharge()")
+  class NormalizeServiceCharge {
+
+    @Test
+    void should_mapCommission_to_marketplaceCommission() {
+      var row = new YandexServicesReportRow(
+          1001L, "SKU-1", "Product", "2024-01-15T10:00:00",
+          "FBY", 100L, "1234567890",
+          BigDecimal.valueOf(1000), 1,
+          "Размещение заказа", "2024-01-15T10:00:00",
+          "2024-01-31", BigDecimal.valueOf(5), null,
+          BigDecimal.valueOf(50),
+          null, null, null, null, null);
+
+      var result = normalizer.normalizeServiceCharge(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.YANDEX_COMMISSION);
+      assertThat(result.marketplaceCommissionAmount())
+          .isEqualByComparingTo(BigDecimal.valueOf(-50));
+      assertThat(result.revenueAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+      assertThat(result.orderId()).isEqualTo("1001");
+      assertThat(result.currency()).isEqualTo("RUB");
+    }
+
+    @Test
+    void should_mapStorage_to_storageCost() {
+      var row = new YandexServicesReportRow(
+          null, "SKU-2", "Product", null,
+          "FBY", 100L, null,
+          null, null,
+          "Хранение на складе", "2024-02-01T00:00:00",
+          null, null, null,
+          BigDecimal.valueOf(120),
+          null, null, null, null, null);
+
+      var result = normalizer.normalizeServiceCharge(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.YANDEX_STORAGE);
+      assertThat(result.storageCostAmount())
+          .isEqualByComparingTo(BigDecimal.valueOf(-120));
+    }
+
+    @Test
+    void should_mapUnknownService_to_OTHER() {
+      var row = new YandexServicesReportRow(
+          1003L, "SKU-3", "Product", null,
+          "FBS", 100L, null,
+          null, null,
+          "Новая неизвестная услуга", null,
+          null, null, null,
+          BigDecimal.valueOf(10),
+          null, null, null, null, null);
+
+      var result = normalizer.normalizeServiceCharge(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.OTHER);
+    }
+
+    @Test
+    void should_handleNullTotalAmount() {
+      var row = new YandexServicesReportRow(
+          1004L, "SKU-4", "Product", null,
+          "FBY", 100L, null,
+          null, null,
+          "Размещение заказа", null,
+          null, null, null,
+          null,
+          null, null, null, null, null);
+
+      var result = normalizer.normalizeServiceCharge(row);
+
+      assertThat(result.netPayout()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+  }
+
+  @Nested
+  @DisplayName("normalizeRealization()")
+  class NormalizeRealization {
+
+    @Test
+    void should_calculateRevenue_from_priceAndCount() {
+      var row = new YandexRealizationReportRow(
+          2001L, "EXT-2001", "VENDOR-1", "SKU-1", "Product Name",
+          "2024-01-10", "2024-01-12", "2024-01-14",
+          3, BigDecimal.valueOf(500),
+          "20%", "FBY", 100L);
+
+      var result = normalizer.normalizeRealization(row);
+
+      assertThat(result.entryType()).isEqualTo(FinanceEntryType.YANDEX_SALE);
+      assertThat(result.revenueAmount())
+          .isEqualByComparingTo(BigDecimal.valueOf(1500));
+      assertThat(result.orderId()).isEqualTo("2001");
+      assertThat(result.sellerSku()).isEqualTo("VENDOR-1");
+      assertThat(result.marketplaceSku()).isEqualTo("SKU-1");
+      assertThat(result.entryDate()).isNotNull();
+    }
+
+    @Test
+    void should_handleNullCount_as_zero() {
+      var row = new YandexRealizationReportRow(
+          2002L, null, null, "SKU-2", null,
+          null, null, null,
+          null, BigDecimal.valueOf(1000),
+          null, null, null);
+
+      var result = normalizer.normalizeRealization(row);
+
+      assertThat(result.revenueAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void should_handleNullPrice_as_zero() {
+      var row = new YandexRealizationReportRow(
+          2003L, null, null, "SKU-3", null,
+          null, null, null,
+          5, null,
+          null, null, null);
+
+      var result = normalizer.normalizeRealization(row);
+
+      assertThat(result.revenueAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
   }
 }

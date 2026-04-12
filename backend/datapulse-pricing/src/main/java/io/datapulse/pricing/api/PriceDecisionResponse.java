@@ -25,6 +25,11 @@ public record PriceDecisionResponse(
         String skipReason,
         String explanationSummary,
         String executionMode,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        String offerName,
+        String sellerSku,
+        String connectionName,
+        String policyName,
+        Object policySnapshot
 ) {
 }

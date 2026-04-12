@@ -200,6 +200,7 @@ public class GridService {
                 row.getActivePolicy(),
                 row.getLastDecision(),
                 row.getLastActionStatus(),
+                row.getPendingActionId(),
                 row.getPromoStatus(),
                 row.isManualLock(),
                 row.getSimulatedPrice(),
@@ -210,7 +211,8 @@ public class GridService {
                 row.getBidStrategyType(),
                 row.getCurrentBid(),
                 row.getLastBidDecisionType(),
-                row.isManualBidLock()
+                row.isManualBidLock(),
+                row.getBidLockId()
         );
     }
 

@@ -243,7 +243,13 @@ public class PricingRunService {
             }
 
             decisionRepository.saveAll(decisions);
-            scheduleActions(decisions, workspaceId, downgradedPolicyIds);
+
+            Map<Long, PricePolicyEntity> chunkPolicyById = new HashMap<>();
+            for (EligibleOffer o : chunk) {
+                chunkPolicyById.putIfAbsent(o.policy().getId(), o.policy());
+            }
+            scheduleActions(decisions, workspaceId, connectionId,
+                    chunkPolicyById, downgradedPolicyIds);
 
             return new BatchResult(new RunCounters(changeCount, skipCount, holdCount), false);
         });
@@ -361,6 +367,8 @@ public class PricingRunService {
     }
 
     private void scheduleActions(List<PriceDecisionEntity> decisions, long workspaceId,
+                                  long connectionId,
+                                  Map<Long, PricePolicyEntity> policyById,
                                   Set<Long> downgradedPolicyIds) {
         for (PriceDecisionEntity decision : decisions) {
             if (decision.getDecisionType() != DecisionType.CHANGE) {
@@ -380,13 +388,26 @@ public class PricingRunService {
                 mode = ExecutionMode.SEMI_AUTO;
             }
 
+            PricePolicyEntity policy = decision.getPricePolicyId() != null
+                    ? policyById.get(decision.getPricePolicyId()) : null;
+            int approvalTimeoutHours = policy != null
+                    ? resolveApprovalTimeout(policy) : 72;
+
             actionScheduler.scheduleAction(
                     decision.getId(),
                     decision.getMarketplaceOfferId(),
                     decision.getTargetPrice(),
+                    decision.getCurrentPrice(),
                     mode,
-                    workspaceId);
+                    connectionId,
+                    workspaceId,
+                    approvalTimeoutHours);
         }
+    }
+
+    private int resolveApprovalTimeout(PricePolicyEntity policy) {
+        Integer timeout = policy.getApprovalTimeoutHours();
+        return timeout != null && timeout > 0 ? timeout : 72;
     }
 
     private String mapToExecutionMode(PriceDecisionEntity decision) {

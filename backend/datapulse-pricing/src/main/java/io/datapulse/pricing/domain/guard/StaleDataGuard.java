@@ -21,7 +21,7 @@ public class StaleDataGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 20;
+        return 15;
     }
 
     @Override

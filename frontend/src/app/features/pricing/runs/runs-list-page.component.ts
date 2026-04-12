@@ -40,6 +40,8 @@ const RUN_STATUS_COLOR: Record<string, string> = {
   COMPLETED: 'success',
   COMPLETED_WITH_ERRORS: 'warning',
   FAILED: 'error',
+  PAUSED: 'warning',
+  CANCELLED: 'neutral',
 };
 
 const TRIGGER_COLOR: Record<string, string> = {
@@ -339,7 +341,7 @@ export class RunsListPageComponent {
       key: 'status',
       label: 'pricing.runs.filter.status',
       type: 'multi-select',
-      options: (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED'] as const)
+      options: (['PENDING', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'PAUSED', 'CANCELLED'] as const)
         .map((value) => ({ value, label: `pricing.runs.status.${value}` })),
     },
     {

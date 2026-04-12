@@ -104,9 +104,13 @@ export class QueueBuilderModalComponent {
   }));
 
   readonly saveMutation = injectMutation(() => ({
-    mutationFn: (req: { isEdit: boolean; queueId?: number; body: CreateQueueRequest }) => {
+    mutationFn: (
+      req:
+        | { kind: 'create'; body: CreateQueueRequest }
+        | { kind: 'update'; queueId: number; body: UpdateQueueRequest },
+    ) => {
       const wsId = this.wsStore.currentWorkspaceId()!;
-      if (req.isEdit && req.queueId) {
+      if (req.kind === 'update') {
         return lastValueFrom(this.queueApi.updateQueue(wsId, req.queueId, req.body));
       }
       return lastValueFrom(this.queueApi.createQueue(wsId, req.body));
@@ -142,6 +146,7 @@ export class QueueBuilderModalComponent {
 
       if (eq) {
         this.form.patchValue({ name: eq.name, queueType: eq.queueType });
+        this.populateRulesFromQueue(eq);
       } else {
         this.form.reset({ name: '', queueType: 'ATTENTION' });
         this.addRule();
@@ -189,18 +194,22 @@ export class QueueBuilderModalComponent {
     this.form.markAllAsTouched();
     if (this.form.invalid) return;
 
-    const body: CreateQueueRequest = {
-      name: this.form.controls.name.value.trim(),
-      queueType: this.form.controls.queueType.value,
-      autoCriteria: this.buildCriteria(),
-    };
-
+    const criteria = this.buildCriteria();
+    const name = this.form.controls.name.value.trim();
+    const queueType = this.form.controls.queueType.value;
     const eq = this.editQueue();
-    this.saveMutation.mutate({
-      isEdit: eq != null,
-      queueId: eq?.queueId,
-      body,
-    });
+    if (eq != null) {
+      this.saveMutation.mutate({
+        kind: 'update',
+        queueId: eq.queueId,
+        body: { name, autoCriteria: criteria, enabled: true },
+      });
+    } else {
+      this.saveMutation.mutate({
+        kind: 'create',
+        body: { name, queueType, autoCriteria: criteria },
+      });
+    }
   }
 
   confirmDelete(): void {
@@ -218,5 +227,57 @@ export class QueueBuilderModalComponent {
       .map((r) => ({ field: r.field, op: r.op, value: r.value }));
     if (match_rules.length === 0) return null;
     return { entity_type: 'marketplace_offer', match_rules };
+  }
+
+  private populateRulesFromQueue(eq: Queue): void {
+    const rules = this.extractMatchRules(eq);
+    if (rules.length === 0) {
+      this.addRule();
+      return;
+    }
+    const defaultField = CRITERIA_FIELDS[0].id;
+    for (const r of rules) {
+      const field = typeof r.field === 'string' && r.field ? r.field : defaultField;
+      const op = typeof r.op === 'string' && r.op ? r.op : 'eq';
+      this.rules.push(
+        this.fb.group({
+          field: this.fb.nonNullable.control(field),
+          op: this.fb.nonNullable.control(this.normalizeOperator(field, op)),
+          value: this.fb.nonNullable.control(this.matchRuleValueToFormString(r.value)),
+        }) as RuleForm,
+      );
+    }
+  }
+
+  private extractMatchRules(eq: Queue): QueueMatchRule[] {
+    const ac = eq.autoCriteria;
+    if (!ac || !Array.isArray(ac.match_rules)) {
+      return [];
+    }
+    return ac.match_rules as QueueMatchRule[];
+  }
+
+  private normalizeOperator(fieldId: string, op: string): string {
+    const allowed = this.operatorsFor(fieldId);
+    if (allowed.includes(op)) {
+      return op;
+    }
+    return allowed[0] ?? 'eq';
+  }
+
+  private matchRuleValueToFormString(value: unknown): string {
+    if (value == null) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => String(v)).join(',');
+    }
+    return JSON.stringify(value);
   }
 }

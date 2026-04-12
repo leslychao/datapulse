@@ -670,8 +670,8 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
     const val = parseFloat(this.inlineCostValue().replace(',', '.'));
     if (!id || !Number.isFinite(val) || val <= 0) return;
     this.inlineCostItemId.set(null);
-    this.toast.info(this.translate.instant('queues.toast.cost_saved'));
-    this.afterMutation();
+    this.inlineCostValue.set('');
+    this.toast.info(this.translate.instant('queues.inline_cost_not_implemented'));
   }
 
   cancelInlineCost(): void {

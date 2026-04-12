@@ -19,6 +19,8 @@ export interface Queue {
   pendingCount: number;
   inProgressCount: number;
   totalActiveCount: number;
+  /** Present when API returns queue definition details (list/get). */
+  autoCriteria?: QueueAutoCriteria | null;
 }
 
 export interface QueueItem {
@@ -64,6 +66,6 @@ export interface QueueMatchRule {
 
 export interface UpdateQueueRequest {
   name: string;
-  queueType: QueueType;
   autoCriteria: QueueAutoCriteria | null;
+  enabled: boolean;
 }

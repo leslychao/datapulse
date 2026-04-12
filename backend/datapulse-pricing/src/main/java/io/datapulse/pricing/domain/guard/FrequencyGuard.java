@@ -21,7 +21,7 @@ public class FrequencyGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 50;
+        return 20;
     }
 
     @Override

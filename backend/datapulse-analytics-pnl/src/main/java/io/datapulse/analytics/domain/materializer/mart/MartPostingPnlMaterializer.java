@@ -126,10 +126,10 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
       FROM (
           -- Aggregate posting-level entries per posting
           SELECT
+              workspace_id,
+              source_platform,
               posting_id,
-              connection_id,
-              any(workspace_id) AS workspace_id,
-              any(source_platform) AS source_platform,
+              any(connection_id) AS connection_id,
               any(fulfillment_type) AS fulfillment_type,
               any(order_id) AS order_id,
               any(seller_sku_id) AS seller_sku_id,
@@ -153,13 +153,14 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
           WHERE attribution_level = 'POSTING'
             AND posting_id IS NOT NULL
             AND posting_id != ''
-          GROUP BY posting_id, connection_id /*INCR*/
+          GROUP BY workspace_id, source_platform, posting_id /*INCR*/
       ) pm
       -- Acquiring: order-level entries allocated pro-rata by revenue
       LEFT JOIN (
           SELECT
+              workspace_id,
+              source_platform,
               order_id,
-              connection_id,
               sum(acquiring_commission_amount) AS order_acquiring,
               sum(net_payout) AS order_acquiring_payout
           FROM fact_finance
@@ -167,57 +168,72 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
             AND posting_id IS NULL
             AND order_id IS NOT NULL
             AND order_id != ''
-          GROUP BY order_id, connection_id
-      ) aq ON pm.order_id = aq.order_id AND pm.connection_id = aq.connection_id
+          GROUP BY workspace_id, source_platform, order_id
+      ) aq ON pm.order_id = aq.order_id
+          AND pm.workspace_id = aq.workspace_id
+          AND pm.source_platform = aq.source_platform
       -- Order-level revenue for pro-rata denominator
       LEFT JOIN (
           SELECT
+              workspace_id,
+              source_platform,
               order_id,
-              connection_id,
               sum(revenue_amount) AS order_revenue
           FROM (
-              SELECT posting_id, connection_id, any(order_id) AS order_id,
+              SELECT workspace_id, source_platform, posting_id,
+                     any(order_id) AS order_id,
                      sum(revenue_amount) AS revenue_amount
               FROM fact_finance
               WHERE attribution_level = 'POSTING'
                 AND posting_id IS NOT NULL AND posting_id != ''
-              GROUP BY posting_id, connection_id
+              GROUP BY workspace_id, source_platform, posting_id
           )
           WHERE order_id IS NOT NULL AND order_id != ''
-          GROUP BY order_id, connection_id
-      ) orv ON pm.order_id = orv.order_id AND pm.connection_id = orv.connection_id
+          GROUP BY workspace_id, source_platform, order_id
+      ) orv ON pm.order_id = orv.order_id
+          AND pm.workspace_id = orv.workspace_id
+          AND pm.source_platform = orv.source_platform
       -- Resolve seller_sku_id from canonical sales when finance row has no SKU
       LEFT JOIN (
           SELECT
+              workspace_id,
+              source_platform,
               posting_id,
-              connection_id,
               anyLast(seller_sku_id) AS sales_seller_sku_id
           FROM fact_sales
           WHERE posting_id IS NOT NULL AND posting_id != ''
             AND seller_sku_id IS NOT NULL
-          GROUP BY posting_id, connection_id
-      ) fs ON pm.posting_id = fs.posting_id AND pm.connection_id = fs.connection_id
+          GROUP BY workspace_id, source_platform, posting_id
+      ) fs ON pm.posting_id = fs.posting_id
+          AND pm.workspace_id = fs.workspace_id
+          AND pm.source_platform = fs.source_platform
       -- Sales quantity for COGS
       LEFT JOIN (
-          SELECT posting_id, sum(quantity) AS quantity
+          SELECT workspace_id, source_platform, posting_id,
+                 sum(quantity) AS quantity
           FROM fact_sales
           WHERE posting_id IS NOT NULL AND posting_id != ''
-          GROUP BY posting_id
+          GROUP BY workspace_id, source_platform, posting_id
       ) s ON pm.posting_id = s.posting_id
+          AND pm.workspace_id = s.workspace_id
+          AND pm.source_platform = s.source_platform
       -- Product dimension for product_id resolution (uses resolved seller SKU)
       LEFT JOIN dim_product AS dp
           ON coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) = dp.seller_sku_id
+          AND pm.workspace_id = dp.workspace_id
       -- SCD2 cost for COGS (equality-only JOIN: range filter moved to WHERE — CH hash join)
       LEFT JOIN (
           SELECT
+              pm_c.workspace_id AS workspace_id,
+              pm_c.source_platform AS source_platform,
               pm_c.posting_id AS posting_id,
               any(fpc_inner.cost_price) AS cost_price
           FROM (
               SELECT
+                  workspace_id,
+                  source_platform,
                   posting_id,
-                  connection_id,
-                  any(workspace_id) AS workspace_id,
-                  any(source_platform) AS source_platform,
+                  any(connection_id) AS connection_id,
                   any(order_id) AS order_id,
                   any(seller_sku_id) AS seller_sku_id,
                   coalesce(
@@ -240,25 +256,31 @@ public class MartPostingPnlMaterializer implements AnalyticsMaterializer {
               WHERE attribution_level = 'POSTING'
                 AND posting_id IS NOT NULL
                 AND posting_id != ''
-              GROUP BY posting_id, connection_id /*INCR*/
+              GROUP BY workspace_id, source_platform, posting_id /*INCR*/
           ) AS pm_c
           INNER JOIN fact_product_cost AS fpc_inner
-              ON pm_c.seller_sku_id = fpc_inner.seller_sku_id
+              ON pm_c.workspace_id = fpc_inner.workspace_id
+             AND pm_c.seller_sku_id = fpc_inner.seller_sku_id
           WHERE pm_c.finance_date >= fpc_inner.valid_from
             AND (fpc_inner.valid_to IS NULL OR pm_c.finance_date < fpc_inner.valid_to)
-          GROUP BY pm_c.posting_id
+          GROUP BY pm_c.workspace_id, pm_c.source_platform, pm_c.posting_id
       ) AS fpc_cost ON pm.posting_id = fpc_cost.posting_id
+          AND pm.workspace_id = fpc_cost.workspace_id
+          AND pm.source_platform = fpc_cost.source_platform
       LEFT JOIN dim_product AS p_by_id ON dp.product_id = p_by_id.product_id
+          AND dp.workspace_id = p_by_id.workspace_id
       LEFT JOIN (
           SELECT
+              workspace_id,
               seller_sku_id,
               anyLast(sku_code) AS sku_code,
               anyLast(marketplace_sku) AS marketplace_sku,
               anyLast(product_name) AS product_name
           FROM dim_product
-          GROUP BY seller_sku_id
+          GROUP BY workspace_id, seller_sku_id
       ) AS p_by_sku
           ON coalesce(pm.seller_sku_id, fs.sales_seller_sku_id) = p_by_sku.seller_sku_id
+          AND pm.workspace_id = p_by_sku.workspace_id
       SETTINGS final = 1
       """;
 

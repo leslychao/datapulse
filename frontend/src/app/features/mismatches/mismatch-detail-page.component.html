@@ -204,13 +204,6 @@
                 {{ 'mismatches.detail.ignore' | translate }}
               </button>
             }
-            @if (rbac.canOperateMismatches()) {
-              <button type="button" (click)="onEscalate()" [disabled]="escalateMutation.isPending()"
-                class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-error)] px-4 py-2 text-sm font-medium text-[var(--status-error)] hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] disabled:opacity-50">
-                <lucide-icon [img]="EscalateIcon" [size]="14" />
-                {{ 'mismatches.detail.escalate' | translate }}
-              </button>
-            }
           }
 
           @if (isAcknowledged()) {
@@ -226,13 +219,6 @@
                 class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50">
                 <lucide-icon [img]="RefreshIcon" [size]="14" />
                 {{ 'mismatches.detail.retry' | translate }}
-              </button>
-            }
-            @if (rbac.canOperateMismatches()) {
-              <button type="button" (click)="onEscalate()" [disabled]="escalateMutation.isPending()"
-                class="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--status-error)] px-4 py-2 text-sm font-medium text-[var(--status-error)] hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] disabled:opacity-50">
-                <lucide-icon [img]="EscalateIcon" [size]="14" />
-                {{ 'mismatches.detail.escalate' | translate }}
               </button>
             }
           }

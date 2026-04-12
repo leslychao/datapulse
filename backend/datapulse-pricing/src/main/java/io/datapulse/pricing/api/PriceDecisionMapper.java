@@ -12,5 +12,10 @@ public interface PriceDecisionMapper {
     @Mapping(target = "signalSnapshot", qualifiedByName = "jsonToObject")
     @Mapping(target = "constraintsApplied", qualifiedByName = "jsonToObject")
     @Mapping(target = "guardsEvaluated", qualifiedByName = "jsonToObject")
+    @Mapping(target = "policySnapshot", qualifiedByName = "jsonToObject")
+    @Mapping(target = "offerName", ignore = true)
+    @Mapping(target = "sellerSku", ignore = true)
+    @Mapping(target = "connectionName", ignore = true)
+    @Mapping(target = "policyName", ignore = true)
     PriceDecisionResponse toResponse(PriceDecisionEntity entity);
 }

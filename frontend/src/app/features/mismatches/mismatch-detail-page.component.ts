@@ -20,13 +20,12 @@ import {
   ArrowLeft,
   Check,
   Ban,
-  ArrowUpRight,
   CircleCheck,
   RefreshCw,
 } from 'lucide-angular';
 
 import { ActionApiService } from '@core/api/action-api.service';
-import { AlertApiService } from '@core/api/alert-api.service';
+
 import { MismatchApiService } from '@core/api/mismatch-api.service';
 import { MarketplaceType, MismatchDetail, MismatchStatus } from '@core/models';
 import { RbacService } from '@core/auth/rbac.service';
@@ -80,7 +79,7 @@ export class MismatchDetailPageComponent {
 
   private readonly api = inject(MismatchApiService);
   private readonly actionApi = inject(ActionApiService);
-  private readonly alertApi = inject(AlertApiService);
+
   protected readonly ws = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
@@ -91,7 +90,7 @@ export class MismatchDetailPageComponent {
   readonly BackIcon = ArrowLeft;
   readonly CheckIcon = Check;
   readonly BanIcon = Ban;
-  readonly EscalateIcon = ArrowUpRight;
+
   readonly ResolveIcon = CircleCheck;
   readonly RefreshIcon = RefreshCw;
 
@@ -199,28 +198,6 @@ export class MismatchDetailPageComponent {
     onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
   }));
 
-  readonly escalateMutation = injectMutation(() => ({
-    mutationFn: () => {
-      const data = this.d();
-      if (!data) throw new Error('no data');
-      return lastValueFrom(this.alertApi.createAlert({
-        sourceType: 'MISMATCH',
-        sourceId: data.mismatchId,
-        severity: data.severity,
-        message: this.translate.instant('mismatches.escalate.message', {
-          type: this.translate.instant('mismatches.type.' + data.type),
-          offerName: data.offer.offerName,
-          skuCode: data.offer.skuCode,
-          expected: data.expectedValue,
-          actual: data.actualValue,
-        }),
-      }));
-    },
-    onSuccess: () => {
-      this.toast.success(this.translate.instant('mismatches.toast.escalate'));
-    },
-    onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
-  }));
 
   onResolve(payload: { resolution: string; note: string }): void {
     this.resolveMutation.mutate(payload);
@@ -232,10 +209,6 @@ export class MismatchDetailPageComponent {
       resolution: 'IGNORED',
       note: this.translate.instant('mismatches.ignore.note'),
     });
-  }
-
-  onEscalate(): void {
-    this.escalateMutation.mutate();
   }
 
   private invalidateAll(): void {

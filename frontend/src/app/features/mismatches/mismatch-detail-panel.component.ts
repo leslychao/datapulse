@@ -22,14 +22,13 @@ import {
   RefreshCw,
   Check,
   Ban,
-  ArrowUpRight,
   CircleCheck,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-angular';
 
 import { ActionApiService } from '@core/api/action-api.service';
-import { AlertApiService } from '@core/api/alert-api.service';
+
 import { MismatchApiService } from '@core/api/mismatch-api.service';
 import { MarketplaceType, MismatchDetail, MismatchStatus } from '@core/models';
 import { RbacService } from '@core/auth/rbac.service';
@@ -256,9 +255,6 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
                 @if (rbac.canIgnoreMismatches()) {
                   <button type="button" (click)="showIgnoreModal.set(true)" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)]"><lucide-icon [img]="BanIcon" [size]="14" />{{ 'mismatches.detail.ignore' | translate }}</button>
                 }
-                @if (rbac.canOperateMismatches()) {
-                  <button type="button" (click)="onEscalate()" [disabled]="escalateMutation.isPending()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--status-error)] px-3 py-1.5 text-sm text-[var(--status-error)] hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] disabled:opacity-50"><lucide-icon [img]="EscalateIcon" [size]="14" />{{ 'mismatches.detail.escalate' | translate }}</button>
-                }
               }
               @if (d.status === 'ACKNOWLEDGED') {
                 @if (rbac.canOperateMismatches()) {
@@ -266,9 +262,6 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
                 }
                 @if (rbac.canOperateMismatches() && d.relatedActionId) {
                   <button type="button" (click)="retryMutation.mutate()" [disabled]="retryMutation.isPending()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] disabled:opacity-50"><lucide-icon [img]="RefreshIcon" [size]="14" />{{ 'mismatches.detail.retry' | translate }}</button>
-                }
-                @if (rbac.canOperateMismatches()) {
-                  <button type="button" (click)="onEscalate()" [disabled]="escalateMutation.isPending()" class="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-md)] border border-[var(--status-error)] px-3 py-1.5 text-sm text-[var(--status-error)] hover:bg-[color-mix(in_srgb,var(--status-error)_8%,transparent)] disabled:opacity-50"><lucide-icon [img]="EscalateIcon" [size]="14" />{{ 'mismatches.detail.escalate' | translate }}</button>
                 }
               }
             </div>
@@ -284,7 +277,7 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
 export class MismatchDetailPanelComponent {
   private readonly api = inject(MismatchApiService);
   private readonly actionApi = inject(ActionApiService);
-  private readonly alertApi = inject(AlertApiService);
+
   protected readonly ws = inject(WorkspaceContextStore);
   private readonly detailPanel = inject(DetailPanelService);
   private readonly toast = inject(ToastService);
@@ -302,7 +295,7 @@ export class MismatchDetailPanelComponent {
   readonly RefreshIcon = RefreshCw;
   readonly CheckIcon = Check;
   readonly BanIcon = Ban;
-  readonly EscalateIcon = ArrowUpRight;
+
   readonly ResolveIcon = CircleCheck;
   readonly PrevIcon = ChevronLeft;
   readonly NextIcon = ChevronRight;
@@ -350,29 +343,6 @@ export class MismatchDetailPanelComponent {
       this.showResolveModal.set(false);
       this.toast.success(this.translate.instant('mismatches.toast.resolve'));
       this.invalidateAll();
-    },
-    onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
-  }));
-
-  readonly escalateMutation = injectMutation(() => ({
-    mutationFn: () => {
-      const d = this.detailQuery.data();
-      if (!d) throw new Error('no data');
-      return lastValueFrom(this.alertApi.createAlert({
-        sourceType: 'MISMATCH',
-        sourceId: d.mismatchId,
-        severity: d.severity,
-        message: this.translate.instant('mismatches.escalate.message', {
-          type: this.translate.instant('mismatches.type.' + d.type),
-          offerName: d.offer.offerName,
-          skuCode: d.offer.skuCode,
-          expected: d.expectedValue,
-          actual: d.actualValue,
-        }),
-      }));
-    },
-    onSuccess: () => {
-      this.toast.success(this.translate.instant('mismatches.toast.escalate'));
     },
     onError: () => this.toast.error(this.translate.instant('mismatches.toast.error')),
   }));
@@ -449,9 +419,6 @@ export class MismatchDetailPanelComponent {
     });
   }
 
-  protected onEscalate(): void {
-    this.escalateMutation.mutate();
-  }
 
   protected mpType(d: MismatchDetail): MarketplaceType {
     return mp(d.offer.marketplaceType);

@@ -6,7 +6,8 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { DatePipe } from '@angular/common';
 import {
   injectMutation,
   injectQuery,
@@ -41,7 +42,7 @@ import {
   selector: 'dp-insights-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, LucideAngularModule, FilterBarComponent, EmptyStateComponent],
+  imports: [TranslatePipe, DatePipe, LucideAngularModule, FilterBarComponent, EmptyStateComponent],
   template: `
     <div class="flex h-full flex-col">
       <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
@@ -100,7 +101,7 @@ import {
                       {{ insight.title }}
                     </h3>
                     <span class="flex-shrink-0 text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
-                      {{ insight.createdAt | translate }}
+                      {{ insight.createdAt | date:'dd.MM.yyyy HH:mm' }}
                     </span>
                   </div>
 
@@ -145,6 +146,7 @@ export class InsightsPageComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly filterValues = signal<Record<string, any>>({});
 
@@ -245,7 +247,7 @@ export class InsightsPageComponent {
       this.insightsQuery.refetch();
     },
     onError: () => {
-      this.toast.error('pricing.insights.acknowledge_error');
+      this.toast.error(this.translate.instant('pricing.insights.acknowledge_error'));
     },
   }));
 

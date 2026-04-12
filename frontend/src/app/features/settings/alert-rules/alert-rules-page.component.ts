@@ -127,7 +127,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
 
                 @if (expandedRuleId() === rule.id) {
                   <tr>
-                    <td colspan="5" class="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-6 py-5">
+                    <td colspan="4" class="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-6 py-5">
                       <div class="max-w-lg space-y-4">
                         <div>
                           <label class="mb-1 block text-sm font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.severity_label' | translate }}</label>

@@ -3,7 +3,14 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '@env';
-import { CreateQueueRequest, Page, Queue, QueueFilter, QueueItem } from '@core/models';
+import {
+  CreateQueueRequest,
+  Page,
+  Queue,
+  QueueFilter,
+  QueueItem,
+  UpdateQueueRequest,
+} from '@core/models';
 
 @Injectable({ providedIn: 'root' })
 export class QueueApiService {
@@ -22,7 +29,7 @@ export class QueueApiService {
     return this.http.post<Queue>(`${this.base}/workspaces/${workspaceId}/queues`, req);
   }
 
-  updateQueue(workspaceId: number, queueId: number, req: CreateQueueRequest): Observable<Queue> {
+  updateQueue(workspaceId: number, queueId: number, req: UpdateQueueRequest): Observable<Queue> {
     return this.http.put<Queue>(`${this.base}/workspaces/${workspaceId}/queues/${queueId}`, req);
   }
 

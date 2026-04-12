@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * Materializes mart_product_pnl from mart_posting_pnl + fact_finance (PRODUCT, ACCOUNT level).
  *
  * <p>Three sources merged via UNION ALL, then aggregated by
- * (connection_id, seller_sku_id, period, attribution_level) to prevent
+ * (workspace_id, source_platform, seller_sku_id, period, attribution_level) to prevent
  * ReplacingMergeTree key collisions when the same SKU has both posting
  * and standalone (PRODUCT-level) entries:</p>
  * <ul>
@@ -132,9 +132,9 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           %d AS ver
       FROM (
       SELECT
-          connection_id,
           workspace_id,
-          any(source_platform) AS source_platform,
+          source_platform,
+          any(connection_id) AS connection_id,
           seller_sku_id,
           max(product_id) AS product_id,
           period,
@@ -186,8 +186,8 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                   if(cnt_no_cost_profile > 0, 'NO_COST_PROFILE', 'OK')) AS cogs_status
           FROM (
               SELECT
-                  connection_id,
-                  any(workspace_id) AS workspace_id,
+                  workspace_id,
+                  any(connection_id) AS connection_id,
                   source_platform,
                   seller_sku_id,
                   product_id,
@@ -232,7 +232,7 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
                       cogs_status
                   FROM mart_posting_pnl
               ) AS posting_keys
-              GROUP BY connection_id, source_platform, seller_sku_id, product_id, period
+              GROUP BY workspace_id, source_platform, seller_sku_id, product_id, period
           ) AS posting_rollup
 
           UNION ALL
@@ -240,9 +240,9 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           -- Source 2: PRODUCT-level fact_finance entries (not in mart_posting_pnl)
           -- Inner projection so GROUP BY keys match SELECT (CH 24 NOT_AN_AGGREGATE on coalesce).
           SELECT
-              connection_id,
-              any(workspace_id) AS workspace_id,
-              any(source_platform) AS source_platform,
+              workspace_id,
+              source_platform,
+              any(connection_id) AS connection_id,
               seller_sku_id_key AS seller_sku_id,
               0 AS product_id,
               period,
@@ -283,16 +283,16 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
               FROM fact_finance
               WHERE attribution_level = 'PRODUCT'
           ) AS ff_product
-          GROUP BY connection_id, seller_sku_id_key, period
+          GROUP BY workspace_id, source_platform, seller_sku_id_key, period
 
           UNION ALL
 
           -- Source 3: ACCOUNT-level fact_finance entries
           -- Inner projection isolates WHERE from SELECT alias to avoid CH alias shadowing.
           SELECT
-              connection_id,
-              any(workspace_id) AS workspace_id,
-              any(source_platform) AS source_platform,
+              workspace_id,
+              source_platform,
+              any(connection_id) AS connection_id,
               0 AS seller_sku_id,
               0 AS product_id,
               period,
@@ -332,34 +332,40 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
               FROM fact_finance
               WHERE attribution_level = 'ACCOUNT'
           ) AS ff_account
-          GROUP BY connection_id, period
+          GROUP BY workspace_id, source_platform, period
       ) AS raw_union
-      GROUP BY workspace_id, connection_id, seller_sku_id, period, attribution_level
+      GROUP BY workspace_id, source_platform, seller_sku_id, period, attribution_level
       )
       ) AS base
       LEFT JOIN dim_product AS p_by_id ON base.product_id = p_by_id.product_id
+          AND base.workspace_id = p_by_id.workspace_id
       LEFT JOIN (
           SELECT
+              workspace_id,
               seller_sku_id,
               anyLast(sku_code) AS sku_code,
               anyLast(marketplace_sku) AS marketplace_sku,
               anyLast(product_name) AS product_name
           FROM dim_product
-          GROUP BY seller_sku_id
+          GROUP BY workspace_id, seller_sku_id
       ) AS p_by_sku
           ON base.seller_sku_id = p_by_sku.seller_sku_id
+          AND base.workspace_id = p_by_sku.workspace_id
       LEFT JOIN (
           SELECT
-              fa.connection_id,
+              fa.workspace_id,
+              fa.source_platform,
               dp.seller_sku_id,
               toYYYYMM(fa.ad_date) AS period,
               sum(fa.spend) AS ad_spend
           FROM fact_advertising AS fa
           INNER JOIN dim_product AS dp
               ON fa.marketplace_sku = dp.marketplace_sku
-          GROUP BY fa.connection_id, dp.seller_sku_id, period
+              AND fa.workspace_id = dp.workspace_id
+          GROUP BY fa.workspace_id, fa.source_platform, dp.seller_sku_id, period
       ) AS ad_agg
-          ON base.connection_id = ad_agg.connection_id
+          ON base.workspace_id = ad_agg.workspace_id
+          AND base.source_platform = ad_agg.source_platform
           AND base.seller_sku_id = ad_agg.seller_sku_id
           AND base.period = ad_agg.period
       SETTINGS final = 1

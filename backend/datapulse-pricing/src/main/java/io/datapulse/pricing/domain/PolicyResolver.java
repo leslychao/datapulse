@@ -94,6 +94,6 @@ public class PolicyResolver {
                     PricePolicyEntity policy = policyById.get(a.getPricePolicyId());
                     return policy != null ? policy.getPriority() : 0;
                 })
-                .thenComparing(PricePolicyAssignmentEntity::getPricePolicyId, Comparator.reverseOrder());
+                .thenComparing(PricePolicyAssignmentEntity::getPricePolicyId);
     }
 }

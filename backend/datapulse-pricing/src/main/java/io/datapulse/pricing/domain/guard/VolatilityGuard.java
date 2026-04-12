@@ -20,7 +20,7 @@ public class VolatilityGuard implements PricingGuard {
 
     @Override
     public int order() {
-        return 60;
+        return 21;
     }
 
     @Override

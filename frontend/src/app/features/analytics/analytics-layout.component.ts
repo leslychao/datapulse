@@ -170,8 +170,15 @@ export class AnalyticsLayoutComponent {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
-    const tag = (event.target as HTMLElement).tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    const tag = (event.target as HTMLElement)?.tagName;
+    if (
+      tag === 'INPUT' ||
+      tag === 'TEXTAREA' ||
+      tag === 'SELECT' ||
+      (event.target as HTMLElement)?.isContentEditable
+    ) {
+      return;
+    }
 
     const route = AnalyticsLayoutComponent.SHORTCUT_ROUTES[event.key];
     if (route) {
