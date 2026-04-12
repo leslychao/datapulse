@@ -107,3 +107,6 @@ databaseChangeLog:
   - include:
       file: changes/0039-cost-profile-workspace-id.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0040-cost-profile-overlap-constraint.sql
+      relativeToChangelogFile: true

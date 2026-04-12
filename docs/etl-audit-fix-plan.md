@@ -1263,23 +1263,25 @@ WB Statistics API (`/api/v1/supplier/orders`, `/api/v1/supplier/sales`) не и�
 
 ## Порядок реализации (полный, обновлённый)
 
-| Чат | Finding | Severity | Зависимости | Описание |
-|-----|---------|----------|-------------|----------|
-| 1 | F-14 + F-15 | MEDIUM | Нет | Мелкие фиксы — rate limit, index |
-| 2 | F-19 | MEDIUM | Нет | Dead code cleanup |
-| 3 | F-05 | CRITICAL | Нет | Ozon multi-line order grain fix |
-| 4 | F-01 | CRITICAL | Нет | SubSourceRunner batch errors |
-| 5 | F-02 | CRITICAL | Нет | WbFinanceReadAdapter typed errors |
-| 6 | F-04 | CRITICAL | Нет | workspace_id в cost/warehouse |
-| 7 | F-07 | HIGH | F-04 (cost join) | Mart joins → (workspace_id, source_platform) |
-| 8 | F-09 | HIGH | Нет | Ozon FBO date-window |
-| 9 | F-06 | HIGH | F-01 (SubSourceResult) | Unmapped finance types alert |
-| 10 | F-12 | HIGH | F-04 (cost materializer) | Cost watermark |
-| 11 | F-23 | MEDIUM | Нет | cost_profile SCD2 overlap protection |
-| 12 | F-17 | MEDIUM | Нет | Bid queue split |
-| 13 | F-27 | MEDIUM | Нет | WB Orders/Sales pagination verification |
-| 14 | F-13 | HIGH | F-01, F-02, F-04, F-05, F-07 | Tests (после основных фиксов) |
-| 15 | F-03 | CRITICAL | F-06 | Yandex finance normalization |
+> **Статус на 2026-04-12:** 13 из 15 фиксов реализованы. Осталось: F-13 (тесты) и F-27 (верификация WB API).
+
+| Чат | Finding | Severity | Статус | Описание |
+|-----|---------|----------|--------|----------|
+| 1 | F-14 + F-15 | MEDIUM | ✅ DONE | Мелкие фиксы — rate limit, index |
+| 2 | F-19 | MEDIUM | ✅ DONE | Dead code cleanup |
+| 3 | F-05 | CRITICAL | ✅ DONE | Ozon multi-line order grain fix |
+| 4 | F-01 | CRITICAL | ✅ DONE | SubSourceRunner batch errors |
+| 5 | F-02 | CRITICAL | ✅ DONE | WbFinanceReadAdapter typed errors |
+| 6 | F-04 | CRITICAL | ✅ DONE | workspace_id в cost/warehouse |
+| 7 | F-07 | HIGH | ✅ DONE | Mart joins → (workspace_id, source_platform) |
+| 8 | F-09 | HIGH | ✅ DONE | Ozon FBO date-window |
+| 9 | F-06 | HIGH | ✅ DONE | Unmapped finance types alert |
+| 10 | F-12 | HIGH | ✅ DONE | Cost watermark |
+| 11 | F-23 | MEDIUM | ✅ DONE | cost_profile SCD2 overlap protection |
+| 12 | F-17 | MEDIUM | ✅ DONE | Bid queue split |
+| 13 | F-27 | MEDIUM | ⏳ PENDING | WB Orders/Sales pagination verification |
+| 14 | F-13 | HIGH | ⏳ PENDING | Tests (после основных фиксов) |
+| 15 | F-03 | CRITICAL | ✅ DONE | Yandex finance normalization |
 
 ### Findings не требующие фиксов (reassessed)
 

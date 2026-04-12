@@ -1078,10 +1078,12 @@ Pricing run в FULL_AUTO mode отслеживает aggregate metrics по хо
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| POST | `/api/workspaces/{workspaceId}/competitors/match` | PRICING_MANAGER, ADMIN, OWNER | Создать привязку конкурента к offer |
-| GET | `/api/workspaces/{workspaceId}/competitors/matches` | Все роли | Список привязок конкурентов для workspace |
-| POST | `/api/workspaces/{workspaceId}/competitors/observations` | PRICING_MANAGER, ADMIN, OWNER | Добавить наблюдение цены конкурента |
-| POST | `/api/workspaces/{workspaceId}/competitors/upload-csv` | PRICING_MANAGER, ADMIN, OWNER | Массовая загрузка наблюдений из CSV |
+| GET | `/api/workspaces/{workspaceId}/competitors/matches` | Все роли | Список привязок конкурентов (фильтр: `marketplaceOfferId`) |
+| POST | `/api/workspaces/{workspaceId}/competitors/matches` | PRICING_MANAGER, ADMIN, OWNER | Создать привязку конкурента к offer |
+| DELETE | `/api/workspaces/{workspaceId}/competitors/matches/{matchId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить привязку |
+| POST | `/api/workspaces/{workspaceId}/competitors/matches/{matchId}/observations` | PRICING_MANAGER, ADMIN, OWNER | Добавить наблюдение цены конкурента |
+| GET | `/api/workspaces/{workspaceId}/competitors/matches/{matchId}/observations` | Все роли | История наблюдений для привязки |
+| POST | `/api/workspaces/{workspaceId}/competitors/bulk-upload` | PRICING_MANAGER, ADMIN, OWNER | Массовая загрузка наблюдений из CSV (multipart) |
 
 ## Связанные модули
 
