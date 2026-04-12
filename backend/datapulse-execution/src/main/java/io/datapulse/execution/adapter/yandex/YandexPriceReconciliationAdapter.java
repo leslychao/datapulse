@@ -30,7 +30,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class YandexPriceReadAdapter implements PriceReadAdapter {
+public class YandexPriceReconciliationAdapter implements PriceReadAdapter {
 
   private static final String OFFER_PRICES_PATH =
       "/v2/businesses/%d/offer-prices";
