@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Component
 @RequiredArgsConstructor
-public class VolatilityGuard implements BiddingGuard {
+public class BidVolatilityGuard implements BiddingGuard {
 
   private final BiddingProperties biddingProperties;
   private final BidDecisionRepository decisionRepository;

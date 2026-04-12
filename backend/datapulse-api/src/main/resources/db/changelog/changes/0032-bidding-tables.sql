@@ -78,7 +78,7 @@ CREATE TABLE manual_bid_lock (
 
 CREATE UNIQUE INDEX uq_manual_bid_lock_offer
     ON manual_bid_lock(workspace_id, marketplace_offer_id)
-    WHERE expires_at IS NULL OR expires_at > now();
+    WHERE expires_at IS NULL;
 
 --rollback DROP TABLE manual_bid_lock;
 --rollback DROP TABLE bid_decision;

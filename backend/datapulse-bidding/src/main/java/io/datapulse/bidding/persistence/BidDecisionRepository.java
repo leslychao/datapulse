@@ -27,14 +27,12 @@ public interface BidDecisionRepository extends JpaRepository<BidDecisionEntity, 
   Page<BidDecisionEntity> findByWorkspaceIdAndMarketplaceOfferId(
       Long workspaceId, Long marketplaceOfferId, Pageable pageable);
 
-  @Query("""
-      SELECT COUNT(d) FROM BidDecisionEntity d
-      WHERE d.marketplaceOfferId = :offerId
-        AND d.createdAt >= CURRENT_TIMESTAMP - :periodDays * INTERVAL '1 day'
-        AND d.decisionType IN (
-            io.datapulse.bidding.domain.BidDecisionType.BID_UP,
-            io.datapulse.bidding.domain.BidDecisionType.BID_DOWN)
-      """)
+  @Query(value = """
+      SELECT COUNT(*) FROM bid_decision
+      WHERE marketplace_offer_id = :offerId
+        AND created_at >= now() - make_interval(days => :periodDays)
+        AND decision_type IN ('BID_UP', 'BID_DOWN')
+      """, nativeQuery = true)
   int countDirectionChanges(
       @Param("offerId") long marketplaceOfferId,
       @Param("periodDays") int periodDays);

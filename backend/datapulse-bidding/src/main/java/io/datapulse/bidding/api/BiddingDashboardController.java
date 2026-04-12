@@ -19,7 +19,7 @@ public class BiddingDashboardController {
   private final BiddingDashboardService dashboardService;
 
   @GetMapping
-  @PreAuthorize("@workspaceAccessService.canRead(#workspaceId)")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public BiddingDashboardResponse getDashboard(
       @PathVariable("workspaceId") long workspaceId) {
     return dashboardService.getDashboard(workspaceId);

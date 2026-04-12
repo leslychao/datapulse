@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Blocks BID_UP when stock coverage is dangerously low (but not zero —
- * zero stock is handled by {@link StockOutGuard}).
+ * zero stock is handled by {@link BidStockOutGuard}).
  */
 @Component
 @RequiredArgsConstructor

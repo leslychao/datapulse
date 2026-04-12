@@ -9,9 +9,9 @@ import io.datapulse.bidding.domain.BidDecisionType;
 import io.datapulse.bidding.domain.BiddingGuardContext;
 import io.datapulse.bidding.domain.BiddingGuardResult;
 
-class StockOutGuardTest {
+class BidStockOutGuardTest {
 
-  private final StockOutGuard guard = new StockOutGuard();
+  private final BidStockOutGuard guard = new BidStockOutGuard();
 
   @Test
   @DisplayName("blocks BID_UP when stock is depleted (stockDays == 0)")

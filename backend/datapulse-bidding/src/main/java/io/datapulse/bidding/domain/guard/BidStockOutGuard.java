@@ -14,7 +14,7 @@ import io.datapulse.common.error.MessageCodes;
  * HOLD and BID_DOWN remain allowed — seller may still want to lower the bid.
  */
 @Component
-public class StockOutGuard implements BiddingGuard {
+public class BidStockOutGuard implements BiddingGuard {
 
   private static final Set<BidDecisionType> BLOCKED_DECISIONS =
       Set.of(BidDecisionType.BID_UP, BidDecisionType.SET_MINIMUM);

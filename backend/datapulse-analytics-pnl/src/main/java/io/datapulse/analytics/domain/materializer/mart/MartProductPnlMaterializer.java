@@ -240,9 +240,9 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           -- Source 2: PRODUCT-level fact_finance entries (not in mart_posting_pnl)
           -- Inner projection so GROUP BY keys match SELECT (CH 24 NOT_AN_AGGREGATE on coalesce).
           SELECT
+              any(connection_id) AS connection_id,
               workspace_id,
               source_platform,
-              any(connection_id) AS connection_id,
               seller_sku_id_key AS seller_sku_id,
               0 AS product_id,
               period,
@@ -290,9 +290,9 @@ public class MartProductPnlMaterializer implements AnalyticsMaterializer {
           -- Source 3: ACCOUNT-level fact_finance entries
           -- Inner projection isolates WHERE from SELECT alias to avoid CH alias shadowing.
           SELECT
+              any(connection_id) AS connection_id,
               workspace_id,
               source_platform,
-              any(connection_id) AS connection_id,
               0 AS seller_sku_id,
               0 AS product_id,
               period,

@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Component
 @RequiredArgsConstructor
-public class FrequencyGuard implements BiddingGuard {
+public class BidFrequencyGuard implements BiddingGuard {
 
   private final BiddingProperties biddingProperties;
 

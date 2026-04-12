@@ -10,10 +10,10 @@ import io.datapulse.bidding.domain.BidDecisionType;
 import io.datapulse.bidding.domain.BiddingGuardContext;
 import io.datapulse.bidding.domain.BiddingGuardResult;
 
-class FrequencyGuardTest {
+class BidFrequencyGuardTest {
 
   private final BiddingProperties props = new BiddingProperties();
-  private final FrequencyGuard guard = new FrequencyGuard(props);
+  private final BidFrequencyGuard guard = new BidFrequencyGuard(props);
 
   @Test
   @DisplayName("blocks when bid was changed recently (within min interval hours)")
