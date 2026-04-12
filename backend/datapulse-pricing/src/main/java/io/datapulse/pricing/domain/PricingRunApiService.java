@@ -215,10 +215,17 @@ public class PricingRunApiService {
         Map<Long, String> connNames = runReadRepository.findConnectionNames(
                 Set.of(entity.getConnectionId()));
 
+        int simCount = decisionRepository.countSimulatedByRunIds(List.of(entity.getId()))
+                .stream()
+                .filter(r -> ((Long) r[0]).equals(entity.getId()))
+                .map(r -> ((Number) r[1]).intValue())
+                .findFirst()
+                .orElse(0);
+
         return runMapper.toResponse(entity)
                 .withEnrichment(
                         connNames.getOrDefault(entity.getConnectionId(), ""),
-                        0);
+                        simCount);
     }
 
     @Transactional

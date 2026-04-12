@@ -112,7 +112,7 @@ class PricingRunApiServiceTest {
   class GetRun {
 
     @Test
-    @DisplayName("returns response enriched with connection name")
+    @DisplayName("returns response enriched with connection name and simulated count")
     void should_returnResponse_when_runExists() {
       var entity = new PricingRunEntity();
       entity.setId(1L);
@@ -127,10 +127,13 @@ class PricingRunApiServiceTest {
       when(runMapper.toResponse(entity)).thenReturn(baseResponse);
       when(runReadRepository.findConnectionNames(java.util.Set.of(CONNECTION_ID)))
           .thenReturn(Map.of(CONNECTION_ID, "My Shop"));
+      when(decisionRepository.countSimulatedByRunIds(List.of(1L)))
+          .thenReturn(List.<Object[]>of(new Object[]{1L, 5L}));
 
       PricingRunResponse result = service.getRun(1L, WORKSPACE_ID);
 
       assertThat(result.connectionName()).isEqualTo("My Shop");
+      assertThat(result.simulatedDecisionCount()).isEqualTo(5);
     }
 
     @Test

@@ -26,11 +26,15 @@ public class PricingInsightService {
                                                  String insightType,
                                                  Boolean acknowledged,
                                                  Pageable pageable) {
+    if (insightType != null && acknowledged != null) {
+      return insightRepository.findByTypeAndAcknowledged(
+          workspaceId, insightType, acknowledged, pageable);
+    }
     if (insightType != null) {
       return insightRepository.findByType(workspaceId, insightType, pageable);
     }
-    if (acknowledged != null && !acknowledged) {
-      return insightRepository.findUnacknowledged(workspaceId, pageable);
+    if (acknowledged != null) {
+      return insightRepository.findByAcknowledged(workspaceId, acknowledged, pageable);
     }
     return insightRepository.findAllByWorkspaceIdOrderByCreatedAtDesc(workspaceId, pageable);
   }

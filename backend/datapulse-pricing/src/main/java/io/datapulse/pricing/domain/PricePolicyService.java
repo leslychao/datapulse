@@ -298,10 +298,10 @@ public class PricePolicyService {
                     "strategyParams.targetMarginPct is required");
         }
         java.math.BigDecimal pct = params.targetMarginPct();
-        if (pct.compareTo(java.math.BigDecimal.ZERO) < 0
-                || pct.compareTo(java.math.BigDecimal.ONE) >= 0) {
-            throw BadRequestException.of(MessageCodes.VALIDATION_FAILED,
-                    "strategyParams.targetMarginPct must be in [0, 1)");
+        if (pct.compareTo(new java.math.BigDecimal("0.01")) < 0
+                || pct.compareTo(new java.math.BigDecimal("0.80")) > 0) {
+            throw BadRequestException.of(
+                    MessageCodes.PRICING_TARGET_MARGIN_OUT_OF_RANGE);
         }
         if (params.commissionSource() == TargetMarginParams.CommissionSource.MANUAL
                 && params.commissionManualPct() == null) {

@@ -544,6 +544,8 @@
   "pricing.competitor.stale": "Данные о конкурентах старше {{hours}} ч (последнее наблюдение: {{lastObserved}}).",
   "pricing.competitor.untrusted": "Соответствие конкуренту не подтверждено (уровень доверия: {{trustLevel}}).",
 
+  "pricing.validation.target_margin_out_of_range": "Целевая маржа должна быть в диапазоне от 1% до 80%.",
+
   "pricing.policy.not_found": "Ценовая политика не найдена.",
   "pricing.policy.archived": "Невозможно изменить архивную политику.",
   "pricing.policy.invalid_state": "Переход из состояния {{currentState}} в {{targetState}} невозможен.",
@@ -3857,5 +3859,7 @@
   "bidding.detail.explanation_title": "Обоснование последнего решения",
   "bidding.detail.recent_decisions": "Последние решения",
   "bidding.detail.no_decisions": "Нет решений по ставкам для этого товара",
-  "bidding.detail.all_decisions": "Все решения"
+  "bidding.detail.all_decisions": "Все решения",
+
+  "etl.alert.unmapped_finance_types": "Обнаружены неизвестные типы финансовых операций. Данные попали в категорию «Прочее», что может искажать P&L."
 }

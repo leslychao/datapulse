@@ -33,6 +33,30 @@ public interface PricingInsightRepository extends JpaRepository<PricingInsightEn
       @Param("insightType") String insightType,
       Pageable pageable);
 
+  @Query("""
+      SELECT i FROM PricingInsightEntity i
+      WHERE i.workspaceId = :workspaceId
+        AND i.insightType = :insightType
+        AND i.acknowledged = :acknowledged
+      ORDER BY i.createdAt DESC
+      """)
+  Page<PricingInsightEntity> findByTypeAndAcknowledged(
+      @Param("workspaceId") Long workspaceId,
+      @Param("insightType") String insightType,
+      @Param("acknowledged") boolean acknowledged,
+      Pageable pageable);
+
+  @Query("""
+      SELECT i FROM PricingInsightEntity i
+      WHERE i.workspaceId = :workspaceId
+        AND i.acknowledged = :acknowledged
+      ORDER BY i.createdAt DESC
+      """)
+  Page<PricingInsightEntity> findByAcknowledged(
+      @Param("workspaceId") Long workspaceId,
+      @Param("acknowledged") boolean acknowledged,
+      Pageable pageable);
+
   Optional<PricingInsightEntity> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
   long countByWorkspaceIdAndAcknowledgedFalse(Long workspaceId);

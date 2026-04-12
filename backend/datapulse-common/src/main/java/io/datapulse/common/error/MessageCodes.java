@@ -171,6 +171,10 @@ public final class MessageCodes {
     public static final String PRICING_RUN_BLAST_RADIUS_BREACHED = "pricing.run.blast_radius_breached";
     public static final String PRICING_RUN_NO_ACTIVE_ASSIGNMENTS = "pricing.run.no_active_assignments";
 
+    // --- Pricing: Validation ---
+    public static final String PRICING_TARGET_MARGIN_OUT_OF_RANGE =
+            "pricing.validation.target_margin_out_of_range";
+
     // --- Pricing: Impact Preview ---
     public static final String PRICING_PREVIEW_OFFER_INACTIVE = "pricing.preview.offer_inactive";
     public static final String PRICING_PREVIEW_MANUAL_OVERRIDE = "pricing.preview.manual_override";
@@ -286,4 +290,7 @@ public final class MessageCodes {
 
     // --- Common: Concurrent Modification ---
     public static final String CONCURRENT_MODIFICATION = "common.concurrent_modification";
+
+    // --- ETL ---
+    public static final String ETL_UNMAPPED_FINANCE_TYPES = "etl.alert.unmapped_finance_types";
 }

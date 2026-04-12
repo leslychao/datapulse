@@ -53,7 +53,7 @@ public class MarginGuard implements PricingGuard {
 
         BigDecimal threshold = config.effectiveMinMarginPct();
         if (threshold == null) {
-            threshold = BigDecimal.ZERO;
+            return GuardResult.pass(guardName());
         }
 
         if (projectedMargin.compareTo(threshold) < 0) {

@@ -16,6 +16,8 @@ class MarginGuardTest {
 
   private final MarginGuard guard = new MarginGuard();
 
+  private static final BigDecimal THRESHOLD_10_PCT = new BigDecimal("0.10");
+
   @Test
   @DisplayName("guard name is 'margin_guard'")
   void should_returnCorrectName() {
@@ -29,16 +31,35 @@ class MarginGuardTest {
   }
 
   @Nested
-  @DisplayName("when margin guard enabled")
-  class Enabled {
+  @DisplayName("when threshold is null (not configured)")
+  class NullThreshold {
 
     @Test
-    @DisplayName("blocks when margin is negative (target < COGS)")
-    void should_block_when_marginNegative() {
+    @DisplayName("passes regardless of margin value")
+    void should_pass_when_thresholdIsNull() {
+      PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000"));
+      BigDecimal targetPrice = new BigDecimal("500");
+
+      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+
+      assertThat(result.passed()).isTrue();
+    }
+  }
+
+  @Nested
+  @DisplayName("when margin guard enabled with explicit threshold")
+  class Enabled {
+
+    private final GuardConfig configWithThreshold =
+        GuardConfig.DEFAULTS.withMinMarginPct(THRESHOLD_10_PCT);
+
+    @Test
+    @DisplayName("blocks when margin is below threshold")
+    void should_block_when_marginBelowThreshold() {
       PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000"));
       BigDecimal targetPrice = new BigDecimal("800");
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isFalse();
       assertThat(result.reason()).isEqualTo("pricing.guard.margin_below_threshold");
@@ -48,23 +69,23 @@ class MarginGuardTest {
     }
 
     @Test
-    @DisplayName("passes when margin is positive (target > COGS)")
-    void should_pass_when_marginPositive() {
+    @DisplayName("passes when margin is above threshold")
+    void should_pass_when_marginAboveThreshold() {
       PricingSignalSet signals = signalsWithCogs(new BigDecimal("500"));
       BigDecimal targetPrice = new BigDecimal("1000");
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isTrue();
     }
 
     @Test
-    @DisplayName("passes when margin is exactly zero (target == COGS)")
-    void should_pass_when_marginZero() {
-      PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000"));
+    @DisplayName("passes when margin equals threshold exactly")
+    void should_pass_when_marginEqualsThreshold() {
+      PricingSignalSet signals = signalsWithCogs(new BigDecimal("900"));
       BigDecimal targetPrice = new BigDecimal("1000");
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isTrue();
     }
@@ -75,7 +96,7 @@ class MarginGuardTest {
       PricingSignalSet signals = signalsWithCogs(null);
       BigDecimal targetPrice = new BigDecimal("1000");
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isTrue();
     }
@@ -85,7 +106,7 @@ class MarginGuardTest {
     void should_pass_when_targetPriceNull() {
       PricingSignalSet signals = signalsWithCogs(new BigDecimal("500"));
 
-      GuardResult result = guard.check(signals, null, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, null, configWithThreshold);
 
       assertThat(result.passed()).isTrue();
     }
@@ -95,7 +116,7 @@ class MarginGuardTest {
     void should_pass_when_targetPriceZero() {
       PricingSignalSet signals = signalsWithCogs(new BigDecimal("500"));
 
-      GuardResult result = guard.check(signals, BigDecimal.ZERO, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, BigDecimal.ZERO, configWithThreshold);
 
       assertThat(result.passed()).isTrue();
     }
@@ -123,25 +144,28 @@ class MarginGuardTest {
   @DisplayName("edge cases")
   class EdgeCases {
 
-    @Test
-    @DisplayName("blocks when target is barely below COGS (margin = -0.1%)")
-    void should_block_when_slightlyBelowCogs() {
-      PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000.00"));
-      BigDecimal targetPrice = new BigDecimal("999.00");
+    private final GuardConfig configWithThreshold =
+        GuardConfig.DEFAULTS.withMinMarginPct(THRESHOLD_10_PCT);
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+    @Test
+    @DisplayName("blocks when target barely below threshold margin")
+    void should_block_when_slightlyBelowThreshold() {
+      PricingSignalSet signals = signalsWithCogs(new BigDecimal("910.00"));
+      BigDecimal targetPrice = new BigDecimal("1000.00");
+
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isFalse();
       assertThat(result.args()).containsKey("marginPct");
     }
 
     @Test
-    @DisplayName("passes when COGS is zero (margin formula skipped)")
+    @DisplayName("passes when COGS is zero")
     void should_pass_when_cogsIsZero() {
       PricingSignalSet signals = signalsWithCogs(BigDecimal.ZERO);
       BigDecimal targetPrice = new BigDecimal("100");
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isTrue();
     }
@@ -152,11 +176,23 @@ class MarginGuardTest {
       PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000"));
       BigDecimal targetPrice = new BigDecimal("500");
 
-      GuardResult result = guard.check(signals, targetPrice, GuardConfig.DEFAULTS);
+      GuardResult result = guard.check(signals, targetPrice, configWithThreshold);
 
       assertThat(result.passed()).isFalse();
       Object marginPct = result.args().get("marginPct");
       assertThat(marginPct).isNotNull();
+    }
+
+    @Test
+    @DisplayName("blocks when threshold is zero and margin is negative")
+    void should_block_when_thresholdZeroAndMarginNegative() {
+      GuardConfig zeroThreshold = GuardConfig.DEFAULTS.withMinMarginPct(BigDecimal.ZERO);
+      PricingSignalSet signals = signalsWithCogs(new BigDecimal("1000"));
+      BigDecimal targetPrice = new BigDecimal("800");
+
+      GuardResult result = guard.check(signals, targetPrice, zeroThreshold);
+
+      assertThat(result.passed()).isFalse();
     }
   }
 
