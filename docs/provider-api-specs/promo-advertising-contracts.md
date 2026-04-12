@@ -194,6 +194,9 @@ WB promo write body format cannot be fully tested until:
 
 ## 2. WB ADVERTISING (Advert API)
 
+> **Bidding-specific contracts** (change bids, min bids, bid recommendations, campaign management)
+> описаны в отдельном документе: [wb-advertising-bidding-contracts.md](wb-advertising-bidding-contracts.md).
+
 ### 2.1 List Campaigns
 
 | Свойство | Значение | Confidence |
@@ -676,9 +679,12 @@ Authoritative reconciliation occurs at next `PROMO_SYNC`: ETL re-reads products 
 
 ## 4. OZON ADVERTISING (Performance API)
 
+> **Bidding-specific contracts** (set bids, recommended bids, promo products, batch enable/disable)
+> описаны в отдельном документе: [ozon-advertising-bidding-contracts.md](ozon-advertising-bidding-contracts.md).
+
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
-| Status | **NOT IMPLEMENTED** — requires OAuth2 infrastructure | code-verified |
+| Status | **READ IMPLEMENTED** — OAuth2 token + campaigns + stats adapters working | code-verified |
 | Base URL | `https://api-performance.ozon.ru` | confirmed |
 | Auth | **OAuth2 `client_credentials`** (NOT `Client-Id` + `Api-Key`) | confirmed |
 | Rate limit | 100,000 requests/day per Performance account | confirmed-docs |
@@ -688,10 +694,12 @@ Authoritative reconciliation occurs at next `PROMO_SYNC`: ETL re-reads products 
 
 ### Current State
 
-`OzonAdvertisingEventSource` is a **no-op stub** that returns an empty list. Requires:
-1. Separate OAuth2 credentials (client_id + client_secret) from seller.ozon.ru → Settings → API Keys → Performance API
-2. Token exchange implementation
-3. Async report flow (request UUID → poll → download)
+OAuth2 token exchange and read adapters are **fully implemented**:
+- `OzonPerformanceTokenService` — token exchange + caching (25 min TTL)
+- `OzonAdvertisingReadAdapter` — campaigns list + SKU-level statistics
+- `OzonAdvertisingFactSource` — ETL event source (skips if no Performance credentials)
+
+Requires only real Performance API credentials to activate.
 
 **Verification (2026-03-31):**
 - Token endpoint `POST /api/client/token` → 401 `{"error":"invalid_client","error_description":"Client authentication failed"}` (endpoint exists and responds correctly for invalid credentials)
@@ -878,7 +886,395 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 
 ---
 
-## 5. ETL PIPELINE MAPPING
+## 5. YANDEX PROMOTIONS (Business API)
+
+> **Phase E/F scope, not MVP.** Yandex promo integration is planned for later phases.
+> Contracts documented here for completeness and forward planning.
+
+### 5.1 List Promotions
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/promos` | confirmed |
+| Base URL | `https://api.partner.market.yandex.ru` | confirmed |
+| Auth | `Api-Key` header | confirmed |
+| Scope | `pricing`, `pricing:read-only`, `promotion`, `promotion:read-only`, `all-methods` | confirmed-docs |
+| Level | **Business-level** | confirmed-docs |
+
+### Request Body
+
+```json
+{
+  "participation": "PARTICIPATING_NOW",
+  "mechanics": "DIRECT_DISCOUNT"
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `participation` | string | no | Filter: `PARTICIPATING_NOW`, `PARTICIPATED` (last year). Default: all eligible + participating | confirmed-docs |
+| `mechanics` | string | no | Filter by mechanics type | confirmed-docs |
+
+### Mechanics Type Enum
+
+| Value | Semantics | Confidence |
+|-------|-----------|------------|
+| `DIRECT_DISCOUNT` | Direct price discount | confirmed-docs |
+| `BLUE_FLASH` | Flash sale | confirmed-docs |
+| `MARKET_PROMOCODE` | Promo code discount | confirmed-docs |
+
+### Response Structure
+
+```json
+{
+  "status": "OK",
+  "result": {
+    "promos": [
+      {
+        "id": "promo-123",
+        "name": "Весенняя распродажа",
+        "period": {
+          "dateTimeFrom": "2025-03-01T00:00:00Z",
+          "dateTimeTo": "2025-03-31T23:59:59Z"
+        },
+        "participating": true,
+        "assortmentInfo": {
+          "activeOffers": 15,
+          "potentialOffers": 50
+        },
+        "mechanicsInfo": {
+          "type": "DIRECT_DISCOUNT"
+        },
+        "channels": ["MARKET"],
+        "constraints": {
+          "discountPercent": { "min": 10, "max": 95 }
+        }
+      }
+    ]
+  }
+}
+```
+*(synthetic, based on official contract)*
+
+### Response Fields
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `id` | string | Unique promotion ID | confirmed-docs |
+| `name` | string | Promo name | confirmed-docs |
+| `period.dateTimeFrom` | string | Start datetime (ISO 8601) | confirmed-docs |
+| `period.dateTimeTo` | string | End datetime (ISO 8601) | confirmed-docs |
+| `participating` | boolean | Whether seller currently participates | confirmed-docs |
+| `assortmentInfo.activeOffers` | int | Offers currently in promo | confirmed-docs |
+| `assortmentInfo.potentialOffers` | int | Eligible offers | confirmed-docs |
+| `mechanicsInfo.type` | string | Mechanics type enum | confirmed-docs |
+| `channels` | string[] | Promo channels (e.g., `MARKET`) | confirmed-docs |
+| `constraints.discountPercent.min` | number | Minimum required discount % | confirmed-docs |
+| `constraints.discountPercent.max` | number | Maximum allowed discount % | confirmed-docs |
+| `bestsellerInfo` | object | Bestseller promo info (if applicable) | confirmed-docs |
+
+### Pagination
+
+No pagination — returns all matching promos in a single response.
+
+### Rate Limits
+
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Rate limit | 1,000 req/hour | confirmed-docs |
+
+---
+
+### 5.2 Promo Offers (Products in Promo)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/promos/offers` | confirmed |
+| Base URL | `https://api.partner.market.yandex.ru` | confirmed |
+| Auth | `Api-Key` header | confirmed |
+| Scope | `pricing`, `pricing:read-only`, `promotion`, `promotion:read-only`, `all-methods` | confirmed-docs |
+| Level | **Business-level** | confirmed-docs |
+
+### Request Body
+
+```json
+{
+  "promoId": "promo-123",
+  "statusType": "PARTICIPATING"
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `promoId` | string | yes | Target promotion ID | confirmed-docs |
+| `statusType` | string | no | Filter: `PARTICIPATING`, `READY_FOR_PARTICIPATING` | confirmed-docs |
+
+### Response Fields
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `offers[].offerId` | string | Seller's SKU | confirmed-docs |
+| `offers[].participationStatus` | string | `PARTICIPATING`, `READY_FOR_PARTICIPATING` | confirmed-docs |
+| `offers[].currentPrice` | object | Current price | confirmed-docs |
+| `offers[].maxPromoPrice` | number | Max allowed promo price | confirmed-docs |
+
+### Pagination
+
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Type | Cursor-based (`pageToken` + `limit`) | confirmed-docs |
+| Max page size | 500 | confirmed-docs |
+
+---
+
+### 5.3 Update Promo Offers (WRITE)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/promos/offers/update` | confirmed-docs |
+| Level | **Business-level** | confirmed-docs |
+
+### Request Body
+
+```json
+{
+  "promoId": "promo-123",
+  "offers": [
+    {
+      "offerId": "SKU-001",
+      "params": {
+        "discountParams": {
+          "promoPrice": 450
+        }
+      }
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `promoId` | string | yes | Target promotion ID | confirmed-docs |
+| `offers[].offerId` | string | yes | Seller's SKU | confirmed-docs |
+| `offers[].params.discountParams.promoPrice` | number | yes | Promo price (must be ≤ `maxPromoPrice`) | confirmed-docs |
+
+### Constraints
+
+- `promoPrice` must be ≤ `maxPromoPrice` from promo offers response
+- Discount must meet `constraints.discountPercent.min` requirement from promo listing
+
+---
+
+### 5.4 Delete Promo Offers (WRITE)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/promos/offers/delete` | confirmed-docs |
+| Level | **Business-level** | confirmed-docs |
+
+### Request Body
+
+```json
+{
+  "promoId": "promo-123",
+  "offerIds": ["SKU-001", "SKU-002"]
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `promoId` | string | yes | Target promotion ID | confirmed-docs |
+| `offerIds` | string[] | yes | SKUs to remove from promo | confirmed-docs |
+
+---
+
+### 5.5 Canonical Mapping
+
+| Yandex field | → Canonical target | Confidence |
+|---|---|---|
+| `id` (promos) | `dim_promo_campaign.external_campaign_id` | C-docs |
+| `name` | `dim_promo_campaign.name` | C-docs |
+| `period.dateTimeFrom` | `dim_promo_campaign.start_date` | C-docs |
+| `period.dateTimeTo` | `dim_promo_campaign.end_date` | C-docs |
+| `mechanicsInfo.type` | `dim_promo_campaign.promo_type` | C-docs |
+| `participating` | `dim_promo_campaign.is_participating` | C-docs |
+| promo offers `offerId` | `fact_promo_product.offer_id` → lookup → `marketplace_offer_id` | C-docs |
+| promo offers `maxPromoPrice` | `fact_promo_product.max_promo_price` | C-docs |
+| promo offers `participationStatus` | `fact_promo_product.participation_status` | C-docs |
+
+> **Phase E/F scope, not MVP.** Promo sync for Yandex will be implemented when the promo module is extended to support Yandex mechanics.
+
+---
+
+## 6. YANDEX SALES BOOST / ADVERTISING (Business API)
+
+> **Phase E/F scope, not MVP.** Yandex Sales Boost (bidding) integration is planned for later phases.
+> Read contracts documented here; write contracts in [wb-advertising-bidding-contracts.md](wb-advertising-bidding-contracts.md) pattern.
+
+### 6.1 Read Current Bids
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed |
+| Path | `/v2/businesses/{businessId}/bids/info` | confirmed (F-2: empirically discovered) |
+| Base URL | `https://api.partner.market.yandex.ru` | confirmed |
+| Auth | `Api-Key` header | confirmed |
+| Scope | `pricing`, `pricing:read-only`, `promotion`, `promotion:read-only`, `all-methods` | confirmed-docs |
+| Level | **Business-level** | confirmed-docs |
+
+> **CRITICAL (F-2):** Read endpoint is `POST /bids/info`, NOT `POST /bids`. The `/bids` path only accepts `PUT` (write).
+
+### Request Body
+
+```json
+{
+  "skus": ["SKU-001", "SKU-002"]
+}
+```
+
+Empty `skus` (or omitted) returns all SKUs with bids, paginated.
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `skus` | string[] | no | Filter by seller SKUs. Max 500 | confirmed-docs |
+
+### Response Structure
+
+```json
+{
+  "status": "OK",
+  "result": {
+    "bids": [
+      { "sku": "SKU-001", "bid": 570 }
+    ],
+    "paging": { "nextPageToken": "eyJ..." }
+  }
+}
+```
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `bids[].sku` | string | Seller's SKU (= `offerId` from catalog) | confirmed-docs |
+| `bids[].bid` | integer | Bid value (0–9999) | confirmed-docs |
+
+### Bid Semantics
+
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Encoding | Percent of item cost × 100 (e.g., 570 = 5.7%) | confirmed-docs |
+| Min effective | 50 (0.5%) | confirmed-docs |
+| Max | 9999 (99.99%) | confirmed-docs |
+| 0 | No bid set | confirmed-docs |
+
+### Pagination
+
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Type | Cursor-based (`pageToken` + `limit`) | confirmed-docs |
+| Default page size | 250 | confirmed-docs |
+| Max page size | 500 | confirmed-docs |
+| When `skus` specified | Single page, ignores `pageToken`/`limit` | confirmed-docs |
+
+### Rate Limits
+
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Rate limit | 500 req/min (1,000 with subscription) | confirmed-docs |
+| Until 18.05.2026 | 1,000 req/min (old limit) | confirmed-docs |
+
+### Known Limitation
+
+Only returns bids set via API — bids set in Yandex Partner cabinet are NOT returned (confirmed-docs).
+
+---
+
+### 6.2 Bid Recommendations
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/bids/recommendations` | confirmed-docs |
+| Level | **Business-level** | confirmed-docs |
+
+Returns recommended bid values per SKU, including `minBid`, `maxBid`, `currentBid`.
+
+### Request Body
+
+```json
+{
+  "skus": ["SKU-001", "SKU-002"]
+}
+```
+
+### Response Fields
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `recommendations[].sku` | string | Seller's SKU | confirmed-docs |
+| `recommendations[].minBid` | integer | Minimum effective bid | confirmed-docs |
+| `recommendations[].maxBid` | integer | Maximum recommended bid | confirmed-docs |
+| `recommendations[].currentBid` | integer | Current bid value | confirmed-docs |
+
+---
+
+### 6.3 Set Bids (WRITE)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `PUT` | confirmed (empirically discovered) |
+| Path | `/v2/businesses/{businessId}/bids` | confirmed |
+| Level | **Business-level** | confirmed-docs |
+| Scope | `pricing`, `promotion`, `all-methods` | confirmed-docs |
+
+### Request Body
+
+```json
+{
+  "bids": [
+    { "sku": "SKU-001", "bid": 570 }
+  ]
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `bids[].sku` | string | yes | Seller's SKU | confirmed-docs |
+| `bids[].bid` | integer | yes | Bid value (0–9999). Set to 0 to remove bid | confirmed-docs |
+
+### Response
+
+```json
+{
+  "status": "OK"
+}
+```
+
+### Idempotency
+
+Last-write-wins. Setting same bid value is a no-op (accepted without error).
+
+---
+
+### 6.4 Canonical Mapping
+
+| Yandex field | → Canonical target | Confidence |
+|---|---|---|
+| `bids[].sku` | `marketplace_offer` via `offerId` join | C-docs |
+| `bids[].bid` | `fact_advertising.bid_value` (if modeled) | A |
+| recommendations `minBid` / `maxBid` | Used by autobidding algorithm, not persisted | A |
+
+**Join key:** `bids[].sku` = catalog `offer.offerId` = `marketplace_offer.external_sku` or via `seller_sku.sku_code` lookup.
+
+> **Phase E/F scope, not MVP.** Yandex Sales Boost bidding will be integrated as part of the autobidding module.
+> Existing WB/Ozon bidding patterns (see dedicated bidding contracts docs) serve as implementation reference.
+
+---
+
+## 7. ETL PIPELINE MAPPING
 
 ### Event Sources
 
@@ -890,6 +1286,9 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 | `OzonPromoActionProductsEventSource` | `PROMO_SYNC` | OZON | `raw_ozon_action_products` | 1 |
 | `WbAdvertisingEventSource` | `ADVERTISING_FACT` | WB | `raw_wb_advertising_fullstats` | 0 |
 | `OzonAdvertisingEventSource` | `ADVERTISING_FACT` | OZON | (stub — empty) | 0 |
+| `YandexPromoEventSource` | `PROMO_SYNC` | YANDEX_MARKET | `raw_yandex_promos` | 0 |
+| `YandexPromoOffersEventSource` | `PROMO_SYNC` | YANDEX_MARKET | `raw_yandex_promo_offers` | 1 |
+| `YandexBidsEventSource` | `ADVERTISING_FACT` | YANDEX_MARKET | `raw_yandex_bids` | 0 |
 
 ### Materialization Handlers
 
@@ -899,6 +1298,8 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 | `PromoOzonMaterializationHandler` | `dim_promo_campaign` + `fact_promo_product` |
 | `AdvertisingFactWildberriesMaterializationHandler` | `dim_advertising_campaign` + `fact_advertising` |
 | `AdvertisingFactOzonMaterializationHandler` | `dim_advertising_campaign` + `fact_advertising` |
+| `PromoYandexMaterializationHandler` | `dim_promo_campaign` + `fact_promo_product` |
+| `AdvertisingFactYandexMaterializationHandler` | `dim_advertising_campaign` + `fact_advertising` |
 
 > **Naming decision (DD-AD-3):** Target table is `fact_advertising` (not `fact_advertising_costs`),
 > because fullstats contains not only costs but also views, clicks, orders, conversions.
@@ -906,7 +1307,7 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 
 ---
 
-## 6. FINDINGS & CRITICAL ISSUES
+## 8. FINDINGS & CRITICAL ISSUES
 
 ### F-1: WB Advertising Campaigns Endpoint Migration (CRITICAL — blocks Phase B)
 
@@ -933,19 +1334,20 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 5. Skip current-day queries (returns 0 for some metrics)
 6. New grain: product-level daily breakdown (nmId available in response)
 
-### F-3: Ozon Advertising — OAuth2 Not Implemented (HIGH — blocks Phase B extended) — ENDPOINT VERIFIED
+### F-3: Ozon Advertising — OAuth2 Implemented, Credentials Needed (MEDIUM) — UPDATED 2026-04-12
 
-**Finding:** The Ozon Performance API requires OAuth2 client_credentials flow on a separate host (`api-performance.ozon.ru`).
+**Finding:** OAuth2 infrastructure is **fully implemented** in code:
+- `OzonPerformanceTokenService` — token exchange + Caffeine cache (25 min TTL)
+- `OzonAdvertisingReadAdapter` — campaigns + SKU-level statistics capture
+- `CredentialResolver.resolvePerformanceCredentials()` — vault integration
+- `OzonPerformanceCampaignDto`, `OzonPerformanceStatDto` — DTOs ready
+
 **Verification (2026-03-31):** Token endpoint `POST /api/client/token` returns proper 401 for invalid creds (endpoint confirmed accessible). Old host `performance.ozon.ru` returns 404 (migration confirmed).
-**Impact:** No Ozon advertising data is being ingested. **Not a code blocker** — only credentials needed.
+**Impact:** Code is ready, but no data is being ingested because real credentials are not provisioned.
 **Remaining work:**
-1. OAuth2 token exchange implementation (§4.1) — endpoint verified, standard `client_credentials` flow
-2. Token caching (30 min TTL) in Redis or in-memory
-3. `secret_reference` extension: `secret_type = OZON_PERFORMANCE_OAUTH2`
-4. Async report flow: request UUID → poll → download (§4.3)
-5. Campaign list adapter (§4.2)
-6. **Obtain real Performance API credentials** from seller.ozon.ru → Settings → API Keys → Performance API
-7. Empirical verification of report schemas with real credentials
+1. **Obtain real Performance API credentials** from seller.ozon.ru → Settings → API Keys → Performance API
+2. Empirical verification of campaign/stats response schemas with real credentials
+3. For autobidding: implement bidding write adapters (see [ozon-advertising-bidding-contracts.md](ozon-advertising-bidding-contracts.md))
 
 ### F-4: DTO Expansion Required (MEDIUM — blocks Phase B)
 
@@ -961,18 +1363,22 @@ Product-level breakdown (sku-level): available through report types 2 and 4. Joi
 
 ---
 
-## 7. SUMMARY STATUS
+## 9. SUMMARY STATUS
 
-| Capability | WB | Ozon | Phase | Status |
-|------------|-----|------|-------|--------|
-| Promo list | **READY** (verified) | **READY** (verified) | F | Both working |
-| Promo details | READY (code-verified) | N/A | F | — |
-| Promo products | READY (code-verified) | READY (code-verified) | F | Need data verification |
-| Promo candidates | N/A | READY (code-verified) | F | — |
-| Ad campaigns (dim) | **NEEDS WORK** (F-1, F-4) | **NEEDS WORK** (F-3) | **B** | DTO expansion + OAuth2 credentials |
-| Ad stats (fact) | **READY** (v3 endpoint verified) | **NEEDS WORK** (F-3) | **B** | v3 GET confirmed; Ozon needs OAuth2 credentials |
+| Capability | WB | Ozon | Yandex | Phase | Status |
+|------------|-----|------|--------|-------|--------|
+| Promo list | **READY** (verified) | **READY** (verified) | **READY** (docs) | F | All three documented |
+| Promo details | READY (code-verified) | N/A | N/A | F | — |
+| Promo products | READY (code-verified) | READY (code-verified) | READY (docs) | F | Need data verification |
+| Promo candidates | N/A | READY (code-verified) | N/A | F | — |
+| Promo write (update/delete) | N/A | N/A | READY (docs) | E/F | — |
+| Ad campaigns (dim) | **NEEDS WORK** (F-1, F-4) | **READY** (code implemented, needs credentials) | N/A | **B** | WB: DTO expansion; Ozon: get real credentials |
+| Ad stats (fact) | **READY** (v3 endpoint verified) | **READY** (code implemented, needs credentials) | N/A | **B** | v3 GET confirmed; Ozon: code ready, needs credentials |
+| Bids read | N/A | N/A | **READY** (endpoint confirmed) | E/F | F-2: bids/info confirmed |
+| **Bidding write (ставки)** | **DOCUMENTED** | **DOCUMENTED** | **DOCUMENTED** (PUT /bids) | **Bidding MVP** | See dedicated bidding contracts docs |
+| **Bid recommendations** | **DOCUMENTED** | **DOCUMENTED** | **DOCUMENTED** | **Bidding MVP** | See dedicated bidding contracts docs |
 
-## 8. DESIGN DECISIONS
+## 10. DESIGN DECISIONS
 
 ### DD-AD-1: No canonical entity for advertising — RESOLVED
 

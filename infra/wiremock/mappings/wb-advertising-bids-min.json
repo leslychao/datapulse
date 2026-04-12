@@ -1,0 +1,14 @@
+{
+  "name": "WB Advertising — Minimum Bids for Product Cards (advert-api)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/advert/v1/bids/min"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-advertising-bids-min.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

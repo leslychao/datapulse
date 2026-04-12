@@ -1,0 +1,47 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "warehouses": [
+      {
+        "id": 70001,
+        "name": "Ростов-на-Дону (Аксай)",
+        "address": {
+          "city": "Аксай",
+          "street": "ул. Промышленная",
+          "number": "1",
+          "gps": {
+            "latitude": 47.27,
+            "longitude": 39.87
+          }
+        }
+      },
+      {
+        "id": 70002,
+        "name": "Москва (Софьино)",
+        "address": {
+          "city": "Софьино",
+          "street": "ул. Складская",
+          "number": "5",
+          "gps": {
+            "latitude": 55.45,
+            "longitude": 37.91
+          }
+        }
+      },
+      {
+        "id": 70003,
+        "name": "Екатеринбург (Берёзовский)",
+        "address": {
+          "city": "Берёзовский",
+          "street": "ул. Логистическая",
+          "number": "12",
+          "gps": {
+            "latitude": 56.91,
+            "longitude": 60.80
+          }
+        }
+      }
+    ]
+  }
+}

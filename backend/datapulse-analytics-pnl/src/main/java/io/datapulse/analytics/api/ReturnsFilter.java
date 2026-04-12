@@ -9,6 +9,7 @@ public record ReturnsFilter(
         LocalDate to,
         String period,
         String search,
+        String sourcePlatform,
         TrendGranularity granularity
 ) {
 

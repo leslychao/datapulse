@@ -4,6 +4,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 
 import { GridStore } from '@shared/stores/grid.store';
 import { RbacService } from '@core/auth/rbac.service';
+import { MARKETPLACE_REGISTRY } from '@core/models';
 import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/filter-bar.component';
 import { SearchInputComponent } from '@shared/components/form/search-input.component';
 
@@ -132,10 +133,7 @@ export class GridToolbarComponent {
       key: 'marketplaceType',
       label: 'grid.filter.marketplace',
       type: 'multi-select',
-      options: [
-        { value: 'WB', label: 'Wildberries' },
-        { value: 'OZON', label: 'Ozon' },
-      ],
+      options: MARKETPLACE_REGISTRY.map(m => ({ value: m.type, label: m.label })),
     },
     {
       key: 'status',

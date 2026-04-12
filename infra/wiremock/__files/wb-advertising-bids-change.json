@@ -1,0 +1,19 @@
+{
+  "bids": [
+    {
+      "advert_id": 100001,
+      "nm_bids": [
+        {
+          "nm_id": 274849,
+          "bid_kopecks": 350,
+          "placement": "search"
+        },
+        {
+          "nm_id": 275100,
+          "bid_kopecks": 280,
+          "placement": "recommendations"
+        }
+      ]
+    }
+  ]
+}

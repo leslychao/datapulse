@@ -92,29 +92,29 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
         @if (invitations.length === 0) {
           <dp-empty-state [message]="'settings.invitations.empty' | translate" />
         } @else {
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-sm">
+          <div class="dp-table-wrap">
+            <table class="dp-table">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.invitations.col_email' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.invitations.col_role' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.invitations.col_status' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.invitations.col_created' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.invitations.col_expires' | translate }}</th>
-                  <th class="px-4 py-2"></th>
+                <tr>
+                  <th>{{ 'settings.invitations.col_email' | translate }}</th>
+                  <th>{{ 'settings.invitations.col_role' | translate }}</th>
+                  <th>{{ 'settings.invitations.col_status' | translate }}</th>
+                  <th>{{ 'settings.invitations.col_created' | translate }}</th>
+                  <th>{{ 'settings.invitations.col_expires' | translate }}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 @for (inv of invitations; track inv.id) {
-                  <tr class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]">
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ inv.email }}</td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ inv.role | dpRoleLabel }}</td>
-                    <td class="px-4 py-2.5">
+                  <tr>
+                    <td class="text-[var(--text-primary)]">{{ inv.email }}</td>
+                    <td class="text-[var(--text-secondary)]">{{ inv.role | dpRoleLabel }}</td>
+                    <td>
                       <dp-status-badge [label]="invStatusLabel(inv.status)" [color]="invStatusColor(inv.status)" />
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ inv.createdAt | dpDateFormat:'short' }}</td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ inv.expiresAt | dpDateFormat:'short' }}</td>
-                    <td class="px-4 py-2.5 text-right">
+                    <td class="text-[var(--text-secondary)]">{{ inv.createdAt | dpDateFormat:'short' }}</td>
+                    <td class="text-[var(--text-secondary)]">{{ inv.expiresAt | dpDateFormat:'short' }}</td>
+                    <td class="text-right">
                       @if (inv.status === 'PENDING') {
                         <div class="flex items-center justify-end gap-2">
                           <button

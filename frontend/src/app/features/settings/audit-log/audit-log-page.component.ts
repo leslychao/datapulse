@@ -62,44 +62,44 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
             (action)="onFiltersChanged({})"
           />
         } @else {
-          <div class="mt-4 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-sm">
+          <div class="mt-4 dp-table-wrap">
+            <table class="dp-table">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="w-8 px-2 py-2"></th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_time' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_user' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_action' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_entity' | translate }}</th>
-                  <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">{{ 'settings.audit_log.col_outcome' | translate }}</th>
+                <tr>
+                  <th class="w-8 px-2"></th>
+                  <th>{{ 'settings.audit_log.col_time' | translate }}</th>
+                  <th>{{ 'settings.audit_log.col_user' | translate }}</th>
+                  <th>{{ 'settings.audit_log.col_action' | translate }}</th>
+                  <th>{{ 'settings.audit_log.col_entity' | translate }}</th>
+                  <th class="text-center">{{ 'settings.audit_log.col_outcome' | translate }}</th>
                 </tr>
               </thead>
               <tbody>
                 @for (entry of page.content; track entry.id) {
                   <tr
-                    class="border-b border-[var(--border-subtle)] cursor-pointer transition-colors hover:bg-[var(--bg-secondary)]"
+                    class="cursor-pointer"
                     [class.bg-[var(--bg-secondary)]]="expandedId() === entry.id"
                     (click)="toggleExpand(entry.id)"
                   >
-                    <td class="px-2 py-2.5 text-center text-[var(--text-tertiary)]">
+                    <td class="px-2 text-center text-[var(--text-tertiary)]">
                       <lucide-icon
                         [img]="expandedId() === entry.id ? ChevronDownIcon : ChevronRightIcon"
                         [size]="14"
                       />
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">
+                    <td class="text-[var(--text-primary)]">
                       {{ entry.createdAt | dpDateFormat:'full' }}
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">
+                    <td class="text-[var(--text-primary)]">
                       {{ actorDisplayName(entry) }}
                     </td>
-                    <td class="px-4 py-2.5 font-mono text-[var(--text-secondary)]">
-                      {{ entry.actionType }}
+                    <td class="text-[var(--text-secondary)]">
+                      {{ translateEnum('settings.audit_log.action_type.', entry.actionType) }}
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">
-                      {{ entry.entityType }}{{ entry.entityId ? '#' + entry.entityId : '' }}
+                    <td class="text-[var(--text-secondary)]">
+                      {{ translateEnum('settings.audit_log.entity_type.', entry.entityType) }}{{ entry.entityId ? '#' + entry.entityId : '' }}
                     </td>
-                    <td class="px-4 py-2.5 text-center">
+                    <td class="text-center">
                       <dp-status-badge
                         [label]="outcomeLabel(entry.outcome)"
                         [color]="outcomeColor(entry.outcome)"
@@ -134,7 +134,7 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
                           </div>
                           <div>
                             <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.entity_type' | translate }}:</span>
-                            <span class="ml-2 text-[var(--text-primary)]">{{ entry.entityType }}</span>
+                            <span class="ml-2 text-[var(--text-primary)]">{{ translateEnum('settings.audit_log.entity_type.', entry.entityType) }}</span>
                           </div>
                           <div>
                             <span class="text-[var(--text-tertiary)]">{{ 'settings.audit_log.detail.entity_id' | translate }}:</span>
@@ -324,6 +324,12 @@ export class AuditLogPageComponent {
 
   outcomeColor(outcome: AuditOutcome): StatusColor {
     return OUTCOME_COLORS[outcome] ?? 'neutral';
+  }
+
+  translateEnum(prefix: string, value: string): string {
+    const key = prefix + value;
+    const translated = this.translate.instant(key);
+    return translated === key ? value : translated;
   }
 
   toggleExpand(id: number): void {

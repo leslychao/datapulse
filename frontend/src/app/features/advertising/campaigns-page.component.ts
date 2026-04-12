@@ -12,6 +12,7 @@ import { ColDef, GridApi, ValueFormatterParams } from 'ag-grid-community';
 import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AdvertisingApiService } from '@core/api/advertising-api.service';
+import { MarketplaceType, getMarketplaceConfig } from '@core/models';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import {
@@ -202,12 +203,9 @@ export class CampaignsPageComponent {
       headerTooltip: this.t.instant('advertising.campaigns.col.platform'),
       width: 90,
       cellRenderer: (p: { value: string }) => {
-        const cls = p.value === 'WB'
-          ? 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]'
-          : p.value === 'OZON'
-            ? 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]'
-            : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
-        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${p.value}</span>`;
+        const mc = getMarketplaceConfig(p.value as MarketplaceType);
+        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium"
+          style="background:${mc.badgeBg}22;color:${mc.badgeBg}">${mc.shortLabel}</span>`;
       },
     },
     {

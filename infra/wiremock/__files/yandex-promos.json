@@ -1,0 +1,38 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "promos": [
+      {
+        "promoId": "PROMO-600001",
+        "name": "Весенняя распродажа",
+        "status": "ACTIVE",
+        "channels": ["MARKET"],
+        "startDate": "2026-04-01",
+        "endDate": "2026-04-30",
+        "mechanicsType": "DIRECT_DISCOUNT",
+        "participationType": "AUTO"
+      },
+      {
+        "promoId": "PROMO-600002",
+        "name": "Кэшбэк на инструменты",
+        "status": "ACTIVE",
+        "channels": ["MARKET"],
+        "startDate": "2026-04-10",
+        "endDate": "2026-04-20",
+        "mechanicsType": "PARTNER_STANDART_CASHBACK",
+        "participationType": "MANUAL"
+      },
+      {
+        "promoId": "PROMO-600003",
+        "name": "Флеш-распродажа",
+        "status": "FINISHED",
+        "channels": ["MARKET"],
+        "startDate": "2026-03-15",
+        "endDate": "2026-03-17",
+        "mechanicsType": "CHEAPEST_AS_GIFT",
+        "participationType": "AUTO"
+      }
+    ]
+  }
+}

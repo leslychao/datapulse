@@ -63,7 +63,7 @@ public class ReturnsReadRepository {
         AND period = :period
       """;
 
-  private static final String REASON_BREAKDOWN_SQL = """
+  private static final String REASON_BREAKDOWN_BASE = """
       SELECT
           return_reason,
           count() AS cnt,
@@ -72,13 +72,9 @@ public class ReturnsReadRepository {
       FROM fact_returns
       WHERE workspace_id = :workspaceId
         AND toYYYYMM(return_date) = :period
-      GROUP BY return_reason
-      ORDER BY cnt DESC
-      LIMIT 10
-      SETTINGS final = 1
       """;
 
-  private static final String REASONS_SQL = """
+  private static final String REASONS_BASE = """
       SELECT
           return_reason,
           count() AS cnt,
@@ -88,9 +84,6 @@ public class ReturnsReadRepository {
       FROM fact_returns
       WHERE workspace_id = :workspaceId
         AND toYYYYMM(return_date) = :period
-      GROUP BY return_reason
-      ORDER BY cnt DESC
-      SETTINGS final = 1
       """;
 
   private static final String BY_PRODUCT_SQL = """
@@ -201,11 +194,16 @@ public class ReturnsReadRepository {
         (rs, rowNum) -> rs.getBigDecimal("return_rate_pct"));
   }
 
-  public List<ReasonRow> findReasonBreakdown(long workspaceId, int period) {
+  public List<ReasonRow> findReasonBreakdown(long workspaceId, int period,
+      ReturnsFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId)
         .addValue("period", period);
+    var sb = new StringBuilder(REASON_BREAKDOWN_BASE);
+    appendPlatformFilter(sb, params, filter);
+    sb.append(" GROUP BY return_reason ORDER BY cnt DESC LIMIT 10");
+    sb.append(SETTINGS_FINAL);
 
-    return jdbc.ch().query(REASON_BREAKDOWN_SQL, params,
+    return jdbc.ch().query(sb.toString(), params,
         (rs, rowNum) -> new ReasonRow(
             rs.getString("return_reason"),
             rs.getInt("cnt"),
@@ -213,11 +211,16 @@ public class ReturnsReadRepository {
             rs.getInt("product_count")));
   }
 
-  public List<FullReasonRow> findReasons(long workspaceId, int period) {
+  public List<FullReasonRow> findReasons(long workspaceId, int period,
+      ReturnsFilter filter) {
     var params = new MapSqlParameterSource("workspaceId", workspaceId)
         .addValue("period", period);
+    var sb = new StringBuilder(REASONS_BASE);
+    appendPlatformFilter(sb, params, filter);
+    sb.append(" GROUP BY return_reason ORDER BY cnt DESC");
+    sb.append(SETTINGS_FINAL);
 
-    return jdbc.ch().query(REASONS_SQL, params,
+    return jdbc.ch().query(sb.toString(), params,
         (rs, rowNum) -> new FullReasonRow(
             rs.getString("return_reason"),
             rs.getInt("cnt"),
@@ -286,6 +289,15 @@ public class ReturnsReadRepository {
       sb.append(" AND period = :period");
       params.addValue("period", periodInt);
     }
+    appendPlatformFilter(sb, params, filter);
+  }
+
+  private void appendPlatformFilter(StringBuilder sb, MapSqlParameterSource params,
+      ReturnsFilter filter) {
+    if (filter.sourcePlatform() != null && !filter.sourcePlatform().isBlank()) {
+      sb.append(" AND source_platform = :sourcePlatform");
+      params.addValue("sourcePlatform", filter.sourcePlatform().trim());
+    }
   }
 
   private void appendSearchFilter(StringBuilder sb, MapSqlParameterSource params,
@@ -316,6 +328,10 @@ public class ReturnsReadRepository {
     if (to != null) {
       sb.append(" AND ").append(column).append(" <= :dateTo");
       params.addValue("dateTo", to);
+    }
+    if (filter.sourcePlatform() != null && !filter.sourcePlatform().isBlank()) {
+      sb.append(" AND source_platform = :sourcePlatform");
+      params.addValue("sourcePlatform", filter.sourcePlatform().trim());
     }
     return sb.toString();
   }

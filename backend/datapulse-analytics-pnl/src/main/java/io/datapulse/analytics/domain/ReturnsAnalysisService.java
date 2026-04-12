@@ -40,7 +40,7 @@ public class ReturnsAnalysisService {
     BigDecimal returnRateDeltaPct = null;
 
     if (currentPeriod != null) {
-      reasonBreakdown = buildReasonBreakdown(workspaceId, currentPeriod);
+      reasonBreakdown = buildReasonBreakdown(workspaceId, currentPeriod, filter);
       returnRateDeltaPct = calculateDelta(workspaceId, currentPeriod, summary.returnRatePct());
     }
 
@@ -84,7 +84,7 @@ public class ReturnsAnalysisService {
       return List.of();
     }
 
-    List<FullReasonRow> rows = returnsReadRepository.findReasons(workspaceId, currentPeriod);
+    List<FullReasonRow> rows = returnsReadRepository.findReasons(workspaceId, currentPeriod, filter);
     int totalCount = rows.stream().mapToInt(FullReasonRow::count).sum();
 
     if (totalCount == 0) {
@@ -104,8 +104,9 @@ public class ReturnsAnalysisService {
         .toList();
   }
 
-  private List<ReasonBreakdownItem> buildReasonBreakdown(long workspaceId, int period) {
-    List<ReasonRow> rows = returnsReadRepository.findReasonBreakdown(workspaceId, period);
+  private List<ReasonBreakdownItem> buildReasonBreakdown(long workspaceId, int period,
+      ReturnsFilter filter) {
+    List<ReasonRow> rows = returnsReadRepository.findReasonBreakdown(workspaceId, period, filter);
     int totalCount = rows.stream().mapToInt(ReasonRow::count).sum();
 
     if (totalCount == 0) {
@@ -156,7 +157,8 @@ public class ReturnsAnalysisService {
     }
     LocalDate from = period.atDay(1);
     LocalDate to = period.atEndOfMonth();
-    return new ReturnsFilter(from, to, filter.period(), filter.search(), filter.granularity());
+    return new ReturnsFilter(from, to, filter.period(), filter.search(),
+        filter.sourcePlatform(), filter.granularity());
   }
 
   private YearMonth parseYearMonth(String period) {

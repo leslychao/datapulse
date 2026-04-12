@@ -326,7 +326,196 @@ This endpoint (documented in `ozon-read-contracts.md` §2 PRICES) serves as the 
 
 ---
 
-## 3. ARCHITECTURE MAPPING
+## 3. YANDEX MARKET — PRICE UPDATE (synchronous)
+
+### 3.1 Write Endpoint — Set Prices for All Stores
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/offer-prices/updates` | confirmed-docs |
+| Base URL | `https://api.partner.market.yandex.ru` | confirmed |
+| Auth | `Api-Key` header | confirmed |
+| Token scope | `pricing`, `all-methods` | confirmed-docs |
+| Execution model | **Synchronous** — returns 200 OK on acceptance | confirmed-docs |
+| Level | **Business-level** (applies to all stores in cabinet) | confirmed-docs |
+
+### Request Structure
+
+```json
+{
+  "offers": [
+    {
+      "offerId": "SKU-001",
+      "price": {
+        "value": 5000,
+        "currencyId": "RUR",
+        "discountBase": 6000,
+        "minimumForBestseller": 4500
+      }
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Semantics | Confidence |
+|-------|------|----------|-----------|------------|
+| `offers` | array | yes | Array of price items (max 500) | confirmed-docs |
+| `offers[].offerId` | string | yes | Seller's SKU (1–255 chars) | confirmed-docs |
+| `offers[].price.value` | number | yes | Base sale price (> 0) | confirmed-docs |
+| `offers[].price.currencyId` | string | no | Currency code (default: `RUR`) | confirmed-docs |
+| `offers[].price.discountBase` | number | no | Crossed-out price (discount 5–99%) | confirmed-docs |
+| `offers[].price.minimumForBestseller` | number | no | Min price for "Bestsellers" promo | confirmed-docs |
+
+**Implementation notes:**
+- `offerId` uniqueness within request is required — duplicate SKUs in same request will error
+- `value` must be > 0 (exclusive minimum)
+- `discountBase` must be integer, and discount must be between 5% and 99%
+- `minimumForBestseller` — price ceiling for automatic participation in "Бестселлеры Маркета" promo. If omitted, any previously set value is removed
+- Currency `RUR` = Russian Rubles (Yandex convention, equivalent to `RUB`)
+- Data update is **not instantaneous** — takes up to several minutes
+
+### Response Structure
+
+```json
+{
+  "status": "OK"
+}
+```
+
+| Field | Type | Semantics | Confidence |
+|-------|------|-----------|------------|
+| `status` | string | `"OK"` = accepted, `"ERROR"` = failed | confirmed-docs |
+
+**NOTE:** Unlike Ozon (which returns per-item success/failure), Yandex returns a blanket OK/ERROR. No per-item granularity in response.
+
+### Price Quarantine Semantics
+
+After price update, Yandex may **quarantine** the new price if it looks suspicious (e.g., dramatic price drop). Quarantined prices are NOT immediately visible to buyers.
+
+| Property | Value | Confidence |
+|----------|-------|------------|
+| Quarantine check endpoint | `POST /v2/businesses/{businessId}/price-quarantine` | confirmed-docs |
+| Quarantine confirmation | `POST /v2/businesses/{businessId}/price-quarantine/confirm` | confirmed-docs |
+| Auto-resolution | Quarantine auto-resolves after review period (undocumented duration) | assumed |
+
+**Impact:** After price write, adapter should check quarantine status. If price is quarantined, reconciliation status = `RECONCILIATION_PENDING` until quarantine resolves.
+
+### Error Handling
+
+| Scenario | HTTP Status | Response | Confidence |
+|----------|-------------|----------|------------|
+| Success | 200 | `{"status": "OK"}` | confirmed-docs |
+| Invalid request body | 400 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+| Invalid/missing token | 401 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+| Wrong scope / forbidden | 403 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+| Resource not found | 404 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+| Rate limit exceeded | 420 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+| Store locked | 423 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+| Internal error | 500 | `{"status": "ERROR", "errors": [...]}` | confirmed-docs |
+
+### 3.2 Reconciliation Read — View Current Prices
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `POST` | confirmed-docs |
+| Path | `/v2/businesses/{businessId}/offer-prices` | confirmed |
+| Base URL | `https://api.partner.market.yandex.ru` | confirmed |
+| Auth | `Api-Key` header | confirmed |
+| Token scope | `pricing`, `pricing:read-only`, `all-methods` | confirmed-docs |
+
+Returns prices currently set via API. Used for read-after-write verification.
+
+### Reconciliation Logic (recommended)
+
+```
+1. Write: POST /v2/businesses/{businessId}/offer-prices/updates → status=OK
+2. Wait: 30–60 seconds (data update is not instantaneous)
+3. Check quarantine: POST /v2/businesses/{businessId}/price-quarantine
+4. Verify: POST /v2/businesses/{businessId}/offer-prices (filter by offerId)
+5. Assert: response price == sentPrice
+6. If quarantined: → RECONCILIATION_PENDING (wait for quarantine resolution)
+7. If mismatch: → RECONCILIATION_FAILED
+```
+
+### 3.3 Error Classification
+
+| Error class | HTTP codes | Retryable | Action | Confidence |
+|---|---|---|---|---|
+| Client error | 400 | No | Fix request payload | confirmed-docs |
+| Auth error | 401, 403 | No | Check token scope | confirmed-docs |
+| Not found | 404 | No | Check businessId | confirmed-docs |
+| Rate limited | 420 | **Yes** — backoff + retry | Exponential backoff | confirmed-docs |
+| Locked | 423 | **Yes** — retry later | Method blocked for store, retry after delay | confirmed-docs |
+| Server error | 500 | **Yes** — backoff + retry | Exponential backoff | confirmed-docs |
+
+> **CRITICAL:** Rate limit code is **420** (not 429). Retry logic must handle both 420 and 429.
+
+### 3.4 Idempotency
+
+- **No explicit idempotency key.** Yandex uses **last-write-wins** semantics.
+- Repeated calls with same `(offerId, price)` are accepted without error — `status: OK`.
+- No deduplication mechanism analogous to WB's `alreadyExists`.
+- **Confidence:** confirmed-docs
+
+### 3.5 Rate Limits
+
+| Constraint | Value | Confidence |
+|------------|-------|------------|
+| Max items per request | 500 | confirmed-docs |
+| Items per minute | 10,000 | confirmed-docs |
+| Rate limit HTTP code | 420 (not 429!) | confirmed-docs |
+
+### 3.6 Stock Update (Out of MVP Scope)
+
+| Свойство | Значение | Confidence |
+|----------|----------|------------|
+| Method | `PUT` | confirmed-docs |
+| Path | `/v2/campaigns/{campaignId}/offers/stocks` | confirmed |
+| Level | **Campaign-level** (requires `campaignId`) | confirmed-docs |
+| Models | FBS, Express, DBS only — **NOT FBY** | confirmed-docs |
+| Max items | 2,000 per request | confirmed-docs |
+| Rate limit | 100,000 items/min | confirmed-docs |
+
+**Out of MVP scope** because:
+1. FBY stock is managed by Yandex warehouses — seller cannot update
+2. FBS/DBS stock management is a later-phase feature
+3. Price update is the primary write capability for MVP pricing module
+
+Request structure (for reference):
+```json
+{
+  "skus": [
+    {
+      "sku": "SKU-001",
+      "items": [{ "count": 50, "updatedAt": "2025-01-01T00:00:00Z" }]
+    }
+  ]
+}
+```
+
+### 3.7 Findings
+
+#### F-7: Yandex Price Write — Blanket Response (MEDIUM)
+
+**Finding:** Yandex price update returns blanket `{"status": "OK"}` without per-item results. Unlike Ozon (per-item `updated: true/false` with errors), there is no way to know which specific items failed within a batch.
+
+**Impact:** If a batch of 500 items has 1 invalid SKU, the behavior is unclear:
+- Option A: Entire batch rejected (400 error)
+- Option B: Valid items applied, invalid silently skipped
+**Action:** Needs empirical verification with active account. Until then, assume Option A (atomic batch).
+**Confidence:** assumed (not verified)
+
+#### F-8: Price Quarantine — Undocumented Auto-Resolution (LOW)
+
+**Finding:** Yandex quarantine auto-resolves, but the timeout is not documented. This creates uncertainty for reconciliation SLA.
+**Impact:** `RECONCILIATION_PENDING` may remain for an unknown duration.
+**Action:** Monitor quarantine status; set internal timeout (e.g., 24 hours → escalate to `RECONCILIATION_FAILED`).
+**Confidence:** assumed
+
+---
+
+## 4. ARCHITECTURE MAPPING
 
 ### 3.1 Code-to-Contract Mapping
 
@@ -359,7 +548,7 @@ Source: `datapulse-marketplaces.yml`
 
 ---
 
-## 4. FINDINGS & CRITICAL ISSUES
+## 5. FINDINGS & CRITICAL ISSUES
 
 ### F-1: WB Host Migration (CRITICAL) — RESOLVED
 
@@ -436,7 +625,7 @@ If the product previously had an `old_price`, this will remove the discount visu
 
 ---
 
-## 5. RATE LIMITS
+## 6. RATE LIMITS
 
 ### WB Price Write
 
@@ -455,9 +644,18 @@ If the product previously had an `old_price`, this will remove the discount visu
 | Per-product limit | 10 updates/hour | confirmed-docs |
 | API-level limit | Not explicitly documented | unknown |
 
+### Yandex Price Write
+
+| Constraint | Value | Confidence |
+|------------|-------|------------|
+| Rate limit group | `YANDEX_PRICE_UPDATE` (planned) | assumed |
+| Per-request limit | 500 items | confirmed-docs |
+| Per-minute limit | 10,000 items | confirmed-docs |
+| Rate limit HTTP code | 420 | confirmed-docs |
+
 ---
 
-## 6. IDEMPOTENCY
+## 7. IDEMPOTENCY
 
 ### WB
 
@@ -471,24 +669,34 @@ If the product previously had an `old_price`, this will remove the discount visu
 - Price-per-hour limit (10/product) acts as implicit throttle
 - **Confidence:** confirmed-docs
 
+### Yandex
+
+- No explicit idempotency mechanism. Last-write-wins semantics
+- Repeated calls with same price succeed with `status: OK`
+- No per-item dedup or `alreadyExists` equivalent
+- **Confidence:** confirmed-docs
+
 ---
 
-## 7. SIGN CONVENTIONS & UNITS
+## 8. SIGN CONVENTIONS & UNITS
 
 | Provider | Price unit | Currency | Sign | Confidence |
 |----------|-----------|----------|------|------------|
 | WB | Whole RUB (integer) | RUB only | Positive | confirmed |
 | Ozon | String representation of RUB | RUB (or as per account) | Positive | confirmed-docs |
+| Yandex | Rubles (decimal number) | RUR (treat as RUB) | Positive | confirmed-docs |
 
 ---
 
-## 8. SUMMARY STATUS
+## 9. SUMMARY STATUS
 
-| Capability | WB | Ozon | Notes |
-|------------|----|----- |-------|
-| Price Write | **READY** (host confirmed, need write-scope token) | READY | WB: host fixed, token needs "Write" scope |
-| Async Poll | **READY** (same host as write) | N/A (synchronous) | WB-only, same host |
-| Reconciliation Read | READY (endpoint works) | READY (endpoint works) | Logic not implemented |
-| Reconciliation Logic | NOT IMPLEMENTED | NOT IMPLEMENTED | ADR-016 gap |
-| Rate Limiting | Configured, limits unknown | Configured, per-product limit documented | — |
-| Idempotency | Partial (alreadyExists) | None | — |
+| Capability | WB | Ozon | Yandex | Notes |
+|------------|----|----- |--------|-------|
+| Price Write | **READY** (host confirmed, need write-scope token) | READY | **READY** (docs, not empirically verified) | WB: host fixed, token needs "Write" scope |
+| Async Poll | **READY** (same host as write) | N/A (synchronous) | N/A (synchronous) | WB-only, same host |
+| Quarantine Check | N/A | N/A | READY (endpoint documented) | Yandex-only |
+| Reconciliation Read | READY (endpoint works) | READY (endpoint works) | READY (endpoint confirmed) | Logic not implemented |
+| Reconciliation Logic | NOT IMPLEMENTED | NOT IMPLEMENTED | NOT IMPLEMENTED | ADR-016 gap |
+| Stock Write | — | — | Out of MVP scope (FBS/DBS only) | — |
+| Rate Limiting | Configured, limits unknown | Configured, per-product limit documented | 500/req, 10K items/min | — |
+| Idempotency | Partial (alreadyExists) | None | None (last-write-wins) | — |

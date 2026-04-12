@@ -1,0 +1,107 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "paging": {},
+    "offerMappings": [
+      {
+        "offer": {
+          "offerId": "TEST-SKU-001",
+          "name": "Ударная дрель Makita HP1630, 710 Вт",
+          "vendor": "Makita",
+          "barcodes": ["4607159324843"],
+          "vendorCode": "VNDR-0005A",
+          "description": "Ударная дрель мощностью 710 Вт с ключевым патроном",
+          "weightDimensions": {
+            "length": 32.5,
+            "width": 8.0,
+            "height": 22.0,
+            "weight": 1.8
+          },
+          "basicPrice": {
+            "value": 5990,
+            "currencyId": "RUR"
+          },
+          "purchasePrice": {
+            "value": 3200,
+            "currencyId": "RUR"
+          },
+          "cardStatus": "HAS_CARD_CAN_NOT_UPDATE",
+          "campaigns": [
+            {
+              "campaignId": 10001,
+              "status": "PUBLISHED"
+            },
+            {
+              "campaignId": 10002,
+              "status": "PUBLISHED"
+            }
+          ],
+          "sellingPrograms": [
+            {
+              "sellingProgram": "FBS",
+              "status": "ACTIVE"
+            },
+            {
+              "sellingProgram": "FBY",
+              "status": "ACTIVE"
+            }
+          ],
+          "archived": false
+        },
+        "mapping": {
+          "marketSku": 200100500,
+          "marketSkuName": "Дрель Makita HP1630",
+          "marketModelName": "Makita HP1630",
+          "marketCategoryId": 91597,
+          "marketCategoryName": "Дрели"
+        }
+      },
+      {
+        "offer": {
+          "offerId": "TEST-SKU-002",
+          "name": "Набор бит Bosch 43 шт.",
+          "vendor": "Bosch",
+          "barcodes": ["4002451199476"],
+          "vendorCode": "BOSCH-BIT-43",
+          "description": "Набор бит для шуруповёрта, 43 предмета",
+          "weightDimensions": {
+            "length": 18.0,
+            "width": 12.0,
+            "height": 5.0,
+            "weight": 0.45
+          },
+          "basicPrice": {
+            "value": 1490,
+            "currencyId": "RUR"
+          },
+          "purchasePrice": {
+            "value": 720,
+            "currencyId": "RUR"
+          },
+          "cardStatus": "HAS_CARD_CAN_UPDATE",
+          "campaigns": [
+            {
+              "campaignId": 10001,
+              "status": "PUBLISHED"
+            }
+          ],
+          "sellingPrograms": [
+            {
+              "sellingProgram": "FBS",
+              "status": "ACTIVE"
+            }
+          ],
+          "archived": false
+        },
+        "mapping": {
+          "marketSku": 200100501,
+          "marketSkuName": "Набор бит Bosch 43 шт.",
+          "marketModelName": "Bosch X-Line 43",
+          "marketCategoryId": 91598,
+          "marketCategoryName": "Биты для шуруповёртов"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "competitiveBid": 250,
+  "leadersBid": 480,
+  "top2": 620,
+  "normQueries": [
+    {
+      "normQuery": "купальник женский",
+      "reachMax": {
+        "bidKopecks": 550,
+        "bidKopecksMin": 400
+      },
+      "reachMedium": {
+        "bidKopecks": 350,
+        "bidKopecksMin": 250
+      },
+      "reachMin": {
+        "bidKopecks": 200,
+        "bidKopecksMin": 125
+      }
+    },
+    {
+      "normQuery": "купальник раздельный",
+      "reachMax": {
+        "bidKopecks": 480,
+        "bidKopecksMin": 350
+      },
+      "reachMedium": {
+        "bidKopecks": 300,
+        "bidKopecksMin": 200
+      },
+      "reachMin": {
+        "bidKopecks": 170,
+        "bidKopecksMin": 100
+      }
+    }
+  ]
+}

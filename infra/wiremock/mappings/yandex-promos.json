@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Promos (POST /v2/businesses/{businessId}/promos)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/businesses/[0-9]+/promos"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-promos.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

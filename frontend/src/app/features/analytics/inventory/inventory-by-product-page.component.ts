@@ -321,6 +321,7 @@ export class InventoryByProductPageComponent {
       field: 'stockOutRisk',
       headerName: this.t.instant('analytics.inventory.col.risk'),
       cellRenderer: (p: { value: string }) => {
+        if (!p.value) return '—';
         let dotCls: string;
         switch (p.value) {
           case 'CRITICAL': dotCls = 'bg-[var(--status-error)]'; break;

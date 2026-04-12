@@ -89,36 +89,36 @@
     </div>
 
     <!-- Entries table -->
-    <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
-      <table class="w-full text-left text-[length:var(--text-sm)]">
-        <thead class="bg-[var(--bg-secondary)] text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+    <div class="dp-table-wrap overflow-x-auto">
+      <table class="dp-table">
+        <thead>
           <tr>
-            <th class="px-3 py-2 font-medium">{{ 'analytics.pnl.posting.entry_type' | translate }}</th>
+            <th>{{ 'analytics.pnl.posting.entry_type' | translate }}</th>
             @for (col of measureColumns; track col.field) {
-              <th class="px-3 py-2 font-medium text-right">{{ col.labelKey | translate }}</th>
+              <th class="text-right">{{ col.labelKey | translate }}</th>
             }
           </tr>
         </thead>
         <tbody>
           @for (entry of d.entries; track entry.entryId) {
-            <tr class="border-t border-[var(--border-subtle)]">
-              <td class="px-3 py-2 font-medium text-[var(--text-primary)]">{{ entryTypeLabel(entry.entryType) }}</td>
+            <tr>
+              <td class="font-medium text-[var(--text-primary)]">{{ entryTypeLabel(entry.entryType) }}</td>
               @for (col of measureColumns; track col.field) {
-                <td class="px-3 py-2 text-right font-mono" [class]="moneyColorClass(entryMeasure(entry, col.field))">
+                <td class="text-right font-mono" [class]="moneyColorClass(entryMeasure(entry, col.field), col.isCost)">
                   {{ formatMoney(entryMeasure(entry, col.field)) }}
                 </td>
               }
             </tr>
           }
         </tbody>
-        <tfoot class="border-t-2 border-[var(--border-default)] bg-[var(--bg-secondary)]">
+        <tfoot>
           <tr>
-            <td class="px-3 py-2 font-semibold text-[var(--text-primary)]">
+            <td class="text-[var(--text-primary)]">
               {{ 'analytics.pnl.posting.total' | translate }}
             </td>
             @for (col of measureColumns; track col.field) {
-              <td class="px-3 py-2 text-right font-mono font-semibold"
-                  [class]="moneyColorClass(totals()[col.field])">
+              <td class="text-right font-mono"
+                  [class]="moneyColorClass(totals()[col.field], col.isCost)">
                 {{ formatMoney(totals()[col.field]) }}
               </td>
             }

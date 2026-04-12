@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Generate Report (POST /v2/reports/united-marketplace-services/generate)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/reports/united-marketplace-services/generate"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-report-generate.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

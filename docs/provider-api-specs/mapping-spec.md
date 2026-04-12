@@ -294,6 +294,28 @@ add `type_id` to `marketplace_offer` as nullable field + join to categories via
 catalog sync (only fetch products updated since last sync). Not required for Phase A/B but
 recommended for Phase C+ to reduce API calls. See DD in etl-pipeline.md.
 
+### Yandex → NormalizedCatalogItem — DOCS VERIFIED
+
+| Yandex field | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `offer.offerId` | `sellerSku` | C-docs | Seller's own SKU (shopSku). Primary join key across all endpoints (DD-27) |
+| `mapping.marketSku` | `marketplaceSku` | C-docs | Yandex global marketplace SKU (long → stored as string) |
+| (none) | `marketplaceSkuAlt` | — | No secondary marketplace SKU for Yandex. NULL |
+| `offer.name` | `name` | C-docs | Product name |
+| `offer.vendor` | `brand` | C-docs | Brand name — directly in offer-mappings response (unlike Ozon which needs attributes API) |
+| `mapping.marketCategoryName` | `category` | C-docs | Category name from mapping object |
+| `offer.barcodes[0]` | `barcode` | C-docs | First barcode; array field |
+| `offer.cardStatus` + `offer.archived` | `status` | A | `archived = false` + card status in ["HAS_CARD_CAN_UPDATE", "HAS_CARD_CAN_NOT_UPDATE"] → ACTIVE; `archived = true` → ARCHIVED; card status "NO_CARD_*" → BLOCKED |
+
+**Key differences from WB/Ozon:**
+- Prices embedded in offer-mappings response (`offer.basicPrice`, `offer.purchasePrice`) — no separate price endpoint hierarchy
+- `vendor` field contains brand directly (like WB, unlike Ozon which needs attributes API)
+- No `updated_at` timestamp in offer-mappings — full sync only, no incremental
+- `mapping.marketCategoryId` available for category lookup (integer)
+- Max 100 items per page; cursor-based pagination via `pageToken`
+
+**Rate limits:** 100 req/min (600 with subscription). Until 18.05.2026: 600 req/min.
+
 ### NormalizedCatalogItem → CanonicalOffer
 
 CanonicalOffer реализована как три таблицы: `product_master`, `seller_sku`, `marketplace_offer`. См. [ETL Pipeline](../modules/etl-pipeline.md) §Связи каталожных сущностей.
@@ -309,6 +331,12 @@ CanonicalOffer реализована как три таблицы: `product_mas
 | `category` | `marketplace_offer.category_id` (FK → category) | C (WB sandbox) / C (Ozon) | Name for WB, ID for Ozon |
 | `barcode` | `seller_sku.barcode` | C (both) | |
 | `status` | `marketplace_offer.status` | C (Ozon) / A (WB) | Ozon: `is_archived` verified; WB: derived |
+
+**Yandex-specific notes:**
+- `sellerSku` = `offer.offerId` (C-docs) → `seller_sku.sku_code` — exact mapping
+- `marketplaceSku` = `mapping.marketSku` (C-docs) → `marketplace_offer.marketplace_sku` — exact mapping (DD-28)
+- `brand` = `offer.vendor` (C-docs) → `product_master.brand` — exact, direct field (no secondary API call needed)
+- `status` mapping: conditional — `archived` flag + `cardStatus` enum (see Yandex → NormalizedCatalogItem above)
 
 ---
 
@@ -342,6 +370,23 @@ CanonicalOffer реализована как три таблицы: `product_mas
 - Price values are NUMBERS (not strings as in product/info)
 - `currency_code` is inside `price` object
 - `marketing_seller_price` chosen as `discountPrice` per DD-1
+
+### Yandex → NormalizedPriceItem — DOCS VERIFIED
+
+| Yandex field | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `offer.offerId` | `sellerSku` | C-docs | From offer-mappings response |
+| `offer.basicPrice.value` | `price` | C-docs | Seller's base price (number, RUB) |
+| (no separate discount price) | `discountPrice` | — | Yandex does not have a `marketing_seller_price` equivalent. NULL |
+| `offer.basicPrice.currencyId` | `currency` | C-docs | "RUR" (Yandex uses RUR, not RUB) — treat as RUB |
+
+**Key differences from WB/Ozon:**
+- Prices come from offer-mappings response, not a dedicated price endpoint (no per-size hierarchy like WB, no nested price object like Ozon)
+- `offer.purchasePrice` = cost/purchase price (informational, for margin calculation)
+- `currencyId` = "RUR" (Yandex convention) — adapter normalizes to "RUB"
+- No `old_price` or `min_price` concept in read response — these are write-side fields
+- **Price quarantine:** Yandex may quarantine suspicious price changes. Read quarantine status via `POST /v2/businesses/{businessId}/price-quarantine`
+- **Rate limits:** Shares with offer-mappings (100 req/min)
 
 ### NormalizedPriceItem → CanonicalPriceCurrent
 
@@ -400,6 +445,37 @@ For product-level stock: `SUM(quantity) GROUP BY nmId, warehouseId`.
 - `warehouse_ids` IS present in v4 response (was documented as absent)
 - Ozon `warehouseId` mapping updated to use `warehouse_ids[0]` with type fallback (DD-2)
 
+### Yandex → NormalizedStockItem — DOCS VERIFIED
+
+| Yandex field | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `offers[].offerId` | `sellerSku` | C-docs | Seller's SKU, direct in stocks response |
+| `warehouseId` | `warehouseId` | C-docs | Warehouse ID (outer level in response hierarchy) |
+| `stocks[?type=="AVAILABLE"].count` | `available` | C-docs | Available for new orders |
+| `stocks[?type=="FREEZE"].count` | `reserved` | C-docs | Reserved for existing orders |
+
+**Granularity:** 1 row = 1 offer × 1 warehouse × N stock types. Grain is `(offerId, warehouseId)`.
+
+**Stock type mapping:**
+
+| Yandex type | Canonical semantics | Confidence |
+|---|---|---|
+| `FIT` | Total usable (available + reserved) | C-docs |
+| `AVAILABLE` | Available for new orders → `available` | C-docs |
+| `FREEZE` | Reserved for orders → `reserved` | C-docs |
+| `QUARANTINE` | Temporarily unavailable (informational) | C-docs |
+| `DEFECT` | Defective (informational) | C-docs |
+| `EXPIRED` | Expired (informational) | C-docs |
+
+**Key differences from WB/Ozon:**
+- **Campaign-level endpoint** — must call per `campaignId`, not `businessId`. Requires campaign fan-out (DD-22)
+- Rich stock type breakdown (6 types vs WB's single `quantity` and Ozon's `present`/`reserved`)
+- `updatedAt` per offer — staleness indicator (unlike WB which updates every 30 min globally)
+- Rate limit counts **items** (100,000/min), not requests
+- Turnover data (`turnoverSummary`) available for FBY/LaaS models
+
+**Rate limits:** 100,000 items/min (not requests)
+
 ### NormalizedStockItem → CanonicalStockCurrent
 
 | Normalized field | Canonical field (DDL: `canonical_stock_current`) | Confidence | Notes |
@@ -446,6 +522,32 @@ For product-level stock: `SUM(quantity) GROUP BY nmId, warehouseId`.
 - `analytics_data.warehouse_id` = LONG (populated!)
 - `created_at` = ISO 8601 UTC with nanoseconds
 - `substatus` provides additional status detail
+
+### Yandex → NormalizedOrderItem — DOCS VERIFIED
+
+| Yandex field | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `id` | `externalOrderId` | C-docs | Yandex order ID (long, unique across marketplace) |
+| `items[].offerId` | `sellerSku` | C-docs | Seller's SKU per item |
+| `items[].count` | `quantity` | C-docs | Units ordered |
+| `items[].prices[?type=="BUYER"].costPerItem` | `pricePerUnit` | C-docs | Buyer-paid price per unit (RUB) |
+| `items[].prices[?type=="BUYER"].total` | `totalAmount` | C-docs | Total for this item line |
+| (implicit) | `currency` | A | "RUB" (no explicit currency in orders response) |
+| `creationDate` | `orderDate` | C-docs | Date-only `YYYY-MM-DD` → LocalDate |
+| `status` | `status` | C-docs | Order status enum (see yandex-read-contracts.md §5) |
+| `programType` | `fulfillmentType` | C-docs | FBY/FBS/DBS/EXPRESS → delivery_schema (DD-25) |
+| `delivery.region.name` | `region` | C-docs | Delivery region name |
+
+**Key differences from WB/Ozon:**
+- **Business-level endpoint** (`POST /v1/businesses/{businessId}/orders`) — returns orders across ALL campaigns
+- `creationDate` is date-only (not ISO 8601 datetime like Ozon `created_at`)
+- Items contain structured `prices[]` array with type discriminator (`BUYER`, `CASHBACK_SPEND`, etc.)
+- **No financial breakdown** in orders endpoint — commission, logistics not available here. Financial decomposition requires finance reports (DD-23)
+- Max 30-day date range per request; max 50 items per page
+- Terminal statuses: `DELIVERED`, `CANCELLED`, `PARTIALLY_RETURNED`, `RETURNED`
+- `campaignId` returned per order — allows attribution to specific campaign/placement model
+
+**Rate limits:** 10,000 req/hour
 
 ### NormalizedOrderItem → CanonicalOrder
 
@@ -580,6 +682,18 @@ SPP не включается в формулу P&L как отдельная с
 | (resolved) | `canonical_order_id` (FK → canonical_order) | B | Resolved post-persist: lookup `canonical_order` by `(connection_id, external_order_id)` where `external_order_id` = WB `srid` / Ozon `posting_number`. NULL if order not yet ingested |
 | `postingId` | `posting_id` | C | WB: `srid` (same as `external_sale_id`, DD-18). Ozon: `posting_number`. Join key for order ↔ sale reconciliation |
 
+### Yandex → NormalizedSaleItem — TBD
+
+**Yandex does not have a dedicated sales endpoint.** Sales data for P&L is obtained exclusively from finance reports (DD-23):
+- **United Marketplace Services report** — contains ORDER_ID, SHOP_SKU, amounts per service type
+- **Goods Realization report** — contains delivery dates, prices with VAT, quantities
+
+This is a fundamentally different pattern from WB (sales endpoint + finance report) and Ozon (delivered postings + finance transactions). The Yandex adapter must derive sales facts from async report data.
+
+**Mapping (from finance report rows):** TBD — depends on sign convention verification (DD-26). Blocked until real report data is available.
+
+**Confidence:** U (architecture pattern confirmed as C-docs, field-level mapping blocked)
+
 ---
 
 ## 6. RETURNS
@@ -633,6 +747,35 @@ Must combine with `reportDetailByPeriod` for monetary values.
 - `product.commission` IS present (verified)
 - `logistic.return_date` CONFIRMED as return date field (ISO 8601 UTC)
 - Ozon RETURNS readiness upgraded from PARTIAL to READY
+
+### Yandex → NormalizedReturnItem — PARTIAL DOCS
+
+| Yandex field | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `id` | `externalReturnId` | C-docs | Unique return ID (long) |
+| `items[].shopSku` | `sellerSku` | C-docs | Seller's SKU (= `offerId`) |
+| `items[].count` | `quantity` | C-docs | Returned quantity |
+| (not in returns endpoint) | `returnAmount` | U | Financial impact NOT in returns endpoint — must derive from finance reports |
+| `items[].returnReason.type` | `returnReason` | C-docs | Return reason type enum: `BAD_QUALITY`, etc. |
+| (implicit) | `currency` | A | "RUB" |
+| `creationDate` | `returnDate` | C-docs | Return creation date (`YYYY-MM-DD`) |
+| `returnStatus` | `status` | C-docs | Return lifecycle status |
+
+**Return type:**
+
+| Yandex value | Semantics | Confidence |
+|---|---|---|
+| `RETURN` | Standard return after delivery | C-docs |
+| `UNREDEEMED` | Not picked up at PVZ | C-docs |
+| `CROSSDOCK_RETURN` | Crossdock return (FBY) | C-docs |
+
+**Key differences from WB/Ozon:**
+- **Campaign-level endpoint** (`GET /v2/campaigns/{campaignId}/returns`) — must call per campaignId (DD-22)
+- Financial impact of returns NOT in this endpoint (unlike Ozon which has `product.price` in returns). Must derive from finance reports
+- Partial docs — returns documentation URL returned 404 during fetch; contract inferred from general API structure
+- `items[].decisionType` provides decision outcome (e.g., `REFUND_MONEY`)
+
+**Rate limits:** Not explicitly documented (unknown)
 
 ### Additional Ozon Return Fields (available for enrichment)
 
@@ -846,6 +989,47 @@ Per-posting P&L requires aggregating ALL operations by `posting_number`.
 
 Note: These 6 types have `items=[]` and `services=[]`. Charge amount is at `operation.amount` only.
 
+### Yandex → NormalizedFinanceItem — PARTIAL DOCS (DD-23)
+
+**CRITICAL DIFFERENCE:** Yandex finance data is obtained through **async reports ONLY** — no synchronous transaction API.
+
+**Two report types:**
+
+**1. United Marketplace Services Report** (`/v2/reports/united-marketplace-services/generate`):
+
+| Report column (CSV/JSON) | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `ORDER_ID` / `orderId` | `externalRef` | C-docs | Order ID, join key to orders |
+| `YOUR_SKU` / `yourSku` or `SHOP_SKU` / `shopSku` | `sellerSku` | C-docs | Seller's SKU |
+| Service-specific amount columns | `amount` | U | Column names and sign convention NOT verified — BLOCKER (DD-26) |
+| (implicit) | `currency` | A | "RUB" |
+| `ORDER_CREATION_DATE_TIME` | `entryDate` | C-docs | Order creation datetime |
+| `PLACEMENT_MODEL` | (informational) | C-docs | FBY/FBS/DBS/Express — campaign type |
+| `PARTNER_ID` | (informational) | C-docs | Campaign ID |
+
+**2. Goods Realization Report** (`/v2/reports/goods-realization/generate`):
+
+| Report column (CSV) | Normalized field | Confidence | Notes |
+|---|---|---|---|
+| `ORDER_ID` | `externalRef` | C-docs | Order ID |
+| `YOUR_SKU` / `SHOP_SKU` | `sellerSku` | C-docs | Seller's SKU |
+| `PRICE_WITH_VAT_AND_NO_DISCOUNT` | `amount` (revenue) | C-docs | Price with VAT, no discount — likely revenue |
+| `DELIVERY_DATE` | `entryDate` | C-docs | Delivery date |
+| `TRANSFERRED_TO_DELIVERY_COUNT` | (informational) | C-docs | Units transferred |
+
+**Async capture flow:** generate → poll (exponential backoff) → download → parse (DD-23)
+
+**⚠️ WARNING (F-6):** Report structure may change without notice. Parser MUST be lenient.
+
+**BLOCKER:** Finance field-level mapping is blocked until:
+1. Real report data is available (needs active Yandex account)
+2. Sign convention is verified (DD-26)
+3. Report column inventory is confirmed empirically
+
+**Per-measure mapping: TBD** — cannot map to `fact_finance` measures without sign convention and real data.
+
+**Confidence overall:** U (pattern confirmed, field-level mapping blocked)
+
 ### Ozon Finance Breakdown Fields (per sale operation)
 
 | Field | Semantics | Sign | Confidence |
@@ -961,6 +1145,94 @@ Canonical DDL содержит per-measure columns (DD-8 composite row model). N
 - Коррекция: WB корректирует ранее начисленные суммы (продажи, логистика, эквайринг). Correction row содержит дельту в соответствующем amount-поле (e.g., `retail_price_withdisc_rub` для коррекции продаж). Composite row model обрабатывает это автоматически.
 - Услуга платной доставки (DBS) и Бронирование (C&C) — специфичны для моделей продаж, которые пока не активны у нашего тестового продавца. Финансовый impact попадает в стандартные поля (`delivery_rub`, `deduction`).
 
+### DD-22: Yandex businessId/campaignId Resolution
+
+**Решение:** Datapulse `marketplace_connection` maps to one Yandex **business** (businessId). At connection setup, adapter calls `GET /v2/campaigns` to discover all campaigns (FBY/FBS/DBS/Express). Each campaign is stored as a sub-entity (e.g., in `connection_metadata` JSONB or separate `yandex_campaign` table). Campaign-level endpoints (stocks, returns) fan out per campaignId.
+
+**Обоснование:** WB and Ozon use single-level hierarchy (one account = one seller). Yandex has two-level (business → campaigns). A connection represents a seller relationship, which is the business. Campaign discovery is automated — seller doesn't need to know campaignIds.
+
+**Confidence:** C-docs (hierarchy confirmed empirically, campaigns endpoint returned 200 OK)
+
+### DD-23: Yandex Async Finance Reports
+
+**Решение:** Yandex finance data is obtained via async reports ONLY (generate → poll → download → parse). No synchronous finance transaction API exists (unlike WB `reportDetailByPeriod` GET or Ozon `v3/finance/transaction/list` POST).
+
+**Pipeline:** New `AsyncReportCapture` step in ETL:
+1. `POST /v2/reports/{type}/generate` → `reportId`
+2. Poll `GET /v2/reports/info/{reportId}` with exponential backoff (5s → 10s → 30s → 60s, max 10 min)
+3. Download CSV/JSON from `result.file` URL
+4. Parse with lenient parser (`@JsonIgnoreProperties(ignoreUnknown = true)`) — report structure may change without notice (F-6)
+
+**Обоснование:** Only Yandex-specific pattern. WB/Ozon use synchronous paginated APIs for finance. This adds a new capture strategy to the ETL pipeline.
+
+**Confidence:** C-docs (async flow confirmed from official docs, report endpoints probed — 403 due to disabled business)
+
+### DD-24: Yandex pageToken Pagination in CursorPagedCapture
+
+**Решение:** All Yandex cursor-based endpoints use `pageToken` query param (request) + `paging.nextPageToken` field (response). Termination: `nextPageToken` absent or empty. This maps directly to existing `CursorPagedCapture` with `cursorField = "paging.nextPageToken"`, `cursorParam = "pageToken"`.
+
+**Обоснование:** Same cursor pattern as Ozon (`cursor` / `last_id`), different field names. Adapter only needs correct field mapping, no new capture strategy.
+
+**Dual pagination note:** `GET /v2/campaigns` returns BOTH legacy `pager` (page-based) AND modern `paging` (cursor-based). Adapter MUST use `paging.nextPageToken` and ignore `pager`.
+
+**Confidence:** confirmed (campaigns endpoint empirically verified with dual pagination response)
+
+### DD-25: Yandex Order Model → delivery_schema Mapping
+
+**Решение:** Yandex `programType` (from orders endpoint) and `placementType` (from campaigns) map to canonical `delivery_schema`:
+
+| Yandex value | → `delivery_schema` | Confidence |
+|---|---|---|
+| `FBY` | `FBY` (Fulfillment by Yandex, analogous to WB/Ozon FBO) | C-docs |
+| `FBS` | `FBS` | C-docs |
+| `DBS` | `DBS` (Delivery by Seller, no WB/Ozon equivalent) | C-docs |
+| `EXPRESS` | `EXPRESS` | C-docs |
+
+**Обоснование:** WB uses implicit delivery schema (endpoint determines FBO/FBS). Ozon uses `delivery_schema` field in postings ("FBO"/"FBS"). Yandex uses `programType` in orders and `placementType` in campaigns — same semantics, different field names.
+
+**Acceptable limitation:** DBS and EXPRESS have no direct equivalent in WB/Ozon. canonical `delivery_schema` enum must be extended to include these values.
+
+**Confidence:** C-docs
+
+### DD-26: Yandex Finance Sign Convention
+
+**Решение:** **UNKNOWN — not yet verified.** Report columns separate credits and debits by column name (assumed, similar to WB), NOT by sign (unlike Ozon). Needs empirical verification with active account and real report data.
+
+**Assumption basis:** Report column names like `PRICE_WITH_VAT_AND_NO_DISCOUNT`, `TRANSFERRED_TO_DELIVERY_COUNT` suggest factual amounts without sign encoding. But this is NOT confirmed.
+
+**BLOCKER for P&L mapping** until real report data is available.
+
+**Confidence:** U (unknown)
+
+### DD-27: Yandex offerId = Primary Join Key
+
+**Решение:** Yandex `offerId` (= seller's `shopSku`) is the universal join key across all endpoints:
+
+| Endpoint | Field name | Semantics | Confidence |
+|---|---|---|---|
+| Catalog (offer-mappings) | `offer.offerId` | Seller's SKU | C-docs |
+| Stocks | `offerId` | Same SKU | C-docs |
+| Orders (items) | `items[].offerId` / `shopSku` | Same SKU | C-docs |
+| Bids | `sku` | Same SKU | C-docs |
+| Finance reports | `YOUR_SKU` / `SHOP_SKU` | Same SKU | C-docs |
+| Promos | `offerId` | Same SKU | C-docs |
+
+This is analogous to Ozon `offer_id` and WB `vendorCode`/`supplierArticle` — a seller-assigned SKU that is stable across endpoints.
+
+**Confidence:** C-docs (all joins documented in official API, cross-referenced in yandex-read-contracts.md §Join Key Semantics)
+
+### DD-28: Yandex marketSku vs offerId
+
+**Решение:** Yandex has TWO product identifiers:
+- `offerId` (string) = seller's own SKU → maps to `seller_sku.sku_code` and `marketplace_offer.external_sku`
+- `marketSku` (long) = Yandex-assigned global marketplace SKU → maps to `marketplace_offer.marketplace_sku`
+
+This is analogous to:
+- WB: `vendorCode` (seller) vs `nmID` (marketplace)
+- Ozon: `offer_id` (seller) vs `product_id` (marketplace)
+
+**Confidence:** C-docs
+
 **Per-measure mapping (Ozon):**
 
 | Ozon finance field | → canonical measure column | Sign | Confidence |
@@ -978,6 +1250,19 @@ Canonical DDL содержит per-measure columns (DD-8 composite row model). N
 Promo mapping (WB + Ozon → CanonicalPromoCampaign, CanonicalPromoProduct) documented in a separate file: [promo-advertising-contracts.md](promo-advertising-contracts.md).
 
 Referenced from [ETL Pipeline](../modules/etl-pipeline.md) §Promo canonical entities.
+
+**Yandex promo mapping:** Yandex promos (§9 in yandex-read-contracts.md) follow the same canonical pattern as WB/Ozon:
+- `promoId` → `dim_promo_campaign.external_campaign_id` (C-docs)
+- `name` → `dim_promo_campaign.name` (C-docs)
+- `startDate` / `endDate` → `dim_promo_campaign.start_date` / `end_date` (C-docs)
+- `mechanicsType` → `dim_promo_campaign.promo_type` (C-docs): `DIRECT_DISCOUNT`, `BLUE_FLASH`, `MARKET_PROMOCODE`
+- Promo offers: `POST /v2/businesses/{businessId}/promos/offers` → `fact_promo_product` (C-docs)
+- Full details in [promo-advertising-contracts.md](promo-advertising-contracts.md) §5.
+
+**Yandex advertising / bids mapping:** Yandex Sales Boost (§10 in yandex-read-contracts.md):
+- `sku` → `marketplace_offer` via `offerId` join key (DD-27) (C-docs)
+- `bid` → bid value (integer, 0–9999, percent × 100) (C-docs)
+- Full details in [promo-advertising-contracts.md](promo-advertising-contracts.md) §6.
 
 ---
 
@@ -1013,6 +1298,25 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
          Join: items[].sku → catalog sources[].sku → product_id → offer_id
 ```
 
+### Yandex Join Keys (docs-confirmed)
+
+```
+offerId (catalog) = offerId (stocks) = items[].offerId (orders) = shopSku (returns) = sku (bids) = YOUR_SKU/SHOP_SKU (finance reports)
+marketSku (catalog) = items[].marketSku (orders) = items[].marketSku (returns)
+campaignId (campaigns) = campaignId (orders) = campaignId (stocks path) = campaignId (returns path)
+warehouseId (stocks) = id (warehouses)
+orderId (orders) = orderId (returns) = ORDER_ID (finance reports)
+
+FINANCE JOIN:
+  Reports are async — no posting_number equivalent
+  Join key: ORDER_ID + YOUR_SKU → canonical_order + seller_sku
+  Campaign attribution: PARTNER_ID (report column) = campaignId (campaigns discovery)
+
+CAMPAIGN FAN-OUT:
+  Business-level: catalog, orders, bids, promos, finance reports
+  Campaign-level: stocks, returns → must iterate per campaignId
+```
+
 ---
 
 ## Mapping Readiness Summary
@@ -1028,6 +1332,21 @@ WARNING: finance items[] has sku + name only, NOT offer_id!
 | SALES | **READY** (sandbox) | READY (composite) | WB: forPay/finishedPrice/priceWithDisc verified; Ozon: resolved (DD-3) |
 | RETURNS | **READY** | READY | WB: unblocked — date-only format was root cause; Ozon: all fields verified |
 | FINANCES | **READY** (sandbox+docs) | READY | Both fully verified: WB sign convention (DD-7), v5 P&L fields mapped (DD-19), supplier_oper_name full list (DD-21); Ozon: 44 op types mapped (23 empirical + 21 official enum), dual acquiring format (DD-15) |
+
+### Yandex Readiness
+
+| Capability | Yandex Readiness | Blockers |
+|---|---|---|
+| CATALOG | READY (docs) | No empirical verification (disabled account). Official docs quality high |
+| PRICES | READY (docs) | Prices embedded in offer-mappings; no standalone price API |
+| STOCKS | READY (docs) | Campaign-level fan-out required (DD-22) |
+| ORDERS | READY (docs) | Business-level v1 endpoint; max 30-day range |
+| SALES | **BLOCKED** | No sales endpoint — derived from finance reports (DD-23). Blocked by DD-26 (sign convention) |
+| RETURNS | PARTIAL | Documentation URL 404; contract inferred. Financial impact requires finance reports |
+| FINANCES | **BLOCKED** | Async-only reports (DD-23). Sign convention unknown (DD-26). No real data available |
+| PROMO | READY (docs) | Business-level; mechanics types documented |
+| ADVERTISING (Bids) | READY (docs) | Read endpoint empirically discovered (F-2); bid semantics clear |
+| WAREHOUSES | READY (docs) | Simple reference data |
 
 ### Resolved Blockers
 

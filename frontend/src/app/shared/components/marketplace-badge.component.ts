@@ -1,11 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-import { MarketplaceType } from '@core/models';
-
-const STYLES: Record<MarketplaceType, { bg: string; text: string; label: string }> = {
-  WB: { bg: '#7B2FBE', text: '#FFFFFF', label: 'WB' },
-  OZON: { bg: '#005BFF', text: '#FFFFFF', label: 'Ozon' },
-};
+import { MarketplaceType, getMarketplaceConfig } from '@core/models';
 
 @Component({
   selector: 'dp-marketplace-badge',
@@ -24,5 +19,8 @@ const STYLES: Record<MarketplaceType, { bg: string; text: string; label: string 
 export class MarketplaceBadgeComponent {
   readonly type = input.required<MarketplaceType>();
 
-  protected readonly config = computed(() => STYLES[this.type()]);
+  protected readonly config = computed(() => {
+    const mc = getMarketplaceConfig(this.type());
+    return { bg: mc.badgeBg, text: mc.badgeText, label: mc.shortLabel };
+  });
 }

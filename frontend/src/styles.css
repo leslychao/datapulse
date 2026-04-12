@@ -48,6 +48,8 @@
   --mp-wb-bg: #F5F3FF;
   --mp-ozon: #005BFF;
   --mp-ozon-bg: #EFF6FF;
+  --mp-yandex: #D4A017;
+  --mp-yandex-bg: #FFFBEB;
 
   /* Colors — overlay */
   --bg-overlay: rgba(0, 0, 0, 0.4);
@@ -328,6 +330,68 @@ router-outlet + * {
   width: 15px;
   height: 15px;
   stroke-width: 2;
+}
+
+/* HTML table styling — matches AG Grid look */
+.dp-table-wrap {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.dp-table {
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.dp-table thead {
+  background-color: var(--bg-secondary);
+}
+
+.dp-table thead tr {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.dp-table th {
+  padding: 8px 16px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dp-table tbody tr {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color 0.15s ease;
+}
+
+.dp-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.dp-table tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.dp-table td {
+  padding: 10px 16px;
+}
+
+.dp-table tfoot {
+  border-top: 2px solid var(--border-default);
+  background-color: var(--bg-secondary);
+}
+
+.dp-table tfoot td {
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
+.dp-table-compact th {
+  padding: 6px 12px;
+}
+
+.dp-table-compact td {
+  padding: 6px 12px;
 }
 
 /* Driver.js guided tour overrides */

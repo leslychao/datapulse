@@ -1,0 +1,10 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "status": "DONE",
+    "file": "https://storage.example.com/reports/RPT-550001.csv",
+    "generationRequestedAt": "2026-04-10T10:00:00Z",
+    "generationFinishedAt": "2026-04-10T10:01:30Z"
+  }
+}

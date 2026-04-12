@@ -1,0 +1,14 @@
+{
+  "name": "WB Advertising — Recommended Bids (advert-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/api/advert/v0/bids/recommendations"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-advertising-bids-recommendations.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

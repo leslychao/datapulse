@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Performance — List Search Promo Products",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/client/campaign/search/promo/products"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-performance-promo-products.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

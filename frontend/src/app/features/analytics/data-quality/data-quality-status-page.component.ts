@@ -289,42 +289,34 @@ interface DomainConnectionInfo {
 
                   <!-- Per-connection table -->
                   <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="dp-table">
                       <thead>
-                        <tr class="bg-[var(--bg-secondary)]">
-                          <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                            {{ 'analytics.data_quality.connection' | translate }}
-                          </th>
-                          <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                            {{ 'analytics.data_quality.status' | translate }}
-                          </th>
-                          <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                            {{ 'analytics.data_quality.last_sync' | translate }}
-                          </th>
-                          <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                            {{ 'analytics.data_quality.lag' | translate }}
-                          </th>
+                        <tr>
+                          <th>{{ 'analytics.data_quality.connection' | translate }}</th>
+                          <th>{{ 'analytics.data_quality.status' | translate }}</th>
+                          <th>{{ 'analytics.data_quality.last_sync' | translate }}</th>
+                          <th>{{ 'analytics.data_quality.lag' | translate }}</th>
                         </tr>
                       </thead>
                       <tbody>
                         @for (conn of card.connections; track conn.connectionId) {
-                          <tr class="border-t border-[var(--border-subtle)]">
-                            <td class="px-4 py-2.5">
+                          <tr>
+                            <td>
                               <div class="flex items-center gap-2">
                                 <dp-marketplace-badge [type]="conn.marketplaceType" />
                                 <span class="text-[var(--text-primary)]">{{ conn.connectionName }}</span>
                               </div>
                             </td>
-                            <td class="px-4 py-2.5">
+                            <td>
                               <dp-status-badge
                                 [label]="syncStatusLabel(conn.status)"
                                 [color]="syncStatusColor(conn.status)"
                               />
                             </td>
-                            <td class="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">
+                            <td class="whitespace-nowrap text-[var(--text-secondary)]">
                               {{ fmtDateTime(conn.lastSuccessAt) }}
                             </td>
-                            <td class="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">
+                            <td class="whitespace-nowrap text-[var(--text-secondary)]">
                               {{ conn.lagText }}
                             </td>
                           </tr>

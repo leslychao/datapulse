@@ -52,6 +52,16 @@ function monthEnd(period: string): string {
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <dp-month-picker [value]="period()" (valueChange)="onPeriodChange($event)" />
+        <select
+          [value]="platform()"
+          (change)="platform.set($any($event.target).value)"
+          class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
+                 px-2.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
+                 outline-none focus:border-[var(--accent-primary)]">
+          <option value="">{{ 'analytics.returns.filter.all_platforms' | translate }}</option>
+          <option value="WB">Wildberries</option>
+          <option value="OZON">Ozon</option>
+        </select>
         <input
           type="text"
           [value]="search()"
@@ -229,10 +239,13 @@ export class ReturnsByProductPageComponent {
   readonly period = signal(
     this.navStore.getSectionFilterValue<string>('analytics:returns', 'period') ?? currentMonth()
   );
+  readonly platform = signal(
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'platform') ?? ''
+  );
   readonly search = signal('');
   readonly selectedProduct = signal<ReturnsByProduct | null>(null);
   readonly currentPage = signal(0);
-  readonly currentSort = signal<SortUrlState>({ column: 'return_rate_pct', direction: 'desc' });
+  readonly currentSort = signal<SortUrlState>({ column: 'returnRatePct', direction: 'desc' });
   readonly sortString = computed(() => `${this.currentSort().column},${this.currentSort().direction}`);
   readonly initialSortModel = computed(() => {
     const s = this.currentSort();
@@ -242,6 +255,7 @@ export class ReturnsByProductPageComponent {
 
   private readonly filterDefs: UrlFilterDef[] = [
     { key: 'period', signal: this.period, defaultValue: currentMonth() },
+    { key: 'platform', signal: this.platform, defaultValue: '' },
     { key: 'search', signal: this.search, defaultValue: '' },
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
@@ -253,12 +267,13 @@ export class ReturnsByProductPageComponent {
       pageKey: 'analytics:returns:by-product',
       filterDefs: this.filterDefs,
       sortSignal: this.currentSort,
-      defaultSort: { column: 'return_rate_pct', direction: 'desc' },
+      defaultSort: { column: 'returnRatePct', direction: 'desc' },
     });
     effect(() => {
       const period = this.period();
+      const platform = this.platform();
       this.navStore.setSectionFilter('analytics:returns', {
-        period,
+        period, platform,
         from: monthStart(period),
         to: monthEnd(period),
       });
@@ -275,6 +290,7 @@ export class ReturnsByProductPageComponent {
       'analytics', 'returns-by-product',
       this.wsStore.currentWorkspaceId(),
       this.period(),
+      this.platform(),
       this.search(),
       this.currentPage(),
       this.sortString(),
@@ -283,7 +299,8 @@ export class ReturnsByProductPageComponent {
       lastValueFrom(
         this.analyticsApi.listReturnsByProduct(
           this.wsStore.currentWorkspaceId()!,
-          { period: this.period(), search: this.search() || undefined },
+          { period: this.period(), search: this.search() || undefined,
+            sourcePlatform: this.platform() || undefined },
           this.currentPage(),
           this.pageSize(),
           this.sortString(),
@@ -401,7 +418,7 @@ export class ReturnsByProductPageComponent {
     if (sort.column) {
       this.currentSort.set({ column: sort.column, direction: sort.direction as 'asc' | 'desc' });
     } else {
-      this.currentSort.set({ column: 'return_rate_pct', direction: 'desc' });
+      this.currentSort.set({ column: 'returnRatePct', direction: 'desc' });
     }
     this.currentPage.set(0);
   }

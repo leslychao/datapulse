@@ -1,0 +1,23 @@
+{
+  "name": "Yandex Market — Price Update Rate Limit (420)",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/businesses/[0-9]+/offer-prices/updates",
+    "headers": {
+      "X-Simulate-Rate-Limit": {
+        "equalTo": "true"
+      }
+    }
+  },
+  "response": {
+    "status": 420,
+    "bodyFileName": "yandex-price-update-rate-limit.json",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-RateLimit-Resource-Limit": "10000",
+      "X-RateLimit-Resource-Remaining": "0",
+      "X-RateLimit-Resource-Until": "2026-04-12T12:01:00Z"
+    }
+  }
+}

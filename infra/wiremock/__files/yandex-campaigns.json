@@ -1,0 +1,36 @@
+{
+  "_source": "empirical-session-6",
+  "campaigns": [
+    {
+      "id": 10001,
+      "clientId": 50001,
+      "business": {
+        "id": 90001,
+        "name": "Test Business"
+      },
+      "domain": "test-store",
+      "placementType": "FBS",
+      "apiAvailability": "AVAILABLE"
+    },
+    {
+      "id": 10002,
+      "clientId": 50001,
+      "business": {
+        "id": 90001,
+        "name": "Test Business"
+      },
+      "domain": "test-store-fby",
+      "placementType": "FBY",
+      "apiAvailability": "AVAILABLE"
+    }
+  ],
+  "pager": {
+    "total": 2,
+    "from": 1,
+    "to": 2,
+    "currentPage": 1,
+    "pagesCount": 1,
+    "pageSize": 100
+  },
+  "paging": {}
+}

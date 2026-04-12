@@ -1,0 +1,28 @@
+{
+  "products": [
+    {
+      "sku": 300001,
+      "bid": 12.50,
+      "enabled": true,
+      "title": "Купальник женский раздельный",
+      "price": 2490.00,
+      "category_id": 15621042
+    },
+    {
+      "sku": 300002,
+      "bid": 8.75,
+      "enabled": true,
+      "title": "Футболка мужская базовая",
+      "price": 890.00,
+      "category_id": 15621043
+    },
+    {
+      "sku": 300003,
+      "bid": 0,
+      "enabled": false,
+      "title": "Шорты плавательные",
+      "price": 1290.00,
+      "category_id": 15621042
+    }
+  ]
+}

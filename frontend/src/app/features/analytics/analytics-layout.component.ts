@@ -74,7 +74,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
           <a
             [routerLink]="tab.path"
             routerLinkActive="active"
-            class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
+            class="border-b-2 border-transparent px-3 py-2.5 text-[length:var(--text-sm)]
                    font-medium text-[var(--text-secondary)] transition-colors
                    hover:text-[var(--text-primary)]
                    [&.active]:border-[var(--accent-primary)] [&.active]:text-[var(--accent-primary)]"
@@ -94,7 +94,7 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
               [routerLink]="link.path"
               routerLinkActive="active"
               [routerLinkActiveOptions]="subNavMatchOptions"
-              class="border-b-2 border-transparent px-3 py-2 text-[length:var(--text-sm)]
+              class="border-b-2 border-transparent px-3 py-2.5 text-[length:var(--text-sm)]
                      font-medium text-[var(--text-secondary)] transition-colors
                      hover:text-[var(--text-primary)]
                      [&.active]:border-[var(--accent-primary)] [&.active]:text-[var(--accent-primary)]"

@@ -18,20 +18,21 @@ import { formatMoney } from '@shared/utils/format.utils';
 interface MeasureColumn {
   labelKey: string;
   field: keyof PostingEntry;
+  isCost?: boolean;
 }
 
 const MEASURE_COLUMNS: MeasureColumn[] = [
   { labelKey: 'analytics.pnl.col.revenue', field: 'revenueAmount' },
-  { labelKey: 'analytics.pnl.col.commission', field: 'marketplaceCommissionAmount' },
-  { labelKey: 'analytics.pnl.col.acquiring', field: 'acquiringCommissionAmount' },
-  { labelKey: 'analytics.pnl.col.logistics', field: 'logisticsCostAmount' },
-  { labelKey: 'analytics.pnl.col.storage', field: 'storageCostAmount' },
-  { labelKey: 'analytics.pnl.col.penalties', field: 'penaltiesAmount' },
-  { labelKey: 'analytics.pnl.col.acceptance', field: 'acceptanceCostAmount' },
-  { labelKey: 'analytics.pnl.col.marketing', field: 'marketingCostAmount' },
-  { labelKey: 'analytics.pnl.col.other_charges', field: 'otherMarketplaceChargesAmount' },
+  { labelKey: 'analytics.pnl.col.commission', field: 'marketplaceCommissionAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.acquiring', field: 'acquiringCommissionAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.logistics', field: 'logisticsCostAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.storage', field: 'storageCostAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.penalties', field: 'penaltiesAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.acceptance', field: 'acceptanceCostAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.marketing', field: 'marketingCostAmount', isCost: true },
+  { labelKey: 'analytics.pnl.col.other_charges', field: 'otherMarketplaceChargesAmount', isCost: true },
   { labelKey: 'analytics.pnl.col.compensation', field: 'compensationAmount' },
-  { labelKey: 'analytics.pnl.col.refunds', field: 'refundAmount' },
+  { labelKey: 'analytics.pnl.col.refunds', field: 'refundAmount', isCost: true },
   { labelKey: 'analytics.pnl.col.payout', field: 'netPayout' },
 ];
 
@@ -83,14 +84,14 @@ export class PostingDetailPageComponent {
   }
 
   formatMoney(value: number | null): string {
-    if (value === 0) return '—';
     return formatMoney(value, 0);
   }
 
-  moneyColorClass(value: number | null): string {
-    if (value != null && value > 0) return 'text-[var(--finance-positive)]';
-    if (value != null && value < 0) return 'text-[var(--finance-negative)]';
-    return 'text-[var(--finance-zero)]';
+  moneyColorClass(value: number | null, isCost = false): string {
+    if (value == null || value === 0) return 'text-[var(--finance-zero)]';
+    if (isCost) return 'text-[var(--text-primary)]';
+    if (value > 0) return 'text-[var(--finance-positive)]';
+    return 'text-[var(--finance-negative)]';
   }
 
   residualColorClass(value: number): string {

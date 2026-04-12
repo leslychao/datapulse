@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Offer Mappings (POST /v2/businesses/{businessId}/offer-mappings)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/businesses/[0-9]+/offer-mappings"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-offer-mappings.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

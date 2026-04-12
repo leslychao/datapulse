@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
@@ -45,6 +45,16 @@ function monthEnd(period: string): string {
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
+        <select
+          [value]="platform()"
+          (change)="platform.set($any($event.target).value)"
+          class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
+                 px-2.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
+                 outline-none focus:border-[var(--accent-primary)]">
+          <option value="">{{ 'analytics.returns.filter.all_platforms' | translate }}</option>
+          <option value="WB">Wildberries</option>
+          <option value="OZON">Ozon</option>
+        </select>
         @if (!filtersDefault()) {
           <button type="button" (click)="onResetFilters()"
             class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
@@ -212,44 +222,35 @@ function monthEnd(period: string): string {
                 {{ 'analytics.returns.no_problem_products' | translate }}
               </p>
             } @else {
-              <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-                <table class="w-full text-sm">
+              <div class="dp-table-wrap">
+                <table class="dp-table">
                   <thead>
-                    <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                      <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">SKU</th>
-                      <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                        {{ 'analytics.returns.col.product' | translate }}
-                      </th>
-                      <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                        {{ 'analytics.returns.col.return_rate' | translate }}
-                      </th>
-                      <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                        {{ 'analytics.returns.col.return_count' | translate }}
-                      </th>
-                      <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                        {{ 'analytics.returns.col.top_reason' | translate }}
-                      </th>
+                    <tr>
+                      <th>SKU</th>
+                      <th>{{ 'analytics.returns.col.product' | translate }}</th>
+                      <th class="text-right">{{ 'analytics.returns.col.return_rate' | translate }}</th>
+                      <th class="text-right">{{ 'analytics.returns.col.return_count' | translate }}</th>
+                      <th>{{ 'analytics.returns.col.top_reason' | translate }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (item of topProducts(); track item.sellerSkuId) {
-                      <tr class="border-b border-[var(--border-subtle)] last:border-0
-                                 transition-colors hover:bg-[var(--bg-secondary)]">
-                        <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-[var(--text-secondary)]">
+                      <tr>
+                        <td class="whitespace-nowrap font-mono text-xs text-[var(--text-secondary)]">
                           {{ item.skuCode }}
                         </td>
-                        <td class="max-w-[200px] truncate px-4 py-2.5 text-[var(--text-primary)]"
+                        <td class="max-w-[200px] truncate text-[var(--text-primary)]"
                             [title]="item.productName">
                           {{ item.productName }}
                         </td>
-                        <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono"
+                        <td class="whitespace-nowrap text-right font-mono"
                             [class]="returnRateClass(item.returnRatePct)">
                           {{ formatPct(item.returnRatePct) }}
                         </td>
-                        <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                        <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                           {{ item.returnCount }}
                         </td>
-                        <td class="px-4 py-2.5 text-[var(--text-secondary)]">
+                        <td class="text-[var(--text-secondary)]">
                           {{ item.topReturnReason || '—' }}
                         </td>
                       </tr>
@@ -270,11 +271,15 @@ export class ReturnsOverviewPageComponent {
   private readonly navStore = inject(NavigationStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly t = inject(TranslateService);
 
   readonly infoIcon = Info;
 
   readonly period = signal(
     this.navStore.getSectionFilterValue<string>('analytics:returns', 'period') ?? currentMonth(),
+  );
+  readonly platform = signal(
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'platform') ?? '',
   );
 
   readonly trendMetric = signal<TrendMetric>('rate');
@@ -285,6 +290,7 @@ export class ReturnsOverviewPageComponent {
 
   private readonly filterDefs: UrlFilterDef[] = [
     { key: 'period', signal: this.period, defaultValue: currentMonth() },
+    { key: 'platform', signal: this.platform, defaultValue: '' },
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
@@ -294,8 +300,9 @@ export class ReturnsOverviewPageComponent {
     });
     effect(() => {
       const period = this.period();
+      const platform = this.platform();
       this.navStore.setSectionFilter('analytics:returns', {
-        period,
+        period, platform,
         from: monthStart(period),
         to: monthEnd(period),
       });
@@ -307,36 +314,37 @@ export class ReturnsOverviewPageComponent {
   }
 
   readonly summaryQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'returns-summary', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'returns-summary', this.wsStore.currentWorkspaceId(), this.period(), this.platform()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getReturnsSummary(
           this.wsStore.currentWorkspaceId()!,
-          { period: this.period() },
+          { period: this.period(), sourcePlatform: this.platform() || undefined },
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
   readonly trendQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'returns-trend', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'returns-trend', this.wsStore.currentWorkspaceId(), this.period(), this.platform()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.getReturnsTrend(
           this.wsStore.currentWorkspaceId()!,
-          { from: monthStart(this.period()), to: monthEnd(this.period()), granularity: 'DAILY' },
+          { from: monthStart(this.period()), to: monthEnd(this.period()), granularity: 'DAILY',
+            sourcePlatform: this.platform() || undefined },
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),
   }));
 
   readonly topProductsQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'returns-top-products', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'returns-top-products', this.wsStore.currentWorkspaceId(), this.period(), this.platform()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.listReturnsByProduct(
           this.wsStore.currentWorkspaceId()!,
-          { period: this.period() },
+          { period: this.period(), sourcePlatform: this.platform() || undefined },
           0, 5, 'returnRatePct,desc',
         ),
       ),
@@ -469,9 +477,10 @@ export class ReturnsOverviewPageComponent {
     if (last.returnRatePct == null || prev.returnRatePct == null) return null;
     const diff = last.returnRatePct - prev.returnRatePct;
     if (Math.abs(diff) < 0.1) return null;
-    return diff > 0
-      ? `Доля возвратов выросла на ${formatPercent(Math.abs(diff))} за последний день периода`
-      : `Доля возвратов снизилась на ${formatPercent(Math.abs(diff))} за последний день периода`;
+    const key = diff > 0
+      ? 'analytics.returns.trend_insight.up'
+      : 'analytics.returns.trend_insight.down';
+    return this.t.instant(key, { value: formatPercent(Math.abs(diff)) });
   });
 
   returnRateClass(rate: number): string {

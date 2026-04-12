@@ -240,7 +240,9 @@ export class DecisionsListPageComponent {
         field: 'participationMode',
         width: 120,
         valueFormatter: (params: any) =>
-          this.translate.instant(`promo.participation_mode.${params.value}`),
+          params.value
+            ? this.translate.instant(`promo.participation_mode.${params.value}`)
+            : '—',
       },
       {
         headerName: this.translate.instant('promo.decisions.col.target_price'),

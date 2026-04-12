@@ -32,7 +32,7 @@
         />
       </div>
       <p class="mt-1 text-[length:var(--text-sm)] text-[var(--text-secondary)]">
-        {{ c.promoType }} · {{ c.mechanic }} ·
+        {{ 'promo.promo_type.' + c.promoType | translate }} · {{ 'promo.mechanic.' + c.mechanic | translate }} ·
         {{ formatDate(c.dateFrom) }} — {{ c.dateTo ? formatDate(c.dateTo) : ('promo.campaigns.indefinite' | translate) }}
       </p>
     }

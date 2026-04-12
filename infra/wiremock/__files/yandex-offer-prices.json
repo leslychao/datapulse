@@ -1,0 +1,26 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "offers": [
+      {
+        "offerId": "TEST-SKU-001",
+        "price": {
+          "value": 5990,
+          "discountBase": 7500,
+          "currencyId": "RUR",
+          "updatedAt": "2026-04-01T10:30:00Z"
+        }
+      },
+      {
+        "offerId": "TEST-SKU-002",
+        "price": {
+          "value": 1490,
+          "currencyId": "RUR",
+          "updatedAt": "2026-04-05T14:15:00Z"
+        }
+      }
+    ],
+    "paging": {}
+  }
+}

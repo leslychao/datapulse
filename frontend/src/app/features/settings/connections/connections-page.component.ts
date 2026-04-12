@@ -8,7 +8,14 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
-import { ConnectionSummary, CreateConnectionRequest, MarketplaceType } from '@core/models';
+import {
+  ConnectionSummary,
+  CreateConnectionRequest,
+  MarketplaceType,
+  MARKETPLACE_REGISTRY,
+  MarketplaceConfig,
+  getMarketplaceConfig,
+} from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { StatusBadgeComponent } from '@shared/components/status-badge.component';
@@ -82,7 +89,7 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
             <form (ngSubmit)="submitCreate()" class="max-w-md space-y-4">
               <div class="flex items-center gap-2">
                 <dp-marketplace-badge [type]="selectedMarketplace()!" />
-                <span class="text-sm text-[var(--text-secondary)]">{{ selectedMarketplace() === 'WB' ? 'Wildberries' : 'Ozon' }}</span>
+                <span class="text-sm text-[var(--text-secondary)]">{{ selectedConfig()?.label }}</span>
               </div>
 
               <div>
@@ -97,43 +104,31 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
                 />
               </div>
 
-              @if (selectedMarketplace() === 'WB') {
-                <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.wb_token_label' | translate }}</label>
-                  <textarea
-                    [(ngModel)]="wbToken"
-                    name="wbToken"
-                    required
-                    rows="3"
-                    [placeholder]="'settings.connections.wb_token_placeholder' | translate"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  ></textarea>
-                </div>
-              }
-
-              @if (selectedMarketplace() === 'OZON') {
-                <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.ozon_client_id_label' | translate }}</label>
-                  <input
-                    type="text"
-                    [(ngModel)]="ozonClientId"
-                    name="ozonClientId"
-                    required
-                    [placeholder]="'settings.connections.ozon_client_id_placeholder' | translate"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-                <div>
-                  <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connections.ozon_api_key_label' | translate }}</label>
-                  <input
-                    type="password"
-                    [(ngModel)]="ozonApiKey"
-                    name="ozonApiKey"
-                    required
-                    [placeholder]="'settings.connections.ozon_api_key_placeholder' | translate"
-                    class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
-                </div>
+              @if (selectedConfig(); as config) {
+                @for (field of config.credentialFields; track field.key) {
+                  <div>
+                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ field.labelKey | translate }}</label>
+                    @if (field.inputType === 'textarea') {
+                      <textarea
+                        [(ngModel)]="credentialValues[field.key]"
+                        [name]="field.key"
+                        required
+                        rows="3"
+                        [placeholder]="field.placeholderKey ? (field.placeholderKey | translate) : ''"
+                        class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                      ></textarea>
+                    } @else {
+                      <input
+                        [type]="field.inputType"
+                        [(ngModel)]="credentialValues[field.key]"
+                        [name]="field.key"
+                        required
+                        [placeholder]="field.placeholderKey ? (field.placeholderKey | translate) : ''"
+                        class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                      />
+                    }
+                  </div>
+                }
               }
 
               @if (createMutation.error()) {
@@ -173,34 +168,31 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
             [hint]="'settings.connections.empty_hint' | translate"
           />
         } @else {
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-sm">
+          <div class="dp-table-wrap">
+            <table class="dp-table">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_marketplace' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_name' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_status' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.connections.col_last_sync' | translate }}</th>
-                  <th class="px-4 py-2"></th>
+                <tr>
+                  <th>{{ 'settings.connections.col_marketplace' | translate }}</th>
+                  <th>{{ 'settings.connections.col_name' | translate }}</th>
+                  <th>{{ 'settings.connections.col_status' | translate }}</th>
+                  <th>{{ 'settings.connections.col_last_sync' | translate }}</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 @for (conn of connections; track conn.id) {
-                  <tr
-                    class="border-b border-[var(--border-subtle)] cursor-pointer transition-colors hover:bg-[var(--bg-secondary)]"
-                    (click)="openDetail(conn)"
-                  >
-                    <td class="px-4 py-2.5">
+                  <tr class="cursor-pointer" (click)="openDetail(conn)">
+                    <td>
                       <dp-marketplace-badge [type]="conn.marketplaceType" />
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ conn.name }}</td>
-                    <td class="px-4 py-2.5">
+                    <td class="text-[var(--text-primary)]">{{ conn.name }}</td>
+                    <td>
                       <dp-status-badge [label]="conn.status | dpStatusLabel" [color]="conn.status | dpStatusColor" />
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">
+                    <td class="text-[var(--text-secondary)]">
                       {{ conn.lastSuccessAt | dpDateFormat }}
                     </td>
-                    <td class="px-4 py-2.5 text-right">
+                    <td class="text-right">
                       <lucide-icon [img]="ExternalLinkIcon" [size]="14" class="text-[var(--text-tertiary)]" />
                     </td>
                   </tr>
@@ -227,16 +219,15 @@ export class ConnectionsPageComponent {
 
   readonly formStep = signal<FormStep>('idle');
   readonly selectedMarketplace = signal<MarketplaceType | null>(null);
+  readonly selectedConfig = computed(() => {
+    const mp = this.selectedMarketplace();
+    return mp ? getMarketplaceConfig(mp) : null;
+  });
 
   formName = '';
-  wbToken = '';
-  ozonClientId = '';
-  ozonApiKey = '';
+  credentialValues: Record<string, string> = {};
 
-  readonly marketplaces = [
-    { type: 'WB' as MarketplaceType, label: 'Wildberries' },
-    { type: 'OZON' as MarketplaceType, label: 'Ozon' },
-  ];
+  readonly marketplaces = MARKETPLACE_REGISTRY;
 
   readonly connectionsQuery = injectQuery(() => ({
     queryKey: ['connections'],
@@ -260,6 +251,7 @@ export class ConnectionsPageComponent {
 
   selectMarketplace(type: MarketplaceType): void {
     this.selectedMarketplace.set(type);
+    this.credentialValues = {};
     this.formStep.set('credentials');
   }
 
@@ -267,28 +259,26 @@ export class ConnectionsPageComponent {
     this.formStep.set('idle');
     this.selectedMarketplace.set(null);
     this.formName = '';
-    this.wbToken = '';
-    this.ozonClientId = '';
-    this.ozonApiKey = '';
+    this.credentialValues = {};
   }
 
   isFormValid(): boolean {
     if (!this.formName.trim()) return false;
-    if (this.selectedMarketplace() === 'WB') return !!this.wbToken.trim();
-    return !!this.ozonClientId.trim() && !!this.ozonApiKey.trim();
+    const config = this.selectedConfig();
+    if (!config) return false;
+    return config.credentialFields.every(f => !!this.credentialValues[f.key]?.trim());
   }
 
   submitCreate(): void {
     if (!this.isFormValid()) return;
-    const mp = this.selectedMarketplace()!;
-    const credentials = mp === 'WB'
-      ? { apiToken: this.wbToken.trim() }
-      : { clientId: this.ozonClientId.trim(), apiKey: this.ozonApiKey.trim() };
-
+    const credentials: Record<string, string> = {};
+    for (const [k, v] of Object.entries(this.credentialValues)) {
+      credentials[k] = v.trim();
+    }
     this.createMutation.mutate({
-      marketplaceType: mp,
+      marketplaceType: this.selectedMarketplace()!,
       name: this.formName.trim(),
-      credentials,
+      credentials: credentials as unknown as CreateConnectionRequest['credentials'],
     });
   }
 

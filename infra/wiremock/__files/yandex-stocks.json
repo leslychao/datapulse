@@ -1,0 +1,57 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "paging": {},
+    "warehouses": [
+      {
+        "warehouseId": 70001,
+        "offers": [
+          {
+            "offerId": "TEST-SKU-001",
+            "stocks": [
+              { "type": "FIT", "count": 50 },
+              { "type": "AVAILABLE", "count": 42 },
+              { "type": "FREEZE", "count": 8 },
+              { "type": "QUARANTINE", "count": 0 }
+            ],
+            "updatedAt": "2026-04-10T08:30:00Z",
+            "turnoverSummary": {
+              "turnover": "HIGH",
+              "turnoverDays": 65.3
+            }
+          },
+          {
+            "offerId": "TEST-SKU-002",
+            "stocks": [
+              { "type": "FIT", "count": 120 },
+              { "type": "AVAILABLE", "count": 115 },
+              { "type": "FREEZE", "count": 5 },
+              { "type": "QUARANTINE", "count": 3 }
+            ],
+            "updatedAt": "2026-04-10T08:30:00Z",
+            "turnoverSummary": {
+              "turnover": "VERY_HIGH",
+              "turnoverDays": 28.7
+            }
+          }
+        ]
+      },
+      {
+        "warehouseId": 70002,
+        "offers": [
+          {
+            "offerId": "TEST-SKU-001",
+            "stocks": [
+              { "type": "FIT", "count": 15 },
+              { "type": "AVAILABLE", "count": 15 },
+              { "type": "FREEZE", "count": 0 },
+              { "type": "QUARANTINE", "count": 0 }
+            ],
+            "updatedAt": "2026-04-09T22:00:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

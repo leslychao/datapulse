@@ -1,0 +1,13 @@
+{
+  "name": "WB Advertising — Pause Campaign (advert-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/adv/v0/pause"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

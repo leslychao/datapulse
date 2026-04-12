@@ -1,0 +1,30 @@
+[
+  {
+    "nm_id": 274849,
+    "subject_id": 1045,
+    "placements": [
+      {
+        "type": "search",
+        "min_bid_kopecks": 125
+      },
+      {
+        "type": "recommendations",
+        "min_bid_kopecks": 80
+      }
+    ]
+  },
+  {
+    "nm_id": 275100,
+    "subject_id": 1045,
+    "placements": [
+      {
+        "type": "search",
+        "min_bid_kopecks": 150
+      },
+      {
+        "type": "recommendations",
+        "min_bid_kopecks": 95
+      }
+    ]
+  }
+]

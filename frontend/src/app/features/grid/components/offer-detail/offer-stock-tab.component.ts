@@ -54,32 +54,23 @@ import { MoneyDisplayComponent } from '@shared/components/money-display.componen
           <h4 class="mb-2 text-[length:var(--text-base)] font-semibold text-[var(--text-primary)]">
             {{ 'detail.stock.by_warehouse' | translate }}
           </h4>
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-[length:var(--text-sm)]">
+          <div class="dp-table-wrap">
+            <table class="dp-table dp-table-compact">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">
-                    {{ 'detail.stock.warehouse' | translate }}
-                  </th>
-                  <th class="px-3 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'detail.stock.available_short' | translate }}
-                  </th>
-                  <th class="px-3 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'detail.stock.reserved' | translate }}
-                  </th>
-                  <th class="px-3 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'detail.stock.cover_short' | translate }}
-                  </th>
+                <tr>
+                  <th>{{ 'detail.stock.warehouse' | translate }}</th>
+                  <th class="text-right">{{ 'detail.stock.available_short' | translate }}</th>
+                  <th class="text-right">{{ 'detail.stock.reserved' | translate }}</th>
+                  <th class="text-right">{{ 'detail.stock.cover_short' | translate }}</th>
                 </tr>
               </thead>
               <tbody>
                 @for (wh of offer().warehouses; track wh.warehouseName) {
-                  <tr class="border-b border-[var(--border-subtle)] last:border-b-0"
-                      [class]="whRowClass(wh.daysOfCover)">
-                    <td class="px-3 py-2 text-[var(--text-primary)]">{{ wh.warehouseName }}</td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">{{ wh.available }}</td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">{{ wh.reserved }}</td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--text-primary)]">
+                  <tr [class]="whRowClass(wh.daysOfCover)">
+                    <td class="text-[var(--text-primary)]">{{ wh.warehouseName }}</td>
+                    <td class="text-right font-mono text-[var(--text-primary)]">{{ wh.available }}</td>
+                    <td class="text-right font-mono text-[var(--text-primary)]">{{ wh.reserved }}</td>
+                    <td class="text-right font-mono text-[var(--text-primary)]">
                       @if (wh.daysOfCover !== null) {
                         {{ wh.daysOfCover.toFixed(1).replace('.', ',') }}
                       } @else {

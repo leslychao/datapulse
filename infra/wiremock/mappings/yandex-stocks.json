@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Stocks (POST /v2/campaigns/{campaignId}/offers/stocks)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/campaigns/[0-9]+/offers/stocks"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-stocks.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

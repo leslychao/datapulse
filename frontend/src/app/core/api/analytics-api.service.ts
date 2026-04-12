@@ -227,6 +227,9 @@ export class AnalyticsApiService {
     if (filter.granularity) {
       params = params.set('granularity', filter.granularity);
     }
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
+    }
     if (filter.sellerSkuId) {
       params = params.set('sellerSkuId', filter.sellerSkuId);
     }

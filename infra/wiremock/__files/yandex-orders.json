@@ -1,0 +1,119 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "paging": {},
+    "orders": [
+      {
+        "id": 300001,
+        "status": "DELIVERED",
+        "substatus": "USER_RECEIVED",
+        "creationDate": "2026-03-25",
+        "updatedAt": "2026-03-30T14:30:00Z",
+        "paymentType": "PREPAID",
+        "programType": "FBY",
+        "campaignId": 10002,
+        "items": [
+          {
+            "offerId": "TEST-SKU-001",
+            "offerName": "Ударная дрель Makita HP1630, 710 Вт",
+            "marketSku": 200100500,
+            "count": 1,
+            "prices": [
+              {
+                "type": "BUYER",
+                "costPerItem": 5990,
+                "total": 5990
+              }
+            ]
+          }
+        ],
+        "delivery": {
+          "deliveryPartnerType": "YANDEX_MARKET",
+          "type": "DELIVERY",
+          "shipments": [
+            {
+              "shipmentDate": "2026-03-26"
+            }
+          ],
+          "region": {
+            "id": 213,
+            "name": "Москва"
+          }
+        }
+      },
+      {
+        "id": 300002,
+        "status": "PROCESSING",
+        "substatus": "READY_TO_SHIP",
+        "creationDate": "2026-04-10",
+        "updatedAt": "2026-04-10T18:45:00Z",
+        "paymentType": "PREPAID",
+        "programType": "FBS",
+        "campaignId": 10001,
+        "items": [
+          {
+            "offerId": "TEST-SKU-002",
+            "offerName": "Набор бит Bosch 43 шт.",
+            "marketSku": 200100501,
+            "count": 3,
+            "prices": [
+              {
+                "type": "BUYER",
+                "costPerItem": 1490,
+                "total": 4470
+              }
+            ]
+          }
+        ],
+        "delivery": {
+          "deliveryPartnerType": "YANDEX_MARKET",
+          "type": "PICKUP",
+          "shipments": [
+            {
+              "shipmentDate": "2026-04-11"
+            }
+          ],
+          "region": {
+            "id": 2,
+            "name": "Санкт-Петербург"
+          }
+        }
+      },
+      {
+        "id": 300003,
+        "status": "CANCELLED",
+        "substatus": "USER_CHANGED_MIND",
+        "creationDate": "2026-04-08",
+        "updatedAt": "2026-04-09T09:00:00Z",
+        "paymentType": "PREPAID",
+        "programType": "FBS",
+        "campaignId": 10001,
+        "items": [
+          {
+            "offerId": "TEST-SKU-001",
+            "offerName": "Ударная дрель Makita HP1630, 710 Вт",
+            "marketSku": 200100500,
+            "count": 1,
+            "prices": [
+              {
+                "type": "BUYER",
+                "costPerItem": 5990,
+                "total": 5990
+              }
+            ]
+          }
+        ],
+        "delivery": {
+          "deliveryPartnerType": "YANDEX_MARKET",
+          "type": "DELIVERY",
+          "shipments": [],
+          "region": {
+            "id": 213,
+            "name": "Москва"
+          }
+        }
+      }
+    ]
+  }
+}

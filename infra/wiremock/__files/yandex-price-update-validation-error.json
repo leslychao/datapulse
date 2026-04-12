@@ -1,0 +1,10 @@
+{
+  "_source": "official-docs",
+  "status": "ERROR",
+  "errors": [
+    {
+      "code": "INVALID_FIELD",
+      "message": "Field 'offers[0].price.value' must be greater than 0."
+    }
+  ]
+}

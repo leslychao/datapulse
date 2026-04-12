@@ -349,7 +349,8 @@ export class EvaluationsListPageComponent {
         width: 150,
         cellRenderer: (params: any) => {
           if (!params.value) return '';
-          return `<span class="text-[var(--text-secondary)]" title="${params.value}">${params.value}</span>`;
+          const translated = this.translate.instant(params.value);
+          return `<span class="text-[var(--text-secondary)]" title="${translated}">${translated}</span>`;
         },
       },
       {

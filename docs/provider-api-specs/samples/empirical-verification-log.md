@@ -831,3 +831,279 @@ Sum: 7.58 - 0.50 - 0.50 - 76.33 + 4.85 - 78.00 - 1.36 + 1.36 = **-142.90**
 | WB v5 optional fields | ⏳ No production data | Deferred, monitor on first ingestion |
 | Ozon timezone | ✅ Moscow (UTC+3) confirmed | DD-17 created in mapping-spec |
 | Partial return | ✅ Residual=0, rules documented | Return measures rules added to analytics-pnl K-3 |
+
+---
+
+## Session 6: 2026-04-12 (Yandex Market Partner API — empirical verification)
+
+### Goal
+
+Полная эмпирическая верификация Yandex Market Partner API: auth, каталог, цены, остатки, заказы, возвраты, отчёты, склады, категории, акции, ставки, тарифы. Проверка error contract, endpoint discovery, расхождений с документацией.
+
+### Constraint
+
+Токен привязан к бизнесу с **disabled partners** (нет активных магазинов/кампаний). Это блокирует все business-level и campaign-level endpoints (403 API_DISABLED). Тем не менее, сессия верифицирует: auth mechanism, error response contract, endpoint URL корректность, HTTP method discovery, official docs cross-check.
+
+---
+
+### 6.1 Auth & Business Discovery
+
+**Endpoint:** `POST /v2/auth/token`
+**Result:** 403
+
+```json
+{
+  "status": "ERROR",
+  "errors": [{
+    "code": "API_DISABLED",
+    "message": "API for business <REDACTED_ID> disabled because it has only disabled partners."
+  }]
+}
+```
+
+**Ключевые находки:**
+- Токен валиден — API распознаёт его и возвращает `businessId` в сообщении об ошибке
+- `businessId` успешно извлечён из error response
+- Auth mechanism: `Api-Key: ACMA:...` header — **подтверждён**
+
+### 6.2 Campaigns (магазины)
+
+**Endpoint:** `GET /v2/campaigns`
+**Result:** 200 OK
+
+```json
+{
+  "campaigns": [],
+  "pager": {
+    "total": 0,
+    "from": 1,
+    "to": 0,
+    "currentPage": 1,
+    "pagesCount": 0,
+    "pageSize": 100
+  },
+  "paging": {}
+}
+```
+
+**Ключевые находки:**
+- Единственный endpoint, вернувший 200 OK — работает даже для disabled business
+- **Dual pagination** в ответе: legacy `pager` (page-based) + modern `paging` (cursor-based `nextPageToken`)
+- Подтверждена структура из docs: `campaigns[].id` (campaignId), `campaigns[].business.id` (businessId), `campaigns[].placementType`, `campaigns[].apiAvailability`
+- Пустой массив — нет активных магазинов, что объясняет 403 на всех остальных endpoints
+- **Rate limit** из docs: 1000 req/hour (до 18.05.2026 — 5000 req/hour)
+
+### 6.3 Offer Mappings (каталог)
+
+**Endpoint:** `POST /v2/businesses/{businessId}/offer-mappings`
+**Result:** 403 API_DISABLED
+
+**Из official docs подтверждено:**
+- Request body: `{"offerIds": [...], "cardStatuses": [...], "categoryIds": [...], "vendorNames": [...], "tags": [...], "archived": bool}`
+- Pagination: cursor-based (`pageToken` + `limit`, max 100)
+- Response wrapper: `{"status": "OK", "result": {"paging": {"nextPageToken": "..."}, "offerMappings": [{offer: {...}, mapping: {...}}]}}`
+- Offer fields: `offerId` (seller SKU), `name`, `vendor`, `barcodes[]`, `vendorCode`, `weightDimensions`, `basicPrice`, `purchasePrice`, `cardStatus`, `campaigns[]`, `sellingPrograms[]`, `archived`, `groupId`
+- Mapping fields: `marketSku` (Yandex SKU), `marketSkuName`, `marketModelName`, `marketCategoryId`, `marketCategoryName`
+- **Rate limit**: 100 req/min (600 with subscription)
+- Supports `language` query param: `RU` (default), `UZ`
+
+### 6.4 Offer Prices
+
+**Endpoint:** `POST /v2/businesses/{businessId}/offer-prices`
+**Result:** 403 API_DISABLED
+
+**Из official docs:** Цены доступны как часть offer-mappings через `offer.basicPrice`, `offer.purchasePrice`. Отдельный endpoint для получения цен — подтверждён URL.
+
+### 6.5 Stocks (остатки)
+
+**Endpoint:** `POST /v2/campaigns/{campaignId}/offers/stocks`
+**Result:** 403 FORBIDDEN (fake campaignId — "Access denied")
+
+**Из official docs подтверждено:**
+- Campaign-level endpoint (требует `campaignId`, НЕ `businessId`)
+- Request body: `{"offerIds": [...], "warehouseIds": [...], "withTurnover": bool}`
+- Response: items with `offerId`, `stocks[].warehouseId`, `stocks[].count`, `stocks[].type` (FIT/QUARANTINE/etc.)
+- Для FBY: можно получить `turnover` (оборачиваемость) через `withTurnover: true`
+- **Rate limit**: 100,000 items/min (НЕ запросов — считаются товары)
+
+### 6.6 Orders (заказы)
+
+**Endpoint:** `POST /v1/businesses/{businessId}/orders`
+**Result:** 403 API_DISABLED
+
+**Критическая находка из docs:**
+- `GET /v2/campaigns/{campaignId}/orders` — **DEPRECATED!**
+- Рекомендованная замена: `POST /v1/businesses/{businessId}/orders` (business-level)
+- Альтернатива: `POST /v2/campaigns/{campaignId}/stats/orders` (campaign-level stats)
+- Не возвращает заказы, доставленные/отменённые >30 дней назад (для старых — stats endpoint)
+- Поддерживает `fake: true` для тестовых заказов
+- **Rate limit**: 10,000 req/hour (до 18.05.2026 — 100,000)
+
+### 6.7 Returns (возвраты)
+
+**Endpoint:** `GET /v2/campaigns/{campaignId}/returns?limit=3`
+**Result:** 403 FORBIDDEN (fake campaignId)
+
+**Из docs:** campaign-level endpoint, требует `campaignId`.
+
+### 6.8 Report: United Marketplace Services
+
+**Endpoint:** `POST /v2/reports/united-marketplace-services/generate`
+**Result:** 403 API_DISABLED
+
+**Из official docs подтверждено:**
+- Async: generate → poll `GET /v2/reports/info/{reportId}` → download
+- Два типа отчётов: по дате начисления (`dateFrom`+`dateTo`) или по дате акта (`year`+`month`)
+- Scope: `finance-and-accounting` или `all-methods`
+- **Структура может меняться без предупреждения** (explicit disclaimer from Yandex!)
+- Колонки включают: ORDER_ID, SHOP_SKU, ORDER_CREATION_DATE_TIME, PLACEMENT_MODEL (FBY/FBS/etc.), INN, PARTNER_ID
+
+### 6.9 Report: Goods Realization
+
+**Endpoint:** `POST /v2/reports/goods-realization/generate`
+**Result:** 403 API_DISABLED
+
+**Из official docs подтверждено:**
+- Request: `{"businessId": ..., "year": YYYY, "month": M}` — помесячная генерация
+- Доступен для FBY, FBS, Express, DBS
+- Scope: `finance-and-accounting` или `all-methods`
+- Колонки: ORDER_ID, YOUR_ORDER_ID, YOUR_SKU, SHOP_SKU, ORDER_CREATION_DATE, TRANSFERRED_TO_DELIVERY_DATE, DELIVERY_DATE, TRANSFERRED_TO_DELIVERY_COUNT
+- **Структура может меняться без предупреждения**
+
+### 6.10 Warehouses (Yandex)
+
+**Endpoint:** `GET /v2/warehouses`
+**Result:** 403 API_DISABLED
+
+### 6.11 Warehouses (seller)
+
+**Endpoint:** `GET /v2/businesses/{businessId}/warehouses`
+**Result:** 403 API_DISABLED
+
+### 6.12 Categories Tree
+
+**Endpoint:** `POST /v2/categories/tree`
+**Result:** 403 API_DISABLED
+
+**Находка:** даже «справочные» endpoints, не привязанные к конкретному бизнесу, блокируются для disabled business. Это отличается от WB, где справочники доступны без привязки к аккаунту.
+
+### 6.13 Promos (акции)
+
+**Endpoint:** `POST /v2/businesses/{businessId}/promos`
+**Result:** 403 API_DISABLED
+
+### 6.14 Bids (ставки буста) — ENDPOINT DISCOVERY
+
+**Attempted endpoints:**
+
+| Method | URL | HTTP Status | Error Code |
+|--------|-----|-------------|------------|
+| POST | `/v2/businesses/{id}/bids` | 405 | METHOD_NOT_ALLOWED |
+| GET | `/v2/businesses/{id}/bids` | 405 | METHOD_NOT_ALLOWED |
+| PUT | `/v2/businesses/{id}/bids` | 403 | API_DISABLED |
+| POST | `/v2/businesses/{id}/bids/info/search` | 404 | NOT_FOUND |
+| POST | `/v2/businesses/{id}/bids/info` | 403 | API_DISABLED |
+
+**Вывод — правильные endpoints:**
+- **Read bids:** `POST /v2/businesses/{businessId}/bids/info` ✅
+- **Write bids:** `PUT /v2/businesses/{businessId}/bids` ✅
+
+**Из official docs подтверждено:**
+- Bid = integer, 0–9999 (процент от стоимости × 100, например 570 = 5.7%)
+- Request body (read): `{"skus": ["sku1", "sku2"]}` — если пустой, возвращает все ставки
+- Response: `{"status": "OK", "result": {"bids": [{"sku": "...", "bid": 570}], "paging": {"nextPageToken": "..."}}}`
+- Pagination: cursor-based, max 500 items
+- Scopes: `pricing`, `pricing:read-only`, `promotion`, `promotion:read-only`, `all-methods`
+- **Rate limit**: 500 req/min (1000 with subscription)
+
+### 6.15 Tariffs Calculator
+
+**Endpoint:** `POST /v2/tariffs/calculate`
+**Result:** 403 API_DISABLED
+
+---
+
+### Error Response Contract — VERIFIED
+
+| HTTP Status | Error Code | Message Pattern | Trigger |
+|-------------|------------|-----------------|---------|
+| 401 | `UNAUTHORIZED` | `Credentials are not specified` | No Api-Key header |
+| 401 | `UNAUTHORIZED` | `Api-Key token prefix invalid` | Malformed token |
+| 403 | `API_DISABLED` | `API for business {id} disabled because it has only disabled partners.` | Valid token, disabled business |
+| 403 | `FORBIDDEN` | `Access denied` | Valid token, wrong campaignId |
+| 404 | `NOT_FOUND` | `Resource not found` | Non-existent endpoint |
+| 405 | `METHOD_NOT_ALLOWED` | `Request method '{METHOD}' not supported` | Wrong HTTP method |
+
+**Общая структура ответов:**
+- Success: `{"status": "OK", "result": {...}}`
+- Error: `{"status": "ERROR", "errors": [{"code": "...", "message": "..."}]}`
+- Campaigns (legacy): includes `pager` (page-based) alongside `paging` (cursor-based)
+
+---
+
+### Key Findings & Discrepancies
+
+#### F-1: Disabled Business Blocks ALL Endpoints
+Даже «справочные» endpoints (categories, warehouses) блокируются для disabled business. В отличие от WB/Ozon, Yandex Market не разделяет «аккаунтные» и «глобальные» API. Единственное исключение — `GET /v2/campaigns` (возвращает пустой массив с 200).
+
+#### F-2: Bids Endpoint URL Mismatch
+Пользовательская спецификация указала `POST /v2/businesses/{businessId}/bids` для чтения ставок. Реальный read endpoint — `POST /v2/businesses/{businessId}/bids/info`. Endpoint `/bids` принимает только PUT (write). Это критическое расхождение для адаптера.
+
+#### F-3: Orders Endpoint Deprecated
+`GET /v2/campaigns/{campaignId}/orders` помечен как **Deprecated** в официальной документации. Рекомендуемая замена — `POST /v1/businesses/{businessId}/orders`. Это меняет уровень запроса с campaign на business.
+
+#### F-4: Dual Pagination in Campaigns
+Endpoint `/v2/campaigns` возвращает оба формата пагинации: legacy `pager` (page-based) и modern `paging` (cursor-based). Адаптер должен использовать `paging.nextPageToken`.
+
+#### F-5: Rate Limit Code = 420 (Not 429)
+В отличие от стандартного 429 Too Many Requests, Yandex Market возвращает **420 Enhance Your Calm** (420 Method Failure в документации). Retry logic должна обрабатывать оба кода.
+
+#### F-6: Report Structure Disclaimer
+Yandex Market явно заявляет: «Структура и содержание отчетов могут изменяться без предварительного уведомления». Парсер отчётов должен быть lenient (`@JsonIgnoreProperties(ignoreUnknown = true)`).
+
+#### F-7: No Sandbox
+У Yandex Market нет отдельного sandbox-окружения (в отличие от WB). Тестирование — только через production API с реальным аккаунтом. Для интеграционных тестов — только WireMock.
+
+---
+
+### МАТРИЦА ДОСТУПНОСТИ ПРОВЕРКИ
+
+| # | Endpoint | R/W | Official docs | Empirical prod | Sandbox | Реальные данные | WireMock нужен | Уверенность в контракте |
+|---|----------|-----|---------------|----------------|---------|-----------------|----------------|-------------------------|
+| 1 | `POST /v2/auth/token` | R | ✅ Есть | ✅ 403 (businessId discovered) | ❌ Нет | ❌ Disabled biz | Нет (auth only) | 🟡 Medium |
+| 2 | `GET /v2/campaigns` | R | ✅ Есть, sample | ✅ 200 OK (empty) | ❌ Нет | ❌ Нет кампаний | ✅ Да | 🟢 High |
+| 3 | `POST /businesses/{id}/offer-mappings` | R | ✅ Есть, полный sample | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 4 | `POST /businesses/{id}/offer-prices` | R | ⚠️ Цены в offer-mappings | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 5 | `POST /campaigns/{id}/offers/stocks` | R | ✅ Есть, полный sample | ❌ 403 (FORBIDDEN) | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 6 | `POST /v1/businesses/{id}/orders` | R | ✅ Есть (v1) | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 7 | `GET /campaigns/{id}/returns` | R | ⚠️ Docs URL 404 | ❌ 403 (FORBIDDEN) | ❌ Нет | ❌ Нет | ✅ Да | 🔴 Low |
+| 8 | `POST /reports/united-mktplace-services/generate` | R | ✅ Есть, column spec | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 9 | `GET /reports/info/{reportId}` | R | ✅ Есть | ❌ No reportId | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 10 | `POST /reports/goods-realization/generate` | R | ✅ Есть, column spec | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 11 | `GET /v2/warehouses` | R | ✅ Есть | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 12 | `GET /businesses/{id}/warehouses` | R | ✅ Есть | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 13 | `POST /categories/tree` | R | ✅ Есть | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 14 | `POST /businesses/{id}/promos` | R | ✅ Есть | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+| 15 | `POST /businesses/{id}/bids/info` | R | ✅ Есть, full spec | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟢 High |
+| 16 | `POST /tariffs/calculate` | R | ✅ Есть | ❌ 403 | ❌ Нет | ❌ Нет | ✅ Да | 🟡 Medium |
+
+**Легенда уверенности:**
+- 🟢 **High** — подтверждено эмпирически + docs (URL/method verified via probing, response structure from docs)
+- 🟡 **Medium** — docs-only (URL и body structure из документации, не проверено на реальных данных)
+- 🔴 **Low** — ни docs, ни empirical не подтвердили полный контракт
+
+---
+
+### Summary of Session 6
+
+| Verification | Result | Impact |
+|-------------|--------|--------|
+| Auth mechanism (Api-Key header) | ✅ Confirmed | Token valid, businessId discoverable |
+| Error response contract | ✅ 6 error codes verified | Adapter error handling fully spec'd |
+| Campaigns structure | ✅ 200 OK (empty) | Dual pagination confirmed |
+| Bids endpoint discovery | ✅ Read=POST bids/info, Write=PUT bids | F-2: original spec was wrong |
+| Orders deprecation | ⚠️ GET orders DEPRECATED | F-3: use POST /v1/businesses/{id}/orders |
+| Report structure disclaimer | ⚠️ May change without notice | F-6: parser must be lenient |
+| All business-level endpoints | ❌ 403 API_DISABLED | Need active account for data verification |
+| No sandbox | ❌ Confirmed | F-7: WireMock required for all tests |
+| Data-level verification | ❌ Not possible | BLOCKER: disabled business, no real data |

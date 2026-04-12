@@ -46,32 +46,32 @@ const NON_ADMIN_ROLES: WorkspaceRole[] = ['PRICING_MANAGER', 'OPERATOR', 'ANALYS
         @if (members.length === 0) {
           <dp-empty-state [message]="'settings.team.empty' | translate" />
         } @else {
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-sm">
+          <div class="dp-table-wrap">
+            <table class="dp-table">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_name' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_email' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_role' | translate }}</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.team.col_joined' | translate }}</th>
+                <tr>
+                  <th>{{ 'settings.team.col_name' | translate }}</th>
+                  <th>{{ 'settings.team.col_email' | translate }}</th>
+                  <th>{{ 'settings.team.col_role' | translate }}</th>
+                  <th>{{ 'settings.team.col_joined' | translate }}</th>
                   @if (rbac.isAdmin()) {
-                    <th class="px-4 py-2"></th>
+                    <th></th>
                   }
                 </tr>
               </thead>
               <tbody>
                 @for (m of members; track m.userId) {
-                  <tr class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]">
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">
+                  <tr>
+                    <td class="text-[var(--text-primary)]">
                       {{ m.name }}
                       @if (isSelf(m)) {
                         <span class="ml-1 text-xs text-[var(--text-tertiary)]">({{ 'settings.team.you' | translate }})</span>
                       }
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ m.email }}</td>
-                    <td class="px-4 py-2.5">
+                    <td class="text-[var(--text-secondary)]">{{ m.email }}</td>
+                    <td>
                       @if (m.role === 'OWNER' || !rbac.isAdmin() || isSelf(m)) {
-                        <span class="text-sm font-medium text-[var(--text-primary)]">{{ m.role | dpRoleLabel }}</span>
+                        <span class="font-medium text-[var(--text-primary)]">{{ m.role | dpRoleLabel }}</span>
                       } @else {
                         <select
                           [ngModel]="m.role"
@@ -85,11 +85,11 @@ const NON_ADMIN_ROLES: WorkspaceRole[] = ['PRICING_MANAGER', 'OPERATOR', 'ANALYS
                         </select>
                       }
                     </td>
-                    <td class="px-4 py-2.5 text-[var(--text-secondary)]">
+                    <td class="text-[var(--text-secondary)]">
                       {{ m.createdAt | dpDateFormat:'short' }}
                     </td>
                     @if (rbac.isAdmin()) {
-                      <td class="px-4 py-2.5 text-right">
+                      <td class="text-right">
                         @if (m.role !== 'OWNER' && !isSelf(m)) {
                           <button
                             (click)="confirmRemove(m)"

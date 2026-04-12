@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Report Status Done (GET /v2/reports/info/{reportId})",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/v2/reports/info/[A-Za-z0-9-]+"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-report-status-done.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

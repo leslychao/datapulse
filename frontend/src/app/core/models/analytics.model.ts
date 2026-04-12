@@ -12,6 +12,7 @@ export interface AnalyticsFilter {
   sellerSkuId?: number;
   stockOutRisk?: StockOutRisk;
   productId?: number;
+  sourcePlatform?: string;
 }
 
 export interface CostBreakdownItem {

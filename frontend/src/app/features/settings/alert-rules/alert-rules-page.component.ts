@@ -77,31 +77,28 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
       }
 
       @if (rulesQuery.data(); as rules) {
-        <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-          <table class="w-full text-sm">
+        <div class="dp-table-wrap">
+          <table class="dp-table">
             <thead>
-              <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_name' | translate }}</th>
-                <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_type' | translate }}</th>
-                <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_severity' | translate }}</th>
-                <th class="px-4 py-2 text-center font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_status' | translate }}</th>
-                <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">{{ 'settings.alert_rules.col_last_triggered' | translate }}</th>
+              <tr>
+                <th>{{ 'settings.alert_rules.col_type' | translate }}</th>
+                <th class="text-center">{{ 'settings.alert_rules.col_severity' | translate }}</th>
+                <th class="text-center">{{ 'settings.alert_rules.col_status' | translate }}</th>
+                <th class="text-right">{{ 'settings.alert_rules.col_last_triggered' | translate }}</th>
               </tr>
             </thead>
             <tbody>
               @for (rule of rules; track rule.id) {
                 <tr
-                  class="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-secondary)]"
                   [class.cursor-pointer]="rbac.isAdmin()"
                   [class.bg-[var(--bg-secondary)]]="expandedRuleId() === rule.id"
                   (click)="rbac.isAdmin() && toggleExpand(rule)"
                 >
-                  <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ ruleTypeLabel(rule.ruleType) }}</td>
-                  <td class="px-4 py-2.5 font-mono text-[var(--text-secondary)]">{{ rule.ruleType }}</td>
-                  <td class="px-4 py-2.5 text-center">
+                  <td class="text-[var(--text-primary)]">{{ ruleTypeLabel(rule.ruleType) }}</td>
+                  <td class="text-center">
                     <dp-status-badge [label]="severityLabel(rule.severity)" [color]="severityColor(rule.severity)" />
                   </td>
-                  <td class="px-4 py-2.5 text-center">
+                  <td class="text-center">
                     @if (rbac.isAdmin()) {
                       <button
                         (click)="toggleEnabled(rule, $event)"
@@ -123,7 +120,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
                       </span>
                     }
                   </td>
-                  <td class="px-4 py-2.5 text-right text-[var(--text-secondary)]">
+                  <td class="text-right text-[var(--text-secondary)]">
                     {{ rule.lastTriggeredAt | dpDateFormat:'short' }}
                   </td>
                 </tr>

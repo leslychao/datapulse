@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, NgZone, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, NgZone, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
@@ -20,7 +20,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ConnectionApiService } from '@core/api/connection-api.service';
 import { RbacService } from '@core/auth/rbac.service';
 import { translateApiErrorMessage } from '@core/i18n/translate-api-error';
-import { CallLogEntry, SyncState } from '@core/models';
+import { CallLogEntry, SyncState, getMarketplaceConfig, getMarketplaceLabel, MarketplaceType } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { BreadcrumbService } from '@shared/services/breadcrumb.service';
@@ -107,7 +107,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.marketplace' | translate }}</span>
-              <p class="mt-0.5 text-[var(--text-primary)]">{{ conn.marketplaceType === 'WB' ? 'Wildberries' : 'Ozon' }}</p>
+              <p class="mt-0.5 text-[var(--text-primary)]">{{ marketplaceLabel(conn.marketplaceType) }}</p>
             </div>
             <div>
               <span class="text-[var(--text-secondary)]">{{ 'settings.connection_detail.status' | translate }}</span>
@@ -143,37 +143,26 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
               </div>
             } @else {
               <form (ngSubmit)="submitRotation()" class="max-w-md space-y-4">
-                @if (conn.marketplaceType === 'WB') {
+                @for (field of rotationFields(); track field.key) {
                   <div>
-                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_token_label' | translate }}</label>
-                    <textarea
-                      [(ngModel)]="newWbToken"
-                      name="newWbToken"
-                      required
-                      rows="3"
-                      class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                    ></textarea>
-                  </div>
-                } @else {
-                  <div>
-                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_client_id_label' | translate }}</label>
-                    <input
-                      type="text"
-                      [(ngModel)]="newOzonClientId"
-                      name="newOzonClientId"
-                      required
-                      class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ 'settings.connection_detail.new_api_key_label' | translate }}</label>
-                    <input
-                      type="password"
-                      [(ngModel)]="newOzonApiKey"
-                      name="newOzonApiKey"
-                      required
-                      class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                    />
+                    <label class="mb-1 block text-sm text-[var(--text-secondary)]">{{ field.labelKey | translate }}</label>
+                    @if (field.inputType === 'textarea') {
+                      <textarea
+                        [(ngModel)]="rotationValues[field.key]"
+                        [name]="field.key"
+                        required
+                        rows="3"
+                        class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                      ></textarea>
+                    } @else {
+                      <input
+                        [type]="field.inputType"
+                        [(ngModel)]="rotationValues[field.key]"
+                        [name]="field.key"
+                        required
+                        class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                      />
+                    }
                   </div>
                 }
                 <div class="flex gap-3">
@@ -215,7 +204,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
               [rowData]="syncStates"
               [columnDefs]="syncColDefs"
               [defaultColDef]="defaultColDef"
-              [animateRows]="true"
+              [animateRows]="false"
               [suppressCellFocus]="true"
               [localeText]="AG_GRID_LOCALE_RU"
             />
@@ -231,12 +220,33 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
                 [rowData]="callLogPage.content"
                 [columnDefs]="callLogColDefs"
                 [defaultColDef]="defaultColDef"
-                [animateRows]="true"
+                [animateRows]="false"
                 [suppressCellFocus]="true"
-                [pagination]="true"
-                [paginationPageSize]="20"
                 [localeText]="AG_GRID_LOCALE_RU"
               />
+              @if (callLogPage.totalPages > 1) {
+                <div class="mt-3 flex items-center justify-between text-sm">
+                  <span class="text-[var(--text-secondary)]">
+                    {{ 'common.pagination.showing' | translate:{
+                      from: callLogPage.number * callLogPage.size + 1,
+                      to: callLogPage.number * callLogPage.size + callLogPage.content.length,
+                      total: callLogPage.totalElements
+                    } }}
+                  </span>
+                  <div class="flex gap-2">
+                    <button
+                      (click)="callLogPage$.set(callLogPage$() - 1)"
+                      [disabled]="callLogPage$() === 0"
+                      class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >{{ 'common.pagination.prev' | translate }}</button>
+                    <button
+                      (click)="callLogPage$.set(callLogPage$() + 1)"
+                      [disabled]="callLogPage$() >= callLogPage.totalPages - 1"
+                      class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >{{ 'common.pagination.next' | translate }}</button>
+                  </div>
+                </div>
+              }
             }
           </dp-section-card>
 
@@ -351,9 +361,13 @@ export class ConnectionDetailPageComponent {
   readonly showRotation = signal(false);
   readonly showArchiveModal = signal(false);
 
-  newWbToken = '';
-  newOzonClientId = '';
-  newOzonApiKey = '';
+  rotationValues: Record<string, string> = {};
+
+  readonly rotationFields = computed(() => {
+    const conn = this.connectionQuery.data();
+    if (!conn) return [];
+    return getMarketplaceConfig(conn.marketplaceType).credentialFields;
+  });
 
   private get connId(): number {
     return Number(this.connectionId());
@@ -365,9 +379,14 @@ export class ConnectionDetailPageComponent {
     staleTime: 30_000,
   }));
 
+  readonly callLogPage$ = signal(0);
+  private readonly callLogPageSize = 20;
+
   readonly callLogQuery = injectQuery(() => ({
-    queryKey: ['connection-call-log', this.connectionId()],
-    queryFn: () => lastValueFrom(this.connectionApi.getCallLog(this.connId, {}, 0, 50)),
+    queryKey: ['connection-call-log', this.connectionId(), this.callLogPage$()],
+    queryFn: () => lastValueFrom(
+      this.connectionApi.getCallLog(this.connId, {}, this.callLogPage$(), this.callLogPageSize),
+    ),
   }));
 
   readonly renameMutation = injectMutation(() => ({
@@ -383,11 +402,11 @@ export class ConnectionDetailPageComponent {
 
   readonly rotateMutation = injectMutation(() => ({
     mutationFn: () => {
-      const conn = this.connectionQuery.data()!;
-      const credentials = conn.marketplaceType === 'WB'
-        ? { apiToken: this.newWbToken.trim() }
-        : { clientId: this.newOzonClientId.trim(), apiKey: this.newOzonApiKey.trim() };
-      return lastValueFrom(this.connectionApi.updateCredentials(this.connId, { credentials }));
+      const credentials: Record<string, string> = {};
+      for (const [k, v] of Object.entries(this.rotationValues)) {
+        credentials[k] = v.trim();
+      }
+      return lastValueFrom(this.connectionApi.updateCredentials(this.connId, { credentials } as any));
     },
     onSuccess: () => {
       this.connectionQuery.refetch();
@@ -453,6 +472,10 @@ export class ConnectionDetailPageComponent {
       headerName: this.translate.instant('settings.connection_detail.col_status'),
       field: 'status',
       flex: 1,
+      valueFormatter: (params) =>
+        params.value
+          ? this.translate.instant(`connection.sync_status.${params.value.toLowerCase()}`)
+          : '—',
       cellStyle: (params) => {
         if (params.value === 'IDLE') return { color: 'var(--status-success)' };
         if (params.value === 'SYNCING') return { color: 'var(--status-info)' };
@@ -541,17 +564,18 @@ export class ConnectionDetailPageComponent {
   }
 
   isRotationValid(): boolean {
-    const conn = this.connectionQuery.data();
-    if (!conn) return false;
-    if (conn.marketplaceType === 'WB') return !!this.newWbToken.trim();
-    return !!this.newOzonClientId.trim() && !!this.newOzonApiKey.trim();
+    const fields = this.rotationFields();
+    if (!fields.length) return false;
+    return fields.every(f => !!this.rotationValues[f.key]?.trim());
   }
 
   cancelRotation(): void {
     this.showRotation.set(false);
-    this.newWbToken = '';
-    this.newOzonClientId = '';
-    this.newOzonApiKey = '';
+    this.rotationValues = {};
+  }
+
+  protected marketplaceLabel(type: MarketplaceType): string {
+    return getMarketplaceLabel(type);
   }
 
   submitRotation(): void {

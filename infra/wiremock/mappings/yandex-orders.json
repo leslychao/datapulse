@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Orders (POST /v1/businesses/{businessId}/orders)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v1/businesses/[0-9]+/orders"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-orders.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

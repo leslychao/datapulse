@@ -21,6 +21,10 @@ import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
 
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -87,29 +91,29 @@ const GRANULARITY_OPTIONS: { value: Granularity; labelKey: string }[] = [
       <!-- Summary table -->
       @if (trendQuery.data(); as points) {
         @if (points.length > 0) {
-          <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-left text-[length:var(--text-sm)]">
-              <thead class="bg-[var(--bg-secondary)] text-[length:var(--text-xs)] text-[var(--text-secondary)]">
+          <div class="dp-table-wrap overflow-x-auto">
+            <table class="dp-table">
+              <thead>
                 <tr>
-                  <th class="px-3 py-2 font-medium">{{ 'analytics.pnl.trend.period' | translate }}</th>
-                  <th class="px-3 py-2 font-medium text-right">{{ 'analytics.pnl.col.revenue' | translate }}</th>
-                  <th class="px-3 py-2 font-medium text-right">{{ 'analytics.pnl.kpi.total_costs' | translate }}</th>
-                  <th class="px-3 py-2 font-medium text-right">{{ 'analytics.pnl.kpi.cogs' | translate }}</th>
-                  <th class="px-3 py-2 font-medium text-right">{{ 'analytics.pnl.kpi.advertising' | translate }}</th>
-                  <th class="px-3 py-2 font-medium text-right">{{ 'analytics.pnl.col.full_pnl' | translate }}</th>
+                  <th>{{ 'analytics.pnl.trend.period' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.pnl.col.revenue' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.pnl.kpi.total_costs' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.pnl.kpi.cogs' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.pnl.kpi.advertising' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.pnl.col.full_pnl' | translate }}</th>
                 </tr>
               </thead>
               <tbody>
                 @for (pt of points; track pt.period) {
-                  <tr class="border-t border-[var(--border-subtle)]">
-                    <td class="px-3 py-2 text-[var(--text-secondary)]">{{ pt.period }}</td>
-                    <td class="px-3 py-2 text-right font-mono">{{ formatMoney(pt.revenueAmount) }}</td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--finance-negative)]">
+                  <tr>
+                    <td class="text-[var(--text-secondary)]">{{ pt.period }}</td>
+                    <td class="text-right font-mono">{{ formatMoney(pt.revenueAmount) }}</td>
+                    <td class="text-right font-mono text-[var(--finance-negative)]">
                       {{ formatMoney(pt.totalCostsAmount) }}
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--finance-negative)]">{{ formatMoney(pt.cogsAmount) }}</td>
-                    <td class="px-3 py-2 text-right font-mono text-[var(--finance-negative)]">{{ formatMoney(pt.advertisingCostAmount) }}</td>
-                    <td class="px-3 py-2 text-right font-mono font-semibold" [class]="moneyColorClass(pt.fullPnl)">
+                    <td class="text-right font-mono text-[var(--finance-negative)]">{{ formatMoney(pt.cogsAmount) }}</td>
+                    <td class="text-right font-mono text-[var(--finance-negative)]">{{ formatMoney(pt.advertisingCostAmount) }}</td>
+                    <td class="text-right font-mono font-semibold" [class]="moneyColorClass(pt.fullPnl)">
                       {{ formatMoney(pt.fullPnl) }}
                     </td>
                   </tr>
@@ -192,16 +196,16 @@ export class PnlTrendPageComponent {
           type: 'line',
           data: points.map((p) => p.revenueAmount),
           smooth: true,
-          itemStyle: { color: '#059669' },
+          itemStyle: { color: cssVar('--finance-positive') },
           lineStyle: { width: 2 },
-          areaStyle: { color: 'rgba(5,150,105,0.1)' },
+          areaStyle: { color: cssVar('--finance-positive') + '1a' },
         },
         {
           name: this.t.instant('analytics.pnl.chart.costs'),
           type: 'line',
           data: points.map((p) => p.totalCostsAmount),
           smooth: true,
-          itemStyle: { color: '#DC2626' },
+          itemStyle: { color: cssVar('--finance-negative') },
           lineStyle: { width: 2, type: 'dashed' },
         },
         {
@@ -209,7 +213,7 @@ export class PnlTrendPageComponent {
           type: 'line',
           data: points.map((p) => p.fullPnl),
           smooth: true,
-          itemStyle: { color: '#2563EB' },
+          itemStyle: { color: cssVar('--accent-primary') },
           lineStyle: { width: 3 },
         },
       ],

@@ -80,7 +80,7 @@
         >
           <option value="">{{ 'queues.filters.all' | translate }}</option>
           @for (s of severityOptions; track s) {
-            <option [value]="s">{{ s }}</option>
+            <option [value]="s">{{ 'mismatches.severity.' + s | translate }}</option>
           }
         </select>
       </label>
@@ -96,7 +96,7 @@
         >
           <option value="">{{ 'queues.filters.all' | translate }}</option>
           @for (t of mismatchTypeOptions; track t) {
-            <option [value]="t">{{ t }}</option>
+            <option [value]="t">{{ 'mismatches.type.' + t | translate }}</option>
           }
         </select>
       </label>
@@ -112,7 +112,7 @@
         >
           <option value="">{{ 'queues.filters.all' | translate }}</option>
           @for (d of decisionTypeOptions; track d) {
-            <option [value]="d">{{ d }}</option>
+            <option [value]="d">{{ 'queues.decision_type.' + d | translate }}</option>
           }
         </select>
       </label>
@@ -257,6 +257,7 @@
           [animateRows]="true"
           [rowHeight]="32"
           [headerHeight]="32"
+          [localeText]="localeText"
           [loading]="itemsQuery.isPending()"
           (gridReady)="onGridReady($event)"
           (selectionChanged)="onSelectionChanged($event)"

@@ -57,6 +57,7 @@ import {
   financeColor,
   renderBadge,
 } from '@shared/utils/format.utils';
+import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
 type QueueContext = SystemQueueCode | 'CUSTOM';
 
@@ -156,6 +157,8 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
 
   readonly queueIdNum = computed(() => Number(this.queueId()));
   readonly workspaceId = computed(() => this.wsStore.currentWorkspaceId());
+
+  readonly localeText = AG_GRID_LOCALE_RU;
 
   readonly defaultColDef: ColDef<QueueItem> = {
     flex: 1,

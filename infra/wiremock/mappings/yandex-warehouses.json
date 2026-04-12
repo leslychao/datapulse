@@ -1,0 +1,14 @@
+{
+  "name": "Yandex Market — Fulfillment Warehouses (GET /v2/warehouses)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/v2/warehouses"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-warehouses.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

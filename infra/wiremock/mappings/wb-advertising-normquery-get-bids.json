@@ -1,0 +1,14 @@
+{
+  "name": "WB Advertising — Get Norm Query Bids (advert-api)",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/adv/v0/normquery/get-bids"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-advertising-normquery-get-bids.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

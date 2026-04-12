@@ -1,5 +1,5 @@
 ---
-description: Strict evidence chain for analyzing provider APIs (Wildberries, Ozon)
+description: Strict evidence chain for analyzing provider APIs (Wildberries, Ozon, Yandex Market)
 alwaysApply: true
 ---
 
@@ -20,6 +20,7 @@ alwaysApply: true
 - Wildberries финансовые отчёты: https://openapi.wildberries.ru/#tag/Finansy
 - Wildberries sandbox
 - Ozon Seller API: https://docs.ozon.ru/api/seller/
+- Yandex Market Partner API: https://yandex.ru/dev/market/partner-api/doc/ru/
 
 ## Реальные API-вызовы
 
@@ -104,6 +105,88 @@ Sandbox требует: **тестовый токен** (`"t":true` в JWT) + **
 
 Источник: https://dev.wildberries.ru/sandbox
 
+## Yandex Market API — особенности
+
+### Base URL
+
+```
+https://api.partner.market.yandex.ru
+```
+
+Все endpoints версионированы: `/v2/campaigns/...`, `/v2/businesses/...`, `/v2/reports/...`.
+
+### Авторизация
+
+Api-Key-токен в заголовке `Api-Key` (не `Authorization`):
+
+```
+Api-Key: ACMA:Wd1CyQdDkhs1ewX1I0hKFKRGmYGbCLS5QRgLbrH7:c48c5547
+```
+
+- **Формат токена**: `ACMA:<base64>:<hex>` — непрозрачная строка, не JWT.
+- **Срок жизни**: бессрочный — действует до ручного удаления в кабинете.
+- **Макс. количество**: 30 токенов на кабинет.
+- **Scopes**: токен создаётся с доступами к группам методов (`all-methods`, `pricing`, `inventory-and-order-processing`, `offers-and-cards-management`, `promotion`, `finance-and-accounting`, `communication`, `settings-management`, `supplies-management:read-only`). Read-only варианты: `*:read-only`.
+- **OAuth-токен** — устаревший способ, также поддерживается (заголовок `Authorization: OAuth <token>`), но для новых интеграций рекомендован Api-Key.
+
+### Иерархия идентификаторов
+
+| ID | Уровень | Описание |
+|---|---|---|
+| `businessId` | Кабинет | Один кабинет = один продавец. Методы уровня кабинета (каталог, товары) |
+| `campaignId` | Магазин (кампания) | Один кабинет может содержать несколько магазинов (FBY, FBS, DBS, Express). Методы уровня магазина (заказы, отгрузки, возвраты) |
+
+- **Получить оба ID**: `GET /v2/campaigns` — возвращает список магазинов с `businessId` и `campaignId` для токена.
+- **Важно**: часть методов работает на уровне `businessId` (каталог, цены), часть — на уровне `campaignId` (заказы, остатки, возвраты). Некоторые методы (отчёты) требуют тот или другой в зависимости от типа отчёта.
+
+### Пагинация
+
+**Cursor-based** (рекомендуемый):
+- Запрос: `pageToken` (string, cursor) + `limit` (int).
+- Ответ: `paging.nextPageToken` — если присутствует, есть следующая страница. Если отсутствует — последняя страница.
+- `pageToken` — непрозрачная строка, не номер страницы.
+
+**Page-based** (устаревший, не использовать):
+- `page` + `pageSize` — deprecated, заменён на `pageToken` + `limit`.
+
+### Rate Limits
+
+Лимиты указаны **per-method** в документации каждого endpoint (в формате «N запросов в час» или «N запросов в минуту»). Общего единого лимита нет.
+
+- При превышении: HTTP `420 Enhance Your Calm` (не 429).
+- Пример: `GET /v2/campaigns` — 1 000 req/hour (до 18.05.2026 — 5 000 req/hour).
+
+### Retry-поведение
+
+| HTTP-код | Значение | Retry |
+|---|---|---|
+| 400 | Ошибка в содержании запроса | **Нет** — исправить запрос |
+| 401 | Нет или невалидный токен | **Нет** |
+| 403 | Токен не имеет доступа / истёк OAuth | **Нет** |
+| 404 | Ресурс не найден | **Нет** |
+| 420 | Rate limit exceeded | **Да** — backoff |
+| 423 | Метод заблокирован для магазина | **Нет** |
+| 499 | Клиент закрыл соединение | **Да** — повторить |
+| 500 | Internal Server Error | **Да** — backoff |
+| 503 | Service Unavailable | **Да** — backoff |
+
+### Модели размещения
+
+У Яндекс Маркета несколько моделей, каждая = отдельный `campaignId`:
+
+| Модель | Описание |
+|---|---|
+| FBY | Fulfillment by Yandex (аналог FBO у WB) |
+| FBS | Fulfillment by Seller |
+| DBS | Delivery by Seller |
+| Express | Экспресс-доставка |
+
+Не все методы доступны для всех моделей — проверять в документации метода.
+
+### Sandbox
+
+**Нет отдельного sandbox-окружения.** В отличие от WB, Яндекс Маркет не предоставляет sandbox URL. Тестирование — на реальном API с реальным аккаунтом.
+
 ## Provider Connections
 
 ### Real Account
@@ -114,6 +197,8 @@ WILDBERRIES:
 OZON:
  client-id: "1943980"
  api-key: "a9d31abc-6f09-4848-915e-d669fba8845a"
+YANDEX_MARKET:
+ api-key: "ACMA:Wd1CyQdDkhs1ewX1I0hKFKRGmYGbCLS5QRgLbrH7:c48c5547"
 ```
 
 ### Sandbox Account

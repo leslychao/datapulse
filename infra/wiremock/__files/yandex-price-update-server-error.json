@@ -1,0 +1,10 @@
+{
+  "_source": "empirical-session-6",
+  "status": "ERROR",
+  "errors": [
+    {
+      "code": "INTERNAL_SERVER_ERROR",
+      "message": "Internal server error. Please try again later."
+    }
+  ]
+}

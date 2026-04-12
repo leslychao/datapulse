@@ -113,43 +113,35 @@ function resolveCssVar(name: string): string {
             {{ 'analytics.inventory.no_critical' | translate }}
           </p>
         } @else {
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-sm">
+          <div class="dp-table-wrap">
+            <table class="dp-table">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">SKU</th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.product' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.available' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.days_of_cover' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.risk' | translate }}
-                  </th>
+                <tr>
+                  <th>SKU</th>
+                  <th>{{ 'analytics.inventory.col.product' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.inventory.col.available' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.inventory.col.days_of_cover' | translate }}</th>
+                  <th>{{ 'analytics.inventory.col.risk' | translate }}</th>
                 </tr>
               </thead>
               <tbody>
                 @for (item of visibleCritical(); track item.productId) {
-                  <tr class="border-b border-[var(--border-subtle)] transition-colors last:border-0 hover:bg-[var(--bg-secondary)]">
-                    <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-[var(--text-secondary)]"
+                  <tr>
+                    <td class="whitespace-nowrap font-mono text-xs text-[var(--text-secondary)]"
                         [title]="item.skuCode">
                       {{ item.skuCode }}
                     </td>
-                    <td class="max-w-xs truncate px-4 py-2.5 text-[var(--text-primary)]"
+                    <td class="max-w-xs truncate text-[var(--text-primary)]"
                         [title]="item.productName">
                       {{ item.productName }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ item.available }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ item.daysOfCover ?? '—' }}
                     </td>
-                    <td class="px-4 py-2.5">
+                    <td>
                       <dp-stock-risk-badge [risk]="item.stockOutRisk" />
                     </td>
                   </tr>

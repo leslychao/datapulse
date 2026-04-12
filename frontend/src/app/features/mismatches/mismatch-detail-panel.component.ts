@@ -158,14 +158,14 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
       <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         @if (detailQuery.data(); as d) {
           @if (activeTab() === 'comparison') {
-            <div class="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
-              <table class="w-full text-sm">
-                <thead class="bg-[var(--bg-secondary)] text-left text-[var(--text-secondary)]"><tr><th class="px-3 py-2">{{ 'mismatches.detail.field' | translate }}</th><th class="px-3 py-2">{{ 'mismatches.detail.expected' | translate }}</th><th class="px-3 py-2">{{ 'mismatches.detail.actual' | translate }}</th></tr></thead>
-                <tbody class="divide-y divide-[var(--border-subtle)]">
+            <div class="dp-table-wrap overflow-x-auto">
+              <table class="dp-table dp-table-compact">
+                <thead><tr><th>{{ 'mismatches.detail.field' | translate }}</th><th>{{ 'mismatches.detail.expected' | translate }}</th><th>{{ 'mismatches.detail.actual' | translate }}</th></tr></thead>
+                <tbody>
                   <tr>
-                    <td class="px-3 py-2 text-[var(--text-secondary)]">{{ 'mismatches.detail.value_row' | translate }}</td>
-                    <td class="max-w-[140px] break-words px-3 py-2 font-mono" [ngClass]="cellExpected(d)">{{ d.expectedValue }}</td>
-                    <td class="max-w-[140px] break-words px-3 py-2 font-mono" [ngClass]="cellActual(d)">
+                    <td class="text-[var(--text-secondary)]">{{ 'mismatches.detail.value_row' | translate }}</td>
+                    <td class="max-w-[140px] break-words font-mono" [ngClass]="cellExpected(d)">{{ d.expectedValue }}</td>
+                    <td class="max-w-[140px] break-words font-mono" [ngClass]="cellActual(d)">
                       {{ d.actualValue }}
                       @if (d.expectedValue !== d.actualValue && d.deltaPct != null) {
                         <span class="ml-1 text-[11px] font-medium text-[var(--status-error)]">
@@ -175,9 +175,9 @@ function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' |
                     </td>
                   </tr>
                   <tr>
-                    <td class="px-3 py-2 text-[var(--text-secondary)]">{{ 'mismatches.detail.source' | translate }}</td>
-                    <td class="px-3 py-2">{{ d.expectedSource }}</td>
-                    <td class="px-3 py-2">{{ d.actualSource }}</td>
+                    <td class="text-[var(--text-secondary)]">{{ 'mismatches.detail.source' | translate }}</td>
+                    <td>{{ d.expectedSource }}</td>
+                    <td>{{ d.actualSource }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -399,9 +399,9 @@ export class MismatchDetailPanelComponent {
   protected tabCls(id: DetailTab): Record<string, boolean> {
     const on = this.activeTab() === id;
     return {
-      'cursor-pointer rounded-t-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors': true,
-      'bg-[var(--bg-tertiary)] text-[var(--text-primary)]': on,
-      'text-[var(--text-secondary)]': !on,
+      'cursor-pointer px-3 py-2 text-sm font-medium transition-colors': true,
+      'border-b-2 border-[var(--accent-primary)] text-[var(--text-primary)]': on,
+      'border-b-2 border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]': !on,
     };
   }
 

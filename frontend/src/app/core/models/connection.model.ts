@@ -1,4 +1,4 @@
-export type MarketplaceType = 'WB' | 'OZON';
+export type MarketplaceType = 'WB' | 'OZON' | 'YANDEX';
 export type ConnectionStatus = 'PENDING_VALIDATION' | 'ACTIVE' | 'AUTH_FAILED' | 'DISABLED' | 'ARCHIVED';
 export type SyncHealth = 'OK' | 'SYNCING' | 'STALE' | 'ERROR';
 
@@ -30,7 +30,7 @@ export interface ConnectionDetail {
 export interface CreateConnectionRequest {
   marketplaceType: MarketplaceType;
   name: string;
-  credentials: WbCredentials | OzonCredentials;
+  credentials: WbCredentials | OzonCredentials | YandexCredentials;
 }
 
 export interface WbCredentials {
@@ -42,8 +42,12 @@ export interface OzonCredentials {
   apiKey: string;
 }
 
+export interface YandexCredentials {
+  apiKey: string;
+}
+
 export interface UpdateCredentialsRequest {
-  credentials: WbCredentials | OzonCredentials;
+  credentials: WbCredentials | OzonCredentials | YandexCredentials;
 }
 
 export interface SyncState {

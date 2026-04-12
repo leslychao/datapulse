@@ -7,7 +7,8 @@ datapulse:
       statistics-base-url: https://statistics-api-sandbox.wildberries.ru
       marketplace-base-url: https://marketplace-api-sandbox.wildberries.ru
       promo-base-url: https://discounts-prices-api-sandbox.wildberries.ru
-      advert-base-url: https://advert-api-sandbox.wildberries.ru
+      # Advert API → WireMock (sandbox returns 404 for bidding endpoints)
+      advert-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
       # No sandbox for analytics API — route to WireMock
       analytics-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
       # Write URLs → WireMock
@@ -18,6 +19,8 @@ datapulse:
       # Read URL uses real API (has real data — 464 products)
       # Write URL → WireMock
       seller-write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      # Performance API → WireMock (no real credentials yet)
+      performance-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
 
 spring:
   jpa:

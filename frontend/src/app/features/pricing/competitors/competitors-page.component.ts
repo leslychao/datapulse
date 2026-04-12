@@ -145,19 +145,19 @@ import { ConfirmationModalComponent } from '@shared/components/confirmation-moda
           } @else if (observations().length === 0) {
             <p class="text-xs text-[var(--text-tertiary)]">{{ 'pricing.competitors.observations_empty' | translate }}</p>
           } @else {
-            <div class="max-h-48 overflow-auto rounded-[var(--radius-md)] border border-[var(--border-default)]">
-              <table class="w-full text-left text-sm">
-                <thead class="bg-[var(--bg-tertiary)] text-xs text-[var(--text-secondary)]">
+            <div class="dp-table-wrap max-h-48 overflow-auto">
+              <table class="dp-table dp-table-compact">
+                <thead>
                   <tr>
-                    <th class="px-3 py-1.5">{{ 'pricing.competitors.col.last_price' | translate }}</th>
-                    <th class="px-3 py-1.5">{{ 'pricing.competitors.col.observed_at' | translate }}</th>
+                    <th>{{ 'pricing.competitors.col.last_price' | translate }}</th>
+                    <th>{{ 'pricing.competitors.col.observed_at' | translate }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (obs of observations(); track obs.id) {
-                    <tr class="border-t border-[var(--border-default)]">
-                      <td class="px-3 py-1.5 font-mono">{{ obs.competitorPrice | number:'1.2-2' }} ₽</td>
-                      <td class="px-3 py-1.5 text-[var(--text-secondary)]">{{ obs.observedAt }}</td>
+                    <tr>
+                      <td class="font-mono">{{ obs.competitorPrice | number:'1.2-2' }} ₽</td>
+                      <td class="text-[var(--text-secondary)]">{{ fmtDateTime(obs.observedAt) }}</td>
                     </tr>
                   }
                 </tbody>
@@ -290,7 +290,7 @@ export class CompetitorsPageComponent {
     },
     {
       field: 'createdAt',
-      headerName: this.translate.instant('pricing.competitors.col.observed_at'),
+      headerName: this.translate.instant('pricing.competitors.col.created_at'),
       width: 170,
       valueFormatter: (p: ValueFormatterParams<CompetitorMatch>) =>
         p.value ? formatDateTime(p.value) : '',
@@ -411,6 +411,10 @@ export class CompetitorsPageComponent {
     if (target) {
       this.deleteMutation.mutate(target.id);
     }
+  }
+
+  fmtDateTime(value: string | null): string {
+    return value ? formatDateTime(value) : '—';
   }
 
   private resetForm(): void {

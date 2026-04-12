@@ -1,0 +1,14 @@
+{
+  "name": "WB Advertising — Change Bids (advert-api)",
+  "request": {
+    "method": "PATCH",
+    "urlPathPattern": "/api/advert/v1/bids"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "wb-advertising-bids-change.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

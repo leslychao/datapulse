@@ -1,0 +1,49 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "paging": {},
+    "returns": [
+      {
+        "id": 400001,
+        "orderId": 300001,
+        "creationDate": "2026-04-02",
+        "updateDate": "2026-04-05",
+        "returnStatus": "RECEIVED_ON_MARKETPLACE",
+        "returnType": "RETURN",
+        "items": [
+          {
+            "marketSku": 200100500,
+            "shopSku": "TEST-SKU-001",
+            "count": 1,
+            "decisionType": "REFUND_MONEY",
+            "returnReason": {
+              "type": "BAD_QUALITY",
+              "description": "Дефект корпуса"
+            }
+          }
+        ]
+      },
+      {
+        "id": 400002,
+        "orderId": 300003,
+        "creationDate": "2026-04-09",
+        "updateDate": "2026-04-09",
+        "returnStatus": "WAITING_FOR_RETURN",
+        "returnType": "UNREDEEMED",
+        "items": [
+          {
+            "marketSku": 200100500,
+            "shopSku": "TEST-SKU-001",
+            "count": 1,
+            "decisionType": "REFUND_MONEY",
+            "returnReason": {
+              "type": "DO_NOT_FIT",
+              "description": "Не подошёл размер"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -42,6 +42,16 @@ function monthEnd(period: string): string {
       <!-- Filter bar -->
       <div class="flex items-center gap-3">
         <dp-month-picker [value]="period()" (valueChange)="period.set($event)" />
+        <select
+          [value]="platform()"
+          (change)="platform.set($any($event.target).value)"
+          class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)]
+                 px-2.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
+                 outline-none focus:border-[var(--accent-primary)]">
+          <option value="">{{ 'analytics.returns.filter.all_platforms' | translate }}</option>
+          <option value="WB">Wildberries</option>
+          <option value="OZON">Ozon</option>
+        </select>
         @if (!filtersDefault()) {
           <button type="button" (click)="onResetFilters()"
             class="h-8 cursor-pointer rounded-[var(--radius-md)] px-3 text-[length:var(--text-sm)]
@@ -84,46 +94,35 @@ function monthEnd(period: string): string {
           <h3 class="mb-3 text-sm font-medium text-[var(--text-primary)]">
             {{ 'analytics.returns.reasons.table_title' | translate }}
           </h3>
-          <div class="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)]">
-            <table class="w-full text-sm">
+          <div class="dp-table-wrap">
+            <table class="dp-table">
               <thead>
-                <tr class="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
-                  <th class="px-4 py-2 text-left font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.returns.reasons.col.reason' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.returns.reasons.col.count' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.returns.reasons.col.percent' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.returns.reasons.col.amount' | translate }}
-                  </th>
-                  <th class="px-4 py-2 text-right font-medium text-[var(--text-secondary)]">
-                    {{ 'analytics.returns.reasons.col.products' | translate }}
-                  </th>
-                  <th class="w-20 px-4 py-2"></th>
+                <tr>
+                  <th>{{ 'analytics.returns.reasons.col.reason' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.returns.reasons.col.count' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.returns.reasons.col.percent' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.returns.reasons.col.amount' | translate }}</th>
+                  <th class="text-right">{{ 'analytics.returns.reasons.col.products' | translate }}</th>
+                  <th class="w-20"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (r of reasons(); track r.reason) {
-                  <tr class="border-b border-[var(--border-subtle)] last:border-0
-                             transition-colors hover:bg-[var(--bg-secondary)]">
-                    <td class="px-4 py-2.5 text-[var(--text-primary)]">{{ r.reason }}</td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                  <tr>
+                    <td class="text-[var(--text-primary)]">{{ r.reason }}</td>
+                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ r.returnCount.toLocaleString('ru-RU') }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ formatPct(r.percent) }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ formatMoney(r.returnAmount) }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">
+                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
                       {{ r.productCount }}
                     </td>
-                    <td class="px-4 py-2.5 text-right">
+                    <td class="text-right">
                       <button
                         (click)="navigateToProducts(r.reason)"
                         class="cursor-pointer text-[length:var(--text-xs)] font-medium text-[var(--accent-primary)]
@@ -152,9 +151,13 @@ export class ReturnsReasonsPageComponent {
   readonly period = signal(
     this.navStore.getSectionFilterValue<string>('analytics:returns', 'period') ?? currentMonth(),
   );
+  readonly platform = signal(
+    this.navStore.getSectionFilterValue<string>('analytics:returns', 'platform') ?? '',
+  );
 
   private readonly filterDefs: UrlFilterDef[] = [
     { key: 'period', signal: this.period, defaultValue: currentMonth() },
+    { key: 'platform', signal: this.platform, defaultValue: '' },
   ];
   readonly filtersDefault = isFiltersDefault(this.filterDefs);
 
@@ -164,8 +167,9 @@ export class ReturnsReasonsPageComponent {
     });
     effect(() => {
       const period = this.period();
+      const platform = this.platform();
       this.navStore.setSectionFilter('analytics:returns', {
-        period,
+        period, platform,
         from: monthStart(period),
         to: monthEnd(period),
       });
@@ -177,12 +181,12 @@ export class ReturnsReasonsPageComponent {
   }
 
   readonly reasonsQuery = injectQuery(() => ({
-    queryKey: ['analytics', 'returns-reasons', this.wsStore.currentWorkspaceId(), this.period()],
+    queryKey: ['analytics', 'returns-reasons', this.wsStore.currentWorkspaceId(), this.period(), this.platform()],
     queryFn: () =>
       lastValueFrom(
         this.analyticsApi.listReturnReasons(
           this.wsStore.currentWorkspaceId()!,
-          { period: this.period() },
+          { period: this.period(), sourcePlatform: this.platform() || undefined },
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),

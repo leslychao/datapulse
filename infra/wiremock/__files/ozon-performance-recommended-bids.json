@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    {
+      "sku": 300001,
+      "recommended_bid": 15.00,
+      "min_bid": 3.00,
+      "category_median_bid": 12.50
+    },
+    {
+      "sku": 300002,
+      "recommended_bid": 9.50,
+      "min_bid": 2.00,
+      "category_median_bid": 8.00
+    }
+  ]
+}

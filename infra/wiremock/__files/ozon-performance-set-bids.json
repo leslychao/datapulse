@@ -1,0 +1,14 @@
+{
+  "updatedSkus": [
+    {
+      "sku": 300001,
+      "bid": 12.50,
+      "status": "OK"
+    },
+    {
+      "sku": 300002,
+      "bid": 8.75,
+      "status": "OK"
+    }
+  ]
+}

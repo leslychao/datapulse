@@ -1,0 +1,14 @@
+{
+  "name": "Ozon Performance — Set Search Promo Bids",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/client/campaign/products/set-bids"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "ozon-performance-set-bids.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Yandex Market — Price Update Success (POST /v2/businesses/{businessId}/offer-prices/updates)",
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v2/businesses/[0-9]+/offer-prices/updates"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "yandex-price-update-success.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

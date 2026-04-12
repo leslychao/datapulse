@@ -244,6 +244,7 @@ export class DecisionsListPageComponent {
       width: 150,
       sortable: true,
       cellRenderer: (params: ICellRendererParams<PricingDecisionSummary>) => {
+        if (!params.value) return '—';
         const label = this.translate.instant(
           `pricing.policies.strategy.${params.value}`,
         );

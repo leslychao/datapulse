@@ -1,0 +1,10 @@
+{
+  "_source": "official-docs",
+  "status": "ERROR",
+  "errors": [
+    {
+      "code": "METHOD_FAILURE",
+      "message": "Rate limit exceeded. Try again later."
+    }
+  ]
+}

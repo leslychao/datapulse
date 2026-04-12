@@ -55,20 +55,20 @@
           <div class="border-b border-[var(--border-default)] px-4 py-3">
             <h2 class="text-sm font-semibold text-[var(--text-primary)]">{{ 'mismatches.tabs.comparison' | translate }}</h2>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-[var(--bg-secondary)] text-left text-[var(--text-secondary)]">
+          <div class="dp-table-wrap overflow-x-auto">
+            <table class="dp-table dp-table-compact">
+              <thead>
                 <tr>
-                  <th class="px-4 py-2.5">{{ 'mismatches.detail.field' | translate }}</th>
-                  <th class="px-4 py-2.5">{{ 'mismatches.detail.expected' | translate }}</th>
-                  <th class="px-4 py-2.5">{{ 'mismatches.detail.actual' | translate }}</th>
+                  <th>{{ 'mismatches.detail.field' | translate }}</th>
+                  <th>{{ 'mismatches.detail.expected' | translate }}</th>
+                  <th>{{ 'mismatches.detail.actual' | translate }}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-[var(--border-subtle)]">
+              <tbody>
                 <tr>
-                  <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ 'mismatches.detail.value_row' | translate }}</td>
-                  <td class="px-4 py-2.5 font-mono" [ngClass]="cellExpected(data)">{{ data.expectedValue }}</td>
-                  <td class="px-4 py-2.5 font-mono" [ngClass]="cellActual(data)">
+                  <td class="text-[var(--text-secondary)]">{{ 'mismatches.detail.value_row' | translate }}</td>
+                  <td class="font-mono" [ngClass]="cellExpected(data)">{{ data.expectedValue }}</td>
+                  <td class="font-mono" [ngClass]="cellActual(data)">
                     {{ data.actualValue }}
                     @if (data.expectedValue !== data.actualValue && data.deltaPct != null) {
                       <span class="ml-1.5 text-[11px] font-medium text-[var(--status-error)]">
@@ -78,9 +78,9 @@
                   </td>
                 </tr>
                 <tr>
-                  <td class="px-4 py-2.5 text-[var(--text-secondary)]">{{ 'mismatches.detail.source' | translate }}</td>
-                  <td class="px-4 py-2.5">{{ data.expectedSource }}</td>
-                  <td class="px-4 py-2.5">{{ data.actualSource }}</td>
+                  <td class="text-[var(--text-secondary)]">{{ 'mismatches.detail.source' | translate }}</td>
+                  <td>{{ data.expectedSource }}</td>
+                  <td>{{ data.actualSource }}</td>
                 </tr>
               </tbody>
             </table>

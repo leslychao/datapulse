@@ -1,0 +1,13 @@
+{
+  "name": "WB Advertising — Start Campaign (advert-api)",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/adv/v0/start"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
