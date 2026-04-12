@@ -9,6 +9,7 @@ import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SectionCardComponent } from '@shared/components/section-card.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 import { StatusLabelPipe } from '@shared/pipes/status-label.pipe';
@@ -21,6 +22,7 @@ import { StatusLabelPipe } from '@shared/pipes/status-label.pipe';
     FormsModule,
     TranslatePipe,
     SectionCardComponent,
+    EmptyStateComponent,
     SpinnerComponent,
     DateFormatPipe,
     StatusLabelPipe,
@@ -34,6 +36,12 @@ import { StatusLabelPipe } from '@shared/pipes/status-label.pipe';
 
       @if (workspaceQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (workspaceQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="workspaceQuery.refetch()"
+        />
       }
 
       @if (workspaceQuery.data(); as ws) {

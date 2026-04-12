@@ -7,6 +7,7 @@ import { lastValueFrom } from 'rxjs';
 import { UserApiService } from '@core/api/user-api.service';
 import { AuthService } from '@core/auth/auth.service';
 import { SectionCardComponent } from '@shared/components/section-card.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { ToastService } from '@shared/shell/toast/toast.service';
 
@@ -14,7 +15,7 @@ import { ToastService } from '@shared/shell/toast/toast.service';
   selector: 'dp-profile-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, SectionCardComponent, SpinnerComponent],
+  imports: [FormsModule, TranslatePipe, SectionCardComponent, SpinnerComponent, EmptyStateComponent],
   template: `
     <div class="max-w-2xl">
       <div class="mb-6">
@@ -28,6 +29,12 @@ import { ToastService } from '@shared/shell/toast/toast.service';
 
       @if (profileQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (profileQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="profileQuery.refetch()"
+        />
       }
 
       @if (profileQuery.data(); as user) {

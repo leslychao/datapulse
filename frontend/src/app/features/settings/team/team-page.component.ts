@@ -40,6 +40,12 @@ const NON_ADMIN_ROLES: WorkspaceRole[] = ['PRICING_MANAGER', 'OPERATOR', 'ANALYS
 
       @if (membersQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (membersQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="membersQuery.refetch()"
+        />
       }
 
       @if (membersQuery.data(); as members) {

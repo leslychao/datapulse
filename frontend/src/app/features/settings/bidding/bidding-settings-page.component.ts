@@ -10,6 +10,7 @@ import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SectionCardComponent } from '@shared/components/section-card.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 
 @Component({
@@ -20,6 +21,7 @@ import { SpinnerComponent } from '@shared/layout/spinner.component';
     FormsModule,
     TranslatePipe,
     SectionCardComponent,
+    EmptyStateComponent,
     SpinnerComponent,
   ],
   template: `
@@ -35,6 +37,12 @@ import { SpinnerComponent } from '@shared/layout/spinner.component';
 
       @if (settingsQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (settingsQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="settingsQuery.refetch()"
+        />
       }
 
       @if (settingsQuery.data(); as settings) {

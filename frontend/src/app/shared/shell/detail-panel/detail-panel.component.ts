@@ -7,15 +7,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideAngularModule, X, GripVertical } from 'lucide-angular';
-
 import { DetailPanelService } from '@shared/services/detail-panel.service';
 
 @Component({
   selector: 'dp-detail-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [],
   template: `
     <div class="relative flex h-full flex-col bg-[var(--bg-primary)]"
          [style.width.px]="panelService.width()">
@@ -38,8 +36,6 @@ import { DetailPanelService } from '@shared/services/detail-panel.service';
 export class DetailPanelComponent {
   protected readonly panelService = inject(DetailPanelService);
 
-  readonly closeIcon = X;
-  readonly gripIcon = GripVertical;
   readonly isResizing = signal(false);
 
   private startX = 0;

@@ -41,6 +41,7 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
         <p class="mt-1 text-[var(--text-sm)] text-[var(--text-secondary)]">{{ 'settings.invitations.subtitle' | translate }}</p>
       </div>
 
+      @if (rbac.isAdmin()) {
       <dp-section-card [title]="'settings.invitations.send_title' | translate" class="mb-6">
         <form (ngSubmit)="sendInvite()" class="flex items-end gap-3">
           <div class="flex-1">
@@ -83,9 +84,16 @@ import { RoleLabelPipe } from '@shared/pipes/role-label.pipe';
           <p class="mt-2 text-sm text-[var(--status-error)]">{{ 'settings.invitations.create_error_message' | translate }}</p>
         }
       </dp-section-card>
+      }
 
       @if (invitationsQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (invitationsQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="invitationsQuery.refetch()"
+        />
       }
 
       @if (invitationsQuery.data(); as invitations) {

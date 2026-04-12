@@ -28,6 +28,7 @@ import { StatusBadgeComponent } from '@shared/components/status-badge.component'
 import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 import { SectionCardComponent } from '@shared/components/section-card.component';
 import { ConfirmationModalComponent } from '@shared/components/confirmation-modal.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 import { StatusLabelPipe, StatusColorPipe } from '@shared/pipes/status-label.pipe';
@@ -47,6 +48,7 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
     MarketplaceBadgeComponent,
     SectionCardComponent,
     ConfirmationModalComponent,
+    EmptyStateComponent,
     SpinnerComponent,
     DateFormatPipe,
     StatusLabelPipe,
@@ -64,6 +66,12 @@ import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
       @if (connectionQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (connectionQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="connectionQuery.refetch()"
+        />
       }
 
       @if (connectionQuery.data(); as conn) {

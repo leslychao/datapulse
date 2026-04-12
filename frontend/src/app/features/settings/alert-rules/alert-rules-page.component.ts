@@ -9,6 +9,7 @@ import { RbacService } from '@core/auth/rbac.service';
 import { AlertRule, AlertRuleType, AlertSeverity } from '@core/models';
 import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
+import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
 import { DateFormatPipe } from '@shared/pipes/date-format.pipe';
 
@@ -62,6 +63,7 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
     FormsModule,
     TranslatePipe,
     SpinnerComponent,
+    EmptyStateComponent,
     StatusBadgeComponent,
     DateFormatPipe,
   ],
@@ -74,6 +76,12 @@ const CONFIG_FIELDS: Record<AlertRuleType, ConfigFieldDef[]> = {
 
       @if (rulesQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (rulesQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="rulesQuery.refetch()"
+        />
       }
 
       @if (rulesQuery.data(); as rules) {

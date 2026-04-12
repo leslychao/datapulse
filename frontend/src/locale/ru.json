@@ -154,6 +154,13 @@
   "shell.command_palette.go_settings": "Перейти к настройкам",
   "shell.command_palette.start_sync": "Запустить синхронизацию",
   "shell.command_palette.create_policy": "Создать ценовую политику",
+  "shell.command_palette.search_placeholder": "Поиск товаров, политик, команд...",
+  "shell.command_palette.no_results": "Ничего не найдено по запросу «{{query}}»",
+  "shell.command_palette.group.products": "Товары",
+  "shell.command_palette.group.policies": "Политики",
+  "shell.command_palette.group.promos": "Промо-акции",
+  "shell.command_palette.group.views": "Представления",
+  "shell.command_palette.group.commands": "Команды",
 
   "shell.workspace_switcher.switch": "Переключить рабочее пространство",
   "shell.workspace_switcher.title": "Рабочие пространства",
@@ -3089,6 +3096,7 @@
   "scope_type.BRAND": "Бренд",
 
   "common.error": "Произошла ошибка. Попробуйте ещё раз.",
+  "common.load_error": "Не удалось загрузить данные",
   "common.loading": "Загрузка...",
   "common.logout": "Выйти",
   "common.browse": "Выбрать файл",

@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { injectQuery, injectMutation } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
-import { LucideAngularModule, Plus, ExternalLink, RefreshCw } from 'lucide-angular';
+import { LucideAngularModule, Plus, ExternalLink } from 'lucide-angular';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ConnectionApiService } from '@core/api/connection-api.service';
@@ -159,6 +159,12 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
 
       @if (connectionsQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (connectionsQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="connectionsQuery.refetch()"
+        />
       }
 
       @if (connectionsQuery.data(); as connections) {
@@ -208,8 +214,6 @@ type FormStep = 'idle' | 'select-marketplace' | 'credentials';
 export class ConnectionsPageComponent {
   protected readonly PlusIcon = Plus;
   protected readonly ExternalLinkIcon = ExternalLink;
-  protected readonly RefreshIcon = RefreshCw;
-
   protected readonly rbac = inject(RbacService);
   private readonly connectionApi = inject(ConnectionApiService);
   private readonly wsStore = inject(WorkspaceContextStore);

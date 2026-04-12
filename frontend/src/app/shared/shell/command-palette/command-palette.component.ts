@@ -12,7 +12,7 @@ import { Router } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subject, catchError, debounceTime, of, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { SearchApiService } from '@core/api/search-api.service';
 import { SearchResult, getMarketplaceShortLabel } from '@core/models';
@@ -63,6 +63,7 @@ const STATIC_COMMANDS: { labelKey: string; path: string }[] = [
   selector: 'dp-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   host: { '(document:keydown)': 'onKeyDown($event)' },
   template: `
     @if (isOpen()) {
@@ -80,7 +81,7 @@ const STATIC_COMMANDS: { labelKey: string; path: string }[] = [
               class="palette-input"
               [value]="query()"
               (input)="onQueryChange($event)"
-              placeholder="Поиск товаров, политик, команд..."
+              [placeholder]="'shell.command_palette.search_placeholder' | translate"
             />
             <kbd class="palette-kbd">Esc</kbd>
           </div>
@@ -92,7 +93,7 @@ const STATIC_COMMANDS: { labelKey: string; path: string }[] = [
               }
             } @else if (query().trim().length >= 2 && flatItems().length === 0) {
               <div class="palette-empty">
-                Ничего не найдено по запросу «{{ query().trim() }}»
+                {{ 'shell.command_palette.no_results' | translate:{ query: query().trim() } }}
               </div>
             } @else {
               @for (group of displayGroups(); track group.label) {
@@ -295,7 +296,7 @@ export class CommandPaletteComponent {
     if (q.length >= 2 && res) {
       if (res.products.length > 0) {
         groups.push({
-          label: 'ТОВАРЫ',
+          label: this.translate.instant('shell.command_palette.group.products'),
           items: res.products.slice(0, 5).map((p) => ({
             type: 'product' as const,
             label: p.productName,
@@ -306,7 +307,7 @@ export class CommandPaletteComponent {
       }
       if (res.policies.length > 0) {
         groups.push({
-          label: 'ПОЛИТИКИ',
+          label: this.translate.instant('shell.command_palette.group.policies'),
           items: res.policies.slice(0, 3).map((p) => ({
             type: 'policy' as const,
             label: p.name,
@@ -316,7 +317,7 @@ export class CommandPaletteComponent {
       }
       if (res.promos.length > 0) {
         groups.push({
-          label: 'ПРОМО-АКЦИИ',
+          label: this.translate.instant('shell.command_palette.group.promos'),
           items: res.promos.slice(0, 3).map((p) => ({
             type: 'promo' as const,
             label: p.name,
@@ -326,7 +327,7 @@ export class CommandPaletteComponent {
       }
       if (res.views.length > 0) {
         groups.push({
-          label: 'ПРЕДСТАВЛЕНИЯ',
+          label: this.translate.instant('shell.command_palette.group.views'),
           items: res.views.slice(0, 3).map((v) => ({
             type: 'view' as const,
             label: v.name,
@@ -343,7 +344,7 @@ export class CommandPaletteComponent {
     );
     if (matchingCommands.length > 0) {
       groups.push({
-        label: 'КОМАНДЫ',
+        label: this.translate.instant('shell.command_palette.group.commands'),
         items: matchingCommands.slice(0, 5).map((c) => ({
           type: 'command' as const,
           label: this.translate.instant(c.labelKey),

@@ -94,8 +94,12 @@ export class WebSocketService {
     if (!this.rxStomp) return null;
     const sub = this.rxStomp.watch(destination).subscribe((message) => {
       this.zone.run(() => {
-        const body = JSON.parse(message.body) as T;
-        callback(body);
+        try {
+          const body = JSON.parse(message.body) as T;
+          callback(body);
+        } catch (e) {
+          console.error('WebSocket: failed to parse message', destination, e);
+        }
       });
     });
     this.subscriptions.push(sub);

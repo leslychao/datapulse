@@ -9,7 +9,6 @@ import { AuditLogApiService } from '@core/api/audit-log-api.service';
 import { MemberApiService } from '@core/api/member-api.service';
 import { AuditLogEntry, AuditOutcome } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
-import { ToastService } from '@shared/shell/toast/toast.service';
 import { SpinnerComponent } from '@shared/layout/spinner.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
@@ -51,6 +50,12 @@ const OUTCOME_COLORS: Record<AuditOutcome, StatusColor> = {
 
       @if (auditQuery.isPending()) {
         <dp-spinner [message]="'common.loading' | translate" />
+      } @else if (auditQuery.isError()) {
+        <dp-empty-state
+          [message]="'common.load_error' | translate"
+          [actionLabel]="'actions.retry' | translate"
+          (action)="auditQuery.refetch()"
+        />
       }
 
       @if (auditQuery.data(); as page) {
@@ -194,7 +199,6 @@ export class AuditLogPageComponent {
   private readonly auditLogApi = inject(AuditLogApiService);
   private readonly memberApi = inject(MemberApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
-  private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
   readonly expandedId = signal<number | null>(null);

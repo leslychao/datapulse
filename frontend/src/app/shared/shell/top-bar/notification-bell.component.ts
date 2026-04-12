@@ -13,7 +13,7 @@ import { DatePipe } from '@angular/common';
 
 import { NotificationStore } from '@shared/stores/notification.store';
 import { AppNotification, NotificationSeverity } from '@core/models';
-import { TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
   CRITICAL: 'bg-red-500',
@@ -25,12 +25,12 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
   selector: 'dp-notification-bell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, DatePipe],
+  imports: [LucideAngularModule, DatePipe, TranslatePipe],
   template: `
     <div class="relative">
       <button
         (click)="toggle()"
-        aria-label="Уведомления"
+        [attr.aria-label]="'notifications.title' | translate"
         class="relative flex cursor-pointer items-center justify-center rounded-[var(--radius-md)] p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
       >
         <lucide-icon [img]="Bell" [size]="18" />
@@ -49,12 +49,12 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
           class="absolute right-0 top-full z-50 mt-1 flex w-[360px] max-h-[480px] flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] shadow-[var(--shadow-md)]"
         >
           <div class="flex items-center justify-between border-b border-[var(--border-default)] px-3 py-2">
-            <span class="text-sm font-semibold text-[var(--text-primary)]">Уведомления</span>
+            <span class="text-sm font-semibold text-[var(--text-primary)]">{{ 'notifications.title' | translate }}</span>
             <button
               (click)="onMarkAllRead()"
               class="cursor-pointer text-xs font-medium text-[var(--accent-primary)] transition-colors hover:underline"
             >
-              Прочитать все
+              {{ 'notifications.mark_all_read' | translate }}
             </button>
           </div>
 
@@ -80,7 +80,7 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
               </button>
             } @empty {
               <div class="px-3 py-6 text-center text-xs text-[var(--text-tertiary)]">
-                Нет уведомлений
+                {{ 'notifications.empty' | translate }}
               </div>
             }
           </div>
@@ -89,7 +89,7 @@ const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
             (click)="close()"
             class="block cursor-pointer border-t border-[var(--border-default)] px-3 py-2 text-center text-xs font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
           >
-            Показать все
+            {{ 'notifications.show_all' | translate }}
           </a>
         </div>
       }
