@@ -1,7 +1,11 @@
 package io.datapulse.bidding.domain;
 
+import java.time.OffsetDateTime;
+
+import io.datapulse.bidding.persistence.BidActionRepository;
 import io.datapulse.bidding.persistence.BidPolicyEntity;
 import io.datapulse.bidding.persistence.BidPolicyRepository;
+import io.datapulse.bidding.persistence.BiddingRunRepository;
 import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
@@ -17,7 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BidPolicyService {
 
+  private static final int FULL_AUTO_MIN_SUCCESSFUL_RUNS = 5;
+  private static final int FULL_AUTO_LOOKBACK_DAYS = 7;
+
   private final BidPolicyRepository policyRepository;
+  private final BiddingRunRepository runRepository;
+  private final BidActionRepository actionRepository;
 
   @Transactional
   public BidPolicyEntity createPolicy(
@@ -52,6 +61,11 @@ public class BidPolicyService {
 
     BidPolicyEntity entity = requirePolicy(id);
     ensureNotArchived(entity);
+
+    if (executionMode == ExecutionMode.FULL_AUTO
+        && entity.getExecutionMode() != ExecutionMode.FULL_AUTO) {
+      ensureFullAutoSafetyGate(entity);
+    }
 
     entity.setName(name);
     entity.setExecutionMode(executionMode);
@@ -117,6 +131,36 @@ public class BidPolicyService {
   private void ensureNotArchived(BidPolicyEntity entity) {
     if (entity.getStatus() == BidPolicyStatus.ARCHIVED) {
       throw BadRequestException.of(MessageCodes.BIDDING_POLICY_ARCHIVED);
+    }
+  }
+
+  private void ensureFullAutoSafetyGate(BidPolicyEntity entity) {
+    OffsetDateTime since = OffsetDateTime.now()
+        .minusDays(FULL_AUTO_LOOKBACK_DAYS);
+
+    long completedRuns = runRepository.countByPolicyIdAndStatusSince(
+        entity.getId(), BiddingRunStatus.COMPLETED, since);
+    if (completedRuns < FULL_AUTO_MIN_SUCCESSFUL_RUNS) {
+      throw BadRequestException.of(
+          MessageCodes.BIDDING_FULL_AUTO_INSUFFICIENT_RUNS,
+          completedRuns, FULL_AUTO_MIN_SUCCESSFUL_RUNS,
+          FULL_AUTO_LOOKBACK_DAYS);
+    }
+
+    long failedRuns = runRepository.countByPolicyIdAndStatusSince(
+        entity.getId(), BiddingRunStatus.FAILED, since);
+    if (failedRuns > 0) {
+      throw BadRequestException.of(
+          MessageCodes.BIDDING_FULL_AUTO_HAS_FAILURES, failedRuns);
+    }
+
+    long failedActions = actionRepository
+        .countByStatusAndPolicySince(entity.getId(),
+            BidActionStatus.FAILED, since);
+    if (failedActions > 0) {
+      throw BadRequestException.of(
+          MessageCodes.BIDDING_FULL_AUTO_HAS_FAILED_ACTIONS,
+          failedActions);
     }
   }
 }

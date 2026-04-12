@@ -151,7 +151,8 @@ public class BiddingRunService {
       run.setTotalPause(totalPause);
 
       String blastRadiusReason = checkBlastRadius(
-          totalBidUp, eligible.size(), maxAbsChangePctObserved);
+          totalBidUp, eligible.size(), maxAbsChangePctObserved,
+          policy.getExecutionMode());
       if (blastRadiusReason != null) {
         run.setStatus(BiddingRunStatus.PAUSED);
         run.setErrorMessage(blastRadiusReason);
@@ -206,19 +207,24 @@ public class BiddingRunService {
   }
 
   private String checkBlastRadius(int totalBidUp, int totalEligible,
-      int maxAbsChangePct) {
+      int maxAbsChangePct, ExecutionMode executionMode) {
+    int bidUpRatioPct = properties.getMaxBidUpRatioPct();
+    int absChangePctLimit = properties.getMaxAbsChangePct();
+    if (executionMode == ExecutionMode.FULL_AUTO) {
+      bidUpRatioPct = bidUpRatioPct / 2;
+      absChangePctLimit = absChangePctLimit > 0
+          ? absChangePctLimit / 2 : absChangePctLimit;
+    }
     if (totalEligible > 0) {
-      int threshold = totalEligible * properties.getMaxBidUpRatioPct() / 100;
+      int threshold = totalEligible * bidUpRatioPct / 100;
       if (totalBidUp > threshold) {
         return "Blast radius breached: totalBidUp=%d exceeds %d%% of %d eligible"
-            .formatted(totalBidUp, properties.getMaxBidUpRatioPct(),
-                totalEligible);
+            .formatted(totalBidUp, bidUpRatioPct, totalEligible);
       }
     }
-    int maxAllowedChangePct = properties.getMaxAbsChangePct();
-    if (maxAllowedChangePct > 0 && maxAbsChangePct > maxAllowedChangePct) {
+    if (absChangePctLimit > 0 && maxAbsChangePct > absChangePctLimit) {
       return "Blast radius breached: maxAbsChangePct=%d%% exceeds limit %d%%"
-          .formatted(maxAbsChangePct, maxAllowedChangePct);
+          .formatted(maxAbsChangePct, absChangePctLimit);
     }
     return null;
   }

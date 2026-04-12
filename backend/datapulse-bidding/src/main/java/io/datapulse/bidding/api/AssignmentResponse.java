@@ -7,6 +7,7 @@ public record AssignmentResponse(
     long bidPolicyId,
     Long marketplaceOfferId,
     String campaignExternalId,
+    Long categoryId,
     String scope,
     OffsetDateTime createdAt
 ) {

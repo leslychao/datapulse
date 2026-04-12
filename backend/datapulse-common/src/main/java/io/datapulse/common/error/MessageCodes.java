@@ -117,6 +117,10 @@ public final class MessageCodes {
     public static final String BIDDING_GUARD_DAILY_SPEND_LIMIT = "bidding.guard.daily_spend_limit.blocked";
     public static final String BIDDING_GUARD_VOLATILITY = "bidding.guard.volatility.blocked";
     public static final String BIDDING_GUARD_PRICE_COMPETITIVENESS = "bidding.guard.price_competitiveness.blocked";
+    public static final String BIDDING_FULL_AUTO_INSUFFICIENT_RUNS = "bidding.full_auto.insufficient_runs";
+    public static final String BIDDING_FULL_AUTO_HAS_FAILURES = "bidding.full_auto.has_failures";
+    public static final String BIDDING_FULL_AUTO_HAS_FAILED_ACTIONS = "bidding.full_auto.has_failed_actions";
+    public static final String BIDDING_ASSIGNMENT_CATEGORY_REQUIRED = "bidding.assignment.category_required";
 
     // --- Pricing: Guards ---
     public static final String PRICING_GUARD_MANUAL_LOCK = "pricing.guard.manual_lock";
@@ -251,6 +255,7 @@ public final class MessageCodes {
     // --- Autobidding Alerts ---
     public static final String AUTOBID_HIGH_DRR_CLUSTER_TITLE = "autobidding.alert.high_drr_cluster.title";
     public static final String AUTOBID_SPEND_SPIKE_TITLE = "autobidding.alert.spend_spike.title";
+    public static final String AUTOBID_FULL_AUTO_ANOMALY_TITLE = "autobidding.alert.full_auto_anomaly.title";
 
     // --- Pricing: AI Features ---
     public static final String PRICING_ADVISOR_UNAVAILABLE = "pricing.advisor.unavailable";

@@ -9,7 +9,15 @@ const routes: Routes = [
     path: '',
     component: BiddingLayoutComponent,
     children: [
-      { path: '', redirectTo: 'strategies', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./dashboard/bidding-dashboard-page.component').then(
+            (m) => m.BiddingDashboardPageComponent,
+          ),
+        data: { breadcrumb: 'Дашборд' },
+      },
       {
         path: 'strategies',
         loadComponent: () =>

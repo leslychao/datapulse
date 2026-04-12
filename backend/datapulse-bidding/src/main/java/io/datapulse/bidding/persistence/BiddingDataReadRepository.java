@@ -52,14 +52,17 @@ public class BiddingDataReadRepository {
 
   private static final String ELIGIBLE_PRODUCTS = """
       SELECT
-          bpa.marketplace_offer_id,
+          mo.id AS marketplace_offer_id,
           mo.marketplace_sku,
           mo.marketplace_connection_id
       FROM bid_policy_assignment bpa
-      JOIN marketplace_offer mo ON mo.id = bpa.marketplace_offer_id
+      LEFT JOIN marketplace_offer mo
+          ON (bpa.assignment_scope = 'PRODUCT' AND mo.id = bpa.marketplace_offer_id)
+          OR (bpa.assignment_scope = 'CATEGORY' AND mo.category_id = bpa.category_id
+              AND mo.workspace_id = :workspaceId)
       WHERE bpa.bid_policy_id = :bidPolicyId
         AND bpa.workspace_id = :workspaceId
-        AND bpa.marketplace_offer_id IS NOT NULL
+        AND mo.id IS NOT NULL
       """;
 
   private static final String CAMPAIGN_INFO = """

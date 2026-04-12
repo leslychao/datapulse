@@ -503,7 +503,6 @@ export function buildGridColumnDefs(
       headerName: translate.instant('grid.col.bid_policy'),
       width: 160,
       sortable: false,
-      hide: true,
       tooltipField: 'bidPolicyName',
       cellClass: 'text-[length:var(--text-sm)]',
       valueFormatter: (p: ValueFormatterParams) => p.value ?? '—',
@@ -513,7 +512,6 @@ export function buildGridColumnDefs(
       headerName: translate.instant('grid.col.current_bid'),
       width: 110,
       sortable: true,
-      hide: true,
       type: 'rightAligned',
       cellClass: 'font-mono text-[length:var(--text-sm)]',
       valueFormatter: (p: ValueFormatterParams) => {
@@ -526,7 +524,6 @@ export function buildGridColumnDefs(
       headerName: translate.instant('grid.col.last_bid_decision'),
       width: 130,
       sortable: false,
-      hide: true,
       cellClass: 'text-center',
       cellRenderer: (params: ICellRendererParams) => {
         if (!params.value) return '—';
@@ -559,7 +556,6 @@ export function buildGridColumnDefs(
       headerName: translate.instant('grid.col.manual_bid_lock'),
       width: 100,
       sortable: false,
-      hide: true,
       cellClass: 'text-center',
       cellRenderer: (params: ICellRendererParams) => {
         if (!params.value) return '—';

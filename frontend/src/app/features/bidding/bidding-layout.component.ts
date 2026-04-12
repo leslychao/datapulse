@@ -13,7 +13,7 @@ interface BiddingTab {
 }
 
 const MODULE = 'bidding';
-const DEFAULT_TAB = 'strategies';
+const DEFAULT_TAB = 'dashboard';
 
 @Component({
   selector: 'dp-bidding-layout',
@@ -29,7 +29,7 @@ const DEFAULT_TAB = 'strategies';
           <a
             [routerLink]="getTabRoute(tab.path)"
             routerLinkActive="border-[var(--accent-primary)] text-[var(--accent-primary)]"
-            [routerLinkActiveOptions]="tab.path === 'strategies' ? exactPathOptions : { exact: false }"
+            [routerLinkActiveOptions]="(tab.path === 'strategies' || tab.path === 'dashboard') ? exactPathOptions : { exact: false }"
             class="border-b-2 border-transparent px-3 py-2.5 text-[length:var(--text-sm)]
                    font-medium text-[var(--text-secondary)] transition-colors
                    hover:text-[var(--text-primary)]"
@@ -83,6 +83,7 @@ export class BiddingLayoutComponent {
   };
 
   readonly tabs: BiddingTab[] = [
+    { label: 'bidding.tabs.dashboard', path: 'dashboard' },
     { label: 'bidding.tabs.strategies', path: 'strategies' },
     { label: 'bidding.tabs.runs', path: 'runs' },
     { label: 'bidding.tabs.decisions', path: 'decisions' },

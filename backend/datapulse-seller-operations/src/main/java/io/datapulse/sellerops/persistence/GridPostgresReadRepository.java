@@ -64,7 +64,12 @@ public class GridPostgresReadRepository {
                 mpl.id IS NOT NULL          AS manual_lock,
                 sos.simulated_price,
                 sos.price_delta_pct         AS simulated_delta_pct,
-                mss.last_success_at         AS last_sync_at
+                mss.last_success_at         AS last_sync_at,
+                bid_asgn.policy_name        AS bid_policy_name,
+                bid_asgn.strategy_type      AS bid_strategy_type,
+                latest_bd.current_bid,
+                latest_bd.decision_type     AS last_bid_decision_type,
+                mbl.id IS NOT NULL          AS manual_bid_lock
             """;
 
     private static final String FROM_JOINS = """
@@ -136,6 +141,23 @@ public class GridPostgresReadRepository {
                 FROM marketplace_sync_state
                 WHERE marketplace_connection_id = mc.id
             ) mss ON true
+            LEFT JOIN LATERAL (
+                SELECT bp.name AS policy_name, bp.strategy_type
+                FROM bid_policy_assignment bpa
+                JOIN bid_policy bp ON bp.id = bpa.bid_policy_id AND bp.status = 'ACTIVE'
+                WHERE bpa.marketplace_offer_id = mo.id
+                LIMIT 1
+            ) bid_asgn ON true
+            LEFT JOIN LATERAL (
+                SELECT bd.current_bid, bd.decision_type
+                FROM bid_decision bd
+                WHERE bd.marketplace_offer_id = mo.id
+                ORDER BY bd.created_at DESC
+                LIMIT 1
+            ) latest_bd ON true
+            LEFT JOIN manual_bid_lock mbl
+                ON mbl.marketplace_offer_id = mo.id
+                AND (mbl.expires_at IS NULL OR mbl.expires_at > now())
             """;
 
     private static final String BASE_COUNT = "SELECT COUNT(*) " + FROM_JOINS;
@@ -309,6 +331,11 @@ public class GridPostgresReadRepository {
                 .simulatedPrice(rs.getBigDecimal("simulated_price"))
                 .simulatedDeltaPct(rs.getBigDecimal("simulated_delta_pct"))
                 .lastSyncAt(rs.getObject("last_sync_at", OffsetDateTime.class))
+                .bidPolicyName(rs.getString("bid_policy_name"))
+                .bidStrategyType(rs.getString("bid_strategy_type"))
+                .currentBid(getBoxedInt(rs, "current_bid"))
+                .lastBidDecisionType(rs.getString("last_bid_decision_type"))
+                .manualBidLock(rs.getBoolean("manual_bid_lock"))
                 .build();
     }
 

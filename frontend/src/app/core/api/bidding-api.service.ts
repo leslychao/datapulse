@@ -8,6 +8,7 @@ import {
   BidDecisionDetail,
   BidDecisionFilter,
   BidDecisionSummary,
+  BiddingDashboard,
   BidPolicyAssignment,
   BidPolicyDetail,
   BidPolicyFilter,
@@ -340,6 +341,36 @@ export class BiddingApiService {
     return this.http.post<void>(
       `${this.base}/workspaces/${workspaceId}/bidding/actions/bulk-reject`,
       { actionIds },
+    );
+  }
+
+  // ── Dashboard ──
+
+  getDashboard(workspaceId: number): Observable<BiddingDashboard> {
+    return this.http.get<BiddingDashboard>(
+      `${this.base}/workspaces/${workspaceId}/bidding/dashboard`,
+    );
+  }
+
+  // ── CSV Export ──
+
+  exportDecisionsCsv(
+    workspaceId: number,
+    filter?: BidDecisionFilter,
+  ): Observable<Blob> {
+    let params = new HttpParams();
+    if (filter?.bidPolicyId) {
+      params = params.set('bidPolicyId', filter.bidPolicyId);
+    }
+    if (filter?.dateFrom) {
+      params = params.set('dateFrom', filter.dateFrom);
+    }
+    if (filter?.dateTo) {
+      params = params.set('dateTo', filter.dateTo);
+    }
+    return this.http.get(
+      `${this.base}/workspaces/${workspaceId}/bidding/decisions/export`,
+      { params, responseType: 'blob' },
     );
   }
 }

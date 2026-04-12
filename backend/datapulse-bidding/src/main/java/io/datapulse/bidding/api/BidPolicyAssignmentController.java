@@ -55,6 +55,7 @@ public class BidPolicyAssignmentController {
         workspaceId,
         request.marketplaceOfferId(),
         request.campaignExternalId(),
+        request.categoryId(),
         AssignmentScope.valueOf(request.scope()));
 
     return mapper.toResponse(entity);

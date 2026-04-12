@@ -35,4 +35,9 @@ public class GridRow {
     private BigDecimal simulatedPrice;
     private BigDecimal simulatedDeltaPct;
     private OffsetDateTime lastSyncAt;
+    private String bidPolicyName;
+    private String bidStrategyType;
+    private Integer currentBid;
+    private String lastBidDecisionType;
+    private boolean manualBidLock;
 }

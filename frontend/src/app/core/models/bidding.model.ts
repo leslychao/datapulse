@@ -135,3 +135,24 @@ export interface BidDecisionFilter {
   dateFrom?: string;
   dateTo?: string;
 }
+
+export interface BiddingDashboard {
+  totalManagedProducts: number;
+  activePolicies: number;
+  productsByStrategy: Record<string, number>;
+  decisionsByType: Record<string, number>;
+  totalRunsLast7d: number;
+  failedRunsLast7d: number;
+  pausedRunsLast7d: number;
+  topHighDrr: BiddingTopProductItem[];
+  topImproved: BiddingTopProductItem[];
+}
+
+export interface BiddingTopProductItem {
+  marketplaceOfferId: number;
+  marketplaceSku: string;
+  strategyType: BiddingStrategyType;
+  lastDecisionType: BidDecisionType;
+  currentBid: number | null;
+  drrPct: number | null;
+}

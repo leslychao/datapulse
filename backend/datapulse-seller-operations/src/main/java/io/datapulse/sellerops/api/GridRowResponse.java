@@ -35,6 +35,11 @@ public record GridRowResponse(
         BigDecimal simulatedPrice,
         BigDecimal simulatedDeltaPct,
         OffsetDateTime lastSyncAt,
-        String dataFreshness
+        String dataFreshness,
+        String bidPolicyName,
+        String bidStrategyType,
+        Integer currentBid,
+        String lastBidDecisionType,
+        boolean manualBidLock
 ) {
 }

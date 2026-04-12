@@ -205,7 +205,12 @@ public class GridService {
                 row.getSimulatedPrice(),
                 row.getSimulatedDeltaPct(),
                 row.getLastSyncAt(),
-                computeFreshness(row.getLastSyncAt())
+                computeFreshness(row.getLastSyncAt()),
+                row.getBidPolicyName(),
+                row.getBidStrategyType(),
+                row.getCurrentBid(),
+                row.getLastBidDecisionType(),
+                row.isManualBidLock()
         );
     }
 

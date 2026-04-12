@@ -60,6 +60,11 @@ export interface OfferSummary {
   simulatedDeltaPct: number | null;
   lastSyncAt: string | null;
   dataFreshness: DataFreshness | null;
+  bidPolicyName: string | null;
+  bidStrategyType: string | null;
+  currentBid: number | null;
+  lastBidDecisionType: string | null;
+  manualBidLock: boolean;
 }
 
 export interface OfferDetail extends Omit<OfferSummary, 'promoStatus'> {

@@ -1285,6 +1285,10 @@ MVP реализован в модуле `datapulse-bidding` со стандар
 |----------|------|-------------|
 | Economy Hold | `ECONOMY_HOLD` | Keeps DRR within target band using step-up/step-down percentages |
 | Minimal Presence | `MINIMAL_PRESENCE` | Maintains bid at marketplace minimum allowed level |
+| Growth | `GROWTH` | Maximizes ad orders within CPO ceiling |
+| Position Hold | `POSITION_HOLD` | Keeps impressions within target band, respecting DRR ceiling |
+| Launch | `LAUNCH` | Initial launch with protected period, auto-transitions to target strategy |
+| Liquidation | `LIQUIDATION` | Accelerates sales for overstock, allows higher DRR |
 
 ### Guards (ordered)
 

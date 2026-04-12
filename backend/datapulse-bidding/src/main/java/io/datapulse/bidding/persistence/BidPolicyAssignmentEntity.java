@@ -37,6 +37,9 @@ public class BidPolicyAssignmentEntity {
   @Column(name = "campaign_external_id", length = 100)
   private String campaignExternalId;
 
+  @Column(name = "category_id")
+  private Long categoryId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "assignment_scope", nullable = false, length = 30)
   private AssignmentScope assignmentScope;

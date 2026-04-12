@@ -89,3 +89,6 @@ databaseChangeLog:
   - include:
       file: changes/0033-bid-action-tables.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0034-bidding-category-assignment.sql
+      relativeToChangelogFile: true

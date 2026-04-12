@@ -25,11 +25,15 @@ public class BidPolicyAssignmentService {
       long workspaceId,
       Long marketplaceOfferId,
       String campaignExternalId,
+      Long categoryId,
       AssignmentScope scope) {
 
     if (marketplaceOfferId != null
         && assignmentRepository.existsByMarketplaceOfferId(marketplaceOfferId)) {
       throw BadRequestException.of(MessageCodes.BIDDING_ASSIGNMENT_CONFLICT);
+    }
+    if (scope == AssignmentScope.CATEGORY && categoryId == null) {
+      throw BadRequestException.of(MessageCodes.BIDDING_ASSIGNMENT_CATEGORY_REQUIRED);
     }
 
     var entity = new BidPolicyAssignmentEntity();
@@ -37,6 +41,7 @@ public class BidPolicyAssignmentService {
     entity.setWorkspaceId(workspaceId);
     entity.setMarketplaceOfferId(marketplaceOfferId);
     entity.setCampaignExternalId(campaignExternalId);
+    entity.setCategoryId(categoryId);
     entity.setAssignmentScope(scope);
 
     return assignmentRepository.save(entity);
@@ -56,7 +61,7 @@ public class BidPolicyAssignmentService {
 
     List<BidPolicyAssignmentEntity> results = new ArrayList<>(marketplaceOfferIds.size());
     for (Long offerId : marketplaceOfferIds) {
-      results.add(assign(bidPolicyId, workspaceId, offerId, null, scope));
+      results.add(assign(bidPolicyId, workspaceId, offerId, null, null, scope));
     }
     return results;
   }
