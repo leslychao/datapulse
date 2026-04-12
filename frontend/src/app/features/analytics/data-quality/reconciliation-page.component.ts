@@ -334,8 +334,8 @@ export class ReconciliationPageComponent {
       });
     });
 
-    const legendItems = connIds.flatMap((id) => {
-      const name = connMap.get(id) ?? `#${id}`;
+    const legendItems = mpTypes.flatMap((mp) => {
+      const name = connMap.get(mp) ?? mp;
       return [name, `${name} (${baselineSuffix})`];
     });
 

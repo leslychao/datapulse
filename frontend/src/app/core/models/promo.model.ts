@@ -35,7 +35,6 @@ export interface PromoCampaignSummary {
   participatedCount: number;
   pendingReviewCount: number;
   status: CampaignStatus;
-  sourcePlatform: string;
   connectionName: string;
 }
 
