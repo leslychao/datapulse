@@ -258,6 +258,7 @@ public class YandexNormalizer {
     return new NormalizedReturnItem(
         String.valueOf(ret.id()),
         item.shopSku(),
+        null,
         item.count(),
         BigDecimal.ZERO,
         reason,

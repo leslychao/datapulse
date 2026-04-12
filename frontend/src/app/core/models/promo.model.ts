@@ -113,7 +113,7 @@ export interface PromoPolicyAssignment {
 }
 
 export interface CreatePromoAssignmentRequest {
-  marketplaceConnectionId: number;
+  sourcePlatform: string;
   scopeType: PromoAssignmentScopeType;
   categoryId?: number;
   marketplaceOfferId?: number;

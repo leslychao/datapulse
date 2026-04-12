@@ -883,7 +883,7 @@ if (signals.adCostRatio() != null) {
 
 | Параметр | Тип | Описание |
 |----------|-----|----------|
-| `connectionIds` | List\<Long\> | Фильтр по подключениям |
+| `sourcePlatform` | String | Фильтр по маркетплейсу (`wb`, `ozon`) |
 | `period` | String | `7d` / `30d` |
 | `status` | String | `active` / `paused` / `archived` (optional) |
 | `sort` | String | Поле сортировки |

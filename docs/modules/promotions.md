@@ -741,7 +741,7 @@ Partial unique index `idx_promo_action_active_simulated` изолирует simu
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/promo/campaigns` | Any role | Paginated. Filters: `?connectionId=...&status=ACTIVE&marketplaceType=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/campaigns` | Any role | Paginated. Filters: `?sourcePlatform=...&status=ACTIVE&from=...&to=...` |
 | GET | `/api/workspaces/{workspaceId}/promo/campaigns/{campaignId}` | Any role | Детали campaign + product stats (total, eligible, participating, declined) |
 | GET | `/api/workspaces/{workspaceId}/promo/campaigns/{campaignId}/products` | Any role | Products in campaign. Paginated. Filters: `?participationStatus=...&search=...` |
 
@@ -769,9 +769,9 @@ Partial unique index `idx_promo_action_active_simulated` изолирует simu
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/promo/evaluation-runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/promo/evaluation-runs` | Any role | Paginated. Filters: `?sourcePlatform=...&status=...&from=...&to=...` |
 | GET | `/api/workspaces/{workspaceId}/promo/evaluation-runs/{runId}` | Any role | Детали run: status, counts, timing |
-| POST | `/api/workspaces/{workspaceId}/promo/evaluation-runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual promo evaluation. Body: `{ connectionId }` |
+| POST | `/api/workspaces/{workspaceId}/promo/evaluation-runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual promo evaluation. Body: `{ sourcePlatform }` |
 
 ### Evaluations & decisions
 

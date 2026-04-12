@@ -7,7 +7,8 @@ import java.time.OffsetDateTime;
 public record PromoAssignmentResponse(
         Long id,
         Long promoPolicyId,
-        Long marketplaceConnectionId,
+        String connectionName,
+        String marketplace,
         PromoScopeType scopeType,
         Long categoryId,
         Long marketplaceOfferId,

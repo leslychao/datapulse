@@ -217,6 +217,7 @@ class WbNormalizerTest {
       var result = normalizer.normalizeReturn(item);
 
       assertThat(result.externalReturnId()).isEqualTo("srid-1");
+      assertThat(result.marketplaceProductId()).isEqualTo("12345");
       assertThat(result.quantity()).isEqualTo(1);
       assertThat(result.returnAmount()).isEqualByComparingTo(BigDecimal.ZERO);
       assertThat(result.returnReason()).isEqualTo("Брак");

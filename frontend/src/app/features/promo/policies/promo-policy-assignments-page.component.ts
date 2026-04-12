@@ -90,21 +90,21 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
                 {{ 'promo.assignments.connection' | translate }}
               </label>
               <select
-                [(ngModel)]="newConnectionId"
+                [(ngModel)]="selectedSourcePlatform"
                 class="h-8 rounded-[var(--radius-md)] border border-[var(--border-default)]
                        bg-[var(--bg-primary)] px-3 text-[length:var(--text-sm)]
                        text-[var(--text-primary)] outline-none"
               >
                 <option [ngValue]="null" disabled>{{ 'promo.assignments.connection' | translate }}</option>
-                @for (conn of connections(); track conn.id) {
-                  <option [ngValue]="conn.id">{{ conn.name }} ({{ mpShortLabel(conn.marketplaceType) }})</option>
+                @for (conn of activeConnections(); track conn.id) {
+                  <option [ngValue]="conn.marketplaceType">{{ conn.name }} ({{ mpShortLabel(conn.marketplaceType) }})</option>
                 }
               </select>
             </div>
 
             <button
               (click)="submitAdd()"
-              [disabled]="!newConnectionId"
+              [disabled]="!selectedSourcePlatform"
               class="h-8 cursor-pointer rounded-[var(--radius-md)] bg-[var(--accent-primary)] px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {{ 'promo.assignments.add' | translate }}
@@ -181,14 +181,16 @@ export class PromoPolicyAssignmentsPageComponent {
   readonly showDeleteModal = signal(false);
   readonly deleteTarget = signal<PromoPolicyAssignment | null>(null);
   newScopeType: PromoAssignmentScopeType = 'CONNECTION';
-  newConnectionId: number | null = null;
+  selectedSourcePlatform: string | null = null;
 
   readonly connectionsQuery = injectQuery(() => ({
     queryKey: ['connections'],
     queryFn: () => lastValueFrom(this.connectionApi.listConnections()),
   }));
 
-  readonly connections = computed(() => this.connectionsQuery.data() ?? []);
+  readonly activeConnections = computed(() =>
+    (this.connectionsQuery.data() ?? []).filter((c) => c.status === 'ACTIVE'),
+  );
 
   readonly columnDefs = computed(() => {
     const cols: any[] = [
@@ -265,7 +267,7 @@ export class PromoPolicyAssignmentsPageComponent {
       ),
     onSuccess: () => {
       this.showAddForm.set(false);
-      this.newConnectionId = null;
+      this.selectedSourcePlatform = null;
       this.queryClient.invalidateQueries({ queryKey: ['promo-assignments'] });
       this.toast.success(this.translate.instant('promo.assignments.toast.create_success'));
     },
@@ -296,9 +298,9 @@ export class PromoPolicyAssignmentsPageComponent {
   readonly getRowId = (params: any) => String(params.data.id);
 
   submitAdd(): void {
-    if (!this.newConnectionId) return;
+    if (!this.selectedSourcePlatform) return;
     const req: CreatePromoAssignmentRequest = {
-      marketplaceConnectionId: this.newConnectionId,
+      sourcePlatform: this.selectedSourcePlatform,
       scopeType: this.newScopeType,
     };
     this.createMutation.mutate(req);

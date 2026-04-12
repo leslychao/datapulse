@@ -916,7 +916,7 @@ deferred_action:
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/actions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&status=...&executionMode=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/actions` | Any role | Paginated. Filters: `?sourcePlatform=...&marketplaceOfferId=...&status=...&executionMode=...&from=...&to=...` |
 | GET | `/api/workspaces/{workspaceId}/actions/{actionId}` | Any role | Детали action: all fields + attempt history |
 | GET | `/api/workspaces/{workspaceId}/actions/{actionId}/attempts` | Any role | Список attempts с provider request/response summaries |
 
@@ -936,9 +936,9 @@ deferred_action:
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/simulation/comparison` | Any role | Simulated vs live comparison per connection. Filter: `?connectionId=...` |
+| GET | `/api/workspaces/{workspaceId}/simulation/comparison` | Any role | Simulated vs live comparison per connection. Filter: `?sourcePlatform=...` |
 | GET | `/api/workspaces/{workspaceId}/simulation/preview` | Any role | Decision-level simulation preview: simulated prices for a specific price decision. Filter: `?decisionId=...` |
-| DELETE | `/api/workspaces/{workspaceId}/simulation/shadow-state` | PRICING_MANAGER, ADMIN, OWNER | Reset shadow-state for connection. Body: `{ connectionId }` |
+| DELETE | `/api/workspaces/{workspaceId}/simulation/shadow-state` | PRICING_MANAGER, ADMIN, OWNER | Reset shadow-state for connection. Body: `{ sourcePlatform }` |
 
 ## Observability и alerting
 

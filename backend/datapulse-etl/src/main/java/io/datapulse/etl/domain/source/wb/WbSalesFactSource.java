@@ -2,6 +2,7 @@ package io.datapulse.etl.domain.source.wb;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import io.datapulse.etl.adapter.wb.WbNormalizer;
 import io.datapulse.etl.adapter.wb.WbOrdersReadAdapter;
@@ -20,6 +21,8 @@ import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalOrderUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalReturnUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalSaleUpsertRepository;
+import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
+import io.datapulse.etl.persistence.canonical.SkuLookupRepository.OfferSkuIds;
 import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,7 @@ public class WbSalesFactSource implements EventSource {
     private final CanonicalSaleUpsertRepository saleRepo;
     private final CanonicalReturnUpsertRepository returnRepo;
     private final CanonicalEntityMapper mapper;
+    private final SkuLookupRepository skuLookup;
     private final SubSourceRunner subSourceRunner;
 
     @Override
@@ -72,12 +76,21 @@ public class WbSalesFactSource implements EventSource {
                         .map(item -> mapper.toSale(normalizer.normalizeSale(item), ctx))
                         .toList())));
 
+        var offerSkuMap = skuLookup.findAllOfferWithSkuByWorkspace(ctx.workspaceId());
+
         var returnsCtx = CaptureContextFactory.build(ctx, eventType(), "WbReturnsReadAdapter");
         var returnsPage = returnsAdapter.capturePage(returnsCtx, token, dateFrom, dateTo);
         results.add(subSourceRunner.processPages(
                 "WbReturnsReadAdapter", List.of(returnsPage), WbReturnItem.class,
                 batch -> returnRepo.batchUpsert(batch.stream()
-                        .map(item -> mapper.toReturn(normalizer.normalizeReturn(item), ctx))
+                        .map(item -> {
+                            var norm = normalizer.normalizeReturn(item);
+                            OfferSkuIds ids = norm.marketplaceProductId() != null
+                                    ? offerSkuMap.get(norm.marketplaceProductId()) : null;
+                            return mapper.toReturn(norm, ctx,
+                                    ids != null ? ids.offerId() : null,
+                                    ids != null ? ids.sellerSkuId() : null);
+                        })
                         .toList())));
 
         return results;

@@ -4,10 +4,10 @@ import io.datapulse.common.error.MessageCodes;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.promotions.api.CreatePromoAssignmentRequest;
-import io.datapulse.promotions.api.PromoAssignmentMapper;
 import io.datapulse.promotions.api.PromoAssignmentResponse;
 import io.datapulse.promotions.persistence.PromoEvaluationRunQueryRepository;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentEntity;
+import io.datapulse.promotions.persistence.PromoPolicyAssignmentReadRepository;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentRepository;
 import io.datapulse.promotions.persistence.PromoPolicyRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,15 +23,14 @@ import java.util.List;
 public class PromoPolicyAssignmentService {
 
     private final PromoPolicyAssignmentRepository assignmentRepository;
+    private final PromoPolicyAssignmentReadRepository assignmentReadRepository;
     private final PromoPolicyRepository policyRepository;
-    private final PromoAssignmentMapper assignmentMapper;
     private final PromoEvaluationRunQueryRepository runQueryRepository;
 
     @Transactional(readOnly = true)
     public List<PromoAssignmentResponse> listAssignments(long policyId, long workspaceId) {
         ensurePolicyExists(policyId, workspaceId);
-        List<PromoPolicyAssignmentEntity> assignments = assignmentRepository.findAllByPromoPolicyId(policyId);
-        return assignmentMapper.toResponses(assignments);
+        return assignmentReadRepository.findEnrichedByPolicyId(policyId);
     }
 
     @Transactional
@@ -59,7 +58,7 @@ public class PromoPolicyAssignmentService {
         log.info("Promo assignment created: id={}, policyId={}, scopeType={}",
                 saved.getId(), policyId, request.scopeType());
 
-        return assignmentMapper.toResponse(saved);
+        return assignmentReadRepository.findEnrichedById(saved.getId());
     }
 
     @Transactional

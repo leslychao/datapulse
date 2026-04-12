@@ -211,6 +211,7 @@ public class WbNormalizer {
         return new NormalizedReturnItem(
                 item.srid(),
                 null,
+                String.valueOf(item.nmId()),
                 1,
                 BigDecimal.ZERO,
                 item.returnType(),

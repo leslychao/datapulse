@@ -139,17 +139,19 @@ class CanonicalEntityMapperTest {
     void should_mapAllFields_includingFulfillmentType() {
       var returnDate = OffsetDateTime.now();
       var norm = new NormalizedReturnItem(
-          "RET-1", "SKU-1", 1,
+          "RET-1", "SKU-1", "MSKU-1", 1,
           BigDecimal.valueOf(500), "defective",
           "RUB", returnDate, "accepted", "FBW");
       var ctx = buildContext();
 
-      var entity = mapper.toReturn(norm, ctx);
+      var entity = mapper.toReturn(norm, ctx, 10L, 20L);
 
       assertThat(entity.getWorkspaceId()).isEqualTo(1L);
       assertThat(entity.getConnectionId()).isEqualTo(100L);
       assertThat(entity.getSourcePlatform()).isEqualTo("wb");
       assertThat(entity.getExternalReturnId()).isEqualTo("RET-1");
+      assertThat(entity.getMarketplaceOfferId()).isEqualTo(10L);
+      assertThat(entity.getSellerSkuId()).isEqualTo(20L);
       assertThat(entity.getReturnDate()).isEqualTo(returnDate);
       assertThat(entity.getReturnAmount()).isEqualByComparingTo(BigDecimal.valueOf(500));
       assertThat(entity.getReturnReason()).isEqualTo("defective");
@@ -160,16 +162,18 @@ class CanonicalEntityMapperTest {
     }
 
     @Test
-    void should_mapNullFulfillmentType() {
+    void should_mapNullProductFks() {
       var returnDate = OffsetDateTime.now();
       var norm = new NormalizedReturnItem(
-          "RET-2", "SKU-1", 1,
+          "RET-2", "SKU-1", null, 1,
           BigDecimal.valueOf(300), "damaged",
           "RUB", returnDate, "accepted", null);
       var ctx = buildContext();
 
-      var entity = mapper.toReturn(norm, ctx);
+      var entity = mapper.toReturn(norm, ctx, null, null);
 
+      assertThat(entity.getMarketplaceOfferId()).isNull();
+      assertThat(entity.getSellerSkuId()).isNull();
       assertThat(entity.getFulfillmentType()).isNull();
     }
   }

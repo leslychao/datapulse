@@ -272,6 +272,7 @@ public class OzonNormalizer {
         return new NormalizedReturnItem(
                 String.valueOf(item.id()),
                 sellerSku,
+                null,
                 quantity,
                 returnAmount,
                 item.returnReasonName(),

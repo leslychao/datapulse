@@ -95,7 +95,7 @@ public class YandexSalesFactSource implements EventSource {
         batch -> {
           var normalized = normalizer.normalizeReturns(batch);
           returnRepo.batchUpsert(normalized.stream()
-              .map(item -> mapper.toReturn(item, ctx))
+              .map(item -> mapper.toReturn(item, ctx, null, null))
               .toList());
         }));
 

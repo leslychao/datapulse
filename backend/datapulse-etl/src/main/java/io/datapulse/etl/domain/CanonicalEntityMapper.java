@@ -151,12 +151,15 @@ public class CanonicalEntityMapper {
         return entity;
     }
 
-    public CanonicalReturnEntity toReturn(NormalizedReturnItem norm, IngestContext ctx) {
+    public CanonicalReturnEntity toReturn(NormalizedReturnItem norm, IngestContext ctx,
+                                           Long marketplaceOfferId, Long sellerSkuId) {
         var entity = new CanonicalReturnEntity();
         entity.setWorkspaceId(ctx.workspaceId());
         entity.setConnectionId(ctx.connectionId());
         entity.setSourcePlatform(platformName(ctx));
         entity.setExternalReturnId(norm.externalReturnId());
+        entity.setMarketplaceOfferId(marketplaceOfferId);
+        entity.setSellerSkuId(sellerSkuId);
         entity.setReturnDate(norm.returnDate());
         entity.setReturnAmount(norm.returnAmount());
         entity.setReturnReason(norm.returnReason());

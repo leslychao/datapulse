@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 public record NormalizedReturnItem(
         String externalReturnId,
         String sellerSku,
+        String marketplaceProductId,
         int quantity,
         BigDecimal returnAmount,
         String returnReason,

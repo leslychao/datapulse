@@ -50,6 +50,14 @@ public class SkuLookupRepository {
             WHERE marketplace_connection_id = ?
             """;
 
+    private static final String FIND_ALL_OFFER_WITH_SKU_BY_WORKSPACE = """
+            SELECT mo.marketplace_sku, mo.id, mo.seller_sku_id
+            FROM marketplace_offer mo
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
+            WHERE mc.workspace_id = ?
+              AND mo.seller_sku_id IS NOT NULL
+            """;
+
     /**
      * Batch lookup: returns all seller_sku records for a workspace.
      *
@@ -75,6 +83,24 @@ public class SkuLookupRepository {
                                 rs.getString("marketplace_sku"),
                                 rs.getLong("id")),
                         connectionId)
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (existing, replacement) -> existing));
+    }
+
+    public record OfferSkuIds(long offerId, long sellerSkuId) {}
+
+    /**
+     * Batch lookup: marketplace_sku → (marketplace_offer.id, seller_sku_id) for a workspace.
+     * Workspace-scoped (not connection-scoped) so that product resolution survives
+     * connection re-creation and works across multiple connections.
+     */
+    public Map<String, OfferSkuIds> findAllOfferWithSkuByWorkspace(long workspaceId) {
+        return jdbc.query(FIND_ALL_OFFER_WITH_SKU_BY_WORKSPACE,
+                        (rs, rowNum) -> Map.entry(
+                                rs.getString("marketplace_sku"),
+                                new OfferSkuIds(rs.getLong("id"), rs.getLong("seller_sku_id"))),
+                        workspaceId)
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
                         (existing, replacement) -> existing));

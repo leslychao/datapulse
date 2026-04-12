@@ -85,7 +85,8 @@ public class OzonSalesFactSource implements EventSource {
         results.add(subSourceRunner.processPages(
                 "OzonReturnsReadAdapter", returnsPages, OzonReturnItem.class,
                 batch -> returnRepo.batchUpsert(batch.stream()
-                        .map(item -> mapper.toReturn(normalizer.normalizeReturn(item), ctx))
+                        .map(item -> mapper.toReturn(
+                                normalizer.normalizeReturn(item), ctx, null, null))
                         .toList())));
 
         return results;

@@ -1017,7 +1017,7 @@ Pricing run в FULL_AUTO mode отслеживает aggregate metrics по хо
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
 | GET | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments` | Any role | Список assignments |
-| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment. Body: `{ connectionId, scopeType, categoryId?, marketplaceOfferId? }` |
+| POST | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments` | PRICING_MANAGER, ADMIN, OWNER | Добавить assignment. Body: `{ sourcePlatform, scopeType, categoryId?, marketplaceOfferId? }` |
 | DELETE | `/api/workspaces/{workspaceId}/pricing/policies/{policyId}/assignments/{assignmentId}` | PRICING_MANAGER, ADMIN, OWNER | Удалить assignment |
 
 ### Manual price lock
@@ -1033,8 +1033,8 @@ Pricing run в FULL_AUTO mode отслеживает aggregate metrics по хо
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
 | POST | `/api/workspaces/{workspaceId}/pricing/runs/trigger` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing runs for all connections with active policies. No body. Returns `List<PricingRunResponse>`. Skips connections with run already in progress |
-| POST | `/api/workspaces/{workspaceId}/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run for specific connection. Body: `{ connectionId }`. Legacy endpoint |
-| GET | `/api/workspaces/{workspaceId}/pricing/runs` | Any role | Paginated. Filters: `?connectionId=...&status=...&from=...&to=...` |
+| POST | `/api/workspaces/{workspaceId}/pricing/runs` | PRICING_MANAGER, ADMIN, OWNER | Trigger manual pricing run for specific connection. Body: `{ sourcePlatform }` |
+| GET | `/api/workspaces/{workspaceId}/pricing/runs` | Any role | Paginated. Filters: `?sourcePlatform=...&status=...&from=...&to=...` |
 | GET | `/api/workspaces/{workspaceId}/pricing/runs/{runId}` | Any role | Детали run: status, counts, timing |
 | POST | `/api/workspaces/{workspaceId}/pricing/runs/{runId}/resume` | PRICING_MANAGER, ADMIN, OWNER | Resume PAUSED run (blast radius override). PAUSED → IN_PROGRESS, ON_HOLD actions → APPROVED |
 | POST | `/api/workspaces/{workspaceId}/pricing/runs/{runId}/cancel` | PRICING_MANAGER, ADMIN, OWNER | Cancel PAUSED run. PAUSED → CANCELLED, ON_HOLD actions → CANCELLED |
@@ -1043,7 +1043,7 @@ Pricing run в FULL_AUTO mode отслеживает aggregate metrics по хо
 
 | Method | Path | Roles | Описание |
 |--------|------|-------|----------|
-| GET | `/api/workspaces/{workspaceId}/pricing/decisions` | Any role | Paginated. Filters: `?connectionId=...&marketplaceOfferId=...&decisionType=...&pricingRunId=...&from=...&to=...` |
+| GET | `/api/workspaces/{workspaceId}/pricing/decisions` | Any role | Paginated. Filters: `?sourcePlatform=...&marketplaceOfferId=...&decisionType=...&pricingRunId=...&from=...&to=...` |
 | GET | `/api/workspaces/{workspaceId}/pricing/decisions/{decisionId}` | Any role | Полные детали decision: signal_snapshot, constraints_applied, guards_evaluated, explanation_summary |
 
 ### Impact preview

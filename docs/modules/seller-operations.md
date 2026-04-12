@@ -835,7 +835,7 @@ Composite query: PostgreSQL (canonical state, pricing, execution, promo) + Click
 
 | Endpoint | Method | Описание |
 |----------|--------|----------|
-| `/api/workspaces/{workspaceId}/mismatches` | GET | Active mismatches (paginated). Filters: `?type=PRICE&connectionId=...&severity=...` |
+| `/api/workspaces/{workspaceId}/mismatches` | GET | Active mismatches (paginated). Filters: `?type=PRICE&sourcePlatform=...&severity=...` |
 | `/api/workspaces/{workspaceId}/mismatches/{mismatchId}/acknowledge` | POST | Acknowledge mismatch (оператор подтверждает осведомлённость) |
 | `/api/workspaces/{workspaceId}/mismatches/{mismatchId}/resolve` | POST | Resolve mismatch. Body: `{ resolution, note }` |
 

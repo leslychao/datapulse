@@ -3,10 +3,10 @@ package io.datapulse.promotions.domain;
 import io.datapulse.common.exception.BadRequestException;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.promotions.api.CreatePromoAssignmentRequest;
-import io.datapulse.promotions.api.PromoAssignmentMapper;
 import io.datapulse.promotions.api.PromoAssignmentResponse;
 import io.datapulse.promotions.persistence.PromoEvaluationRunQueryRepository;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentEntity;
+import io.datapulse.promotions.persistence.PromoPolicyAssignmentReadRepository;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
 import io.datapulse.promotions.persistence.PromoPolicyRepository;
@@ -24,6 +24,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,9 +41,9 @@ class PromoPolicyAssignmentServiceTest {
   @Mock
   private PromoPolicyAssignmentRepository assignmentRepository;
   @Mock
-  private PromoPolicyRepository policyRepository;
+  private PromoPolicyAssignmentReadRepository assignmentReadRepository;
   @Mock
-  private PromoAssignmentMapper assignmentMapper;
+  private PromoPolicyRepository policyRepository;
   @Mock
   private PromoEvaluationRunQueryRepository runQueryRepository;
 
@@ -62,8 +63,10 @@ class PromoPolicyAssignmentServiceTest {
 
       when(assignmentRepository.existsByPromoPolicyIdAndMarketplaceConnectionIdAndScopeType(
           POLICY_ID, CONNECTION_ID, PromoScopeType.CONNECTION)).thenReturn(false);
-      when(assignmentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(assignmentMapper.toResponse(any())).thenReturn(null);
+      var saved = new PromoPolicyAssignmentEntity();
+      saved.setId(ASSIGNMENT_ID);
+      when(assignmentRepository.save(any())).thenReturn(saved);
+      when(assignmentReadRepository.findEnrichedById(ASSIGNMENT_ID)).thenReturn(null);
 
       service.createAssignment(POLICY_ID, request, WORKSPACE_ID);
 
@@ -170,12 +173,11 @@ class PromoPolicyAssignmentServiceTest {
     @Test
     void should_return_assignments_for_existing_policy() {
       mockPolicyExists();
-      when(assignmentRepository.findAllByPromoPolicyId(POLICY_ID)).thenReturn(List.of());
-      when(assignmentMapper.toResponses(any())).thenReturn(List.of());
+      when(assignmentReadRepository.findEnrichedByPolicyId(POLICY_ID)).thenReturn(List.of());
 
       service.listAssignments(POLICY_ID, WORKSPACE_ID);
 
-      verify(assignmentRepository).findAllByPromoPolicyId(POLICY_ID);
+      verify(assignmentReadRepository).findEnrichedByPolicyId(POLICY_ID);
     }
 
     @Test

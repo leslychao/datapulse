@@ -59,6 +59,7 @@ class IngestOrchestratorTest {
   @Mock private PostIngestMaterializationHook postIngestMaterialization;
   @Mock private MarketplaceSyncStateRepository marketplaceSyncStateRepository;
   @Mock private MarketplaceConnectionRepository marketplaceConnectionRepository;
+  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
   private IngestOrchestrator orchestrator;
 
@@ -99,7 +100,8 @@ class IngestOrchestratorTest {
         ingestProperties,
         transactionTemplate,
         postIngestMaterialization,
-        outboxService);
+        outboxService,
+        eventPublisher);
 
     orchestrator = new IngestOrchestrator(
         jobExecutionRepository,
@@ -420,7 +422,8 @@ class IngestOrchestratorTest {
           asyncProps,
           transactionTemplate,
           postIngestMaterialization,
-          outboxService);
+          outboxService,
+          eventPublisher);
       asyncOrchestrator = new IngestOrchestrator(
           jobExecutionRepository,
           dagExecutor,
