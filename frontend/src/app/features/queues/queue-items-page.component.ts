@@ -41,6 +41,7 @@ import {
   QueueItem,
   QueueItemStatus,
   SystemQueueCode,
+  MARKETPLACE_REGISTRY,
 } from '@core/models';
 import { RbacService } from '@core/auth/rbac.service';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -56,6 +57,7 @@ import {
   formatInteger,
   financeColor,
   renderBadge,
+  renderMarketplaceBadge,
 } from '@shared/utils/format.utils';
 import { AG_GRID_LOCALE_RU } from '@shared/config/ag-grid-locale';
 
@@ -104,6 +106,7 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
   private readonly shortcuts = inject(ShortcutService);
   private readonly ws = inject(WebSocketService);
   protected readonly rbac = inject(RbacService);
+  protected readonly marketplaces = MARKETPLACE_REGISTRY;
 
   readonly queueId = input.required<string>();
   readonly checkIcon = CheckCircle2;
@@ -973,8 +976,10 @@ export class QueueItemsPageComponent implements OnInit, OnDestroy {
       colId: 'marketplace',
       headerName: this.translate.instant('queues.grid.marketplace'),
       headerTooltip: this.translate.instant('queues.grid.marketplace'),
-      width: 60,
+      width: 75,
       valueGetter: (p) => this.summary(p.data, 'marketplaceType'),
+      cellRenderer: (p: ICellRendererParams) =>
+        p.value ? renderMarketplaceBadge(p.value as string) : '',
     };
 
     const currentPriceCol: ColDef<QueueItem> = {

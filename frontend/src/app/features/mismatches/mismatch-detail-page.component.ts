@@ -41,7 +41,7 @@ import { MismatchResolveModalComponent } from './mismatch-resolve-modal.componen
 const TERMINAL_STATUSES: MismatchStatus[] = ['RESOLVED', 'AUTO_RESOLVED', 'IGNORED'];
 
 function mpType(t: string): MarketplaceType {
-  return t === 'OZON' ? 'OZON' : 'WB';
+  return t as MarketplaceType;
 }
 
 function statusColor(st: MismatchStatus): StatusColor {

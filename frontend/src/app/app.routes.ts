@@ -80,6 +80,11 @@ export const routes: Routes = [
         data: { breadcrumb: 'Реклама' },
       },
       {
+        path: 'bidding',
+        loadChildren: () => import('./features/bidding/bidding.routes'),
+        data: { breadcrumb: 'Автобиддинг' },
+      },
+      {
         path: 'execution/actions/:actionId',
         redirectTo: 'pricing/price-actions/:actionId',
         pathMatch: 'full',

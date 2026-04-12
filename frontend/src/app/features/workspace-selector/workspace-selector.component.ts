@@ -10,7 +10,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { WorkspaceApiService } from '@core/api/workspace-api.service';
 import { AuthService } from '@core/auth/auth.service';
-import { WorkspaceMembership, WorkspaceRole, WorkspaceDetail } from '@core/models';
+import { WorkspaceMembership, WorkspaceRole, WorkspaceDetail, getMarketplaceShortLabel } from '@core/models';
 import { MinimalTopBarComponent } from '@shared/layout/minimal-top-bar.component';
 import { CenteredContentComponent } from '@shared/layout/centered-content.component';
 import { StatusMessageComponent } from '@shared/layout/status-message.component';
@@ -96,7 +96,7 @@ interface WorkspaceCard {
                     <div class="flex gap-1.5">
                       @for (mp of ws.marketplaces; track mp) {
                         <span class="rounded-[var(--radius-sm)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-                          {{ mp }}
+                          {{ mpShortLabel(mp) }}
                         </span>
                       }
                     </div>
@@ -193,6 +193,10 @@ export class WorkspaceSelectorComponent implements OnInit {
       case 'VIEWER':
         return `${base} bg-[var(--bg-tertiary)] text-[var(--text-secondary)]`;
     }
+  }
+
+  protected mpShortLabel(type: string): string {
+    return getMarketplaceShortLabel(type);
   }
 
   private mergeData(memberships: WorkspaceMembership[], details: WorkspaceDetail[]): WorkspaceCard[] {

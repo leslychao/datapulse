@@ -20,12 +20,7 @@
         <h2 class="text-[length:var(--text-lg)] font-semibold text-[var(--text-primary)]">
           {{ 'analytics.pnl.posting.title' | translate }} {{ d.postingId }}
         </h2>
-        <span
-          class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[length:var(--text-xs)] font-medium"
-          [class]="platformBadge(d.sourcePlatform)"
-        >
-          {{ d.sourcePlatform }}
-        </span>
+        <dp-marketplace-badge [type]="d.sourcePlatform" />
       </div>
       <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-[length:var(--text-sm)] lg:grid-cols-4">
         <div>

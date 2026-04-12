@@ -10,7 +10,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import io.datapulse.bidding.config.BiddingProperties;
+import io.datapulse.bidding.domain.event.BiddingRunCompletedEvent;
 import io.datapulse.bidding.domain.guard.BiddingGuardChain;
 import io.datapulse.bidding.domain.guard.BiddingGuardChain.GuardChainResult;
 import io.datapulse.bidding.domain.strategy.BiddingStrategyRegistry;
@@ -40,6 +43,7 @@ public class BiddingRunService {
   private final BiddingActionScheduler actionScheduler;
   private final BiddingProperties properties;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public void executeRun(long workspaceId, long bidPolicyId) {
@@ -157,6 +161,11 @@ public class BiddingRunService {
               + "bidUp={}, bidDown={}, hold={}, pause={}, status={}",
           run.getId(), bidPolicyId, eligible.size(),
           totalBidUp, totalBidDown, totalHold, totalPause, run.getStatus());
+
+      eventPublisher.publishEvent(new BiddingRunCompletedEvent(
+          workspaceId, run.getId(), bidPolicyId,
+          run.getStatus().name(),
+          totalBidUp, totalBidDown, totalHold, totalPause));
 
     } catch (Exception e) {
       log.error("Bidding run failed: runId={}, policy={}, error={}",

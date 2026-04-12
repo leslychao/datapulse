@@ -36,6 +36,7 @@ import {
   CreateAssignmentRequest,
   OfferSuggestion,
   PolicyAssignment,
+  getMarketplaceShortLabel,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -147,7 +148,7 @@ interface ScopeOption {
               </option>
               @for (conn of activeConnections(); track conn.id) {
                 <option [ngValue]="conn.id">
-                  {{ conn.name }} ({{ conn.marketplaceType }})
+                  {{ conn.name }} ({{ mpShortLabel(conn.marketplaceType) }})
                 </option>
               }
             </select>
@@ -291,7 +292,7 @@ interface ScopeOption {
                     {{ a.connectionName }}
                   </span>
                   <span class="rounded-[var(--radius-sm)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-tertiary)]">
-                    {{ a.marketplace }}
+                    {{ mpShortLabel(a.marketplace) }}
                   </span>
                   <span
                     class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[10px] font-medium"
@@ -347,6 +348,7 @@ export class PolicyAssignmentsSectionComponent {
   private readonly translate = inject(TranslateService);
   private readonly queryClient = inject(QueryClient);
   protected readonly rbac = inject(RbacService);
+  protected readonly mpShortLabel = getMarketplaceShortLabel;
 
   readonly policyId = input.required<number>();
 

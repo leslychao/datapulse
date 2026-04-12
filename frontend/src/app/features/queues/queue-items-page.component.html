@@ -53,8 +53,9 @@
         (change)="onMarketplaceChange($event)"
       >
         <option value="">{{ 'queues.filters.all' | translate }}</option>
-        <option value="WB">WB</option>
-        <option value="OZON">Ozon</option>
+        @for (mp of marketplaces; track mp.type) {
+          <option [value]="mp.type">{{ mp.shortLabel }}</option>
+        }
       </select>
     </label>
 

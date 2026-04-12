@@ -15,7 +15,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslateService } from '@ngx-translate/core';
 
 import { SearchApiService } from '@core/api/search-api.service';
-import { SearchResult } from '@core/models';
+import { SearchResult, getMarketplaceShortLabel } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 
 interface PaletteItem {
@@ -299,7 +299,7 @@ export class CommandPaletteComponent {
           items: res.products.slice(0, 5).map((p) => ({
             type: 'product' as const,
             label: p.productName,
-            sublabel: `${p.skuCode} · ${p.marketplaceType}`,
+            sublabel: `${p.skuCode} · ${getMarketplaceShortLabel(p.marketplaceType)}`,
             action: () => this.navigateInWorkspace('grid', { product: p.offerId }),
           })),
         });

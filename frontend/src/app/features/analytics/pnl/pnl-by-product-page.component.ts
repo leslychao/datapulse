@@ -21,6 +21,7 @@ import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import { formatMoney, financeColor, currentMonth } from '@shared/utils/format.utils';
+import { platformColumn } from '@shared/utils/column-factories';
 import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
@@ -178,18 +179,7 @@ export class PnlByProductPageComponent {
       headerName: this.t.instant('analytics.pnl.col.product'),
       minWidth: 200,
     },
-    {
-      field: 'sourcePlatform',
-      headerName: this.t.instant('analytics.pnl.col.platform'),
-      cellRenderer: (p: { value: string }) => {
-        const cls = p.value === 'WB'
-          ? 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]'
-          : p.value === 'OZON'
-            ? 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]'
-            : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
-        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${p.value}</span>`;
-      },
-    },
+    platformColumn(this.t),
     {
       field: 'revenueAmount',
       headerName: this.t.instant('analytics.pnl.col.revenue'),

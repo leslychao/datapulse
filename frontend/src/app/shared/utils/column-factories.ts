@@ -1,7 +1,7 @@
 import { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
 import { TranslateService } from '@ngx-translate/core';
 
-import { formatMoney, financeColor, formatDateTime, renderBadge, renderOutlineBadge } from './format.utils';
+import { formatMoney, financeColor, formatDateTime, renderBadge, renderOutlineBadge, renderMarketplaceBadge } from './format.utils';
 
 type Translator = (key: string) => string;
 
@@ -77,27 +77,25 @@ export function badgeColumn(
 }
 
 // ---------------------------------------------------------------------------
-// Platform column (WB / OZON badge)
+// Platform column (marketplace badge from registry)
 // ---------------------------------------------------------------------------
-
-const PLATFORM_CLASSES: Record<string, string> = {
-  WB: 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]',
-  OZON: 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]',
-};
 
 export function platformColumn(
   t: TranslateService | Translator,
   field = 'sourcePlatform',
   headerKey = 'analytics.pnl.col.platform',
+  width = 90,
 ): ColDef {
   const tr = resolveTranslator(t);
   return {
     field,
     headerName: tr(headerKey),
+    headerTooltip: tr(headerKey),
+    width,
     cellRenderer: (p: ICellRendererParams) => {
       const val = p.value as string;
-      const cls = PLATFORM_CLASSES[val] ?? 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
-      return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${val}</span>`;
+      if (!val) return '';
+      return renderMarketplaceBadge(val);
     },
   };
 }

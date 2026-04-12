@@ -33,6 +33,11 @@ public class WorkspaceTopicStompPublisher {
     messagingTemplate.convertAndSend(destination, payload);
   }
 
+  public void publishBiddingRunUpdate(long workspaceId, Map<String, Object> payload) {
+    messagingTemplate.convertAndSend(
+        "/topic/workspace/%d/bidding-runs".formatted(workspaceId), payload);
+  }
+
   public void publishActionStatusUpdate(
       long workspaceId, long actionId, String status, String executionMode) {
     Map<String, Object> payload = Map.of(

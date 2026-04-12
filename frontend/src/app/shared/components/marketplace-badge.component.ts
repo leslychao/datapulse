@@ -17,10 +17,10 @@ import { MarketplaceType, getMarketplaceConfig } from '@core/models';
   `,
 })
 export class MarketplaceBadgeComponent {
-  readonly type = input.required<MarketplaceType>();
+  readonly type = input.required<string>();
 
   protected readonly config = computed(() => {
-    const mc = getMarketplaceConfig(this.type());
+    const mc = getMarketplaceConfig(this.type() as MarketplaceType);
     return { bg: mc.badgeBg, text: mc.badgeText, label: mc.shortLabel };
   });
 }

@@ -34,6 +34,7 @@ import {
   DomainImpact,
   DOMAIN_IMPACT,
   SEVERITY_ORDER,
+  getMarketplaceShortLabel,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { KpiCardComponent, KpiAccent } from '@shared/components/kpi-card.component';
@@ -189,7 +190,7 @@ interface DomainConnectionInfo {
                   : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'"
                 (click)="selectedMarketplace.set(mp)"
               >
-                {{ mp === 'ALL' ? ('analytics.data_quality.filter.all_marketplaces' | translate) : mp }}
+                {{ mp === 'ALL' ? ('analytics.data_quality.filter.all_marketplaces' | translate) : mpShortLabel(mp) }}
               </button>
             }
           </div>
@@ -356,6 +357,7 @@ export class DataQualityStatusPageComponent {
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
 
+  protected readonly mpShortLabel = getMarketplaceShortLabel;
   readonly icActivity = Activity;
   readonly icAlertTriangle = AlertTriangle;
   readonly icZap = Zap;

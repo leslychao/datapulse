@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping(
     value = "/api/workspaces/{workspaceId}/manual-bid-locks",
@@ -43,6 +45,29 @@ public class ManualBidLockController {
         request.expiresAt());
 
     return mapper.toResponse(entity);
+  }
+
+  @PostMapping("/bulk")
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+  public List<ManualBidLockResponse> bulkCreateLocks(
+      @PathVariable("workspaceId") long workspaceId,
+      @Valid @RequestBody List<CreateManualBidLockRequest> requests) {
+
+    return lockService.bulkCreateLock(
+            workspaceId, requests, workspaceContext.getUserId())
+        .stream()
+        .map(mapper::toResponse)
+        .toList();
+  }
+
+  @PostMapping("/bulk-unlock")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("hasAnyAuthority('ROLE_OPERATOR', 'ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+  public void bulkRemoveLocks(
+      @PathVariable("workspaceId") long workspaceId,
+      @Valid @RequestBody BulkUnlockRequest request) {
+    lockService.bulkRemoveLock(request.lockIds());
   }
 
   @DeleteMapping("/{id}")

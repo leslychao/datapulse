@@ -1,5 +1,6 @@
 package io.datapulse.bidding.domain;
 
+import io.datapulse.bidding.api.CreateManualBidLockRequest;
 import io.datapulse.bidding.persistence.ManualBidLockEntity;
 import io.datapulse.bidding.persistence.ManualBidLockRepository;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -50,6 +53,30 @@ public class ManualBidLockService {
   @Transactional
   public void removeLock(long lockId) {
     lockRepository.deleteById(lockId);
+  }
+
+  @Transactional
+  public List<ManualBidLockEntity> bulkCreateLock(
+      long workspaceId,
+      List<CreateManualBidLockRequest> requests,
+      Long lockedBy) {
+
+    List<ManualBidLockEntity> results = new ArrayList<>(requests.size());
+    for (CreateManualBidLockRequest req : requests) {
+      results.add(createLock(
+          workspaceId,
+          req.marketplaceOfferId(),
+          req.lockedBid(),
+          req.reason(),
+          lockedBy,
+          req.expiresAt()));
+    }
+    return results;
+  }
+
+  @Transactional
+  public void bulkRemoveLock(List<Long> lockIds) {
+    lockRepository.deleteAllById(lockIds);
   }
 
   @Transactional(readOnly = true)

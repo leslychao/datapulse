@@ -13,15 +13,8 @@
 
     @if (campaign(); as c) {
       <div class="mt-2 flex items-center gap-3">
-        @if (mpBadge(); as badge) {
-          <span
-            class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold"
-            [style.background-color]="badge.bg"
-            [style.color]="badge.color"
-            [style.border]="'1px solid ' + badge.borderColor"
-          >
-            {{ badge.label }}
-          </span>
+        @if (campaign(); as c) {
+          <dp-marketplace-badge [type]="c.sourcePlatform" />
         }
         <h2 class="text-lg font-semibold text-[var(--text-primary)]">
           {{ c.promoName }}

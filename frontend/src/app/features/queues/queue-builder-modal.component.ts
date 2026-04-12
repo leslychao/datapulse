@@ -21,6 +21,7 @@ import {
   QueueMatchRule,
   QueueType,
   UpdateQueueRequest,
+  getMarketplaceShortLabel,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -34,7 +35,7 @@ interface CriteriaField {
 }
 
 const CRITERIA_FIELDS: CriteriaField[] = [
-  { id: 'marketplace_type', labelKey: 'queues.builder.field.marketplace_type', type: 'enum', operators: ['eq', 'in'], options: ['WB', 'OZON'] },
+  { id: 'marketplace_type', labelKey: 'queues.builder.field.marketplace_type', type: 'enum', operators: ['eq', 'in'], options: ['WB', 'OZON', 'YANDEX'] },
   { id: 'connection_id', labelKey: 'queues.builder.field.connection_id', type: 'select', operators: ['eq', 'in'] },
   { id: 'category', labelKey: 'queues.builder.field.category', type: 'text', operators: ['eq', 'in'] },
   { id: 'brand', labelKey: 'queues.builder.field.brand', type: 'text', operators: ['eq', 'in'] },
@@ -76,6 +77,7 @@ export class QueueBuilderModalComponent {
 
   readonly queueTypes: QueueType[] = ['ATTENTION', 'DECISION', 'PROCESSING'];
   readonly criteriaFields = CRITERIA_FIELDS;
+  protected readonly optionLabel = getMarketplaceShortLabel;
 
   readonly previewCount = signal<number | null>(null);
   readonly deleteConfirmOpen = signal(false);

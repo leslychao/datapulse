@@ -9,7 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 import { Mismatch, MismatchType } from '@core/models';
-import { renderBadge } from '@shared/utils/format.utils';
+import { renderBadge, renderMarketplaceBadge } from '@shared/utils/format.utils';
 
 const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'info' | 'neutral'> = {
   ACTIVE: 'error',
@@ -52,9 +52,7 @@ export function buildMismatchColumnDefs(
       cellRenderer: (p: ICellRendererParams<Mismatch>) => {
         const d = p.data;
         if (!d) return '';
-        const mp = d.marketplaceType === 'OZON'
-          ? '<span class="mr-1.5 inline-block rounded px-1 py-0.5 text-[10px] font-semibold leading-none" style="background:#005BFF;color:#fff">Ozon</span>'
-          : '<span class="mr-1.5 inline-block rounded px-1 py-0.5 text-[10px] font-semibold leading-none" style="background:#7B2FBE;color:#fff">WB</span>';
+        const mp = `<span class="mr-1.5">${renderMarketplaceBadge(d.marketplaceType)}</span>`;
         return `<div class="leading-tight py-1"><div class="flex items-center">${mp}<span class="font-medium text-[var(--accent-primary)] cursor-pointer hover:underline">${esc(d.offerName)}</span></div><div class="font-mono text-[11px] text-[var(--text-secondary)] mt-0.5">${esc(d.skuCode)}</div></div>`;
       },
       onCellClicked: (params: CellClickedEvent<Mismatch>) => {

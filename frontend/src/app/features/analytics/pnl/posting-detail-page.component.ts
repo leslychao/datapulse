@@ -13,6 +13,7 @@ import { lastValueFrom } from 'rxjs';
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { PostingEntry } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 import { formatMoney } from '@shared/utils/format.utils';
 
 interface MeasureColumn {
@@ -40,7 +41,7 @@ const MEASURE_COLUMNS: MeasureColumn[] = [
   selector: 'dp-posting-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, MarketplaceBadgeComponent],
   templateUrl: './posting-detail-page.component.html',
 })
 export class PostingDetailPageComponent {
@@ -109,9 +110,4 @@ export class PostingDetailPageComponent {
     return entry[field as keyof PostingEntry] as number;
   }
 
-  platformBadge(platform: string): string {
-    if (platform === 'WB') return 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]';
-    if (platform === 'OZON') return 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]';
-    return 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
-  }
 }

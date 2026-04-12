@@ -24,8 +24,9 @@ import { OfferPriceJournalTabComponent } from './components/offer-detail/offer-p
 import { OfferPromoJournalTabComponent } from './components/offer-detail/offer-promo-journal-tab.component';
 import { OfferActionHistoryTabComponent } from './components/offer-detail/offer-action-history-tab.component';
 import { OfferStockTabComponent } from './components/offer-detail/offer-stock-tab.component';
+import { OfferBiddingTabComponent } from './components/offer-detail/offer-bidding-tab.component';
 
-type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action-history' | 'stock';
+type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action-history' | 'stock' | 'bidding';
 
 @Component({
   selector: 'dp-offer-detail-page',
@@ -43,6 +44,7 @@ type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action-histor
     OfferPromoJournalTabComponent,
     OfferActionHistoryTabComponent,
     OfferStockTabComponent,
+    OfferBiddingTabComponent,
   ],
   template: `
     <div class="flex flex-col gap-4 p-4">
@@ -235,6 +237,9 @@ type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action-histor
               @case ('stock') {
                 <dp-offer-stock-tab [offer]="offer" />
               }
+              @case ('bidding') {
+                <dp-offer-bidding-tab [offerId]="offer.offerId" />
+              }
             }
           </div>
         </div>
@@ -272,6 +277,7 @@ export class OfferDetailPageComponent {
     { key: 'promo-journal', label: 'detail.tab.promo_journal' },
     { key: 'action-history', label: 'detail.tab.action_history' },
     { key: 'stock', label: 'detail.tab.stock' },
+    { key: 'bidding', label: 'detail.tab.bidding' },
   ];
 
   private readonly numericOfferId = computed(() => Number(this.offerId()));

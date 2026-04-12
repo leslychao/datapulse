@@ -22,6 +22,7 @@ import {
   CreatePromoAssignmentRequest,
   PromoAssignmentScopeType,
   PromoPolicyAssignment,
+  getMarketplaceShortLabel,
 } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ToastService } from '@shared/shell/toast/toast.service';
@@ -96,7 +97,7 @@ const SCOPE_TYPE_COLOR: Record<PromoAssignmentScopeType, string> = {
               >
                 <option [ngValue]="null" disabled>{{ 'promo.assignments.connection' | translate }}</option>
                 @for (conn of connections(); track conn.id) {
-                  <option [ngValue]="conn.id">{{ conn.name }} ({{ conn.marketplaceType }})</option>
+                  <option [ngValue]="conn.id">{{ conn.name }} ({{ mpShortLabel(conn.marketplaceType) }})</option>
                 }
               </select>
             </div>
@@ -172,6 +173,7 @@ export class PromoPolicyAssignmentsPageComponent {
   private readonly queryClient = inject(QueryClient);
   private readonly translate = inject(TranslateService);
   protected readonly rbac = inject(RbacService);
+  protected readonly mpShortLabel = getMarketplaceShortLabel;
 
   readonly policyId = input.required<string>();
 

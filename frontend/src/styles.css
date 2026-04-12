@@ -44,12 +44,12 @@
   --finance-zero: #6B7280;
 
   /* Colors — marketplace */
-  --mp-wb: #6B21A8;
-  --mp-wb-bg: #F5F3FF;
+  --mp-wb: #7B2FBE;
+  --mp-wb-text: #FFFFFF;
   --mp-ozon: #005BFF;
-  --mp-ozon-bg: #EFF6FF;
-  --mp-yandex: #D4A017;
-  --mp-yandex-bg: #FFFBEB;
+  --mp-ozon-text: #FFFFFF;
+  --mp-yandex: #FFCC00;
+  --mp-yandex-text: #000000;
 
   /* Colors — overlay */
   --bg-overlay: rgba(0, 0, 0, 0.4);

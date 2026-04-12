@@ -13,6 +13,7 @@ import { CheckCircle, XCircle, Clock } from 'lucide-angular';
 
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatDateTime, formatMoney, renderBadge } from '@shared/utils/format.utils';
+import { platformColumn } from '@shared/utils/column-factories';
 import {
   PromoDecisionFilter,
   PromoDecisionType,
@@ -36,23 +37,6 @@ const DECISION_TYPES: PromoDecisionType[] = [
   'PARTICIPATE', 'DECLINE', 'DEACTIVATE', 'PENDING_REVIEW',
 ];
 
-const MP_BADGE: Record<
-  string,
-  { bg: string; color: string; borderColor: string; label: string }
-> = {
-  WB: {
-    bg: 'var(--mp-wb-bg)',
-    color: 'var(--mp-wb)',
-    borderColor: 'var(--mp-wb)',
-    label: 'WB',
-  },
-  OZON: {
-    bg: 'var(--mp-ozon-bg)',
-    color: 'var(--mp-ozon)',
-    borderColor: 'var(--mp-ozon)',
-    label: 'Ozon',
-  },
-};
 
 @Component({
   selector: 'dp-decisions-list-page',
@@ -200,18 +184,7 @@ export class DecisionsListPageComponent {
           if (params.data) this.onRowClicked(params.data);
         },
       },
-      {
-        headerName: this.translate.instant('promo.decisions.col.marketplace'),
-        headerTooltip: this.translate.instant('promo.decisions.col.marketplace'),
-        field: 'sourcePlatform',
-        width: 100,
-        cellClass: 'text-center',
-        cellRenderer: (params: any) => {
-          const mp = MP_BADGE[params.value];
-          if (!mp) return params.value ?? '';
-          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold" style="background-color:${mp.bg};color:${mp.color};border:1px solid ${mp.borderColor}">${mp.label}</span>`;
-        },
-      },
+      platformColumn(this.translate, 'sourcePlatform', 'promo.decisions.col.marketplace', 100),
       {
         headerName: this.translate.instant('promo.decisions.col.product'),
         field: 'productName',

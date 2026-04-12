@@ -63,6 +63,18 @@ public class AlertCheckerScheduler {
         runCheckerForType(AlertRuleType.AD_PRICE_DROP_HIGH_DRR.name());
     }
 
+    @Scheduled(fixedDelayString = "${datapulse.alerting.autobid-high-drr-interval:PT30M}")
+    @SchedulerLock(name = "alertChecker-autobidHighDrr", lockAtMostFor = "PT15M", lockAtLeastFor = "PT2M")
+    public void runAutobidHighDrrClusterChecker() {
+        runCheckerForType(AlertRuleType.AUTOBID_HIGH_DRR_CLUSTER.name());
+    }
+
+    @Scheduled(fixedDelayString = "${datapulse.alerting.autobid-spend-spike-interval:PT15M}")
+    @SchedulerLock(name = "alertChecker-autobidSpendSpike", lockAtMostFor = "PT10M", lockAtLeastFor = "PT2M")
+    public void runAutobidSpendSpikeChecker() {
+        runCheckerForType(AlertRuleType.AUTOBID_SPEND_SPIKE.name());
+    }
+
     private void runCheckerForType(String ruleType) {
         AlertChecker checker = checkerRegistry.getChecker(ruleType);
         if (checker == null) {

@@ -61,6 +61,13 @@ public class BidPolicyAssignmentService {
     return results;
   }
 
+  @Transactional
+  public void bulkUnassign(long bidPolicyId, List<Long> marketplaceOfferIds) {
+    for (Long offerId : marketplaceOfferIds) {
+      assignmentRepository.deleteByBidPolicyIdAndMarketplaceOfferId(bidPolicyId, offerId);
+    }
+  }
+
   @Transactional(readOnly = true)
   public Page<BidPolicyAssignmentEntity> listAssignments(long bidPolicyId, Pageable pageable) {
     return assignmentRepository.findByBidPolicyId(bidPolicyId, pageable);

@@ -1,6 +1,6 @@
 # Автобиддинг — бизнес-функциональная спецификация
 
-**Статус:** draft — ready for review
+**Статус:** implemented — MVP
 **Дата:** 2026-04-12
 **Автор:** Datapulse product team
 

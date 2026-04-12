@@ -13,6 +13,7 @@ import { ClipboardList, TrendingUp, AlertCircle, TrendingDown } from 'lucide-ang
 
 import { PromoApiService } from '@core/api/promo-api.service';
 import { formatMoney, formatDateTime, renderBadge } from '@shared/utils/format.utils';
+import { platformColumn } from '@shared/utils/column-factories';
 import { EvaluationResult, PromoEvaluationFilter } from '@core/models';
 import { createListPageState } from '@shared/utils/list-page-state';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
@@ -34,23 +35,6 @@ const EVAL_VALUES: EvaluationResult[] = [
   'PROFITABLE', 'MARGINAL', 'UNPROFITABLE', 'INSUFFICIENT_STOCK', 'INSUFFICIENT_DATA',
 ];
 
-const MP_BADGE: Record<
-  string,
-  { bg: string; color: string; borderColor: string; label: string }
-> = {
-  WB: {
-    bg: 'var(--mp-wb-bg)',
-    color: 'var(--mp-wb)',
-    borderColor: 'var(--mp-wb)',
-    label: 'WB',
-  },
-  OZON: {
-    bg: 'var(--mp-ozon-bg)',
-    color: 'var(--mp-ozon)',
-    borderColor: 'var(--mp-ozon)',
-    label: 'Ozon',
-  },
-};
 
 @Component({
   selector: 'dp-evaluations-list-page',
@@ -205,18 +189,7 @@ export class EvaluationsListPageComponent {
           if (params.data) this.onRowClicked(params.data);
         },
       },
-      {
-        headerName: this.translate.instant('promo.evaluations.col.marketplace'),
-        headerTooltip: this.translate.instant('promo.evaluations.col.marketplace'),
-        field: 'sourcePlatform',
-        width: 100,
-        cellClass: 'text-center',
-        cellRenderer: (params: any) => {
-          const mp = MP_BADGE[params.value];
-          if (!mp) return params.value ?? '';
-          return `<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold" style="background-color:${mp.bg};color:${mp.color};border:1px solid ${mp.borderColor}">${mp.label}</span>`;
-        },
-      },
+      platformColumn(this.translate, 'sourcePlatform', 'promo.evaluations.col.marketplace', 100),
       {
         headerName: this.translate.instant('promo.evaluations.col.product'),
         field: 'productName',

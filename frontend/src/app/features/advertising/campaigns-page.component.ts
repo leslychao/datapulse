@@ -12,7 +12,7 @@ import { ColDef, GridApi, ValueFormatterParams } from 'ag-grid-community';
 import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AdvertisingApiService } from '@core/api/advertising-api.service';
-import { MarketplaceType, getMarketplaceConfig } from '@core/models';
+import { platformColumn } from '@shared/utils/column-factories';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import {
@@ -197,17 +197,7 @@ export class CampaignsPageComponent {
       minWidth: 220,
       flex: 1,
     },
-    {
-      field: 'sourcePlatform',
-      headerName: this.t.instant('advertising.campaigns.col.platform'),
-      headerTooltip: this.t.instant('advertising.campaigns.col.platform'),
-      width: 90,
-      cellRenderer: (p: { value: string }) => {
-        const mc = getMarketplaceConfig(p.value as MarketplaceType);
-        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium"
-          style="background:${mc.badgeBg}22;color:${mc.badgeBg}">${mc.shortLabel}</span>`;
-      },
-    },
+    platformColumn(this.t, 'sourcePlatform', 'advertising.campaigns.col.platform'),
     {
       field: 'campaignType',
       headerName: this.t.instant('advertising.campaigns.col.type'),

@@ -18,6 +18,7 @@ import {
   AnalyticsFilter,
   InventoryByProduct,
   StockOutRisk,
+  getMarketplaceShortLabel,
 } from '@core/models';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
@@ -25,6 +26,7 @@ import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.com
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createDebouncedSearch } from '@shared/utils/debounced-search';
 import { formatMoney } from '@shared/utils/format.utils';
+import { platformColumn } from '@shared/utils/column-factories';
 import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
@@ -125,7 +127,7 @@ import {
               <p class="text-xs text-[var(--text-secondary)]">
                 {{ 'analytics.inventory.col.platform' | translate }}
               </p>
-              <p class="mt-0.5 text-sm text-[var(--text-primary)]">{{ product.sourcePlatform }}</p>
+              <p class="mt-0.5 text-sm text-[var(--text-primary)]">{{ mpShortLabel(product.sourcePlatform) }}</p>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -210,6 +212,7 @@ export class InventoryByProductPageComponent {
 
   readonly downloadIcon = Download;
   readonly historyIcon = History;
+  protected readonly mpShortLabel = getMarketplaceShortLabel;
   private gridApi: GridApi | null = null;
 
   @HostListener('document:keydown.escape')
@@ -293,18 +296,7 @@ export class InventoryByProductPageComponent {
       headerName: this.t.instant('analytics.inventory.col.product'),
       minWidth: 220,
     },
-    {
-      field: 'sourcePlatform',
-      headerName: this.t.instant('analytics.inventory.col.platform'),
-      cellRenderer: (p: { value: string }) => {
-        const cls = p.value === 'WB'
-          ? 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]'
-          : p.value === 'OZON'
-            ? 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]'
-            : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
-        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${p.value}</span>`;
-      },
-    },
+    platformColumn(this.t, 'sourcePlatform', 'analytics.inventory.col.platform'),
     {
       field: 'available',
       headerName: this.t.instant('analytics.inventory.col.available'),

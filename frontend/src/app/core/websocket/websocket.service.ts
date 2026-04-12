@@ -188,6 +188,13 @@ export class WebSocketService {
       this.lastMismatchEvent.set(msg);
     });
 
+    this.subscribeTo(`${ws}/bidding-runs`, () => {
+      this.queryClient.invalidateQueries({ queryKey: ['bidding-runs'] });
+      this.queryClient.invalidateQueries({ queryKey: ['bidding-run'] });
+      this.queryClient.invalidateQueries({ queryKey: ['bidding-decisions'] });
+      this.queryClient.invalidateQueries({ queryKey: ['bidding-actions'] });
+    });
+
     this.subscribeTo(`${ws}/promo-campaigns`, () => {
       this.queryClient.invalidateQueries({ queryKey: ['promo-campaigns'] });
     });

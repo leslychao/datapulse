@@ -15,7 +15,7 @@ import { ColDef, GridApi } from 'ag-grid-community';
 import { LucideAngularModule, Download } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
-import { ReturnsByProduct } from '@core/models';
+import { ReturnsByProduct, MARKETPLACE_REGISTRY, getMarketplaceShortLabel } from '@core/models';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
@@ -27,6 +27,7 @@ import {
   formatPercent,
   currentMonth,
 } from '@shared/utils/format.utils';
+import { platformColumn } from '@shared/utils/column-factories';
 import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
   SortUrlState,
@@ -59,8 +60,9 @@ function monthEnd(period: string): string {
                  px-2.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none focus:border-[var(--accent-primary)]">
           <option value="">{{ 'analytics.returns.filter.all_platforms' | translate }}</option>
-          <option value="WB">Wildberries</option>
-          <option value="OZON">Ozon</option>
+          @for (mp of marketplaces; track mp.type) {
+            <option [value]="mp.type">{{ mp.label }}</option>
+          }
         </select>
         <input
           type="text"
@@ -141,7 +143,7 @@ function monthEnd(period: string): string {
 
           <div class="flex-1 space-y-4 overflow-y-auto p-4">
             <div class="text-xs text-[var(--text-tertiary)]">
-              {{ selectedProduct()!.skuCode }} · {{ selectedProduct()!.sourcePlatform }}
+              {{ selectedProduct()!.skuCode }} · {{ mpShortLabel(selectedProduct()!.sourcePlatform) }}
             </div>
 
             <!-- Return Stats -->
@@ -229,6 +231,8 @@ export class ReturnsByProductPageComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly downloadIcon = Download;
+  protected readonly marketplaces = MARKETPLACE_REGISTRY;
+  protected readonly mpShortLabel = getMarketplaceShortLabel;
   private gridApi: GridApi | null = null;
 
   @HostListener('document:keydown.escape')
@@ -329,18 +333,7 @@ export class ReturnsByProductPageComponent {
       headerName: this.t.instant('analytics.returns.col.product'),
       minWidth: 200,
     },
-    {
-      field: 'sourcePlatform',
-      headerName: this.t.instant('analytics.returns.col.platform'),
-      cellRenderer: (p: { value: string }) => {
-        const cls = p.value === 'WB'
-          ? 'bg-[var(--mp-wb-bg)] text-[var(--mp-wb)]'
-          : p.value === 'OZON'
-            ? 'bg-[var(--mp-ozon-bg)] text-[var(--mp-ozon)]'
-            : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral)]';
-        return `<span class="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] font-medium ${cls}">${p.value}</span>`;
-      },
-    },
+    platformColumn(this.t, 'sourcePlatform', 'analytics.returns.col.platform'),
     {
       field: 'returnCount',
       headerName: this.t.instant('analytics.returns.col.return_count'),

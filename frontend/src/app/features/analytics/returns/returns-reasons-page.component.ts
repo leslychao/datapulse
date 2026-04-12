@@ -13,6 +13,7 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
+import { MARKETPLACE_REGISTRY } from '@core/models';
 import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
@@ -49,8 +50,9 @@ function monthEnd(period: string): string {
                  px-2.5 text-[length:var(--text-sm)] text-[var(--text-primary)]
                  outline-none focus:border-[var(--accent-primary)]">
           <option value="">{{ 'analytics.returns.filter.all_platforms' | translate }}</option>
-          <option value="WB">Wildberries</option>
-          <option value="OZON">Ozon</option>
+          @for (mp of marketplaces; track mp.type) {
+            <option [value]="mp.type">{{ mp.label }}</option>
+          }
         </select>
         @if (!filtersDefault()) {
           <button type="button" (click)="onResetFilters()"
@@ -147,6 +149,8 @@ export class ReturnsReasonsPageComponent {
   private readonly t = inject(TranslateService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  protected readonly marketplaces = MARKETPLACE_REGISTRY;
 
   readonly period = signal(
     this.navStore.getSectionFilterValue<string>('analytics:returns', 'period') ?? currentMonth(),

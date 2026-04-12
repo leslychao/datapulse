@@ -1,3 +1,5 @@
+import { MarketplaceType, getMarketplaceConfig } from '@core/models';
+
 export function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -130,4 +132,15 @@ export function renderBadge(label: string, color: string, pulse = false): string
  */
 export function renderOutlineBadge(label: string): string {
   return `<span style="${OUTLINE_BADGE_STYLE}">${label}</span>`;
+}
+
+/**
+ * Renders a marketplace badge for AG Grid cells using registry colors.
+ * Uses inline styles so it works in raw innerHTML without CSS class dependencies.
+ */
+export function renderMarketplaceBadge(marketplaceType: string): string {
+  const mc = getMarketplaceConfig(marketplaceType as MarketplaceType);
+  return `<span style="display:inline-flex;align-items:center;border-radius:4px;` +
+    `padding:2px 8px;font-size:11px;font-weight:600;line-height:16px;` +
+    `background-color:${mc.badgeBg};color:${mc.badgeText}">${mc.shortLabel}</span>`;
 }

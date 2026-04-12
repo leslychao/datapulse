@@ -22,8 +22,8 @@ export const MARKETPLACE_REGISTRY: MarketplaceConfig[] = [
     type: 'WB',
     label: 'Wildberries',
     shortLabel: 'WB',
-    badgeBg: '#7B2FBE',
-    badgeText: '#FFFFFF',
+    badgeBg: 'var(--mp-wb)',
+    badgeText: 'var(--mp-wb-text)',
     credentialFields: [
       {
         key: 'apiToken',
@@ -38,8 +38,8 @@ export const MARKETPLACE_REGISTRY: MarketplaceConfig[] = [
     type: 'OZON',
     label: 'Ozon',
     shortLabel: 'Ozon',
-    badgeBg: '#005BFF',
-    badgeText: '#FFFFFF',
+    badgeBg: 'var(--mp-ozon)',
+    badgeText: 'var(--mp-ozon-text)',
     credentialFields: [
       {
         key: 'clientId',
@@ -60,8 +60,8 @@ export const MARKETPLACE_REGISTRY: MarketplaceConfig[] = [
     type: 'YANDEX',
     label: 'Яндекс.Маркет',
     shortLabel: 'YM',
-    badgeBg: '#FFCC00',
-    badgeText: '#000000',
+    badgeBg: 'var(--mp-yandex)',
+    badgeText: 'var(--mp-yandex-text)',
     credentialFields: [
       {
         key: 'apiKey',
@@ -80,4 +80,9 @@ export function getMarketplaceConfig(type: MarketplaceType): MarketplaceConfig {
 
 export function getMarketplaceLabel(type: MarketplaceType): string {
   return getMarketplaceConfig(type).label;
+}
+
+export function getMarketplaceShortLabel(type: string): string {
+  const cfg = MARKETPLACE_REGISTRY.find(m => m.type === type);
+  return cfg ? cfg.shortLabel : type;
 }

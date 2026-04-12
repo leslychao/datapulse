@@ -42,6 +42,7 @@ import { DataGridComponent } from '@shared/components/data-grid/data-grid.compon
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { StatusBadgeComponent, StatusColor } from '@shared/components/status-badge.component';
+import { MarketplaceBadgeComponent } from '@shared/components/marketplace-badge.component';
 
 const CAMPAIGN_STATUS_COLOR: Record<CampaignStatus, StatusColor> = {
   UPCOMING: 'info',
@@ -96,23 +97,6 @@ const ACTION_COLOR: Record<PromoActionStatus, string> = {
   CANCELLED: 'neutral',
 };
 
-const MP_BADGE: Record<
-  string,
-  { bg: string; color: string; borderColor: string; label: string }
-> = {
-  WB: {
-    bg: 'var(--mp-wb-bg)',
-    color: 'var(--mp-wb)',
-    borderColor: 'var(--mp-wb)',
-    label: 'WB',
-  },
-  OZON: {
-    bg: 'var(--mp-ozon-bg)',
-    color: 'var(--mp-ozon)',
-    borderColor: 'var(--mp-ozon)',
-    label: 'Ozon',
-  },
-};
 
 @Component({
   selector: 'dp-campaign-detail-page',
@@ -126,6 +110,7 @@ const MP_BADGE: Record<
     EmptyStateComponent,
     KpiCardComponent,
     StatusBadgeComponent,
+    MarketplaceBadgeComponent,
   ],
   templateUrl: './campaign-detail-page.component.html',
 })
@@ -488,10 +473,6 @@ export class CampaignDetailPageComponent {
     return c ? (CAMPAIGN_STATUS_COLOR[c.status] ?? 'neutral') : 'neutral';
   });
 
-  readonly mpBadge = computed(() => {
-    const c = this.campaign();
-    return c ? MP_BADGE[c.sourcePlatform] ?? null : null;
-  });
 
   readonly isCampaignEnded = computed(() => {
     const c = this.campaign();

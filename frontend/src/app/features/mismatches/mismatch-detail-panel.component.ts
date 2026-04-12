@@ -47,7 +47,7 @@ type DetailTab = 'comparison' | 'timeline' | 'action';
 const TERMINAL_STATUSES: MismatchStatus[] = ['RESOLVED', 'AUTO_RESOLVED', 'IGNORED'];
 
 function mp(t: string): MarketplaceType {
-  return t === 'OZON' ? 'OZON' : 'WB';
+  return t as MarketplaceType;
 }
 
 function stColor(st: MismatchStatus): 'success' | 'error' | 'warning' | 'info' | 'neutral' {

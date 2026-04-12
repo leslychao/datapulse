@@ -7,6 +7,7 @@ import {
 import { TranslateService } from '@ngx-translate/core';
 
 import { DraftPriceChange } from '@core/models';
+import { platformColumn } from '@shared/utils/column-factories';
 
 const MARGIN_THRESHOLDS = { high: 30, low: 10, negative: 0 };
 
@@ -246,16 +247,7 @@ export function buildGridColumnDefs(
       tooltipField: 'productName',
       cellClass: 'text-[length:var(--text-sm)]',
     },
-    {
-      field: 'marketplaceType',
-      headerName: translate.instant('grid.col.marketplace'),
-      headerTooltip: translate.instant('grid.col.marketplace_full'),
-      width: 65,
-      sortable: false,
-      cellClass: 'text-center',
-      valueFormatter: (p: ValueFormatterParams) =>
-        translate.instant('grid.marketplace.' + p.value),
-    },
+    { ...platformColumn(translate, 'marketplaceType', 'grid.col.marketplace', 75), headerTooltip: translate.instant('grid.col.marketplace_full'), sortable: false },
     buildCurrentPriceCol(translate, callbacks, draftMode),
     {
       field: 'marginPct',
@@ -505,6 +497,74 @@ export function buildGridColumnDefs(
       tooltipField: 'activePolicy',
       cellClass: 'text-[length:var(--text-sm)]',
       valueFormatter: (p: ValueFormatterParams) => p.value ?? '—',
+    },
+    {
+      field: 'bidPolicyName',
+      headerName: translate.instant('grid.col.bid_policy'),
+      width: 160,
+      sortable: false,
+      hide: true,
+      tooltipField: 'bidPolicyName',
+      cellClass: 'text-[length:var(--text-sm)]',
+      valueFormatter: (p: ValueFormatterParams) => p.value ?? '—',
+    },
+    {
+      field: 'currentBid',
+      headerName: translate.instant('grid.col.current_bid'),
+      width: 110,
+      sortable: true,
+      hide: true,
+      type: 'rightAligned',
+      cellClass: 'font-mono text-[length:var(--text-sm)]',
+      valueFormatter: (p: ValueFormatterParams) => {
+        if (p.value === null || p.value === undefined) return '—';
+        return formatMoney(p.value / 100);
+      },
+    },
+    {
+      field: 'lastBidDecisionType',
+      headerName: translate.instant('grid.col.last_bid_decision'),
+      width: 130,
+      sortable: false,
+      hide: true,
+      cellClass: 'text-center',
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return '—';
+        const colors: Record<string, string> = {
+          BID_UP: 'var(--status-success)',
+          BID_DOWN: 'var(--status-error)',
+          HOLD: 'var(--status-neutral)',
+          PAUSE: 'var(--status-warning)',
+          RESUME: 'var(--status-info)',
+          SET_MINIMUM: 'var(--status-info)',
+          EMERGENCY_CUT: 'var(--status-error)',
+        };
+        const color = colors[params.value] ?? 'var(--status-neutral)';
+        const label = translate.instant('bidding.decision.' + params.value);
+        return `<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style="background:color-mix(in srgb,${color} 15%,transparent);color:${color}">${label}</span>`;
+      },
+    },
+    {
+      field: 'bidDrrPct',
+      headerName: translate.instant('grid.col.bid_drr'),
+      width: 100,
+      sortable: true,
+      hide: true,
+      type: 'rightAligned',
+      cellClass: 'font-mono text-[length:var(--text-sm)]',
+      valueFormatter: percentFormatter,
+    },
+    {
+      field: 'manualBidLock',
+      headerName: translate.instant('grid.col.manual_bid_lock'),
+      width: 100,
+      sortable: false,
+      hide: true,
+      cellClass: 'text-center',
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return '—';
+        return `<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style="background:color-mix(in srgb,var(--status-warning) 15%,transparent);color:var(--status-warning)">🔒</span>`;
+      },
     },
     {
       field: 'lastSyncAt',

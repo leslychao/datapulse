@@ -94,7 +94,7 @@
                     >
                       <option value="">—</option>
                       @for (opt of opts; track opt) {
-                        <option [value]="opt">{{ opt }}</option>
+                        <option [value]="opt">{{ optionLabel(opt) }}</option>
                       }
                     </select>
                   } @else {

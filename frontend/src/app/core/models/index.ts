@@ -19,3 +19,4 @@ export * from './alert.model';
 export * from './mismatch.model';
 export * from './queue.model';
 export * from './tour.model';
+export * from './bidding.model';

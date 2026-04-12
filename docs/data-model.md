@@ -32,6 +32,14 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | `category` | Dict | [ETL Pipeline](modules/etl-pipeline.md) |
 | `warehouse` | Dict | [ETL Pipeline](modules/etl-pipeline.md) |
 
+### Yandex-specific canonical extensions
+
+| Таблица | Новое поле | Тип | Назначение |
+|---------|-----------|-----|------------|
+| `canonical_stock_current` | `source_campaign_id` | `VARCHAR(40)` | Yandex campaign ID, от которого получены остатки (fan-out per campaign) |
+| `canonical_return` | `source_campaign_id` | `VARCHAR(40)` | Yandex campaign ID, от которого получены возвраты (fan-out per campaign) |
+| `marketplace_offer` | `delivery_schema` | `VARCHAR(20)` | Модель размещения. Расширение: `DBS`, `EXPRESS` (дополнительно к `FBO`, `FBS`) |
+
 ## Star schema (обзор)
 
 | Тип | Таблицы | Модуль-владелец |
@@ -53,6 +61,7 @@ API маркетплейсов → Raw (S3) → Normalized (in-process) → Cano
 | [Promotions](modules/promotions.md) | `promo_policy` (versioned), `promo_policy_assignment`, `promo_evaluation_run`, `promo_evaluation`, `promo_decision` (policy_snapshot), `promo_action`, `promo_action_attempt`. Canonical truth: `canonical_promo_campaign`, `canonical_promo_product` (owned by ETL, read + updated by Promotions) |
 | [Seller Operations](modules/seller-operations.md) | `saved_view`, `working_queue_definition`, `working_queue_assignment` |
 | [Audit & Alerting](modules/audit-alerting.md) | `audit_log`, `alert_rule`, `alert_event`, `user_notification` |
+| [Autobidding](modules/autobidding.md) | `bid_policy`, `bid_policy_assignment`, `bidding_run`, `bid_decision`, `bid_action`, `bid_action_attempt`, `manual_bid_lock` |
 
 ## Источники истины
 
@@ -140,6 +149,9 @@ outbox_event:
 | `PROMO_EVALUATION_EXECUTE` | Promotions | `datapulse-pricing-worker` | `promo.evaluation` / `promo.evaluation` | Запуск promo evaluation batch |
 | `ETL_PROMO_CAMPAIGN_STALE` | ETL Pipeline | `datapulse-pricing-worker` | `datapulse.etl.events` / fanout | Stale campaign detected — кампания не возвращается в PROMO_SYNC > 48h. Promotions expires pending actions |
 | `REMATERIALIZATION_REQUESTED` | Analytics | `datapulse-ingest-worker` | `etl.sync` / `etl.sync` | On-demand rematerialization ClickHouse marts (triggered by ETL backfill or manual request) |
+| `BIDDING_RUN_EXECUTE` | Autobidding | `datapulse-pricing-worker` | `bidding.run` / `bidding.run` | Запуск bidding run batch |
+| `BID_ACTION_EXECUTE` | Autobidding | `datapulse-executor-worker` | `bid.execution` / `bid.execution` | Исполнение bid action |
+| `BID_ACTION_RETRY` | Autobidding | `datapulse-executor-worker` | Publish → `bid.execution.wait` (TTL 1 min) → DLX → `bid.execution` | Retry bid action |
 
 ### Outbox poller
 

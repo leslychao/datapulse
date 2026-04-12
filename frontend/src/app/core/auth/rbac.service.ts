@@ -64,6 +64,14 @@ const ALERT_VIEW_ROLES = new Set<WorkspaceRole>([
   'OPERATOR', 'PRICING_MANAGER', 'ADMIN', 'OWNER',
 ]);
 
+const BID_POLICY_WRITE_ROLES = new Set<WorkspaceRole>([
+  'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
+const BID_ACTION_APPROVE_ROLES = new Set<WorkspaceRole>([
+  'PRICING_MANAGER', 'ADMIN', 'OWNER',
+]);
+
 @Injectable({ providedIn: 'root' })
 export class RbacService {
   private readonly auth = inject(AuthService);
@@ -139,6 +147,14 @@ export class RbacService {
 
   readonly canViewAlertRules = computed(
     () => hasRole(this.currentRole(), ALERT_VIEW_ROLES),
+  );
+
+  readonly canWriteBidPolicies = computed(
+    () => hasRole(this.currentRole(), BID_POLICY_WRITE_ROLES),
+  );
+
+  readonly canApproveBidActions = computed(
+    () => hasRole(this.currentRole(), BID_ACTION_APPROVE_ROLES),
   );
 
   readonly currentUserId = computed(() => this.auth.user()?.id ?? null);

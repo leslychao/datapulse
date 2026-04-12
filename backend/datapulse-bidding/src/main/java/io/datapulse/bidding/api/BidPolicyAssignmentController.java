@@ -78,6 +78,16 @@ public class BidPolicyAssignmentController {
         .toList();
   }
 
+  @PostMapping("/bulk-unassign")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+  public void bulkUnassign(
+      @PathVariable("workspaceId") long workspaceId,
+      @PathVariable("policyId") long policyId,
+      @Valid @RequestBody BulkUnassignRequest request) {
+    assignmentService.bulkUnassign(policyId, request.marketplaceOfferIds());
+  }
+
   @DeleteMapping("/{assignmentId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
