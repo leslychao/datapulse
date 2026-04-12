@@ -47,7 +47,7 @@ class AlertEventServiceTest {
 
   private AlertEventResponse buildAlert(long id, String status) {
     return new AlertEventResponse(
-        id, null, 1L, "WB", status, "WARNING",
+        id, null, 1L, "WB", 10L, status, "WARNING",
         "Test alert", null, false,
         OffsetDateTime.now(), null, null, null, null);
   }

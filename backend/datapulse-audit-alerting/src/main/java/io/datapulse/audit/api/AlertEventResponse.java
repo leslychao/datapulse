@@ -1,5 +1,6 @@
 package io.datapulse.audit.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.OffsetDateTime;
 
 public record AlertEventResponse(
@@ -7,6 +8,7 @@ public record AlertEventResponse(
         Long alertRuleId,
         long workspaceId,
         String sourcePlatform,
+        @JsonIgnore Long connectionId,
         String status,
         String severity,
         String title,

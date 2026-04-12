@@ -1065,7 +1065,6 @@
   "queues.builder.delete_confirm": "Удалить очередь «{{name}}»? Это действие необратимо.",
   "queues.builder.deleted": "Очередь удалена.",
   "queues.builder.delete_error": "Не удалось удалить очередь.",
-  "queues.builder.field.connection_id": "Подключение",
   "queues.builder.field.marketplace_type": "Маркетплейс",
   "queues.builder.field.category": "Категория",
   "queues.builder.field.brand": "Бренд",

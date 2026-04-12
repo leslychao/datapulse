@@ -31,7 +31,8 @@ public class AlertEventRepository {
             """;
 
     private static final String SELECT_COLUMNS = """
-            SELECT ae.id, ae.alert_rule_id, ae.workspace_id, ae.status, ae.severity,
+            SELECT ae.id, ae.alert_rule_id, ae.workspace_id, ae.connection_id,
+                   ae.status, ae.severity,
                    ae.title, ae.details, ae.blocks_automation, ae.opened_at,
                    ae.acknowledged_at, ae.acknowledged_by, ae.resolved_at, ae.resolved_reason,
                    mc.marketplace_type AS source_platform
@@ -234,6 +235,7 @@ public class AlertEventRepository {
                 rs.getObject("alert_rule_id", Long.class),
                 rs.getLong("workspace_id"),
                 rs.getString("source_platform"),
+                rs.getObject("connection_id", Long.class),
                 rs.getString("status"),
                 rs.getString("severity"),
                 rs.getString("title"),

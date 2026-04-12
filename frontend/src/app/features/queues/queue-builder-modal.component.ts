@@ -36,7 +36,6 @@ interface CriteriaField {
 
 const CRITERIA_FIELDS: CriteriaField[] = [
   { id: 'marketplace_type', labelKey: 'queues.builder.field.marketplace_type', type: 'enum', operators: ['eq', 'in'], options: ['WB', 'OZON', 'YANDEX'] },
-  { id: 'connection_id', labelKey: 'queues.builder.field.connection_id', type: 'select', operators: ['eq', 'in'] },
   { id: 'category', labelKey: 'queues.builder.field.category', type: 'text', operators: ['eq', 'in'] },
   { id: 'brand', labelKey: 'queues.builder.field.brand', type: 'text', operators: ['eq', 'in'] },
   { id: 'stock_risk', labelKey: 'queues.builder.field.stock_risk', type: 'enum', operators: ['eq', 'in'], options: ['CRITICAL', 'WARNING', 'NORMAL'] },
