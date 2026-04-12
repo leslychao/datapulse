@@ -34,6 +34,7 @@ class OzonBidCommandAdapterTest {
   @Mock private IntegrationProperties.Ozon ozonProps;
   @Mock private MarketplaceRateLimiter rateLimiter;
   @Mock private OzonPerformanceAuthService authService;
+  @Mock private OzonBidReadAdapter ozonBidReadAdapter;
 
   private OzonBidCommandAdapter adapter;
 
@@ -64,7 +65,8 @@ class OzonBidCommandAdapterTest {
     lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
     lenient().when(responseSpec.bodyToMono(String.class)).thenReturn(Mono.just("{}"));
 
-    adapter = new OzonBidCommandAdapter(builder, properties, rateLimiter, authService);
+    adapter = new OzonBidCommandAdapter(
+        builder, properties, rateLimiter, authService, ozonBidReadAdapter);
   }
 
   @Test
@@ -151,7 +153,7 @@ class OzonBidCommandAdapterTest {
               401, "Unauthorized", null, "token expired".getBytes(), null)));
 
       var adapter401 = new OzonBidCommandAdapter(
-          builder401, properties, rateLimiter, authService);
+          builder401, properties, rateLimiter, authService, ozonBidReadAdapter);
       BidActionEntity action = createAction("12345", 1500);
 
       BidActionGatewayResult result = adapter401.execute(

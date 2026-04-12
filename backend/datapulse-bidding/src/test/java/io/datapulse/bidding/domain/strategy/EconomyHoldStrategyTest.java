@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.datapulse.bidding.domain.BidDecisionType;
+import io.datapulse.bidding.domain.BidUnit;
 import io.datapulse.bidding.domain.BiddingSignalSet;
 import io.datapulse.bidding.domain.BiddingStrategyResult;
 
@@ -169,7 +170,7 @@ class EconomyHoldStrategyTest {
         currentBid, drrPct, null, roas,
         100, 10, 5, BigDecimal.TEN,
         marginPct, 30, null, null, minBid,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 
   private JsonNode config(String targetDrrPct, String tolerancePct,

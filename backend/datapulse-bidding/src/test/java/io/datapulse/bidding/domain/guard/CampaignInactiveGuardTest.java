@@ -25,13 +25,13 @@ class CampaignInactiveGuardTest {
   }
 
   @Test
-  @DisplayName("blocks when campaign status is null")
-  void should_block_when_statusNull() {
+  @DisplayName("allows when campaign status is null (e.g. Yandex with no campaign concept)")
+  void should_allow_when_statusNull() {
     BiddingGuardContext ctx = context(TestSignals.withCampaignStatus(null));
 
     BiddingGuardResult result = guard.evaluate(ctx);
 
-    assertThat(result.allowed()).isFalse();
+    assertThat(result.allowed()).isTrue();
   }
 
   @Test

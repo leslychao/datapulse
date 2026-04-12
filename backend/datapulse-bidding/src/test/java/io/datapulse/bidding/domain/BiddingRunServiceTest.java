@@ -54,6 +54,8 @@ class BiddingRunServiceTest {
   @Mock private BiddingRunRepository runRepository;
   @Mock private BidPolicyRepository policyRepository;
   @Mock private BiddingActionScheduler actionScheduler;
+  @Mock private BiddingResumeEvaluator resumeEvaluator;
+  @Mock private WorkspaceBiddingSettingsService settingsService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private BiddingStrategy mockStrategy;
 
@@ -63,7 +65,7 @@ class BiddingRunServiceTest {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final BiddingProperties properties =
-      new BiddingProperties(7, 50, 4, 48, 7, true);
+      new BiddingProperties(7, 50, 4, 48, 7, true, 3, 7, 30);
 
   private BiddingRunService service;
   private BidPolicyEntity activePolicy;
@@ -73,7 +75,14 @@ class BiddingRunServiceTest {
     service = new BiddingRunService(
         strategyRegistry, guardChain, signalCollector, readRepo,
         decisionRepository, runRepository, policyRepository,
-        actionScheduler, properties, objectMapper, eventPublisher);
+        actionScheduler, resumeEvaluator, settingsService,
+        properties, objectMapper, eventPublisher);
+
+    lenient().when(settingsService.isBiddingEnabled(anyLong())).thenReturn(true);
+    lenient().when(resumeEvaluator.evaluateResume(anyLong(), anyLong(), any()))
+        .thenReturn(null);
+    lenient().when(runRepository.existsByBidPolicyIdAndStatus(anyLong(), any()))
+        .thenReturn(false);
 
     activePolicy = new BidPolicyEntity();
     activePolicy.setId(10L);
@@ -102,12 +111,12 @@ class BiddingRunServiceTest {
       setupPipeline();
 
       BiddingSignalSet signals = defaultSignals();
-      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), anyInt()))
+      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), eq(5L), anyInt()))
           .thenReturn(signals);
       when(signalCollector.hasMinimumData(signals)).thenReturn(true);
 
       when(mockStrategy.evaluate(any(), any()))
-          .thenReturn(new BiddingStrategyResult(BidDecisionType.BID_DOWN, 800, "bid down"));
+          .thenReturn(new BiddingStrategyResult(BidDecisionType.BID_DOWN, 900, "bid down"));
       when(guardChain.evaluate(any()))
           .thenReturn(new GuardChainResult(true, null, List.of()));
 
@@ -116,7 +125,7 @@ class BiddingRunServiceTest {
       verify(decisionRepository).save(decisionCaptor.capture());
       BidDecisionEntity decision = decisionCaptor.getValue();
       assertThat(decision.getDecisionType()).isEqualTo(BidDecisionType.BID_DOWN);
-      assertThat(decision.getTargetBid()).isEqualTo(800);
+      assertThat(decision.getTargetBid()).isEqualTo(900);
       assertThat(decision.getStrategyType()).isEqualTo(BiddingStrategyType.ECONOMY_HOLD);
 
       verify(actionScheduler).scheduleActions(1L);
@@ -128,7 +137,7 @@ class BiddingRunServiceTest {
       setupPipeline();
 
       BiddingSignalSet signals = defaultSignals();
-      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), anyInt()))
+      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), eq(5L), anyInt()))
           .thenReturn(signals);
       when(signalCollector.hasMinimumData(signals)).thenReturn(true);
 
@@ -167,7 +176,7 @@ class BiddingRunServiceTest {
       when(readRepo.findEligibleProducts(1L, 10L)).thenReturn(products);
 
       BiddingSignalSet signals = defaultSignals();
-      when(signalCollector.collect(eq(1L), anyLong(), any(), anyInt()))
+      when(signalCollector.collect(eq(1L), anyLong(), any(), anyLong(), anyInt()))
           .thenReturn(signals);
       when(signalCollector.hasMinimumData(any())).thenReturn(true);
 
@@ -200,7 +209,7 @@ class BiddingRunServiceTest {
       setupPipeline();
 
       BiddingSignalSet signals = defaultSignals();
-      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), anyInt()))
+      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), eq(5L), anyInt()))
           .thenReturn(signals);
       when(signalCollector.hasMinimumData(signals)).thenReturn(false);
 
@@ -244,7 +253,7 @@ class BiddingRunServiceTest {
       setupPipeline();
 
       BiddingSignalSet signals = defaultSignals();
-      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), anyInt()))
+      when(signalCollector.collect(eq(1L), eq(100L), eq("SKU1"), eq(5L), anyInt()))
           .thenReturn(signals);
       when(signalCollector.hasMinimumData(signals)).thenReturn(true);
 
@@ -276,6 +285,6 @@ class BiddingRunServiceTest {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 }

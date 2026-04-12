@@ -12,7 +12,8 @@ import io.datapulse.bidding.domain.BiddingGuardResult;
 
 class LowStockGuardTest {
 
-  private final BiddingProperties props = new BiddingProperties(7, 50, 4, 48, 7, true);
+  private final BiddingProperties props =
+      new BiddingProperties(7, 50, 4, 48, 7, true, 3, 7, 30);
   private final LowStockGuard guard = new LowStockGuard(props);
 
   @Test

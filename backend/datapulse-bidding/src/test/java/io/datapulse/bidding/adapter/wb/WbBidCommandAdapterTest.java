@@ -33,6 +33,7 @@ class WbBidCommandAdapterTest {
   @Mock private IntegrationProperties properties;
   @Mock private IntegrationProperties.Wildberries wbProps;
   @Mock private MarketplaceRateLimiter rateLimiter;
+  @Mock private WbBidReadAdapter wbBidReadAdapter;
 
   private WbBidCommandAdapter adapter;
 
@@ -61,7 +62,7 @@ class WbBidCommandAdapterTest {
     lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
     lenient().when(responseSpec.bodyToMono(String.class)).thenReturn(Mono.just(""));
 
-    adapter = new WbBidCommandAdapter(builder, properties, rateLimiter);
+    adapter = new WbBidCommandAdapter(builder, properties, rateLimiter, wbBidReadAdapter);
   }
 
   @Test
@@ -109,7 +110,8 @@ class WbBidCommandAdapterTest {
         Mono.error(WebClientResponseException.create(
             429, "Too Many Requests", null, "rate limited".getBytes(), null)));
 
-    var adapterRateLimit = new WbBidCommandAdapter(builder429, properties, rateLimiter);
+    var adapterRateLimit =
+        new WbBidCommandAdapter(builder429, properties, rateLimiter, wbBidReadAdapter);
     BidActionEntity action = createAction("12345", "67890", 150);
 
     BidActionGatewayResult result = adapterRateLimit.execute(
@@ -141,7 +143,8 @@ class WbBidCommandAdapterTest {
         Mono.error(WebClientResponseException.create(
             400, "Bad Request", null, "invalid params".getBytes(), null)));
 
-    var adapter400 = new WbBidCommandAdapter(builder400, properties, rateLimiter);
+    var adapter400 =
+        new WbBidCommandAdapter(builder400, properties, rateLimiter, wbBidReadAdapter);
     BidActionEntity action = createAction("12345", "67890", 150);
 
     BidActionGatewayResult result = adapter400.execute(

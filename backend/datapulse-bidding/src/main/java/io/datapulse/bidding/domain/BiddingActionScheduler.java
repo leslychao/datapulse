@@ -27,6 +27,8 @@ public class BiddingActionScheduler {
   private static final List<BidDecisionType> ACTIONABLE_TYPES = List.of(
       BidDecisionType.BID_UP,
       BidDecisionType.BID_DOWN,
+      BidDecisionType.PAUSE,
+      BidDecisionType.RESUME,
       BidDecisionType.SET_MINIMUM,
       BidDecisionType.EMERGENCY_CUT);
 
@@ -100,7 +102,7 @@ public class BiddingActionScheduler {
     action.setBidDecisionId(decision.getId());
     action.setWorkspaceId(decision.getWorkspaceId());
     action.setMarketplaceOfferId(decision.getMarketplaceOfferId());
-    action.setTargetBid(decision.getTargetBid());
+    action.setTargetBid(resolveTargetBid(decision));
     action.setPreviousBid(decision.getCurrentBid());
     action.setExecutionMode(decision.getExecutionMode());
     action.setMaxRetries(3);
@@ -130,6 +132,18 @@ public class BiddingActionScheduler {
     }
 
     return action;
+  }
+
+  private int resolveTargetBid(BidDecisionEntity decision) {
+    if (decision.getDecisionType() == BidDecisionType.PAUSE) {
+      return 0;
+    }
+    if (decision.getTargetBid() == null) {
+      throw new IllegalStateException(
+          "targetBid is null for actionable decision: decisionId=%d, type=%s"
+              .formatted(decision.getId(), decision.getDecisionType()));
+    }
+    return decision.getTargetBid();
   }
 
   private EligibleProductRow resolveProduct(BidDecisionEntity decision) {

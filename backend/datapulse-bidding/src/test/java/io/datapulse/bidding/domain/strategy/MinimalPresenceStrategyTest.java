@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 import io.datapulse.bidding.domain.BidDecisionType;
+import io.datapulse.bidding.domain.BidUnit;
 import io.datapulse.bidding.domain.BiddingSignalSet;
 import io.datapulse.bidding.domain.BiddingStrategyResult;
 import io.datapulse.bidding.domain.BiddingStrategyType;
@@ -113,6 +114,6 @@ class MinimalPresenceStrategyTest {
         currentBid, null, null, null,
         0, 0, 0, BigDecimal.ZERO,
         null, stockDays, null, null, minBid,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 }
