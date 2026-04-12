@@ -145,7 +145,7 @@ public class OzonNormalizer {
         String region = posting.analyticsData() != null ? posting.analyticsData().region() : null;
 
         return new NormalizedOrderItem(
-                posting.postingNumber(),
+                posting.postingNumber() + "-" + product.sku(),
                 product.offerId(),
                 product.quantity(),
                 pricePerUnit,
@@ -173,7 +173,7 @@ public class OzonNormalizer {
         String city = posting.analyticsData() != null ? posting.analyticsData().city() : null;
 
         return new NormalizedOrderItem(
-                posting.postingNumber(),
+                posting.postingNumber() + "-" + product.sku(),
                 product.offerId(),
                 product.quantity(),
                 pricePerUnit,

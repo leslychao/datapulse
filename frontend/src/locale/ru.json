@@ -1049,6 +1049,7 @@
   "queues.toast.retried": "Повтор запущен",
   "queues.toast.cancelled": "Отменено",
   "queues.toast.cost_saved": "Себестоимость сохранена",
+  "queues.inline_cost_not_implemented": "Функция inline-редактирования себестоимости в разработке",
   "queues.toast.bulk_approved": "Массовое одобрение выполнено",
   "queues.toast.bulk_rejected": "Массовое отклонение выполнено",
   "queues.toast.bulk_retried": "Массовый повтор запущен",

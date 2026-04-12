@@ -8,6 +8,8 @@ import io.datapulse.pricing.api.ManualLockMapper;
 import io.datapulse.pricing.api.ManualLockResponse;
 import io.datapulse.pricing.persistence.ManualPriceLockEntity;
 import io.datapulse.pricing.persistence.ManualPriceLockRepository;
+import io.datapulse.pricing.persistence.PricingRunReadRepository;
+import io.datapulse.pricing.persistence.PricingRunReadRepository.OfferInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,6 +32,7 @@ public class ManualPriceLockService {
 
     private final ManualPriceLockRepository lockRepository;
     private final ManualLockMapper lockMapper;
+    private final PricingRunReadRepository runReadRepository;
 
     @Transactional
     public ManualLockResponse createLock(CreateManualLockRequest request,
@@ -54,22 +61,65 @@ public class ManualPriceLockService {
     public Page<ManualLockResponse> listActiveLocks(
         long workspaceId, Long marketplaceOfferId,
         Long connectionId, String search, Pageable pageable) {
+        Page<ManualLockResponse> result;
+
         if (marketplaceOfferId != null) {
             List<ManualLockResponse> content = lockRepository.findActiveLock(marketplaceOfferId)
                 .map(lockMapper::toResponse)
                 .map(List::of)
                 .orElse(List.of());
-            return new PageImpl<>(content, pageable, content.size());
-        }
-
-        if (connectionId != null || (search != null && !search.isBlank())) {
-            return lockRepository.findActiveLocksFiltered(
+            result = new PageImpl<>(content, pageable, content.size());
+        } else if (connectionId != null || (search != null && !search.isBlank())) {
+            result = lockRepository.findActiveLocksFiltered(
                     workspaceId, connectionId, search, pageable)
+                .map(lockMapper::toResponse);
+        } else {
+            result = lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(
+                    workspaceId, pageable)
                 .map(lockMapper::toResponse);
         }
 
-        return lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(workspaceId, pageable)
-            .map(lockMapper::toResponse);
+        return enrichLocks(result);
+    }
+
+    private Page<ManualLockResponse> enrichLocks(Page<ManualLockResponse> page) {
+        if (page.isEmpty()) {
+            return page;
+        }
+
+        Set<Long> offerIds = page.stream()
+                .map(ManualLockResponse::marketplaceOfferId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> userIds = page.stream()
+                .map(ManualLockResponse::lockedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, OfferInfo> offerInfoMap = runReadRepository.findOfferInfo(offerIds);
+        Map<Long, String> userNames = runReadRepository.findUserNames(userIds);
+
+        Set<Long> connectionIds = offerInfoMap.values().stream()
+                .map(OfferInfo::connectionId)
+                .collect(Collectors.toSet());
+        Map<Long, String> connectionNames = runReadRepository.findConnectionNames(connectionIds);
+
+        return page.map(l -> {
+            OfferInfo offer = offerInfoMap.get(l.marketplaceOfferId());
+            Long connId = offer != null ? offer.connectionId() : null;
+            String connName = connId != null ? connectionNames.get(connId) : null;
+            String userName = userNames.get(l.lockedBy());
+
+            return new ManualLockResponse(
+                    l.id(), l.marketplaceOfferId(), l.lockedPrice(),
+                    l.reason(), l.lockedBy(), l.lockedAt(),
+                    l.expiresAt(), l.unlockedAt(), l.unlockedBy(),
+                    offer != null ? offer.name() : null,
+                    offer != null ? offer.sellerSku() : null,
+                    connId,
+                    connName,
+                    userName);
+        });
     }
 
     @Transactional

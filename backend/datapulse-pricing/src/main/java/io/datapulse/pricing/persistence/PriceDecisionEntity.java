@@ -38,14 +38,14 @@ public class PriceDecisionEntity {
     @Column(name = "marketplace_offer_id", nullable = false)
     private Long marketplaceOfferId;
 
-    @Column(name = "price_policy_id")
+    @Column(name = "price_policy_id", nullable = false)
     private Long pricePolicyId;
 
     @Column(name = "policy_version", nullable = false)
     private Integer policyVersion;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "policy_snapshot", columnDefinition = "jsonb")
+    @Column(name = "policy_snapshot", columnDefinition = "jsonb", nullable = false)
     private String policySnapshot;
 
     @Enumerated(EnumType.STRING)

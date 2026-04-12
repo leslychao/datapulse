@@ -12,6 +12,11 @@ public record ManualLockResponse(
         OffsetDateTime lockedAt,
         OffsetDateTime expiresAt,
         OffsetDateTime unlockedAt,
-        Long unlockedBy
+        Long unlockedBy,
+        String offerName,
+        String sellerSku,
+        Long connectionId,
+        String connectionName,
+        String lockedByName
 ) {
 }
