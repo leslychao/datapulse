@@ -9,7 +9,6 @@ public record DataQualityStatusResponse(
 ) {
 
   public record ConnectionDataQuality(
-      long connectionId,
       String connectionName,
       String marketplaceType,
       boolean automationBlocked,

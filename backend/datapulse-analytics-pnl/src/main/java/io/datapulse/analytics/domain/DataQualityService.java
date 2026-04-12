@@ -82,7 +82,7 @@ public class DataQualityService {
 
     List<ConnectionDataQuality> connections = grouped.values().stream()
         .map(b -> new ConnectionDataQuality(
-            b.connectionId, b.connectionName, b.marketplaceType,
+            b.connectionName, b.marketplaceType,
             b.automationBlocked, b.blockReason, b.blockReasonArgs,
             List.copyOf(b.domains)))
         .toList();
@@ -217,7 +217,7 @@ public class DataQualityService {
           residualRatioPct, baseline, stdMultiplier, minSamples);
 
       result.add(new ConnectionReconciliation(
-          connId, conn.name(), conn.marketplaceType(),
+          conn.name(), conn.marketplaceType(),
           totalResidual, residualRatioPct, baselinePct, status));
     }
     return result;
@@ -254,7 +254,7 @@ public class DataQualityService {
 
       return new TrendPoint(
           String.valueOf(row.period()),
-          row.connectionId(),
+          row.sourcePlatform(),
           ratioPct,
           baselinePct);
     }).toList();

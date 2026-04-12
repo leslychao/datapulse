@@ -14,7 +14,6 @@ public record PromoCampaignSummaryResponse(
         int eligibleCount,
         int participatedCount,
         String status,
-        Long connectionId,
         String connectionName
 ) {
 }

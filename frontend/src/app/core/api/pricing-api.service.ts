@@ -160,10 +160,10 @@ export class PricingApiService {
   listAssignmentCategories(
     workspaceId: number,
     policyId: number,
-    connectionId: number,
+    sourcePlatform: string,
     search?: string,
   ): Observable<CategorySuggestion[]> {
-    let params = new HttpParams().set('connectionId', connectionId);
+    let params = new HttpParams().set('sourcePlatform', sourcePlatform);
     if (search) params = params.set('search', search);
     return this.http.get<CategorySuggestion[]>(
       `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments/categories`,
@@ -174,11 +174,11 @@ export class PricingApiService {
   searchAssignmentOffers(
     workspaceId: number,
     policyId: number,
-    connectionId: number,
+    sourcePlatform: string,
     search: string,
   ): Observable<OfferSuggestion[]> {
     const params = new HttpParams()
-      .set('connectionId', connectionId)
+      .set('sourcePlatform', sourcePlatform)
       .set('search', search);
     return this.http.get<OfferSuggestion[]>(
       `${this.base}/workspaces/${workspaceId}/pricing/policies/${policyId}/assignments/offers`,
@@ -212,8 +212,8 @@ export class PricingApiService {
       .set('size', size)
       .set('sort', sort);
 
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.status?.length) {
       params = params.set('status', filter.status.join(','));
@@ -242,11 +242,11 @@ export class PricingApiService {
 
   triggerManualRun(
     workspaceId: number,
-    connectionId: number,
+    sourcePlatform: string,
   ): Observable<PricingRunSummary> {
     return this.http.post<PricingRunSummary>(
       `${this.base}/workspaces/${workspaceId}/pricing/runs`,
-      { connectionId },
+      { sourcePlatform },
     );
   }
 
@@ -271,8 +271,8 @@ export class PricingApiService {
       .set('size', size)
       .set('sort', sort);
 
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.marketplaceOfferId) {
       params = params.set('marketplaceOfferId', filter.marketplaceOfferId);
@@ -320,8 +320,8 @@ export class PricingApiService {
       .set('size', size)
       .set('sort', sort);
 
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.search) {
       params = params.set('search', filter.search);

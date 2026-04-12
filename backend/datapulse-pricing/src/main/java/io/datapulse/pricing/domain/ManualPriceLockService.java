@@ -37,7 +37,8 @@ public class ManualPriceLockService {
     @Transactional
     public ManualLockResponse createLock(CreateManualLockRequest request,
                                          long workspaceId, long userId) {
-        boolean alreadyLocked = lockRepository.isLocked(request.marketplaceOfferId());
+        boolean alreadyLocked = lockRepository.isLocked(
+                request.marketplaceOfferId(), workspaceId);
         if (alreadyLocked) {
             throw BadRequestException.of(MessageCodes.PRICING_LOCK_ALREADY_EXISTS);
         }
@@ -63,18 +64,19 @@ public class ManualPriceLockService {
     @Transactional(readOnly = true)
     public Page<ManualLockResponse> listActiveLocks(
         long workspaceId, Long marketplaceOfferId,
-        Long connectionId, String search, Pageable pageable) {
+        String sourcePlatform, String search, Pageable pageable) {
         Page<ManualLockResponse> result;
 
         if (marketplaceOfferId != null) {
-            List<ManualLockResponse> content = lockRepository.findActiveLock(marketplaceOfferId)
+            List<ManualLockResponse> content = lockRepository
+                .findActiveLock(marketplaceOfferId, workspaceId)
                 .map(lockMapper::toResponse)
                 .map(List::of)
                 .orElse(List.of());
             result = new PageImpl<>(content, pageable, content.size());
-        } else if (connectionId != null || (search != null && !search.isBlank())) {
+        } else if (sourcePlatform != null || (search != null && !search.isBlank())) {
             result = lockRepository.findActiveLocksFiltered(
-                    workspaceId, connectionId, search, pageable)
+                    workspaceId, sourcePlatform, search, pageable)
                 .map(lockMapper::toResponse);
         } else {
             result = lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(
@@ -106,11 +108,14 @@ public class ManualPriceLockService {
                 .map(OfferInfo::connectionId)
                 .collect(Collectors.toSet());
         Map<Long, String> connectionNames = runReadRepository.findConnectionNames(connectionIds);
+        Map<Long, String> connectionTypes =
+                runReadRepository.findConnectionMarketplaceTypes(connectionIds);
 
         return page.map(l -> {
             OfferInfo offer = offerInfoMap.get(l.marketplaceOfferId());
             Long connId = offer != null ? offer.connectionId() : null;
             String connName = connId != null ? connectionNames.get(connId) : null;
+            String platform = connId != null ? connectionTypes.get(connId) : null;
             String userName = userNames.get(l.lockedBy());
 
             return new ManualLockResponse(
@@ -119,7 +124,7 @@ public class ManualPriceLockService {
                     l.expiresAt(), l.unlockedAt(), l.unlockedBy(),
                     offer != null ? offer.name() : null,
                     offer != null ? offer.sellerSku() : null,
-                    connId,
+                    platform,
                     connName,
                     userName);
         });
@@ -139,12 +144,8 @@ public class ManualPriceLockService {
 
     @Transactional
     public void unlockByOfferId(long offerId, long workspaceId, long userId) {
-        ManualPriceLockEntity entity = lockRepository.findActiveLock(offerId)
+        ManualPriceLockEntity entity = lockRepository.findActiveLock(offerId, workspaceId)
                 .orElseThrow(() -> NotFoundException.of(MessageCodes.PRICING_LOCK_NOT_FOUND));
-
-        if (!entity.getWorkspaceId().equals(workspaceId)) {
-            throw NotFoundException.of(MessageCodes.PRICING_LOCK_NOT_FOUND);
-        }
 
         doUnlock(entity, userId);
     }

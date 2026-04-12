@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -27,7 +30,9 @@ public class PromoEvaluationRunApiService {
     private final PromoEvaluationRunMapper runMapper;
 
     @Transactional
-    public PromoEvaluationRunResponse triggerManualRun(long connectionId, long workspaceId) {
+    public PromoEvaluationRunResponse triggerManualRun(String sourcePlatform, long workspaceId) {
+        long connectionId = requireConnectionId(workspaceId, sourcePlatform);
+
         boolean inProgress = runRepository.existsByConnectionIdAndStatus(
                 connectionId, PromoRunStatus.IN_PROGRESS);
         if (inProgress) {
@@ -41,26 +46,28 @@ public class PromoEvaluationRunApiService {
         run.setStatus(PromoRunStatus.PENDING);
 
         PromoEvaluationRunEntity saved = runRepository.save(run);
-        log.info("Manual promo evaluation run triggered: runId={}, connectionId={}",
-                saved.getId(), connectionId);
+        log.info("Manual promo evaluation run triggered: runId={}, sourcePlatform={}",
+                saved.getId(), sourcePlatform);
 
-        return runMapper.toResponse(saved);
+        return runMapper.toResponse(saved).withSourcePlatform(sourcePlatform);
     }
 
     @Transactional(readOnly = true)
-    public Page<PromoEvaluationRunResponse> listRuns(long workspaceId, Long connectionId,
+    public Page<PromoEvaluationRunResponse> listRuns(long workspaceId, String sourcePlatform,
                                                       PromoRunStatus status, LocalDate from,
                                                       LocalDate to, Pageable pageable) {
-        boolean hasDateFilters = from != null || to != null;
-
-        if (hasDateFilters) {
-            return runQueryRepository.findFiltered(
-                    workspaceId, connectionId, status, from, to, pageable)
-                    .map(runMapper::toResponse);
+        Long connectionId = runQueryRepository.resolveConnectionId(workspaceId, sourcePlatform);
+        if (sourcePlatform != null && connectionId == null) {
+            return Page.empty(pageable);
         }
 
+        boolean hasDateFilters = from != null || to != null;
+
         Page<PromoEvaluationRunEntity> page;
-        if (connectionId != null) {
+        if (hasDateFilters) {
+            page = runQueryRepository.findFiltered(
+                    workspaceId, connectionId, status, from, to, pageable);
+        } else if (connectionId != null) {
             page = runRepository.findAllByWorkspaceIdAndConnectionId(
                     workspaceId, connectionId, pageable);
         } else if (status != null) {
@@ -69,13 +76,36 @@ public class PromoEvaluationRunApiService {
             page = runRepository.findAllByWorkspaceId(workspaceId, pageable);
         }
 
-        return page.map(runMapper::toResponse);
+        return enrichWithSourcePlatform(page);
+    }
+
+    private long requireConnectionId(long workspaceId, String sourcePlatform) {
+        Long connectionId = runQueryRepository.resolveConnectionId(workspaceId, sourcePlatform);
+        if (connectionId == null) {
+            throw NotFoundException.entity("MarketplaceConnection", sourcePlatform);
+        }
+        return connectionId;
     }
 
     @Transactional(readOnly = true)
     public PromoEvaluationRunResponse getRun(long runId, long workspaceId) {
         PromoEvaluationRunEntity entity = runRepository.findByIdAndWorkspaceId(runId, workspaceId)
                 .orElseThrow(() -> NotFoundException.entity("PromoEvaluationRun", runId));
-        return runMapper.toResponse(entity);
+        Map<Long, String> types = runQueryRepository.findConnectionMarketplaceTypes(
+                Set.of(entity.getConnectionId()));
+        return runMapper.toResponse(entity)
+                .withSourcePlatform(types.getOrDefault(entity.getConnectionId(), ""));
+    }
+
+    private Page<PromoEvaluationRunResponse> enrichWithSourcePlatform(
+        Page<PromoEvaluationRunEntity> page) {
+        Set<Long> connectionIds = page.getContent().stream()
+                .map(PromoEvaluationRunEntity::getConnectionId)
+                .collect(Collectors.toSet());
+        Map<Long, String> types = runQueryRepository.findConnectionMarketplaceTypes(
+                connectionIds);
+        return page.map(entity -> runMapper.toResponse(entity)
+                .withSourcePlatform(
+                    types.getOrDefault(entity.getConnectionId(), "")));
     }
 }

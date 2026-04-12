@@ -12,7 +12,7 @@ public interface ManualLockMapper {
 
     @Mapping(target = "offerName", ignore = true)
     @Mapping(target = "sellerSku", ignore = true)
-    @Mapping(target = "connectionId", ignore = true)
+    @Mapping(target = "sourcePlatform", ignore = true)
     @Mapping(target = "connectionName", ignore = true)
     @Mapping(target = "lockedByName", ignore = true)
     ManualLockResponse toResponse(ManualPriceLockEntity entity);

@@ -75,7 +75,7 @@ export interface ActionDetail {
 }
 
 export interface ActionFilter {
-  connectionId?: number;
+  sourcePlatform?: string;
   status?: string[];
   executionMode?: ExecutionMode;
   search?: string;
@@ -106,7 +106,7 @@ export interface ReconcileRequest {
 }
 
 export interface SimulationComparisonResponse {
-  connectionId: number;
+  sourcePlatform: string;
   summary: SimulationSummary;
   items: SimulationComparisonItem[];
 }

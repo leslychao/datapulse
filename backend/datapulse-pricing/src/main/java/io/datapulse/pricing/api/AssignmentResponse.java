@@ -5,7 +5,6 @@ import io.datapulse.pricing.domain.ScopeType;
 public record AssignmentResponse(
     Long id,
     Long pricePolicyId,
-    Long connectionId,
     String connectionName,
     String marketplace,
     ScopeType scopeType,

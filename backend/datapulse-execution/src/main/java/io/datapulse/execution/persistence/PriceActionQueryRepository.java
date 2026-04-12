@@ -147,14 +147,9 @@ public class PriceActionQueryRepository {
             return;
         }
 
-        if (filter.connectionId() != null) {
-            where.append("""
-                     AND pa.marketplace_offer_id IN (
-                       SELECT mo.id FROM marketplace_offer mo
-                       WHERE mo.marketplace_connection_id = :connectionId
-                     )
-                    """);
-            params.addValue("connectionId", filter.connectionId());
+        if (filter.sourcePlatform() != null) {
+            where.append(" AND mc.marketplace_type = :sourcePlatform");
+            params.addValue("sourcePlatform", filter.sourcePlatform());
         }
 
         if (filter.marketplaceOfferId() != null) {

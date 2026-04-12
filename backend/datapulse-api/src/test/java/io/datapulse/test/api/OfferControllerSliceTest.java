@@ -83,8 +83,7 @@ class OfferControllerSliceTest {
           new PromoInfo(true, "Spring Sale", new BigDecimal("850"), now.plusDays(7)),
           new LockInfo(new BigDecimal("999"), "Ожидание акции", now.minusDays(1)),
           new BigDecimal("1200"), new BigDecimal("20.00"),
-          now.minusHours(1), "FRESH"
-      );
+          now.minusHours(1), "FRESH");
 
       when(offerService.getOfferDetail(1L, 100L)).thenReturn(response);
 
@@ -140,8 +139,7 @@ class OfferControllerSliceTest {
           null, null, null, null,
           null, null, null, null, null,
           null, null,
-          null, "STALE"
-      );
+          null, "STALE");
 
       when(offerService.getOfferDetail(1L, 100L)).thenReturn(response);
 
@@ -168,8 +166,7 @@ class OfferControllerSliceTest {
           null, null, null, null,
           null, null, null, null, null,
           null, null,
-          null, "FRESH"
-      );
+          null, "FRESH");
 
       when(offerService.getOfferDetail(1L, 100L)).thenReturn(response);
 
@@ -191,8 +188,7 @@ class OfferControllerSliceTest {
           null, null, null, null,
           null, null, null, null, null,
           null, null,
-          syncAt, "FRESH"
-      );
+          syncAt, "FRESH");
 
       when(offerService.getOfferDetail(1L, 100L)).thenReturn(response);
 

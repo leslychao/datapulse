@@ -37,7 +37,6 @@ public class PromoCampaignController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoCampaignSummaryResponse> listCampaigns(
             @PathVariable("workspaceId") long workspaceId,
-            @RequestParam(value = "connectionId", required = false) Long connectionId,
             @RequestParam(value = "status", required = false) List<String> status,
             @RequestParam(value = "marketplaceType", required = false) List<String> marketplaceType,
             @RequestParam(value = "from", required = false)
@@ -46,8 +45,7 @@ public class PromoCampaignController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Pageable pageable) {
         return campaignService.listCampaigns(
-                workspaceId, connectionId, status,
-                marketplaceType, from, to, pageable);
+                workspaceId, status, marketplaceType, from, to, pageable);
     }
 
     @GetMapping("/{campaignId:\\d+}")

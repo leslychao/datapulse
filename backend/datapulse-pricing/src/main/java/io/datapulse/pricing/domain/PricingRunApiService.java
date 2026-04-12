@@ -44,7 +44,11 @@ public class PricingRunApiService {
     private final OutboxService outboxService;
 
     @Transactional
-    public PricingRunResponse triggerManualRun(long connectionId, long workspaceId) {
+    public PricingRunResponse triggerManualRun(String sourcePlatform, long workspaceId) {
+        Long connectionId = runReadRepository.resolveConnectionId(workspaceId, sourcePlatform);
+        if (connectionId == null) {
+            throw NotFoundException.entity("MarketplaceConnection", sourcePlatform);
+        }
         ensureNoRunInProgress(connectionId);
         return doCreateManualRun(connectionId, workspaceId);
     }
@@ -182,8 +186,17 @@ public class PricingRunApiService {
     @Transactional(readOnly = true)
     public Page<PricingRunResponse> listRuns(long workspaceId, PricingRunFilter filter,
                                              Pageable pageable) {
+        Long connectionId = null;
+        if (filter.sourcePlatform() != null) {
+            connectionId = runReadRepository.resolveConnectionId(
+                    workspaceId, filter.sourcePlatform());
+            if (connectionId == null) {
+                return Page.empty(pageable);
+            }
+        }
+
         Page<PricingRunEntity> page = runReadRepository.findByFilter(
-                workspaceId, filter, pageable);
+                workspaceId, connectionId, filter, pageable);
 
         List<Long> runIds = page.getContent().stream()
                 .map(PricingRunEntity::getId)
@@ -196,14 +209,17 @@ public class PricingRunApiService {
                                 r -> (Long) r[0],
                                 r -> ((Number) r[1]).intValue()));
 
-        Map<Long, String> connNames = runReadRepository.findConnectionNames(
-                page.getContent().stream()
-                        .map(PricingRunEntity::getConnectionId)
-                        .collect(Collectors.toSet()));
+        Set<Long> connectionIds = page.getContent().stream()
+                .map(PricingRunEntity::getConnectionId)
+                .collect(Collectors.toSet());
+        Map<Long, String> connNames = runReadRepository.findConnectionNames(connectionIds);
+        Map<Long, String> connTypes = runReadRepository.findConnectionMarketplaceTypes(
+                connectionIds);
 
         return page.map(entity -> runMapper.toResponse(entity)
                 .withEnrichment(
                         connNames.getOrDefault(entity.getConnectionId(), ""),
+                        connTypes.getOrDefault(entity.getConnectionId(), ""),
                         simCounts.getOrDefault(entity.getId(), 0)));
     }
 
@@ -212,8 +228,10 @@ public class PricingRunApiService {
         PricingRunEntity entity = runRepository.findByIdAndWorkspaceId(runId, workspaceId)
                 .orElseThrow(() -> NotFoundException.entity("PricingRun", runId));
 
-        Map<Long, String> connNames = runReadRepository.findConnectionNames(
-                Set.of(entity.getConnectionId()));
+        Set<Long> connectionIds = Set.of(entity.getConnectionId());
+        Map<Long, String> connNames = runReadRepository.findConnectionNames(connectionIds);
+        Map<Long, String> connTypes = runReadRepository.findConnectionMarketplaceTypes(
+                connectionIds);
 
         int simCount = decisionRepository.countSimulatedByRunIds(List.of(entity.getId()))
                 .stream()
@@ -225,6 +243,7 @@ public class PricingRunApiService {
         return runMapper.toResponse(entity)
                 .withEnrichment(
                         connNames.getOrDefault(entity.getConnectionId(), ""),
+                        connTypes.getOrDefault(entity.getConnectionId(), ""),
                         simCount);
     }
 

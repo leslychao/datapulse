@@ -98,7 +98,6 @@ interface DomainCard {
 }
 
 interface DomainConnectionInfo {
-  connectionId: number;
   connectionName: string;
   marketplaceType: MarketplaceType;
   status: SyncDomainStatus;
@@ -300,7 +299,7 @@ interface DomainConnectionInfo {
                         </tr>
                       </thead>
                       <tbody>
-                        @for (conn of card.connections; track conn.connectionId) {
+                        @for (conn of card.connections; track conn.connectionName) {
                           <tr>
                             <td>
                               <div class="flex items-center gap-2">
@@ -418,7 +417,6 @@ export class DataQualityStatusPageComponent {
       for (const d of conn.domains) {
         const list = domainMap.get(d.domain) ?? [];
         list.push({
-          connectionId: conn.connectionId,
           connectionName: conn.connectionName,
           marketplaceType: conn.marketplaceType as MarketplaceType,
           status: d.status,

@@ -43,9 +43,6 @@ export class OfferApiService {
     if (filter.marketplaceType?.length) {
       params = params.set('marketplace_type', filter.marketplaceType.join(','));
     }
-    if (filter.connectionId?.length) {
-      params = params.set('connection_id', filter.connectionId.join(','));
-    }
     if (filter.categoryId?.length) {
       params = params.set('category_id', filter.categoryId.join(','));
     }

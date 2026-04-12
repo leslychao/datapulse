@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 
 public record PricingRunResponse(
         Long id,
-        Long connectionId,
+        String sourcePlatform,
         String connectionName,
         RunTriggerType triggerType,
         RunStatus status,
@@ -23,9 +23,10 @@ public record PricingRunResponse(
         int simulatedDecisionCount
 ) {
 
-    public PricingRunResponse withEnrichment(String name, int simCount) {
+    public PricingRunResponse withEnrichment(
+        String name, String platform, int simCount) {
         return new PricingRunResponse(
-            id, connectionId, name, triggerType, status,
+            id, platform, name, triggerType, status,
             totalOffers, eligibleCount, changeCount,
             skipCount, holdCount, startedAt, completedAt,
             errorDetails, createdAt, simCount);

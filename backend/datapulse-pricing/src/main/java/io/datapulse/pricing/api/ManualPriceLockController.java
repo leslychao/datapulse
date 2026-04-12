@@ -43,11 +43,11 @@ public class ManualPriceLockController {
     public Page<ManualLockResponse> listActiveLocks(
         @PathVariable("workspaceId") long workspaceId,
         @RequestParam(value = "marketplaceOfferId", required = false) Long marketplaceOfferId,
-        @RequestParam(value = "connectionId", required = false) Long connectionId,
+        @RequestParam(value = "sourcePlatform", required = false) String sourcePlatform,
         @RequestParam(value = "search", required = false) String search,
         Pageable pageable) {
         return lockService.listActiveLocks(workspaceId, marketplaceOfferId,
-                connectionId, search, pageable);
+                sourcePlatform, search, pageable);
     }
 
     @DeleteMapping("/{lockId}")

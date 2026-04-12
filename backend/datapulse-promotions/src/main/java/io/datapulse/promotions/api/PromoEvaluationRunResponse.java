@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 
 public record PromoEvaluationRunResponse(
         Long id,
-        Long connectionId,
+        String sourcePlatform,
         PromoRunTriggerType triggerType,
         PromoRunStatus status,
         Integer totalProducts,
@@ -20,4 +20,12 @@ public record PromoEvaluationRunResponse(
         OffsetDateTime completedAt,
         OffsetDateTime createdAt
 ) {
+
+    public PromoEvaluationRunResponse withSourcePlatform(String platform) {
+        return new PromoEvaluationRunResponse(
+            id, platform, triggerType, status,
+            totalProducts, eligibleCount, participateCount,
+            declineCount, pendingReviewCount, deactivateCount,
+            startedAt, completedAt, createdAt);
+    }
 }

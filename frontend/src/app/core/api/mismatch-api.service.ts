@@ -21,7 +21,7 @@ export class MismatchApiService {
       .set('sort', sort);
 
     if (filter.type?.length) params = params.set('type', filter.type.join(','));
-    if (filter.connectionId?.length) params = params.set('connectionId', filter.connectionId.join(','));
+    if (filter.sourcePlatform?.length) params = params.set('sourcePlatform', filter.sourcePlatform.join(','));
     if (filter.status?.length) params = params.set('status', filter.status.join(','));
     if (filter.severity?.length) params = params.set('severity', filter.severity.join(','));
     if (filter.from) params = params.set('from', filter.from);
@@ -56,7 +56,7 @@ export class MismatchApiService {
   exportCsv(workspaceId: number, filter: MismatchFilter): Observable<Blob> {
     let params = new HttpParams();
     if (filter.type?.length) params = params.set('type', filter.type.join(','));
-    if (filter.connectionId?.length) params = params.set('connectionId', filter.connectionId.join(','));
+    if (filter.sourcePlatform?.length) params = params.set('sourcePlatform', filter.sourcePlatform.join(','));
     if (filter.status?.length) params = params.set('status', filter.status.join(','));
     if (filter.severity?.length) params = params.set('severity', filter.severity.join(','));
     if (filter.from) params = params.set('from', filter.from);

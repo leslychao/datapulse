@@ -20,7 +20,6 @@ public class PricePolicyAssignmentReadRepository {
   private static final String LIST_ENRICHED = """
       SELECT ppa.id,
              ppa.price_policy_id,
-             ppa.marketplace_connection_id AS connection_id,
              mc.name                       AS connection_name,
              mc.marketplace_type           AS marketplace,
              ppa.scope_type,
@@ -45,7 +44,6 @@ public class PricePolicyAssignmentReadRepository {
   private static final String FIND_ENRICHED_BY_ID = """
       SELECT ppa.id,
              ppa.price_policy_id,
-             ppa.marketplace_connection_id AS connection_id,
              mc.name                       AS connection_name,
              mc.marketplace_type           AS marketplace,
              ppa.scope_type,
@@ -72,7 +70,6 @@ public class PricePolicyAssignmentReadRepository {
     return new AssignmentResponse(
         rs.getLong("id"),
         rs.getLong("price_policy_id"),
-        rs.getLong("connection_id"),
         rs.getString("connection_name"),
         rs.getString("marketplace"),
         ScopeType.valueOf(rs.getString("scope_type")),

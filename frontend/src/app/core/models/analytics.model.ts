@@ -232,7 +232,6 @@ export interface SyncDomainInfo {
 }
 
 export interface ConnectionDataQuality {
-  connectionId: number;
   connectionName: string;
   marketplaceType: string;
   automationBlocked: boolean;
@@ -246,7 +245,6 @@ export interface DataQualityStatus {
 }
 
 export interface ReconciliationConnection {
-  connectionId: number;
   connectionName: string;
   marketplaceType: string;
   residualAmount: number;
@@ -257,7 +255,7 @@ export interface ReconciliationConnection {
 
 export interface ReconciliationTrendPoint {
   period: string;
-  connectionId: number;
+  marketplaceType: string;
   residualRatioPct: number;
   baselineRatioPct: number;
 }

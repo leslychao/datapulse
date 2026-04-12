@@ -330,7 +330,7 @@ export class ActionsListPageComponent {
   protected readonly ColumnsIcon = Columns3;
 
   private readonly filterBarUrlDefs: FilterBarUrlDef[] = [
-    { key: 'connectionId', type: 'string' },
+    { key: 'sourcePlatform', type: 'string' },
     { key: 'status', type: 'csv' },
     { key: 'executionMode', type: 'string' },
     { key: 'search', type: 'string' },
@@ -406,12 +406,12 @@ export class ActionsListPageComponent {
 
   readonly filterConfigs = computed<FilterConfig[]>(() => {
     const connectionOptions = (this.connectionsQuery.data() ?? []).map(c => ({
-      value: String(c.id),
+      value: c.marketplaceType,
       label: c.name,
     }));
     return [
       {
-        key: 'connectionId',
+        key: 'sourcePlatform',
         label: 'execution.filter.connection',
         type: 'select' as const,
         options: connectionOptions,
@@ -573,7 +573,7 @@ export class ActionsListPageComponent {
   private readonly filter = computed<ActionFilter>(() => {
     const vals = this.filterValues();
     const f: ActionFilter = {};
-    if (vals['connectionId']) f.connectionId = Number(vals['connectionId']);
+    if (vals['sourcePlatform']) f.sourcePlatform = vals['sourcePlatform'];
     if (vals['status']?.length) f.status = vals['status'];
     if (vals['executionMode']) f.executionMode = vals['executionMode'];
     if (vals['search']) f.search = vals['search'];

@@ -27,13 +27,13 @@ public class PromoCampaignService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
+    public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId,
                                                              List<String> statuses,
                                                              List<String> marketplaceTypes,
                                                              LocalDate from, LocalDate to,
                                                              Pageable pageable) {
         return campaignQueryRepository.listCampaigns(
-                workspaceId, connectionId, statuses, marketplaceTypes, from, to, pageable);
+                workspaceId, statuses, marketplaceTypes, from, to, pageable);
     }
 
     @Transactional(readOnly = true)

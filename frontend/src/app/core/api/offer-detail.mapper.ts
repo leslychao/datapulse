@@ -18,7 +18,6 @@ export interface OfferDetailApiJson {
   skuCode: string;
   productName: string;
   marketplaceType: string;
-  connectionId: number;
   connectionName: string;
   status: string;
   category: string | null;
@@ -133,7 +132,6 @@ export function mapOfferDetailApiResponse(raw: OfferDetailApiJson): OfferDetail 
     skuCode: raw.skuCode,
     productName: raw.productName,
     marketplaceType: raw.marketplaceType as MarketplaceType,
-    connectionId: raw.connectionId,
     connectionName: raw.connectionName,
     status: asOfferStatus(raw.status),
     category: raw.category,

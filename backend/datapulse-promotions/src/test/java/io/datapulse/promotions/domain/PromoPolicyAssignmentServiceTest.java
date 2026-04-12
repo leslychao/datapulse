@@ -5,6 +5,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.promotions.api.CreatePromoAssignmentRequest;
 import io.datapulse.promotions.api.PromoAssignmentMapper;
 import io.datapulse.promotions.api.PromoAssignmentResponse;
+import io.datapulse.promotions.persistence.PromoEvaluationRunQueryRepository;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentEntity;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentRepository;
 import io.datapulse.promotions.persistence.PromoPolicyEntity;
@@ -34,6 +35,7 @@ class PromoPolicyAssignmentServiceTest {
   private static final long POLICY_ID = 100L;
   private static final long ASSIGNMENT_ID = 200L;
   private static final long CONNECTION_ID = 5L;
+  private static final String SOURCE_PLATFORM = "WB";
 
   @Mock
   private PromoPolicyAssignmentRepository assignmentRepository;
@@ -41,6 +43,8 @@ class PromoPolicyAssignmentServiceTest {
   private PromoPolicyRepository policyRepository;
   @Mock
   private PromoAssignmentMapper assignmentMapper;
+  @Mock
+  private PromoEvaluationRunQueryRepository runQueryRepository;
 
   @InjectMocks
   private PromoPolicyAssignmentService service;
@@ -52,8 +56,9 @@ class PromoPolicyAssignmentServiceTest {
     @Test
     void should_create_connection_scope_assignment() {
       mockPolicyExists();
+      mockResolveConnectionId();
       var request = new CreatePromoAssignmentRequest(
-          CONNECTION_ID, PromoScopeType.CONNECTION, null, null);
+          SOURCE_PLATFORM, PromoScopeType.CONNECTION, null, null);
 
       when(assignmentRepository.existsByPromoPolicyIdAndMarketplaceConnectionIdAndScopeType(
           POLICY_ID, CONNECTION_ID, PromoScopeType.CONNECTION)).thenReturn(false);
@@ -68,8 +73,9 @@ class PromoPolicyAssignmentServiceTest {
     @Test
     void should_throw_when_duplicate_connection_assignment() {
       mockPolicyExists();
+      mockResolveConnectionId();
       var request = new CreatePromoAssignmentRequest(
-          CONNECTION_ID, PromoScopeType.CONNECTION, null, null);
+          SOURCE_PLATFORM, PromoScopeType.CONNECTION, null, null);
 
       when(assignmentRepository.existsByPromoPolicyIdAndMarketplaceConnectionIdAndScopeType(
           POLICY_ID, CONNECTION_ID, PromoScopeType.CONNECTION)).thenReturn(true);
@@ -82,7 +88,7 @@ class PromoPolicyAssignmentServiceTest {
     void should_throw_when_sku_scope_without_offer_id() {
       mockPolicyExists();
       var request = new CreatePromoAssignmentRequest(
-          CONNECTION_ID, PromoScopeType.SKU, null, null);
+          SOURCE_PLATFORM, PromoScopeType.SKU, null, null);
 
       assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
           .isInstanceOf(BadRequestException.class);
@@ -94,7 +100,7 @@ class PromoPolicyAssignmentServiceTest {
     void should_throw_when_category_scope_without_category_id() {
       mockPolicyExists();
       var request = new CreatePromoAssignmentRequest(
-          CONNECTION_ID, PromoScopeType.CATEGORY, null, null);
+          SOURCE_PLATFORM, PromoScopeType.CATEGORY, null, null);
 
       assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
           .isInstanceOf(BadRequestException.class);
@@ -105,7 +111,19 @@ class PromoPolicyAssignmentServiceTest {
       when(policyRepository.findByIdAndWorkspaceId(POLICY_ID, WORKSPACE_ID))
           .thenReturn(Optional.empty());
       var request = new CreatePromoAssignmentRequest(
-          CONNECTION_ID, PromoScopeType.CONNECTION, null, null);
+          SOURCE_PLATFORM, PromoScopeType.CONNECTION, null, null);
+
+      assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
+          .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void should_throw_when_connection_not_found_for_source_platform() {
+      mockPolicyExists();
+      when(runQueryRepository.resolveConnectionId(WORKSPACE_ID, "UNKNOWN"))
+          .thenReturn(null);
+      var request = new CreatePromoAssignmentRequest(
+          "UNKNOWN", PromoScopeType.CONNECTION, null, null);
 
       assertThatThrownBy(() -> service.createAssignment(POLICY_ID, request, WORKSPACE_ID))
           .isInstanceOf(NotFoundException.class);
@@ -168,6 +186,11 @@ class PromoPolicyAssignmentServiceTest {
       assertThatThrownBy(() -> service.listAssignments(POLICY_ID, WORKSPACE_ID))
           .isInstanceOf(NotFoundException.class);
     }
+  }
+
+  private void mockResolveConnectionId() {
+    when(runQueryRepository.resolveConnectionId(WORKSPACE_ID, SOURCE_PLATFORM))
+        .thenReturn(CONNECTION_ID);
   }
 
   private void mockPolicyExists() {

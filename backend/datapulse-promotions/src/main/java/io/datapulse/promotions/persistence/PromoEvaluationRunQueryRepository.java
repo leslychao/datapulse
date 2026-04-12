@@ -12,14 +12,50 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
 public class PromoEvaluationRunQueryRepository {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+
+    private static final String RESOLVE_CONNECTION_SQL = """
+            SELECT id FROM marketplace_connection
+            WHERE workspace_id = :workspaceId
+              AND marketplace_type = :sourcePlatform
+              AND status <> 'ARCHIVED'
+            """;
+
+    private static final String CONNECTION_MARKETPLACE_TYPES_SQL = """
+            SELECT id, marketplace_type FROM marketplace_connection WHERE id IN (:ids)
+            """;
+
+    public Map<Long, String> findConnectionMarketplaceTypes(Collection<Long> connectionIds) {
+        if (connectionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbcTemplate.query(CONNECTION_MARKETPLACE_TYPES_SQL,
+                Map.of("ids", connectionIds),
+                (rs, rowNum) -> Map.entry(
+                    rs.getLong("id"), rs.getString("marketplace_type")))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    public Long resolveConnectionId(long workspaceId, String sourcePlatform) {
+        if (sourcePlatform == null) {
+            return null;
+        }
+        var params = Map.of("workspaceId", workspaceId, "sourcePlatform", sourcePlatform);
+        List<Long> ids = jdbcTemplate.queryForList(RESOLVE_CONNECTION_SQL, params, Long.class);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
 
     public Page<PromoEvaluationRunEntity> findFiltered(long workspaceId, Long connectionId,
                                                         PromoRunStatus status,

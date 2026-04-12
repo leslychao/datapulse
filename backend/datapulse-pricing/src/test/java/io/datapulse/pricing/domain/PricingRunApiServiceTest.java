@@ -119,7 +119,7 @@ class PricingRunApiServiceTest {
       entity.setConnectionId(CONNECTION_ID);
 
       var baseResponse = new PricingRunResponse(
-          1L, CONNECTION_ID, null, RunTriggerType.MANUAL, RunStatus.COMPLETED,
+          1L, null, null, RunTriggerType.MANUAL, RunStatus.COMPLETED,
           10, 8, 5, 2, 1, null, null, null, null, 0);
 
       when(runRepository.findByIdAndWorkspaceId(1L, WORKSPACE_ID))
@@ -127,6 +127,8 @@ class PricingRunApiServiceTest {
       when(runMapper.toResponse(entity)).thenReturn(baseResponse);
       when(runReadRepository.findConnectionNames(java.util.Set.of(CONNECTION_ID)))
           .thenReturn(Map.of(CONNECTION_ID, "My Shop"));
+      when(runReadRepository.findConnectionMarketplaceTypes(java.util.Set.of(CONNECTION_ID)))
+          .thenReturn(Map.of(CONNECTION_ID, "WB"));
       when(decisionRepository.countSimulatedByRunIds(List.of(1L)))
           .thenReturn(List.<Object[]>of(new Object[]{1L, 5L}));
 
@@ -168,7 +170,7 @@ class PricingRunApiServiceTest {
           });
       when(runMapper.toResponse(any(PricingRunEntity.class)))
           .thenReturn(new PricingRunResponse(
-              100L, 10L, null, RunTriggerType.MANUAL, RunStatus.PENDING,
+              100L, null, null, RunTriggerType.MANUAL, RunStatus.PENDING,
               0, 0, 0, 0, 0, null, null, null, null, 0));
 
       List<PricingRunResponse> result = service.triggerManualRunForWorkspace(WORKSPACE_ID);
@@ -194,7 +196,7 @@ class PricingRunApiServiceTest {
           });
       when(runMapper.toResponse(any(PricingRunEntity.class)))
           .thenReturn(new PricingRunResponse(
-              100L, 20L, null, RunTriggerType.MANUAL, RunStatus.PENDING,
+              100L, null, null, RunTriggerType.MANUAL, RunStatus.PENDING,
               0, 0, 0, 0, 0, null, null, null, null, 0));
 
       List<PricingRunResponse> result = service.triggerManualRunForWorkspace(WORKSPACE_ID);
@@ -230,7 +232,7 @@ class PricingRunApiServiceTest {
       Page<PricingRunEntity> page = new PageImpl<>(List.of(entity));
 
       var baseResponse = new PricingRunResponse(
-          1L, CONNECTION_ID, null, RunTriggerType.MANUAL, RunStatus.COMPLETED,
+          1L, null, null, RunTriggerType.MANUAL, RunStatus.COMPLETED,
           10, 8, 5, 2, 1, null, null, null, null, 0);
 
       when(runReadRepository.findByFilter(WORKSPACE_ID, filter, pageable)).thenReturn(page);
@@ -239,6 +241,8 @@ class PricingRunApiServiceTest {
           .thenReturn(List.<Object[]>of(new Object[]{1L, 3L}));
       when(runReadRepository.findConnectionNames(java.util.Set.of(CONNECTION_ID)))
           .thenReturn(Map.of(CONNECTION_ID, "Test Connection"));
+      when(runReadRepository.findConnectionMarketplaceTypes(java.util.Set.of(CONNECTION_ID)))
+          .thenReturn(Map.of(CONNECTION_ID, "WB"));
 
       Page<PricingRunResponse> result = service.listRuns(WORKSPACE_ID, filter, pageable);
 

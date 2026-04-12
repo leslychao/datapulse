@@ -4,7 +4,6 @@ import java.time.OffsetDateTime;
 
 public record PromoCampaignDetailResponse(
         Long id,
-        Long connectionId,
         String externalPromoId,
         String sourcePlatform,
         String promoName,

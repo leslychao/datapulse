@@ -12,6 +12,7 @@ import io.datapulse.pricing.persistence.PricePolicyAssignmentEntity;
 import io.datapulse.pricing.persistence.PricePolicyAssignmentReadRepository;
 import io.datapulse.pricing.persistence.PricePolicyAssignmentRepository;
 import io.datapulse.pricing.persistence.PricePolicyRepository;
+import io.datapulse.pricing.persistence.PricingRunReadRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class PricePolicyAssignmentService {
   private final PricePolicyAssignmentReadRepository assignmentReadRepository;
   private final AssignmentSuggestionReadRepository suggestionReadRepository;
   private final PricePolicyRepository policyRepository;
+  private final PricingRunReadRepository runReadRepository;
 
   @Transactional(readOnly = true)
   public List<AssignmentResponse> listAssignments(long policyId, long workspaceId) {
@@ -39,12 +41,13 @@ public class PricePolicyAssignmentService {
   public AssignmentResponse createAssignment(long policyId, CreateAssignmentRequest request,
                                              long workspaceId) {
     ensurePolicyExists(policyId, workspaceId);
+    long connectionId = requireConnectionId(workspaceId, request.sourcePlatform());
     validateScopeConsistency(request);
-    checkDuplicate(policyId, request);
+    checkDuplicate(policyId, connectionId, request);
 
     var entity = new PricePolicyAssignmentEntity();
     entity.setPricePolicyId(policyId);
-    entity.setMarketplaceConnectionId(request.connectionId());
+    entity.setMarketplaceConnectionId(connectionId);
     entity.setScopeType(request.scopeType());
     entity.setCategoryId(request.categoryId());
     entity.setMarketplaceOfferId(request.marketplaceOfferId());
@@ -72,12 +75,16 @@ public class PricePolicyAssignmentService {
   }
 
   @Transactional(readOnly = true)
-  public List<CategorySuggestionResponse> listCategories(long connectionId, String search) {
+  public List<CategorySuggestionResponse> listCategories(
+      long workspaceId, String sourcePlatform, String search) {
+    long connectionId = requireConnectionId(workspaceId, sourcePlatform);
     return suggestionReadRepository.findCategories(connectionId, search);
   }
 
   @Transactional(readOnly = true)
-  public List<OfferSuggestionResponse> searchOffers(long connectionId, String search) {
+  public List<OfferSuggestionResponse> searchOffers(
+      long workspaceId, String sourcePlatform, String search) {
+    long connectionId = requireConnectionId(workspaceId, sourcePlatform);
     return suggestionReadRepository.searchOffers(connectionId, search);
   }
 
@@ -102,17 +109,26 @@ public class PricePolicyAssignmentService {
     }
   }
 
-  private void checkDuplicate(long policyId, CreateAssignmentRequest request) {
+  private long requireConnectionId(long workspaceId, String sourcePlatform) {
+    Long connectionId = runReadRepository.resolveConnectionId(workspaceId, sourcePlatform);
+    if (connectionId == null) {
+      throw NotFoundException.entity("MarketplaceConnection", sourcePlatform);
+    }
+    return connectionId;
+  }
+
+  private void checkDuplicate(long policyId, long connectionId,
+                               CreateAssignmentRequest request) {
     boolean exists = switch (request.scopeType()) {
       case CONNECTION -> assignmentRepository
           .existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeType(
-              policyId, request.connectionId(), ScopeType.CONNECTION);
+              policyId, connectionId, ScopeType.CONNECTION);
       case CATEGORY -> assignmentRepository
           .existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndCategoryId(
-              policyId, request.connectionId(), ScopeType.CATEGORY, request.categoryId());
+              policyId, connectionId, ScopeType.CATEGORY, request.categoryId());
       case SKU -> assignmentRepository
           .existsByPricePolicyIdAndMarketplaceConnectionIdAndScopeTypeAndMarketplaceOfferId(
-              policyId, request.connectionId(), ScopeType.SKU, request.marketplaceOfferId());
+              policyId, connectionId, ScopeType.SKU, request.marketplaceOfferId());
     };
     if (exists) {
       throw BadRequestException.of(MessageCodes.PRICING_ASSIGNMENT_DUPLICATE);

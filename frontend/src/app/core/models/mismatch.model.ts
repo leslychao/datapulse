@@ -85,7 +85,7 @@ export interface MismatchWsEvent {
 
 export interface MismatchFilter {
   type?: MismatchType[];
-  connectionId?: number[];
+  sourcePlatform?: string[];
   status?: MismatchStatus[];
   severity?: MismatchSeverity[];
   from?: string;

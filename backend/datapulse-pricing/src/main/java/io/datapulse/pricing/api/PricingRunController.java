@@ -28,7 +28,7 @@ public class PricingRunController {
 
     @PostMapping("/trigger")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public List<PricingRunResponse> triggerManualRuns(
             @PathVariable("workspaceId") long workspaceId) {
         return runApiService.triggerManualRunForWorkspace(workspaceId);
@@ -36,11 +36,11 @@ public class PricingRunController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public PricingRunResponse triggerRun(
             @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody TriggerPricingRunRequest request) {
-        return runApiService.triggerManualRun(request.connectionId(), workspaceId);
+        return runApiService.triggerManualRun(request.sourcePlatform(), workspaceId);
     }
 
     @GetMapping
@@ -62,7 +62,7 @@ public class PricingRunController {
 
     @PostMapping("/{runId}/resume")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void resumeRun(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("runId") long runId) {
@@ -71,7 +71,7 @@ public class PricingRunController {
 
     @PostMapping("/{runId}/cancel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void cancelRun(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("runId") long runId) {

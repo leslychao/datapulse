@@ -53,7 +53,6 @@ public class GridController {
             @RequestParam(value = "sort", required = false) String sort,
             @RequestParam(value = "direction", defaultValue = "ASC") String direction,
             @RequestParam(value = "marketplace_type", required = false) List<String> marketplaceType,
-            @RequestParam(value = "connection_id", required = false) List<Long> connectionId,
             @RequestParam(value = "status", required = false) List<String> status,
             @RequestParam(value = "sku_code", required = false) String skuCode,
             @RequestParam(value = "product_name", required = false) String productName,
@@ -79,7 +78,7 @@ public class GridController {
             pageSort = buildSortFromView(view);
         } else {
             filter = new GridFilter(
-                    marketplaceType, connectionId, status, skuCode, productName,
+                    marketplaceType, status, skuCode, productName,
                     categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
                     lastDecision, lastActionStatus, null, stockRisk, null
             );
@@ -101,7 +100,6 @@ public class GridController {
     public ResponseEntity<StreamingResponseBody> exportCsv(
             @PathVariable("workspaceId") Long workspaceId,
             @RequestParam(value = "marketplace_type", required = false) List<String> marketplaceType,
-            @RequestParam(value = "connection_id", required = false) List<Long> connectionId,
             @RequestParam(value = "status", required = false) List<String> status,
             @RequestParam(value = "sku_code", required = false) String skuCode,
             @RequestParam(value = "product_name", required = false) String productName,
@@ -113,7 +111,7 @@ public class GridController {
             @RequestParam(value = "offer_id", required = false) List<Long> offerId) {
 
         GridFilter filter = new GridFilter(
-                marketplaceType, connectionId, status, skuCode, productName,
+                marketplaceType, status, skuCode, productName,
                 categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
                 null, null, null, null, null
         );
@@ -141,7 +139,6 @@ public class GridController {
     public MatchingIdsResponse getMatchingIds(
             @PathVariable("workspaceId") Long workspaceId,
             @RequestParam(value = "marketplace_type", required = false) List<String> marketplaceType,
-            @RequestParam(value = "connection_id", required = false) List<Long> connectionId,
             @RequestParam(value = "status", required = false) List<String> status,
             @RequestParam(value = "sku_code", required = false) String skuCode,
             @RequestParam(value = "product_name", required = false) String productName,
@@ -155,7 +152,7 @@ public class GridController {
             @RequestParam(value = "stock_risk", required = false) String stockRisk) {
 
         GridFilter filter = new GridFilter(
-                marketplaceType, connectionId, status, skuCode, productName,
+                marketplaceType, status, skuCode, productName,
                 categoryId, marginMin, marginMax, hasManualLock, hasActivePromo,
                 lastDecision, lastActionStatus, null, stockRisk, null
         );
@@ -176,7 +173,6 @@ public class GridController {
         Map<String, Object> f = view.getFilters();
         return new GridFilter(
                 safeStringList(f.get("marketplace_type")),
-                safeLongList(f.get("connection_id")),
                 safeStringList(f.get("status")),
                 f.get("sku_code") instanceof String s ? s : null,
                 f.get("product_name") instanceof String s ? s : null,

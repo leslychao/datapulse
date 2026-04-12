@@ -80,12 +80,9 @@ function buildAlertFilter(values: Record<string, unknown>): AlertFilter {
   if (Array.isArray(st) && st.length > 0) {
     f.status = st as AlertStatus[];
   }
-  const cid = values['connectionId'];
-  if (typeof cid === 'string' && cid !== '') {
-    const n = Number(cid);
-    if (!Number.isNaN(n)) {
-      f.connectionId = n;
-    }
+  const sp = values['sourcePlatform'];
+  if (typeof sp === 'string' && sp !== '') {
+    f.sourcePlatform = sp;
   }
   return f;
 }
@@ -168,7 +165,7 @@ export class AlertEventsPageComponent {
   readonly filterConfigs = computed<FilterConfig[]>(() => {
     const connOpts =
       this.connectionsQuery.data()?.map((c) => ({
-        value: String(c.id),
+        value: c.marketplaceType,
         label: c.name,
       })) ?? [];
     return [
@@ -192,7 +189,7 @@ export class AlertEventsPageComponent {
         ],
       },
       {
-        key: 'connectionId',
+        key: 'sourcePlatform',
         label: 'alerts.filter.connection',
         type: 'select',
         options: [

@@ -112,7 +112,7 @@ import { formatDateTime } from '@shared/utils/format.utils';
               {{ 'alerts.detail.links' | translate }}
             </h4>
             <div class="flex flex-col gap-2">
-              @if (alert.connectionId != null) {
+              @if (alert.sourcePlatform != null) {
                 <a
                   [routerLink]="['/workspace', workspaceId(), 'settings', 'connections']"
                   class="inline-flex items-center gap-2 text-[length:var(--text-sm)] text-[var(--accent-primary)] hover:underline"

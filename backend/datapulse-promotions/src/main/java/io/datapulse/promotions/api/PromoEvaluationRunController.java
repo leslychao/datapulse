@@ -36,21 +36,21 @@ public class PromoEvaluationRunController {
     public PromoEvaluationRunResponse triggerRun(
             @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody TriggerPromoEvaluationRunRequest request) {
-        return runApiService.triggerManualRun(request.connectionId(), workspaceId);
+        return runApiService.triggerManualRun(request.sourcePlatform(), workspaceId);
     }
 
     @GetMapping
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public Page<PromoEvaluationRunResponse> listRuns(
             @PathVariable("workspaceId") long workspaceId,
-            @RequestParam(value = "connectionId", required = false) Long connectionId,
+            @RequestParam(value = "sourcePlatform", required = false) String sourcePlatform,
             @RequestParam(value = "status", required = false) PromoRunStatus status,
             @RequestParam(value = "from", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(value = "to", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Pageable pageable) {
-        return runApiService.listRuns(workspaceId, connectionId, status, from, to, pageable);
+        return runApiService.listRuns(workspaceId, sourcePlatform, status, from, to, pageable);
     }
 
     @GetMapping("/{runId}")

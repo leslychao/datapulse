@@ -36,7 +36,6 @@ export interface OfferSummary {
   skuCode: string;
   productName: string;
   marketplaceType: MarketplaceType;
-  connectionId: number;
   connectionName: string;
   status: OfferStatus;
   category: string | null;
@@ -96,7 +95,6 @@ export interface WarehouseStock {
 
 export interface OfferFilter {
   marketplaceType?: MarketplaceType[];
-  connectionId?: number[];
   categoryId?: number[];
   status?: OfferStatus[];
   skuCode?: string;

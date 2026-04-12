@@ -135,7 +135,7 @@ const CONNECTION_PALETTE = [
 
         <!-- Per-connection cards -->
         <div class="flex flex-col gap-3">
-          @for (conn of connections(); track conn.connectionId) {
+          @for (conn of connections(); track conn.marketplaceType) {
             <div
               class="rounded-[var(--radius-md)] border bg-[var(--bg-primary)] p-4"
               [style.border-color]="statusColor(conn.status)"
@@ -301,16 +301,16 @@ export class ReconciliationPageComponent {
     if (!data) return {};
 
     const trend = data.trend;
-    const connMap = new Map(data.connections.map((c) => [c.connectionId, c.connectionName]));
-    const connIds = [...new Set(trend.map((t) => t.connectionId))];
+    const connMap = new Map(data.connections.map((c) => [c.marketplaceType, c.connectionName]));
+    const mpTypes = [...new Set(trend.map((t) => t.marketplaceType))];
     const periods = [...new Set(trend.map((t) => t.period))].sort();
     const baselineSuffix = this.t.instant('analytics.reconciliation.baseline_suffix');
 
     const series: Record<string, unknown>[] = [];
-    connIds.forEach((id, idx) => {
+    mpTypes.forEach((mp, idx) => {
       const color = CONNECTION_PALETTE[idx % CONNECTION_PALETTE.length];
-      const name = connMap.get(id) ?? `#${id}`;
-      const points = trend.filter((t) => t.connectionId === id);
+      const name = connMap.get(mp) ?? mp;
+      const points = trend.filter((t) => t.marketplaceType === mp);
 
       series.push({
         name,

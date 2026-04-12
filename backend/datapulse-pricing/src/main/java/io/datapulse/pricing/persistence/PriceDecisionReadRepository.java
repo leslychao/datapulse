@@ -18,11 +18,18 @@ public class PriceDecisionReadRepository {
 
     private final EntityManager entityManager;
 
-    public Page<PriceDecisionEntity> findByFilter(long workspaceId, PriceDecisionFilter filter,
+    public Page<PriceDecisionEntity> findByFilter(long workspaceId, Long connectionId,
+                                                  PriceDecisionFilter filter,
                                                   Pageable pageable) {
         var whereClause = new StringBuilder("WHERE d.workspaceId = :workspaceId");
         Map<String, Object> params = new HashMap<>();
         params.put("workspaceId", workspaceId);
+
+        if (connectionId != null) {
+            whereClause.append(" AND d.pricingRunId IN (SELECT r.id FROM PricingRunEntity r"
+                    + " WHERE r.connectionId = :connectionId)");
+            params.put("connectionId", connectionId);
+        }
 
         appendFilters(filter, whereClause, params);
 
@@ -44,12 +51,6 @@ public class PriceDecisionReadRepository {
                                Map<String, Object> params) {
         if (filter == null) {
             return;
-        }
-
-        if (filter.connectionId() != null) {
-            whereClause.append(" AND d.pricingRunId IN (SELECT r.id FROM PricingRunEntity r"
-                    + " WHERE r.connectionId = :connectionId)");
-            params.put("connectionId", filter.connectionId());
         }
 
         if (filter.pricingRunId() != null) {

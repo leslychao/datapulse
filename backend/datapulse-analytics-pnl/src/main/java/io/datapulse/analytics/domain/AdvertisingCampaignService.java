@@ -12,7 +12,6 @@ import io.datapulse.analytics.persistence.AdvertisingCampaignReadRepository;
 import io.datapulse.analytics.persistence.AdvertisingClickHouseReadRepository;
 import io.datapulse.analytics.persistence.CampaignMetrics;
 import io.datapulse.analytics.persistence.CampaignPgRow;
-import io.datapulse.analytics.persistence.WorkspaceConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -25,24 +24,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AdvertisingCampaignService {
 
-  private final WorkspaceConnectionRepository connectionRepository;
   private final AdvertisingCampaignReadRepository pgRepo;
   private final AdvertisingClickHouseReadRepository chRepo;
 
   public Page<CampaignSummaryResponse> getCampaigns(
       long workspaceId, CampaignDashboardFilter filter, Pageable pageable) {
 
-    List<Long> connectionIds = resolveConnectionIds(workspaceId, filter);
-    if (connectionIds.isEmpty()) {
-      return Page.empty(pageable);
-    }
-
     String sortColumn = extractSortColumn(pageable, "name");
 
     List<CampaignPgRow> pgRows = pgRepo.findCampaigns(
-        connectionIds, filter.status(),
+        workspaceId, filter.sourcePlatform(), filter.status(),
         sortColumn, pageable.getPageSize(), pageable.getOffset());
-    long total = pgRepo.countCampaigns(connectionIds, filter.status());
+    long total = pgRepo.countCampaigns(
+        workspaceId, filter.sourcePlatform(), filter.status());
 
     if (pgRows.isEmpty()) {
       return new PageImpl<>(List.of(), pageable, total);
@@ -59,18 +53,6 @@ public class AdvertisingCampaignService {
         .toList();
 
     return new PageImpl<>(content, pageable, total);
-  }
-
-  private List<Long> resolveConnectionIds(long workspaceId,
-      CampaignDashboardFilter filter) {
-    List<Long> wsConnectionIds =
-        connectionRepository.findConnectionIdsByWorkspaceId(workspaceId);
-    if (filter.connectionIds() != null && !filter.connectionIds().isEmpty()) {
-      return wsConnectionIds.stream()
-          .filter(filter.connectionIds()::contains)
-          .toList();
-    }
-    return wsConnectionIds;
   }
 
   private List<Long> parseCampaignIds(List<CampaignPgRow> rows) {

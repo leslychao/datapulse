@@ -159,7 +159,6 @@ export interface UpdatePolicyRequest extends CreatePolicyRequest {}
 export interface PolicyAssignment {
   id: number;
   scopeType: AssignmentScopeType;
-  connectionId: number;
   connectionName: string;
   marketplace: MarketplaceType;
   categoryId: number | null;
@@ -170,7 +169,7 @@ export interface PolicyAssignment {
 }
 
 export interface CreateAssignmentRequest {
-  connectionId: number;
+  sourcePlatform: string;
   scopeType: AssignmentScopeType;
   categoryId?: number;
   marketplaceOfferId?: number;
@@ -192,7 +191,7 @@ export interface OfferSuggestion {
 export interface PricingRunSummary {
   id: number;
   triggerType: RunTriggerType;
-  connectionId: number;
+  sourcePlatform: string;
   connectionName: string;
   marketplace: MarketplaceType;
   status: RunStatus;
@@ -254,7 +253,7 @@ export interface ManualPriceLock {
   offerId: number;
   offerName: string;
   sellerSku: string;
-  connectionId: number;
+  sourcePlatform: string;
   connectionName: string;
   lockedPrice: number;
   reason: string | null;
@@ -304,7 +303,7 @@ export interface PricingFilter {
 }
 
 export interface PricingRunFilter {
-  connectionId?: number;
+  sourcePlatform?: string;
   status?: RunStatus[];
   triggerType?: RunTriggerType[];
   from?: string;
@@ -312,7 +311,7 @@ export interface PricingRunFilter {
 }
 
 export interface PricingDecisionFilter {
-  connectionId?: number;
+  sourcePlatform?: string;
   marketplaceOfferId?: number;
   decisionType?: DecisionOutcome[];
   pricingRunId?: number;
@@ -322,7 +321,7 @@ export interface PricingDecisionFilter {
 }
 
 export interface PricingLockFilter {
-  connectionId?: number;
+  sourcePlatform?: string;
   search?: string;
 }
 

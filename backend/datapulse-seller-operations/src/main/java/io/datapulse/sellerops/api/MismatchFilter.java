@@ -11,7 +11,7 @@ import java.util.List;
  */
 public record MismatchFilter(
     List<String> type,
-    List<Long> connectionId,
+    List<String> sourcePlatform,
     List<String> status,
     List<String> severity,
     LocalDate from,
@@ -23,7 +23,7 @@ public record MismatchFilter(
   public MismatchFilter normalize() {
     return new MismatchFilter(
         splitCsv(type),
-        connectionId,
+        splitCsv(sourcePlatform),
         splitCsv(status),
         splitCsv(severity),
         from, to, query, offerId

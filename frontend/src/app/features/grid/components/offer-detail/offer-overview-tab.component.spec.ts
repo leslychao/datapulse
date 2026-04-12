@@ -18,7 +18,6 @@ function buildOffer(overrides: Partial<OfferDetail> = {}): OfferDetail {
     skuCode: 'SKU-001',
     productName: 'Test Product',
     marketplaceType: 'WB',
-    connectionId: 1,
     connectionName: 'WB Main',
     status: 'ACTIVE',
     category: 'Electronics',

@@ -31,13 +31,15 @@ public class AlertEventRepository {
             """;
 
     private static final String SELECT_COLUMNS = """
-            SELECT id, alert_rule_id, workspace_id, connection_id, status, severity,
-                   title, details, blocks_automation, opened_at,
-                   acknowledged_at, acknowledged_by, resolved_at, resolved_reason
-            FROM alert_event
+            SELECT ae.id, ae.alert_rule_id, ae.workspace_id, ae.status, ae.severity,
+                   ae.title, ae.details, ae.blocks_automation, ae.opened_at,
+                   ae.acknowledged_at, ae.acknowledged_by, ae.resolved_at, ae.resolved_reason,
+                   mc.marketplace_type AS source_platform
+            FROM alert_event ae
+            LEFT JOIN marketplace_connection mc ON mc.id = ae.connection_id
             """;
 
-    private static final String BASE_WHERE = " WHERE workspace_id = :workspaceId";
+    private static final String BASE_WHERE = " WHERE ae.workspace_id = :workspaceId";
 
     private static final Map<String, String> SORT_WHITELIST = Map.of(
             "openedAt", "opened_at",
@@ -95,13 +97,15 @@ public class AlertEventRepository {
 
     public long count(long workspaceId, AlertEventFilter filter) {
         var params = buildFilterParams(workspaceId, filter);
-        String sql = "SELECT count(*) FROM alert_event" + BASE_WHERE + buildFilterClause(filter);
+        String sql = "SELECT count(*) FROM alert_event ae"
+                + " LEFT JOIN marketplace_connection mc ON mc.id = ae.connection_id"
+                + BASE_WHERE + buildFilterClause(filter);
         Long result = jdbc.queryForObject(sql, params, Long.class);
         return result != null ? result : 0L;
     }
 
     public Optional<AlertEventResponse> findById(long id, long workspaceId) {
-        String sql = SELECT_COLUMNS + " WHERE id = :id AND workspace_id = :workspaceId";
+        String sql = SELECT_COLUMNS + " WHERE ae.id = :id AND ae.workspace_id = :workspaceId";
         var params = new MapSqlParameterSource("id", id).addValue("workspaceId", workspaceId);
         return jdbc.query(sql, params, this::mapRow).stream().findFirst();
     }
@@ -143,8 +147,8 @@ public class AlertEventRepository {
 
     public List<AlertEventResponse> findActiveByRuleAndConnection(long alertRuleId, long connectionId) {
         String sql = SELECT_COLUMNS
-                + " WHERE alert_rule_id = :alertRuleId AND connection_id = :connectionId"
-                + " AND status IN ('OPEN', 'ACKNOWLEDGED')";
+                + " WHERE ae.alert_rule_id = :alertRuleId AND ae.connection_id = :connectionId"
+                + " AND ae.status IN ('OPEN', 'ACKNOWLEDGED')";
         var params = new MapSqlParameterSource("alertRuleId", alertRuleId)
                 .addValue("connectionId", connectionId);
         return jdbc.query(sql, params, this::mapRow);
@@ -152,7 +156,7 @@ public class AlertEventRepository {
 
     public List<AlertEventResponse> findActiveByRule(long alertRuleId) {
         String sql = SELECT_COLUMNS
-                + " WHERE alert_rule_id = :alertRuleId AND status IN ('OPEN', 'ACKNOWLEDGED')";
+                + " WHERE ae.alert_rule_id = :alertRuleId AND ae.status IN ('OPEN', 'ACKNOWLEDGED')";
         var params = new MapSqlParameterSource("alertRuleId", alertRuleId);
         return jdbc.query(sql, params, this::mapRow);
     }
@@ -204,8 +208,8 @@ public class AlertEventRepository {
         if (filter.severity() != null && !filter.severity().isBlank()) {
             params.addValue("severity", filter.severity().trim());
         }
-        if (filter.connectionId() != null) {
-            params.addValue("connectionId", filter.connectionId());
+        if (filter.sourcePlatform() != null && !filter.sourcePlatform().isBlank()) {
+            params.addValue("sourcePlatform", filter.sourcePlatform().trim());
         }
         return params;
     }
@@ -213,13 +217,13 @@ public class AlertEventRepository {
     private String buildFilterClause(AlertEventFilter filter) {
         var sb = new StringBuilder();
         if (filter.status() != null && !filter.status().isBlank()) {
-            sb.append(" AND status = :status");
+            sb.append(" AND ae.status = :status");
         }
         if (filter.severity() != null && !filter.severity().isBlank()) {
-            sb.append(" AND severity = :severity");
+            sb.append(" AND ae.severity = :severity");
         }
-        if (filter.connectionId() != null) {
-            sb.append(" AND connection_id = :connectionId");
+        if (filter.sourcePlatform() != null && !filter.sourcePlatform().isBlank()) {
+            sb.append(" AND mc.marketplace_type = :sourcePlatform");
         }
         return sb.toString();
     }
@@ -229,7 +233,7 @@ public class AlertEventRepository {
                 rs.getLong("id"),
                 rs.getObject("alert_rule_id", Long.class),
                 rs.getLong("workspace_id"),
-                rs.getObject("connection_id", Long.class),
+                rs.getString("source_platform"),
                 rs.getString("status"),
                 rs.getString("severity"),
                 rs.getString("title"),

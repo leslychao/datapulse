@@ -174,7 +174,7 @@ class GridServiceTest {
   }
 
   private GridFilter emptyFilter() {
-    return new GridFilter(null, null, null, null, null,
+    return new GridFilter(null, null, null, null,
         null, null, null, null, null, null, null, null, null, null);
   }
 }

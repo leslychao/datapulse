@@ -20,7 +20,7 @@ public class PricingAdvisorController {
   private final PricingAdvisorService advisorService;
 
   @PostMapping("/{offerId}")
-  @PreAuthorize("@workspaceAccessService.canRead(#workspaceId)")
+  @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
   public AdvisorResponse generateAdvice(
       @PathVariable("workspaceId") long workspaceId,
       @PathVariable("offerId") long offerId) {

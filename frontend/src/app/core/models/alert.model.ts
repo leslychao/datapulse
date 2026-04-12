@@ -24,7 +24,7 @@ export interface AlertEvent {
   title: string;
   details: Record<string, unknown>;
   blocksAutomation: boolean;
-  connectionId: number | null;
+  sourcePlatform: string | null;
   connectionName: string | null;
   openedAt: string;
   acknowledgedAt: string | null;
@@ -41,7 +41,7 @@ export interface AlertSummary {
 export interface AlertFilter {
   ruleType?: AlertRuleType[];
   severity?: AlertSeverity[];
-  connectionId?: number;
+  sourcePlatform?: string;
   status?: AlertStatus[];
   blocksAutomation?: boolean;
 }

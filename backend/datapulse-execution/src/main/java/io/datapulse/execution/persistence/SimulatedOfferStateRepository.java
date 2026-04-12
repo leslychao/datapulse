@@ -18,9 +18,11 @@ public interface SimulatedOfferStateRepository extends JpaRepository<SimulatedOf
             WHERE s.workspaceId = :workspaceId
               AND s.marketplaceOfferId IN (
                 SELECT mo.id FROM MarketplaceOfferEntity mo
-                WHERE mo.marketplaceConnectionId = :connectionId
+                JOIN MarketplaceConnectionEntity mc ON mo.marketplaceConnectionId = mc.id
+                WHERE mc.workspaceId = :workspaceId
+                  AND mc.marketplaceType = :sourcePlatform
               )
             """)
-    int deleteByConnection(@Param("workspaceId") long workspaceId,
-                           @Param("connectionId") long connectionId);
+    int deleteBySourcePlatform(@Param("workspaceId") long workspaceId,
+                               @Param("sourcePlatform") String sourcePlatform);
 }

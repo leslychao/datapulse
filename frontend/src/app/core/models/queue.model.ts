@@ -39,7 +39,6 @@ export interface QueueFilter {
   status?: QueueItemStatus[];
   assignedToMe?: boolean;
   marketplaceType?: string[];
-  connectionId?: number[];
   query?: string;
   severity?: string[];
   mismatchType?: string[];

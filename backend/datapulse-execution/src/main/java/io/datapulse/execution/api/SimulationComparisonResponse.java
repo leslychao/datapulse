@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record SimulationComparisonResponse(
-        long connectionId,
+        String sourcePlatform,
         SimulationSummary summary,
         List<SimulationComparisonItemResponse> items
 ) {

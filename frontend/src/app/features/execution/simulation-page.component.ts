@@ -42,12 +42,12 @@ import { ToastService } from '@shared/shell/toast/toast.service';
           @if (connectionsQuery.data(); as connections) {
             <select
               class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-              [value]="connectionId()"
+              [value]="selectedPlatform()"
               (change)="onConnectionChange($event)"
             >
-              <option [value]="0" disabled>{{ 'execution.simulation.select_connection' | translate }}</option>
+              <option [value]="''" disabled>{{ 'execution.simulation.select_connection' | translate }}</option>
               @for (conn of connections; track conn.id) {
-                <option [value]="conn.id">{{ conn.name }}</option>
+                <option [value]="conn.marketplaceType">{{ conn.name }}</option>
               }
             </select>
           }
@@ -187,7 +187,7 @@ export class SimulationPageComponent {
   protected readonly TrendingUpIcon = TrendingUp;
   protected readonly TargetIcon = Target;
 
-  protected readonly connectionId = signal(0);
+  protected readonly selectedPlatform = signal('');
   protected readonly showResetModal = signal(false);
 
   protected readonly connectionsQuery = injectQuery(() => ({
@@ -197,24 +197,24 @@ export class SimulationPageComponent {
   }));
 
   protected readonly canQuery = computed(
-    () => !!this.wsStore.currentWorkspaceId() && this.connectionId() > 0,
+    () => !!this.wsStore.currentWorkspaceId() && this.selectedPlatform() !== '',
   );
 
   constructor() {
     effect(() => {
       const connections = this.connectionsQuery.data();
-      if (connections?.length && this.connectionId() === 0) {
-        this.connectionId.set(connections[0].id);
+      if (connections?.length && this.selectedPlatform() === '') {
+        this.selectedPlatform.set(connections[0].marketplaceType);
       }
     });
   }
 
   protected readonly simulationQuery = injectQuery(() => {
     const wsId = this.wsStore.currentWorkspaceId();
-    const connId = this.connectionId();
+    const platform = this.selectedPlatform();
     return {
-      queryKey: ['simulation-comparison', wsId, connId],
-      queryFn: () => lastValueFrom(this.actionApi.getSimulationComparison(wsId!, connId)),
+      queryKey: ['simulation-comparison', wsId, platform],
+      queryFn: () => lastValueFrom(this.actionApi.getSimulationComparison(wsId!, platform)),
       enabled: this.canQuery(),
       staleTime: 300_000,
       refetchOnWindowFocus: true,
@@ -229,8 +229,8 @@ export class SimulationPageComponent {
   protected readonly resetMutation = injectMutation(() => ({
     mutationFn: () => {
       const wsId = this.wsStore.currentWorkspaceId()!;
-      const connId = this.connectionId();
-      return lastValueFrom(this.actionApi.resetShadowState(wsId, connId));
+      const platform = this.selectedPlatform();
+      return lastValueFrom(this.actionApi.resetShadowState(wsId, platform));
     },
     onSuccess: () => {
       this.showResetModal.set(false);
@@ -245,7 +245,7 @@ export class SimulationPageComponent {
   }
 
   protected onConnectionChange(event: Event): void {
-    this.connectionId.set(Number((event.target as HTMLSelectElement).value));
+    this.selectedPlatform.set((event.target as HTMLSelectElement).value);
   }
 
   protected onResetConfirmed(): void {

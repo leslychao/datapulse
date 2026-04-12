@@ -10,7 +10,6 @@ public record ReconciliationResultResponse(
 ) {
 
   public record ConnectionReconciliation(
-      long connectionId,
       String connectionName,
       String marketplaceType,
       BigDecimal residualAmount,
@@ -21,7 +20,7 @@ public record ReconciliationResultResponse(
 
   public record TrendPoint(
       String period,
-      long connectionId,
+      String marketplaceType,
       BigDecimal residualRatioPct,
       BigDecimal baselineRatioPct
   ) {}

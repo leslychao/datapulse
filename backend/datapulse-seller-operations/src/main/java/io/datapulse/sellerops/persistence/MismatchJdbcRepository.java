@@ -544,9 +544,9 @@ public class MismatchJdbcRepository {
       where.append(" AND ae.details->>'mismatch_type' IN (:types)");
       params.addValue("types", filter.type());
     }
-    if (!CollectionUtils.isEmpty(filter.connectionId())) {
-      where.append(" AND ae.connection_id IN (:connectionIds)");
-      params.addValue("connectionIds", filter.connectionId());
+    if (!CollectionUtils.isEmpty(filter.sourcePlatform())) {
+      where.append(" AND mc.marketplace_type IN (:sourcePlatforms)");
+      params.addValue("sourcePlatforms", filter.sourcePlatform());
     }
     if (!CollectionUtils.isEmpty(filter.status())) {
       List<String> dbStatuses = new ArrayList<>();

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -23,11 +24,33 @@ public class PricingRunReadRepository {
     private final EntityManager entityManager;
     private final NamedParameterJdbcTemplate jdbc;
 
-    public Page<PricingRunEntity> findByFilter(long workspaceId, PricingRunFilter filter,
+    private static final String RESOLVE_CONNECTION_SQL = """
+            SELECT id FROM marketplace_connection
+            WHERE workspace_id = :workspaceId
+              AND marketplace_type = :sourcePlatform
+              AND status <> 'ARCHIVED'
+            """;
+
+    public Long resolveConnectionId(long workspaceId, String sourcePlatform) {
+        if (sourcePlatform == null) {
+            return null;
+        }
+        var params = Map.of("workspaceId", workspaceId, "sourcePlatform", sourcePlatform);
+        List<Long> ids = jdbc.queryForList(RESOLVE_CONNECTION_SQL, params, Long.class);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    public Page<PricingRunEntity> findByFilter(long workspaceId, Long connectionId,
+                                               PricingRunFilter filter,
                                                Pageable pageable) {
         var where = new StringBuilder("WHERE r.workspaceId = :workspaceId");
         Map<String, Object> params = new HashMap<>();
         params.put("workspaceId", workspaceId);
+
+        if (connectionId != null) {
+            where.append(" AND r.connectionId = :connectionId");
+            params.put("connectionId", connectionId);
+        }
 
         appendFilters(filter, where, params);
 
@@ -58,6 +81,21 @@ public class PricingRunReadRepository {
         return jdbc.query(CONNECTION_NAMES_SQL,
                 Map.of("ids", connectionIds),
                 (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("name")))
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private static final String CONNECTION_MARKETPLACE_TYPES_SQL = """
+            SELECT id, marketplace_type FROM marketplace_connection WHERE id IN (:ids)
+            """;
+
+    public Map<Long, String> findConnectionMarketplaceTypes(Collection<Long> connectionIds) {
+        if (connectionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return jdbc.query(CONNECTION_MARKETPLACE_TYPES_SQL,
+                Map.of("ids", connectionIds),
+                (rs, rowNum) -> Map.entry(rs.getLong("id"), rs.getString("marketplace_type")))
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
@@ -118,11 +156,6 @@ public class PricingRunReadRepository {
                                Map<String, Object> params) {
         if (filter == null) {
             return;
-        }
-
-        if (filter.connectionId() != null) {
-            where.append(" AND r.connectionId = :connectionId");
-            params.put("connectionId", filter.connectionId());
         }
 
         if (filter.status() != null && !filter.status().isEmpty()) {

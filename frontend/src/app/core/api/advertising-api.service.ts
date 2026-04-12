@@ -28,10 +28,8 @@ export class AdvertisingApiService {
     if (filter.status) {
       params = params.set('status', filter.status);
     }
-    if (filter.connectionIds?.length) {
-      for (const id of filter.connectionIds) {
-        params = params.append('connectionIds', id);
-      }
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
 
     return this.http.get<Page<CampaignSummary>>(

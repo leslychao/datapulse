@@ -33,8 +33,8 @@ export class ActionApiService {
       .set('size', size)
       .set('sort', sort);
 
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.status?.length) {
       params = params.set('status', filter.status.join(','));
@@ -130,19 +130,19 @@ export class ActionApiService {
 
   getSimulationComparison(
     workspaceId: number,
-    connectionId: number,
+    sourcePlatform: string,
   ): Observable<SimulationComparisonResponse> {
-    const params = new HttpParams().set('connectionId', connectionId);
+    const params = new HttpParams().set('sourcePlatform', sourcePlatform);
     return this.http.get<SimulationComparisonResponse>(
       `${this.base}/workspaces/${workspaceId}/simulation/comparison`,
       { params },
     );
   }
 
-  resetShadowState(workspaceId: number, connectionId: number): Observable<void> {
+  resetShadowState(workspaceId: number, sourcePlatform: string): Observable<void> {
     return this.http.delete<void>(
       `${this.base}/workspaces/${workspaceId}/simulation/shadow-state`,
-      { body: { connectionId } },
+      { body: { sourcePlatform } },
     );
   }
 }

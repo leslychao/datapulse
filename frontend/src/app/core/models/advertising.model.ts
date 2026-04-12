@@ -15,7 +15,7 @@ export interface CampaignSummary {
 }
 
 export interface CampaignDashboardFilter {
-  connectionIds?: number[];
+  sourcePlatform?: string;
   period?: string;
   status?: string;
 }

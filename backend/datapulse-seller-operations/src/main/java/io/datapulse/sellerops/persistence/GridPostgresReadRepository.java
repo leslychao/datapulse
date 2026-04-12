@@ -213,11 +213,6 @@ public class GridPostgresReadRepository {
             params.addValue("marketplaceTypes", filter.marketplaceType());
         }
 
-        if (filter.connectionId() != null && !filter.connectionId().isEmpty()) {
-            where.append(" AND mc.id IN (:connectionIds)");
-            params.addValue("connectionIds", filter.connectionId());
-        }
-
         if (filter.status() != null && !filter.status().isEmpty()) {
             where.append(" AND mo.status IN (:statuses)");
             params.addValue("statuses", filter.status());

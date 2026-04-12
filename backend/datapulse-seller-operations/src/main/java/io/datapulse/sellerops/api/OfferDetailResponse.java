@@ -9,7 +9,6 @@ public record OfferDetailResponse(
         String skuCode,
         String productName,
         String marketplaceType,
-        long connectionId,
         String connectionName,
         String status,
         String category,

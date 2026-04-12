@@ -37,7 +37,7 @@ public class PricePolicyAssignmentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public AssignmentResponse createAssignment(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId,
@@ -47,7 +47,7 @@ public class PricePolicyAssignmentController {
 
     @DeleteMapping("/{assignmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId) and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void deleteAssignment(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId,
@@ -60,9 +60,9 @@ public class PricePolicyAssignmentController {
     public List<CategorySuggestionResponse> listCategories(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId,
-            @RequestParam("connectionId") long connectionId,
+            @RequestParam("sourcePlatform") String sourcePlatform,
             @RequestParam(value = "search", required = false) String search) {
-        return assignmentService.listCategories(connectionId, search);
+        return assignmentService.listCategories(workspaceId, sourcePlatform, search);
     }
 
     @GetMapping("/offers")
@@ -70,8 +70,8 @@ public class PricePolicyAssignmentController {
     public List<OfferSuggestionResponse> searchOffers(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId,
-            @RequestParam("connectionId") long connectionId,
+            @RequestParam("sourcePlatform") String sourcePlatform,
             @RequestParam(value = "search", required = false) String search) {
-        return assignmentService.searchOffers(connectionId, search);
+        return assignmentService.searchOffers(workspaceId, sourcePlatform, search);
     }
 }

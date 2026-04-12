@@ -35,7 +35,7 @@ export interface PromoCampaignSummary {
   participatedCount: number;
   pendingReviewCount: number;
   status: CampaignStatus;
-  connectionId: number;
+  sourcePlatform: string;
   connectionName: string;
 }
 
@@ -169,7 +169,7 @@ export interface PromoDecisionDetail extends PromoDecision {
 }
 
 export interface PromoCampaignFilter {
-  connectionId?: number;
+  sourcePlatform?: string;
   marketplaceType?: MarketplaceType[];
   status?: CampaignStatus[];
   promoType?: string;
@@ -194,7 +194,7 @@ export interface PromoPolicyFilter {
 
 export interface PromoEvaluationFilter {
   campaignId?: number;
-  connectionId?: number;
+  sourcePlatform?: string;
   marketplaceType?: MarketplaceType[];
   evaluationResult?: EvaluationResult[];
   from?: string;
@@ -229,7 +229,7 @@ export interface PromoActionFilter {
 
 export interface PromoDecisionFilter {
   campaignId?: number;
-  connectionId?: number;
+  sourcePlatform?: string;
   decisionType?: PromoDecisionType[];
   decidedBy?: 'all' | 'auto' | 'manual';
   from?: string;

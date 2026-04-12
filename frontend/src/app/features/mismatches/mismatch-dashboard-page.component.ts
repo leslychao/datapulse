@@ -64,7 +64,7 @@ const FILTER_URL_DEFS: FilterBarUrlDef[] = [
   { key: 'type', type: 'csv' },
   { key: 'status', type: 'csv' },
   { key: 'severity', type: 'csv' },
-  { key: 'connectionId', type: 'string' },
+  { key: 'sourcePlatform', type: 'string' },
   { key: 'period', type: 'date-range' },
   { key: 'query', type: 'string' },
 ];
@@ -147,8 +147,8 @@ export class MismatchDashboardPageComponent {
         options: (['WARNING', 'CRITICAL'] as const).map(s => ({
           value: s, label: 'mismatches.severity.' + s,
         })) },
-      { key: 'connectionId', label: 'mismatches.filter.connection', type: 'select',
-        options: conns.map(c => ({ value: String(c.id), label: c.name })) },
+      { key: 'sourcePlatform', label: 'mismatches.filter.connection', type: 'select',
+        options: conns.map(c => ({ value: c.marketplaceType, label: c.name })) },
       { key: 'period', label: 'mismatches.filter.period', type: 'date-range' },
       { key: 'query', label: 'mismatches.filter.search', type: 'text' },
     ];
@@ -163,8 +163,8 @@ export class MismatchDashboardPageComponent {
     if (Array.isArray(st) && st.length) f.status = st; else f.status = ['ACTIVE'];
     const sev = vals['severity'];
     if (Array.isArray(sev) && sev.length) f.severity = sev;
-    const cid = vals['connectionId'];
-    if (cid) f.connectionId = [Number(cid)];
+    const sp = vals['sourcePlatform'];
+    if (sp) f.sourcePlatform = [sp];
     const period = vals['period'];
     if (period?.from) f.from = period.from;
     if (period?.to) f.to = period.to;

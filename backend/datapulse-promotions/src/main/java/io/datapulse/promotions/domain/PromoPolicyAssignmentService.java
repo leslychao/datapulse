@@ -6,6 +6,7 @@ import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.promotions.api.CreatePromoAssignmentRequest;
 import io.datapulse.promotions.api.PromoAssignmentMapper;
 import io.datapulse.promotions.api.PromoAssignmentResponse;
+import io.datapulse.promotions.persistence.PromoEvaluationRunQueryRepository;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentEntity;
 import io.datapulse.promotions.persistence.PromoPolicyAssignmentRepository;
 import io.datapulse.promotions.persistence.PromoPolicyRepository;
@@ -24,6 +25,7 @@ public class PromoPolicyAssignmentService {
     private final PromoPolicyAssignmentRepository assignmentRepository;
     private final PromoPolicyRepository policyRepository;
     private final PromoAssignmentMapper assignmentMapper;
+    private final PromoEvaluationRunQueryRepository runQueryRepository;
 
     @Transactional(readOnly = true)
     public List<PromoAssignmentResponse> listAssignments(long policyId, long workspaceId) {
@@ -38,15 +40,17 @@ public class PromoPolicyAssignmentService {
         ensurePolicyExists(policyId, workspaceId);
         validateScopeConsistency(request);
 
+        long connectionId = requireConnectionId(workspaceId, request.sourcePlatform());
+
         boolean exists = assignmentRepository.existsByPromoPolicyIdAndMarketplaceConnectionIdAndScopeType(
-                policyId, request.connectionId(), request.scopeType());
+                policyId, connectionId, request.scopeType());
         if (exists && request.scopeType() == PromoScopeType.CONNECTION) {
             throw BadRequestException.of(MessageCodes.PROMO_ASSIGNMENT_DUPLICATE);
         }
 
         var entity = new PromoPolicyAssignmentEntity();
         entity.setPromoPolicyId(policyId);
-        entity.setMarketplaceConnectionId(request.connectionId());
+        entity.setMarketplaceConnectionId(connectionId);
         entity.setScopeType(request.scopeType());
         entity.setCategoryId(request.categoryId());
         entity.setMarketplaceOfferId(request.marketplaceOfferId());
@@ -71,6 +75,14 @@ public class PromoPolicyAssignmentService {
 
         assignmentRepository.delete(assignment);
         log.info("Promo assignment deleted: id={}, policyId={}", assignmentId, policyId);
+    }
+
+    private long requireConnectionId(long workspaceId, String sourcePlatform) {
+        Long connectionId = runQueryRepository.resolveConnectionId(workspaceId, sourcePlatform);
+        if (connectionId == null) {
+            throw NotFoundException.entity("MarketplaceConnection", sourcePlatform);
+        }
+        return connectionId;
     }
 
     private void ensurePolicyExists(long policyId, long workspaceId) {

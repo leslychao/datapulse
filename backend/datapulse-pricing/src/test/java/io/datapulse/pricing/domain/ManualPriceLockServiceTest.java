@@ -155,8 +155,8 @@ class ManualPriceLockServiceTest {
       when(lockRepository.findActiveLock(100L)).thenReturn(Optional.of(entity));
       ManualLockResponse response = new ManualLockResponse(
           1L, 100L, new BigDecimal("999"), "Testing", USER_ID,
-          OffsetDateTime.now(), null, null, null,
-          null, null, null, null, null);
+          OffsetDateTime.now(), null, null, null, null, null,
+          null, null, null);
       when(lockMapper.toResponse(entity)).thenReturn(response);
       when(runReadRepository.findOfferInfo(any())).thenReturn(Collections.emptyMap());
       when(runReadRepository.findUserNames(any())).thenReturn(Collections.emptyMap());

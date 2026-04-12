@@ -46,8 +46,8 @@ export class PromoApiService {
       .set('size', size)
       .set('sort', sort);
 
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.marketplaceType?.length) {
       params = params.set('marketplaceType', filter.marketplaceType.join(','));
@@ -242,8 +242,8 @@ export class PromoApiService {
     if (filter.campaignId) {
       params = params.set('campaignId', filter.campaignId);
     }
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.marketplaceType?.length) {
       params = params.set('marketplaceType', filter.marketplaceType.join(','));
@@ -284,8 +284,8 @@ export class PromoApiService {
     if (filter.campaignId) {
       params = params.set('campaignId', filter.campaignId);
     }
-    if (filter.connectionId) {
-      params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform) {
+      params = params.set('sourcePlatform', filter.sourcePlatform);
     }
     if (filter.decisionType?.length) {
       params = params.set('decisionType', filter.decisionType.join(','));

@@ -18,10 +18,11 @@ public class SimulationService {
     private final SimulatedOfferStateRepository simulatedStateRepository;
 
     @Transactional
-    public int resetShadowState(long workspaceId, long connectionId) {
-        int deleted = simulatedStateRepository.deleteByConnection(workspaceId, connectionId);
-        log.info("Shadow-state reset: workspaceId={}, connectionId={}, deletedRows={}",
-                workspaceId, connectionId, deleted);
+    public int resetShadowState(long workspaceId, String sourcePlatform) {
+        int deleted = simulatedStateRepository.deleteBySourcePlatform(
+                workspaceId, sourcePlatform);
+        log.info("Shadow-state reset: workspaceId={}, sourcePlatform={}, deletedRows={}",
+                workspaceId, sourcePlatform, deleted);
         return deleted;
     }
 }

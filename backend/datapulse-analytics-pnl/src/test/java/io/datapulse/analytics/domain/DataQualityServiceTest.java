@@ -81,7 +81,6 @@ class DataQualityServiceTest {
 
       assertThat(result.connections()).hasSize(1);
       ConnectionDataQuality conn = result.connections().get(0);
-      assertThat(conn.connectionId()).isEqualTo(10L);
       assertThat(conn.domains()).hasSize(2);
     }
 

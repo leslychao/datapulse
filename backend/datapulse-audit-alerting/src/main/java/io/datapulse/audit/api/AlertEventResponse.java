@@ -6,7 +6,7 @@ public record AlertEventResponse(
         long id,
         Long alertRuleId,
         long workspaceId,
-        Long connectionId,
+        String sourcePlatform,
         String status,
         String severity,
         String title,

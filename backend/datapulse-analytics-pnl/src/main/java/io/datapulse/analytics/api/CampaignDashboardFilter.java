@@ -1,9 +1,7 @@
 package io.datapulse.analytics.api;
 
-import java.util.List;
-
 public record CampaignDashboardFilter(
-    List<Long> connectionIds,
+    String sourcePlatform,
     String period,
     String status
 ) {

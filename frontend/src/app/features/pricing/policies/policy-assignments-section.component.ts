@@ -139,7 +139,7 @@ interface ScopeOption {
               {{ 'pricing.form.assignments.connection_label' | translate }}
             </label>
             <select
-              [ngModel]="formConnectionId()"
+              [ngModel]="formSourcePlatform()"
               (ngModelChange)="onConnectionChange($event)"
               class="h-8 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-2 text-[var(--text-sm)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
             >
@@ -147,7 +147,7 @@ interface ScopeOption {
                 {{ 'pricing.form.assignments.connection_placeholder' | translate }}
               </option>
               @for (conn of activeConnections(); track conn.id) {
-                <option [ngValue]="conn.id">
+                <option [ngValue]="conn.marketplaceType">
                   {{ conn.name }} ({{ mpShortLabel(conn.marketplaceType) }})
                 </option>
               }
@@ -155,7 +155,7 @@ interface ScopeOption {
           </div>
 
           <!-- Category selector -->
-          @if (formScopeType() === 'CATEGORY' && formConnectionId()) {
+          @if (formScopeType() === 'CATEGORY' && formSourcePlatform()) {
             <div class="mb-3">
               <label class="mb-1 block text-[var(--text-xs)] font-medium text-[var(--text-secondary)]">
                 {{ 'pricing.form.assignments.category_label' | translate }}
@@ -182,7 +182,7 @@ interface ScopeOption {
           }
 
           <!-- Offer search -->
-          @if (formScopeType() === 'SKU' && formConnectionId()) {
+          @if (formScopeType() === 'SKU' && formSourcePlatform()) {
             <div class="mb-3">
               <label class="mb-1 block text-[var(--text-xs)] font-medium text-[var(--text-secondary)]">
                 {{ 'pricing.form.assignments.offer_label' | translate }}
@@ -380,7 +380,7 @@ export class PolicyAssignmentsSectionComponent {
   readonly deleteTarget = signal<PolicyAssignment | null>(null);
 
   readonly formScopeType = signal<AssignmentScopeType>('CONNECTION');
-  readonly formConnectionId = signal<number | null>(null);
+  readonly formSourcePlatform = signal<string | null>(null);
   readonly formCategoryId = signal<number | null>(null);
   readonly selectedOffer = signal<OfferSuggestion | null>(null);
   readonly offerSearchText = signal('');
@@ -394,12 +394,12 @@ export class PolicyAssignmentsSectionComponent {
         debounceTime(300),
         distinctUntilChanged(),
         switchMap((term) => {
-          if (!term || term.length < 2 || !this.formConnectionId()) return of([]);
+          if (!term || term.length < 2 || !this.formSourcePlatform()) return of([]);
           return lastValueFrom(
             this.pricingApi.searchAssignmentOffers(
               this.wsStore.currentWorkspaceId()!,
               this.policyId(),
-              this.formConnectionId()!,
+              this.formSourcePlatform()!,
               term,
             ),
           ).then((r) => r);
@@ -437,7 +437,7 @@ export class PolicyAssignmentsSectionComponent {
   readonly categoriesQuery = injectQuery(() => ({
     queryKey: [
       'assignment-categories',
-      this.formConnectionId(),
+      this.formSourcePlatform(),
       this.policyId(),
     ],
     queryFn: () =>
@@ -445,12 +445,12 @@ export class PolicyAssignmentsSectionComponent {
         this.pricingApi.listAssignmentCategories(
           this.wsStore.currentWorkspaceId()!,
           this.policyId(),
-          this.formConnectionId()!,
+          this.formSourcePlatform()!,
         ),
       ),
     enabled:
       this.formScopeType() === 'CATEGORY' &&
-      !!this.formConnectionId() &&
+      !!this.formSourcePlatform() &&
       !!this.wsStore.currentWorkspaceId(),
     staleTime: 60_000,
   }));
@@ -510,8 +510,8 @@ export class PolicyAssignmentsSectionComponent {
     this.offerResults.set([]);
   }
 
-  onConnectionChange(id: number | null): void {
-    this.formConnectionId.set(id);
+  onConnectionChange(platform: string | null): void {
+    this.formSourcePlatform.set(platform);
     this.formCategoryId.set(null);
     this.selectedOffer.set(null);
     this.offerSearchText.set('');
@@ -537,7 +537,7 @@ export class PolicyAssignmentsSectionComponent {
   }
 
   isFormValid(): boolean {
-    if (!this.formConnectionId()) return false;
+    if (!this.formSourcePlatform()) return false;
     if (this.formScopeType() === 'CATEGORY' && !this.formCategoryId()) return false;
     if (this.formScopeType() === 'SKU' && !this.selectedOffer()) return false;
     return true;
@@ -546,7 +546,7 @@ export class PolicyAssignmentsSectionComponent {
   submitCreate(): void {
     if (!this.isFormValid()) return;
     const req: CreateAssignmentRequest = {
-      connectionId: this.formConnectionId()!,
+      sourcePlatform: this.formSourcePlatform()!,
       scopeType: this.formScopeType(),
     };
     if (this.formScopeType() === 'CATEGORY') {
@@ -595,7 +595,7 @@ export class PolicyAssignmentsSectionComponent {
   private resetForm(): void {
     this.showAddForm.set(false);
     this.formScopeType.set('CONNECTION');
-    this.formConnectionId.set(null);
+    this.formSourcePlatform.set(null);
     this.formCategoryId.set(null);
     this.selectedOffer.set(null);
     this.offerSearchText.set('');

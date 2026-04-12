@@ -28,9 +28,11 @@ public class SimulationComparisonRepository {
                    sos.price_action_id
             FROM simulated_offer_state sos
             JOIN marketplace_offer mo ON sos.marketplace_offer_id = mo.id
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             LEFT JOIN canonical_price_current cpc ON sos.marketplace_offer_id = cpc.marketplace_offer_id
             WHERE sos.workspace_id = :workspaceId
-              AND mo.marketplace_connection_id = :connectionId
+              AND mc.workspace_id = :workspaceId
+              AND mc.marketplace_type = :sourcePlatform
             ORDER BY ABS(sos.price_delta_pct) DESC NULLS LAST
             """;
 
@@ -43,23 +45,28 @@ public class SimulationComparisonRepository {
                    COALESCE(SUM(sos.price_delta), 0)                AS total_delta_sum
             FROM simulated_offer_state sos
             JOIN marketplace_offer mo ON sos.marketplace_offer_id = mo.id
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             WHERE sos.workspace_id = :workspaceId
-              AND mo.marketplace_connection_id = :connectionId
+              AND mc.workspace_id = :workspaceId
+              AND mc.marketplace_type = :sourcePlatform
             """;
 
     private static final String COVERAGE_SQL = """
             SELECT COUNT(DISTINCT sos.marketplace_offer_id) AS simulated_count,
                    COUNT(DISTINCT mo.id)                    AS total_offers
             FROM marketplace_offer mo
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             LEFT JOIN simulated_offer_state sos
                    ON mo.id = sos.marketplace_offer_id AND sos.workspace_id = :workspaceId
-            WHERE mo.marketplace_connection_id = :connectionId
+            WHERE mc.workspace_id = :workspaceId
+              AND mc.marketplace_type = :sourcePlatform
             """;
 
-    public List<SimulationComparisonRow> findComparisonItems(long workspaceId, long connectionId) {
+    public List<SimulationComparisonRow> findComparisonItems(long workspaceId,
+                                                               String sourcePlatform) {
         var params = new MapSqlParameterSource()
                 .addValue("workspaceId", workspaceId)
-                .addValue("connectionId", connectionId);
+                .addValue("sourcePlatform", sourcePlatform);
 
         return jdbc.query(COMPARISON_ITEMS_SQL, params, (rs, rowNum) -> new SimulationComparisonRow(
                 rs.getLong("marketplace_offer_id"),
@@ -75,10 +82,10 @@ public class SimulationComparisonRepository {
         ));
     }
 
-    public SimulationSummaryRow findSummary(long workspaceId, long connectionId) {
+    public SimulationSummaryRow findSummary(long workspaceId, String sourcePlatform) {
         var params = new MapSqlParameterSource()
                 .addValue("workspaceId", workspaceId)
-                .addValue("connectionId", connectionId);
+                .addValue("sourcePlatform", sourcePlatform);
 
         return jdbc.queryForObject(SUMMARY_SQL, params, (rs, rowNum) -> new SimulationSummaryRow(
                 rs.getLong("total_simulated"),
@@ -90,10 +97,10 @@ public class SimulationComparisonRepository {
         ));
     }
 
-    public CoverageRow findCoverage(long workspaceId, long connectionId) {
+    public CoverageRow findCoverage(long workspaceId, String sourcePlatform) {
         var params = new MapSqlParameterSource()
                 .addValue("workspaceId", workspaceId)
-                .addValue("connectionId", connectionId);
+                .addValue("sourcePlatform", sourcePlatform);
 
         return jdbc.queryForObject(COVERAGE_SQL, params, (rs, rowNum) -> new CoverageRow(
                 rs.getLong("simulated_count"),

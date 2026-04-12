@@ -36,7 +36,8 @@ public class PromoPolicyAssignmentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public PromoAssignmentResponse createAssignment(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId,
@@ -46,7 +47,8 @@ public class PromoPolicyAssignmentController {
 
     @DeleteMapping("/{assignmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
+    @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)"
+        + " and hasAnyAuthority('ROLE_PRICING_MANAGER', 'ROLE_ADMIN', 'ROLE_OWNER')")
     public void deleteAssignment(
             @PathVariable("workspaceId") long workspaceId,
             @PathVariable("policyId") Long policyId,

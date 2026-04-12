@@ -6,7 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 public record PriceDecisionFilter(
-        Long connectionId,
+        String sourcePlatform,
         Long marketplaceOfferId,
         List<DecisionType> decisionType,
         Long pricingRunId,

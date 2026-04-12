@@ -145,7 +145,7 @@ public class GridService {
             return filter;
         }
         return new GridFilter(
-                filter.marketplaceType(), filter.connectionId(), filter.status(),
+                filter.marketplaceType(), filter.status(),
                 filter.skuCode(), filter.productName(), filter.categoryId(),
                 filter.marginMin(), filter.marginMax(), filter.hasManualLock(),
                 filter.hasActivePromo(), filter.lastDecision(), filter.lastActionStatus(),

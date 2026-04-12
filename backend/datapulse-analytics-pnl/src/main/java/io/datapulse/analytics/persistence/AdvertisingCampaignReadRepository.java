@@ -43,12 +43,13 @@ public class AdvertisingCampaignReadRepository {
       """;
 
   public List<CampaignPgRow> findCampaigns(
-      List<Long> connectionIds, String status,
+      long workspaceId, String sourcePlatform, String status,
       String sortColumn, int limit, long offset) {
 
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(BASE_SELECT);
-    sb.append(" WHERE cac.connection_id IN (:connectionIds)");
+    sb.append(" WHERE mc.workspace_id = :workspaceId");
+    appendSourcePlatformFilter(sb, params, sourcePlatform);
     appendStatusFilter(sb, params, status);
 
     String orderBy = SORT_WHITELIST.getOrDefault(sortColumn, "cac.name");
@@ -70,14 +71,24 @@ public class AdvertisingCampaignReadRepository {
     ));
   }
 
-  public long countCampaigns(List<Long> connectionIds, String status) {
-    var params = new MapSqlParameterSource("connectionIds", connectionIds);
+  public long countCampaigns(long workspaceId, String sourcePlatform,
+      String status) {
+    var params = new MapSqlParameterSource("workspaceId", workspaceId);
     var sb = new StringBuilder(BASE_COUNT);
-    sb.append(" WHERE cac.connection_id IN (:connectionIds)");
+    sb.append(" WHERE mc.workspace_id = :workspaceId");
+    appendSourcePlatformFilter(sb, params, sourcePlatform);
     appendStatusFilter(sb, params, status);
 
     Long result = jdbc.queryForObject(sb.toString(), params, Long.class);
     return result != null ? result : 0L;
+  }
+
+  private void appendSourcePlatformFilter(StringBuilder sb,
+      MapSqlParameterSource params, String sourcePlatform) {
+    if (sourcePlatform != null && !sourcePlatform.isBlank()) {
+      sb.append(" AND mc.marketplace_type = :sourcePlatform");
+      params.addValue("sourcePlatform", sourcePlatform.trim());
+    }
   }
 
   private void appendStatusFilter(StringBuilder sb, MapSqlParameterSource params,

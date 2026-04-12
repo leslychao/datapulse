@@ -33,8 +33,9 @@ public class SimulationController {
     @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
     public SimulationComparisonResponse comparison(
             @PathVariable("workspaceId") long workspaceId,
-            @RequestParam("connectionId") long connectionId) {
-        SimulationComparisonReport report = comparisonService.buildReport(workspaceId, connectionId);
+            @RequestParam("sourcePlatform") String sourcePlatform) {
+        SimulationComparisonReport report = comparisonService.buildReport(
+                workspaceId, sourcePlatform);
         return toResponse(report);
     }
 
@@ -55,7 +56,7 @@ public class SimulationController {
     public void resetShadowState(
             @PathVariable("workspaceId") long workspaceId,
             @Valid @RequestBody ResetShadowStateRequest request) {
-        simulationService.resetShadowState(workspaceId, request.connectionId());
+        simulationService.resetShadowState(workspaceId, request.sourcePlatform());
     }
 
     private SimulationComparisonResponse toResponse(SimulationComparisonReport report) {
@@ -75,7 +76,7 @@ public class SimulationController {
                 .map(this::toItemResponse)
                 .toList();
 
-        return new SimulationComparisonResponse(report.connectionId(), summary, items);
+        return new SimulationComparisonResponse(report.sourcePlatform(), summary, items);
     }
 
     private SimulationComparisonItemResponse toItemResponse(SimulationComparisonRow row) {

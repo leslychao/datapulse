@@ -72,7 +72,7 @@ public class PromoCampaignQueryRepository {
                 rs.getLong("products_participating")));
     }
 
-    public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId, Long connectionId,
+    public Page<PromoCampaignSummaryResponse> listCampaigns(long workspaceId,
                                                              Collection<String> statuses,
                                                              Collection<String> marketplaceTypes,
                                                              LocalDate from, LocalDate to,
@@ -80,10 +80,6 @@ public class PromoCampaignQueryRepository {
         var where = new StringBuilder(BASE_SELECT);
         var params = new MapSqlParameterSource().addValue("workspaceId", workspaceId);
 
-        if (connectionId != null) {
-            where.append(" AND cpc.connection_id = :connectionId");
-            params.addValue("connectionId", connectionId);
-        }
         if (statuses != null && !statuses.isEmpty()) {
             where.append(" AND cpc.status IN (:statuses)");
             params.addValue("statuses", statuses);
@@ -122,7 +118,6 @@ public class PromoCampaignQueryRepository {
                         rs.getInt("eligible_count"),
                         rs.getInt("participated_count"),
                         rs.getString("status"),
-                        rs.getLong("connection_id"),
                         rs.getString("connection_name")
                 ));
 
@@ -161,7 +156,6 @@ public class PromoCampaignQueryRepository {
             }
             return Optional.of(new PromoCampaignDetailResponse(
                     rs.getLong("id"),
-                    rs.getLong("connection_id"),
                     rs.getString("external_promo_id"),
                     rs.getString("source_platform"),
                     rs.getString("promo_name"),

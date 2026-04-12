@@ -91,7 +91,7 @@ class PricePolicyAssignmentServiceTest {
         return e;
       });
       when(assignmentReadRepository.findEnrichedById(1L)).thenReturn(
-          new AssignmentResponse(1L, POLICY_ID, CONNECTION_ID,
+          new AssignmentResponse(1L, POLICY_ID,
               "Test Connection", "WB", ScopeType.CONNECTION,
               null, null, null, null, null));
 

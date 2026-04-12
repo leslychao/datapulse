@@ -34,8 +34,17 @@ public class PriceDecisionService {
     @Transactional(readOnly = true)
     public Page<PriceDecisionResponse> listDecisions(long workspaceId, PriceDecisionFilter filter,
                                                      Pageable pageable) {
+        Long connectionId = null;
+        if (filter.sourcePlatform() != null) {
+            connectionId = runReadRepository.resolveConnectionId(
+                    workspaceId, filter.sourcePlatform());
+            if (connectionId == null) {
+                return Page.empty(pageable);
+            }
+        }
+
         Page<PriceDecisionEntity> page = decisionReadRepository.findByFilter(
-                workspaceId, filter, pageable);
+                workspaceId, connectionId, filter, pageable);
         Page<PriceDecisionResponse> mapped = page.map(decisionMapper::toResponse);
         return enrichDecisions(mapped);
     }

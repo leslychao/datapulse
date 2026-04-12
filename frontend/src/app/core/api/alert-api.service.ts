@@ -18,7 +18,7 @@ export class AlertApiService {
 
     if (filter.ruleType?.length) params = params.set('ruleType', filter.ruleType.join(','));
     if (filter.severity?.length) params = params.set('severity', filter.severity.join(','));
-    if (filter.connectionId != null) params = params.set('connectionId', filter.connectionId);
+    if (filter.sourcePlatform != null) params = params.set('sourcePlatform', filter.sourcePlatform);
     if (filter.status?.length) params = params.set('status', filter.status.join(','));
     if (filter.blocksAutomation != null) params = params.set('blocksAutomation', filter.blocksAutomation);
 

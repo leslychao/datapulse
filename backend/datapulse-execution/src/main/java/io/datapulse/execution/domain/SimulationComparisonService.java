@@ -26,11 +26,13 @@ public class SimulationComparisonService {
 
     private final SimulationComparisonRepository comparisonRepository;
 
-    public SimulationComparisonReport buildReport(long workspaceId, long connectionId) {
-        SimulationSummaryRow summary = comparisonRepository.findSummary(workspaceId, connectionId);
-        CoverageRow coverage = comparisonRepository.findCoverage(workspaceId, connectionId);
+    public SimulationComparisonReport buildReport(long workspaceId, String sourcePlatform) {
+        SimulationSummaryRow summary = comparisonRepository.findSummary(
+                workspaceId, sourcePlatform);
+        CoverageRow coverage = comparisonRepository.findCoverage(
+                workspaceId, sourcePlatform);
         List<SimulationComparisonRow> items = comparisonRepository.findComparisonItems(
-                workspaceId, connectionId);
+                workspaceId, sourcePlatform);
 
         BigDecimal coveragePct = BigDecimal.ZERO;
         if (coverage.totalOffers() > 0) {
@@ -39,7 +41,7 @@ public class SimulationComparisonService {
         }
 
         return new SimulationComparisonReport(
-                connectionId,
+                sourcePlatform,
                 summary.totalSimulated(),
                 summary.avgDeltaPct(),
                 summary.countIncrease(),
@@ -58,7 +60,7 @@ public class SimulationComparisonService {
     }
 
     public record SimulationComparisonReport(
-            long connectionId,
+            String sourcePlatform,
             long totalSimulatedActions,
             BigDecimal avgDeltaPct,
             long countIncrease,

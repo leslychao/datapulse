@@ -15,7 +15,7 @@ public record ManualLockResponse(
         Long unlockedBy,
         String offerName,
         String sellerSku,
-        Long connectionId,
+        String sourcePlatform,
         String connectionName,
         String lockedByName
 ) {

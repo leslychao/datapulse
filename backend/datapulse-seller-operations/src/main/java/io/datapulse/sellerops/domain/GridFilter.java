@@ -5,7 +5,6 @@ import java.util.List;
 
 public record GridFilter(
     List<String> marketplaceType,
-    List<Long> connectionId,
     List<String> status,
     String skuCode,
     String productName,

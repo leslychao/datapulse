@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 public record PricingRunFilter(
-        Long connectionId,
+        String sourcePlatform,
         List<RunStatus> status,
         List<RunTriggerType> triggerType,
         OffsetDateTime from,
