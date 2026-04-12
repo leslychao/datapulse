@@ -63,7 +63,7 @@ public class PriceDecisionReadRepository {
         }
 
         if (filter.decisionType() != null && !filter.decisionType().isEmpty()) {
-            whereClause.append(" AND d.decisionType IN :decisionTypes");
+            whereClause.append(" AND d.decisionType IN (:decisionTypes)");
             params.put("decisionTypes", filter.decisionType());
         }
 

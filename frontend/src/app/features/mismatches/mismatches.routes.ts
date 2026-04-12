@@ -7,7 +7,7 @@ const routes: Routes = [
       import('./mismatch-dashboard-page.component').then(
         (m) => m.MismatchDashboardPageComponent,
       ),
-    data: { breadcrumb: 'Расхождения' },
+    data: { breadcrumb: 'breadcrumb.mismatches.list' },
   },
   {
     path: ':mismatchId',
@@ -15,7 +15,7 @@ const routes: Routes = [
       import('./mismatch-detail-page.component').then(
         (m) => m.MismatchDetailPageComponent,
       ),
-    data: { breadcrumb: 'Детали' },
+    data: { breadcrumb: 'breadcrumb.mismatches.detail' },
   },
 ];
 

@@ -12,7 +12,7 @@ const routes: Routes = [
       import('./offer-detail-page.component').then(
         (m) => m.OfferDetailPageComponent,
       ),
-    data: { breadcrumb: 'Детали товара' },
+    data: { breadcrumb: 'breadcrumb.grid.product_detail' },
   },
 ];
 

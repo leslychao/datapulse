@@ -274,7 +274,8 @@ export class EvaluationsListPageComponent {
           if (params.value == null) return '—';
           const arrow = params.value < 0 ? '↓' : '↑';
           const color = params.value < 0 ? 'var(--finance-negative)' : 'var(--finance-positive)';
-          return `<span style="color:${color}">${arrow} ${Math.abs(params.value).toFixed(1).replace('.', ',')} п.п.</span>`;
+          const unit = this.translate.instant('common.unit.percentage_points_short');
+          return `<span style="color:${color}">${arrow} ${Math.abs(params.value).toFixed(1).replace('.', ',')} ${unit}</span>`;
         },
       },
       {

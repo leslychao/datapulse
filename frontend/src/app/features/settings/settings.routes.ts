@@ -11,13 +11,13 @@ const routes: Routes = [
         path: 'profile',
         loadComponent: () =>
           import('./profile/profile-page.component').then((m) => m.ProfilePageComponent),
-        data: { breadcrumb: 'Профиль' },
+        data: { breadcrumb: 'breadcrumb.settings.profile' },
       },
       {
         path: 'connections',
         loadComponent: () =>
           import('./connections/connections-page.component').then((m) => m.ConnectionsPageComponent),
-        data: { breadcrumb: 'Подключения' },
+        data: { breadcrumb: 'breadcrumb.settings.connections' },
       },
       {
         path: 'connections/:connectionId',
@@ -25,25 +25,25 @@ const routes: Routes = [
           import('./connection-detail/connection-detail-page.component').then(
             (m) => m.ConnectionDetailPageComponent,
           ),
-        data: { breadcrumb: 'Подключение' },
+        data: { breadcrumb: 'breadcrumb.settings.connection' },
       },
       {
         path: 'team',
         loadComponent: () =>
           import('./team/team-page.component').then((m) => m.TeamPageComponent),
-        data: { breadcrumb: 'Команда' },
+        data: { breadcrumb: 'breadcrumb.settings.team' },
       },
       {
         path: 'invitations',
         loadComponent: () =>
           import('./invitations/invitations-page.component').then((m) => m.InvitationsPageComponent),
-        data: { breadcrumb: 'Приглашения' },
+        data: { breadcrumb: 'breadcrumb.settings.invitations' },
       },
       {
         path: 'general',
         loadComponent: () =>
           import('./general/general-page.component').then((m) => m.GeneralPageComponent),
-        data: { breadcrumb: 'Общие' },
+        data: { breadcrumb: 'breadcrumb.settings.general' },
       },
       {
         path: 'bidding',
@@ -51,7 +51,7 @@ const routes: Routes = [
           import('./bidding/bidding-settings-page.component').then(
             (m) => m.BiddingSettingsPageComponent,
           ),
-        data: { breadcrumb: 'Автобиддинг' },
+        data: { breadcrumb: 'breadcrumb.settings.bidding' },
       },
       {
         path: 'alert-rules',
@@ -59,7 +59,7 @@ const routes: Routes = [
           import('./alert-rules/alert-rules-page.component').then(
             (m) => m.AlertRulesPageComponent,
           ),
-        data: { breadcrumb: 'Правила алертов' },
+        data: { breadcrumb: 'breadcrumb.settings.alert_rules' },
       },
       {
         path: 'audit',
@@ -67,7 +67,7 @@ const routes: Routes = [
           import('./audit-log/audit-log-page.component').then(
             (m) => m.AuditLogPageComponent,
           ),
-        data: { breadcrumb: 'Журнал аудита' },
+        data: { breadcrumb: 'breadcrumb.settings.audit_log' },
       },
     ],
   },

@@ -167,7 +167,7 @@ class OzonNormalizerTest {
 
       var result = normalizer.normalizeFboPosting(posting, product);
 
-      assertThat(result.externalOrderId()).isEqualTo("87621408-0010-1");
+      assertThat(result.externalOrderId()).isEqualTo("87621408-0010-1-55555");
       assertThat(result.sellerSku()).isEqualTo("OFFER-1");
       assertThat(result.quantity()).isEqualTo(2);
       assertThat(result.pricePerUnit()).isEqualByComparingTo(new BigDecimal("500.00"));
@@ -177,6 +177,26 @@ class OzonNormalizerTest {
       assertThat(result.fulfillmentType()).isEqualTo("FBO");
       assertThat(result.region()).isEqualTo("Moscow");
       assertThat(result.orderDate()).isNotNull();
+    }
+
+    @Test
+    void should_produceUniqueOrderIds_for_multiItemPosting() {
+      var product1 = new OzonFboPosting.OzonPostingProduct(
+          11111L, "OFFER-A", "Product A", 1, "300.00", "RUB");
+      var product2 = new OzonFboPosting.OzonPostingProduct(
+          22222L, "OFFER-B", "Product B", 2, "500.00", "RUB");
+      var posting = new OzonFboPosting(
+          "87621408-0010-1", 1001L, "ORD-001", "delivered",
+          "2024-01-15T10:00:00+03:00", null,
+          List.of(product1, product2),
+          null, null);
+
+      var result1 = normalizer.normalizeFboPosting(posting, product1);
+      var result2 = normalizer.normalizeFboPosting(posting, product2);
+
+      assertThat(result1.externalOrderId()).isEqualTo("87621408-0010-1-11111");
+      assertThat(result2.externalOrderId()).isEqualTo("87621408-0010-1-22222");
+      assertThat(result1.externalOrderId()).isNotEqualTo(result2.externalOrderId());
     }
   }
 

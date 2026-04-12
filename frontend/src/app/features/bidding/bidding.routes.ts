@@ -16,7 +16,7 @@ const routes: Routes = [
           import('./dashboard/bidding-dashboard-page.component').then(
             (m) => m.BiddingDashboardPageComponent,
           ),
-        data: { breadcrumb: 'Дашборд' },
+        data: { breadcrumb: 'breadcrumb.bidding.dashboard' },
       },
       {
         path: 'strategies',
@@ -24,7 +24,7 @@ const routes: Routes = [
           import('./strategies/bid-policy-list-page.component').then(
             (m) => m.BidPolicyListPageComponent,
           ),
-        data: { breadcrumb: 'Стратегии' },
+        data: { breadcrumb: 'breadcrumb.bidding.strategies' },
       },
       {
         path: 'strategies/new',
@@ -34,7 +34,7 @@ const routes: Routes = [
           import('./strategies/bid-policy-form-page.component').then(
             (m) => m.BidPolicyFormPageComponent,
           ),
-        data: { breadcrumb: 'Новая стратегия' },
+        data: { breadcrumb: 'breadcrumb.bidding.new_strategy' },
       },
       {
         path: 'strategies/:policyId/edit',
@@ -44,7 +44,7 @@ const routes: Routes = [
           import('./strategies/bid-policy-form-page.component').then(
             (m) => m.BidPolicyFormPageComponent,
           ),
-        data: { breadcrumb: 'Редактирование' },
+        data: { breadcrumb: 'breadcrumb.bidding.edit' },
       },
       {
         path: 'runs',
@@ -52,7 +52,7 @@ const routes: Routes = [
           import('./runs/bidding-runs-list-page.component').then(
             (m) => m.BiddingRunsListPageComponent,
           ),
-        data: { breadcrumb: 'Прогоны' },
+        data: { breadcrumb: 'breadcrumb.bidding.runs' },
       },
       {
         path: 'runs/:runId',
@@ -60,7 +60,7 @@ const routes: Routes = [
           import('./runs/bidding-run-detail-page.component').then(
             (m) => m.BiddingRunDetailPageComponent,
           ),
-        data: { breadcrumb: 'Детали прогона' },
+        data: { breadcrumb: 'breadcrumb.bidding.run_detail' },
       },
       {
         path: 'decisions',
@@ -68,7 +68,7 @@ const routes: Routes = [
           import('./decisions/bid-decisions-list-page.component').then(
             (m) => m.BidDecisionsListPageComponent,
           ),
-        data: { breadcrumb: 'Решения' },
+        data: { breadcrumb: 'breadcrumb.bidding.decisions' },
       },
       {
         path: 'decisions/:decisionId',
@@ -76,7 +76,7 @@ const routes: Routes = [
           import('./decisions/bid-decision-detail-page.component').then(
             (m) => m.BidDecisionDetailPageComponent,
           ),
-        data: { breadcrumb: 'Решение' },
+        data: { breadcrumb: 'breadcrumb.bidding.decision' },
       },
       {
         path: 'actions',
@@ -84,7 +84,7 @@ const routes: Routes = [
           import('./actions/bid-actions-list-page.component').then(
             (m) => m.BidActionsListPageComponent,
           ),
-        data: { breadcrumb: 'Действия' },
+        data: { breadcrumb: 'breadcrumb.bidding.actions' },
       },
       {
         path: 'locks',
@@ -92,7 +92,7 @@ const routes: Routes = [
           import('./locks/bid-locks-page.component').then(
             (m) => m.BidLocksPageComponent,
           ),
-        data: { breadcrumb: 'Блокировки' },
+        data: { breadcrumb: 'breadcrumb.bidding.locks' },
       },
     ],
   },

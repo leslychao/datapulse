@@ -117,7 +117,7 @@ import { TranslatePipe } from '@ngx-translate/core';
               placeholder="50000"
               class="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 pr-8 font-mono text-right text-[var(--text-sm)] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/20"
             />
-            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">коп</span>
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-xs)] text-[var(--text-tertiary)]">{{ 'common.unit.kopecks_short' | translate }}</span>
           </div>
           <p class="mt-0.5 text-[var(--text-xs)] text-[var(--text-tertiary)]">
             {{ 'bidding.strategy.growth.max_bid_hint' | translate }}

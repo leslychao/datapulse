@@ -27,7 +27,9 @@ import io.datapulse.pricing.api.PriceDecisionResponse;
 import io.datapulse.pricing.persistence.PriceDecisionEntity;
 import io.datapulse.pricing.persistence.PriceDecisionReadRepository;
 import io.datapulse.pricing.persistence.PriceDecisionRepository;
+import io.datapulse.pricing.persistence.PricingRunReadRepository;
 
+import java.util.Collections;
 import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,7 @@ class PriceDecisionServiceTest {
   @Mock private PriceDecisionRepository decisionRepository;
   @Mock private PriceDecisionReadRepository decisionReadRepository;
   @Mock private PriceDecisionMapper decisionMapper;
+  @Mock private PricingRunReadRepository runReadRepository;
 
   @InjectMocks
   private PriceDecisionService service;
@@ -51,9 +54,19 @@ class PriceDecisionServiceTest {
     void should_returnResponse_when_decisionExists() {
       PriceDecisionEntity entity = new PriceDecisionEntity();
       entity.setId(1L);
+      entity.setMarketplaceOfferId(100L);
+      entity.setPricePolicyId(10L);
+      PriceDecisionResponse response = new PriceDecisionResponse(
+          1L, null, 100L, 10L, null, null, null, null,
+          null, null, null, null, null, null, null, null,
+          null, null, null, null, null, null, null, null);
+
       when(decisionRepository.findByIdAndWorkspaceId(1L, WORKSPACE_ID))
           .thenReturn(Optional.of(entity));
-      when(decisionMapper.toResponse(entity)).thenReturn(null);
+      when(decisionMapper.toResponse(entity)).thenReturn(response);
+      when(runReadRepository.findOfferInfo(any())).thenReturn(Collections.emptyMap());
+      when(runReadRepository.findPolicyNames(any())).thenReturn(Collections.emptyMap());
+      when(runReadRepository.findConnectionNames(any())).thenReturn(Collections.emptyMap());
 
       service.getDecision(1L, WORKSPACE_ID);
 
@@ -79,13 +92,23 @@ class PriceDecisionServiceTest {
     @DisplayName("delegates to read repository and maps results")
     void should_delegateToReadRepo_when_listing() {
       Pageable pageable = PageRequest.of(0, 20);
-      PriceDecisionFilter filter = new PriceDecisionFilter(null, null, null, null, null, null);
+      PriceDecisionFilter filter = new PriceDecisionFilter(
+          null, null, null, null, null, null, null);
       PriceDecisionEntity entity = new PriceDecisionEntity();
+      entity.setMarketplaceOfferId(100L);
+      entity.setPricePolicyId(10L);
       Page<PriceDecisionEntity> page = new PageImpl<>(List.of(entity));
+      PriceDecisionResponse response = new PriceDecisionResponse(
+          1L, null, 100L, 10L, null, null, null, null,
+          null, null, null, null, null, null, null, null,
+          null, null, null, null, null, null, null, null);
 
       when(decisionReadRepository.findByFilter(WORKSPACE_ID, filter, pageable))
           .thenReturn(page);
-      when(decisionMapper.toResponse(entity)).thenReturn(null);
+      when(decisionMapper.toResponse(entity)).thenReturn(response);
+      when(runReadRepository.findOfferInfo(any())).thenReturn(Collections.emptyMap());
+      when(runReadRepository.findPolicyNames(any())).thenReturn(Collections.emptyMap());
+      when(runReadRepository.findConnectionNames(any())).thenReturn(Collections.emptyMap());
 
       service.listDecisions(WORKSPACE_ID, filter, pageable);
 

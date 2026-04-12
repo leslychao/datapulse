@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,12 +35,14 @@ import io.datapulse.pricing.api.ManualLockMapper;
 import io.datapulse.pricing.api.ManualLockResponse;
 import io.datapulse.pricing.persistence.ManualPriceLockEntity;
 import io.datapulse.pricing.persistence.ManualPriceLockRepository;
+import io.datapulse.pricing.persistence.PricingRunReadRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ManualPriceLockServiceTest {
 
   @Mock private ManualPriceLockRepository lockRepository;
   @Mock private ManualLockMapper lockMapper;
+  @Mock private PricingRunReadRepository runReadRepository;
 
   @InjectMocks
   private ManualPriceLockService service;
@@ -152,10 +155,15 @@ class ManualPriceLockServiceTest {
       when(lockRepository.findActiveLock(100L)).thenReturn(Optional.of(entity));
       ManualLockResponse response = new ManualLockResponse(
           1L, 100L, new BigDecimal("999"), "Testing", USER_ID,
-          OffsetDateTime.now(), null, null, null);
+          OffsetDateTime.now(), null, null, null,
+          null, null, null, null, null);
       when(lockMapper.toResponse(entity)).thenReturn(response);
+      when(runReadRepository.findOfferInfo(any())).thenReturn(Collections.emptyMap());
+      when(runReadRepository.findUserNames(any())).thenReturn(Collections.emptyMap());
+      when(runReadRepository.findConnectionNames(any())).thenReturn(Collections.emptyMap());
 
-      var result = service.listActiveLocks(WORKSPACE_ID, 100L, PageRequest.of(0, 10));
+      var result = service.listActiveLocks(WORKSPACE_ID, 100L,
+          null, null, PageRequest.of(0, 10));
 
       assertThat(result.getContent()).hasSize(1);
     }
@@ -165,7 +173,8 @@ class ManualPriceLockServiceTest {
     void should_returnEmpty_when_noActiveLockForOffer() {
       when(lockRepository.findActiveLock(100L)).thenReturn(Optional.empty());
 
-      var result = service.listActiveLocks(WORKSPACE_ID, 100L, PageRequest.of(0, 10));
+      var result = service.listActiveLocks(WORKSPACE_ID, 100L,
+          null, null, PageRequest.of(0, 10));
 
       assertThat(result.getContent()).isEmpty();
     }
@@ -176,7 +185,8 @@ class ManualPriceLockServiceTest {
       when(lockRepository.findAllByWorkspaceIdAndUnlockedAtIsNull(eq(WORKSPACE_ID), any(Pageable.class)))
           .thenReturn(new PageImpl<>(List.of()));
 
-      service.listActiveLocks(WORKSPACE_ID, null, PageRequest.of(0, 20));
+      service.listActiveLocks(WORKSPACE_ID, null,
+          null, null, PageRequest.of(0, 20));
 
       verify(lockRepository).findAllByWorkspaceIdAndUnlockedAtIsNull(eq(WORKSPACE_ID), any(Pageable.class));
     }

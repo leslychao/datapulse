@@ -131,6 +131,7 @@ public class OfferService {
         row.getSkuCode(),
         row.getProductName(),
         row.getMarketplaceType(),
+        row.getConnectionId(),
         row.getConnectionName(),
         row.getStatus(),
         row.getCategory(),

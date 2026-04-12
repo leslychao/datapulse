@@ -12,19 +12,19 @@ const routes: Routes = [
         path: 'events',
         loadComponent: () =>
           import('./alert-events-page.component').then((m) => m.AlertEventsPageComponent),
-        data: { breadcrumb: 'Алерты' },
+        data: { breadcrumb: 'breadcrumb.alerts.events' },
       },
       {
         path: 'events/:eventId',
         loadComponent: () =>
           import('./alert-events-page.component').then((m) => m.AlertEventsPageComponent),
-        data: { breadcrumb: 'Алерты' },
+        data: { breadcrumb: 'breadcrumb.alerts.events' },
       },
       {
         path: 'notifications',
         loadComponent: () =>
           import('./notifications-page.component').then((m) => m.NotificationsPageComponent),
-        data: { breadcrumb: 'Уведомления' },
+        data: { breadcrumb: 'breadcrumb.alerts.notifications' },
       },
     ],
   },

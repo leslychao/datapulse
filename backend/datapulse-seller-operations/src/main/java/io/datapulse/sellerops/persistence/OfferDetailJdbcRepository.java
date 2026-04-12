@@ -24,6 +24,7 @@ public class OfferDetailJdbcRepository {
           ss.sku_code,
           mo.name                     AS product_name,
           mc.marketplace_type,
+          mc.id                       AS connection_id,
           mc.name                     AS connection_name,
           mo.status,
           cat.name                    AS category,
@@ -176,6 +177,7 @@ public class OfferDetailJdbcRepository {
         .skuCode(rs.getString("sku_code"))
         .productName(rs.getString("product_name"))
         .marketplaceType(rs.getString("marketplace_type"))
+        .connectionId(rs.getLong("connection_id"))
         .connectionName(rs.getString("connection_name"))
         .status(rs.getString("status"))
         .category(rs.getString("category"))

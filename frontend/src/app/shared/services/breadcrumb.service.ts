@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { TranslateService } from '@ngx-translate/core';
 
 export interface BreadcrumbSegment {
   label: string;
@@ -11,6 +12,7 @@ export interface BreadcrumbSegment {
 export class BreadcrumbService {
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly translate = inject(TranslateService);
 
   readonly segments = signal<BreadcrumbSegment[]>([]);
 
@@ -34,9 +36,11 @@ export class BreadcrumbService {
       if (pathSegments.length > 0) {
         url += '/' + pathSegments.join('/');
       }
-      if (route.snapshot.data['breadcrumb'] && pathSegments.length > 0) {
+      const key = route.snapshot.data['breadcrumb'] as string | undefined;
+      if (key && pathSegments.length > 0) {
+        const translated = this.translate.instant(key);
         segments.push({
-          label: route.snapshot.data['breadcrumb'] as string,
+          label: translated !== key ? translated : key,
           route: url,
         });
       }

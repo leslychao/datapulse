@@ -9,8 +9,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * For WB Finance {@code rrdid}-based cursor (1 endpoint: reportDetailByPeriod).
- * Reads the last 32 KB of the temp file and finds the last occurrence of {@code "rrd_id"}.
+ * Reads the last 32 KB of the temp file and finds the last occurrence of a JSON field.
+ * Supports numeric fields ({@code rrd_id}) and string fields ({@code lastChangeDate}).
  * Overhead: < 1 ms (direct seek + regex on small tail chunk).
  */
 public final class TailFieldExtractor implements CursorExtractor {
@@ -19,15 +19,26 @@ public final class TailFieldExtractor implements CursorExtractor {
 
     private final Pattern fieldPattern;
 
-    public TailFieldExtractor(String fieldName) {
-        this.fieldPattern = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*(\\d+)");
+    private TailFieldExtractor(Pattern fieldPattern) {
+        this.fieldPattern = fieldPattern;
     }
 
-    /**
-     * Creates extractor for WB Finance {@code rrd_id} field.
-     */
     public static TailFieldExtractor wbRrdId() {
-        return new TailFieldExtractor("rrd_id");
+        return numeric("rrd_id");
+    }
+
+    public static TailFieldExtractor wbLastChangeDate() {
+        return stringField("lastChangeDate");
+    }
+
+    static TailFieldExtractor numeric(String fieldName) {
+        return new TailFieldExtractor(
+            Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*(\\d+)"));
+    }
+
+    static TailFieldExtractor stringField(String fieldName) {
+        return new TailFieldExtractor(
+            Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*\"([^\"]+)\""));
     }
 
     @Override

@@ -367,8 +367,15 @@ Resolved to `seller_sku` via: `nmId` → `marketplace_offer.marketplace_sku` →
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
 | Type | Date-range (`dateFrom` parameter) + `flag` parameter | confirmed |
-| `flag=0` | Return data updated since `dateFrom` | confirmed-docs |
-| `flag=1` | Return data created since `dateFrom` | confirmed-docs |
+| `flag=0` | Return data where `lastChangeDate >= dateFrom` | confirmed-docs |
+| `flag=1` | Return all data for the specific date in `dateFrom` (time ignored) | confirmed-docs |
+| Record limit | ~80,000 rows per response | confirmed-docs |
+| Cursor strategy | Use `lastChangeDate` from last row as next `dateFrom` | confirmed-docs |
+| Termination | Empty array `[]` (0 bytes) | confirmed-docs |
+| Data freshness | Updated every 30 minutes | confirmed-docs |
+| Data retention | 90 days from sale date | confirmed-docs |
+
+**Pagination is required** for `flag=0`. The API returns up to ~80,000 rows per response. For subsequent pages, use the full `lastChangeDate` value from the last row of the previous response as the new `dateFrom`. Continue until the API returns an empty array. Idempotent upsert handles duplicate rows at page boundaries (same `lastChangeDate` may appear in both pages).
 
 ### Identifier Semantics
 
@@ -421,7 +428,10 @@ Resolved to `seller_sku` via: `nmId` → `marketplace_offer.marketplace_sku` →
 - 1 request per minute (confirmed-docs)
 - Statistics token required (confirmed)
 - Row = 1 unit of goods (1 order can have multiple rows) (confirmed-docs)
-- Historical data availability window not documented (unknown)
+- Data retained for max 90 days from sale date (confirmed-docs)
+- ~80,000 rows per response — pagination via `lastChangeDate` required (confirmed-docs)
+- Data is preliminary, updated every 30 minutes (confirmed-docs)
+- Does not include orders with unconfirmed payments (delayed/installment) (confirmed-docs)
 - Returns empty/null for accounts without orders (confirmed)
 
 ### Rate Limits
@@ -451,7 +461,15 @@ Resolved to `seller_sku` via: `nmId` → `marketplace_offer.marketplace_sku` →
 | Свойство | Значение | Confidence |
 |----------|----------|------------|
 | Type | Date-range (`dateFrom`) + `flag` parameter | confirmed |
-| Same semantics as Orders | `flag=0` updated since, `flag=1` created since | confirmed-docs |
+| `flag=0` | Return data where `lastChangeDate >= dateFrom` | confirmed-docs |
+| `flag=1` | Return all data for the specific date in `dateFrom` (time ignored) | confirmed-docs |
+| Record limit | ~80,000 rows per response | confirmed-docs |
+| Cursor strategy | Use `lastChangeDate` from last row as next `dateFrom` | confirmed-docs |
+| Termination | Empty array `[]` (0 bytes) | confirmed-docs |
+| Data freshness | Updated every 30 minutes | confirmed-docs |
+| Data retention | 90 days from sale date | confirmed-docs |
+
+**Same pagination pattern as Orders** — see Orders section for details.
 
 ### Identifier Semantics — SANDBOX VERIFIED
 
@@ -506,8 +524,12 @@ Resolved to `seller_sku` via: `nmId` → `marketplace_offer.marketplace_sku` →
 
 - 1 request per minute (confirmed-docs)
 - Statistics token required (confirmed)
+- ~80,000 rows per response — pagination via `lastChangeDate` required (confirmed-docs)
+- Data retained for max 90 days from sale date (confirmed-docs)
+- Data is preliminary, updated every 30 minutes (confirmed-docs)
 - Returns mixed with sales via `saleID` prefix semantics (confirmed-docs)
 - Exact meaning of `spp` computation not fully transparent (assumed)
+- Does not include orders with unconfirmed payments (confirmed-docs)
 - Returns empty/null for accounts without sales (confirmed)
 
 ### Rate Limits
@@ -881,8 +903,8 @@ had `sale_dt` populated with ISO 8601 datetime. Storage/penalty entry types not 
 | CATALOG | **READY** | All fields sandbox-verified: nmID, vendorCode, brand, title, sizes, dimensions, timestamps |
 | PRICES | **READY** | All fields sandbox-verified: per-size pricing, discountedPrice, clubDiscountedPrice, currency explicit |
 | STOCKS | PARTIAL | No warehouses in sandbox; endpoint confirmed but field names unverified with data |
-| ORDERS | **READY** | Sandbox-verified: totalPrice, discountPercent, priceWithDisc, isCancel, cancelDate, srid |
-| SALES | **READY** | Sandbox-verified: forPay, finishedPrice, priceWithDisc, saleID prefix, spp |
+| ORDERS | **READY** | Sandbox-verified: totalPrice, discountPercent, priceWithDisc, isCancel, cancelDate, srid. Pagination via lastChangeDate (80K row limit) |
+| SALES | **READY** | Sandbox-verified: forPay, finishedPrice, priceWithDisc, saleID prefix, spp. Pagination via lastChangeDate (80K row limit) |
 | RETURNS | **READY** | Unblocked: date-only format required; response schema confirmed from official docs; no return data in test account |
 | FINANCES | **READY** | Sandbox-verified + official docs: sign convention confirmed (all positive), delivery_rub=20 in sandbox |
 

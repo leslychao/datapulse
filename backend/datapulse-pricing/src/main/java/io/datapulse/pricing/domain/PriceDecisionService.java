@@ -11,10 +11,12 @@ import io.datapulse.pricing.persistence.PricingRunReadRepository;
 import io.datapulse.pricing.persistence.PricingRunReadRepository.OfferInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -44,8 +46,7 @@ public class PriceDecisionService {
                 .orElseThrow(() -> NotFoundException.entity("PriceDecision", decisionId));
         PriceDecisionResponse response = decisionMapper.toResponse(entity);
         Page<PriceDecisionResponse> enriched = enrichDecisions(
-                new org.springframework.data.domain.PageImpl<>(
-                        java.util.List.of(response)));
+                new PageImpl<>(List.of(response)));
         return enriched.getContent().get(0);
     }
 

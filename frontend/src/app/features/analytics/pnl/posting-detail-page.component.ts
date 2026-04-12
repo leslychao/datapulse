@@ -5,6 +5,7 @@ import {
   inject,
   input,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
@@ -41,7 +42,7 @@ const MEASURE_COLUMNS: MeasureColumn[] = [
   selector: 'dp-posting-detail-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, MarketplaceBadgeComponent],
+  imports: [DatePipe, TranslatePipe, MarketplaceBadgeComponent],
   templateUrl: './posting-detail-page.component.html',
 })
 export class PostingDetailPageComponent {

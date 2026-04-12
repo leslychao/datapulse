@@ -12,7 +12,7 @@ const routes: Routes = [
       import('./campaigns-page.component').then(
         (m) => m.CampaignsPageComponent,
       ),
-    data: { breadcrumb: 'Кампании' },
+    data: { breadcrumb: 'breadcrumb.advertising.campaigns' },
   },
 ];
 

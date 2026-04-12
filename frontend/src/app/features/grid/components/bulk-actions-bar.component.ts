@@ -210,7 +210,7 @@ import { CostUpdatePanelComponent } from './cost-update-panel.component';
         <input
           type="number"
           [(ngModel)]="bidAssignPolicyId"
-          placeholder="ID стратегии"
+          [placeholder]="'grid.bulk.bid_policy_id_placeholder' | translate"
           class="h-9 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
         />
       </div>

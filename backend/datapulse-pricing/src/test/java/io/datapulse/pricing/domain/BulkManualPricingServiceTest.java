@@ -3,6 +3,7 @@ package io.datapulse.pricing.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -308,7 +309,8 @@ class BulkManualPricingServiceTest {
       verify(decisionRepository).saveAll(decisionsCaptor.capture());
       assertThat(decisionsCaptor.getValue()).hasSize(1);
       verify(actionScheduler).scheduleAction(
-          anyLong(), eq(100L), any(), eq(ExecutionMode.FULL_AUTO), eq(WORKSPACE_ID));
+          anyLong(), eq(100L), any(), any(), eq(ExecutionMode.FULL_AUTO),
+          anyLong(), eq(WORKSPACE_ID), anyInt());
     }
 
     @Test

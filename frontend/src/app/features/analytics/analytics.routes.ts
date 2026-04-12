@@ -32,7 +32,7 @@ const routes: Routes = [
           import('./pnl/pnl-summary-page.component').then(
             (m) => m.PnlSummaryPageComponent,
           ),
-        data: { breadcrumb: 'Сводка', section: 'pnl' },
+        data: { breadcrumb: 'breadcrumb.analytics.summary', section: 'pnl' },
       },
       {
         path: 'pnl/by-product',
@@ -40,7 +40,7 @@ const routes: Routes = [
           import('./pnl/pnl-by-product-page.component').then(
             (m) => m.PnlByProductPageComponent,
           ),
-        data: { breadcrumb: 'По товарам', section: 'pnl' },
+        data: { breadcrumb: 'breadcrumb.analytics.by_product', section: 'pnl' },
       },
       {
         path: 'pnl/by-posting',
@@ -48,7 +48,7 @@ const routes: Routes = [
           import('./pnl/pnl-by-posting-page.component').then(
             (m) => m.PnlByPostingPageComponent,
           ),
-        data: { breadcrumb: 'По отправкам', section: 'pnl' },
+        data: { breadcrumb: 'breadcrumb.analytics.by_posting', section: 'pnl' },
       },
       {
         path: 'pnl/posting/:postingId',
@@ -56,7 +56,7 @@ const routes: Routes = [
           import('./pnl/posting-detail-page.component').then(
             (m) => m.PostingDetailPageComponent,
           ),
-        data: { breadcrumb: 'Детали', section: 'pnl' },
+        data: { breadcrumb: 'breadcrumb.analytics.details', section: 'pnl' },
       },
       {
         path: 'pnl/trend',
@@ -64,7 +64,7 @@ const routes: Routes = [
           import('./pnl/pnl-trend-page.component').then(
             (m) => m.PnlTrendPageComponent,
           ),
-        data: { breadcrumb: 'Тренд', section: 'pnl' },
+        data: { breadcrumb: 'breadcrumb.analytics.trend', section: 'pnl' },
       },
 
       // Inventory
@@ -75,7 +75,7 @@ const routes: Routes = [
           import('./inventory/inventory-overview-page.component').then(
             (m) => m.InventoryOverviewPageComponent,
           ),
-        data: { breadcrumb: 'Обзор', section: 'inventory' },
+        data: { breadcrumb: 'breadcrumb.analytics.overview', section: 'inventory' },
       },
       {
         path: 'inventory/by-product',
@@ -83,7 +83,7 @@ const routes: Routes = [
           import('./inventory/inventory-by-product-page.component').then(
             (m) => m.InventoryByProductPageComponent,
           ),
-        data: { breadcrumb: 'По товарам', section: 'inventory' },
+        data: { breadcrumb: 'breadcrumb.analytics.by_product', section: 'inventory' },
       },
       {
         path: 'inventory/stock-history',
@@ -91,7 +91,7 @@ const routes: Routes = [
           import('./inventory/stock-history-page.component').then(
             (m) => m.StockHistoryPageComponent,
           ),
-        data: { breadcrumb: 'История', section: 'inventory' },
+        data: { breadcrumb: 'breadcrumb.analytics.history', section: 'inventory' },
       },
 
       // Returns
@@ -102,7 +102,7 @@ const routes: Routes = [
           import('./returns/returns-overview-page.component').then(
             (m) => m.ReturnsOverviewPageComponent,
           ),
-        data: { breadcrumb: 'Обзор', section: 'returns' },
+        data: { breadcrumb: 'breadcrumb.analytics.overview', section: 'returns' },
       },
       {
         path: 'returns/by-product',
@@ -110,7 +110,7 @@ const routes: Routes = [
           import('./returns/returns-by-product-page.component').then(
             (m) => m.ReturnsByProductPageComponent,
           ),
-        data: { breadcrumb: 'Товары', section: 'returns' },
+        data: { breadcrumb: 'breadcrumb.analytics.products', section: 'returns' },
       },
       {
         path: 'returns/reasons',
@@ -118,7 +118,7 @@ const routes: Routes = [
           import('./returns/returns-reasons-page.component').then(
             (m) => m.ReturnsReasonsPageComponent,
           ),
-        data: { breadcrumb: 'Причины', section: 'returns' },
+        data: { breadcrumb: 'breadcrumb.analytics.reasons', section: 'returns' },
       },
 
       // Data Quality
@@ -129,7 +129,7 @@ const routes: Routes = [
           import('./data-quality/data-quality-status-page.component').then(
             (m) => m.DataQualityStatusPageComponent,
           ),
-        data: { breadcrumb: 'Обзор', section: 'data-quality' },
+        data: { breadcrumb: 'breadcrumb.analytics.overview', section: 'data-quality' },
       },
       {
         path: 'data-quality/reconciliation',
@@ -138,7 +138,7 @@ const routes: Routes = [
           import('./data-quality/reconciliation-page.component').then(
             (m) => m.ReconciliationPageComponent,
           ),
-        data: { breadcrumb: 'Reconciliation', section: 'data-quality' },
+        data: { breadcrumb: 'breadcrumb.analytics.reconciliation', section: 'data-quality' },
       },
     ],
   },

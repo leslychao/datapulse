@@ -11,7 +11,7 @@ const routes: Routes = [
       {
         path: ':queueId',
         component: QueueItemsPageComponent,
-        data: { breadcrumb: 'Очередь' },
+        data: { breadcrumb: 'breadcrumb.queues.queue' },
       },
     ],
   },

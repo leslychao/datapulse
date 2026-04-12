@@ -16,7 +16,7 @@ const routes: Routes = [
           import('./campaigns/campaign-list-page.component').then(
             (m) => m.CampaignListPageComponent,
           ),
-        data: { breadcrumb: 'Кампании' },
+        data: { breadcrumb: 'breadcrumb.promo.campaigns' },
       },
       {
         path: 'campaigns/:campaignId',
@@ -24,7 +24,7 @@ const routes: Routes = [
           import('./campaigns/campaign-detail-page.component').then(
             (m) => m.CampaignDetailPageComponent,
           ),
-        data: { breadcrumb: 'Детали кампании' },
+        data: { breadcrumb: 'breadcrumb.promo.campaign_detail' },
       },
       {
         path: 'policies',
@@ -32,7 +32,7 @@ const routes: Routes = [
           import('./policies/promo-policy-list-page.component').then(
             (m) => m.PromoPolicyListPageComponent,
           ),
-        data: { breadcrumb: 'Промо-политики' },
+        data: { breadcrumb: 'breadcrumb.promo.policies' },
       },
       {
         path: 'policies/new',
@@ -42,7 +42,7 @@ const routes: Routes = [
           ),
         canActivate: [promoWriteGuard],
         canDeactivate: [promoUnsavedChangesGuard],
-        data: { breadcrumb: 'Новая политика' },
+        data: { breadcrumb: 'breadcrumb.promo.new_policy' },
       },
       {
         path: 'policies/:policyId/edit',
@@ -52,7 +52,7 @@ const routes: Routes = [
           ),
         canActivate: [promoWriteGuard],
         canDeactivate: [promoUnsavedChangesGuard],
-        data: { breadcrumb: 'Редактирование' },
+        data: { breadcrumb: 'breadcrumb.promo.edit' },
       },
       {
         path: 'policies/:policyId/assignments',
@@ -60,7 +60,7 @@ const routes: Routes = [
           import('./policies/promo-policy-assignments-page.component').then(
             (m) => m.PromoPolicyAssignmentsPageComponent,
           ),
-        data: { breadcrumb: 'Назначения' },
+        data: { breadcrumb: 'breadcrumb.promo.assignments' },
       },
       {
         path: 'evaluations',
@@ -68,7 +68,7 @@ const routes: Routes = [
           import('./evaluations/evaluations-list-page.component').then(
             (m) => m.EvaluationsListPageComponent,
           ),
-        data: { breadcrumb: 'Оценки' },
+        data: { breadcrumb: 'breadcrumb.promo.evaluations' },
       },
       {
         path: 'decisions',
@@ -76,7 +76,7 @@ const routes: Routes = [
           import('./decisions/decisions-list-page.component').then(
             (m) => m.DecisionsListPageComponent,
           ),
-        data: { breadcrumb: 'Решения' },
+        data: { breadcrumb: 'breadcrumb.promo.decisions' },
       },
     ],
   },

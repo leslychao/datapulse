@@ -179,9 +179,12 @@ public class BulkManualPricingService {
             decisionRepository.saveAll(decisions);
             for (PriceDecisionEntity d : decisions) {
                 if (d.getDecisionType() == DecisionType.CHANGE) {
+                    EnrichedOfferRow offer = offers.get(d.getMarketplaceOfferId());
                     actionScheduler.scheduleAction(
                             d.getId(), d.getMarketplaceOfferId(), d.getTargetPrice(),
-                            ExecutionMode.FULL_AUTO, workspaceId);
+                            d.getCurrentPrice(), ExecutionMode.FULL_AUTO,
+                            offer != null ? offer.connectionId() : 0L,
+                            workspaceId, 72);
                 }
             }
         }

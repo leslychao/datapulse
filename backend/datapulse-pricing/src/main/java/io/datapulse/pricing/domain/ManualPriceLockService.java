@@ -54,7 +54,10 @@ public class ManualPriceLockService {
         log.info("Manual price lock created: id={}, offerId={}, workspaceId={}",
                 saved.getId(), request.marketplaceOfferId(), workspaceId);
 
-        return lockMapper.toResponse(saved);
+        ManualLockResponse response = lockMapper.toResponse(saved);
+        Page<ManualLockResponse> enriched = enrichLocks(
+                new PageImpl<>(List.of(response)));
+        return enriched.getContent().get(0);
     }
 
     @Transactional(readOnly = true)

@@ -12,7 +12,6 @@ import io.datapulse.etl.adapter.wb.dto.WbReturnItem;
 import io.datapulse.etl.adapter.wb.dto.WbSaleItem;
 import io.datapulse.etl.domain.CanonicalEntityMapper;
 import io.datapulse.etl.domain.CaptureContextFactory;
-import io.datapulse.etl.domain.CaptureResult;
 import io.datapulse.etl.domain.EtlEventType;
 import io.datapulse.etl.domain.EventSource;
 import io.datapulse.etl.domain.IngestContext;
@@ -58,23 +57,23 @@ public class WbSalesFactSource implements EventSource {
         List<SubSourceResult> results = new ArrayList<>();
 
         var ordersCtx = CaptureContextFactory.build(ctx, eventType(), "WbOrdersReadAdapter");
-        CaptureResult ordersPage = ordersAdapter.capturePage(ordersCtx, token, dateFrom, 0);
+        var ordersPages = ordersAdapter.captureAllPages(ordersCtx, token, dateFrom, 0);
         results.add(subSourceRunner.processPages(
-                "WbOrdersReadAdapter", List.of(ordersPage), WbOrderItem.class,
+                "WbOrdersReadAdapter", ordersPages, WbOrderItem.class,
                 batch -> orderRepo.batchUpsert(batch.stream()
                         .map(item -> mapper.toOrder(normalizer.normalizeOrder(item), ctx))
                         .toList())));
 
         var salesCtx = CaptureContextFactory.build(ctx, eventType(), "WbSalesReadAdapter");
-        CaptureResult salesPage = salesAdapter.capturePage(salesCtx, token, dateFrom, 0);
+        var salesPages = salesAdapter.captureAllPages(salesCtx, token, dateFrom, 0);
         results.add(subSourceRunner.processPages(
-                "WbSalesReadAdapter", List.of(salesPage), WbSaleItem.class,
+                "WbSalesReadAdapter", salesPages, WbSaleItem.class,
                 batch -> saleRepo.batchUpsert(batch.stream()
                         .map(item -> mapper.toSale(normalizer.normalizeSale(item), ctx))
                         .toList())));
 
         var returnsCtx = CaptureContextFactory.build(ctx, eventType(), "WbReturnsReadAdapter");
-        CaptureResult returnsPage = returnsAdapter.capturePage(returnsCtx, token, dateFrom, dateTo);
+        var returnsPage = returnsAdapter.capturePage(returnsCtx, token, dateFrom, dateTo);
         results.add(subSourceRunner.processPages(
                 "WbReturnsReadAdapter", List.of(returnsPage), WbReturnItem.class,
                 batch -> returnRepo.batchUpsert(batch.stream()

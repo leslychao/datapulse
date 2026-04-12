@@ -126,12 +126,12 @@ public class PricingRunReadRepository {
         }
 
         if (filter.status() != null && !filter.status().isEmpty()) {
-            where.append(" AND r.status IN :statuses");
+            where.append(" AND r.status IN (:statuses)");
             params.put("statuses", filter.status());
         }
 
         if (filter.triggerType() != null && !filter.triggerType().isEmpty()) {
-            where.append(" AND r.triggerType IN :triggerTypes");
+            where.append(" AND r.triggerType IN (:triggerTypes)");
             params.put("triggerTypes", filter.triggerType());
         }
 

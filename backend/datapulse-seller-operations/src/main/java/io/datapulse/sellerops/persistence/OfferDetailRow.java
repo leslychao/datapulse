@@ -19,6 +19,7 @@ public class OfferDetailRow {
   private String skuCode;
   private String productName;
   private String marketplaceType;
+  private long connectionId;
   private String connectionName;
   private String status;
   private String category;

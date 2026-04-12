@@ -33,7 +33,7 @@
         </div>
         <div>
           <span class="text-[var(--text-secondary)]">{{ 'analytics.pnl.col.date' | translate }}:</span>
-          <span class="ml-1">{{ d.financeDate }}</span>
+          <span class="ml-1">{{ d.financeDate | date:'dd.MM.yyyy' }}</span>
         </div>
       </div>
     </div>

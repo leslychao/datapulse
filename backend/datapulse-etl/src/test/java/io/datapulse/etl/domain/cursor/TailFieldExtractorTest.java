@@ -32,7 +32,7 @@ class TailFieldExtractorTest {
 
     @Test
     void should_returnEmpty_when_fieldNotFound() throws IOException {
-      var extractor = new TailFieldExtractor("rrd_id");
+      var extractor = TailFieldExtractor.wbRrdId();
       Path file = writeContent("""
           [{"amount": 10}, {"amount": 20}]""");
 
@@ -46,6 +46,50 @@ class TailFieldExtractorTest {
           [{"rrd_id": 42}]""");
 
       assertThat(extractor.extract(file)).hasValue("42");
+    }
+  }
+
+  @Nested
+  @DisplayName("wbLastChangeDate()")
+  class WbLastChangeDate {
+
+    @Test
+    void should_extractLastChangeDate_fromOrdersResponse() throws IOException {
+      var extractor = TailFieldExtractor.wbLastChangeDate();
+      Path file = writeContent("""
+          [{"srid":"abc","lastChangeDate":"2025-12-01T07:51:35Z","nmId":100},
+           {"srid":"def","lastChangeDate":"2025-12-01T12:54:35Z","nmId":200}]""");
+
+      assertThat(extractor.extract(file)).hasValue("2025-12-01T12:54:35Z");
+    }
+
+    @Test
+    void should_extractLastChangeDate_fromSalesResponse() throws IOException {
+      var extractor = TailFieldExtractor.wbLastChangeDate();
+      Path file = writeContent("""
+          [{"saleID":"S123","lastChangeDate":"2026-01-15T10:00:00Z","forPay":100.5},
+           {"saleID":"S124","lastChangeDate":"2026-01-15T14:30:00Z","forPay":200.0},
+           {"saleID":"S125","lastChangeDate":"2026-01-15T18:45:22Z","forPay":50.0}]""");
+
+      assertThat(extractor.extract(file)).hasValue("2026-01-15T18:45:22Z");
+    }
+
+    @Test
+    void should_returnEmpty_when_noLastChangeDate() throws IOException {
+      var extractor = TailFieldExtractor.wbLastChangeDate();
+      Path file = writeContent("""
+          [{"srid":"abc","nmId":100}]""");
+
+      assertThat(extractor.extract(file)).isEmpty();
+    }
+
+    @Test
+    void should_handleDateWithMilliseconds() throws IOException {
+      var extractor = TailFieldExtractor.wbLastChangeDate();
+      Path file = writeContent("""
+          [{"lastChangeDate":"2026-03-10T08:15:30.123Z"}]""");
+
+      assertThat(extractor.extract(file)).hasValue("2026-03-10T08:15:30.123Z");
     }
   }
 

@@ -52,7 +52,7 @@ export const routes: Routes = [
       {
         path: 'grid',
         loadChildren: () => import('./features/grid/grid.routes'),
-        data: { breadcrumb: 'Операции' },
+        data: { breadcrumb: 'breadcrumb.operations' },
       },
       {
         path: 'catalog',
@@ -62,27 +62,27 @@ export const routes: Routes = [
       {
         path: 'analytics',
         loadChildren: () => import('./features/analytics/analytics.routes'),
-        data: { breadcrumb: 'Аналитика' },
+        data: { breadcrumb: 'breadcrumb.analytics' },
       },
       {
         path: 'pricing',
         loadChildren: () => import('./features/pricing/pricing.routes'),
-        data: { breadcrumb: 'Ценообразование' },
+        data: { breadcrumb: 'breadcrumb.pricing' },
       },
       {
         path: 'promo',
         loadChildren: () => import('./features/promo/promo.routes'),
-        data: { breadcrumb: 'Промо' },
+        data: { breadcrumb: 'breadcrumb.promo' },
       },
       {
         path: 'advertising',
         loadChildren: () => import('./features/advertising/advertising.routes'),
-        data: { breadcrumb: 'Реклама' },
+        data: { breadcrumb: 'breadcrumb.advertising' },
       },
       {
         path: 'bidding',
         loadChildren: () => import('./features/bidding/bidding.routes'),
-        data: { breadcrumb: 'Автобиддинг' },
+        data: { breadcrumb: 'breadcrumb.bidding' },
       },
       {
         path: 'execution/actions/:actionId',
@@ -107,22 +107,22 @@ export const routes: Routes = [
       {
         path: 'mismatches',
         loadChildren: () => import('./features/mismatches/mismatches.routes'),
-        data: { breadcrumb: 'Расхождения' },
+        data: { breadcrumb: 'breadcrumb.mismatches' },
       },
       {
         path: 'queues',
         loadChildren: () => import('./features/queues/queues.routes'),
-        data: { breadcrumb: 'Очереди' },
+        data: { breadcrumb: 'breadcrumb.queues' },
       },
       {
         path: 'alerts',
         loadChildren: () => import('./features/alerts/alerts.routes'),
-        data: { breadcrumb: 'Алерты' },
+        data: { breadcrumb: 'breadcrumb.alerts' },
       },
       {
         path: 'settings',
         loadChildren: () => import('./features/settings/settings.routes'),
-        data: { breadcrumb: 'Настройки' },
+        data: { breadcrumb: 'breadcrumb.settings' },
       },
     ],
   },

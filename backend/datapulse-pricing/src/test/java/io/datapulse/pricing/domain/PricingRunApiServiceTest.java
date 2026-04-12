@@ -222,7 +222,7 @@ class PricingRunApiServiceTest {
     @Test
     @DisplayName("delegates to read repo, enriches with connection names and simulated counts")
     void should_delegateToReadRepo_when_listing() {
-      PricingRunFilter filter = new PricingRunFilter(null, null, null, null);
+      PricingRunFilter filter = new PricingRunFilter(null, null, null, null, null);
       Pageable pageable = PageRequest.of(0, 20);
       var entity = new PricingRunEntity();
       entity.setId(1L);

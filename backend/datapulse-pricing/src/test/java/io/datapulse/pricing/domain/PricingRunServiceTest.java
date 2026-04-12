@@ -530,7 +530,7 @@ class PricingRunServiceTest {
       pricingRunService.executeRun(1L);
 
       verify(actionScheduler, never()).scheduleAction(
-          anyLong(), anyLong(), any(), any(), anyLong());
+          anyLong(), anyLong(), any(), any(), any(), anyLong(), anyLong(), anyInt());
     }
 
     @Test
@@ -560,7 +560,8 @@ class PricingRunServiceTest {
       pricingRunService.executeRun(1L);
 
       verify(actionScheduler).scheduleAction(
-          anyLong(), eq(100L), any(), eq(ExecutionMode.SEMI_AUTO), eq(10L));
+          anyLong(), eq(100L), any(), any(), eq(ExecutionMode.SEMI_AUTO),
+          anyLong(), eq(10L), anyInt());
     }
   }
 

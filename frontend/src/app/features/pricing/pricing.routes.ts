@@ -16,7 +16,7 @@ const routes: Routes = [
           import('./policies/policy-list-page.component').then(
             (m) => m.PolicyListPageComponent,
           ),
-        data: { breadcrumb: 'Ценовые политики' },
+        data: { breadcrumb: 'breadcrumb.pricing.policies' },
       },
       {
         path: 'policies/new',
@@ -26,7 +26,7 @@ const routes: Routes = [
           import('./policies/policy-form-page.component').then(
             (m) => m.PolicyFormPageComponent,
           ),
-        data: { breadcrumb: 'Новая политика' },
+        data: { breadcrumb: 'breadcrumb.pricing.new_policy' },
       },
       {
         path: 'policies/:policyId/edit',
@@ -36,7 +36,7 @@ const routes: Routes = [
           import('./policies/policy-form-page.component').then(
             (m) => m.PolicyFormPageComponent,
           ),
-        data: { breadcrumb: 'Редактирование' },
+        data: { breadcrumb: 'breadcrumb.pricing.edit' },
       },
       {
         path: 'runs',
@@ -44,7 +44,7 @@ const routes: Routes = [
           import('./runs/runs-list-page.component').then(
             (m) => m.RunsListPageComponent,
           ),
-        data: { breadcrumb: 'Прогоны' },
+        data: { breadcrumb: 'breadcrumb.pricing.runs' },
       },
       {
         path: 'runs/:runId',
@@ -52,7 +52,7 @@ const routes: Routes = [
           import('./runs/run-detail-page.component').then(
             (m) => m.RunDetailPageComponent,
           ),
-        data: { breadcrumb: 'Детали прогона' },
+        data: { breadcrumb: 'breadcrumb.pricing.run_detail' },
       },
       {
         path: 'decisions',
@@ -60,7 +60,7 @@ const routes: Routes = [
           import('./decisions/decisions-list-page.component').then(
             (m) => m.DecisionsListPageComponent,
           ),
-        data: { breadcrumb: 'Решения' },
+        data: { breadcrumb: 'breadcrumb.pricing.decisions' },
       },
       {
         path: 'decisions/:decisionId',
@@ -68,7 +68,7 @@ const routes: Routes = [
           import('./decisions/decision-detail-page.component').then(
             (m) => m.DecisionDetailPageComponent,
           ),
-        data: { breadcrumb: 'Решение' },
+        data: { breadcrumb: 'breadcrumb.pricing.decision' },
       },
       {
         path: 'price-actions',
@@ -76,7 +76,7 @@ const routes: Routes = [
           import('../execution/actions-list-page.component').then(
             (m) => m.ActionsListPageComponent,
           ),
-        data: { breadcrumb: 'Применение цен' },
+        data: { breadcrumb: 'breadcrumb.pricing.price_actions' },
       },
       {
         path: 'price-actions/:actionId',
@@ -84,7 +84,7 @@ const routes: Routes = [
           import('../execution/action-detail-page.component').then(
             (m) => m.ActionDetailPageComponent,
           ),
-        data: { breadcrumb: 'Детали действия' },
+        data: { breadcrumb: 'breadcrumb.pricing.action_detail' },
       },
       {
         path: 'simulation',
@@ -92,7 +92,7 @@ const routes: Routes = [
           import('../execution/simulation-page.component').then(
             (m) => m.SimulationPageComponent,
           ),
-        data: { breadcrumb: 'Симуляция' },
+        data: { breadcrumb: 'breadcrumb.pricing.simulation' },
       },
       {
         path: 'locks',
@@ -100,7 +100,7 @@ const routes: Routes = [
           import('./locks/locks-page.component').then(
             (m) => m.LocksPageComponent,
           ),
-        data: { breadcrumb: 'Блокировки' },
+        data: { breadcrumb: 'breadcrumb.pricing.locks' },
       },
       {
         path: 'competitors',
@@ -108,7 +108,7 @@ const routes: Routes = [
           import('./competitors/competitors-page.component').then(
             (m) => m.CompetitorsPageComponent,
           ),
-        data: { breadcrumb: 'Конкуренты' },
+        data: { breadcrumb: 'breadcrumb.pricing.competitors' },
       },
       {
         path: 'insights',
@@ -116,7 +116,7 @@ const routes: Routes = [
           import('./insights/insights-page.component').then(
             (m) => m.InsightsPageComponent,
           ),
-        data: { breadcrumb: 'Инсайты' },
+        data: { breadcrumb: 'breadcrumb.pricing.insights' },
       },
     ],
   },
