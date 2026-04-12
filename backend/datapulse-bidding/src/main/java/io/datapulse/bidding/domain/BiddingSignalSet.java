@@ -21,7 +21,7 @@ import java.math.BigDecimal;
  * @param leadersBid            leaders' bid (marketplace-native units)
  * @param minBid                marketplace minimum allowed bid (marketplace-native units)
  * @param previousDecisionType  decision type from the most recent bidding run (nullable)
- * @param daysSinceLastChange   days since the bid was last changed (nullable)
+ * @param hoursSinceLastChange  hours since the bid was last changed (nullable)
  * @param campaignStatus        status of the advertising campaign
  * @param bidUnit               unit of bid values: KOPECKS (WB/Ozon) or PERCENT_X100 (Yandex)
  */
@@ -40,7 +40,7 @@ public record BiddingSignalSet(
     Integer leadersBid,
     Integer minBid,
     BidDecisionType previousDecisionType,
-    Integer daysSinceLastChange,
+    Integer hoursSinceLastChange,
     String campaignStatus,
     BidUnit bidUnit
 ) {

@@ -53,7 +53,7 @@ public class LaunchTransitionListener {
     newAssignment.setBidPolicyId(newPolicy.getId());
     newAssignment.setWorkspaceId(event.workspaceId());
     newAssignment.setMarketplaceOfferId(event.marketplaceOfferId());
-    newAssignment.setAssignmentScope(AssignmentScope.OFFER);
+    newAssignment.setAssignmentScope(AssignmentScope.PRODUCT);
     assignmentRepository.save(newAssignment);
 
     log.info("Launch transition: offerId={} moved from policy={} to policy={} ({})",

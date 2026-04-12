@@ -55,7 +55,7 @@ public class BiddingDashboardReadRepository {
           COUNT(*) FILTER (WHERE status = 'PAUSED') AS paused
       FROM bidding_run
       WHERE workspace_id = :workspaceId
-        AND created_at >= now() - interval '7 days'
+        AND started_at >= now() - interval '7 days'
       """;
 
   private static final String TOP_HIGH_DRR = """
@@ -65,7 +65,7 @@ public class BiddingDashboardReadRepository {
           bp.strategy_type,
           bd.decision_type AS last_decision_type,
           bd.current_bid,
-          bd.drr_pct
+          (bd.signal_snapshot->>'drrPct')::numeric AS drr_pct
       FROM bid_decision bd
       JOIN (
           SELECT marketplace_offer_id, MAX(id) AS max_id
@@ -76,8 +76,8 @@ public class BiddingDashboardReadRepository {
       ) latest ON bd.id = latest.max_id
       JOIN marketplace_offer mo ON mo.id = bd.marketplace_offer_id
       JOIN bid_policy bp ON bp.id = bd.bid_policy_id
-      WHERE bd.drr_pct IS NOT NULL
-      ORDER BY bd.drr_pct DESC
+      WHERE bd.signal_snapshot->>'drrPct' IS NOT NULL
+      ORDER BY (bd.signal_snapshot->>'drrPct')::numeric DESC
       LIMIT :limit
       """;
 
@@ -88,7 +88,7 @@ public class BiddingDashboardReadRepository {
           bp.strategy_type,
           bd.decision_type AS last_decision_type,
           bd.current_bid,
-          bd.drr_pct
+          (bd.signal_snapshot->>'drrPct')::numeric AS drr_pct
       FROM bid_decision bd
       JOIN (
           SELECT marketplace_offer_id, MAX(id) AS max_id
@@ -100,7 +100,7 @@ public class BiddingDashboardReadRepository {
       ) latest ON bd.id = latest.max_id
       JOIN marketplace_offer mo ON mo.id = bd.marketplace_offer_id
       JOIN bid_policy bp ON bp.id = bd.bid_policy_id
-      ORDER BY bd.drr_pct ASC NULLS LAST
+      ORDER BY (bd.signal_snapshot->>'drrPct')::numeric ASC NULLS LAST
       LIMIT :limit
       """;
 

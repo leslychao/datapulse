@@ -61,8 +61,8 @@ public class BiddingSignalCollector {
 
     BidDecisionType previousDecisionType =
         resolvePreviousDecisionType(lastDecision);
-    Integer daysSinceLastChange =
-        resolveDaysSinceLastChange(lastDecision);
+    Integer hoursSinceLastChange =
+        resolveHoursSinceLastChange(lastDecision);
 
     BidReadResult bidInfo = readLiveBids(
         campaign, marketplaceSku, connectionId);
@@ -84,7 +84,7 @@ public class BiddingSignalCollector {
         bidInfo.leadersBid(),
         bidInfo.minBid(),
         previousDecisionType,
-        daysSinceLastChange,
+        hoursSinceLastChange,
         campaign != null ? campaign.status() : null,
         bidUnit
     );
@@ -152,11 +152,11 @@ public class BiddingSignalCollector {
     }
   }
 
-  private Integer resolveDaysSinceLastChange(BidDecisionRow row) {
+  private Integer resolveHoursSinceLastChange(BidDecisionRow row) {
     if (row == null || row.createdAt() == null) {
       return null;
     }
-    long days = ChronoUnit.DAYS.between(row.createdAt(), Instant.now());
-    return (int) days;
+    long hours = ChronoUnit.HOURS.between(row.createdAt(), Instant.now());
+    return (int) hours;
   }
 }

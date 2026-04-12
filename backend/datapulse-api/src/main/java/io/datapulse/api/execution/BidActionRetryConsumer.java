@@ -30,10 +30,18 @@ public class BidActionRetryConsumer {
         return;
       }
 
-      int attemptNumber = payload.path("attemptNumber").asInt(1);
-      log.info("Processing bid action retry: bidActionId={}, attempt={}",
-          bidActionId, attemptNumber);
-      executor.execute(bidActionId);
+      String eventType = payload.path("eventType").asText("");
+
+      if ("RECONCILE".equals(eventType)) {
+        log.info("Processing bid action reconciliation: bidActionId={}",
+            bidActionId);
+        executor.reconcile(bidActionId);
+      } else {
+        int attemptNumber = payload.path("attemptNumber").asInt(1);
+        log.info("Processing bid action retry: bidActionId={}, attempt={}",
+            bidActionId, attemptNumber);
+        executor.execute(bidActionId);
+      }
     } catch (Exception e) {
       log.error("Poison pill detected in bid.execution.wait queue: "
               + "messageId={}, error={}",

@@ -3698,6 +3698,33 @@
   "bidding.decisions.guards.allowed": "Разрешено",
   "bidding.decisions.guards.blocked": "Заблокировано",
 
+  "bidding.decisions.type.BID_UP": "Повышение",
+  "bidding.decisions.type.BID_DOWN": "Снижение",
+  "bidding.decisions.type.HOLD": "Удержание",
+  "bidding.decisions.type.PAUSE": "Пауза",
+  "bidding.decisions.type.RESUME": "Возобновление",
+  "bidding.decisions.type.SET_MINIMUM": "Минимум",
+  "bidding.decisions.type.EMERGENCY_CUT": "Экстренное снижение",
+
+  "bidding.decisions.detail.back": "← Назад",
+  "bidding.decisions.detail.title": "Решение",
+  "bidding.decisions.detail.not_found": "Решение не найдено",
+  "bidding.decisions.detail.meta": "Информация",
+  "bidding.decisions.detail.run_link": "Прогон",
+  "bidding.decisions.detail.bid_change": "Изменение ставки",
+  "bidding.decisions.detail.explanation": "Обоснование",
+  "bidding.decisions.detail.signals": "Сигналы",
+  "bidding.decisions.detail.signal_key": "Параметр",
+  "bidding.decisions.detail.signal_value": "Значение",
+  "bidding.decisions.detail.guards": "Проверки (guards)",
+  "bidding.decisions.detail.guard_name": "Название",
+  "bidding.decisions.detail.guard_result": "Результат",
+  "bidding.decisions.detail.guard_message": "Сообщение",
+  "bidding.decisions.detail.guard_allowed": "Разрешено",
+  "bidding.decisions.detail.guard_blocked": "Заблокировано",
+
+  "bidding.runs.detail.running": "Выполняется с {{time}}",
+
   "bidding.strategy.economy_hold.target_drr_pct": "Целевой ДРР",
   "bidding.strategy.economy_hold.target_drr_pct_hint": "Целевое значение доли рекламных расходов (%)",
   "bidding.strategy.economy_hold.tolerance_pct": "Допуск",
@@ -3783,5 +3810,6 @@
   "grid.bulk.unlock_confirm": "Снять фиксацию",
   "grid.bulk.unlock_message": "Снять фиксацию ставок для {{count}} товаров?",
   "grid.bulk.bid_unlock_success": "Фиксация ставок снята",
-  "grid.bulk.bid_unlock_error": "Не удалось снять фиксацию ставок"
+  "grid.bulk.bid_unlock_error": "Не удалось снять фиксацию ставок",
+  "bidding.policy.config_invalid": "Некорректная конфигурация стратегии: {{details}}"
 }

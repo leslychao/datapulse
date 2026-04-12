@@ -11,6 +11,7 @@ import io.datapulse.bidding.domain.BidDecisionType;
 import io.datapulse.bidding.domain.BiddingSignalSet;
 import io.datapulse.bidding.domain.BiddingStrategyResult;
 import io.datapulse.bidding.domain.BiddingStrategyType;
+import io.datapulse.bidding.domain.PauseReasonCode;
 
 /**
  * LIQUIDATION — accelerate sales for overstock / end-of-season products.
@@ -53,7 +54,7 @@ public class LiquidationStrategy implements BiddingStrategy {
         DEFAULT_EXIT_DAYS_OF_COVER);
 
     if (signals.stockDays() != null && signals.stockDays() == 0) {
-      return new BiddingStrategyResult(BidDecisionType.PAUSE, null,
+      return BiddingStrategyResult.pause(PauseReasonCode.STOCK_OUT,
           "Liquidation: stock depleted (stockDays=0). PAUSE");
     }
 

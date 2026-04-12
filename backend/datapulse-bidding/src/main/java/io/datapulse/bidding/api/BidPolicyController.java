@@ -1,6 +1,5 @@
 package io.datapulse.bidding.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.bidding.domain.BidPolicyService;
 import io.datapulse.bidding.domain.BiddingStrategyType;
 import io.datapulse.bidding.domain.ExecutionMode;
@@ -31,7 +30,6 @@ public class BidPolicyController {
   private final BidPolicyService policyService;
   private final BidPolicyMapper mapper;
   private final WorkspaceContext workspaceContext;
-  private final ObjectMapper objectMapper;
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
@@ -40,13 +38,12 @@ public class BidPolicyController {
       @PathVariable("workspaceId") long workspaceId,
       @Valid @RequestBody CreateBidPolicyRequest request) {
 
-    String configJson = request.config() != null ? request.config().toString() : "{}";
     BidPolicyEntity entity = policyService.createPolicy(
         workspaceId,
         request.name(),
         BiddingStrategyType.valueOf(request.strategyType()),
         ExecutionMode.valueOf(request.executionMode()),
-        configJson,
+        request.config(),
         workspaceContext.getUserId());
 
     return mapper.toDetail(entity, 0);
@@ -81,12 +78,11 @@ public class BidPolicyController {
       @PathVariable("id") long id,
       @Valid @RequestBody UpdateBidPolicyRequest request) {
 
-    String configJson = request.config() != null ? request.config().toString() : "{}";
     BidPolicyEntity entity = policyService.updatePolicy(
         id,
         request.name(),
         ExecutionMode.valueOf(request.executionMode()),
-        configJson);
+        request.config());
 
     int count = policyService.countAssignments(id);
     return mapper.toDetail(entity, count);

@@ -92,3 +92,9 @@ databaseChangeLog:
   - include:
       file: changes/0034-bidding-category-assignment.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0035-bid-decision-pause-reason.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0036-bid-decision-explanation-i18n.sql
+      relativeToChangelogFile: true

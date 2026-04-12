@@ -12,7 +12,7 @@ import io.datapulse.bidding.domain.BiddingGuardResult;
 
 class StaleAdvertisingDataGuardTest {
 
-  private final BiddingProperties props = new BiddingProperties(7, 50, 4, 48, 7, true);
+  private final BiddingProperties props = new BiddingProperties();
   private final StaleAdvertisingDataGuard guard = new StaleAdvertisingDataGuard(props);
 
   @Test
@@ -37,13 +37,23 @@ class StaleAdvertisingDataGuardTest {
   }
 
   @Test
-  @DisplayName("blocks when daysSinceLastChange exceeds threshold")
-  void should_block_when_daysSinceLastChangeTooHigh() {
-    BiddingGuardContext ctx = context(TestSignals.withDaysSinceLastChange(10));
+  @DisplayName("blocks when hoursSinceLastChange exceeds threshold")
+  void should_block_when_hoursSinceLastChangeTooHigh() {
+    BiddingGuardContext ctx = context(TestSignals.withHoursSinceLastChange(72));
 
     BiddingGuardResult result = guard.evaluate(ctx);
 
     assertThat(result.allowed()).isFalse();
+  }
+
+  @Test
+  @DisplayName("allows when hoursSinceLastChange is within threshold")
+  void should_allow_when_hoursSinceLastChangeWithinThreshold() {
+    BiddingGuardContext ctx = context(TestSignals.withHoursSinceLastChange(24));
+
+    BiddingGuardResult result = guard.evaluate(ctx);
+
+    assertThat(result.allowed()).isTrue();
   }
 
   private BiddingGuardContext context(io.datapulse.bidding.domain.BiddingSignalSet signals) {

@@ -11,6 +11,9 @@ import io.datapulse.bidding.domain.BidDecisionType;
 import io.datapulse.bidding.domain.BiddingSignalSet;
 import io.datapulse.bidding.domain.BiddingStrategyResult;
 import io.datapulse.bidding.domain.BiddingStrategyType;
+import io.datapulse.bidding.domain.ExplanationMessage;
+
+import java.util.Map;
 
 /**
  * ECONOMY_HOLD — keeps ad spend (DRR) within the target band.
@@ -81,9 +84,11 @@ public class EconomyHoldStrategy implements BiddingStrategy {
     int rawTarget = Math.round(currentBid * factor.floatValue());
     int target = clampBid(rawTarget, signals.minBid());
 
-    return new BiddingStrategyResult(
+    return BiddingStrategyResult.withMessage(
         BidDecisionType.BID_DOWN, target,
-        explanation(signals.drrPct(), targetDrr, tolerance, "BID_DOWN", currentBid, target));
+        explanation(signals.drrPct(), targetDrr, tolerance, "BID_DOWN", currentBid, target),
+        "bidding.strategy.economy_hold.bid_down",
+        explanationArgs(signals.drrPct(), targetDrr, tolerance, currentBid, target));
   }
 
   private BiddingStrategyResult decideBidUp(
@@ -100,18 +105,22 @@ public class EconomyHoldStrategy implements BiddingStrategy {
     }
     int target = clampBid(rawTarget, signals.minBid());
 
-    return new BiddingStrategyResult(
+    return BiddingStrategyResult.withMessage(
         BidDecisionType.BID_UP, target,
-        explanation(signals.drrPct(), targetDrr, tolerance, "BID_UP", currentBid, target));
+        explanation(signals.drrPct(), targetDrr, tolerance, "BID_UP", currentBid, target),
+        "bidding.strategy.economy_hold.bid_up",
+        explanationArgs(signals.drrPct(), targetDrr, tolerance, currentBid, target));
   }
 
   private BiddingStrategyResult holdWithExplanation(
       BiddingSignalSet signals, int currentBid,
       BigDecimal targetDrr, BigDecimal tolerance) {
 
-    return new BiddingStrategyResult(
+    return BiddingStrategyResult.withMessage(
         BidDecisionType.HOLD, currentBid,
-        explanation(signals.drrPct(), targetDrr, tolerance, "HOLD", currentBid, currentBid));
+        explanation(signals.drrPct(), targetDrr, tolerance, "HOLD", currentBid, currentBid),
+        "bidding.strategy.economy_hold.hold",
+        explanationArgs(signals.drrPct(), targetDrr, tolerance, currentBid, currentBid));
   }
 
   private BiddingStrategyResult hold(BiddingSignalSet signals, String reason) {
@@ -139,6 +148,17 @@ public class EconomyHoldStrategy implements BiddingStrategy {
             targetDrr.setScale(1, RoundingMode.HALF_UP).toPlainString(),
             tolerance.setScale(0, RoundingMode.HALF_UP).toPlainString(),
             decision, currentBid, targetBid);
+  }
+
+  private Map<String, Object> explanationArgs(
+      BigDecimal drrPct, BigDecimal targetDrr, BigDecimal tolerance,
+      int currentBid, int targetBid) {
+    return Map.of(
+        "drrPct", drrPct.setScale(1, RoundingMode.HALF_UP).toPlainString(),
+        "targetDrr", targetDrr.setScale(1, RoundingMode.HALF_UP).toPlainString(),
+        "tolerance", tolerance.setScale(0, RoundingMode.HALF_UP).toPlainString(),
+        "currentBid", currentBid,
+        "targetBid", targetBid);
   }
 
   private BigDecimal decimalField(JsonNode config, String fieldName, BigDecimal defaultValue) {

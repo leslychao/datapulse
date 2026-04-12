@@ -2,6 +2,7 @@ package io.datapulse.bidding.domain.guard;
 
 import java.math.BigDecimal;
 
+import io.datapulse.bidding.domain.BidUnit;
 import io.datapulse.bidding.domain.BiddingSignalSet;
 
 final class TestSignals {
@@ -13,7 +14,7 @@ final class TestSignals {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 
   static BiddingSignalSet withCampaignStatus(String status) {
@@ -21,7 +22,7 @@ final class TestSignals {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, null, status);
+        null, null, status, BidUnit.KOPECKS);
   }
 
   static BiddingSignalSet withNoActivity() {
@@ -29,7 +30,7 @@ final class TestSignals {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         0, 0, 0, BigDecimal.ZERO,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 
   static BiddingSignalSet withActivity(long impressions, long clicks, long adOrders) {
@@ -37,15 +38,15 @@ final class TestSignals {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         impressions, clicks, adOrders, BigDecimal.TEN,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 
-  static BiddingSignalSet withDaysSinceLastChange(Integer days) {
+  static BiddingSignalSet withHoursSinceLastChange(Integer hours) {
     return new BiddingSignalSet(
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, days, "9");
+        null, hours, "9", BidUnit.KOPECKS);
   }
 
   static BiddingSignalSet withStockDays(Integer stockDays) {
@@ -53,7 +54,7 @@ final class TestSignals {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         new BigDecimal("20.0"), stockDays, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 
   static BiddingSignalSet withMarginPct(BigDecimal marginPct) {
@@ -61,7 +62,7 @@ final class TestSignals {
         1000, new BigDecimal("10.0"), null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         marginPct, 30, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 
   static BiddingSignalSet withDrrPct(BigDecimal drrPct) {
@@ -69,6 +70,6 @@ final class TestSignals {
         1000, drrPct, null, new BigDecimal("3.0"),
         100, 10, 5, BigDecimal.TEN,
         new BigDecimal("20.0"), 30, null, null, 50,
-        null, null, "9");
+        null, null, "9", BidUnit.KOPECKS);
   }
 }

@@ -973,42 +973,51 @@ PENDING → IN_PROGRESS → COMPLETED
 | 6 стратегий (ECONOMY_HOLD, POSITION_HOLD, GROWTH, LAUNCH, LIQUIDATION, MINIMAL_PRESENCE) | ✅ | Все 6 с параметрической конфигурацией |
 | Bid policy CRUD | ✅ | Создание, редактирование, активация, пауза, архивация |
 | Назначение на уровне кампании и SKU | ✅ | |
-| Guard chain (11 guards) | ✅ | Все 11 guards из раздела 13 |
+| Guard chain (11 guards) | ✅ | Все 11 guards из раздела 13, `hoursSinceLastChange` для точной гранулярности |
 | Blast radius protection | ✅ | С ужесточёнными порогами для FULL_AUTO |
 | Режимы: RECOMMENDATION, SEMI_AUTO, FULL_AUTO | ✅ | FULL_AUTO с safety gate |
 | Bid decision + explanation | ✅ | Полный audit trail |
-| Bid action lifecycle | ✅ | Через Execution module |
+| Bid action lifecycle | ✅ | Через Execution module (outbox: BIDDING_RUN_EXECUTE, BID_ACTION_EXECUTE, BID_ACTION_RETRY) |
 | WB bid API integration | ✅ | SET + READ через WB Advert API |
 | Ozon bid API integration | ✅ | SET + READ через Ozon Performance API |
 | Yandex Market bid API integration | ✅ | SET + READ |
-| Reconciliation | ✅ | Read-back bid после write |
-| Dashboard автобиддинга | ✅ | Сводная аналитика, KPI, top products |
+| Dashboard автобиддинга | ✅ | Сводная аналитика, KPI, top products. DRR извлекается из `signal_snapshot` JSONB |
 | Страница стратегий в UI | ✅ | Список, карточка, CRUD |
-| Страница решений (decisions) | ✅ | С фильтрами, пагинацией |
+| Страница решений (decisions) | ✅ | С фильтрами, пагинацией, detail page |
 | Страница прогонов (runs) | ✅ | Список + detail page |
 | Страница actions | ✅ | С approve/reject, bulk operations |
 | Manual bid lock | ✅ | CRUD, bulk create/remove |
+| Manual lock auto-expiration | ✅ | `BidLockExpirationScheduler` удаляет истёкшие блокировки по `@Scheduled` |
 | Массовые операции | ✅ | Bulk assign, bulk approve/reject, bulk lock/unlock |
-| Alert checkers (2 из 4) | ✅ | AUTOBID_HIGH_DRR_CLUSTER, AUTOBID_SPEND_SPIKE |
+| Alert checkers (5 из 5) | ✅ | AUTOBID_HIGH_DRR_CLUSTER, AUTOBID_SPEND_SPIKE, AUTOBID_FULL_AUTO_ANOMALY, AUTOBID_NO_EFFECT, AUTOBID_STRATEGY_EXHAUSTED |
+| AlertCheckerScheduler | ✅ | `@Scheduled` запуск всех alert checkers, включая FullAutoAnomaly |
+| LAUNCH auto-transition | ✅ | `LaunchTransitionListener` автоматически перемещает товар на целевую стратегию по событию |
+| RESUME decision type | ✅ | `BiddingResumeEvaluator` генерирует RESUME решения при устранении причины PAUSE |
+| RESUME на основе `pause_reason_code` | ✅ | `PauseReasonCode` enum + `BidDecisionEntity.pauseReasonCode` + fallback на legacy text parsing |
+| Reconciliation (read-back bid) | ✅ | Двухшаговый flow: EXECUTING → RECONCILIATION_PENDING → SUCCEEDED. `BidActionExecutor.reconcile()` + outbox event `BID_ACTION_RECONCILE` |
 | Уведомления | ✅ | STOMP + REST |
 
 ### 22.2. Реализовано частично / требует доработки
 
 | Компонент | Статус | Что нужно |
 |-----------|--------|-----------|
-| LAUNCH auto-transition | ⚠️ | Рекомендует переход, но не выполняет его автоматически |
-| RESUME decision type | ⚠️ | Enum определён, логика генерации не реализована |
-| Manual lock auto-expiration | ⚠️ | `expiresAt` сохраняется, scheduled job для очистки не реализован |
-| Alert checkers (AUTOBID_NO_EFFECT, AUTOBID_STRATEGY_EXHAUSTED) | ⚠️ | Не реализованы |
-| AutobidFullAutoAnomalyChecker scheduling | ⚠️ | Checker есть, `@Scheduled` отсутствует |
-| CSV export decisions | ⚠️ | Backend API есть, кнопка в UI не привязана |
-| Назначение на категорию | ❌ | Backlog |
+| Explanation i18n | ⚠️ | Explanations на английском, хранятся как текст. Нужен формат `{ key, args }` для i18n |
+| Config validation | ~~⚠️~~ ✅ | Типизированные config records per-strategy (`EconomyHoldConfig`, `GrowthConfig`, etc.) с Jakarta Validation. `BidPolicyConfigValidator` валидирует при create/update |
+| Product bidding status в гриде | ⚠️ | Документ (17.3) описывает колонки в операционном гриде — не реализовано |
+| Detail Panel вкладка "Автобиддинг" | ⚠️ | Документ (17.4) — не реализовано |
+| Workspace-level bidding settings | ⚠️ | `enabled`, `max_aggregate_daily_spend` — только YAML, нет REST API и UI |
+| Priority field на bid_policy | ⚠️ | Нужен для разрешения конфликтов назначений |
+| CSV export decisions | ⚠️ | Backend API есть, кнопка в UI привязана, но фильтры передаются не полностью |
+| Назначение на категорию | ❌ | DDL поддерживает (`category_id`), но UI и сервисная логика не реализованы |
 
 ### 22.3. Не реализовано (backlog)
 
 | Компонент | Приоритет | Комментарий |
 |-----------|-----------|-------------|
 | Отчёт «Эффективность» (до/после метрики) | Средний | Требует накопления данных |
+| Optimistic locking (`@Version`) на `bid_policy` | Средний | Защита от concurrent edit |
+| Exclude list для assignments | Средний | Исключения из массового назначения |
+| Weekly/monthly spend cap | Средний | Расширение daily_spend_limit guard |
 | Интеграция с AI insights | Низкий | Рекомендации на основе ML |
 | Координированный decision engine (price + bid) | Низкий | Объединённая оптимизация |
 | Управление бюджетами кампаний | Низкий | Дневные бюджеты, перераспределение |

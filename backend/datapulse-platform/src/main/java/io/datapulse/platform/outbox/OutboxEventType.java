@@ -22,7 +22,8 @@ public enum OutboxEventType {
     REMATERIALIZATION_REQUESTED("etl.sync", "etl.sync"),
     BIDDING_RUN_EXECUTE("bidding.run", "bidding.run"),
     BID_ACTION_EXECUTE("bid.execution", "bid.execution"),
-    BID_ACTION_RETRY("bid.execution.wait", "bid.execution.wait");
+    BID_ACTION_RETRY("bid.execution.wait", "bid.execution.wait"),
+    BID_ACTION_RECONCILE("bid.execution.wait", "bid.execution.wait");
 
     private final String exchange;
     private final String routingKey;

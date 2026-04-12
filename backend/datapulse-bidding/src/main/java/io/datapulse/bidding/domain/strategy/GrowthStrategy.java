@@ -12,6 +12,8 @@ import io.datapulse.bidding.domain.BiddingSignalSet;
 import io.datapulse.bidding.domain.BiddingStrategyResult;
 import io.datapulse.bidding.domain.BiddingStrategyType;
 
+import java.util.Map;
+
 /**
  * GROWTH — maximize ad orders within an acceptable CPO ceiling.
  *
@@ -68,22 +70,28 @@ public class GrowthStrategy implements BiddingStrategy {
     if (cpoPct.compareTo(maxCpo) > 0) {
       int target = applyStep(currentBid, stepPct, false, null,
           signals.minBid());
-      return new BiddingStrategyResult(BidDecisionType.BID_DOWN, target,
-          explanation(cpoPct, targetCpo, maxCpo, "BID_DOWN",
-              currentBid, target));
+      return BiddingStrategyResult.withMessage(
+          BidDecisionType.BID_DOWN, target,
+          explanation(cpoPct, targetCpo, maxCpo, "BID_DOWN", currentBid, target),
+          "bidding.strategy.growth.bid_down",
+          growthArgs(cpoPct, targetCpo, maxCpo, currentBid, target));
     }
 
     if (cpoPct.compareTo(targetCpo) < 0 && hasGrowthHeadroom(signals)) {
       int target = applyStep(currentBid, stepPct, true, maxBid,
           signals.minBid());
-      return new BiddingStrategyResult(BidDecisionType.BID_UP, target,
-          explanation(cpoPct, targetCpo, maxCpo, "BID_UP",
-              currentBid, target));
+      return BiddingStrategyResult.withMessage(
+          BidDecisionType.BID_UP, target,
+          explanation(cpoPct, targetCpo, maxCpo, "BID_UP", currentBid, target),
+          "bidding.strategy.growth.bid_up",
+          growthArgs(cpoPct, targetCpo, maxCpo, currentBid, target));
     }
 
-    return new BiddingStrategyResult(BidDecisionType.HOLD, currentBid,
-        explanation(cpoPct, targetCpo, maxCpo, "HOLD",
-            currentBid, currentBid));
+    return BiddingStrategyResult.withMessage(
+        BidDecisionType.HOLD, currentBid,
+        explanation(cpoPct, targetCpo, maxCpo, "HOLD", currentBid, currentBid),
+        "bidding.strategy.growth.hold",
+        growthArgs(cpoPct, targetCpo, maxCpo, currentBid, currentBid));
   }
 
   private boolean hasGrowthHeadroom(BiddingSignalSet signals) {
@@ -118,6 +126,17 @@ public class GrowthStrategy implements BiddingStrategy {
             targetCpo.setScale(1, RoundingMode.HALF_UP).toPlainString(),
             maxCpo.setScale(1, RoundingMode.HALF_UP).toPlainString(),
             decision, currentBid, targetBid);
+  }
+
+  private Map<String, Object> growthArgs(
+      BigDecimal cpoPct, BigDecimal targetCpo, BigDecimal maxCpo,
+      int currentBid, int targetBid) {
+    return Map.of(
+        "cpoPct", cpoPct.setScale(1, RoundingMode.HALF_UP).toPlainString(),
+        "targetCpo", targetCpo.setScale(1, RoundingMode.HALF_UP).toPlainString(),
+        "maxCpo", maxCpo.setScale(1, RoundingMode.HALF_UP).toPlainString(),
+        "currentBid", currentBid,
+        "targetBid", targetBid);
   }
 
   private BigDecimal decimalField(JsonNode cfg, String field,

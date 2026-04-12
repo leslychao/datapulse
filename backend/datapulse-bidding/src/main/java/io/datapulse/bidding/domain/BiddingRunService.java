@@ -60,8 +60,8 @@ public class BiddingRunService {
     }
 
     if (runRepository.existsByBidPolicyIdAndStatus(
-        bidPolicyId, BiddingRunStatus.IN_PROGRESS)) {
-      log.warn("Concurrent run blocked: bidPolicyId={} already has an IN_PROGRESS run",
+        bidPolicyId, BiddingRunStatus.RUNNING)) {
+      log.warn("Concurrent run blocked: bidPolicyId={} already has a RUNNING run",
           bidPolicyId);
       return;
     }
@@ -272,8 +272,13 @@ public class BiddingRunService {
             guardResult.blockingGuard().guardName(),
             guardResult.blockingGuard().messageKey())
         : original.explanation();
+    ExplanationMessage guardMessage = guardResult.blockingGuard() != null
+        ? ExplanationMessage.of(
+            guardResult.blockingGuard().messageKey(),
+            java.util.Map.of("guard", guardResult.blockingGuard().guardName()))
+        : original.explanationMessage();
     return new BiddingStrategyResult(
-        BidDecisionType.HOLD, null, guardExplanation);
+        BidDecisionType.HOLD, null, guardExplanation, guardMessage);
   }
 
   private void saveDecision(
@@ -296,6 +301,14 @@ public class BiddingRunService {
     entity.setTargetBid(result.targetBid());
     entity.setExecutionMode(policy.getExecutionMode().name());
     entity.setExplanationSummary(result.explanation());
+    entity.setPauseReasonCode(result.pauseReasonCode());
+
+    if (result.explanationMessage() != null) {
+      entity.setExplanationKey(result.explanationMessage().key());
+      entity.setExplanationArgs(
+          serializeJson(result.explanationMessage().args()));
+    }
+
     entity.setSignalSnapshot(serializeJson(signals));
     entity.setGuardsApplied(
         guardResult != null ? serializeJson(guardResult.evaluations()) : null);

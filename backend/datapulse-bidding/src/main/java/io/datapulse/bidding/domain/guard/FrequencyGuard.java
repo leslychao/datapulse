@@ -32,11 +32,10 @@ public class FrequencyGuard implements BiddingGuard {
 
   @Override
   public BiddingGuardResult evaluate(BiddingGuardContext context) {
-    Integer daysSinceLastChange = context.signals().daysSinceLastChange();
+    Integer hoursSinceLastChange = context.signals().hoursSinceLastChange();
     int minIntervalHours = biddingProperties.getMinDecisionIntervalHours();
-    int minIntervalDays = minIntervalHours / 24;
 
-    if (daysSinceLastChange != null && daysSinceLastChange < minIntervalDays) {
+    if (hoursSinceLastChange != null && hoursSinceLastChange < minIntervalHours) {
       return BiddingGuardResult.block(guardName(), MessageCodes.BIDDING_GUARD_FREQUENCY,
           Map.of("hours", minIntervalHours));
     }

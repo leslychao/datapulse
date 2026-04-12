@@ -101,6 +101,9 @@ public final class MessageCodes {
     public static final String BIDDING_RUN_FAILED = "bidding.run.failed";
     public static final String BIDDING_RUN_PAUSED = "bidding.run.paused";
 
+    // --- Bidding: Policy Config ---
+    public static final String BIDDING_POLICY_CONFIG_INVALID = "bidding.policy.config_invalid";
+
     // --- Bidding: Action ---
     public static final String BIDDING_ACTION_NOT_FOUND = "bidding.action.not_found";
     public static final String BIDDING_ACTION_INVALID_STATE = "bidding.action.invalid_state";

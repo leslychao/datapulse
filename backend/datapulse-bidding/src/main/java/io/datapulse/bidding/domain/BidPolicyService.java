@@ -2,6 +2,8 @@ package io.datapulse.bidding.domain;
 
 import java.time.OffsetDateTime;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import io.datapulse.bidding.persistence.BidActionRepository;
 import io.datapulse.bidding.persistence.BidPolicyAssignmentRepository;
 import io.datapulse.bidding.persistence.BidPolicyEntity;
@@ -29,6 +31,7 @@ public class BidPolicyService {
   private final BidPolicyAssignmentRepository assignmentRepository;
   private final BiddingRunRepository runRepository;
   private final BidActionRepository actionRepository;
+  private final BidPolicyConfigValidator configValidator;
 
   @Transactional
   public BidPolicyEntity createPolicy(
@@ -36,8 +39,10 @@ public class BidPolicyService {
       String name,
       BiddingStrategyType strategyType,
       ExecutionMode executionMode,
-      String configJson,
+      JsonNode config,
       Long createdBy) {
+
+    configValidator.validate(strategyType, config);
 
     var entity = new BidPolicyEntity();
     entity.setWorkspaceId(workspaceId);
@@ -45,7 +50,7 @@ public class BidPolicyService {
     entity.setStrategyType(strategyType);
     entity.setExecutionMode(executionMode);
     entity.setStatus(BidPolicyStatus.DRAFT);
-    entity.setConfig(configJson);
+    entity.setConfig(config.toString());
     entity.setCreatedBy(createdBy);
 
     BidPolicyEntity saved = policyRepository.save(entity);
@@ -59,10 +64,12 @@ public class BidPolicyService {
       long id,
       String name,
       ExecutionMode executionMode,
-      String configJson) {
+      JsonNode config) {
 
     BidPolicyEntity entity = requirePolicy(id);
     ensureNotArchived(entity);
+
+    configValidator.validate(entity.getStrategyType(), config);
 
     if (executionMode == ExecutionMode.FULL_AUTO
         && entity.getExecutionMode() != ExecutionMode.FULL_AUTO) {
@@ -71,7 +78,7 @@ public class BidPolicyService {
 
     entity.setName(name);
     entity.setExecutionMode(executionMode);
-    entity.setConfig(configJson);
+    entity.setConfig(config.toString());
 
     log.info("Bid policy updated: id={}", id);
     return policyRepository.save(entity);

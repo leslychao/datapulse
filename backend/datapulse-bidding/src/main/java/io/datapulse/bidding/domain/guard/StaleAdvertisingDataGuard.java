@@ -36,14 +36,14 @@ public class StaleAdvertisingDataGuard implements BiddingGuard {
   public BiddingGuardResult evaluate(BiddingGuardContext context) {
     BiddingSignalSet signals = context.signals();
     int thresholdHours = biddingProperties.getStaleDataThresholdHours();
-    int thresholdDays = thresholdHours / 24;
 
     if (signals.impressions() == 0 && signals.clicks() == 0 && signals.adOrders() == 0) {
       return BiddingGuardResult.block(guardName(), MessageCodes.BIDDING_GUARD_STALE_DATA,
           Map.of("hours", thresholdHours));
     }
 
-    if (signals.daysSinceLastChange() != null && signals.daysSinceLastChange() > thresholdDays) {
+    if (signals.hoursSinceLastChange() != null
+        && signals.hoursSinceLastChange() > thresholdHours) {
       return BiddingGuardResult.block(guardName(), MessageCodes.BIDDING_GUARD_STALE_DATA,
           Map.of("hours", thresholdHours));
     }

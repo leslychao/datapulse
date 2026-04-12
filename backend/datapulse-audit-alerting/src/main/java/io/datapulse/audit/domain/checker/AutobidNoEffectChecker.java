@@ -36,7 +36,7 @@ public class AutobidNoEffectChecker implements AlertChecker {
       WITH recent_runs AS (
         SELECT br.id, br.bid_policy_id,
                ROW_NUMBER() OVER (
-                 PARTITION BY br.bid_policy_id ORDER BY br.created_at DESC) AS rn
+                 PARTITION BY br.bid_policy_id ORDER BY br.started_at DESC) AS rn
         FROM bidding_run br
         INNER JOIN bid_policy bp ON bp.id = br.bid_policy_id
         WHERE bp.workspace_id = :workspaceId

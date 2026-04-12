@@ -50,13 +50,28 @@ public class BiddingResumeEvaluator {
 
   private boolean isPauseReasonResolved(
       BidDecisionEntity pauseDecision, BiddingSignalSet signals) {
+    PauseReasonCode reason = pauseDecision.getPauseReasonCode();
+
+    if (reason != null) {
+      return switch (reason) {
+        case STOCK_OUT ->
+            signals.stockDays() != null && signals.stockDays() > 0;
+        case NEGATIVE_MARGIN ->
+            signals.marginPct() != null && signals.marginPct().signum() > 0;
+        case DRR_CRITICAL -> false;
+        case GUARD_BLOCK -> false;
+      };
+    }
+
+    // Fallback for legacy decisions without pause_reason_code:
+    // parse explanation text (will be removed once all old decisions age out)
     String explanation = pauseDecision.getExplanationSummary();
     if (explanation == null) {
       return false;
     }
 
     if (explanation.contains("stock") || explanation.contains("Stock")) {
-      return signals.availableStock() != null && signals.availableStock() > 0;
+      return signals.stockDays() != null && signals.stockDays() > 0;
     }
     if (explanation.contains("margin") || explanation.contains("Margin")) {
       return signals.marginPct() != null

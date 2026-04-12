@@ -65,9 +65,9 @@ public class LaunchStrategy implements BiddingStrategy {
         DEFAULT_CEILING_DRR);
 
     int currentBid = signals.currentBid();
-    Integer daysSinceChange = signals.daysSinceLastChange();
-    boolean withinLaunchPeriod = daysSinceChange == null
-        || daysSinceChange < launchPeriodDays;
+    Integer hoursSinceChange = signals.hoursSinceLastChange();
+    boolean withinLaunchPeriod = hoursSinceChange == null
+        || hoursSinceChange < launchPeriodDays * 24;
 
     if (withinLaunchPeriod) {
       if (signals.drrPct() != null
@@ -86,10 +86,11 @@ public class LaunchStrategy implements BiddingStrategy {
                     .formatted(currentBid, target));
       }
 
+      int daysSinceChange = hoursSinceChange != null ? hoursSinceChange / 24 : 0;
       return new BiddingStrategyResult(BidDecisionType.HOLD, currentBid,
           "Launch: within period (day %s of %d), holding bid at %d"
               .formatted(
-                  daysSinceChange != null ? String.valueOf(daysSinceChange) : "?",
+                  hoursSinceChange != null ? String.valueOf(daysSinceChange) : "?",
                   launchPeriodDays, currentBid));
     }
 

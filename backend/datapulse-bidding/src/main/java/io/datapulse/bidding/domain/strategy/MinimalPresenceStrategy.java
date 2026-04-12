@@ -8,6 +8,10 @@ import io.datapulse.bidding.domain.BidDecisionType;
 import io.datapulse.bidding.domain.BiddingSignalSet;
 import io.datapulse.bidding.domain.BiddingStrategyResult;
 import io.datapulse.bidding.domain.BiddingStrategyType;
+import io.datapulse.bidding.domain.ExplanationMessage;
+import io.datapulse.bidding.domain.PauseReasonCode;
+
+import java.util.Map;
 
 /**
  * MINIMAL_PRESENCE — keeps the bid at the marketplace minimum allowed level.
@@ -25,8 +29,7 @@ public class MinimalPresenceStrategy implements BiddingStrategy {
   @Override
   public BiddingStrategyResult evaluate(BiddingSignalSet signals, JsonNode policyConfig) {
     if (signals.stockDays() != null && signals.stockDays() == 0) {
-      return new BiddingStrategyResult(
-          BidDecisionType.PAUSE, null,
+      return BiddingStrategyResult.pause(PauseReasonCode.STOCK_OUT,
           "Minimal presence: stockDays=0. Decision: PAUSE");
     }
 

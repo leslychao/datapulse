@@ -72,15 +72,78 @@ public class BidActionExecutor {
     recordAttempt(action.getId(), attemptNumber, result);
 
     if (result.success()) {
-      action.setStatus(BidActionStatus.SUCCEEDED);
+      action.setStatus(BidActionStatus.RECONCILIATION_PENDING);
       action.setExecutedAt(OffsetDateTime.now());
       actionRepository.save(action);
-      log.info("Bid action succeeded: bidActionId={}, offerId={}, "
-              + "targetBid={}",
+
+      outboxService.createEvent(
+          OutboxEventType.BID_ACTION_RECONCILE,
+          "bid_action",
+          action.getId(),
+          Map.of("bidActionId", action.getId(),
+              "eventType", "RECONCILE"));
+
+      log.info("Bid action executed, reconciliation pending: "
+              + "bidActionId={}, offerId={}, targetBid={}",
           bidActionId, action.getMarketplaceOfferId(),
           action.getTargetBid());
     } else {
       handleFailure(action, result);
+    }
+  }
+
+  @Transactional
+  public void reconcile(long bidActionId) {
+    BidActionEntity action = actionRepository.findById(bidActionId).orElse(null);
+    if (action == null) {
+      log.warn("Bid action not found for reconciliation: bidActionId={}",
+          bidActionId);
+      return;
+    }
+
+    if (action.getStatus() != BidActionStatus.RECONCILIATION_PENDING) {
+      log.debug("Bid action not pending reconciliation, skipping: "
+              + "bidActionId={}, status={}",
+          bidActionId, action.getStatus());
+      return;
+    }
+
+    Map<String, String> credentials;
+    try {
+      credentials = resolveCredentials(action.getConnectionId());
+    } catch (Exception e) {
+      log.error("Reconciliation credential resolve failed: "
+              + "bidActionId={}, error={}",
+          bidActionId, e.getMessage(), e);
+      failAction(action, "RECONCILE_TOKEN_FAILED", e.getMessage());
+      return;
+    }
+
+    BidActionGateway gateway;
+    try {
+      ExecutionMode mode = ExecutionMode.valueOf(action.getExecutionMode());
+      gateway = gatewayRegistry.resolve(action.getMarketplaceType(), mode);
+    } catch (Exception e) {
+      log.error("No gateway for reconciliation: bidActionId={}, type={}",
+          bidActionId, action.getMarketplaceType());
+      failAction(action, "NO_GATEWAY", e.getMessage());
+      return;
+    }
+
+    BidActionGatewayResult result = gateway.reconcile(action, credentials);
+
+    if (result.success()) {
+      action.setStatus(BidActionStatus.SUCCEEDED);
+      action.setReconciledAt(OffsetDateTime.now());
+      actionRepository.save(action);
+      log.info("Bid action reconciled OK: bidActionId={}, offerId={}",
+          bidActionId, action.getMarketplaceOfferId());
+    } else {
+      log.warn("Bid action reconciliation failed: bidActionId={}, "
+              + "offerId={}, error={}",
+          bidActionId, action.getMarketplaceOfferId(),
+          result.errorMessage());
+      failAction(action, "RECONCILE_MISMATCH", result.errorMessage());
     }
   }
 

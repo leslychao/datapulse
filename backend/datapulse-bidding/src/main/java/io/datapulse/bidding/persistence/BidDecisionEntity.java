@@ -2,6 +2,7 @@ package io.datapulse.bidding.persistence;
 
 import io.datapulse.bidding.domain.BidDecisionType;
 import io.datapulse.bidding.domain.BiddingStrategyType;
+import io.datapulse.bidding.domain.PauseReasonCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -64,6 +65,17 @@ public class BidDecisionEntity {
 
   @Column(name = "explanation_summary")
   private String explanationSummary;
+
+  @Column(name = "explanation_key")
+  private String explanationKey;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "explanation_args", columnDefinition = "jsonb")
+  private String explanationArgs;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "pause_reason_code", length = 30)
+  private PauseReasonCode pauseReasonCode;
 
   @Column(name = "execution_mode", nullable = false, length = 30)
   private String executionMode;
