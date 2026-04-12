@@ -16,6 +16,26 @@ public interface BidActionRepository extends JpaRepository<BidActionEntity, Long
   Page<BidActionEntity> findByWorkspaceIdAndStatus(
       long workspaceId, BidActionStatus status, Pageable pageable);
 
+  Page<BidActionEntity> findByWorkspaceId(long workspaceId, Pageable pageable);
+
+  Page<BidActionEntity> findByWorkspaceIdAndStatusIn(
+      long workspaceId, List<BidActionStatus> statuses, Pageable pageable);
+
+  Page<BidActionEntity> findByWorkspaceIdAndExecutionMode(
+      long workspaceId, String executionMode, Pageable pageable);
+
+  @Query("""
+      SELECT a FROM BidActionEntity a
+      WHERE a.workspaceId = :wsId
+        AND a.status IN :statuses
+        AND a.executionMode = :mode
+      """)
+  Page<BidActionEntity> findByWorkspaceIdAndStatusInAndExecutionMode(
+      @Param("wsId") long workspaceId,
+      @Param("statuses") List<BidActionStatus> statuses,
+      @Param("mode") String executionMode,
+      Pageable pageable);
+
   List<BidActionEntity> findByMarketplaceOfferIdAndStatusIn(
       long marketplaceOfferId, List<BidActionStatus> statuses);
 

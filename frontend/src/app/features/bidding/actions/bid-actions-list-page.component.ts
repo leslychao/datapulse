@@ -316,6 +316,14 @@ export class BidActionsListPageComponent {
     return cols;
   });
 
+  private readonly actionFilter = computed(() => {
+    const vals = this.listState.filterValues();
+    const f: { status?: string[]; executionMode?: string[] } = {};
+    if (vals['status']?.length) f.status = vals['status'];
+    if (vals['executionMode']?.length) f.executionMode = vals['executionMode'];
+    return f;
+  });
+
   readonly actionsQuery = injectQuery(() => ({
     queryKey: [
       'bid-actions',
@@ -323,14 +331,16 @@ export class BidActionsListPageComponent {
       this.listState.currentPage(),
       this.listState.pageSize(),
       this.listState.sortParam(),
-      this.listState.filterValues(),
+      this.actionFilter(),
     ],
     queryFn: () =>
       lastValueFrom(
-        this.biddingApi.listPendingActions(
+        this.biddingApi.listActions(
           this.wsStore.currentWorkspaceId()!,
+          this.actionFilter(),
           this.listState.currentPage(),
           this.listState.pageSize(),
+          this.listState.sortParam(),
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId(),

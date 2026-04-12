@@ -173,6 +173,9 @@ export class BiddingApiService {
     if (filter?.bidPolicyId) {
       params = params.set('bidPolicyId', filter.bidPolicyId);
     }
+    if (filter?.biddingRunId) {
+      params = params.set('biddingRunId', filter.biddingRunId);
+    }
     if (filter?.marketplaceOfferId) {
       params = params.set('marketplaceOfferId', filter.marketplaceOfferId);
     }
@@ -298,12 +301,25 @@ export class BiddingApiService {
 
   // ── Actions ──
 
-  listPendingActions(
+  listActions(
     workspaceId: number,
+    filter?: { status?: string[]; executionMode?: string[] },
     page = 0,
     size = 50,
+    sort = 'createdAt,desc',
   ): Observable<Page<BidActionSummary>> {
-    const params = new HttpParams().set('page', page).set('size', size);
+    let params = new HttpParams()
+      .set('page', page)
+      .set('size', size)
+      .set('sort', sort);
+
+    if (filter?.status?.length) {
+      params = params.set('status', filter.status.join(','));
+    }
+    if (filter?.executionMode?.length) {
+      params = params.set('executionMode', filter.executionMode.join(','));
+    }
+
     return this.http.get<Page<BidActionSummary>>(
       `${this.base}/workspaces/${workspaceId}/bidding/actions`,
       { params },

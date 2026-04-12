@@ -960,77 +960,65 @@ PENDING → IN_PROGRESS → COMPLETED
 
 ---
 
-## 22. Scope MVP
+## 22. Текущий scope (реализовано)
 
-### 22.1. Что входит в MVP (must-have)
+> **Примечание:** Изначальный MVP-план предусматривал 2 стратегии и 5 guards.
+> По факту реализация опередила MVP-scope — реализовано значительно больше.
+> Этот раздел актуализирован по состоянию кодовой базы на 2026-04-12.
 
-| Компонент | Описание |
-|-----------|----------|
-| Две стратегии: ECONOMY_HOLD, MINIMAL_PRESENCE | Достаточно для 80% товаров |
-| Bid policy CRUD | Создание, редактирование, активация, пауза, архивация |
-| Назначение на уровне кампании и SKU | Категории — в v2 |
-| Guard chain (5 guards) | Manual lock, stale data, stock-out, economy, frequency |
-| Режимы: RECOMMENDATION и SEMI_AUTO | FULL_AUTO — после 30 дней стабильной работы |
-| Bid decision + explanation | Полный audit trail каждого решения |
-| Bid action lifecycle | Через существующий Execution module (расширение) |
-| WB bid API integration | SET bid через WB Advert API |
-| Ozon bid API integration | SET bid через Ozon Performance API |
-| Reconciliation | Read-back bid после write |
-| Страница «Автобиддинг» в UI | Список стратегий, карточка стратегии |
-| Колонки в гриде | Bid-статус, текущая ставка, последнее решение |
-| Detail Panel вкладка | Автобиддинг для товара |
-| Журнал решений | История с фильтрами |
-| Manual bid lock | Ручная фиксация ставки |
-| Массовые операции | Назначить/снять стратегию, approve/reject |
-| Уведомления | Паузы guard-ом, FAILED actions |
+### 22.1. Реализовано полностью
 
-### 22.2. Что входит в MVP, но урезано
+| Компонент | Статус | Комментарий |
+|-----------|--------|-------------|
+| 6 стратегий (ECONOMY_HOLD, POSITION_HOLD, GROWTH, LAUNCH, LIQUIDATION, MINIMAL_PRESENCE) | ✅ | Все 6 с параметрической конфигурацией |
+| Bid policy CRUD | ✅ | Создание, редактирование, активация, пауза, архивация |
+| Назначение на уровне кампании и SKU | ✅ | |
+| Guard chain (11 guards) | ✅ | Все 11 guards из раздела 13 |
+| Blast radius protection | ✅ | С ужесточёнными порогами для FULL_AUTO |
+| Режимы: RECOMMENDATION, SEMI_AUTO, FULL_AUTO | ✅ | FULL_AUTO с safety gate |
+| Bid decision + explanation | ✅ | Полный audit trail |
+| Bid action lifecycle | ✅ | Через Execution module |
+| WB bid API integration | ✅ | SET + READ через WB Advert API |
+| Ozon bid API integration | ✅ | SET + READ через Ozon Performance API |
+| Yandex Market bid API integration | ✅ | SET + READ |
+| Reconciliation | ✅ | Read-back bid после write |
+| Dashboard автобиддинга | ✅ | Сводная аналитика, KPI, top products |
+| Страница стратегий в UI | ✅ | Список, карточка, CRUD |
+| Страница решений (decisions) | ✅ | С фильтрами, пагинацией |
+| Страница прогонов (runs) | ✅ | Список + detail page |
+| Страница actions | ✅ | С approve/reject, bulk operations |
+| Manual bid lock | ✅ | CRUD, bulk create/remove |
+| Массовые операции | ✅ | Bulk assign, bulk approve/reject, bulk lock/unlock |
+| Alert checkers (2 из 4) | ✅ | AUTOBID_HIGH_DRR_CLUSTER, AUTOBID_SPEND_SPIKE |
+| Уведомления | ✅ | STOMP + REST |
 
-| Компонент | MVP-вариант | Полный вариант (v2+) |
-|-----------|------------|---------------------|
-| Стратегии | 2 из 6 | Все 6 |
-| Назначение | Кампания + SKU | + категория |
-| Режимы | RECOMMENDATION + SEMI_AUTO | + FULL_AUTO |
-| Guards | 5 основных | + blast radius, price competitiveness, volatility |
-| Отчёты | Журнал решений | + эффективность, экономия, покрытие |
-| Dashboard | Нет (только через грид) | Сводный dashboard |
+### 22.2. Реализовано частично / требует доработки
 
-### 22.3. Последовательность внедрения MVP
+| Компонент | Статус | Что нужно |
+|-----------|--------|-----------|
+| LAUNCH auto-transition | ⚠️ | Рекомендует переход, но не выполняет его автоматически |
+| RESUME decision type | ⚠️ | Enum определён, логика генерации не реализована |
+| Manual lock auto-expiration | ⚠️ | `expiresAt` сохраняется, scheduled job для очистки не реализован |
+| Alert checkers (AUTOBID_NO_EFFECT, AUTOBID_STRATEGY_EXHAUSTED) | ⚠️ | Не реализованы |
+| AutobidFullAutoAnomalyChecker scheduling | ⚠️ | Checker есть, `@Scheduled` отсутствует |
+| CSV export decisions | ⚠️ | Backend API есть, кнопка в UI не привязана |
+| Назначение на категорию | ❌ | Backlog |
 
-1. **Фаза 1 (2 недели):** Backend pipeline — bid policy, signal assembly, strategy engine (ECONOMY_HOLD), guard chain, bid decision persistence.
-2. **Фаза 2 (2 недели):** Execution — bid action lifecycle, WB/Ozon bid API adapters, reconciliation.
-3. **Фаза 3 (2 недели):** Frontend — страница стратегий, назначения, detail panel, колонки в гриде.
-4. **Фаза 4 (1 неделя):** MINIMAL_PRESENCE strategy, массовые операции, уведомления.
-5. **Фаза 5 (1 неделя):** Тестирование в RECOMMENDATION mode на реальных данных, доработка по результатам.
+### 22.3. Не реализовано (backlog)
+
+| Компонент | Приоритет | Комментарий |
+|-----------|-----------|-------------|
+| Отчёт «Эффективность» (до/после метрики) | Средний | Требует накопления данных |
+| Интеграция с AI insights | Низкий | Рекомендации на основе ML |
+| Координированный decision engine (price + bid) | Низкий | Объединённая оптимизация |
+| Управление бюджетами кампаний | Низкий | Дневные бюджеты, перераспределение |
+| Прогнозная модель (ML) | Низкий | Прогноз CPO/CR |
+| A/B-тестирование стратегий | Низкий | Сравнение стратегий |
+| Smart budget allocation | Низкий | Авто-распределение бюджета |
 
 ---
 
-## 23. Что должно войти в version 2 / дальнейшее развитие
-
-### v2 (3–6 месяцев после MVP)
-
-| Компонент | Описание |
-|-----------|----------|
-| Стратегии GROWTH, POSITION_HOLD | Более сложные, требуют больше сигналов |
-| FULL_AUTO режим | Safety gate по аналогии с pricing |
-| Назначение на категорию | Массовое покрытие |
-| Blast radius protection | Aggregate circuit breaker |
-| Price competitiveness guard | Координация с competitor data |
-| Dashboard автобиддинга | Сводная аналитика |
-| Отчёт «Эффективность» | До/после метрики |
-| Volatility guard | Защита от частых разворотов |
-| Интеграция с AI insights | «Рекомендуем включить LIQUIDATION для товаров с overstock» |
-
-### v3 (6–12 месяцев)
-
-| Компонент | Описание |
-|-----------|----------|
-| Стратегии LAUNCH, LIQUIDATION | Lifecycle-стратегии с автопереходом |
-| Координированный decision engine (price + bid) | Объединённая оптимизация «цена + ставка» |
-| Управление бюджетами кампаний | Дневные бюджеты, перераспределение |
-| Прогнозная модель (ML) | Прогноз CPO/CR по категории для оптимальной ставки |
-| A/B-тестирование стратегий | Сравнение двух стратегий на случайных подгруппах |
-| Smart budget allocation | Автоматическое распределение бюджета между товарами |
+## 23. Дальнейшее развитие (backlog)
 
 ---
 
@@ -1081,7 +1069,7 @@ PENDING → IN_PROGRESS → COMPLETED
 
 7. **Изменение ставки на маркетплейсе — идемпотентная операция.** Повторный вызов с той же ставкой не имеет побочных эффектов. Если нет — reconciliation обрабатывает расхождения.
 
-8. **MVP ориентирован на WB и Ozon.** Другие маркетплейсы — вне scope.
+8. **Поддерживаются WB, Ozon и Yandex Market.** Другие маркетплейсы — вне scope.
 
 ---
 

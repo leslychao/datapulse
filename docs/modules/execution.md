@@ -8,7 +8,7 @@
 
 ## Назначение
 
-Lifecycle внешних действий (price changes) с гарантиями доставки и подтверждения результата. Включает retry, reconciliation, симулированное исполнение.
+Lifecycle внешних действий (price changes, bid changes) с гарантиями доставки и подтверждения результата. Включает retry, reconciliation, симулированное исполнение. Для autobidding — аналогичный lifecycle через `bid_action` (см. [Autobidding](autobidding.md)).
 
 ## Action lifecycle
 
@@ -982,3 +982,4 @@ deferred_action:
 - [Seller Operations](seller-operations.md) — failed action queues, price journal
 - [Tenancy & IAM](tenancy-iam.md) — approval/hold определяются ролями
 - [Audit & Alerting](audit-alerting.md) — audit записи для CAS-переходов и manual operations; alert events (action failed, stuck state, reconciliation failed, poison pill)
+- [Autobidding](autobidding.md) — bid_action создаётся аналогично price_action; shared outbox/retry infrastructure; отдельная очередь `bidding.execution`; reconciliation через `BidReadAdapter`

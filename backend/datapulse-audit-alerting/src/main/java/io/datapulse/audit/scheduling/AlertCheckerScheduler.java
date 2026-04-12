@@ -75,6 +75,24 @@ public class AlertCheckerScheduler {
         runCheckerForType(AlertRuleType.AUTOBID_SPEND_SPIKE.name());
     }
 
+    @Scheduled(fixedDelayString = "${datapulse.alerting.autobid-full-auto-anomaly-interval:PT1H}")
+    @SchedulerLock(name = "alertChecker-autobidFullAutoAnomaly", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
+    public void runAutobidFullAutoAnomalyChecker() {
+        runCheckerForType(AlertRuleType.AUTOBID_FULL_AUTO_ANOMALY.name());
+    }
+
+    @Scheduled(fixedDelayString = "${datapulse.alerting.autobid-no-effect-interval:PT2H}")
+    @SchedulerLock(name = "alertChecker-autobidNoEffect", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
+    public void runAutobidNoEffectChecker() {
+        runCheckerForType(AlertRuleType.AUTOBID_NO_EFFECT.name());
+    }
+
+    @Scheduled(fixedDelayString = "${datapulse.alerting.autobid-strategy-exhausted-interval:PT2H}")
+    @SchedulerLock(name = "alertChecker-autobidStrategyExhausted", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
+    public void runAutobidStrategyExhaustedChecker() {
+        runCheckerForType(AlertRuleType.AUTOBID_STRATEGY_EXHAUSTED.name());
+    }
+
     private void runCheckerForType(String ruleType) {
         AlertChecker checker = checkerRegistry.getChecker(ruleType);
         if (checker == null) {

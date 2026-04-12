@@ -102,10 +102,13 @@ public class LaunchStrategy implements BiddingStrategy {
 
     String targetStrategy = stringField(policyConfig, "targetStrategy",
         "ECONOMY_HOLD");
+    BiddingStrategyType transitionTarget =
+        BiddingStrategyType.valueOf(targetStrategy);
     return new BiddingStrategyResult(BidDecisionType.HOLD, currentBid,
         "Launch: period completed, clicks %d >= target %d. "
             .formatted(signals.clicks(), minClicksTarget)
-            + "Recommend transition to %s".formatted(targetStrategy));
+            + "Auto-transitioning to %s".formatted(targetStrategy),
+        transitionTarget);
   }
 
   private BigDecimal decimalField(JsonNode cfg, String field,

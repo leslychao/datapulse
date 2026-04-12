@@ -130,6 +130,7 @@ export interface BidPolicyFilter {
 
 export interface BidDecisionFilter {
   bidPolicyId?: number;
+  biddingRunId?: number;
   marketplaceOfferId?: number;
   decisionType?: BidDecisionType[];
   dateFrom?: string;

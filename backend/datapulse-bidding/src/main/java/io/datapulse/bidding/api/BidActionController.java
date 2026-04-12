@@ -1,9 +1,12 @@
 package io.datapulse.bidding.api;
 
+import java.util.Arrays;
+import java.util.List;
+
 import io.datapulse.bidding.domain.BidActionApprovalService;
+import io.datapulse.bidding.domain.BidActionQueryService;
 import io.datapulse.bidding.domain.BidActionStatus;
 import io.datapulse.bidding.persistence.BidActionEntity;
-import io.datapulse.bidding.persistence.BidActionRepository;
 import io.datapulse.bidding.persistence.BidDecisionEntity;
 import io.datapulse.bidding.persistence.BidDecisionRepository;
 import jakarta.validation.Valid;
@@ -30,18 +33,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class BidActionController {
 
   private final BidActionApprovalService approvalService;
-  private final BidActionRepository actionRepository;
+  private final BidActionQueryService actionQueryService;
   private final BidDecisionRepository decisionRepository;
 
   @GetMapping
   @PreAuthorize("@workspaceAccessService.isCurrentWorkspace(#workspaceId)")
-  public Page<BidActionSummaryResponse> listPending(
+  public Page<BidActionSummaryResponse> listActions(
       @PathVariable("workspaceId") long workspaceId,
+      @RequestParam(value = "status", required = false) String statusCsv,
+      @RequestParam(value = "executionMode", required = false) String executionMode,
       Pageable pageable) {
 
-    return actionRepository
-        .findByWorkspaceIdAndStatus(
-            workspaceId, BidActionStatus.PENDING_APPROVAL, pageable)
+    List<BidActionStatus> statuses = null;
+    if (statusCsv != null && !statusCsv.isBlank()) {
+      statuses = Arrays.stream(statusCsv.split(","))
+          .map(String::trim)
+          .map(BidActionStatus::valueOf)
+          .toList();
+    }
+
+    return actionQueryService
+        .listActions(workspaceId, statuses, executionMode, pageable)
         .map(this::toSummary);
   }
 

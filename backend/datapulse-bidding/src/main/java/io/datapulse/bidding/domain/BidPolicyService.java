@@ -3,6 +3,7 @@ package io.datapulse.bidding.domain;
 import java.time.OffsetDateTime;
 
 import io.datapulse.bidding.persistence.BidActionRepository;
+import io.datapulse.bidding.persistence.BidPolicyAssignmentRepository;
 import io.datapulse.bidding.persistence.BidPolicyEntity;
 import io.datapulse.bidding.persistence.BidPolicyRepository;
 import io.datapulse.bidding.persistence.BiddingRunRepository;
@@ -25,6 +26,7 @@ public class BidPolicyService {
   private static final int FULL_AUTO_LOOKBACK_DAYS = 7;
 
   private final BidPolicyRepository policyRepository;
+  private final BidPolicyAssignmentRepository assignmentRepository;
   private final BiddingRunRepository runRepository;
   private final BidActionRepository actionRepository;
 
@@ -121,6 +123,11 @@ public class BidPolicyService {
   @Transactional(readOnly = true)
   public Page<BidPolicyEntity> listPolicies(long workspaceId, Pageable pageable) {
     return policyRepository.findByWorkspaceId(workspaceId, pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public int countAssignments(long bidPolicyId) {
+    return assignmentRepository.countByBidPolicyId(bidPolicyId);
   }
 
   private BidPolicyEntity requirePolicy(long id) {

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.bidding.domain.BidPolicyService;
 import io.datapulse.bidding.domain.BiddingStrategyType;
 import io.datapulse.bidding.domain.ExecutionMode;
-import io.datapulse.bidding.persistence.BidPolicyAssignmentRepository;
 import io.datapulse.bidding.persistence.BidPolicyEntity;
 import io.datapulse.platform.security.WorkspaceContext;
 import jakarta.validation.Valid;
@@ -30,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class BidPolicyController {
 
   private final BidPolicyService policyService;
-  private final BidPolicyAssignmentRepository assignmentRepository;
   private final BidPolicyMapper mapper;
   private final WorkspaceContext workspaceContext;
   private final ObjectMapper objectMapper;
@@ -62,7 +60,7 @@ public class BidPolicyController {
 
     return policyService.listPolicies(workspaceId, pageable)
         .map(entity -> mapper.toSummary(entity,
-            assignmentRepository.countByBidPolicyId(entity.getId())));
+            policyService.countAssignments(entity.getId())));
   }
 
   @GetMapping("/{id}")
@@ -72,7 +70,7 @@ public class BidPolicyController {
       @PathVariable("id") long id) {
 
     BidPolicyEntity entity = policyService.getPolicy(id);
-    int count = assignmentRepository.countByBidPolicyId(id);
+    int count = policyService.countAssignments(id);
     return mapper.toDetail(entity, count);
   }
 
@@ -90,7 +88,7 @@ public class BidPolicyController {
         ExecutionMode.valueOf(request.executionMode()),
         configJson);
 
-    int count = assignmentRepository.countByBidPolicyId(id);
+    int count = policyService.countAssignments(id);
     return mapper.toDetail(entity, count);
   }
 

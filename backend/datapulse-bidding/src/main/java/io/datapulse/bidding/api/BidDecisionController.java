@@ -37,9 +37,12 @@ public class BidDecisionController {
   public Page<BidDecisionSummaryResponse> listDecisions(
       @PathVariable("workspaceId") long workspaceId,
       @RequestParam(value = "bidPolicyId", required = false) Long bidPolicyId,
+      @RequestParam(value = "biddingRunId", required = false) Long biddingRunId,
+      @RequestParam(value = "marketplaceOfferId", required = false) Long marketplaceOfferId,
       Pageable pageable) {
 
-    return decisionQueryService.listDecisions(workspaceId, bidPolicyId, pageable)
+    return decisionQueryService.listDecisions(
+            workspaceId, bidPolicyId, biddingRunId, marketplaceOfferId, pageable)
         .map(mapper::toSummary);
   }
 
@@ -82,7 +85,7 @@ public class BidDecisionController {
       Pageable pageable = PageRequest.of(page, size,
           Sort.by(Sort.Direction.DESC, "createdAt"));
       batch = decisionQueryService.listDecisions(
-          workspaceId, bidPolicyId, pageable);
+          workspaceId, bidPolicyId, null, null, pageable);
 
       for (BidDecisionEntity d : batch.getContent()) {
         writer.printf("%d,%d,%s,%s,%s,%s,\"%s\",%s,%s%n",

@@ -14,6 +14,8 @@ public interface BiddingRunRepository extends JpaRepository<BiddingRunEntity, Lo
 
   Page<BiddingRunEntity> findByBidPolicyId(Long bidPolicyId, Pageable pageable);
 
+  boolean existsByBidPolicyIdAndStatus(Long bidPolicyId, BiddingRunStatus status);
+
   Page<BiddingRunEntity> findByWorkspaceId(Long workspaceId, Pageable pageable);
 
   @Query("""

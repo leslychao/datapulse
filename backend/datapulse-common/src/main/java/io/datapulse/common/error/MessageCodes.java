@@ -256,6 +256,8 @@ public final class MessageCodes {
     public static final String AUTOBID_HIGH_DRR_CLUSTER_TITLE = "autobidding.alert.high_drr_cluster.title";
     public static final String AUTOBID_SPEND_SPIKE_TITLE = "autobidding.alert.spend_spike.title";
     public static final String AUTOBID_FULL_AUTO_ANOMALY_TITLE = "autobidding.alert.full_auto_anomaly.title";
+    public static final String AUTOBID_NO_EFFECT_TITLE = "autobidding.alert.no_effect.title";
+    public static final String AUTOBID_STRATEGY_EXHAUSTED_TITLE = "autobidding.alert.strategy_exhausted.title";
 
     // --- Pricing: AI Features ---
     public static final String PRICING_ADVISOR_UNAVAILABLE = "pricing.advisor.unavailable";

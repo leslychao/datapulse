@@ -350,6 +350,11 @@ Thresholds и calibration описаны в [Analytics & P&L](analytics-pnl.md) 
 | `AD_NO_STOCK` | [Advertising](advertising.md) | WARNING | false | Кампания активна + товар 0 остатков + spend > 0 за сегодня |
 | `AD_INEFFICIENT_CAMPAIGN` | [Advertising](advertising.md) | INFO | false | CTR < 1% или CR < 2% при spend > порога за 7 дней |
 | `AD_PRICE_DROP_HIGH_DRR` | [Advertising](advertising.md) | WARNING | false | Цена снижена (manual/auto) при ДРР > 15% |
+| `AUTOBID_HIGH_DRR_CLUSTER` | [Autobidding](autobidding.md) | WARNING | false | Кластер товаров с высоким ДРР под управлением автобиддера |
+| `AUTOBID_SPEND_SPIKE` | [Autobidding](autobidding.md) | WARNING | false | Всплеск рекламных расходов в автобиддинге |
+| `AUTOBID_FULL_AUTO_ANOMALY` | [Autobidding](autobidding.md) | WARNING | false | FULL_AUTO-политики с паузами или ошибками запусков |
+| `AUTOBID_NO_EFFECT` | [Autobidding](autobidding.md) | WARNING | false | Повышение ставок не улучшает показатели (>70% BID_UP за последние N runs) |
+| `AUTOBID_STRATEGY_EXHAUSTED` | [Autobidding](autobidding.md) | INFO | false | Большинство товаров на максимальной ставке — стратегия исчерпана |
 
 ### Execution и promo alerts
 
@@ -366,6 +371,8 @@ Thresholds и calibration описаны в [Analytics & P&L](analytics-pnl.md) 
 | Promo action failed | [Promotions](promotions.md) | CRITICAL | promo_action перешёл в FAILED (max attempts exhausted или non-retriable error) |
 | Promo action stuck | [Promotions](promotions.md) | WARNING | promo_action застрял в EXECUTING/APPROVED > TTL (shared stuck-state detector) |
 | Action deferred | [Pricing](pricing.md) | INFO | Создание price_action отложено из-за in-flight action |
+| Bid action failed | [Autobidding](autobidding.md) | CRITICAL | bid_action перешёл в FAILED; action ID, marketplace, failure reason |
+| Bid action stuck | [Autobidding](autobidding.md) | WARNING | bid_action застрял в EXECUTING > TTL |
 
 Эти alerts не требуют `alert_rule` — они event-driven (publish `AlertTriggeredEvent` → Audit & Alerting listener → INSERT `alert_event` с `alert_rule_id = NULL`). Auto-resolve не применяется — lifecycle управляется оператором (ACKNOWLEDGED → RESOLVED) или module-specific logic.
 
@@ -548,3 +555,4 @@ Default rules seed-ятся при создании workspace. Оператор 
 - [ETL Pipeline](etl-pipeline.md) — source data для MISSING_SYNC checker; ETL_SYNC_COMPLETED как trigger для post-materialization checkers
 - [Integration](integration.md) — audit записи для connection/credential operations
 - [Seller Operations](seller-operations.md) — notification UI, alert dashboard, audit log viewer
+- [Autobidding](autobidding.md) — scheduled checkers (HIGH_DRR_CLUSTER, SPEND_SPIKE, FULL_AUTO_ANOMALY, NO_EFFECT, STRATEGY_EXHAUSTED); event-driven alerts (bid action failed, bid action stuck); audit записи для bid policy CRUD

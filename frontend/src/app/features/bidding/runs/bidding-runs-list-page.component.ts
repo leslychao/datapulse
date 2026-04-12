@@ -126,6 +126,7 @@ const RUN_STATUS_COLOR: Record<string, string> = {
             [height]="'100%'"
             [initialSortModel]="listState.initialSortModel()"
             (sortChanged)="listState.onSortChanged($event)"
+            (rowClicked)="onRowClicked($event)"
           />
         }
       </div>
@@ -322,6 +323,12 @@ export class BiddingRunsListPageComponent {
   }));
 
   readonly getRowId = (params: any) => String(params.data.id);
+
+  onRowClicked(event: { data?: BiddingRunSummary }): void {
+    if (!event.data) return;
+    const wsId = this.wsStore.currentWorkspaceId();
+    this.router.navigate(['/workspace', wsId, 'bidding', 'runs', event.data.id]);
+  }
 
   executeTrigger(): void {
     const pId = this.triggerPolicyId();

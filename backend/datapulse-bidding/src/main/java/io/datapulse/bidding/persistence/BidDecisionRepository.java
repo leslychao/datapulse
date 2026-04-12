@@ -21,6 +21,12 @@ public interface BidDecisionRepository extends JpaRepository<BidDecisionEntity, 
   Page<BidDecisionEntity> findByWorkspaceIdAndBidPolicyId(
       Long workspaceId, Long bidPolicyId, Pageable pageable);
 
+  Page<BidDecisionEntity> findByWorkspaceIdAndBiddingRunId(
+      Long workspaceId, Long biddingRunId, Pageable pageable);
+
+  Page<BidDecisionEntity> findByWorkspaceIdAndMarketplaceOfferId(
+      Long workspaceId, Long marketplaceOfferId, Pageable pageable);
+
   @Query("""
       SELECT COUNT(d) FROM BidDecisionEntity d
       WHERE d.marketplaceOfferId = :offerId

@@ -3,8 +3,9 @@ import {
   Component,
   computed,
   inject,
+  signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -18,6 +19,7 @@ import {
 import { BiddingApiService } from '@core/api/bidding-api.service';
 import { BidDecisionFilter, BidDecisionSummary } from '@core/models';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
+import { ToastService } from '@shared/shell/toast/toast.service';
 import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { PaginationBarComponent } from '@shared/components/pagination-bar/pagination-bar.component';
@@ -53,10 +55,17 @@ const DECISION_COLOR: Record<string, string> = {
   host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
     <div class="flex h-full flex-col">
-      <div class="flex items-center border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
+      <div class="flex items-center justify-between border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2">
         <h2 class="text-sm font-semibold text-[var(--text-primary)]">
           {{ 'bidding.decisions.title' | translate }}
         </h2>
+        <button
+          (click)="exportCsv()"
+          [disabled]="isExporting()"
+          class="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1 text-[var(--text-xs)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+        >
+          {{ 'bidding.decisions.export_csv' | translate }}
+        </button>
       </div>
 
       <!-- Filter Bar -->
@@ -113,7 +122,16 @@ export class BidDecisionsListPageComponent {
   private readonly biddingApi = inject(BiddingApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
+  private readonly toast = inject(ToastService);
+
+  readonly isExporting = signal(false);
+
+  private readonly queryOfferId = computed(() => {
+    const raw = this.route.snapshot.queryParamMap.get('marketplaceOfferId');
+    return raw ? Number(raw) : undefined;
+  });
 
   readonly listState = createListPageState({
     pageKey: 'bidding:decisions',
@@ -148,6 +166,8 @@ export class BidDecisionsListPageComponent {
   private readonly filter = computed<BidDecisionFilter>(() => {
     const vals = this.listState.filterValues();
     const f: BidDecisionFilter = {};
+    const offerId = this.queryOfferId();
+    if (offerId) f.marketplaceOfferId = offerId;
     if (vals['decisionType']?.length) f.decisionType = vals['decisionType'];
     const range = vals['dateRange'];
     if (range?.from) f.dateFrom = range.from;
@@ -269,6 +289,26 @@ export class BidDecisionsListPageComponent {
   navigateToDecision(decisionId: number): void {
     const wsId = this.wsStore.currentWorkspaceId();
     this.router.navigate(['/workspace', wsId, 'bidding', 'decisions', decisionId]);
+  }
+
+  exportCsv(): void {
+    this.isExporting.set(true);
+    const wsId = this.wsStore.currentWorkspaceId()!;
+    this.biddingApi.exportDecisionsCsv(wsId, this.filter()).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bid-decisions-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.isExporting.set(false);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('bidding.decisions.export_error'));
+        this.isExporting.set(false);
+      },
+    });
   }
 
   private formatBid(value: number | null): string {

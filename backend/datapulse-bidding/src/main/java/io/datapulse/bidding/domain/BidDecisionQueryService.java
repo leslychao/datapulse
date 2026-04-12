@@ -20,8 +20,18 @@ public class BidDecisionQueryService {
   public Page<BidDecisionEntity> listDecisions(
       Long workspaceId,
       Long bidPolicyId,
+      Long biddingRunId,
+      Long marketplaceOfferId,
       Pageable pageable) {
 
+    if (biddingRunId != null) {
+      return decisionRepository.findByWorkspaceIdAndBiddingRunId(
+          workspaceId, biddingRunId, pageable);
+    }
+    if (marketplaceOfferId != null) {
+      return decisionRepository.findByWorkspaceIdAndMarketplaceOfferId(
+          workspaceId, marketplaceOfferId, pageable);
+    }
     if (bidPolicyId != null) {
       return decisionRepository.findByWorkspaceIdAndBidPolicyId(
           workspaceId, bidPolicyId, pageable);

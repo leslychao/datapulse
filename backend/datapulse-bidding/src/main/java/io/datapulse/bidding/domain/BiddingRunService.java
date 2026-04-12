@@ -41,6 +41,7 @@ public class BiddingRunService {
   private final BiddingRunRepository runRepository;
   private final BidPolicyRepository policyRepository;
   private final BiddingActionScheduler actionScheduler;
+  private final BiddingResumeEvaluator resumeEvaluator;
   private final BiddingProperties properties;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher eventPublisher;
@@ -58,6 +59,13 @@ public class BiddingRunService {
       return;
     }
 
+    if (runRepository.existsByBidPolicyIdAndStatus(
+        bidPolicyId, BiddingRunStatus.IN_PROGRESS)) {
+      log.warn("Concurrent run blocked: bidPolicyId={} already has an IN_PROGRESS run",
+          bidPolicyId);
+      return;
+    }
+
     JsonNode configNode = parseConfig(policy.getConfig());
     BiddingRunEntity run = createRun(workspaceId, bidPolicyId);
 
@@ -70,6 +78,9 @@ public class BiddingRunService {
         log.info("Bidding run {}: no eligible products for policy {}",
             run.getId(), bidPolicyId);
         completeRun(run);
+        eventPublisher.publishEvent(new BiddingRunCompletedEvent(
+            workspaceId, run.getId(), bidPolicyId,
+            run.getStatus().name(), 0, 0, 0, 0));
         return;
       }
 
@@ -97,7 +108,25 @@ public class BiddingRunService {
           continue;
         }
 
+        BiddingStrategyResult resumeResult = resumeEvaluator.evaluateResume(
+            workspaceId, product.marketplaceOfferId(), signals);
+        if (resumeResult != null) {
+          saveDecision(run.getId(), workspaceId, product, policy,
+              resumeResult, null, signals);
+          totalHold++;
+          continue;
+        }
+
         BiddingStrategyResult result = strategy.evaluate(signals, configNode);
+
+        if (result.suggestedTransition() != null) {
+          eventPublisher.publishEvent(
+              new io.datapulse.bidding.domain.event.LaunchTransitionRequestedEvent(
+                  workspaceId,
+                  product.marketplaceOfferId(),
+                  bidPolicyId,
+                  result.suggestedTransition()));
+        }
 
         if (result.decisionType() == BidDecisionType.HOLD) {
           totalHold++;
@@ -117,7 +146,11 @@ public class BiddingRunService {
 
         GuardChainResult guardResult = guardChain.evaluate(guardContext);
 
-        if (!guardResult.allPassed()) {
+        boolean isDefensiveAction =
+            result.decisionType() == BidDecisionType.BID_DOWN
+                || result.decisionType() == BidDecisionType.PAUSE;
+
+        if (!guardResult.allPassed() && !isDefensiveAction) {
           totalHold++;
           saveDecision(run.getId(), workspaceId, product, policy,
               holdWithGuardInfo(result, guardResult), guardResult, signals);
@@ -188,6 +221,9 @@ public class BiddingRunService {
       run.setErrorMessage(e.getMessage());
       run.setCompletedAt(OffsetDateTime.now());
       runRepository.save(run);
+      eventPublisher.publishEvent(new BiddingRunCompletedEvent(
+          workspaceId, run.getId(), bidPolicyId,
+          run.getStatus().name(), 0, 0, 0, 0));
     }
   }
 

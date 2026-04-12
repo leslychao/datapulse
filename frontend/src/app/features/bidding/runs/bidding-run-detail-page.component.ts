@@ -264,7 +264,7 @@ export class BiddingRunDetailPageComponent {
         this.biddingApi.listDecisions(
           this.wsStore.currentWorkspaceId()!,
           {
-            bidPolicyId: undefined,
+            biddingRunId: this.numericRunId(),
             decisionType: this.decisionFilter().decisionType as any,
           },
           this.decisionPage(),
