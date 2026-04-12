@@ -1,5 +1,6 @@
 package io.datapulse.integration.domain;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.common.exception.NotFoundException;
 import io.datapulse.integration.domain.event.ConnectionStatusChangedEvent;
 import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,9 +27,16 @@ public class ConnectionValidationResultApplier {
   private final MarketplaceConnectionRepository connectionRepository;
   private final MarketplaceSyncStateRepository syncStateRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final ObjectMapper objectMapper;
 
   @Transactional
   public void applySuccess(Long connectionId, String externalAccountId) {
+    applySuccess(connectionId, externalAccountId, null);
+  }
+
+  @Transactional
+  public void applySuccess(Long connectionId, String externalAccountId,
+      Map<String, Object> metadata) {
     MarketplaceConnectionEntity connection = connectionRepository.findById(connectionId)
         .orElseThrow(() -> NotFoundException.connection(connectionId));
 
@@ -38,6 +47,15 @@ public class ConnectionValidationResultApplier {
     connection.setLastSuccessAt(OffsetDateTime.now());
     connection.setLastErrorCode(null);
     connection.setLastErrorAt(null);
+
+    if (metadata != null && !metadata.isEmpty()) {
+      try {
+        connection.setMetadata(objectMapper.writeValueAsString(metadata));
+      } catch (Exception e) {
+        log.warn("Failed to serialize connection metadata: connectionId={}", connectionId, e);
+      }
+    }
+
     connectionRepository.save(connection);
 
     if (ConnectionStatus.PENDING_VALIDATION.name().equals(oldStatus)) {

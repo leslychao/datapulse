@@ -63,6 +63,10 @@ public final class MessageCodes {
     public static final String CONNECTION_MARKETPLACE_MISMATCH = "connection.marketplace.mismatch";
     public static final String CREDENTIALS_INVALID = "credentials.invalid";
     public static final String VAULT_UNAVAILABLE = "vault.unavailable";
+    public static final String INTEGRATION_YANDEX_BUSINESS_DISABLED =
+            "integration.connection.yandex.business_disabled";
+    public static final String INTEGRATION_YANDEX_TOKEN_INVALID =
+            "integration.connection.yandex.token_invalid";
     /** Stored in {@code user_notification.title} / pushed over WS; translate on client for SYNC_COMPLETED. */
     public static final String INTEGRATION_NOTIFICATION_SYNC_COMPLETED_TITLE =
             "integration.notification.sync_completed.title";
@@ -84,6 +88,13 @@ public final class MessageCodes {
     public static final String ALERT_EVENT_NOT_FOUND = "alert.event.not.found";
     public static final String ALERT_EVENT_INVALID_STATE = "alert.event.invalid.state";
     public static final String ALERT_RULE_NOT_FOUND = "alert.rule.not.found";
+
+    // --- Bidding: Guards ---
+    public static final String BIDDING_GUARD_MANUAL_LOCK = "bidding.guard.manual_lock.blocked";
+    public static final String BIDDING_GUARD_CAMPAIGN_INACTIVE = "bidding.guard.campaign_inactive.blocked";
+    public static final String BIDDING_GUARD_STALE_DATA = "bidding.guard.stale_data.blocked";
+    public static final String BIDDING_GUARD_STOCK_OUT = "bidding.guard.stock_out.blocked";
+    public static final String BIDDING_GUARD_ECONOMY = "bidding.guard.economy.blocked";
 
     // --- Pricing: Guards ---
     public static final String PRICING_GUARD_MANUAL_LOCK = "pricing.guard.manual_lock";

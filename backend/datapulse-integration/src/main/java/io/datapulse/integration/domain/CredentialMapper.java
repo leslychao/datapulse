@@ -15,6 +15,7 @@ public final class CredentialMapper {
         return switch (marketplaceType) {
             case WB -> toWbMap(parseWbCredentials(credentials));
             case OZON -> toOzonMap(parseOzonSellerCredentials(credentials));
+            case YANDEX -> toYandexMap(parseYandexCredentials(credentials));
         };
     }
 
@@ -55,10 +56,22 @@ public final class CredentialMapper {
         return map;
     }
 
+    public static YandexCredentials parseYandexCredentials(JsonNode node) {
+        String apiKey = extractRequired(node, "apiKey");
+        return new YandexCredentials(apiKey);
+    }
+
+    public static Map<String, String> toYandexMap(YandexCredentials creds) {
+        Map<String, String> map = new HashMap<>();
+        map.put(CredentialKeys.YANDEX_API_KEY, creds.apiKey());
+        return map;
+    }
+
     public static SecretType resolveSecretType(MarketplaceType marketplaceType) {
         return switch (marketplaceType) {
             case WB -> SecretType.WB_API_TOKEN;
             case OZON -> SecretType.OZON_SELLER_CREDENTIALS;
+            case YANDEX -> SecretType.YANDEX_API_KEY;
         };
     }
 

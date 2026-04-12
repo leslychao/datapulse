@@ -191,6 +191,7 @@ public class ConnectionHealthCheckScheduler {
         return switch (marketplaceType) {
             case WB -> RateLimitGroup.WB_CONTENT;
             case OZON -> RateLimitGroup.OZON_DEFAULT;
+            case YANDEX -> RateLimitGroup.YANDEX_DEFAULT;
         };
     }
 

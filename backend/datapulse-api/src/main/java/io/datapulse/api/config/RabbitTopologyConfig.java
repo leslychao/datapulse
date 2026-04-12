@@ -24,6 +24,9 @@ public class RabbitTopologyConfig {
   public static final String PRICE_RECONCILIATION_WAIT_EXCHANGE = "price.reconciliation.wait";
   public static final String PROMO_EXECUTION_EXCHANGE = "promo.execution";
   public static final String PROMO_EVALUATION_EXCHANGE = "promo.evaluation";
+  public static final String BIDDING_RUN_EXCHANGE = "bidding.run";
+  public static final String BID_EXECUTION_EXCHANGE = "bid.execution";
+  public static final String BID_EXECUTION_WAIT_EXCHANGE = "bid.execution.wait";
 
   // ── Queue names ─────────────────────────────────────────────────────────
 
@@ -39,6 +42,9 @@ public class RabbitTopologyConfig {
   public static final String PRICE_RECONCILIATION_WAIT_QUEUE = "price.reconciliation.wait";
   public static final String PROMO_EXECUTION_QUEUE = "promo.execution";
   public static final String PROMO_EVALUATION_QUEUE = "promo.evaluation";
+  public static final String BIDDING_RUN_QUEUE = "bidding.run";
+  public static final String BID_EXECUTION_QUEUE = "bid.execution";
+  public static final String BID_EXECUTION_WAIT_QUEUE = "bid.execution.wait";
 
   // ── DLX TTL defaults (ms) ───────────────────────────────────────────────
   // Per-message TTL (from delay_ms in payload) controls actual backoff.
@@ -63,6 +69,9 @@ public class RabbitTopologyConfig {
         true, false);
     var promoExecutionExchange = new DirectExchange(PROMO_EXECUTION_EXCHANGE, true, false);
     var promoEvaluationExchange = new DirectExchange(PROMO_EVALUATION_EXCHANGE, true, false);
+    var biddingRunExchange = new DirectExchange(BIDDING_RUN_EXCHANGE, true, false);
+    var bidExecutionExchange = new DirectExchange(BID_EXECUTION_EXCHANGE, true, false);
+    var bidExecutionWaitExchange = new DirectExchange(BID_EXECUTION_WAIT_EXCHANGE, true, false);
 
     // ── Main queues ─────────────────────────────────────────────────────
 
@@ -72,6 +81,8 @@ public class RabbitTopologyConfig {
     var priceReconciliationQueue = QueueBuilder.durable(PRICE_RECONCILIATION_QUEUE).build();
     var promoExecutionQueue = QueueBuilder.durable(PROMO_EXECUTION_QUEUE).build();
     var promoEvaluationQueue = QueueBuilder.durable(PROMO_EVALUATION_QUEUE).build();
+    var biddingRunQueue = QueueBuilder.durable(BIDDING_RUN_QUEUE).build();
+    var bidExecutionQueue = QueueBuilder.durable(BID_EXECUTION_QUEUE).build();
 
     // ── Fanout queues ───────────────────────────────────────────────────
 
@@ -98,6 +109,12 @@ public class RabbitTopologyConfig {
         .deadLetterRoutingKey(PRICE_RECONCILIATION_QUEUE)
         .build();
 
+    var bidExecutionWaitQueue = QueueBuilder.durable(BID_EXECUTION_WAIT_QUEUE)
+        .deadLetterExchange(BID_EXECUTION_EXCHANGE)
+        .deadLetterRoutingKey(BID_EXECUTION_QUEUE)
+        .ttl((int) EXECUTION_WAIT_TTL)
+        .build();
+
     // ── Bindings: direct exchanges → queues ─────────────────────────────
 
     Binding etlSyncBinding = BindingBuilder.bind(etlSyncQueue)
@@ -112,6 +129,10 @@ public class RabbitTopologyConfig {
         .to(promoExecutionExchange).with(PROMO_EXECUTION_QUEUE);
     Binding promoEvaluationBinding = BindingBuilder.bind(promoEvaluationQueue)
         .to(promoEvaluationExchange).with(PROMO_EVALUATION_QUEUE);
+    Binding biddingRunBinding = BindingBuilder.bind(biddingRunQueue)
+        .to(biddingRunExchange).with(BIDDING_RUN_QUEUE);
+    Binding bidExecutionBinding = BindingBuilder.bind(bidExecutionQueue)
+        .to(bidExecutionExchange).with(BID_EXECUTION_QUEUE);
 
     // ── Bindings: wait exchanges → wait queues ──────────────────────────
 
@@ -121,6 +142,8 @@ public class RabbitTopologyConfig {
         .to(priceExecutionWaitExchange).with(PRICE_EXECUTION_WAIT_QUEUE);
     Binding priceReconciliationWaitBinding = BindingBuilder.bind(priceReconciliationWaitQueue)
         .to(priceReconciliationWaitExchange).with(PRICE_RECONCILIATION_WAIT_QUEUE);
+    Binding bidExecutionWaitBinding = BindingBuilder.bind(bidExecutionWaitQueue)
+        .to(bidExecutionWaitExchange).with(BID_EXECUTION_WAIT_QUEUE);
 
     // ── Bindings: fanout exchange → consumer queues ─────────────────────
 
@@ -138,23 +161,28 @@ public class RabbitTopologyConfig {
         priceExecutionExchange, priceExecutionWaitExchange,
         priceReconciliationExchange, priceReconciliationWaitExchange,
         promoExecutionExchange, promoEvaluationExchange,
+        biddingRunExchange, bidExecutionExchange, bidExecutionWaitExchange,
 
         // main queues
         etlSyncQueue, pricingRunQueue, priceExecutionQueue,
         priceReconciliationQueue, promoExecutionQueue, promoEvaluationQueue,
+        biddingRunQueue, bidExecutionQueue,
 
         // fanout queues
         etlEventsPricingQueue, etlEventsApiQueue, etlEventsMismatchQueue,
 
         // wait queues
         etlSyncWaitQueue, priceExecutionWaitQueue, priceReconciliationWaitQueue,
+        bidExecutionWaitQueue,
 
         // bindings: direct
         etlSyncBinding, pricingRunBinding, priceExecutionBinding,
         priceReconciliationBinding, promoExecutionBinding, promoEvaluationBinding,
+        biddingRunBinding, bidExecutionBinding,
 
         // bindings: wait
         etlSyncWaitBinding, priceExecutionWaitBinding, priceReconciliationWaitBinding,
+        bidExecutionWaitBinding,
 
         // bindings: fanout
         etlEventsPricingBinding, etlEventsApiBinding, etlEventsMismatchBinding

@@ -95,7 +95,7 @@ public class MarketplaceRateLimiter {
     }
 
     public void onResponse(long connectionId, RateLimitGroup group, int httpStatus) {
-        if (httpStatus == 429) {
+        if (httpStatus == 429 || httpStatus == 420) {
             aimdController.onThrottle(connectionId, group);
             metricsFacade.incrementCounter(
                     "marketplace_rate_limit_throttled_total",

@@ -39,6 +39,7 @@ public final class IngestContextFixtures {
         WB_FACT_DATE_FROM,
         WB_FACT_DATE_TO,
         OZON_FACT_SINCE,
-        OZON_FACT_TO);
+        OZON_FACT_TO,
+        null);
   }
 }

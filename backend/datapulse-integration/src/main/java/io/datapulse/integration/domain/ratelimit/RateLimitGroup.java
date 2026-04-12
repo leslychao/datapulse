@@ -24,7 +24,16 @@ public enum RateLimitGroup {
     OZON_DEFAULT(30.0 / 60.0, 3, MarketplaceType.OZON),
     OZON_PROMO(20.0 / 60.0, 3, MarketplaceType.OZON),
     OZON_PRICE_UPDATE(30.0 / 60.0, 3, MarketplaceType.OZON),
-    OZON_PERFORMANCE(60.0 / 60.0, 5, MarketplaceType.OZON);
+    OZON_PERFORMANCE(60.0 / 60.0, 5, MarketplaceType.OZON),
+
+    // Yandex Market groups (rates in req/s)
+    YANDEX_DEFAULT(1.5, 4, MarketplaceType.YANDEX),
+    YANDEX_CATALOG(1.5, 4, MarketplaceType.YANDEX),
+    YANDEX_ORDERS(2.5, 5, MarketplaceType.YANDEX),
+    YANDEX_BIDS(8.0, 10, MarketplaceType.YANDEX),
+    YANDEX_PRICE_UPDATE(2.0, 5, MarketplaceType.YANDEX),
+    YANDEX_REPORTS(0.5, 2, MarketplaceType.YANDEX),
+    YANDEX_WAREHOUSES(0.02, 1, MarketplaceType.YANDEX);
 
     private final double initialRate;
     private final int burst;

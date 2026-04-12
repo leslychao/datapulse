@@ -29,6 +29,7 @@
         <module>datapulse-promotions</module>
         <module>datapulse-seller-operations</module>
         <module>datapulse-audit-alerting</module>
+        <module>datapulse-bidding</module>
         <module>datapulse-api</module>
     </modules>
 
@@ -101,6 +102,11 @@
             <dependency>
                 <groupId>io.datapulse</groupId>
                 <artifactId>datapulse-audit-alerting</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.datapulse</groupId>
+                <artifactId>datapulse-bidding</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

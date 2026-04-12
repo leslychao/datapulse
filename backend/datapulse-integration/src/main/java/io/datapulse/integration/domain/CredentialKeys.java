@@ -19,4 +19,6 @@ public final class CredentialKeys {
 
   public static final String OZON_PERFORMANCE_CLIENT_ID = "performanceClientId";
   public static final String OZON_PERFORMANCE_CLIENT_SECRET = "performanceClientSecret";
+
+  public static final String YANDEX_API_KEY = "apiKey";
 }

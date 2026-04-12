@@ -22,9 +22,12 @@ import io.datapulse.integration.domain.MarketplaceType;
  * @param checkpoint     parsed checkpoint from previous attempt (null on first attempt)
  * @param wbFactDateFrom start date (inclusive) for WB fact adapters using {@link LocalDate} filters
  * @param wbFactDateTo   end date (inclusive) for WB fact adapters, usually job-start calendar day
- * @param ozonFactSince  start instant for Ozon fact adapters ({@code since} parameter)
- * @param ozonFactTo     end instant for Ozon fact adapters ({@code to} parameter), typically
- *                       {@code now} at context build time
+ * @param ozonFactSince      start instant for Ozon fact adapters ({@code since} parameter)
+ * @param ozonFactTo         end instant for Ozon fact adapters ({@code to} parameter), typically
+ *                           {@code now} at context build time
+ * @param connectionMetadata raw JSON from {@code marketplace_connection.metadata} JSONB column;
+ *                           contains provider-specific data discovered during health probe
+ *                           (e.g. Yandex {@code businessId} and {@code campaigns})
  */
 public record IngestContext(
         long jobExecutionId,
@@ -38,7 +41,8 @@ public record IngestContext(
         LocalDate wbFactDateFrom,
         LocalDate wbFactDateTo,
         OffsetDateTime ozonFactSince,
-        OffsetDateTime ozonFactTo
+        OffsetDateTime ozonFactTo,
+        String connectionMetadata
 ) {
 
     /**

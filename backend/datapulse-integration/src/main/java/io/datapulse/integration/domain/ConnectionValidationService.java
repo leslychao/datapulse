@@ -47,7 +47,8 @@ public class ConnectionValidationService {
                         connection.getWorkspaceId(), connection.getMarketplaceType());
                 } else {
                     try {
-                        resultApplier.applySuccess(connectionId, result.externalAccountId());
+                        resultApplier.applySuccess(
+                            connectionId, result.externalAccountId(), result.metadata());
                         log.info("Async validation success: connectionId={}, externalAccountId={}",
                             connectionId, result.externalAccountId());
                     } catch (DataIntegrityViolationException ex) {

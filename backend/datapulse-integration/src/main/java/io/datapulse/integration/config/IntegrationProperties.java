@@ -17,6 +17,7 @@ public class IntegrationProperties {
 
     private final Wildberries wildberries;
     private final Ozon ozon;
+    private final Yandex yandex;
     private final HealthCheck healthCheck;
 
     @Validated
@@ -69,6 +70,21 @@ public class IntegrationProperties {
 
         public String getSellerWriteBaseUrl() {
             return sellerWriteBaseUrl != null ? sellerWriteBaseUrl : sellerBaseUrl;
+        }
+    }
+
+    @Validated
+    @Getter
+    @RequiredArgsConstructor
+    public static class Yandex {
+
+        @NotBlank
+        private final String baseUrl;
+
+        private final String writeBaseUrl;
+
+        public String getWriteBaseUrl() {
+            return writeBaseUrl != null ? writeBaseUrl : baseUrl;
         }
     }
 

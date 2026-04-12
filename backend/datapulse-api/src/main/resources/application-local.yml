@@ -21,6 +21,9 @@ datapulse:
       seller-write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
       # Performance API → WireMock (no real credentials yet)
       performance-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+    yandex:
+      base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
+      write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
 
 spring:
   jpa:

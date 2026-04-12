@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.persistence.JobExecutionRow;
+import io.datapulse.integration.persistence.MarketplaceConnectionEntity;
+import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import java.time.Clock;
@@ -34,6 +36,7 @@ public class IngestSyncContextBuilder {
   private final CheckpointManager checkpointManager;
   private final ObjectMapper objectMapper;
   private final MarketplaceSyncStateRepository syncStateRepository;
+  private final MarketplaceConnectionRepository connectionRepository;
   private final IngestProperties ingestProperties;
   private final Clock clock;
 
@@ -48,6 +51,8 @@ public class IngestSyncContextBuilder {
 
     FactCaptureWindow factWindow = resolveFactCaptureWindow(job);
 
+    String connectionMetadata = resolveConnectionMetadata(job.getConnectionId());
+
     return new IngestContext(
         job.getId(),
         job.getConnectionId(),
@@ -60,7 +65,8 @@ public class IngestSyncContextBuilder {
         factWindow.wbDateFrom(),
         factWindow.wbDateTo(),
         factWindow.ozonSince(),
-        factWindow.ozonTo());
+        factWindow.ozonTo(),
+        connectionMetadata);
   }
 
   private Set<EtlEventType> resolveScope(JobExecutionRow job) {
@@ -157,6 +163,12 @@ public class IngestSyncContextBuilder {
     }
 
     return new FactCaptureWindow(wbFrom, today, startOdt, now);
+  }
+
+  private String resolveConnectionMetadata(long connectionId) {
+    return connectionRepository.findById(connectionId)
+        .map(MarketplaceConnectionEntity::getMetadata)
+        .orElse(null);
   }
 
   private Optional<OffsetDateTime> maxLastSuccessAt(long connectionId) {

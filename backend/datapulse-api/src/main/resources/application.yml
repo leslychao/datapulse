@@ -91,6 +91,9 @@ datapulse:
       seller-base-url: ${OZON_SELLER_BASE_URL:https://api-seller.ozon.ru}
       seller-write-base-url: ${OZON_SELLER_WRITE_BASE_URL:${OZON_SELLER_BASE_URL:https://api-seller.ozon.ru}}
       performance-base-url: ${OZON_PERFORMANCE_BASE_URL:https://api-performance.ozon.ru}
+    yandex:
+      base-url: ${YANDEX_BASE_URL:https://api.partner.market.yandex.ru}
+      write-base-url: ${YANDEX_WRITE_BASE_URL:${YANDEX_BASE_URL:https://api.partner.market.yandex.ru}}
     rate-limits:
       groups:
         OZON_DEFAULT:
@@ -132,6 +135,13 @@ datapulse:
       retry-scheduled-grace: ${EXECUTION_STUCK_RETRY_GRACE:PT5M}
       reconciliation-pending-ttl: ${EXECUTION_STUCK_RECON_PENDING_TTL:PT10M}
       scheduled-ttl: ${EXECUTION_STUCK_SCHEDULED_TTL:PT5M}
+  bidding:
+    default-lookback-days: ${BIDDING_DEFAULT_LOOKBACK_DAYS:7}
+    max-bid-up-ratio-pct: ${BIDDING_MAX_BID_UP_RATIO_PCT:50}
+    min-decision-interval-hours: ${BIDDING_MIN_DECISION_INTERVAL_HOURS:4}
+    stale-data-threshold-hours: ${BIDDING_STALE_DATA_THRESHOLD_HOURS:48}
+    low-stock-threshold-days: ${BIDDING_LOW_STOCK_THRESHOLD_DAYS:7}
+    enabled: ${BIDDING_ENABLED:true}
   outbox:
     enabled: ${OUTBOX_ENABLED:true}
     runtime: ${OUTBOX_RUNTIME:ALL}

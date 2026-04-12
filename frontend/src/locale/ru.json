@@ -3361,5 +3361,8 @@
   "pricing.insights.types.HIGH_DRR_ALERT": "Высокий DRR",
   "pricing.insights.types.COMPETITOR_UNDERCUT": "Конкурент ниже",
 
-  "pricing.narrative.unavailable": "Текстовое описание недоступно"
+  "pricing.narrative.unavailable": "Текстовое описание недоступно",
+
+  "integration.connection.yandex.business_disabled": "Яндекс.Маркет: бизнес-аккаунт отключён (нет активных магазинов)",
+  "integration.connection.yandex.token_invalid": "Яндекс.Маркет: невалидный Api-Key токен"
 }

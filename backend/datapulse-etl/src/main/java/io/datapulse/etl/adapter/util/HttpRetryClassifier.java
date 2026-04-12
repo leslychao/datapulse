@@ -12,8 +12,8 @@ import reactor.util.retry.Retry;
 /**
  * Shared HTTP retry policy for marketplace API callers.
  *
- * <p>Retryable: HTTP 429, 500, 502, 503, 504, connection timeout, read timeout.
- * Not retryable: 4xx (except 429), parsing errors, credential errors (401/403).
+ * <p>Retryable: HTTP 420 (Yandex rate limit), 429, 500, 502, 503, 504, connection timeout,
+ * read timeout. Not retryable: other 4xx, parsing errors, credential errors (401/403).
  */
 @Slf4j
 public final class HttpRetryClassifier {
@@ -28,7 +28,7 @@ public final class HttpRetryClassifier {
     public static boolean isRetryable(Throwable ex) {
         if (ex instanceof WebClientResponseException wce) {
             int status = wce.getStatusCode().value();
-            return status == 429 || status >= 500;
+            return status == 420 || status == 429 || status >= 500;
         }
         return ex instanceof ConnectTimeoutException
                 || ex instanceof ReadTimeoutException

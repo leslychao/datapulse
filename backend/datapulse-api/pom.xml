@@ -54,6 +54,10 @@
             <groupId>io.datapulse</groupId>
             <artifactId>datapulse-audit-alerting</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.datapulse</groupId>
+            <artifactId>datapulse-bidding</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

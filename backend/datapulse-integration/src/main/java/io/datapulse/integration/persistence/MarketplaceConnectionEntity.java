@@ -47,4 +47,7 @@ public class MarketplaceConnectionEntity extends BaseEntity {
 
     @Column(name = "last_error_code", length = 60)
     private String lastErrorCode;
+
+    @Column(name = "metadata", columnDefinition = "jsonb")
+    private String metadata;
 }
