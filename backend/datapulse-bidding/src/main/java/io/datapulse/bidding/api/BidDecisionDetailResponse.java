@@ -15,6 +15,8 @@ public record BidDecisionDetailResponse(
     JsonNode signalSnapshot,
     JsonNode guardsApplied,
     String explanationSummary,
+    String explanationKey,
+    JsonNode explanationArgs,
     String executionMode,
     OffsetDateTime createdAt
 ) {

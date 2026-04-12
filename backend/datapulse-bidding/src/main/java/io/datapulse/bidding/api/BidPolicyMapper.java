@@ -37,6 +37,7 @@ public abstract class BidPolicyMapper {
   @Mapping(source = "entity.status", target = "status")
   @Mapping(source = "entity.config", target = "config", qualifiedByName = "jsonStringToNode")
   @Mapping(source = "entity.createdBy", target = "createdBy")
+  @Mapping(source = "entity.version", target = "version")
   @Mapping(source = "entity.createdAt", target = "createdAt")
   @Mapping(source = "entity.updatedAt", target = "updatedAt")
   @Mapping(source = "assignmentCount", target = "assignmentCount")
@@ -49,8 +50,10 @@ public abstract class BidPolicyMapper {
 
   @Mapping(source = "signalSnapshot", target = "signalSnapshot", qualifiedByName = "jsonStringToNode")
   @Mapping(source = "guardsApplied", target = "guardsApplied", qualifiedByName = "jsonStringToNode")
+  @Mapping(source = "explanationArgs", target = "explanationArgs", qualifiedByName = "jsonStringToNode")
   public abstract BidDecisionDetailResponse toDetail(BidDecisionEntity entity);
 
+  @Mapping(source = "explanationArgs", target = "explanationArgs", qualifiedByName = "jsonStringToNode")
   public abstract BidDecisionSummaryResponse toSummary(BidDecisionEntity entity);
 
   public abstract BiddingRunSummaryResponse toSummary(BiddingRunEntity entity);

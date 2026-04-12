@@ -11,6 +11,7 @@ import {
   Building2,
   BellRing,
   ScrollText,
+  Bot,
 } from 'lucide-angular';
 
 import { WorkspaceRole } from '@core/models';
@@ -72,6 +73,7 @@ export class SettingsLayoutComponent {
     { path: 'connections', labelKey: 'settings.nav.connections', icon: Plug },
     { path: 'team', labelKey: 'settings.nav.team', icon: Users },
     { path: 'invitations', labelKey: 'settings.nav.invitations', icon: MailPlus, visibleRoles: ADMIN_ONLY },
+    { path: 'bidding', labelKey: 'settings.nav.bidding', icon: Bot, visibleRoles: ADMIN_ONLY },
     { path: 'alert-rules', labelKey: 'settings.nav.alert_rules', icon: BellRing, visibleRoles: OPERATOR_PLUS },
     { path: 'audit', labelKey: 'settings.nav.audit_log', icon: ScrollText, visibleRoles: ADMIN_ONLY },
   ];

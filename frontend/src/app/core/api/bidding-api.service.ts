@@ -20,6 +20,8 @@ import {
   ManualBidLock,
   Page,
   UpdateBidPolicyRequest,
+  UpdateWorkspaceBiddingSettingsRequest,
+  WorkspaceBiddingSettings,
 } from '@core/models';
 
 @Injectable({ providedIn: 'root' })
@@ -357,6 +359,24 @@ export class BiddingApiService {
     return this.http.post<void>(
       `${this.base}/workspaces/${workspaceId}/bidding/actions/bulk-reject`,
       { actionIds },
+    );
+  }
+
+  // ── Settings ──
+
+  getSettings(workspaceId: number): Observable<WorkspaceBiddingSettings> {
+    return this.http.get<WorkspaceBiddingSettings>(
+      `${this.base}/workspaces/${workspaceId}/bidding/settings`,
+    );
+  }
+
+  updateSettings(
+    workspaceId: number,
+    req: UpdateWorkspaceBiddingSettingsRequest,
+  ): Observable<WorkspaceBiddingSettings> {
+    return this.http.put<WorkspaceBiddingSettings>(
+      `${this.base}/workspaces/${workspaceId}/bidding/settings`,
+      req,
     );
   }
 

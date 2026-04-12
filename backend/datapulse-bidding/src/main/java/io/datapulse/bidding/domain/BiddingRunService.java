@@ -42,12 +42,19 @@ public class BiddingRunService {
   private final BidPolicyRepository policyRepository;
   private final BiddingActionScheduler actionScheduler;
   private final BiddingResumeEvaluator resumeEvaluator;
+  private final WorkspaceBiddingSettingsService settingsService;
   private final BiddingProperties properties;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public void executeRun(long workspaceId, long bidPolicyId) {
+    if (!settingsService.isBiddingEnabled(workspaceId)) {
+      log.info("Bidding disabled for workspace: workspaceId={}, skipping run",
+          workspaceId);
+      return;
+    }
+
     BidPolicyEntity policy = policyRepository.findById(bidPolicyId).orElse(null);
     if (policy == null) {
       log.warn("Bid policy not found: bidPolicyId={}", bidPolicyId);

@@ -283,4 +283,7 @@ public final class MessageCodes {
     public static final String QUEUE_ITEM_ALREADY_CLAIMED = "queues.item.already_claimed";
     public static final String QUEUE_LIMIT_EXCEEDED = "queue.limit.exceeded";
     public static final String SAVED_VIEW_LIMIT_EXCEEDED = "saved_view.limit.exceeded";
+
+    // --- Common: Concurrent Modification ---
+    public static final String CONCURRENT_MODIFICATION = "common.concurrent_modification";
 }

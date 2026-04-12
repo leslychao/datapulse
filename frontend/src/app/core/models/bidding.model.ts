@@ -31,6 +31,7 @@ export interface BidPolicySummary {
 export interface BidPolicyDetail extends BidPolicySummary {
   config: Record<string, unknown>;
   createdBy: number | null;
+  version: number;
 }
 
 export interface CreateBidPolicyRequest {
@@ -69,6 +70,8 @@ export interface BidDecisionSummary {
   currentBid: number | null;
   targetBid: number | null;
   explanationSummary: string | null;
+  explanationKey: string | null;
+  explanationArgs: Record<string, unknown> | null;
   executionMode: BiddingExecutionMode;
   createdAt: string;
 }
@@ -156,4 +159,16 @@ export interface BiddingTopProductItem {
   lastDecisionType: BidDecisionType;
   currentBid: number | null;
   drrPct: number | null;
+}
+
+export interface WorkspaceBiddingSettings {
+  biddingEnabled: boolean;
+  maxAggregateDailySpend: number | null;
+  minDecisionIntervalHours: number;
+}
+
+export interface UpdateWorkspaceBiddingSettingsRequest {
+  biddingEnabled: boolean;
+  maxAggregateDailySpend: number | null;
+  minDecisionIntervalHours: number;
 }

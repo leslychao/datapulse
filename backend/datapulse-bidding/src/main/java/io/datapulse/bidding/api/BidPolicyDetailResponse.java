@@ -13,6 +13,7 @@ public record BidPolicyDetailResponse(
     JsonNode config,
     int assignmentCount,
     Long createdBy,
+    Long version,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {

@@ -10,6 +10,7 @@ import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -81,6 +82,24 @@ public class ApiExceptionHandler {
         null
     );
     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+  }
+
+  @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+  public ResponseEntity<ErrorResponse> handleOptimisticLock(
+      ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+    log.warn("Optimistic lock conflict: path={}, entity={}",
+        request.getRequestURI(), ex.getPersistentClassName());
+
+    ErrorResponse response = new ErrorResponse(
+        Instant.now(),
+        HttpStatus.CONFLICT.value(),
+        HttpStatus.CONFLICT.getReasonPhrase(),
+        MessageCodes.CONCURRENT_MODIFICATION,
+        MessageCodes.CONCURRENT_MODIFICATION,
+        request.getRequestURI(),
+        null
+    );
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
   }
 
   @ExceptionHandler(Exception.class)

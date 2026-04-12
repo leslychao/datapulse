@@ -27,13 +27,6 @@ const DECISION_COLOR: Record<string, StatusColor> = {
   EMERGENCY_CUT: 'error',
 };
 
-const POLICY_STATUS_COLOR: Record<string, StatusColor> = {
-  DRAFT: 'neutral',
-  ACTIVE: 'success',
-  PAUSED: 'warning',
-  ARCHIVED: 'neutral',
-};
-
 @Component({
   selector: 'dp-offer-bidding-tab',
   standalone: true,
@@ -45,6 +38,67 @@ const POLICY_STATUS_COLOR: Record<string, StatusColor> = {
   ],
   template: `
     <div class="space-y-5 p-4">
+
+      <!-- Текущая стратегия и ставка -->
+      <section>
+        <h4 class="mb-2 text-[length:var(--text-base)] font-semibold text-[var(--text-primary)]">
+          {{ 'bidding.detail.current_state' | translate }}
+        </h4>
+
+        <div class="grid grid-cols-2 gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] p-4 sm:grid-cols-4">
+          <div>
+            <span class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+              {{ 'bidding.detail.strategy' | translate }}
+            </span>
+            <p class="mt-0.5 text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
+              {{ strategyLabel() }}
+            </p>
+          </div>
+          <div>
+            <span class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+              {{ 'bidding.detail.current_bid_label' | translate }}
+            </span>
+            <p class="mt-0.5 font-mono text-[length:var(--text-sm)] font-medium text-[var(--text-primary)]">
+              {{ currentBidLabel() }}
+            </p>
+          </div>
+          <div>
+            <span class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+              {{ 'bidding.detail.last_decision_label' | translate }}
+            </span>
+            <p class="mt-0.5 text-[length:var(--text-sm)] text-[var(--text-primary)]">
+              @if (lastDecision()) {
+                <dp-status-badge
+                  [label]="'bidding.decision.' + lastDecision()!.decisionType | translate"
+                  [color]="decisionColor(lastDecision()!.decisionType)"
+                />
+              } @else {
+                <span class="text-[var(--text-tertiary)]">—</span>
+              }
+            </p>
+          </div>
+          <div>
+            <span class="text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
+              {{ 'bidding.detail.last_decision_time' | translate }}
+            </span>
+            <p class="mt-0.5 text-[length:var(--text-sm)] text-[var(--text-primary)]">
+              {{ lastDecision() ? formatDate(lastDecision()!.createdAt) : '—' }}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Explanation последнего решения -->
+      @if (lastDecision()?.explanationKey || lastDecision()?.explanationSummary) {
+        <section>
+          <h4 class="mb-2 text-[length:var(--text-base)] font-semibold text-[var(--text-primary)]">
+            {{ 'bidding.detail.explanation_title' | translate }}
+          </h4>
+          <div class="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-secondary)] p-3 text-[length:var(--text-sm)] text-[var(--text-primary)]">
+            {{ explanationText() }}
+          </div>
+        </section>
+      }
 
       <!-- Последние решения -->
       <section>
@@ -66,6 +120,12 @@ const POLICY_STATUS_COLOR: Record<string, StatusColor> = {
                 />
                 <span class="font-mono text-[length:var(--text-sm)] text-[var(--text-primary)]">
                   {{ formatBid(dec.currentBid) }} → {{ formatBid(dec.targetBid) }}
+                </span>
+                <span
+                  class="hidden max-w-[200px] truncate text-[length:var(--text-xs)] text-[var(--text-secondary)] sm:inline"
+                  [title]="dec.explanationSummary ?? ''"
+                >
+                  {{ decisionExplanation(dec) }}
                 </span>
                 <span class="ml-auto text-[length:var(--text-xs)] text-[var(--text-tertiary)]">
                   {{ formatDate(dec.createdAt) }}
@@ -91,6 +151,9 @@ export class OfferBiddingTabComponent {
   private readonly translate = inject(TranslateService);
 
   readonly offerId = input.required<number>();
+  readonly bidPolicyName = input<string | null>(null);
+  readonly bidStrategyType = input<string | null>(null);
+  readonly currentBid = input<number | null>(null);
 
   readonly decisionsQuery = injectQuery(() => ({
     queryKey: [
@@ -104,7 +167,7 @@ export class OfferBiddingTabComponent {
           this.wsStore.currentWorkspaceId()!,
           { marketplaceOfferId: this.offerId() },
           0,
-          5,
+          10,
         ),
       ),
     enabled: !!this.wsStore.currentWorkspaceId() && !!this.offerId(),
@@ -115,8 +178,53 @@ export class OfferBiddingTabComponent {
     () => this.decisionsQuery.data()?.content ?? [],
   );
 
+  readonly lastDecision = computed<BidDecisionSummary | null>(
+    () => this.decisions()[0] ?? null,
+  );
+
+  readonly strategyLabel = computed<string>(() => {
+    const name = this.bidPolicyName();
+    const type = this.bidStrategyType();
+    if (name && type) return `${name} (${type})`;
+    if (name) return name;
+    if (type) return type;
+    return '—';
+  });
+
+  readonly currentBidLabel = computed<string>(() => {
+    const bid = this.currentBid();
+    if (bid === null || bid === undefined) return '—';
+    return formatMoney(bid / 100, 0) + ' ₽';
+  });
+
+  readonly explanationText = computed<string>(() => {
+    const dec = this.lastDecision();
+    if (!dec) return '';
+
+    if (dec.explanationKey) {
+      const translated = this.translate.instant(
+        dec.explanationKey,
+        dec.explanationArgs ?? {},
+      );
+      if (translated !== dec.explanationKey) return translated;
+    }
+
+    return dec.explanationSummary ?? '';
+  });
+
   decisionColor(type: string): StatusColor {
     return DECISION_COLOR[type] ?? 'neutral';
+  }
+
+  decisionExplanation(dec: BidDecisionSummary): string {
+    if (dec.explanationKey) {
+      const translated = this.translate.instant(
+        dec.explanationKey,
+        dec.explanationArgs ?? {},
+      );
+      if (translated !== dec.explanationKey) return translated;
+    }
+    return dec.explanationSummary ?? '';
   }
 
   formatBid(value: number | null): string {

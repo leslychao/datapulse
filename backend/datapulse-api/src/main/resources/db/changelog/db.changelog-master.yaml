@@ -98,3 +98,9 @@ databaseChangeLog:
   - include:
       file: changes/0036-bid-decision-explanation-i18n.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/0037-workspace-bidding-settings.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/0038-bid-policy-version.sql
+      relativeToChangelogFile: true

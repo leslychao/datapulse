@@ -64,6 +64,7 @@ export interface OfferSummary {
   bidStrategyType: string | null;
   currentBid: number | null;
   lastBidDecisionType: string | null;
+  bidDrrPct: number | null;
   manualBidLock: boolean;
 }
 

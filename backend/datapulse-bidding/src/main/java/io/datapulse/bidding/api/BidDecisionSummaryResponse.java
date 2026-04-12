@@ -1,5 +1,7 @@
 package io.datapulse.bidding.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.time.OffsetDateTime;
 
 public record BidDecisionSummaryResponse(
@@ -10,6 +12,8 @@ public record BidDecisionSummaryResponse(
     Integer currentBid,
     Integer targetBid,
     String explanationSummary,
+    String explanationKey,
+    JsonNode explanationArgs,
     String executionMode,
     OffsetDateTime createdAt
 ) {

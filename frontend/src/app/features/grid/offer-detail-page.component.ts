@@ -238,7 +238,12 @@ type DetailTab = 'overview' | 'price-journal' | 'promo-journal' | 'action-histor
                 <dp-offer-stock-tab [offer]="offer" />
               }
               @case ('bidding') {
-                <dp-offer-bidding-tab [offerId]="offer.offerId" />
+                <dp-offer-bidding-tab
+                  [offerId]="offer.offerId"
+                  [bidPolicyName]="offer.bidPolicyName"
+                  [bidStrategyType]="offer.bidStrategyType"
+                  [currentBid]="offer.currentBid"
+                />
               }
             }
           </div>

@@ -1001,11 +1001,11 @@ PENDING → IN_PROGRESS → COMPLETED
 
 | Компонент | Статус | Что нужно |
 |-----------|--------|-----------|
-| Explanation i18n | ⚠️ | Explanations на английском, хранятся как текст. Нужен формат `{ key, args }` для i18n |
+| Explanation i18n | ~~⚠️~~ ✅ | `ExplanationMessage(key, args)` в `BiddingStrategyResult` + `explanation_key`/`explanation_args` в `bid_decision`. Стратегии возвращают structured messages параллельно с legacy text |
 | Config validation | ~~⚠️~~ ✅ | Типизированные config records per-strategy (`EconomyHoldConfig`, `GrowthConfig`, etc.) с Jakarta Validation. `BidPolicyConfigValidator` валидирует при create/update |
-| Product bidding status в гриде | ⚠️ | Документ (17.3) описывает колонки в операционном гриде — не реализовано |
-| Detail Panel вкладка "Автобиддинг" | ⚠️ | Документ (17.4) — не реализовано |
-| Workspace-level bidding settings | ⚠️ | `enabled`, `max_aggregate_daily_spend` — только YAML, нет REST API и UI |
+| Product bidding status в гриде | ~~⚠️~~ ✅ | Колонки bidPolicyName, currentBid, lastBidDecisionType, bidDrrPct, manualBidLock — реализованы в `grid-column-defs.ts` |
+| Detail Panel вкладка "Автобиддинг" | ~~⚠️~~ ✅ | `OfferBiddingTabComponent`: текущее состояние (стратегия, ставка), explanation с i18n, история решений, навигация |
+| Workspace-level bidding settings | ~~⚠️~~ ✅ | Таблица `workspace_bidding_settings`, REST API `GET/PUT /api/workspaces/{id}/bidding/settings`, UI в Settings → Автобиддинг |
 | Priority field на bid_policy | ⚠️ | Нужен для разрешения конфликтов назначений |
 | CSV export decisions | ⚠️ | Backend API есть, кнопка в UI привязана, но фильтры передаются не полностью |
 | Назначение на категорию | ❌ | DDL поддерживает (`category_id`), но UI и сервисная логика не реализованы |
@@ -1015,7 +1015,7 @@ PENDING → IN_PROGRESS → COMPLETED
 | Компонент | Приоритет | Комментарий |
 |-----------|-----------|-------------|
 | Отчёт «Эффективность» (до/после метрики) | Средний | Требует накопления данных |
-| Optimistic locking (`@Version`) на `bid_policy` | Средний | Защита от concurrent edit |
+| ~~Optimistic locking (`@Version`) на `bid_policy`~~ | ~~Средний~~ ✅ | `@Version` на `BidPolicyEntity`, `ObjectOptimisticLockingFailureException` → HTTP 409 |
 | Exclude list для assignments | Средний | Исключения из массового назначения |
 | Weekly/monthly spend cap | Средний | Расширение daily_spend_limit guard |
 | Интеграция с AI insights | Низкий | Рекомендации на основе ML |

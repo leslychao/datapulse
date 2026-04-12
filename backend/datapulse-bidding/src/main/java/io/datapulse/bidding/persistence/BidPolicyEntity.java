@@ -9,6 +9,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -22,6 +23,10 @@ public class BidPolicyEntity extends BaseEntity {
 
   @Column(name = "workspace_id", nullable = false)
   private Long workspaceId;
+
+  @Version
+  @Column(nullable = false)
+  private Long version;
 
   @Column(nullable = false)
   private String name;

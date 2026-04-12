@@ -46,6 +46,14 @@ const routes: Routes = [
         data: { breadcrumb: 'Общие' },
       },
       {
+        path: 'bidding',
+        loadComponent: () =>
+          import('./bidding/bidding-settings-page.component').then(
+            (m) => m.BiddingSettingsPageComponent,
+          ),
+        data: { breadcrumb: 'Автобиддинг' },
+      },
+      {
         path: 'alert-rules',
         loadComponent: () =>
           import('./alert-rules/alert-rules-page.component').then(
