@@ -202,7 +202,7 @@ class LivePriceActionGatewayTest {
       var action = actionEntity(MarketplaceType.WB);
       var context = new OfferExecutionContext(
           100L, 5L, 10L, MarketplaceType.valueOf("WB"),
-          "SKU-123", null, Map.of());
+          "SKU-123", null, Map.of(), null);
 
       var gatewayWithNoAdapters = new LivePriceActionGateway(
           List.of(), List.of(), errorClassifier, executionProperties);
@@ -232,6 +232,6 @@ class LivePriceActionGatewayTest {
   private OfferExecutionContext contextFor(MarketplaceType marketplace) {
     return new OfferExecutionContext(
         100L, 5L, 10L, marketplace,
-        "SKU-123", null, Map.of("token", "test-token"));
+        "SKU-123", null, Map.of("token", "test-token"), null);
   }
 }

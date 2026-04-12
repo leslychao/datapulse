@@ -1,0 +1,19 @@
+{
+  "_source": "official-docs",
+  "status": "OK",
+  "result": {
+    "paging": {},
+    "bids": [
+      {
+        "offerId": "TEST-SKU-001",
+        "bid": 150,
+        "dontPullUpBids": false
+      },
+      {
+        "offerId": "TEST-SKU-002",
+        "bid": 80,
+        "dontPullUpBids": true
+      }
+    ]
+  }
+}

@@ -1,7 +1,11 @@
 package io.datapulse.execution.domain;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.datapulse.execution.persistence.OfferConnectionResolver;
+import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.CredentialStore;
+import io.datapulse.integration.domain.MarketplaceType;
 import io.datapulse.integration.domain.event.CredentialAccessedEvent;
 import io.datapulse.integration.persistence.SecretReferenceEntity;
 import io.datapulse.integration.persistence.SecretReferenceRepository;
@@ -10,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -25,6 +30,7 @@ public class ExecutionCredentialResolver {
     private final SecretReferenceRepository secretReferenceRepository;
     private final CredentialStore credentialStore;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     public OfferExecutionContext resolve(long marketplaceOfferId) {
         var row = offerConnectionResolver.resolve(marketplaceOfferId)
@@ -40,6 +46,10 @@ public class ExecutionCredentialResolver {
         Map<String, String> credentials = credentialStore.read(
                 secretRef.getVaultPath(), secretRef.getVaultKey());
 
+        if (row.marketplaceType() == MarketplaceType.YANDEX) {
+            credentials = enrichWithYandexMetadata(credentials, row.connectionMetadata());
+        }
+
         eventPublisher.publishEvent(new CredentialAccessedEvent(
                 row.connectionId(), row.workspaceId(), "execution_write"));
 
@@ -53,7 +63,28 @@ public class ExecutionCredentialResolver {
                 row.marketplaceType(),
                 row.marketplaceSku(),
                 row.marketplaceSkuAlt(),
-                credentials
+                credentials,
+                row.connectionMetadata()
         );
+    }
+
+    private Map<String, String> enrichWithYandexMetadata(
+        Map<String, String> credentials, String metadata) {
+        if (metadata == null || metadata.isBlank()) {
+            return credentials;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(metadata);
+            JsonNode businessNode = root.get(CredentialKeys.YANDEX_BUSINESS_ID);
+            if (businessNode != null && !businessNode.isNull()) {
+                var enriched = new HashMap<>(credentials);
+                enriched.put(CredentialKeys.YANDEX_BUSINESS_ID,
+                    String.valueOf(businessNode.asLong()));
+                return Map.copyOf(enriched);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse Yandex connection metadata: {}", e.getMessage());
+        }
+        return credentials;
     }
 }

@@ -16,6 +16,7 @@ public record OfferExecutionContext(
         MarketplaceType marketplaceType,
         String marketplaceSku,
         String marketplaceSkuAlt,
-        Map<String, String> credentials
+        Map<String, String> credentials,
+        String connectionMetadata
 ) {
 }

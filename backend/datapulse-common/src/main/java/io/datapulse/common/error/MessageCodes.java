@@ -89,6 +89,21 @@ public final class MessageCodes {
     public static final String ALERT_EVENT_INVALID_STATE = "alert.event.invalid.state";
     public static final String ALERT_RULE_NOT_FOUND = "alert.rule.not.found";
 
+    // --- Bidding: Policy ---
+    public static final String BIDDING_POLICY_NOT_FOUND = "bidding.policy.not_found";
+    public static final String BIDDING_POLICY_ALREADY_ACTIVE = "bidding.policy.already_active";
+    public static final String BIDDING_POLICY_ALREADY_PAUSED = "bidding.policy.already_paused";
+    public static final String BIDDING_POLICY_ARCHIVED = "bidding.policy.archived";
+    public static final String BIDDING_ASSIGNMENT_CONFLICT = "bidding.assignment.conflict";
+    public static final String BIDDING_ASSIGNMENT_NOT_FOUND = "bidding.assignment.not_found";
+    public static final String BIDDING_RUN_COMPLETED = "bidding.run.completed";
+    public static final String BIDDING_RUN_FAILED = "bidding.run.failed";
+    public static final String BIDDING_RUN_PAUSED = "bidding.run.paused";
+
+    // --- Bidding: Action ---
+    public static final String BIDDING_ACTION_NOT_FOUND = "bidding.action.not_found";
+    public static final String BIDDING_ACTION_INVALID_STATE = "bidding.action.invalid_state";
+
     // --- Bidding: Guards ---
     public static final String BIDDING_GUARD_MANUAL_LOCK = "bidding.guard.manual_lock.blocked";
     public static final String BIDDING_GUARD_CAMPAIGN_INACTIVE = "bidding.guard.campaign_inactive.blocked";

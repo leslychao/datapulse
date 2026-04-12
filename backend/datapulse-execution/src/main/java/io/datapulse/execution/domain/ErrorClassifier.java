@@ -23,7 +23,7 @@ import java.util.concurrent.TimeoutException;
 @Component
 public class ErrorClassifier {
 
-    private static final Set<Integer> RETRIABLE_HTTP_CODES = Set.of(429, 502, 503, 504);
+    private static final Set<Integer> RETRIABLE_HTTP_CODES = Set.of(420, 423, 429, 502, 503, 504);
     private static final Set<Integer> NON_RETRIABLE_HTTP_CODES = Set.of(400, 401, 403, 404, 405, 422);
 
     private static final Set<String> OZON_NON_RETRIABLE_CODES = Set.of(
@@ -82,10 +82,10 @@ public class ErrorClassifier {
     private ErrorClassificationResult classifyHttpError(WebClientResponseException error) {
         int statusCode = error.getStatusCode().value();
 
-        if (statusCode == 429) {
+        if (statusCode == 429 || statusCode == 420) {
             return result(ErrorClassification.RETRIABLE_RATE_LIMIT,
                     AttemptOutcome.RETRIABLE_FAILURE,
-                    "HTTP 429: rate limited");
+                    "HTTP " + statusCode + ": rate limited");
         }
 
         if (RETRIABLE_HTTP_CODES.contains(statusCode)) {

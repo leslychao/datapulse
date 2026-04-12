@@ -91,7 +91,7 @@ class ExecutionCredentialResolverTest {
   private OfferConnectionRow offerRow() {
     return new OfferConnectionRow(
         100L, 5L, 10L, MarketplaceType.WB,
-        "SKU-123", null, 7L);
+        "SKU-123", null, 7L, null);
   }
 
   private SecretReferenceEntity secretRefEntity() {

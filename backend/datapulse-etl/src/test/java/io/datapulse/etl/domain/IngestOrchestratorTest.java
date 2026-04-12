@@ -29,6 +29,7 @@ import io.datapulse.etl.config.IngestProperties.PostIngestMaterializationMode;
 import io.datapulse.etl.persistence.JobExecutionRepository;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import io.datapulse.platform.etl.PostIngestMaterializationHook;
 import io.datapulse.platform.etl.PostIngestMaterializationResult;
@@ -57,6 +58,7 @@ class IngestOrchestratorTest {
   @Mock private TransactionTemplate transactionTemplate;
   @Mock private PostIngestMaterializationHook postIngestMaterialization;
   @Mock private MarketplaceSyncStateRepository marketplaceSyncStateRepository;
+  @Mock private MarketplaceConnectionRepository marketplaceConnectionRepository;
 
   private IngestOrchestrator orchestrator;
 
@@ -86,6 +88,7 @@ class IngestOrchestratorTest {
             checkpointManager,
             new ObjectMapper(),
             marketplaceSyncStateRepository,
+            marketplaceConnectionRepository,
             ingestProperties,
             ingestClock);
     IngestJobCompletionCoordinator completion = new IngestJobCompletionCoordinator(
@@ -406,6 +409,7 @@ class IngestOrchestratorTest {
               checkpointManager,
               new ObjectMapper(),
               marketplaceSyncStateRepository,
+              marketplaceConnectionRepository,
               asyncProps,
               ingestClock);
       IngestJobCompletionCoordinator completion = new IngestJobCompletionCoordinator(

@@ -22,6 +22,9 @@ datapulse:
       # Performance API → WireMock (no real credentials yet)
       performance-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
     yandex:
+      # Both read + write → WireMock (Yandex has no sandbox environment).
+      # WireMock stubs don't validate Api-Key — no credential swap needed.
+      # Real Api-Key: ACMA:Wd1CyQdDkhs1ewX1I0hKFKRGmYGbCLS5QRgLbrH7:c48c5547
       base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
       write-base-url: http://${WIREMOCK_HOST:localhost}:${WIREMOCK_PORT:9091}
 

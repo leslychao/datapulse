@@ -15,8 +15,9 @@ import io.datapulse.integration.domain.MarketplaceType;
  * @param jobExecutionId job_execution PK
  * @param connectionId   marketplace_connection PK
  * @param workspaceId    workspace PK (resolved from connection)
- * @param marketplace    WB or OZON
- * @param credentials    raw Vault credentials map (apiToken for WB; clientId+apiKey for Ozon)
+ * @param marketplace    WB, OZON, or YANDEX
+ * @param credentials    raw Vault credentials map (apiToken for WB; clientId+apiKey for Ozon;
+ *                       apiKey for Yandex)
  * @param eventType      FULL_SYNC, INCREMENTAL, MANUAL_SYNC, etc. (job_execution.event_type)
  * @param scope          subset of DAG nodes to run; full DAG unless MANUAL_SYNC with params.domains
  * @param checkpoint     parsed checkpoint from previous attempt (null on first attempt)

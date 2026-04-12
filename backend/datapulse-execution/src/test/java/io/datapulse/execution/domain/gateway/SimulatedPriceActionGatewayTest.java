@@ -218,6 +218,6 @@ class SimulatedPriceActionGatewayTest {
   private OfferExecutionContext simulatedContext() {
     return new OfferExecutionContext(
         100L, 5L, 10L, MarketplaceType.WB,
-        "SKU-123", null, Map.of());
+        "SKU-123", null, Map.of(), null);
   }
 }

@@ -8,7 +8,7 @@
 
 ## Назначение
 
-Управление подключениями к маркетплейсам (WB, Ozon), безопасное хранение credentials, мониторинг здоровья подключений, журналирование вызовов к API провайдеров. Определяет политику работы с внешними API и фиксирует состояние провайдерских контрактов.
+Управление подключениями к маркетплейсам (WB, Ozon, Yandex Market), безопасное хранение credentials, мониторинг здоровья подключений, журналирование вызовов к API провайдеров. Определяет политику работы с внешними API и фиксирует состояние провайдерских контрактов.
 
 ## Модель данных
 
@@ -29,7 +29,7 @@
 marketplace_connection:
   id                      BIGSERIAL PK
   workspace_id            BIGINT FK → workspace              NOT NULL
-  marketplace_type        VARCHAR(10) NOT NULL                -- 'WB', 'OZON'
+  marketplace_type        VARCHAR(10) NOT NULL                -- 'WB', 'OZON', 'YANDEX'
   name                    VARCHAR(255) NOT NULL               -- user-defined label
   status                  VARCHAR(20) NOT NULL DEFAULT 'PENDING_VALIDATION'
   external_account_id     VARCHAR(120)                        -- provider-specific account/supplier ID
@@ -129,7 +129,7 @@ DISABLED → PENDING_VALIDATION (admin re-enable) → ACTIVE (validation success
 - **Success:** обновить `last_check_at`, `last_success_at`.
 - **Failure:** обновить `last_check_at`, `last_error_at`, `last_error_code`. Если 3 consecutive failures → `status = AUTH_FAILED`, dispatch `ConnectionHealthDegradedEvent` (Spring ApplicationEvent, in-process; не outbox).
 - **Config:** interval и failure threshold — `@ConfigurationProperties`.
-- **Архитектура:** интерфейс `MarketplaceHealthProbe` (Strategy pattern) с реализациями per marketplace (`WbHealthProbe`, `OzonHealthProbe`). Probes автоматически обнаруживаются через `List<MarketplaceHealthProbe>` injection.
+- **Архитектура:** интерфейс `MarketplaceHealthProbe` (Strategy pattern) с реализациями per marketplace (`WbHealthProbe`, `OzonHealthProbe`, `YandexHealthProbe`). Probes автоматически обнаруживаются через `List<MarketplaceHealthProbe>` injection. Yandex probe: `GET /v2/campaigns` → discovers `businessId` + `campaigns[]` → saves to `marketplace_connection.metadata` JSONB.
 - **Audit:** при каждом чтении credentials из Vault публикуется `CredentialAccessedEvent` с `purpose = "health_check"`.
 - **Валидация credentials:** выделена в `ConnectionValidationService` — поддерживает sync (ручная проверка через API) и async (при создании и credential rotation) валидацию. Async validation использует dedicated thread pool `integrationExecutor`.
 
@@ -501,33 +501,33 @@ Health-check (§Health-check выше) обнаруживает полные aut
 ### Core data domains
 
 
-| Capability | WB Status | WB Notes                                      | Ozon Status | Ozon Notes                                                                                                  |
-| ---------- | --------- | --------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
-| Каталог    | READY     | Content API v2                                | PARTIAL     | v3 product/list + v3 product/info + v4 attributes (brand); `updated_at` отсутствует — delta-sync невозможен |
-| Цены       | READY     | Discounts & Prices API v2                     | READY       | v5 product/info/prices                                                                                      |
-| Остатки    | PARTIAL   | Analytics API; sandbox не возвращает данных   | READY       | v4 product/info/stocks                                                                                      |
-| Заказы     | READY     | Statistics API v1                             | PARTIAL     | FBO verified; FBS не тестировался                                                                           |
-| Продажи    | READY     | Statistics API v1                             | READY       | Composite: postings (FBO+FBS) + finance                                                                     |
-| Возвраты   | READY     | Из finance report; dedicated endpoint обойдён | READY       | v1 returns/list                                                                                             |
-| Финансы    | READY     | Statistics API v5                             | READY       | v3 finance/transaction/list                                                                                 |
+| Capability | WB Status | WB Notes                                      | Ozon Status | Ozon Notes                                                                                                  | Yandex Status | Yandex Notes |
+| ---------- | --------- | --------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- | ------------- | ------------ |
+| Каталог    | READY     | Content API v2                                | PARTIAL     | v3 product/list + v3 product/info + v4 attributes (brand); `updated_at` отсутствует — delta-sync невозможен | READY         | POST offer-mappings (business-level) |
+| Цены       | READY     | Discounts & Prices API v2                     | READY       | v5 product/info/prices                                                                                      | READY         | POST offer-prices (business-level) |
+| Остатки    | PARTIAL   | Analytics API; sandbox не возвращает данных   | READY       | v4 product/info/stocks                                                                                      | READY         | POST offers/stocks (campaign-level fan-out) |
+| Заказы     | READY     | Statistics API v1                             | PARTIAL     | FBO verified; FBS не тестировался                                                                           | READY         | POST orders (v1, business-level) |
+| Продажи    | READY     | Statistics API v1                             | READY       | Composite: postings (FBO+FBS) + finance                                                                     | READY         | Composite: orders + returns |
+| Возвраты   | READY     | Из finance report; dedicated endpoint обойдён | READY       | v1 returns/list                                                                                             | PARTIAL       | GET returns (campaign-level fan-out); docs URL 404 risk |
+| Финансы    | READY     | Statistics API v5                             | READY       | v3 finance/transaction/list                                                                                 | READY         | Async reports (services + realization) |
 
 
 ### Extended data domains
 
 
-| Capability                | WB Status       | Ozon Status | Notes                             |
-| ------------------------- | --------------- | ----------- | --------------------------------- |
-| Промо (list/products)     | READY           | READY       | Calendar API / Actions API        |
-| Реклама (campaigns/stats) | NEEDS MIGRATION | NEEDS IMPLEMENTATION | WB: v2→v3; Ozon: OAuth2. **Phase B extended** |
+| Capability                | WB Status       | Ozon Status          | Yandex Status | Notes                             |
+| ------------------------- | --------------- | -------------------- | ------------- | --------------------------------- |
+| Промо (list/products)     | READY           | READY                | READY         | Calendar API / Actions API / promos (Yandex business-level) |
+| Реклама (campaigns/stats) | NEEDS MIGRATION | NEEDS IMPLEMENTATION | PARTIAL       | WB: v2→v3; Ozon: OAuth2. Yandex: bids read only (stub MVP). **Phase B extended** |
 
 
 ### Write capabilities
 
 
-| Capability          | WB Status | Ozon Status | Notes                                             |
-| ------------------- | --------- | ----------- | ------------------------------------------------- |
-| Price write         | BLOCKED   | READY       | WB: DNS failure + 401; см. write-contracts.md F-1 |
-| Promo participation | TBD       | READY       | Ozon: `/v1/actions/products/activate` + `/deactivate` (confirmed-docs); WB: `/api/v1/calendar/promotions/upload` (требует верификации). См. [Promotions](promotions.md) |
+| Capability          | WB Status | Ozon Status | Yandex Status | Notes                                             |
+| ------------------- | --------- | ----------- | ------------- | ------------------------------------------------- |
+| Price write         | BLOCKED   | READY       | READY         | WB: DNS failure + 401; Yandex: POST offer-prices/updates (business-level). См. write-contracts.md |
+| Promo participation | TBD       | READY       | TBD           | Ozon: `/v1/actions/products/activate` + `/deactivate` (confirmed-docs); WB: `/api/v1/calendar/promotions/upload` (требует верификации). См. [Promotions](promotions.md) |
 
 
 ### Известные блокеры
@@ -548,18 +548,25 @@ Health-check (§Health-check выше) обнаруживает полные aut
 | V-1 | Ozon      | FBS postings не тестировались                         | Graceful degradation; полная валидация с production FBS-аккаунтом |
 | V-2 | Ozon      | Rate limits не документированы                        | Эмпирическое определение + мониторинг 429                         |
 | V-3 | WB        | Timestamp formats могут отличаться sandbox/production | Dual-format parsing                                               |
+| V-4 | Yandex    | Returns endpoint docs URL 404                         | Verify on real data (Этап 7)                                      |
+| V-5 | Yandex    | Finance sign convention не подтверждена               | Верификация на первом реальном отчёте                             |
+| V-6 | Yandex    | Rate limits для некоторых endpoints не документированы | Runtime AIMD adaptation                                           |
 
 
 ### Pagination patterns
 
 
-| Провайдер/API | Pattern      | Описание                              |
-| ------------- | ------------ | ------------------------------------- |
-| WB Content    | Cursor-based | `cursor.updatedAt` + `cursor.nmID`    |
-| WB Statistics | Time-bounded | Один запрос = один временной диапазон |
-| WB Finance    | Cursor-based | `rrdid` (cursor) с limit              |
-| Ozon Products | Cursor-based | `last_id` + `limit`                   |
-| Ozon Finance  | Page-based   | `page` + `page_size`                  |
+| Провайдер/API    | Pattern      | Описание                              |
+| ---------------- | ------------ | ------------------------------------- |
+| WB Content       | Cursor-based | `cursor.updatedAt` + `cursor.nmID`    |
+| WB Statistics    | Time-bounded | Один запрос = один временной диапазон |
+| WB Finance       | Cursor-based | `rrdid` (cursor) с limit              |
+| Ozon Products    | Cursor-based | `last_id` + `limit`                   |
+| Ozon Finance     | Page-based   | `page` + `page_size`                  |
+| Yandex Catalog   | Cursor-based | `pageToken` + `limit`                 |
+| Yandex Orders    | Cursor-based | `pageToken` + `limit`                 |
+| Yandex Stocks    | Cursor-based | `pageToken` + `limit`                 |
+| Yandex Finance   | Async report | Generate → poll → download CSV/JSON  |
 
 
 ### Требуемые версии API
@@ -574,6 +581,11 @@ Health-check (§Health-check выше) обнаруживает полные aut
 | WB        | reportDetailByPeriod     | v5       | —                   |
 | WB        | content/get/cards/list   | v2       | —                   |
 | WB        | fullstats                | v3 (GET) | v2 (POST, disabled) |
+| Yandex    | campaigns                | v2       | —                   |
+| Yandex    | offer-mappings           | v2       | —                   |
+| Yandex    | offer-prices             | v2       | —                   |
+| Yandex    | orders                   | v1       | —                   |
+| Yandex    | reports (async)          | v2       | —                   |
 
 
 ## Review checklist для marketplace changes

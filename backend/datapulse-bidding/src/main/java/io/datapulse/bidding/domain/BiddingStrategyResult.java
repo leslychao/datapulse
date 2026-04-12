@@ -12,4 +12,12 @@ public record BiddingStrategyResult(
     Integer targetBid,
     String explanation
 ) {
+
+  public static BiddingStrategyResult hold() {
+    return new BiddingStrategyResult(BidDecisionType.HOLD, null, "Insufficient data");
+  }
+
+  public static BiddingStrategyResult hold(String explanation) {
+    return new BiddingStrategyResult(BidDecisionType.HOLD, null, explanation);
+  }
 }

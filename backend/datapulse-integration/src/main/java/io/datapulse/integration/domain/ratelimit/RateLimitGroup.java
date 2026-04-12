@@ -19,12 +19,15 @@ public enum RateLimitGroup {
     WB_PRICES_READ(1.0 / 10.0, 1, MarketplaceType.WB),
     WB_MARKETPLACE(1.0 / 10.0, 1, MarketplaceType.WB),
     WB_ADVERT(5.0 / 60.0, 1, MarketplaceType.WB),
+    WB_ADVERT_BIDS(5.0, 1, MarketplaceType.WB),
+    WB_ADVERT_RECOMMENDATIONS(5.0 / 60.0, 1, MarketplaceType.WB),
 
     // Ozon groups
     OZON_DEFAULT(30.0 / 60.0, 3, MarketplaceType.OZON),
     OZON_PROMO(20.0 / 60.0, 3, MarketplaceType.OZON),
     OZON_PRICE_UPDATE(30.0 / 60.0, 3, MarketplaceType.OZON),
     OZON_PERFORMANCE(60.0 / 60.0, 5, MarketplaceType.OZON),
+    OZON_PERFORMANCE_BIDS(1.0, 1, MarketplaceType.OZON),
 
     // Yandex Market groups (rates in req/s)
     YANDEX_DEFAULT(1.5, 4, MarketplaceType.YANDEX),

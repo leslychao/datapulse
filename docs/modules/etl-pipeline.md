@@ -785,17 +785,18 @@ Level 3:            FACT_FINANCE                      ← один event (soft d
 
 Один ETL event может включать вызовы к **нескольким API endpoints** (sub-sources). Каждый sub-source — это отдельный `source_id` в `job_item`. Sub-sources внутри event выполняются последовательно; между ними существуют hard/soft зависимости.
 
-| ETL Event | Sub-sources (WB) | Sub-sources (Ozon) | Зависимости |
-|-----------|-------------------|---------------------|-------------|
-| `CATEGORY_DICT` | — (WB: categories из catalog) | `POST /v1/description-category/tree` | — |
-| `WAREHOUSE_DICT` | `GET /api/v3/offices` | — (Ozon: warehouses из stocks) | — |
-| `PRODUCT_DICT` | `GET /content/v2/get/cards/list` | 1. `POST /v3/product/list` (IDs) 2. `POST /v3/product/info/list` (full info) 3. `POST /v4/product/info/attributes` (бренды, **soft**) | Ozon: (2) зависит от product_id из (1) — **hard**; (3) — **soft** |
-| `PRICE_SNAPSHOT` | `GET /api/v2/list/goods/filter` | `POST /v5/product/info/prices` | — |
-| `INVENTORY_FACT` | `POST /api/analytics/v1/stocks-report/wb-warehouses` | `POST /v4/product/info/stocks` | — |
-| `SALES_FACT` | 1. `GET /api/v1/supplier/orders` 2. `GET /api/v1/supplier/sales` 3. `GET /api/v1/analytics/goods-return` | 1. `POST /v2/posting/fbo/list` 2. `POST /v3/posting/fbs/list` 3. `POST /v1/returns/list` (Ozon returns) | WB: (1), (2), (3) **последовательно**; Ozon: (1), (2), (3) **независимы** |
-| `FACT_FINANCE` | `GET /api/v5/supplier/reportDetailByPeriod` | `POST /v3/finance/transaction/list` | — |
-| `PROMO_SYNC` | 1. `GET /api/v1/calendar/promotions` 2. `GET /api/v1/calendar/promotions/nomenclatures` (per promo) | 1. `GET /v1/actions` 2. `POST /v1/actions/products` + `POST /v1/actions/candidates` (per action) | (2) зависит от promo_id из (1) — **hard**. Implemented: `WbPromoSyncSource`, `OzonPromoSyncSource` |
-| `SUPPLY_FACT` | `GET /api/v1/supplier/incomes` (deprecated June 2026) | — (Ozon: нет аналога) | **Stub (no-op).** Post-deprecation: FBS → `/api/v3/supplies` (см. G-3) |
+| ETL Event | Sub-sources (WB) | Sub-sources (Ozon) | Sub-sources (Yandex) | Зависимости |
+|-----------|-------------------|---------------------|----------------------|-------------|
+| `CATEGORY_DICT` | — (WB: categories из catalog) | `POST /v1/description-category/tree` | `POST /v2/categories/tree` | — |
+| `WAREHOUSE_DICT` | `GET /api/v3/offices` | — (Ozon: warehouses из stocks) | 1. `GET /v2/warehouses` (FBY) 2. `GET /v2/businesses/{id}/warehouses` (FBS) | — |
+| `PRODUCT_DICT` | `GET /content/v2/get/cards/list` | 1. `POST /v3/product/list` (IDs) 2. `POST /v3/product/info/list` (full info) 3. `POST /v4/product/info/attributes` (бренды, **soft**) | `POST /v2/businesses/{id}/offer-mappings` | Ozon: (2) зависит от product_id из (1) — **hard**; (3) — **soft** |
+| `PRICE_SNAPSHOT` | `GET /api/v2/list/goods/filter` | `POST /v5/product/info/prices` | `POST /v2/businesses/{id}/offer-prices` | — |
+| `INVENTORY_FACT` | `POST /api/analytics/v1/stocks-report/wb-warehouses` | `POST /v4/product/info/stocks` | `POST /v2/campaigns/{id}/offers/stocks` (fan-out per campaign) | — |
+| `SALES_FACT` | 1. `GET /api/v1/supplier/orders` 2. `GET /api/v1/supplier/sales` 3. `GET /api/v1/analytics/goods-return` | 1. `POST /v2/posting/fbo/list` 2. `POST /v3/posting/fbs/list` 3. `POST /v1/returns/list` (Ozon returns) | 1. `POST /v1/businesses/{id}/orders` 2. `GET /v2/campaigns/{id}/returns` (fan-out per campaign) | WB: (1), (2), (3) **последовательно**; Ozon: (1), (2), (3) **независимы**; Yandex: (1) business-level, (2) campaign fan-out |
+| `FACT_FINANCE` | `GET /api/v5/supplier/reportDetailByPeriod` | `POST /v3/finance/transaction/list` | Async reports: 1. `services` report 2. `goods-realization` report. Generate → poll → download → parse | — |
+| `PROMO_SYNC` | 1. `GET /api/v1/calendar/promotions` 2. `GET /api/v1/calendar/promotions/nomenclatures` (per promo) | 1. `GET /v1/actions` 2. `POST /v1/actions/products` + `POST /v1/actions/candidates` (per action) | `POST /v2/businesses/{id}/promos` | (2) зависит от promo_id из (1) — **hard** (WB/Ozon). Implemented: `WbPromoSyncSource`, `OzonPromoSyncSource`, `YandexPromoSyncSource` |
+| `SUPPLY_FACT` | `GET /api/v1/supplier/incomes` (deprecated June 2026) | — (Ozon: нет аналога) | — (Yandex: нет аналога, stub) | **Stub (no-op).** Post-deprecation: FBS → `/api/v3/supplies` (см. G-3) |
+| `ADVERTISING_FACT` | WB fullstats (stub MVP) | Ozon Performance (stub MVP) | `POST /v2/businesses/{id}/bids/info` (stub MVP) | Stub implementations. Full: Phase B extended |
 
 **Error handling на уровне sub-sources:**
 
@@ -1541,6 +1542,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | CursorExtractor (JsonPath, NoCursor, TailField) | Implemented |
 | WB adapters (7 EventSources, 10 ReadAdapters) | Implemented |
 | Ozon adapters (7 EventSources, 13 ReadAdapters) | Implemented |
+| Yandex adapters (10 EventSources, 12 ReadAdapters, `YandexNormalizer`, `AsyncReportCapture`) | Implemented |
 | Normalized model (9 records) | Implemented |
 | Canonical persistence (JDBC batch upsert, IS DISTINCT FROM) | Implemented |
 | Scheduling (SyncScheduler → SyncDispatcher, StaleJobDetector, ShedLock) | Implemented |
@@ -1565,7 +1567,7 @@ Summary of gaps between this document (target design) and the current codebase.
 | Area | Notes |
 |------|-------|
 | `PROMO_SYNC` EventSource | `WbPromoSyncSource` + `OzonPromoSyncSource`. Read adapters, normalizers, canonical upsert, FK resolution |
-| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`). Full spec: [Advertising](advertising.md) §ETL Pipeline |
+| `ADVERTISING_FACT` EventSource | Registered as no-op stubs (`WbAdvertisingFactSource`, `OzonAdvertisingFactSource`, `YandexAdvertisingFactSource`). Full spec: [Advertising](advertising.md) §ETL Pipeline |
 | Ingest orchestration decomposition | `IngestOrchestrator` → thin shell; `IngestJobAcquisitionService` (CAS/reclaim), `IngestSyncContextBuilder` (context), `IngestJobCompletionCoordinator` (retry/fail/materialize), `SyncDispatcher` (scheduled dispatch with `@Transactional` via AOP proxy) |
 | Async post-ingest materialization | `PostIngestMaterializationMessageHandler` processes `ETL_POST_INGEST_MATERIALIZE` via `etl.sync` queue; CAS failure reconciles sync state |
 | `IngestResultReporter` consolidation | Unified sync state transitions (SYNCING/IDLE/ERROR), configurable `syncInterval` (replaces hardcoded 6h), injectable `Clock` for testability |

@@ -25,7 +25,8 @@ public class OfferConnectionResolver {
                    mc.marketplace_type AS marketplace_type,
                    mo.marketplace_sku  AS marketplace_sku,
                    mo.marketplace_sku_alt AS marketplace_sku_alt,
-                   mc.secret_reference_id AS secret_reference_id
+                   mc.secret_reference_id AS secret_reference_id,
+                   mc.metadata         AS connection_metadata
             FROM marketplace_offer mo
             JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
             WHERE mo.id = :offerId
@@ -40,7 +41,8 @@ public class OfferConnectionResolver {
                 MarketplaceType.valueOf(rs.getString("marketplace_type")),
                 rs.getString("marketplace_sku"),
                 rs.getString("marketplace_sku_alt"),
-                rs.getLong("secret_reference_id")
+                rs.getLong("secret_reference_id"),
+                rs.getString("connection_metadata")
         ));
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -52,7 +54,8 @@ public class OfferConnectionResolver {
             MarketplaceType marketplaceType,
             String marketplaceSku,
             String marketplaceSkuAlt,
-            long secretReferenceId
+            long secretReferenceId,
+            String connectionMetadata
     ) {
     }
 }

@@ -21,4 +21,10 @@ public final class CredentialKeys {
   public static final String OZON_PERFORMANCE_CLIENT_SECRET = "performanceClientSecret";
 
   public static final String YANDEX_API_KEY = "apiKey";
+
+  /**
+   * Yandex businessId — enriched from connection metadata (not from Vault).
+   * Used by {@code ExecutionCredentialResolver} and price adapters.
+   */
+  public static final String YANDEX_BUSINESS_ID = "businessId";
 }

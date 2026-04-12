@@ -85,6 +85,16 @@ class ErrorClassifierTest {
       assertThat(result.isRetryable()).isTrue();
     }
 
+    @Test
+    @DisplayName("should classify HTTP 420 (Yandex rate limit) as RETRIABLE_RATE_LIMIT")
+    void should_classifyAsRetryable_when_yandex420() {
+      var result = classifier.classify(httpError(420));
+
+      assertThat(result.classification()).isEqualTo(ErrorClassification.RETRIABLE_RATE_LIMIT);
+      assertThat(result.outcome()).isEqualTo(AttemptOutcome.RETRIABLE_FAILURE);
+      assertThat(result.isRetryable()).isTrue();
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {502, 503, 504})
     @DisplayName("should classify HTTP 502/503/504 as RETRIABLE_TRANSIENT")

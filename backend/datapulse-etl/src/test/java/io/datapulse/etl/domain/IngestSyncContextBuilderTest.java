@@ -11,6 +11,7 @@ import io.datapulse.etl.config.IngestProperties;
 import io.datapulse.etl.config.IngestProperties.PostIngestMaterializationMode;
 import io.datapulse.etl.persistence.JobExecutionRow;
 import io.datapulse.integration.domain.MarketplaceType;
+import io.datapulse.integration.persistence.MarketplaceConnectionRepository;
 import io.datapulse.integration.persistence.MarketplaceSyncStateEntity;
 import io.datapulse.integration.persistence.MarketplaceSyncStateRepository;
 import java.time.Clock;
@@ -35,6 +36,7 @@ class IngestSyncContextBuilderTest {
   @Mock private CredentialResolver credentialResolver;
   @Mock private CheckpointManager checkpointManager;
   @Mock private MarketplaceSyncStateRepository syncStateRepository;
+  @Mock private MarketplaceConnectionRepository connectionRepository;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final Clock clock =
@@ -61,6 +63,7 @@ class IngestSyncContextBuilderTest {
         checkpointManager,
         objectMapper,
         syncStateRepository,
+        connectionRepository,
         ingestProperties,
         clock);
     when(credentialResolver.resolve(anyLong()))
