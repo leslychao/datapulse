@@ -13,13 +13,17 @@ import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 import { LucideAngularModule, Info } from 'lucide-angular';
 
+import { ColDef } from 'ag-grid-community';
+
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { MARKETPLACE_REGISTRY } from '@core/models';
 import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
+import { platformColumn } from '@shared/utils/column-factories';
 import {
   UrlFilterDef, isFiltersDefault, resetFilters, initPersistedFilters,
 } from '@shared/utils/url-filters';
@@ -40,7 +44,7 @@ function monthEnd(period: string): string {
   selector: 'dp-returns-overview-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent, MonthPickerComponent, LucideAngularModule, RouterLink],
+  imports: [TranslatePipe, ChartComponent, DataGridComponent, MonthPickerComponent, LucideAngularModule, RouterLink],
   template: `
     <div class="flex h-full flex-col gap-4 pb-4">
       <!-- Filter bar -->
@@ -219,47 +223,18 @@ function monthEnd(period: string): string {
                 {{ 'analytics.returns.view_all_products' | translate }}
               </a>
             </div>
-            @if (topProducts().length === 0) {
+            @if (topProducts().length === 0 && !topProductsQuery.isPending()) {
               <p class="py-4 text-center text-[length:var(--text-sm)] text-[var(--text-tertiary)]">
                 {{ 'analytics.returns.no_problem_products' | translate }}
               </p>
             } @else {
-              <div class="dp-table-wrap">
-                <table class="dp-table">
-                  <thead>
-                    <tr>
-                      <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">SKU</th>
-                      <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.product' | translate }}</th>
-                      <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.return_rate' | translate }}</th>
-                      <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.return_count' | translate }}</th>
-                      <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.col.top_reason' | translate }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (item of topProducts(); track item.sellerSkuId) {
-                      <tr>
-                        <td class="whitespace-nowrap font-mono text-[length:var(--text-xs)] text-[var(--text-secondary)]">
-                          {{ item.skuCode || '—' }}
-                        </td>
-                        <td class="max-w-[200px] truncate text-[var(--text-primary)]"
-                            [title]="item.productName || ''">
-                          {{ item.productName || '—' }}
-                        </td>
-                        <td class="whitespace-nowrap text-right font-mono"
-                            [class]="returnRateClass(item.returnRatePct)">
-                          {{ formatPct(item.returnRatePct) }}
-                        </td>
-                        <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                          {{ item.returnCount.toLocaleString('ru-RU') }}
-                        </td>
-                        <td class="text-[var(--text-secondary)]">
-                          {{ item.topReturnReason || '—' }}
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
+              <dp-data-grid
+                [columnDefs]="problemProductsColumnDefs()"
+                [rowData]="topProducts()"
+                [loading]="topProductsQuery.isPending()"
+                [pagination]="false"
+                height="260px"
+              />
             }
           </div>
         }
@@ -355,6 +330,59 @@ export class ReturnsOverviewPageComponent {
   }));
 
   readonly topProducts = computed(() => this.topProductsQuery.data()?.content ?? []);
+
+  readonly problemProductsColumnDefs = computed<ColDef[]>(() => [
+    {
+      field: 'skuCode',
+      headerName: 'SKU',
+      width: 130,
+      cellClass: 'font-mono text-[11px]',
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
+        return params.value;
+      },
+    },
+    {
+      field: 'productName',
+      headerName: this.t.instant('analytics.returns.col.product'),
+      minWidth: 180,
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
+        return `<span title="${params.value}">${params.value}</span>`;
+      },
+    },
+    platformColumn(this.t, 'sourcePlatform', 'analytics.returns.col.platform'),
+    {
+      field: 'returnRatePct',
+      headerName: this.t.instant('analytics.returns.col.return_rate'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      width: 100,
+      valueFormatter: (p) => p.value != null ? formatPercent(p.value) : '—',
+      cellStyle: (p) => {
+        if (p.value > 10) return { color: 'var(--status-error)' };
+        if (p.value >= 5) return { color: 'var(--status-warning)' };
+        return { color: 'var(--text-primary)' };
+      },
+    },
+    {
+      field: 'returnCount',
+      headerName: this.t.instant('analytics.returns.col.return_count'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      width: 100,
+      valueFormatter: (p) => p.value != null ? p.value.toLocaleString('ru-RU') : '—',
+    },
+    {
+      field: 'topReturnReason',
+      headerName: this.t.instant('analytics.returns.col.top_reason'),
+      minWidth: 150,
+      cellRenderer: (p: any) => {
+        if (!p.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
+        return p.value;
+      },
+    },
+  ]);
 
   readonly reasonChartOptions = computed<EChartsOption>(() => {
     const items = this.summaryQuery.data()?.reasonBreakdown ?? [];
@@ -485,12 +513,6 @@ export class ReturnsOverviewPageComponent {
       : 'analytics.returns.trend_insight.down';
     return this.t.instant(key, { value: formatPercent(Math.abs(diff)) });
   });
-
-  returnRateClass(rate: number): string {
-    if (rate > 10) return 'text-[var(--status-error)]';
-    if (rate >= 5) return 'text-[var(--status-warning)]';
-    return 'text-[var(--text-primary)]';
-  }
 
   formatMoney(value: number | null): string {
     return formatMoney(value, 0);

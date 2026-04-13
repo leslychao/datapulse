@@ -58,6 +58,15 @@ public class SkuLookupRepository {
               AND mo.seller_sku_id IS NOT NULL
             """;
 
+    private static final String FIND_ALL_OFFER_BY_SKU_CODE = """
+            SELECT ss.sku_code, mo.id AS offer_id, ss.id AS seller_sku_id
+            FROM marketplace_offer mo
+            JOIN seller_sku ss ON mo.seller_sku_id = ss.id
+            JOIN marketplace_connection mc ON mo.marketplace_connection_id = mc.id
+            WHERE mc.workspace_id = ?
+              AND mo.seller_sku_id IS NOT NULL
+            """;
+
     /**
      * Batch lookup: returns all seller_sku records for a workspace.
      *
@@ -100,6 +109,22 @@ public class SkuLookupRepository {
                         (rs, rowNum) -> Map.entry(
                                 rs.getString("marketplace_sku"),
                                 new OfferSkuIds(rs.getLong("id"), rs.getLong("seller_sku_id"))),
+                        workspaceId)
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (existing, replacement) -> existing));
+    }
+
+    /**
+     * Batch lookup: sku_code → (marketplace_offer.id, seller_sku.id) for a workspace.
+     * Used by Ozon/Yandex return sources where the return API provides seller SKU
+     * (offer_id / shopSku) rather than marketplace SKU.
+     */
+    public Map<String, OfferSkuIds> findAllOfferBySellerSkuCode(long workspaceId) {
+        return jdbc.query(FIND_ALL_OFFER_BY_SKU_CODE,
+                        (rs, rowNum) -> Map.entry(
+                                rs.getString("sku_code"),
+                                new OfferSkuIds(rs.getLong("offer_id"), rs.getLong("seller_sku_id"))),
                         workspaceId)
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,

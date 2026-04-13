@@ -18,6 +18,8 @@ import io.datapulse.etl.domain.SubSourceResult;
 import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalOrderUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalReturnUpsertRepository;
+import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
+import io.datapulse.etl.persistence.canonical.SkuLookupRepository.OfferSkuIds;
 import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +49,7 @@ public class YandexSalesFactSource implements EventSource {
   private final SubSourceRunner subSourceRunner;
   private final CanonicalOrderUpsertRepository orderRepo;
   private final CanonicalReturnUpsertRepository returnRepo;
+  private final SkuLookupRepository skuLookup;
 
   @Override
   public MarketplaceType marketplace() {
@@ -86,6 +89,8 @@ public class YandexSalesFactSource implements EventSource {
       return results;
     }
 
+    var skuCodeMap = skuLookup.findAllOfferBySellerSkuCode(ctx.workspaceId());
+
     var returnsCtx = CaptureContextFactory.build(ctx, eventType(), RETURNS_SOURCE_ID);
     List<CaptureResult> returnPages = returnsAdapter.captureAllPages(
         returnsCtx, apiKey, campaignIds, dateFrom, dateTo);
@@ -95,7 +100,13 @@ public class YandexSalesFactSource implements EventSource {
         batch -> {
           var normalized = normalizer.normalizeReturns(batch);
           returnRepo.batchUpsert(normalized.stream()
-              .map(item -> mapper.toReturn(item, ctx, null, null))
+              .map(item -> {
+                OfferSkuIds ids = item.sellerSku() != null
+                    ? skuCodeMap.get(item.sellerSku()) : null;
+                return mapper.toReturn(item, ctx,
+                    ids != null ? ids.offerId() : null,
+                    ids != null ? ids.sellerSkuId() : null);
+              })
               .toList());
         }));
 

@@ -58,11 +58,10 @@ function daysAgo(n: number): string {
     ChartComponent,
     LucideAngularModule,
   ],
-  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
-    <div class="flex h-full flex-col">
+    <div class="flex flex-col gap-2">
       <!-- Filter bar + export -->
-      <div class="flex items-center gap-2 px-4 pt-2">
+      <div class="flex items-center gap-2">
         <div class="flex-1">
           <dp-filter-bar
             [filters]="filterConfigs"
@@ -82,8 +81,8 @@ function daysAgo(n: number): string {
       </div>
 
       <!-- Main content area: grid + optional detail panel -->
-      <div class="flex flex-1 min-h-0 px-4 py-2">
-        <div class="flex flex-1 flex-col min-h-0">
+      <div class="flex gap-2">
+        <div class="flex-1">
           @if (productsQuery.isError()) {
             <dp-empty-state
               [message]="'analytics.inventory.error' | translate"
@@ -109,7 +108,7 @@ function daysAgo(n: number): string {
               [pagination]="false"
               [pageSize]="listState.pageSize()"
               [getRowId]="getRowId"
-              [height]="'100%'"
+              height="calc(100vh - 280px)"
               [initialSortModel]="listState.initialSortModel()"
               (sortChanged)="listState.onSortChanged($event)"
               (rowClicked)="onRowClicked($event)"
@@ -131,7 +130,8 @@ function daysAgo(n: number): string {
         <!-- Detail panel -->
         @if (selectedProduct(); as product) {
           <div
-            class="flex w-[380px] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)] ml-2"
+            class="flex w-[380px] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)]"
+            style="height: calc(100vh - 280px)"
           >
             <div class="flex items-center justify-between border-b border-[var(--border-default)] px-4 py-3">
               <h3 class="text-sm font-semibold text-[var(--text-primary)]">

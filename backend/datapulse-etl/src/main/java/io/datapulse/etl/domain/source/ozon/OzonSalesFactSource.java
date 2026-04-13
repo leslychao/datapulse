@@ -22,6 +22,8 @@ import io.datapulse.etl.domain.SubSourceRunner;
 import io.datapulse.etl.persistence.canonical.CanonicalOrderUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalReturnUpsertRepository;
 import io.datapulse.etl.persistence.canonical.CanonicalSaleUpsertRepository;
+import io.datapulse.etl.persistence.canonical.SkuLookupRepository;
+import io.datapulse.etl.persistence.canonical.SkuLookupRepository.OfferSkuIds;
 import io.datapulse.integration.domain.CredentialKeys;
 import io.datapulse.integration.domain.MarketplaceType;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class OzonSalesFactSource implements EventSource {
     private final CanonicalSaleUpsertRepository saleRepo;
     private final CanonicalReturnUpsertRepository returnRepo;
     private final CanonicalEntityMapper mapper;
+    private final SkuLookupRepository skuLookup;
     private final SubSourceRunner subSourceRunner;
 
     @Override
@@ -77,6 +80,8 @@ public class OzonSalesFactSource implements EventSource {
                 "OzonFbsOrdersReadAdapter", fbsPages, OzonFbsPosting.class,
                 batch -> processFbsBatch(batch, ctx)));
 
+        var skuCodeMap = skuLookup.findAllOfferBySellerSkuCode(ctx.workspaceId());
+
         var returnsCtx = CaptureContextFactory.build(ctx, eventType(), "OzonReturnsReadAdapter");
         long returnsStart =
             EtlSubSourceResume.nonNegativeLong(ctx, eventType(), "OzonReturnsReadAdapter");
@@ -85,8 +90,14 @@ public class OzonSalesFactSource implements EventSource {
         results.add(subSourceRunner.processPages(
                 "OzonReturnsReadAdapter", returnsPages, OzonReturnItem.class,
                 batch -> returnRepo.batchUpsert(batch.stream()
-                        .map(item -> mapper.toReturn(
-                                normalizer.normalizeReturn(item), ctx, null, null))
+                        .map(item -> {
+                            var norm = normalizer.normalizeReturn(item);
+                            OfferSkuIds ids = norm.sellerSku() != null
+                                    ? skuCodeMap.get(norm.sellerSku()) : null;
+                            return mapper.toReturn(norm, ctx,
+                                    ids != null ? ids.offerId() : null,
+                                    ids != null ? ids.sellerSkuId() : null);
+                        })
                         .toList())));
 
         return results;

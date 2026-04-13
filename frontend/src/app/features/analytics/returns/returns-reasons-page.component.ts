@@ -12,11 +12,14 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import type { EChartsOption } from 'echarts';
 
+import { ColDef } from 'ag-grid-community';
+
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import { MARKETPLACE_REGISTRY } from '@core/models';
 import { NavigationStore } from '@shared/stores/navigation.store';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { DataGridComponent } from '@shared/components/data-grid/data-grid.component';
 import { MonthPickerComponent } from '@shared/components/form/month-picker.component';
 import { formatMoney, formatPercent, currentMonth } from '@shared/utils/format.utils';
 import {
@@ -37,7 +40,7 @@ function monthEnd(period: string): string {
   selector: 'dp-returns-reasons-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ChartComponent, MonthPickerComponent],
+  imports: [TranslatePipe, ChartComponent, DataGridComponent, MonthPickerComponent],
   template: `
     <div class="flex h-full flex-col gap-4 pb-4">
       <!-- Filter bar -->
@@ -96,47 +99,13 @@ function monthEnd(period: string): string {
           <h3 class="mb-3 text-sm font-medium text-[var(--text-primary)]">
             {{ 'analytics.returns.reasons.table_title' | translate }}
           </h3>
-          <div class="dp-table-wrap">
-            <table class="dp-table">
-              <thead>
-                <tr>
-                  <th class="text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.reason' | translate }}</th>
-                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.count' | translate }}</th>
-                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.percent' | translate }}</th>
-                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.amount' | translate }}</th>
-                  <th class="text-right text-[length:var(--text-xs)] uppercase tracking-wider text-[var(--text-tertiary)]">{{ 'analytics.returns.reasons.col.products' | translate }}</th>
-                  <th class="w-20"></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (r of reasons(); track r.reason) {
-                  <tr>
-                    <td class="text-[var(--text-primary)]">{{ r.reason || '—' }}</td>
-                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                      {{ r.returnCount.toLocaleString('ru-RU') }}
-                    </td>
-                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                      {{ formatPct(r.percent) }}
-                    </td>
-                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                      {{ formatMoney(r.returnAmount) }}
-                    </td>
-                    <td class="whitespace-nowrap text-right font-mono text-[var(--text-primary)]">
-                      {{ r.productCount > 0 ? r.productCount.toLocaleString('ru-RU') : '—' }}
-                    </td>
-                    <td class="text-right">
-                      <button
-                        (click)="navigateToProducts(r.reason)"
-                        class="cursor-pointer text-[length:var(--text-xs)] font-medium text-[var(--accent-primary)]
-                               transition-colors hover:text-[var(--accent-primary-hover)]">
-                        {{ 'analytics.returns.reasons.view_products' | translate }}
-                      </button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
+          <dp-data-grid
+            [columnDefs]="reasonsColumnDefs()"
+            [rowData]="reasons()"
+            [loading]="reasonsQuery.isPending()"
+            [pagination]="false"
+            height="400px"
+          />
         </div>
       }
     </div>
@@ -198,6 +167,66 @@ export class ReturnsReasonsPageComponent {
 
   readonly reasons = computed(() => this.reasonsQuery.data() ?? []);
 
+  readonly reasonsColumnDefs = computed<ColDef[]>(() => [
+    {
+      field: 'reason',
+      headerName: this.t.instant('analytics.returns.reasons.col.reason'),
+      minWidth: 200,
+      flex: 1,
+      cellRenderer: (p: any) => {
+        if (!p.value) return '<span class="text-[var(--text-tertiary)]">—</span>';
+        return p.value;
+      },
+    },
+    {
+      field: 'returnCount',
+      headerName: this.t.instant('analytics.returns.reasons.col.count'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      width: 100,
+      valueFormatter: (p) => p.value != null ? p.value.toLocaleString('ru-RU') : '—',
+    },
+    {
+      field: 'percent',
+      headerName: this.t.instant('analytics.returns.reasons.col.percent'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      width: 90,
+      valueFormatter: (p) => p.value != null ? formatPercent(p.value) : '—',
+    },
+    {
+      field: 'returnAmount',
+      headerName: this.t.instant('analytics.returns.reasons.col.amount'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      width: 120,
+      valueFormatter: (p) => formatMoney(p.value, 0),
+    },
+    {
+      field: 'productCount',
+      headerName: this.t.instant('analytics.returns.reasons.col.products'),
+      type: 'rightAligned',
+      cellClass: 'font-mono',
+      width: 100,
+      valueFormatter: (p) => p.value != null && p.value > 0
+          ? p.value.toLocaleString('ru-RU')
+          : '—',
+    },
+    {
+      headerName: '',
+      width: 90,
+      sortable: false,
+      cellRenderer: (p: any) => {
+        if (!p.data) return '';
+        return `<span class="cursor-pointer text-[var(--accent-primary)] text-[11px] font-medium hover:underline"
+                      data-action="view">${this.t.instant('analytics.returns.reasons.view_products')}</span>`;
+      },
+      onCellClicked: (p: any) => {
+        if (p.data?.reason) this.navigateToProducts(p.data.reason);
+      },
+    },
+  ]);
+
   readonly chartOptions = computed<EChartsOption>(() => {
     const items = this.reasons().slice(0, 10);
     return {
@@ -258,11 +287,4 @@ export class ReturnsReasonsPageComponent {
     });
   }
 
-  formatMoney(value: number | null): string {
-    return formatMoney(value, 0);
-  }
-
-  formatPct(value: number | null): string {
-    return formatPercent(value);
-  }
 }

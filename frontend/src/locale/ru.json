@@ -2810,7 +2810,7 @@
   "analytics.returns.reasons.col.count": "Кол-во",
   "analytics.returns.reasons.col.percent": "Доля",
   "analytics.returns.reasons.col.amount": "Сумма",
-  "analytics.returns.reasons.col.products": "Товаров",
+  "analytics.returns.reasons.col.products": "Уник. SKU",
   "analytics.returns.reasons.view_products": "Товары →",
 
   "analytics.data_quality.load_error": "Не удалось загрузить данные о качестве",
