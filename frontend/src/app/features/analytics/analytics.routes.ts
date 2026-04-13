@@ -68,23 +68,16 @@ const routes: Routes = [
       },
 
       // Inventory
-      { path: 'inventory', redirectTo: 'inventory/overview', pathMatch: 'full' },
       {
-        path: 'inventory/overview',
+        path: 'inventory',
         loadComponent: () =>
-          import('./inventory/inventory-overview-page.component').then(
-            (m) => m.InventoryOverviewPageComponent,
+          import('./inventory/inventory-page.component').then(
+            (m) => m.InventoryPageComponent,
           ),
-        data: { breadcrumb: 'breadcrumb.analytics.overview', section: 'inventory' },
+        data: { breadcrumb: 'breadcrumb.analytics.inventory', section: 'inventory' },
       },
-      {
-        path: 'inventory/by-product',
-        loadComponent: () =>
-          import('./inventory/inventory-by-product-page.component').then(
-            (m) => m.InventoryByProductPageComponent,
-          ),
-        data: { breadcrumb: 'breadcrumb.analytics.by_product', section: 'inventory' },
-      },
+      { path: 'inventory/overview', redirectTo: 'inventory', pathMatch: 'full' },
+      { path: 'inventory/by-product', redirectTo: 'inventory', pathMatch: 'full' },
 
       // Returns
       { path: 'returns', redirectTo: 'returns/overview', pathMatch: 'full' },

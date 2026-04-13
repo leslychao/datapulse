@@ -36,10 +36,6 @@ const SUB_NAV: Record<string, SubNavLink[]> = {
     { labelKey: 'analytics.subnav.pnl.by_posting', path: 'pnl/by-posting' },
     { labelKey: 'analytics.subnav.pnl.trend', path: 'pnl/trend' },
   ],
-  inventory: [
-    { labelKey: 'analytics.subnav.inventory.overview', path: 'inventory/overview' },
-    { labelKey: 'analytics.subnav.inventory.by_product', path: 'inventory/by-product' },
-  ],
   returns: [
     { labelKey: 'analytics.subnav.returns.overview', path: 'returns/overview' },
     { labelKey: 'analytics.subnav.returns.by_product', path: 'returns/by-product' },
@@ -135,7 +131,7 @@ export class AnalyticsLayoutComponent {
     });
 
     const lastTab = this.navStore.getLastTab(MODULE);
-    if (lastTab && lastTab !== DEFAULT_TAB && !lastTab.includes('stock-history')) {
+    if (lastTab && lastTab !== DEFAULT_TAB) {
       const wsId = this.wsStore.currentWorkspaceId();
       if (wsId) {
         this.router.navigate(
@@ -162,7 +158,7 @@ export class AnalyticsLayoutComponent {
 
   private static readonly SHORTCUT_ROUTES: Record<string, string> = {
     '1': 'pnl/summary',
-    '2': 'inventory/overview',
+    '2': 'inventory',
     '3': 'returns/overview',
     '4': 'data-quality/status',
   };
@@ -201,7 +197,7 @@ export class AnalyticsLayoutComponent {
         return SUB_NAV[section];
       }
     }
-    return SUB_NAV['pnl'];
+    return [];
   });
 
   private extractChild(url: string): string | null {

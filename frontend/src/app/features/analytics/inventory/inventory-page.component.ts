@@ -12,7 +12,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom, startWith } from 'rxjs';
 import { ColDef, GridApi } from 'ag-grid-community';
 import type { EChartsOption } from 'echarts';
-import { LucideAngularModule, Download } from 'lucide-angular';
+import { LucideAngularModule, Download, Package, AlertTriangle, AlertCircle, DollarSign } from 'lucide-angular';
 
 import { AnalyticsApiService } from '@core/api/analytics-api.service';
 import {
@@ -27,6 +27,7 @@ import { FilterBarComponent, FilterConfig } from '@shared/components/filter-bar/
 import { EmptyStateComponent } from '@shared/components/empty-state.component';
 import { StockRiskBadgeComponent } from '@shared/components/stock-risk-badge.component';
 import { ChartComponent } from '@shared/components/chart/chart.component';
+import { KpiCardComponent } from '@shared/components/kpi-card.component';
 import { WorkspaceContextStore } from '@shared/stores/workspace-context.store';
 import { createListPageState } from '@shared/utils/list-page-state';
 import { formatMoney } from '@shared/utils/format.utils';
@@ -45,214 +46,258 @@ function daysAgo(n: number): string {
 }
 
 @Component({
-  selector: 'dp-inventory-by-product-page',
+  selector: 'dp-inventory-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
+    LucideAngularModule,
     DataGridComponent,
     PaginationBarComponent,
     FilterBarComponent,
     EmptyStateComponent,
     StockRiskBadgeComponent,
     ChartComponent,
-    LucideAngularModule,
+    KpiCardComponent,
   ],
+  host: { class: 'flex flex-1 flex-col min-h-0' },
   template: `
-    <div class="flex flex-col gap-2">
-      <!-- Filter bar + export -->
-      <div class="flex items-center gap-2">
-        <div class="flex-1">
-          <dp-filter-bar
-            [filters]="filterConfigs"
-            [values]="listState.filterValues()"
-            (filtersChanged)="listState.onFiltersChanged($event)"
-          />
-        </div>
-        <button
-          (click)="exportCsv()"
-          class="flex shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)]
-                 bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)]
-                 transition-colors hover:bg-[var(--bg-tertiary)]"
-        >
-          <lucide-icon [img]="downloadIcon" size="14" />
-          <span>{{ 'common.export_csv' | translate }}</span>
-        </button>
+    <!-- KPI cards -->
+    <div class="flex flex-wrap gap-3 pb-3">
+      <dp-kpi-card
+        [label]="'analytics.inventory.kpi.total_skus' | translate"
+        [value]="kpiTotalSkus()"
+        [icon]="PackageIcon"
+        accent="neutral"
+        [loading]="overviewQuery.isPending()"
+      />
+      <dp-kpi-card
+        [label]="'analytics.inventory.kpi.critical' | translate"
+        [value]="kpiCritical()"
+        [icon]="AlertTriangleIcon"
+        accent="error"
+        [loading]="overviewQuery.isPending()"
+        [clickable]="true"
+        [active]="kpiRiskFilter() === 'CRITICAL'"
+        (clicked)="toggleRiskFilter('CRITICAL')"
+      />
+      <dp-kpi-card
+        [label]="'analytics.inventory.kpi.warning' | translate"
+        [value]="kpiWarning()"
+        [icon]="AlertCircleIcon"
+        accent="warning"
+        [loading]="overviewQuery.isPending()"
+        [clickable]="true"
+        [active]="kpiRiskFilter() === 'WARNING'"
+        (clicked)="toggleRiskFilter('WARNING')"
+      />
+      <dp-kpi-card
+        [label]="'analytics.inventory.kpi.frozen_capital' | translate"
+        [value]="kpiFrozenCapital()"
+        [icon]="DollarSignIcon"
+        accent="neutral"
+        [loading]="overviewQuery.isPending()"
+      />
+    </div>
+
+    <!-- Filter bar + export -->
+    <div class="flex items-center gap-2">
+      <div class="flex-1">
+        <dp-filter-bar
+          [filters]="filterConfigs"
+          [values]="listState.filterValues()"
+          (filtersChanged)="listState.onFiltersChanged($event)"
+        />
       </div>
+      <button
+        (click)="exportCsv()"
+        class="flex shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)]
+               bg-[var(--bg-primary)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--text-secondary)]
+               transition-colors hover:bg-[var(--bg-tertiary)]"
+      >
+        <lucide-icon [img]="downloadIcon" size="14" />
+        <span>{{ 'common.export_csv' | translate }}</span>
+      </button>
+    </div>
 
-      <!-- Main content area: grid + optional detail panel -->
-      <div class="flex gap-2">
-        <div class="flex-1">
-          @if (productsQuery.isError()) {
-            <dp-empty-state
-              [message]="'analytics.inventory.error' | translate"
-              [actionLabel]="'actions.retry' | translate"
-              (action)="productsQuery.refetch()"
-            />
-          } @else if (!productsQuery.isPending() && gridRows().length === 0) {
-            <dp-empty-state
-              [message]="listState.hasActiveFilters()
-                ? ('analytics.inventory.empty_filtered' | translate)
-                : ('analytics.inventory.empty' | translate)"
-              [actionLabel]="listState.hasActiveFilters()
-                ? ('filter_bar.reset_all' | translate)
-                : ''"
-              (action)="listState.resetFilters()"
-            />
-          } @else {
-            <dp-data-grid
-              viewStateKey="analytics:inventory:by-product"
-              [columnDefs]="columnDefs()"
-              [rowData]="gridRows()"
-              [loading]="productsQuery.isPending()"
-              [pagination]="false"
-              [pageSize]="listState.pageSize()"
-              [getRowId]="getRowId"
-              height="calc(100vh - 280px)"
-              [initialSortModel]="listState.initialSortModel()"
-              (sortChanged)="listState.onSortChanged($event)"
-              (rowClicked)="onRowClicked($event)"
-              (gridReady)="onGridReady($event)"
-              [clickableRows]="true"
-            />
-          }
+    <!-- Main content area: grid + optional detail panel -->
+    <div class="mt-2 flex flex-1 gap-2 min-h-0">
+      <div class="flex flex-1 flex-col min-h-0">
+        @if (productsQuery.isError()) {
+          <dp-empty-state
+            [message]="'analytics.inventory.error' | translate"
+            [actionLabel]="'actions.retry' | translate"
+            (action)="productsQuery.refetch()"
+          />
+        } @else if (!productsQuery.isPending() && gridRows().length === 0) {
+          <dp-empty-state
+            [message]="listState.hasActiveFilters()
+              ? ('analytics.inventory.empty_filtered' | translate)
+              : ('analytics.inventory.empty' | translate)"
+            [actionLabel]="listState.hasActiveFilters()
+              ? ('filter_bar.reset_all' | translate)
+              : ''"
+            (action)="listState.resetFilters()"
+          />
+        } @else {
+          <dp-data-grid
+            viewStateKey="analytics:inventory:by-product"
+            [columnDefs]="columnDefs()"
+            [rowData]="gridRows()"
+            [loading]="productsQuery.isPending()"
+            [pagination]="false"
+            [pageSize]="listState.pageSize()"
+            [getRowId]="getRowId"
+            height="calc(100vh - 330px)"
+            [initialSortModel]="listState.initialSortModel()"
+            (sortChanged)="listState.onSortChanged($event)"
+            (rowClicked)="onRowClicked($event)"
+            (gridReady)="onGridReady($event)"
+            [clickableRows]="true"
+          />
+        }
 
-          @if (gridRows().length > 0) {
-            <dp-pagination-bar
-              [totalItems]="totalElements()"
-              [pageSize]="listState.pageSize()"
-              [currentPage]="listState.currentPage()"
-              (pageChange)="listState.onPageChanged($event)"
-            />
-          }
-        </div>
-
-        <!-- Detail panel -->
-        @if (selectedProduct(); as product) {
-          <div
-            class="flex w-[380px] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)]"
-            style="height: calc(100vh - 280px)"
-          >
-            <div class="flex items-center justify-between border-b border-[var(--border-default)] px-4 py-3">
-              <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                {{ 'analytics.inventory.detail.title' | translate }}
-              </h3>
-              <button
-                class="cursor-pointer rounded p-1 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-                aria-label="Close"
-                (click)="selectedProduct.set(null)"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div class="flex-1 space-y-4 overflow-auto p-4">
-              <div>
-                <p class="text-xs text-[var(--text-secondary)]">SKU</p>
-                <p class="mt-0.5 font-mono text-sm text-[var(--text-primary)]">{{ product.skuCode }}</p>
-              </div>
-              <div>
-                <p class="text-xs text-[var(--text-secondary)]">
-                  {{ 'analytics.inventory.col.platform' | translate }}
-                </p>
-                <p class="mt-0.5 text-sm text-[var(--text-primary)]">{{ mpShortLabel(product.sourcePlatform) }}</p>
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.available' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
-                    {{ product.available }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.detail.reserved' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
-                    {{ product.reserved }}
-                  </p>
-                </div>
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.days_of_cover' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
-                    {{ product.daysOfCover ?? '—' }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.risk' | translate }}
-                  </p>
-                  <p class="mt-1">
-                    <dp-stock-risk-badge [risk]="product.stockOutRisk" />
-                  </p>
-                </div>
-              </div>
-              <div>
-                <p class="text-xs text-[var(--text-secondary)]">
-                  {{ 'analytics.inventory.detail.avg_daily_sales' | translate }}
-                </p>
-                <p class="mt-0.5 font-mono text-sm text-[var(--text-primary)]">
-                  {{ product.avgDailySales14d ?? '—' }}
-                </p>
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.detail.cost_price' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-sm text-[var(--text-primary)]">
-                    {{ formatMoney(product.costPrice) }}
-                  </p>
-                </div>
-                <div>
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    {{ 'analytics.inventory.col.frozen_capital' | translate }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-sm font-semibold text-[var(--text-primary)]">
-                    {{ formatMoney(product.frozenCapital) }}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <p class="text-xs text-[var(--text-secondary)]">
-                  {{ 'analytics.inventory.col.replenishment' | translate }}
-                </p>
-                <p class="mt-0.5 font-mono text-sm font-semibold text-[var(--text-primary)]">
-                  {{ product.recommendedReplenishment ?? '—' }}
-                </p>
-              </div>
-
-              <!-- Mini stock history chart -->
-              <div class="border-t border-[var(--border-subtle)] pt-3">
-                <p class="mb-2 text-xs font-medium text-[var(--text-secondary)]">
-                  {{ 'analytics.inventory.detail.dynamics_30d' | translate }}
-                </p>
-                <dp-chart
-                  [options]="detailChartOptions()"
-                  [loading]="detailHistoryQuery.isPending()"
-                  height="140px"
-                />
-              </div>
-            </div>
-          </div>
+        @if (gridRows().length > 0) {
+          <dp-pagination-bar
+            [totalItems]="totalElements()"
+            [pageSize]="listState.pageSize()"
+            [currentPage]="listState.currentPage()"
+            (pageChange)="listState.onPageChanged($event)"
+          />
         }
       </div>
+
+      <!-- Detail panel -->
+      @if (selectedProduct(); as product) {
+        <div
+          class="flex w-[380px] shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-primary)]"
+          style="height: calc(100vh - 330px)"
+        >
+          <div class="flex items-center justify-between border-b border-[var(--border-default)] px-4 py-3">
+            <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+              {{ 'analytics.inventory.detail.title' | translate }}
+            </h3>
+            <button
+              class="cursor-pointer rounded p-1 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              aria-label="Close"
+              (click)="selectedProduct.set(null)"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="flex-1 space-y-4 overflow-auto p-4">
+            <div>
+              <p class="text-xs text-[var(--text-secondary)]">SKU</p>
+              <p class="mt-0.5 font-mono text-sm text-[var(--text-primary)]">{{ product.skuCode }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-[var(--text-secondary)]">
+                {{ 'analytics.inventory.col.platform' | translate }}
+              </p>
+              <p class="mt-0.5 text-sm text-[var(--text-primary)]">{{ mpShortLabel(product.sourcePlatform) }}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-[var(--text-secondary)]">
+                  {{ 'analytics.inventory.col.available' | translate }}
+                </p>
+                <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
+                  {{ product.available }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-[var(--text-secondary)]">
+                  {{ 'analytics.inventory.detail.reserved' | translate }}
+                </p>
+                <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
+                  {{ product.reserved }}
+                </p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-[var(--text-secondary)]">
+                  {{ 'analytics.inventory.col.days_of_cover' | translate }}
+                </p>
+                <p class="mt-0.5 font-mono text-lg font-semibold text-[var(--text-primary)]">
+                  {{ product.daysOfCover ?? '—' }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-[var(--text-secondary)]">
+                  {{ 'analytics.inventory.col.risk' | translate }}
+                </p>
+                <p class="mt-1">
+                  <dp-stock-risk-badge [risk]="product.stockOutRisk" />
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="text-xs text-[var(--text-secondary)]">
+                {{ 'analytics.inventory.detail.avg_daily_sales' | translate }}
+              </p>
+              <p class="mt-0.5 font-mono text-sm text-[var(--text-primary)]">
+                {{ product.avgDailySales14d ?? '—' }}
+              </p>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-[var(--text-secondary)]">
+                  {{ 'analytics.inventory.detail.cost_price' | translate }}
+                </p>
+                <p class="mt-0.5 font-mono text-sm text-[var(--text-primary)]">
+                  {{ fmtMoney(product.costPrice) }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-[var(--text-secondary)]">
+                  {{ 'analytics.inventory.col.frozen_capital' | translate }}
+                </p>
+                <p class="mt-0.5 font-mono text-sm font-semibold text-[var(--text-primary)]">
+                  {{ fmtMoney(product.frozenCapital) }}
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="text-xs text-[var(--text-secondary)]">
+                {{ 'analytics.inventory.col.replenishment' | translate }}
+              </p>
+              <p class="mt-0.5 font-mono text-sm font-semibold text-[var(--text-primary)]">
+                {{ product.recommendedReplenishment ?? '—' }}
+              </p>
+            </div>
+
+            <!-- Mini stock history chart -->
+            <div class="border-t border-[var(--border-subtle)] pt-3">
+              <p class="mb-2 text-xs font-medium text-[var(--text-secondary)]">
+                {{ 'analytics.inventory.detail.dynamics_30d' | translate }}
+              </p>
+              <dp-chart
+                [options]="detailChartOptions()"
+                [loading]="detailHistoryQuery.isPending()"
+                height="140px"
+              />
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
-export class InventoryByProductPageComponent {
+export class InventoryPageComponent {
+
   private readonly analyticsApi = inject(AnalyticsApiService);
   private readonly wsStore = inject(WorkspaceContextStore);
   private readonly t = inject(TranslateService);
 
-  readonly downloadIcon = Download;
+  protected readonly PackageIcon = Package;
+  protected readonly AlertTriangleIcon = AlertTriangle;
+  protected readonly AlertCircleIcon = AlertCircle;
+  protected readonly DollarSignIcon = DollarSign;
+  protected readonly downloadIcon = Download;
   protected readonly mpShortLabel = getMarketplaceShortLabel;
+
   private gridApi: GridApi | null = null;
 
   @HostListener('document:keydown.escape')
@@ -261,6 +306,8 @@ export class InventoryByProductPageComponent {
   }
 
   readonly selectedProduct = signal<InventoryByProduct | null>(null);
+
+  readonly kpiRiskFilter = signal<StockOutRisk | null>(null);
 
   readonly listState = createListPageState({
     pageKey: 'analytics:inventory:by-product',
@@ -303,11 +350,50 @@ export class InventoryByProductPageComponent {
     this.t.onTranslationChange.pipe(startWith(null)),
   );
 
+  // --- Overview query (KPI cards) ---
+
+  readonly overviewQuery = injectQuery(() => ({
+    queryKey: ['analytics', 'inventory-overview', this.wsStore.currentWorkspaceId()],
+    queryFn: () =>
+      lastValueFrom(
+        this.analyticsApi.getInventoryOverview(
+          this.wsStore.currentWorkspaceId()!,
+          {},
+        ),
+      ),
+    enabled: !!this.wsStore.currentWorkspaceId(),
+    staleTime: 30_000,
+  }));
+
+  private readonly overview = computed(() => this.overviewQuery.data() ?? null);
+
+  readonly kpiTotalSkus = computed(() => {
+    const data = this.overview();
+    return data ? data.totalSkus.toLocaleString('ru-RU') : null;
+  });
+
+  readonly kpiCritical = computed(() => {
+    const data = this.overview();
+    return data ? data.criticalCount.toLocaleString('ru-RU') : null;
+  });
+
+  readonly kpiWarning = computed(() => {
+    const data = this.overview();
+    return data ? data.warningCount.toLocaleString('ru-RU') : null;
+  });
+
+  readonly kpiFrozenCapital = computed(() => {
+    const data = this.overview();
+    return data ? formatMoney(data.frozenCapital, 0) : null;
+  });
+
+  // --- Grid filter ---
+
   private readonly filter = computed<AnalyticsFilter>(() => {
     const vals = this.listState.filterValues();
     const f: AnalyticsFilter = {};
-    if (vals['stockOutRisk']?.length === 1) {
-      f.stockOutRisk = vals['stockOutRisk'][0];
+    if (vals['stockOutRisk']?.length) {
+      f.stockOutRisk = vals['stockOutRisk'].join(',');
     }
     if (vals['sourcePlatform']?.length) {
       f.sourcePlatform = vals['sourcePlatform'].join(',');
@@ -315,6 +401,8 @@ export class InventoryByProductPageComponent {
     if (vals['search']) f.search = vals['search'];
     return f;
   });
+
+  // --- Products grid query ---
 
   readonly productsQuery = injectQuery(() => ({
     queryKey: [
@@ -342,6 +430,8 @@ export class InventoryByProductPageComponent {
   readonly gridRows = computed(() => this.productsQuery.data()?.content ?? []);
   readonly totalElements = computed(() => this.productsQuery.data()?.totalElements ?? 0);
 
+  // --- Detail panel history query ---
+
   readonly detailHistoryQuery = injectQuery(() => ({
     queryKey: [
       'analytics', 'inventory-detail-history',
@@ -360,6 +450,8 @@ export class InventoryByProductPageComponent {
     enabled: !!this.wsStore.currentWorkspaceId() && !!this.selectedProduct(),
     staleTime: 60_000,
   }));
+
+  // --- Column definitions ---
 
   readonly columnDefs = computed<ColDef[]>(() => {
     this.translationChange();
@@ -439,6 +531,8 @@ export class InventoryByProductPageComponent {
     ];
   });
 
+  // --- Detail chart ---
+
   readonly detailChartOptions = computed<EChartsOption>(() => {
     const points = this.detailHistoryQuery.data() ?? [];
     const dates = points.map((p) => p.date);
@@ -489,6 +583,8 @@ export class InventoryByProductPageComponent {
     };
   });
 
+  // --- Actions ---
+
   readonly getRowId = (params: any) =>
     `${params.data.productId}-${params.data.warehouseId ?? 0}`;
 
@@ -512,7 +608,23 @@ export class InventoryByProductPageComponent {
     );
   }
 
-  formatMoney(value: number | null): string {
+  toggleRiskFilter(risk: StockOutRisk): void {
+    const current = this.kpiRiskFilter();
+    if (current === risk) {
+      this.kpiRiskFilter.set(null);
+      const vals = { ...this.listState.filterValues() };
+      delete vals['stockOutRisk'];
+      this.listState.onFiltersChanged(vals);
+    } else {
+      this.kpiRiskFilter.set(risk);
+      this.listState.onFiltersChanged({
+        ...this.listState.filterValues(),
+        stockOutRisk: [risk],
+      });
+    }
+  }
+
+  fmtMoney(value: number | null): string {
     return formatMoney(value, 0);
   }
 }

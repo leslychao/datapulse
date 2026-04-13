@@ -10,7 +10,7 @@ export interface AnalyticsFilter {
   search?: string;
   granularity?: Granularity;
   sellerSkuId?: number;
-  stockOutRisk?: StockOutRisk;
+  stockOutRisk?: string;
   productId?: number;
   sourcePlatform?: string;
 }
@@ -285,7 +285,7 @@ export interface DomainImpact {
 export const DOMAIN_IMPACT: Record<string, DomainImpact> = {
   finance: { severity: 'critical', affectedAreasKey: 'analytics.data_quality.impact.finance', reportLink: 'pnl/summary' },
   orders: { severity: 'critical', affectedAreasKey: 'analytics.data_quality.impact.orders', reportLink: 'pnl/summary' },
-  stock: { severity: 'warning', affectedAreasKey: 'analytics.data_quality.impact.stock', reportLink: 'inventory/overview' },
+  stock: { severity: 'warning', affectedAreasKey: 'analytics.data_quality.impact.stock', reportLink: 'inventory' },
   catalog: { severity: 'info', affectedAreasKey: 'analytics.data_quality.impact.catalog', reportLink: null },
   advertising: { severity: 'info', affectedAreasKey: 'analytics.data_quality.impact.advertising', reportLink: 'pnl/summary' },
   returns: { severity: 'warning', affectedAreasKey: 'analytics.data_quality.impact.returns', reportLink: 'returns/overview' },

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -259,8 +260,30 @@ public class InventoryReadRepository {
   private void appendProductFilter(StringBuilder sb,
       MapSqlParameterSource params, InventoryFilter filter) {
     if (filter.stockOutRisk() != null && !filter.stockOutRisk().isBlank()) {
-      sb.append(" AND m.stock_out_risk = :stockOutRisk");
-      params.addValue("stockOutRisk", filter.stockOutRisk().trim().toUpperCase());
+      List<String> risks = Arrays.stream(filter.stockOutRisk().split(","))
+          .map(s -> s.trim().toUpperCase())
+          .filter(s -> !s.isEmpty())
+          .toList();
+      if (risks.size() == 1) {
+        sb.append(" AND m.stock_out_risk = :stockOutRisk");
+        params.addValue("stockOutRisk", risks.get(0));
+      } else if (!risks.isEmpty()) {
+        sb.append(" AND m.stock_out_risk IN (:stockOutRisks)");
+        params.addValue("stockOutRisks", risks);
+      }
+    }
+    if (filter.sourcePlatform() != null && !filter.sourcePlatform().isBlank()) {
+      List<String> platforms = Arrays.stream(filter.sourcePlatform().split(","))
+          .map(s -> s.trim().toUpperCase())
+          .filter(s -> !s.isEmpty())
+          .toList();
+      if (platforms.size() == 1) {
+        sb.append(" AND m.source_platform = :sourcePlatform");
+        params.addValue("sourcePlatform", platforms.get(0));
+      } else if (!platforms.isEmpty()) {
+        sb.append(" AND m.source_platform IN (:sourcePlatforms)");
+        params.addValue("sourcePlatforms", platforms);
+      }
     }
     if (filter.search() != null && !filter.search().isBlank()) {
       sb.append(" AND (p.product_name ILIKE :search OR p.sku_code ILIKE :search)");

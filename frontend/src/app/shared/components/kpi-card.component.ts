@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { LucideAngularModule, LucideIconData, TrendingUp, TrendingDown, Minus } from 'lucide-angular';
 
 type TrendDirection = 'up' | 'down' | 'neutral';
@@ -27,8 +27,18 @@ const ACCENT_STYLES: Record<KpiAccent, { bg: string; fg: string }> = {
   host: { class: 'flex min-w-0 flex-1 basis-[150px]' },
   template: `
     <div
-      class="flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-primary)] px-3.5 py-2.5"
+      class="flex w-full items-center gap-3 rounded-[var(--radius-lg)] border bg-[var(--bg-primary)] px-3.5 py-2.5 transition-colors"
+      [class]="clickable()
+        ? (active()
+            ? 'cursor-pointer border-[var(--accent-primary)] bg-[var(--accent-subtle)]'
+            : 'cursor-pointer border-[var(--border-default)] hover:border-[var(--accent-primary)] hover:bg-[var(--bg-tertiary)]')
+        : 'border-[var(--border-default)]'"
       [title]="tooltip()"
+      (click)="clickable() && clicked.emit()"
+      [attr.role]="clickable() ? 'button' : null"
+      [attr.tabindex]="clickable() ? 0 : null"
+      (keydown.enter)="clickable() && clicked.emit()"
+      (keydown.space)="clickable() && clicked.emit(); $event.preventDefault()"
     >
       @if (icon(); as img) {
         <div
@@ -79,6 +89,9 @@ export class KpiCardComponent {
   readonly icon = input<LucideIconData | null>(null);
   readonly accent = input<KpiAccent>('neutral');
   readonly loading = input(false);
+  readonly clickable = input(false);
+  readonly active = input(false);
+  readonly clicked = output<void>();
 
   protected readonly accentBg = computed(() =>
     ACCENT_STYLES[this.accent()]?.bg ?? ACCENT_STYLES.neutral.bg,
